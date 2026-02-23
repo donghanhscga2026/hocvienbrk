@@ -1,7 +1,5 @@
 
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from './prisma'
 
 /**
  * Lấy ID tiếp theo khả dụng cho User mới.
@@ -12,13 +10,24 @@ const prisma = new PrismaClient()
  * 4. Nếu có -> +1 tiếp. Nếu không -> Trả về.
  */
 export async function getNextAvailableId(): Promise<number> {
-    // Lấy User có ID lớn nhất
-    const maxUser = await prisma.user.findFirst({
+    // 1. Lấy danh sách ID đặc biệt
+    const reservedIds = await prisma.reservedId.findMany({
+        select: { id: true }
+    })
+    const reservedIdList = reservedIds.map(r => r.id)
+
+    // 2. Lấy User có ID lớn nhất mà KHÔNG nằm trong danh sách đặc biệt
+    const maxNormalUser = await prisma.user.findFirst({
+        where: {
+            id: {
+                notIn: reservedIdList
+            }
+        },
         orderBy: { id: 'desc' },
         select: { id: true }
     })
 
-    let nextId = (maxUser?.id || 0) + 1
+    let nextId = (maxNormalUser?.id || 0) + 1
 
     while (true) {
         // Kiểm tra xem nextId có bị reserve không
