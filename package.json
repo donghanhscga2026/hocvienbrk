@@ -15,7 +15,10 @@
     "change-id": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/change-id.ts",
     "add-reserved": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/add-reserved-id.ts",
     "import-reserved": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/import-reserved-list.ts",
-    "make-admin": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/make-admin.ts"
+    "make-admin": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/make-admin.ts",
+    "seed-courses": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/seed-courses.ts",
+    "seed-enrollments": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/seed-enrollments.ts",
+    "import-v3": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} scripts/import-v3-data.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
