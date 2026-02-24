@@ -9,21 +9,22 @@ datasource db {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   name          String?
-  email         String    @unique
+  email         String       @unique
   emailVerified DateTime?
   image         String?
   password      String?
-  phone         String?   @unique
-  role          Role      @default(STUDENT)
+  phone         String?      @unique
+  role          Role         @default(STUDENT)
   referrerId    Int?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   accounts      Account[]
+  enrollments   Enrollment[]
   sessions      Session[]
-  referrer      User?     @relation("ReferrerToReferee", fields: [referrerId], references: [id])
-  referrals     User[]    @relation("ReferrerToReferee")
+  referrer      User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
+  referrals     User[]       @relation("ReferrerToReferee")
 
   @@index([email])
   @@index([phone])
@@ -44,7 +45,7 @@ model Account {
   session_state     String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([provider, providerAccountId])
 }
@@ -55,7 +56,7 @@ model Session {
   expires      DateTime
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
@@ -75,6 +76,51 @@ model ReservedId {
   id        Int      @id
   note      String?
   createdAt DateTime @default(now())
+}
+
+model Course {
+  id            Int          @id @default(autoincrement())
+  id_khoa       String       @unique
+  name_lop      String
+  name_khoa     String?
+  date_join     String?
+  status        Boolean      @default(true)
+  mo_ta_ngan    String?
+  mo_ta_dai     String?
+  link_anh_bia  String?      @map("link_anh_bia_khoa")
+  link_zalo     String?
+  phi_coc       Int          @default(0)
+  stk           String?
+  name_stk      String?
+  bank_stk      String?
+  noidung_stk   String?
+  link_qrcode   String?
+  file_email    String?
+  noidung_email String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  enrollments   Enrollment[]
+}
+
+model Enrollment {
+  id           Int              @id @default(autoincrement())
+  userId       Int
+  courseId     Int
+  status       EnrollmentStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  link_anh_coc String?
+  phi_coc      Int              @default(0)
+  startedAt    DateTime?
+  course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ACTIVE
 }
 
 enum Role {
