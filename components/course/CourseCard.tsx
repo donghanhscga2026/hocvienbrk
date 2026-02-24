@@ -87,13 +87,6 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                    {status === 'ACTIVE' && (
-                        <div className="absolute right-4 top-4">
-                            <span className="rounded-full bg-blue-600/90 backdrop-blur-sm px-3 py-1 text-[10px] font-bold uppercase text-white shadow-sm">
-                                Đã sở hữu
-                            </span>
-                        </div>
-                    )}
                 </div>
 
                 {/* Nội dung */}
@@ -106,11 +99,16 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                         <h3 className="text-xl font-extrabold text-[#111827] leading-tight line-clamp-2">{course.name_lop}</h3>
                     </div>
 
-                    {/* Trạng thái Phí */}
-                    <div className="mb-4">
+                    {/* Trạng thái Phí & Đã sở hữu */}
+                    <div className="mb-4 flex flex-wrap gap-2">
                         <span className={`inline-block rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white shadow-sm ${course.phi_coc === 0 ? 'bg-green-500' : 'bg-[#f59e0b]'}`}>
-                            {course.phi_coc === 0 ? 'Miễn phí' : 'Có phí'}
+                            {course.phi_coc === 0 ? 'Miễn phí' : 'Phí cam kết'}
                         </span>
+                        {status === 'ACTIVE' && (
+                            <span className="inline-block rounded-full bg-blue-600 px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white shadow-sm border border-blue-500">
+                                Đã sở hữu
+                            </span>
+                        )}
                     </div>
 
                     {/* Mô tả */}
