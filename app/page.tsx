@@ -13,26 +13,31 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
-      <Header />
+      <Header session={session} />
 
       {/* Hero Section */}
-      <section className="relative flex min-h-[400px] flex-col items-center justify-center bg-gradient-to-br from-[#7c3aed] to-[#5b21b6] px-4 pt-16 text-center text-white">
-        <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <h1 className="mb-4 text-4xl font-extrabold lg:text-5xl">
-            Học viện BRK - Ngân hàng phước báu
+      <section className="relative flex min-h-[320px] sm:min-h-[440px] flex-col items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-black px-4 pt-20 pb-12 text-center text-white overflow-hidden">
+        {/* Subtle Decorative Elements */}
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-yellow-400/5 blur-[100px] rounded-full"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-yellow-400/5 blur-[100px] rounded-full"></div>
+
+        <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
+          <h1 className="mb-4 flex flex-col gap-0 sm:gap-0 font-black tracking-tighter">
+            <span className="text-3xl sm:text-5xl lg:text-6xl uppercase text-white drop-shadow-2xl opacity-90 pb-2">HỌC VIỆN BRK</span>
+            <span className="text-glow-3d text-2xl sm:text-4xl lg:text-5xl uppercase drop-shadow-2xl leading-tight">NGÂN HÀNG PHƯỚC BÁU</span>
           </h1>
-          <p className="mb-8 text-xl font-medium text-purple-100 italic">
+          <p className="mb-10 text-lg sm:text-2xl font-medium text-gray-400 italic">
             Nơi khơi nguồn tri thức, xây dựng tương lai
           </p>
-          <div className="mx-auto h-1 w-24 rounded-full bg-white/30"></div>
+          <div className="mx-auto h-1.5 w-32 rounded-full bg-gradient-to-r from-transparent via-yellow-400/50 to-transparent"></div>
         </div>
       </section>
 
       {/* Intro Message */}
-      <section className="container mx-auto max-w-5xl px-4 py-12 text-center">
-        <div className="rounded-3xl bg-white p-8 shadow-sm border border-purple-50">
-          <h2 className="mb-4 text-2xl font-bold text-[#7c3aed]">Xin chào Học viên thân mến!</h2>
-          <p className="mx-auto max-w-3xl leading-relaxed text-gray-700">
+      <section className="container mx-auto max-w-5xl px-4 py-8 sm:py-12 text-center">
+        <div className="rounded-2xl sm:rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-purple-50">
+          <h2 className="mb-4 text-xl sm:text-2xl font-bold text-[#7c3aed]">Xin chào Học viên thân mến!</h2>
+          <p className="mx-auto max-w-3xl text-sm sm:text-base leading-relaxed text-gray-700">
             Cổng học viện này là nơi tập hợp những tri thức thực chiến đỉnh cao về kinh doanh online,
             nhân hiệu và A.I. Chúng tôi ở đây để đồng hành cùng bạn trên hành trình lan tỏa giá trị
             và kiến tạo sự thịnh vượng bền vững từ gốc.

@@ -76,54 +76,57 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
 
     return (
         <>
-            <div className="group overflow-hidden rounded-3xl bg-white shadow-md transition-all hover:shadow-xl border border-gray-100 flex flex-col h-full">
-                {/* Ảnh bìa */}
-                <div className="relative h-64 w-full overflow-hidden shrink-0">
+            <div className="group overflow-hidden rounded-2xl bg-white shadow-lg transition-all hover:shadow-2xl border border-gray-100 flex flex-col h-full">
+                {/* Ảnh bìa - Tối ưu tỉ lệ để không cắt nội dung */}
+                <div className="relative h-48 sm:h-56 w-full overflow-hidden shrink-0 bg-[#f8fafc]">
                     <Image
                         src={course.link_anh_bia || 'https://i.postimg.cc/PJPkm7vB/1.jpg'}
                         alt={course.name_lop}
                         fill
                         priority={priority}
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="object-contain p-1 transition-transform duration-500 group-hover:scale-105"
                     />
                 </div>
 
                 {/* Nội dung */}
-                <div className="p-6 flex flex-col flex-grow">
-                    {/* Header: Icon + Title */}
-                    <div className="mb-3 flex items-start gap-3">
-                        <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                        </div>
-                        <h3 className="text-xl font-extrabold text-[#111827] leading-tight line-clamp-2">{course.name_lop}</h3>
+                <div className="p-5 flex flex-col flex-grow">
+                    {/* Header: Icon + Title - Căn chỉnh hoàn hảo */}
+                    <div className="mb-4 flex items-center gap-2.5">
+                        <span className="text-2xl sm:text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
+                        <h3
+                            className="text-base sm:text-lg font-black text-black leading-tight truncate flex-1"
+                            style={{ fontFamily: 'var(--font-inter), sans-serif' }}
+                        >
+                            {course.name_lop}
+                        </h3>
                     </div>
 
                     {/* Trạng thái Phí & Đã sở hữu */}
                     <div className="mb-4 flex flex-wrap gap-2">
-                        <span className={`inline-block rounded-full px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white shadow-sm ${course.phi_coc === 0 ? 'bg-green-500' : 'bg-[#f59e0b]'}`}>
+                        <span className={`inline-block rounded-full px-4 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-sm ${course.phi_coc === 0 ? 'bg-yellow-400 text-gray-900 font-extrabold' : 'bg-red-600 text-white'}`}>
                             {course.phi_coc === 0 ? 'Miễn phí' : 'Phí cam kết'}
                         </span>
                         {status === 'ACTIVE' && (
-                            <span className="inline-block rounded-full bg-blue-600 px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-white shadow-sm border border-blue-500">
-                                Đã sở hữu
+                            <span className="inline-block rounded-full bg-sky-500 px-4 py-1 sm:px-4 sm:py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white shadow-sm border border-sky-400">
+                                Đã kích hoạt
                             </span>
                         )}
                     </div>
 
                     {/* Mô tả */}
-                    <p className="mb-8 flex-grow text-[15px] font-medium text-gray-500 leading-relaxed line-clamp-4"
+                    <p className="mb-6 flex-grow text-[14px] font-medium text-gray-500 leading-relaxed line-clamp-4"
                         dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }} />
 
                     {/* Button */}
                     <button
                         onClick={handleAction}
                         disabled={loading}
-                        className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-4 text-base font-black text-white shadow-lg transition-all active:scale-[0.97] ${loading ? 'bg-gray-400 cursor-not-allowed' :
-                            status === 'ACTIVE' ? 'bg-[#7c3aed] hover:bg-purple-700 hover:shadow-purple-200' :
+                        className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-3.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97] ${loading ? 'bg-gray-400 text-white cursor-not-allowed' :
+                            status === 'ACTIVE' ? 'bg-green-600 text-white hover:bg-green-700 hover:shadow-green-200' :
                                 course.phi_coc === 0
-                                    ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200'
-                                    : 'bg-[#f59e0b] hover:bg-orange-600 hover:shadow-orange-200'
+                                    ? 'bg-sky-500 text-white hover:bg-sky-600 hover:shadow-sky-200'
+                                    : 'bg-sky-500 text-white hover:bg-sky-600 hover:shadow-sky-200'
                             }`}
                     >
                         {loading ? (
@@ -139,7 +142,7 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                                 <span>{status === 'ACTIVE' ? '🚀' : '⚡'}</span>
                                 <span>
                                     {status === 'ACTIVE' ? 'Vào học ngay' :
-                                        course.phi_coc === 0 ? 'Đăng ký miễn phí' : 'Kích hoạt ngay'}
+                                        course.phi_coc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
                                 </span>
                                 <span>{status === 'ACTIVE' ? '' : '🚀'}</span>
                             </>
