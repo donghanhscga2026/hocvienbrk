@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { Be_Vietnam_Pro } from "next/font/google";
+import { Be_Vietnam_Pro, Inter } from "next/font/google";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
   subsets: ["vietnamese", "latin"],
   variable: "--font-be-vietnam-pro",
+});
+
+const inter = Inter({
+  subsets: ["vietnamese", "latin"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -21,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body
-        className={`${beVietnamPro.variable} antialiased`}
+        className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
       >
         {children}
       </body>
