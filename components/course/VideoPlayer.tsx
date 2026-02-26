@@ -6,6 +6,7 @@ import { RotateCcw, CheckCircle } from 'lucide-react'
 
 interface VideoPlayerProps {
     videoUrl: string | null
+    playerId?: string           // DOM id duy nhất để tránh xung đột desktop/mobile
     initialMaxTime?: number  // Thời điểm xem dở từ DB
     initialPercent?: number   // % đã xem từ DB (nếu có)
     onProgress: (maxTime: number, duration: number) => void
@@ -18,7 +19,7 @@ function extractVideoId(url: string) {
     return match && match[2].length === 11 ? match[2] : null
 }
 
-export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPercent, onProgress, onPercentChange }: VideoPlayerProps) {
+export default function VideoPlayer({ videoUrl, playerId = 'yt-player', initialMaxTime = 0, initialPercent, onProgress, onPercentChange }: VideoPlayerProps) {
     const playerRef = useRef<any>(null)
     const saveIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const [isReady, setIsReady] = useState(false)
@@ -58,7 +59,7 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPerce
                 playerRef.current.destroy()
             }
 
-            playerRef.current = new (window as any).YT.Player('yt-player', {
+            playerRef.current = new (window as any).YT.Player(playerId, {
                 height: '100%',
                 width: '100%',
                 videoId,
@@ -69,12 +70,13 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPerce
                     start: Math.floor(initialMaxTime),
                     playsinline: 1,
                     enablejsapi: 1,
+                    fs: 1,          // Cho phép fullscreen trên mobile
                 },
                 events: {
                     onReady: (e: any) => {
                         setIsReady(true)
                         const duration = e.target.getDuration()
-                        
+
                         // Tính % ban đầu: ưu tiên initialPercent, sau đó tính từ initialMaxTime/duration
                         let pct = 0
                         if (initialPercent !== undefined) {
@@ -82,7 +84,7 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPerce
                         } else if (initialMaxTime > 0 && duration > 0) {
                             pct = (initialMaxTime / duration) * 100
                         }
-                        
+
                         // Nếu đã xem hết trước đó → hiện màn hình hoàn thành
                         if (pct >= 99.9) {
                             setIsCompleted(true)
@@ -90,7 +92,7 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPerce
                         } else {
                             onPercentChange(Math.round(pct))
                         }
-                        
+
                         // Luôn bắt đầu tracking để cập nhật % khi user xem tiếp
                         startTracking()
                     },
@@ -120,10 +122,18 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPerce
         if ((window as any).YT?.Player) {
             initPlayer()
         } else {
-            const tag = document.createElement('script')
-            tag.src = 'https://www.youtube.com/iframe_api'
-                ; (window as any).onYouTubeIframeAPIReady = initPlayer
-            document.head.appendChild(tag)
+            // Chain callbacks thay vì ghi đè — tránh xung đột khi 2 VideoPlayer mount cùng lúc
+            const prev = (window as any).onYouTubeIframeAPIReady
+                ; (window as any).onYouTubeIframeAPIReady = () => {
+                    if (typeof prev === 'function') prev()
+                    initPlayer()
+                }
+            // Chỉ thêm script tag một lần duy nhất vào DOM
+            if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+                const tag = document.createElement('script')
+                tag.src = 'https://www.youtube.com/iframe_api'
+                document.head.appendChild(tag)
+            }
         }
 
         return () => {
@@ -164,7 +174,7 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPerce
         <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-zinc-800 shadow-2xl">
             {/* Player ẩn đi khi hiện màn hình hoàn thành */}
             <div className={isCompleted ? 'hidden' : 'w-full h-full relative'}>
-                <div id="yt-player" className="w-full h-full absolute inset-0" />
+                <div id={playerId} className="w-full h-full absolute inset-0" />
             </div>
 
             {/* Màn hình "Đã xem hết" */}

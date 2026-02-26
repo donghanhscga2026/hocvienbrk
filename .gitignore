@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Windows reserved device name (causes git add to fail)
+nul
+
+# Local backups
+/backups/
