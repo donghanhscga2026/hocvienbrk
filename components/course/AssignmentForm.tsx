@@ -105,6 +105,11 @@ export default function AssignmentForm({
 
     const deadline = calcDeadline(startedAt, lessonOrder)
 
+    const hasExistingData = initialData?.status != null
+    const isCompleted = initialData?.status === 'COMPLETED'
+    const existingTotalScore = initialData?.totalScore ?? 0
+    const existingScores = initialData?.scores ?? {}
+
     // ── Tính điểm realtime ──────────────────────────────────────────────────
     const vidScore = useMemo(() => {
         if (videoPercent >= 95) return 2
@@ -119,20 +124,24 @@ export default function AssignmentForm({
     }, [reflection])
 
     const validLinks = useMemo(() => links.filter(l => l.trim().length > 0), [links])
-    const pracScore = Math.min(validLinks.length, 3)
+    const pracScore = useMemo(() => Math.min(validLinks.length, 3), [validLinks.length])
 
-    const supportScore = supports.filter(Boolean).length
+    const supportScore = useMemo(() => supports.filter(Boolean).length, [supports])
 
-    // Timing: dự báo dựa vào thời điểm hiện tại so với deadline hôm nay
+    // Timing: dùng điểm đã lưu nếu bài đã hoàn thành, không thì tính theo thời gian hiện tại
     const timingScore = useMemo(() => {
+        if (isCompleted) return existingScores.timing ?? 0
         if (!deadline) return 0
         const now = new Date()
         const dl = new Date(deadline)
         dl.setHours(23, 59, 59, 999)
         return now <= dl ? 1 : -1
-    }, [deadline])
+    }, [deadline, isCompleted, existingScores.timing])
 
-    const total = Math.max(0, vidScore + refScore + pracScore + supportScore + timingScore)
+    // Nếu bài đã hoàn thành thì hiển thị điểm đã lưu, không thì tính realtime
+    const total = isCompleted 
+        ? existingTotalScore 
+        : Math.max(0, vidScore + refScore + pracScore + supportScore + timingScore)
 
     const handleSubmit = async () => {
         if (!startedAt) { alert("Bạn chưa xác nhận ngày bắt đầu lộ trình!"); return }
@@ -151,7 +160,9 @@ export default function AssignmentForm({
             {/* ── Header ── */}
             <div className="sticky top-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-3">
                 <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-bold text-gray-900 text-base">🛒 Ghi nhận kết quả</h3>
+                    <h3 className="font-bold text-gray-900 text-base">
+                        {isCompleted ? '✏️ Cập nhật kết quả' : '🛒 Ghi nhận kết quả'}
+                    </h3>
                     <button
                         onClick={() => setShowRules(true)}
                         className="flex items-center gap-1 text-xs font-semibold text-orange-600 border border-orange-400 rounded-full px-3 py-1 hover:bg-orange-50 transition"
@@ -178,10 +189,13 @@ export default function AssignmentForm({
                 >
                     {loading
                         ? <Loader2 className="w-5 h-5 animate-spin" />
-                        : <><Send className="w-4 h-4" /> GHI NHẬN KẾT QUẢ</>
+                        : <><Send className="w-4 h-4" /> {isCompleted ? 'CẬP NHẬT GHI NHẬN' : 'GHI NHẬN KẾT QUẢ'}</>
                     }
                 </button>
-                <p className="text-center text-[10px] text-gray-400 mt-1">* Điểm &gt;= 5: Hoàn thành</p>
+                {isCompleted && (
+                    <p className="text-center text-[10px] text-gray-400 mt-1">Điểm cũ: {existingTotalScore}/10</p>
+                )}
+                {!isCompleted && <p className="text-center text-[10px] text-gray-400 mt-1">* Điểm &gt;= 5: Hoàn thành</p>}
             </div>
 
             {/* ── 5 Sections ── */}

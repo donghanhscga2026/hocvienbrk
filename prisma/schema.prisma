@@ -145,6 +145,7 @@ model LessonProgress {
   assignment   Json?      // {reflection: "", links: [], supports: []}
   status       String     @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
   maxTime      Float      @default(0)
+  duration     Float      @default(0)
   submittedAt  DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt

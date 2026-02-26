@@ -7,6 +7,7 @@ import { RotateCcw, CheckCircle } from 'lucide-react'
 interface VideoPlayerProps {
     videoUrl: string | null
     initialMaxTime?: number  // Thời điểm xem dở từ DB
+    initialPercent?: number   // % đã xem từ DB (nếu có)
     onProgress: (maxTime: number, duration: number) => void
     onPercentChange: (percent: number) => void  // Cho AssignmentForm biết % realtime
 }
@@ -17,18 +18,40 @@ function extractVideoId(url: string) {
     return match && match[2].length === 11 ? match[2] : null
 }
 
-export default function VideoPlayer({ videoUrl, initialMaxTime = 0, onProgress, onPercentChange }: VideoPlayerProps) {
+export default function VideoPlayer({ videoUrl, initialMaxTime = 0, initialPercent, onProgress, onPercentChange }: VideoPlayerProps) {
     const playerRef = useRef<any>(null)
     const saveIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const [isReady, setIsReady] = useState(false)
     const [isCompleted, setIsCompleted] = useState(false) // Video đã xem hết 100%
-    const [isDone100, setIsDone100] = useState(false)     // Đã đạt >= 95%, dùng để không reset
 
     const videoId = videoUrl ? extractVideoId(videoUrl) : null
+
+    // Track video progress
+    const trackProgress = () => {
+        const player = playerRef.current
+        if (!player?.getCurrentTime || !player?.getDuration) return
+        const cur = player.getCurrentTime()
+        const dur = player.getDuration()
+        if (dur > 0) {
+            const pct = cur / dur
+            onPercentChange(Math.round(pct * 100))
+            onProgress(cur, dur)
+            if (pct >= 0.999 && !isCompleted) {
+                setIsCompleted(true)
+            }
+        }
+    }
 
     // Nạp YouTube API
     useEffect(() => {
         if (!videoId) return
+
+        // Handle postMessage errors from YouTube
+        const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== 'https://www.youtube.com') return
+            // Silently ignore errors
+        }
+        window.addEventListener('message', handleMessage)
 
         const initPlayer = () => {
             if (playerRef.current) {
@@ -40,28 +63,40 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, onProgress, 
                 width: '100%',
                 videoId,
                 playerVars: {
-                    autoplay: 1,  // Tự phát từ vị trí đã lưu (hoặc từ đầu nếu bài mới)
+                    autoplay: 1,
                     modestbranding: 1,
                     rel: 0,
                     start: Math.floor(initialMaxTime),
+                    playsinline: 1,
+                    enablejsapi: 1,
                 },
                 events: {
                     onReady: (e: any) => {
                         setIsReady(true)
                         const duration = e.target.getDuration()
-                        const pct = duration > 0 ? initialMaxTime / duration : 0
-                        // Nếu đã xem hết trước đó → hiện màn hình hoàn thành, báo 100% cho parent
-                        if (pct >= 0.999) {
-                            setIsCompleted(true)
-                            setIsDone100(true)
-                            onPercentChange(100) // ← fix: đồng bộ lên CoursePlayer
-                        } else {
-                            onPercentChange(Math.round(pct * 100))
+                        
+                        // Tính % ban đầu: ưu tiên initialPercent, sau đó tính từ initialMaxTime/duration
+                        let pct = 0
+                        if (initialPercent !== undefined) {
+                            pct = initialPercent
+                        } else if (initialMaxTime > 0 && duration > 0) {
+                            pct = (initialMaxTime / duration) * 100
                         }
+                        
+                        // Nếu đã xem hết trước đó → hiện màn hình hoàn thành
+                        if (pct >= 99.9) {
+                            setIsCompleted(true)
+                            onPercentChange(100)
+                        } else {
+                            onPercentChange(Math.round(pct))
+                        }
+                        
+                        // Luôn bắt đầu tracking để cập nhật % khi user xem tiếp
+                        startTracking()
                     },
                     onStateChange: (e: any) => {
                         const YT = (window as any).YT.PlayerState
-                        if (e.data === YT.PLAYING) {
+                        if (e.data === YT.PLAYING || e.data === YT.BUFFERING) {
                             startTracking()
                         } else {
                             stopTracking()
@@ -72,9 +107,11 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, onProgress, 
                                 onProgress(dur, dur) // Đánh dấu 100%
                                 onPercentChange(100)
                                 setIsCompleted(true)
-                                setIsDone100(true)
                             }
                         }
+                    },
+                    onError: (e: any) => {
+                        console.error('YouTube player error:', e)
                     }
                 }
             })
@@ -90,6 +127,7 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, onProgress, 
         }
 
         return () => {
+            window.removeEventListener('message', handleMessage)
             stopTracking()
             playerRef.current?.destroy?.()
             playerRef.current = null
@@ -97,22 +135,8 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, onProgress, 
     }, [videoId]) // Re-mount khi đổi bài
 
     const startTracking = () => {
-        stopTracking()
-        saveIntervalRef.current = setInterval(() => {
-            const player = playerRef.current
-            if (!player?.getCurrentTime || !player?.getDuration) return
-            const cur = player.getCurrentTime()
-            const dur = player.getDuration()
-            if (dur > 0) {
-                const pct = cur / dur
-                onPercentChange(Math.round(pct * 100))
-                onProgress(cur, dur)
-                if (pct >= 0.999 && !isDone100) {
-                    setIsCompleted(true)
-                    setIsDone100(true)
-                }
-            }
-        }, 2000) // Cập nhật mỗi 2 giây
+        if (saveIntervalRef.current) return // Đã đang chạy
+        saveIntervalRef.current = setInterval(trackProgress, 1000)
     }
 
     const stopTracking = () => {
@@ -139,8 +163,8 @@ export default function VideoPlayer({ videoUrl, initialMaxTime = 0, onProgress, 
     return (
         <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-zinc-800 shadow-2xl">
             {/* Player ẩn đi khi hiện màn hình hoàn thành */}
-            <div className={isCompleted ? 'hidden' : 'w-full h-full'}>
-                <div id="yt-player" className="w-full h-full" />
+            <div className={isCompleted ? 'hidden' : 'w-full h-full relative'}>
+                <div id="yt-player" className="w-full h-full absolute inset-0" />
             </div>
 
             {/* Màn hình "Đã xem hết" */}
