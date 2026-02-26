@@ -173,12 +173,14 @@ export async function saveVideoProgressAction({
         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
         update: {
             maxTime,
+            duration,
             scores: { ...existingScores, vid: vidScore }
         },
         create: {
             enrollmentId,
             lessonId,
             maxTime,
+            duration,
             scores: { vid: vidScore }
         }
     })

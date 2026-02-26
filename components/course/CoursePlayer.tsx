@@ -11,7 +11,7 @@ import {
     saveVideoProgressAction,
     submitAssignmentAction
 } from "@/app/actions/course-actions"
-import { ArrowLeft, ListVideo, Play, ClipboardList } from "lucide-react"
+import { ArrowLeft, ListVideo, Play } from "lucide-react"
 import Link from "next/link"
 
 interface CoursePlayerProps {
@@ -19,7 +19,7 @@ interface CoursePlayerProps {
     enrollment: any
 }
 
-type MobileTab = 'lessons' | 'video' | 'assignment'
+type MobileTab = 'lessons' | 'learn'
 
 export default function CoursePlayer({ course, enrollment: initialEnrollment }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
@@ -31,7 +31,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
         return sorted[0]?.lessonId || course.lessons[0]?.id
     })
     const [videoPercent, setVideoPercent] = useState(0)
-    const [mobileTab, setMobileTab] = useState<MobileTab>('video')
+    const [mobileTab, setMobileTab] = useState<MobileTab>('learn')
     const [progressMap, setProgressMap] = useState<Record<string, any>>(() =>
         enrollment.lessonProgress.reduce((acc: any, p: any) => {
             acc[p.lessonId] = p
@@ -41,11 +41,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
+    const hasDuration = currentProgress?.duration && currentProgress.duration > 0
 
     const handleLessonSelect = (lessonId: string) => {
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
-        setMobileTab('video') // Chuyển tab sang video khi chọn bài
+        setMobileTab('learn') // Chuyển tab sang học khi chọn bài
     }
 
     const handleConfirmStartDate = async (date: Date) => {
@@ -89,7 +90,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
             alert(msg)
             setCurrentLessonId(nextId)
             setVideoPercent(0)
-            setMobileTab('video')
+            setMobileTab('learn')
         } else {
             alert(`📊 Đã ghi nhận! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
         }
@@ -139,6 +140,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                         key={currentLessonId}
                         videoUrl={currentLesson?.videoUrl || null}
                         initialMaxTime={currentProgress?.maxTime || 0}
+                        initialPercent={hasDuration && currentProgress?.maxTime ? (currentProgress.maxTime / currentProgress.duration) * 100 : undefined}
                         onProgress={handleVideoProgress}
                         onPercentChange={setVideoPercent}
                     />
@@ -163,7 +165,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
             </div>
 
             {/* ── Mobile Layout (tabs) ── */}
-            <div className="flex md:hidden flex-1 flex-col min-h-0 text-zinc-300">
+            <div className="flex md:hidden flex-1 flex-col min-h-0 text-zinc-300 overflow-hidden">
                 <div className="flex-1 overflow-y-auto bg-zinc-950">
                     {mobileTab === 'lessons' && (
                         <LessonSidebar
@@ -175,33 +177,36 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                             onResetStartDate={handleResetStartDate}
                         />
                     )}
-                    {mobileTab === 'video' && (
-                        <div className="p-3 space-y-3">
-                            <VideoPlayer
-                                key={currentLessonId}
-                                videoUrl={currentLesson?.videoUrl || null}
-                                initialMaxTime={currentProgress?.maxTime || 0}
-                                onProgress={handleVideoProgress}
-                                onPercentChange={setVideoPercent}
-                            />
-                            <div className="px-1">
+                    {mobileTab === 'learn' && (
+                        <div className="flex flex-col min-h-full">
+                            <div className="w-full">
+                                <VideoPlayer
+                                    key={currentLessonId}
+                                    videoUrl={currentLesson?.videoUrl || null}
+                                    initialMaxTime={currentProgress?.maxTime || 0}
+                                    initialPercent={hasDuration && currentProgress?.maxTime ? (currentProgress.maxTime / currentProgress.duration) * 100 : undefined}
+                                    onProgress={handleVideoProgress}
+                                    onPercentChange={setVideoPercent}
+                                />
+                            </div>
+                            <div className="p-3">
                                 <h2 className="text-base font-bold text-white">{currentLesson?.title}</h2>
                                 {currentLesson?.content && (
                                     <p className="text-zinc-400 mt-1 text-sm leading-relaxed">{currentLesson.content}</p>
                                 )}
                             </div>
+                            <div className="flex-1">
+                                <AssignmentForm
+                                    key={currentLessonId}
+                                    lessonId={currentLessonId!}
+                                    lessonOrder={currentLesson?.order ?? 1}
+                                    startedAt={startedAt}
+                                    videoPercent={videoPercent}
+                                    onSubmit={handleSubmitAssignment}
+                                    initialData={currentProgress}
+                                />
+                            </div>
                         </div>
-                    )}
-                    {mobileTab === 'assignment' && (
-                        <AssignmentForm
-                            key={currentLessonId}
-                            lessonId={currentLessonId!}
-                            lessonOrder={currentLesson?.order ?? 1}
-                            startedAt={startedAt}
-                            videoPercent={videoPercent}
-                            onSubmit={handleSubmitAssignment}
-                            initialData={currentProgress}
-                        />
                     )}
                 </div>
 
@@ -209,8 +214,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                 <nav className="shrink-0 h-16 bg-zinc-900 border-t border-zinc-800 flex items-stretch">
                     {([
                         { id: 'lessons', icon: ListVideo, label: 'Bài học' },
-                        { id: 'video', icon: Play, label: 'Video' },
-                        { id: 'assignment', icon: ClipboardList, label: 'Nộp bài' },
+                        { id: 'learn', icon: Play, label: 'Học' },
                     ] as { id: MobileTab; icon: any; label: string }[]).map(tab => (
                         <button
                             key={tab.id}
