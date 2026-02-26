@@ -99,7 +99,23 @@ model Course {
   noidung_email String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+  type          CourseType   @default(NORMAL)
+  lessons       Lesson[]
   enrollments   Enrollment[]
+}
+
+model Lesson {
+  id               String           @id @default(cuid())
+  courseId         Int
+  title            String
+  videoUrl         String?
+  content          String?
+  order            Int
+  isDailyChallenge Boolean          @default(false)
+  course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress         LessonProgress[]
+
+  @@unique([courseId, order])
 }
 
 model Enrollment {
@@ -112,10 +128,30 @@ model Enrollment {
   link_anh_coc String?
   phi_coc      Int              @default(0)
   startedAt    DateTime?
+  challengeDays Int?
   course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonProgress LessonProgress[]
 
   @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id           Int        @id @default(autoincrement())
+  enrollmentId Int
+  lessonId     String
+  scores       Json?      // {vid: 2, ref: 2, prac: 3, support: 2, timing: 1/-1}
+  totalScore   Int        @default(0)
+  assignment   Json?      // {reflection: "", links: [], supports: []}
+  status       String     @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+  maxTime      Float      @default(0)
+  submittedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
 }
 
 enum EnrollmentStatus {
@@ -128,4 +164,9 @@ enum Role {
   STUDENT
   INSTRUCTOR
   AFFILIATE
+}
+
+enum CourseType {
+  NORMAL
+  CHALLENGE
 }

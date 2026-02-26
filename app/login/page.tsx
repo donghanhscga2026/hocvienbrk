@@ -49,89 +49,68 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-            <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg">
-                <div className="text-center">
-                    <h2 className="text-3xl font-bold tracking-tight text-gray-900">Welcome back</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Sign in to your account to continue
-                    </p>
+        <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black flex items-center justify-center p-4">
+            <div className="w-full max-w-sm">
+                {/* Logo */}
+                <div className="text-center mb-8">
+                    <h1 className="text-2xl font-black text-white tracking-tight">HỌC VIỆN BRK</h1>
+                    <p className="text-zinc-400 text-sm mt-1">Đăng nhập để tiếp tục hành trình</p>
                 </div>
 
-                <div className="space-y-4">
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 space-y-5 shadow-2xl">
+                    {/* Google */}
                     <button
                         onClick={handleGoogleSignIn}
                         disabled={isLoading}
-                        className="flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-600 bg-white/5 px-4 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50"
                     >
-                        {isLoading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
-                            </svg>
-                        )}
-                        Sign in with Google
+                        <svg className="h-4 w-4 shrink-0" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z" /></svg>
+                        Đăng nhập bằng Google
                     </button>
 
                     <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-300"></div>
-                        </div>
-                        <div className="relative flex justify-center text-sm">
-                            <span className="bg-white px-2 text-gray-500">Or continue with</span>
-                        </div>
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-zinc-700" /></div>
+                        <div className="relative flex justify-center text-xs"><span className="bg-transparent px-2 text-zinc-500">hoặc dùng tài khoản</span></div>
                     </div>
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         {error && (
-                            <div className="rounded-md bg-red-50 p-3 text-sm text-red-500">
-                                {error}
-                            </div>
+                            <div className="rounded-lg bg-red-900/30 border border-red-700/50 p-3 text-sm text-red-400">{error}</div>
                         )}
-
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Email / Phone / Student ID
-                            </label>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Email / SĐT / Mã học viên</label>
                             <input
-                                {...register("identifier", { required: "This field is required" })}
+                                {...register("identifier", { required: "Vui lòng nhập thông tin" })}
                                 type="text"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                autoComplete="username"
+                                className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 text-white text-sm placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                placeholder="Nhập email hoặc mã học viên"
                             />
-                            {errors.identifier && (
-                                <p className="mt-1 text-xs text-red-500">{errors.identifier.message}</p>
-                            )}
+                            {errors.identifier && <p className="mt-1 text-xs text-red-400">{errors.identifier.message}</p>}
                         </div>
-
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Password
-                            </label>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Mật khẩu</label>
                             <input
-                                {...register("password", { required: "Password is required" })}
+                                {...register("password", { required: "Vui lòng nhập mật khẩu" })}
                                 type="password"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                autoComplete="current-password"
+                                className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 text-white text-sm placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                placeholder="••••••••"
                             />
-                            {errors.password && (
-                                <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
-                            )}
+                            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
                         </div>
-
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                            className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 px-4 py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
-                            {isLoading ? <Loader2 className="animate-spin" /> : "Sign in"}
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Đăng nhập'}
                         </button>
                     </form>
 
-                    <p className="text-center text-sm text-gray-600">
-                        Don't have an account?{" "}
-                        <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-                            Sign up
-                        </Link>
+                    <p className="text-center text-sm text-zinc-500">
+                        Chưa có tài khoản?{' '}
+                        <Link href="/register" className="font-semibold text-orange-400 hover:text-orange-300">Đăng ký ngay</Link>
                     </p>
                 </div>
             </div>
