@@ -217,7 +217,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
 
                                 {/* Tab: Ghi nhận */}
                                 {mobileTab === 'learn' && (
-                                    <div className="flex flex-col h-full">
+                                    <div className="flex flex-col h-full min-h-0">
                                         {/* Tiêu đề + preview nội dung — cố định */}
                                         <div className="shrink-0 px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
                                             <p className="text-xs font-bold text-white leading-snug">
@@ -239,7 +239,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                                         </div>
 
                                         {/* AssignmentForm — có sticky header + cuộn nội bộ */}
-                                        <div className="flex-1 min-h-0 overflow-hidden">
+                                        <div className="flex-1 h-full min-h-0">
                                             <AssignmentForm
                                                 key={currentLessonId}
                                                 lessonId={currentLessonId!}

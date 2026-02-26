@@ -150,18 +150,17 @@ export default function AssignmentForm({
     }
 
     return (
-        <div className="flex flex-col h-full bg-[#FFFDE7] overflow-y-auto">
+        <div className="flex flex-col h-full min-h-0 bg-[#FFFDE7]">
             {showRules && <RulesModal onClose={() => setShowRules(false)} />}
 
             {/* ── Header sticky ── */}
             <div className="sticky top-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-2">
-                {/* Row 1: Ngày hoàn thành + Tổng điểm */}
+                {/* Row 1: Ngày hoàn thành + Tổng */}
                 <div className="flex items-center justify-between">
                     <p className="text-[11px] text-gray-500 leading-tight">
-                        Hoàn thành trước 23:59 ngày <span className="font-semibold text-gray-700">{formatDate(deadline)}</span> nhé
-                        {isCompleted && <span className="ml-1 text-gray-400">(Cũ: {existingTotalScore}/10)</span>}
+                        Hoàn thành trước 23:59 ngày <span className="font-semibold text-gray-700">{formatDate(deadline)}</span>
                     </p>
-                    <span className="text-sm font-black text-orange-500">Tổng điểm: {total}/10</span>
+                    <span className="text-sm font-black text-orange-500">Tổng: {total}/10</span>
                 </div>
 
                 {/* Row 2: Nút GHI NHẬN + Quy tắc (icon nhỏ kế bên) */}
@@ -187,11 +186,11 @@ export default function AssignmentForm({
             </div>
 
             {/* ── 5 Sections (cuộn) ── */}
-            <div className="flex flex-col gap-2 p-3">
+            <div className="h-full overflow-y-auto flex flex-col gap-2 p-3">
 
                 {/* 1. Video */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={1} label="Học theo Video (2đ)" max={2} current={vidScore} />
+                    <SectionHead num={1} label="Mở TRÍ = học theo Video (2đ)" max={2} current={vidScore} />
                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
                             className="h-full bg-orange-400 transition-all duration-500 rounded-full"
@@ -203,7 +202,7 @@ export default function AssignmentForm({
 
                 {/* 2. Tâm đắc ngộ */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={2} label="Bài học Tâm đắc Ngộ (2đ)" max={2} current={refScore} />
+                    <SectionHead num={2} label="Bồi NHÂN = Bài học Tâm đắc Ngộ (2đ)" max={2} current={refScore} />
                     <textarea
                         value={reflection}
                         onChange={e => setReflection(e.target.value)}
@@ -211,12 +210,12 @@ export default function AssignmentForm({
                         rows={3}
                         className="w-full text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300"
                     />
-                    <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 50 ? '✓ Sâu sắc' : '(cần ≥ 50 để đạt max)'}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>
                 </div>
 
                 {/* 3. Link video */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={3} label="Link Video mỗi ngày (3đ)" max={3} current={pracScore} />
+                    <SectionHead num={3} label="Hành LỄ = Link thực hành mỗi ngày (3đ)" max={3} current={pracScore} />
                     <div className="flex flex-col gap-1.5">
                         {links.map((link, i) => (
                             <input
@@ -228,7 +227,7 @@ export default function AssignmentForm({
                                     next[i] = e.target.value
                                     setLinks(next)
                                 }}
-                                placeholder={`https://youtube.com/${i + 1}`}
+                                placeholder={`link video hoặc link bài tập ${i + 1}`}
                                 className="w-full text-sm text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300"
                             />
                         ))}
@@ -237,7 +236,7 @@ export default function AssignmentForm({
 
                 {/* 4. Hỗ trợ */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={4} label="Hỗ trợ đồng đội (2đ)" max={2} current={supportScore} />
+                    <SectionHead num={4} label="Trọng NGHĨA = hỗ trợ đồng đội (2đ)" max={2} current={supportScore} />
                     <div className="flex flex-col gap-1.5">
                         {[
                             'Giúp người (+1đ)',
@@ -264,7 +263,7 @@ export default function AssignmentForm({
 
                 {/* 5. Đúng hạn */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={5} label="Nộp đúng hạn (1đ)" max={1} current={timingScore === 1 ? 1 : 0} />
+                    <SectionHead num={5} label="Giữ TÍN = Làm đúng hạn (1đ)" max={1} current={timingScore === 1 ? 1 : 0} />
                     <div className="flex flex-col gap-1 text-sm">
                         <div className="flex justify-between">
                             <span className="text-gray-500">Đúng hạn (Trước 23:59):</span>
