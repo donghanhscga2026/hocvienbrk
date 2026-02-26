@@ -1,0 +1,58 @@
+/**
+ * Script: seed-sample-lessons.ts
+ * Chèn 7 bài học mẫu cho các khóa học chưa có bài nào
+ * Chạy: npx ts-node -r tsconfig-paths/register scripts/seed-sample-lessons.ts
+ */
+
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+const DEFAULT_VIDEO_URL = 'https://www.youtube.com/watch?v=ASlj2zjgatc'
+
+const LESSON_TITLES = [
+    'Bài 1: Giới thiệu khóa học & Tổng quan',
+    'Bài 2: Nền tảng tư duy cốt lõi',
+    'Bài 3: Kỹ năng thiết yếu – Phần 1',
+    'Bài 4: Kỹ năng thiết yếu – Phần 2',
+    'Bài 5: Thực chiến & Ứng dụng thực tế',
+    'Bài 6: Nâng cao & Bứt phá giới hạn',
+    'Bài 7: Tổng kết & Bước tiếp theo',
+]
+
+async function main() {
+    // Lấy tất cả khóa học (trừ CHALLENGE_DAILY)
+    const courses = await (prisma as any).course.findMany({
+        where: { id_khoa: { not: 'CHALLENGE_DAILY' } },
+        include: { lessons: { select: { id: true } } }
+    })
+
+    let seededCount = 0
+
+    for (const course of courses) {
+        if (course.lessons.length > 0) {
+            console.log(`⏭  ${course.id_khoa} – đã có ${course.lessons.length} bài, bỏ qua.`)
+            continue
+        }
+
+        console.log(`✅ ${course.id_khoa} – đang tạo 7 bài học mẫu...`)
+
+        await (prisma as any).lesson.createMany({
+            data: LESSON_TITLES.map((title, index) => ({
+                courseId: course.id,
+                title,
+                order: index + 1,
+                videoUrl: DEFAULT_VIDEO_URL,
+                content: `Nội dung bài ${index + 1} – ${course.name_lop}. Hãy xem video hướng dẫn và hoàn thành bài tập thực hành.`,
+            }))
+        })
+
+        seededCount++
+    }
+
+    console.log(`\n🎉 Hoàn thành! Đã thêm 7 bài vào ${seededCount} khóa học.`)
+}
+
+main()
+    .catch(console.error)
+    .finally(() => prisma.$disconnect())
