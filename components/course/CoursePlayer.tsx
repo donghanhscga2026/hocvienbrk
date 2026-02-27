@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import LessonSidebar from "./LessonSidebar"
 import VideoPlayer from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
@@ -43,6 +43,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         }, {})
     )
     const [showContentModal, setShowContentModal] = useState(false)
+    const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
 
     // JS media query — kiểm tra thiết bị client-side
     const [isMobile, setIsMobile] = useState(false)
@@ -61,7 +62,38 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         ? (currentProgress.maxTime / currentProgress.duration) * 100
         : undefined
 
-    const handleLessonSelect = (lessonId: string) => {
+    const handleLessonSelect = async (lessonId: string) => {
+        // Lưu assignment draft trước khi chuyển bài
+        if (assignmentFormRef.current) {
+            await assignmentFormRef.current()
+        }
+
+        // Lưu video progress của bài hiện tại trước khi chuyển
+        if (currentLessonId && videoPercent > 0 && currentProgress) {
+            const maxTime = (videoPercent / 100) * (currentProgress.duration || 0)
+            await saveVideoProgressAction({
+                enrollmentId: enrollment.id,
+                lessonId: currentLessonId,
+                maxTime,
+                duration: currentProgress.duration || 0
+            })
+        }
+        
+        // Auto-submit assignment nếu đã có dữ liệu nhập nhưng chưa submit
+        const currentProg = progressMap[currentLessonId!]
+        if (currentProg?.assignment && !currentProg?.submittedAt && currentProgress) {
+            const assignmentData = currentProgress.assignment as any
+            if (assignmentData?.reflection || assignmentData?.links?.length > 0) {
+                await submitAssignmentAction({
+                    enrollmentId: enrollment.id,
+                    lessonId: currentLessonId!,
+                    reflection: assignmentData.reflection || '',
+                    links: assignmentData.links || [],
+                    supports: assignmentData.supports || []
+                })
+            }
+        }
+        
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
         setMobileTab('content')
@@ -127,7 +159,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         <div className="flex flex-col h-full">
 
             {/* ── Header ─────────────────────────────────────────── */}
-            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 z-20">
+            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 z-50 fixed top-0 left-0 right-0">
                 <div className="flex items-center gap-3 min-w-0">
                     <Link href="/" className="shrink-0 text-zinc-400 hover:text-white transition-colors">
                         <ArrowLeft className="w-5 h-5" />
@@ -153,7 +185,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 VideoPlayer vẫn sống trong cùng vị trí React tree → YouTube player
                 không bị phá hủy.
             */}
-            <div className="flex flex-1 min-h-0 text-zinc-300">
+            <div className={`flex flex-1 min-h-0 text-zinc-300 ${isMobile ? 'pt-14 pb-14' : ''}`}>
 
                 {/* LEFT: sidebar — desktop only */}
                 {!isMobile && (
@@ -230,19 +262,19 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 {/* Tab: Nội dung */}
                                 {mobileTab === 'content' && (
                                     <div className="flex flex-col h-full min-h-0">
-                                        {/* Tiêu đề + preview nội dung — cố định */}
-                                        <div className="shrink-0 px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
-                                            <p className="text-xs font-bold text-white leading-snug">
+                                        {/* Tiêu đề + preview nội dung — mở rộng chiều cao */}
+                                        <div className="shrink-0 px-4 py-5 bg-zinc-900 border-b border-zinc-800">
+                                            <p className="text-base font-bold text-white leading-snug">
                                                 {currentLesson?.title}
                                             </p>
                                             {currentLesson?.content && (
-                                                <div className="mt-1">
-                                                    <p className="text-[11px] text-zinc-400 leading-snug line-clamp-3">
+                                                <div className="mt-3">
+                                                    <p className="text-sm text-zinc-400 leading-relaxed">
                                                         {currentLesson.content}
                                                     </p>
                                                     <button
                                                         onClick={() => setShowContentModal(true)}
-                                                        className="text-[11px] text-orange-400 hover:text-orange-300 transition-colors mt-0.5"
+                                                        className="text-sm text-orange-400 hover:text-orange-300 transition-colors mt-2"
                                                     >
                                                         Xem thêm →
                                                     </button>
@@ -250,8 +282,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             )}
                                         </div>
 
-                                        {/* Phần Tương tác - Chat */}
-                                        <div className="flex-1 h-full min-h-0 overflow-hidden">
+                                        {/* Phần Tương tác - Chat — gọn hơn */}
+                                        <div className="flex-1 h-[150px] min-h-0 overflow-hidden">
                                             <ChatSection lessonId={currentLessonId!} session={session} />
                                         </div>
                                     </div>
@@ -267,14 +299,15 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             startedAt={startedAt}
                                             videoPercent={videoPercent}
                                             onSubmit={handleSubmitAssignment}
-                                            initialData={currentProgress}
+                                            initialData={{...currentProgress, enrollmentId: enrollment.id}}
+                                            onSaveDraft={assignmentFormRef}
                                         />
                                     </div>
                                 )}
                             </div>
 
                             {/* Tab bar — cố định ở dưới cùng */}
-                            <nav className="shrink-0 h-14 bg-zinc-900 border-t border-zinc-800 flex items-stretch">
+                            <nav className="shrink-0 h-14 bg-zinc-900 border-t border-zinc-800 flex items-stretch fixed bottom-0 left-0 right-0 z-50">
                                 {([
                                     { id: 'list', icon: ListVideo, label: 'Danh sách' },
                                     { id: 'content', icon: FileText, label: 'Nội dung' },
@@ -308,7 +341,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             startedAt={startedAt}
                             videoPercent={videoPercent}
                             onSubmit={handleSubmitAssignment}
-                            initialData={currentProgress}
+                            initialData={{...currentProgress, enrollmentId: enrollment.id}}
+                            onSaveDraft={assignmentFormRef}
                         />
                     </div>
                 )}

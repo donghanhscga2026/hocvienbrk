@@ -1,8 +1,10 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { Loader2, Info, X, Send } from "lucide-react"
+import { saveAssignmentDraftAction } from '@/app/actions/course-actions'
 
 interface AssignmentFormProps {
     lessonId: string
@@ -11,6 +13,7 @@ interface AssignmentFormProps {
     videoPercent: number
     onSubmit: (data: any) => Promise<{ success: boolean; totalScore: number } | void>
     initialData?: any
+    onSaveDraft?: React.RefObject<(() => Promise<void>) | undefined>  // Ref để parent gọi khi cần lưu draft
 }
 
 function formatDate(date: Date | null) {
@@ -94,6 +97,7 @@ export default function AssignmentForm({
     videoPercent = 0,
     onSubmit,
     initialData,
+    onSaveDraft,
 }: AssignmentFormProps) {
     const [loading, setLoading] = useState(false)
     const [showRules, setShowRules] = useState(false)
@@ -104,11 +108,67 @@ export default function AssignmentForm({
             : ["", "", ""]
     )
     const [supports, setSupports] = useState<boolean[]>(initialData?.assignment?.supports || [false, false])
+    const router = useRouter()
+    const pathname = usePathname()
 
     const deadline = calcDeadline(startedAt, lessonOrder)
     const isCompleted = initialData?.status === 'COMPLETED'
     const existingTotalScore = initialData?.totalScore ?? 0
     const existingScores = initialData?.scores ?? {}
+
+    const saveDraft = useCallback(async () => {
+        // Luôn lưu draft khi có dữ liệu (cả khi đã hoàn thành - để cập nhật)
+        if (reflection.trim() || links.some(l => l.trim()) || supports.some(s => s)) {
+            try {
+                await saveAssignmentDraftAction({
+                    enrollmentId: initialData?.enrollmentId,
+                    lessonId,
+                    reflection,
+                    links,
+                    supports
+                })
+            } catch (error) {
+                console.error('Failed to save draft:', error)
+            }
+        }
+    }, [reflection, links, supports, lessonId, initialData?.enrollmentId])
+
+    // Lưu draft khi rời khỏi trang (refresh, đóng tab, chuyển trang)
+    useEffect(() => {
+        window.addEventListener('beforeunload', saveDraft)
+        window.addEventListener('pagehide', saveDraft)
+
+        return () => {
+            window.removeEventListener('beforeunload', saveDraft)
+            window.removeEventListener('pagehide', saveDraft)
+        }
+    }, [saveDraft])
+
+    // Lưu draft khi chuyển trang - dùng useEffect với pathname
+    // Khi pathname thay đổi (chuyển sang trang khác), lưu draft trước
+    const prevPathname = useRef(pathname)
+    useEffect(() => {
+        if (prevPathname.current !== pathname && pathname) {
+            saveDraft()
+        }
+        prevPathname.current = pathname
+    }, [pathname, saveDraft])
+
+    // Lưu draft khi lessonId thay đổi (chuyển bài trong cùng trang)
+    const prevLessonId = useRef(lessonId)
+    useEffect(() => {
+        if (prevLessonId.current !== lessonId && prevLessonId.current) {
+            saveDraft()
+        }
+        prevLessonId.current = lessonId
+    }, [lessonId, saveDraft])
+
+    // Đăng ký ref để parent có thể gọi saveDraft
+    useEffect(() => {
+        if (onSaveDraft) {
+            onSaveDraft.current = saveDraft
+        }
+    }, [onSaveDraft, saveDraft])
 
     // ── Realtime scoring ────────────────────────────────────────────────────
     const vidScore = useMemo(() => {
