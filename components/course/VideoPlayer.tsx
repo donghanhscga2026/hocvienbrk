@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { RotateCcw, CheckCircle } from 'lucide-react'
 
 interface VideoPlayerProps {
@@ -9,8 +9,8 @@ interface VideoPlayerProps {
     playerId?: string
     initialMaxTime?: number   // Thời điểm xem dở từ DB
     initialPercent?: number   // % đã xem từ DB
-    onProgress: (maxTime: number, duration: number) => void
-    onPercentChange: (percent: number) => void
+    onProgress: (maxTime: number, duration: number) => void  // Chỉ gọi khi cần lưu (chuyển bài, rời trang)
+    onPercentChange: (percent: number) => void  // UI update mượt mà mỗi 5s
 }
 
 function extractVideoId(url: string) {
@@ -43,7 +43,7 @@ export default function VideoPlayer({
         setIsCompleted(val)
     }
 
-    // Track progress — đọc isCompleted từ ref để luôn có giá trị mới nhất
+    // Track progress — chỉ cập nhật UI (không lưu DB)
     const trackProgress = () => {
         const player = playerRef.current
         if (!player?.getCurrentTime || !player?.getDuration) return
@@ -52,12 +52,22 @@ export default function VideoPlayer({
         if (dur > 0) {
             const pct = cur / dur
             onPercentChange(Math.round(pct * 100))
-            onProgress(cur, dur)
             if (pct >= 0.999 && !isCompletedRef.current) {
                 setCompleted(true)
             }
         }
     }
+
+    // Save progress to DB — gọi khi cần lưu thực sự
+    const saveProgress = useCallback(() => {
+        const player = playerRef.current
+        if (!player?.getCurrentTime || !player?.getDuration) return
+        const cur = player.getCurrentTime()
+        const dur = player.getDuration()
+        if (cur > 0 && dur > 0) {
+            onProgress(cur, dur)
+        }
+    }, [onProgress])
 
     useEffect(() => {
         if (!videoId) return
@@ -65,7 +75,14 @@ export default function VideoPlayer({
         const handleMessage = (event: MessageEvent) => {
             if (event.origin !== 'https://www.youtube.com') return
         }
+        
+        // Lưu progress khi người dùng rời khỏi trang (refresh, đóng tab, chuyển trang)
+        const handleBeforeUnload = () => {
+            saveProgress()
+        }
         window.addEventListener('message', handleMessage)
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        window.addEventListener('pagehide', handleBeforeUnload)
 
         const initPlayer = () => {
             if (playerRef.current) {
@@ -147,15 +164,17 @@ export default function VideoPlayer({
 
         return () => {
             window.removeEventListener('message', handleMessage)
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            window.removeEventListener('pagehide', handleBeforeUnload)
             stopTracking()
             playerRef.current?.destroy?.()
             playerRef.current = null
         }
-    }, [videoId])
+    }, [videoId, saveProgress])
 
     const startTracking = () => {
         if (saveIntervalRef.current) return
-        saveIntervalRef.current = setInterval(trackProgress, 5000) // Lưu mỗi 5s thay vì 1s — giảm 80% DB writes
+        saveIntervalRef.current = setInterval(trackProgress, 5000) // Chỉ cập nhật UI mượt mà, KHÔNG lưu DB
     }
 
     const stopTracking = () => {

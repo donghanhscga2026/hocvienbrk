@@ -294,3 +294,79 @@ export async function submitAssignmentAction({
     revalidatePath(`/courses/[id]/learn`, 'layout')
     return { success: true, totalScore }
 }
+
+export async function saveAssignmentDraftAction({
+    enrollmentId,
+    lessonId,
+    reflection,
+    links,
+    supports
+}: {
+    enrollmentId: number,
+    lessonId: string,
+    reflection: string,
+    links: string[],
+    supports: boolean[]
+}) {
+    const session = await auth()
+    if (!session?.user?.id) throw new Error("Unauthorized")
+
+    const validLinks = links.filter((l: string) => l && l.trim().length > 0)
+
+    // Lấy lesson hiện tại để kiểm tra deadline
+    const lesson = await (prisma as any).lesson.findUnique({
+        where: { id: lessonId },
+        select: { order: true }
+    })
+
+    // Lấy enrollment để kiểm tra startedAt
+    const enrollment = await (prisma as any).enrollment.findUnique({
+        where: { id: enrollmentId },
+        select: { startedAt: true }
+    })
+
+    // Lấy progress hiện tại
+    const existingProgress = await (prisma as any).lessonProgress.findUnique({
+        where: { enrollmentId_lessonId: { enrollmentId, lessonId } }
+    })
+
+    const isCompleted = existingProgress?.status === 'COMPLETED'
+    let canUpdateScore = true
+
+    // Nếu đã hoàn thành, kiểm tra deadline
+    if (isCompleted && enrollment?.startedAt && lesson) {
+        const deadline = new Date(enrollment.startedAt)
+        deadline.setDate(deadline.getDate() + (lesson.order - 1))
+        deadline.setHours(23, 59, 59, 999)
+        
+        // Nếu đã trễ hạn thì không cho cập nhật điểm
+        if (new Date() > deadline) {
+            canUpdateScore = false
+        }
+    }
+
+    // Nếu đã hoàn thành và trễ hạn: chỉ lưu assignment, không lưu scores/status
+    if (isCompleted && !canUpdateScore) {
+        await (prisma as any).lessonProgress.update({
+            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+            data: {
+                assignment: { reflection, links: validLinks, supports }
+            }
+        })
+    } else {
+        // Bình thường: lưu cả assignment
+        await (prisma as any).lessonProgress.upsert({
+            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+            update: {
+                assignment: { reflection, links: validLinks, supports }
+            },
+            create: {
+                enrollmentId,
+                lessonId,
+                assignment: { reflection, links: validLinks, supports }
+            }
+        })
+    }
+
+    return { success: true }
+}
