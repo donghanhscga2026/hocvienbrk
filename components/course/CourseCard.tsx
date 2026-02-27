@@ -1,37 +1,29 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import Image from 'next/image'
 import PaymentModal from './PaymentModal'
-import { enrollInCourseAction, getEnrollmentStatus } from '@/app/actions/course-actions'
+import { enrollInCourseAction } from '@/app/actions/course-actions'
 
 interface CourseCardProps {
     course: any
     isLoggedIn: boolean
+    enrollment?: {
+        status: string
+        startedAt: Date | null
+        completedCount: number
+        totalLessons: number
+    } | null
     priority?: boolean
 }
 
-type EnrollInfo = {
-    status: string
-    startedAt: Date | null
-    completedCount: number
-    totalLessons: number
-} | null
-
-export default function CourseCard({ course, isLoggedIn, priority = false }: CourseCardProps) {
-    const [enrollInfo, setEnrollInfo] = useState<EnrollInfo>(null)
+export default function CourseCard({ course, isLoggedIn, enrollment, priority = false }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [loading, setLoading] = useState(false)
 
-    useEffect(() => {
-        if (isLoggedIn) {
-            getEnrollmentStatus(course.id).then((data: any) => setEnrollInfo(data))
-        }
-    }, [course.id, isLoggedIn])
-
-    const isActive = enrollInfo?.status === 'ACTIVE'
-    const isPending = enrollInfo?.status === 'PENDING'
+    const isActive = enrollment?.status === 'ACTIVE'
+    const isPending = enrollment?.status === 'PENDING'
 
     const handleAction = async (e: React.MouseEvent) => {
         e.preventDefault()
@@ -53,7 +45,6 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
             try {
                 const res = await enrollInCourseAction(course.id)
                 if (res.success) {
-                    setEnrollInfo({ status: res.status, startedAt: null, completedCount: 0, totalLessons: course.total_lessons ?? 0 })
                     window.location.href = `/courses/${course.id_khoa}/learn`
                 }
             } catch (err: any) {
@@ -69,7 +60,6 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                 try {
                     const res = await enrollInCourseAction(course.id)
                     if (res.success) {
-                        setEnrollInfo({ status: res.status, startedAt: null, completedCount: 0, totalLessons: 0 })
                         setShowPayment(true)
                     }
                 } catch (err: any) {
@@ -81,8 +71,8 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
         }
     }
 
-    const progressPct = enrollInfo && enrollInfo.totalLessons > 0
-        ? Math.round((enrollInfo.completedCount / enrollInfo.totalLessons) * 100)
+    const progressPct = enrollment && enrollment.totalLessons > 0
+        ? Math.round((enrollment.completedCount / enrollment.totalLessons) * 100)
         : 0
 
     return (
@@ -120,9 +110,9 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-sky-400">
                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
                                 Đã kích hoạt
-                                {enrollInfo?.startedAt && (
+                                {enrollment?.startedAt && (
                                     <span className="opacity-80 font-normal">
-                                        · Từ {new Date(enrollInfo.startedAt).toLocaleDateString('vi-VN')}
+                                        · Từ {new Date(enrollment.startedAt).toLocaleDateString('vi-VN')}
                                     </span>
                                 )}
                             </span>
@@ -153,7 +143,7 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                         ) : (
                             <>
                                 {/* Thanh tiến trình nền trong nút (chỉ khi Active) */}
-                                {isActive && enrollInfo && enrollInfo.totalLessons > 0 && (
+                                {isActive && enrollment && enrollment.totalLessons > 0 && (
                                     <span
                                         className="absolute inset-0 transition-all duration-700"
                                         style={{ width: `${progressPct}%`, background: 'rgba(255,255,255,0.18)' }}
@@ -165,9 +155,9 @@ export default function CourseCard({ course, isLoggedIn, priority = false }: Cou
                                     <span>{isActive ? '📖' : '⚡'}</span>
                                     <span>
                                         {isActive ? 'Vào học tiếp' : course.phi_coc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
-                                        {isActive && enrollInfo && enrollInfo.totalLessons > 0 && (
+                                        {isActive && enrollment && enrollment.totalLessons > 0 && (
                                             <span className="ml-1.5 font-normal opacity-90 text-[11px]">
-                                                {enrollInfo.completedCount}/{enrollInfo.totalLessons} bài · {progressPct}%
+                                                {enrollment.completedCount}/{enrollment.totalLessons} bài · {progressPct}%
                                             </span>
                                         )}
                                     </span>
