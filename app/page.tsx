@@ -5,27 +5,23 @@ import prisma from "@/lib/prisma";
 
 export default async function Home() {
   const session = await auth();
-  
-  let userName = null;
-  let userId = null;
-  if (session?.user?.id) {
-    const user = await (prisma as any).user.findUnique({
-      where: { id: parseInt(session.user.id) },
-      select: { name: true, id: true }
-    });
-    if (user) {
-      userName = user.name;
-      userId = user.id;
-    }
-  }
 
-  const courses = await (prisma as any).course.findMany({
-    where: { status: true },
-    orderBy: [
-      { pin: 'asc' },
-      { id: 'asc' }
-    ]
-  });
+  // Parallel: lấy user + courses cùng lúc (tiết kiệm 1 round-trip ~150ms)
+  const [courses, userRecord] = await Promise.all([
+    (prisma as any).course.findMany({
+      where: { status: true },
+      orderBy: [{ pin: 'asc' }, { id: 'asc' }]
+    }),
+    session?.user?.id
+      ? (prisma as any).user.findUnique({
+        where: { id: parseInt(session.user.id) },
+        select: { name: true, id: true }
+      })
+      : Promise.resolve(null)
+  ]);
+
+  const userName = userRecord?.name ?? null;
+  const userId = userRecord?.id ?? null;
 
   let myCourseIds: Set<number> = new Set();
   let enrollmentsMap: Record<number, any> = {};
@@ -68,6 +64,7 @@ export default async function Home() {
     }, {});
   }
 
+
   const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
   const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
 
@@ -98,8 +95,8 @@ export default async function Home() {
       <section className="container mx-auto max-w-5xl px-4 py-8 sm:py-12 text-center">
         <div className="rounded-2xl sm:rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-purple-50">
           <h2 className="mb-4 text-xl sm:text-2xl font-bold text-[#7c3aed]">
-            {session?.user 
-              ? `Mến chào ${userName || 'Học viên'} -   Mã học tập ${userId}!` 
+            {session?.user
+              ? `Mến chào ${userName || 'Học viên'} -   Mã học tập ${userId}!`
               : 'Xin chào bạn!'}
           </h2>
           <p className="mx-auto max-w-3xl text-sm sm:text-base leading-relaxed text-gray-700">

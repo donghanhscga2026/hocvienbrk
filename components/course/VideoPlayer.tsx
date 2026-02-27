@@ -155,7 +155,7 @@ export default function VideoPlayer({
 
     const startTracking = () => {
         if (saveIntervalRef.current) return
-        saveIntervalRef.current = setInterval(trackProgress, 1000)
+        saveIntervalRef.current = setInterval(trackProgress, 5000) // Lưu mỗi 5s thay vì 1s — giảm 80% DB writes
     }
 
     const stopTracking = () => {
