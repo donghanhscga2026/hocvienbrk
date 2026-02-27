@@ -23,6 +23,7 @@ model User {
   accounts      Account[]
   enrollments   Enrollment[]
   sessions      Session[]
+  comments      LessonComment[]
   referrer      User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
   referrals     User[]       @relation("ReferrerToReferee")
 
@@ -115,6 +116,7 @@ model Lesson {
   isDailyChallenge Boolean          @default(false)
   course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   progress         LessonProgress[]
+  comments         LessonComment[]
 
   @@unique([courseId, order])
 }
@@ -154,6 +156,19 @@ model LessonProgress {
   lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([enrollmentId, lessonId])
+}
+
+model LessonComment {
+  id        Int      @id @default(autoincrement())
+  lessonId  String
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+  @@index([userId])
 }
 
 enum EnrollmentStatus {
