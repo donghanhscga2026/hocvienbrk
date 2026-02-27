@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { getCommentsByLesson, createComment } from '@/app/actions/comment-actions'
-import { auth } from '@/auth'
 import { Send, LogIn, Loader2, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -28,23 +27,42 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [error, setError] = useState('')
     const commentsEndRef = useRef<HTMLDivElement>(null)
 
+    // Cache comments theo lessonId — tránh reload mỗi lần đổi tab
+    const commentCache = useRef<Map<string, Comment[]>>(new Map())
+    const fetchingRef = useRef<string | null>(null)
+
     useEffect(() => {
-        loadComments()
+        // Nếu đã có cache cho lesson này → dùng ngay, không gọi DB
+        if (commentCache.current.has(lessonId)) {
+            setComments(commentCache.current.get(lessonId)!)
+            setLoading(false)
+            return
+        }
+
+        // Tránh double-fetch trong React StrictMode
+        if (fetchingRef.current === lessonId) return
+        fetchingRef.current = lessonId
+
+        setLoading(true)
+        getCommentsByLesson(lessonId).then(data => {
+            const mapped = data.map((c: any) => ({
+                ...c,
+                createdAt: new Date(c.createdAt)
+            })) as Comment[]
+
+            commentCache.current.set(lessonId, mapped)
+            // Chỉ update state nếu lessonId vẫn còn current
+            if (fetchingRef.current === lessonId) {
+                setComments(mapped)
+                setLoading(false)
+                fetchingRef.current = null
+            }
+        })
     }, [lessonId])
 
     useEffect(() => {
         commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [comments])
-
-    async function loadComments() {
-        setLoading(true)
-        const data = await getCommentsByLesson(lessonId)
-        setComments(data.map((c: any) => ({
-            ...c,
-            createdAt: new Date(c.createdAt)
-        })) as Comment[])
-        setLoading(false)
-    }
 
     async function handleSendComment(e: React.FormEvent) {
         e.preventDefault()
@@ -56,7 +74,11 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
         const result = await createComment(lessonId, newComment)
 
         if (result.success && result.comment) {
-            setComments(prev => [...prev, result.comment as Comment])
+            const newEntry = result.comment as Comment
+            // Cập nhật cache + state đồng thời
+            const updated = [...(commentCache.current.get(lessonId) ?? []), newEntry]
+            commentCache.current.set(lessonId, updated)
+            setComments(updated)
             setNewComment('')
         } else {
             setError(result.message || 'Có lỗi xảy ra')
@@ -72,13 +94,10 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
     function formatDate(date: Date) {
         const today = new Date()
         const isToday = date.toDateString() === today.toDateString()
-        
         if (isToday) return 'Hôm nay'
-        
         const yesterday = new Date(today)
         yesterday.setDate(yesterday.getDate() - 1)
         if (date.toDateString() === yesterday.toDateString()) return 'Hôm qua'
-        
         return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
     }
 
@@ -87,15 +106,16 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     }
 
-    // Group comments by date
-    const groupedComments: { [key: string]: Comment[] } = {}
-    comments.forEach(comment => {
-        const dateKey = comment.createdAt.toDateString()
-        if (!groupedComments[dateKey]) {
-            groupedComments[dateKey] = []
-        }
-        groupedComments[dateKey].push(comment)
-    })
+    // Memo hóa: chỉ tính lại khi danh sách comments thay đổi
+    const groupedComments = useMemo(() => {
+        const map: Record<string, Comment[]> = {}
+        comments.forEach(comment => {
+            const dateKey = comment.createdAt.toDateString()
+            if (!map[dateKey]) map[dateKey] = []
+            map[dateKey].push(comment)
+        })
+        return map
+    }, [comments])
 
     return (
         <div className="flex flex-col h-full">
@@ -134,8 +154,8 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
                                         {/* Avatar */}
                                         <div className="shrink-0">
                                             {comment.userAvatar ? (
-                                                <img 
-                                                    src={comment.userAvatar} 
+                                                <img
+                                                    src={comment.userAvatar}
                                                     alt={comment.userName || 'User'}
                                                     className="w-8 h-8 rounded-full object-cover"
                                                 />
@@ -145,7 +165,7 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
                                                 </div>
                                             )}
                                         </div>
-                                        
+
                                         {/* Content */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-baseline gap-2">

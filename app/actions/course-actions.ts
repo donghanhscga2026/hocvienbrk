@@ -163,11 +163,15 @@ export async function saveVideoProgressAction({
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
 
-    // Threshold-based scoring: >= 95% = 2đ, >= 50% = 1đ (fix lỗi 98% chỉ ra 1đ)
     const percent = duration > 0 ? maxTime / duration : 0
     const vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
 
-    const existingScores = await getExistingScores(enrollmentId, lessonId)
+    // Chỉ lấy field scores (slim select) để giữ các điểm khác khi merge
+    const existing = await (prisma as any).lessonProgress.findUnique({
+        where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+        select: { scores: true }
+    })
+    const existingScores = (existing?.scores as any) ?? {}
 
     await (prisma as any).lessonProgress.upsert({
         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
@@ -188,12 +192,6 @@ export async function saveVideoProgressAction({
     return { success: true, vidScore, percent: Math.round(percent * 100) }
 }
 
-async function getExistingScores(enrollmentId: number, lessonId: string) {
-    const progress = await (prisma as any).lessonProgress.findUnique({
-        where: { enrollmentId_lessonId: { enrollmentId, lessonId } }
-    })
-    return (progress?.scores as any) || {}
-}
 
 export async function submitAssignmentAction({
     enrollmentId,
@@ -212,79 +210,74 @@ export async function submitAssignmentAction({
     if (!session?.user?.id) throw new Error("Unauthorized")
     const userId = parseInt(session.user.id)
 
-    // 1. Lấy thông tin Enrollment & Lesson
-    const enrollment = await (prisma as any).enrollment.findUnique({
-        where: { id: enrollmentId },
-        include: { course: true }
-    })
-    const lesson = await (prisma as any).lesson.findUnique({
-        where: { id: lessonId }
-    })
+    // Batch 1: Lấy enrollment + lesson song song
+    const [enrollment, lesson] = await Promise.all([
+        (prisma as any).enrollment.findUnique({
+            where: { id: enrollmentId },
+            include: { course: true }
+        }),
+        (prisma as any).lesson.findUnique({
+            where: { id: lessonId }
+        })
+    ])
 
     if (!enrollment || !lesson || !enrollment.startedAt) {
         throw new Error("Dữ liệu không hợp lệ hoặc chưa xác nhận ngày bắt đầu.")
     }
 
-    // - Practice (Links): Mỗi link 1đ, max 3đ
-    const validLinks = links.filter(l => l && l.trim().length > 0)
+    const validLinks = links.filter((l: string) => l && l.trim().length > 0)
 
-    // 2. Kiểm tra trùng Link thực hành toàn hệ thống của User
-    const otherProgresses = await (prisma as any).lessonProgress.findMany({
-        where: {
-            enrollment: { userId: userId },
-            NOT: { lessonId: lessonId } // Không check bài hiện tại nếu đang update (hoặc cứ check hết)
-        }
-    })
+    // Batch 2: Kiểm tra link trùng + lấy video score song song
+    const [otherProgresses, existingProgress] = await Promise.all([
+        (prisma as any).lessonProgress.findMany({
+            where: {
+                enrollment: { userId },
+                NOT: { lessonId }
+            },
+            select: { assignment: true }
+        }),
+        (prisma as any).lessonProgress.findUnique({
+            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+            select: { scores: true }
+        })
+    ])
 
     const allPastLinks = otherProgresses.flatMap((p: any) => p.assignment?.links || [])
 
-    // Kiểm tra trùng link ngay trong bài nộp hiện tại
     const currentUniqueLinks = new Set(validLinks)
     if (currentUniqueLinks.size < validLinks.length) {
         throw new Error("Phát hiện các link trùng nhau trong cùng một bài nộp. Vui lòng nộp các link khác nhau.")
     }
 
-    const duplicates = validLinks.filter(link => allPastLinks.includes(link))
-
+    const duplicates = validLinks.filter((link: string) => allPastLinks.includes(link))
     if (duplicates.length > 0) {
         throw new Error(`Phát hiện link đã nộp trong các bài trước: ${duplicates.join(', ')}. Vui lòng nộp nội dung mới.`)
     }
 
-    // 3. Tính toán điểm
-    // - Reflection (Tâm đắc ngộ): min 50 ký tự -> 2đ, dưới 50 -> 1đ, trống -> 0đ
+    // Tính điểm
     let refScore = 0
     if (reflection.trim().length >= 50) refScore = 2
     else if (reflection.trim().length > 0) refScore = 1
 
-    // - Practice (Links): Mỗi link 1đ, max 3đ
     const pracScore = Math.min(validLinks.length, 3)
+    const supportScore = supports.filter((s: boolean) => s === true).length
 
-    // - Support: Mỗi checkbox 1đ, max 2đ
-    const supportScore = supports.filter(s => s === true).length
-
-    // - Timing Score: Deadline = startedAt + (order - 1) ngày
     const deadlineDate = new Date(enrollment.startedAt)
     deadlineDate.setDate(deadlineDate.getDate() + (lesson.order - 1))
-
     const submittedAt = new Date()
     const timingScore = calculateTimingScore(deadlineDate, submittedAt)
 
-    // - Video Score: Lấy từ kết quả autoSave trước đó (nếu có)
-    const existingProgress = await (prisma as any).lessonProgress.findUnique({
-        where: { enrollmentId_lessonId: { enrollmentId, lessonId } }
-    })
-    const vidScore = (existingProgress?.scores as any)?.vid || 0
-
+    const vidScore = (existingProgress?.scores as any)?.vid ?? 0
     const totalScore = vidScore + refScore + pracScore + supportScore + timingScore
 
-    // 4. Cập nhật Database
+    // Cập nhật Database
     await (prisma as any).lessonProgress.upsert({
         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
         update: {
             scores: { vid: vidScore, ref: refScore, prac: pracScore, support: supportScore, timing: timingScore },
-            totalScore: Math.max(0, totalScore), // Không để điểm âm
+            totalScore: Math.max(0, totalScore),
             assignment: { reflection, links: validLinks, supports },
-            status: "COMPLETED",
+            status: 'COMPLETED',
             submittedAt
         },
         create: {
@@ -293,7 +286,7 @@ export async function submitAssignmentAction({
             scores: { vid: vidScore, ref: refScore, prac: pracScore, support: supportScore, timing: timingScore },
             totalScore: Math.max(0, totalScore),
             assignment: { reflection, links: validLinks, supports },
-            status: "COMPLETED",
+            status: 'COMPLETED',
             submittedAt
         }
     })
