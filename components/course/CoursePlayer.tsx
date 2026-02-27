@@ -5,23 +5,25 @@ import { useState, useCallback, useEffect } from 'react'
 import LessonSidebar from "./LessonSidebar"
 import VideoPlayer from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
+import ChatSection from "./ChatSection"
 import StartDateModal from "./StartDateModal"
 import {
     confirmStartDateAction,
     saveVideoProgressAction,
     submitAssignmentAction
 } from "@/app/actions/course-actions"
-import { ArrowLeft, ListVideo, FileText, X } from "lucide-react"
+import { ArrowLeft, ListVideo, FileText, X, ClipboardCheck } from "lucide-react"
 import Link from "next/link"
 
 interface CoursePlayerProps {
     course: any
     enrollment: any
+    session: any
 }
 
-type MobileTab = 'lessons' | 'learn'
+type MobileTab = 'list' | 'content' | 'record'
 
-export default function CoursePlayer({ course, enrollment: initialEnrollment }: CoursePlayerProps) {
+export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const [currentLessonId, setCurrentLessonId] = useState<string>(() => {
         // Tìm bài học chưa hoàn thành gần nhất (theo updatedAt)
@@ -33,7 +35,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
         return incomplete[0]?.lessonId || course.lessons[0]?.id
     })
     const [videoPercent, setVideoPercent] = useState(0)
-    const [mobileTab, setMobileTab] = useState<MobileTab>('learn')
+    const [mobileTab, setMobileTab] = useState<MobileTab>('content')
     const [progressMap, setProgressMap] = useState<Record<string, any>>(() =>
         enrollment.lessonProgress.reduce((acc: any, p: any) => {
             acc[p.lessonId] = p
@@ -62,7 +64,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
     const handleLessonSelect = (lessonId: string) => {
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
-        setMobileTab('learn')
+        setMobileTab('content')
         setShowContentModal(false)
     }
 
@@ -107,7 +109,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
             alert(msg)
             setCurrentLessonId(nextId)
             setVideoPercent(0)
-            setMobileTab('learn')
+            setMobileTab('content')
         } else {
             alert(`📊 Đã ghi nhận! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
         }
@@ -187,13 +189,20 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                         />
                     </div>
 
-                    {/* Desktop: tiêu đề + nội dung bài học */}
+                    {/* Desktop: tiêu đề + nội dung bài học + Tương tác */}
                     {!isMobile && (
-                        <div className="p-5 flex-1">
-                            <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
-                            {currentLesson?.content && (
-                                <p className="text-zinc-400 mt-1 text-sm leading-relaxed">{currentLesson.content}</p>
-                            )}
+                        <div className="p-5 flex-1 flex flex-col gap-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
+                                {currentLesson?.content && (
+                                    <p className="text-zinc-400 mt-1 text-sm leading-relaxed">{currentLesson.content}</p>
+                                )}
+                            </div>
+                            
+                            {/* Phần Tương tác - Chat (Desktop) */}
+                            <div className="flex-1 min-h-0 overflow-hidden border border-zinc-700 rounded-xl mt-2">
+                                <ChatSection lessonId={currentLessonId!} session={session} />
+                            </div>
                         </div>
                     )}
 
@@ -203,8 +212,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                             {/* Nội dung cuộn — chỉ phần này scroll */}
                             <div className="flex-1 min-h-0">
 
-                                {/* Tab: Nội dung khóa học */}
-                                {mobileTab === 'lessons' && (
+                                {/* Tab: Danh sách */}
+                                {mobileTab === 'list' && (
                                     <div className="h-full overflow-y-auto overscroll-contain">
                                         {/* Full-width sidebar (bỏ w-72 fixed) */}
                                         <LessonSidebarMobile
@@ -218,8 +227,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                                     </div>
                                 )}
 
-                                {/* Tab: Ghi nhận */}
-                                {mobileTab === 'learn' && (
+                                {/* Tab: Nội dung */}
+                                {mobileTab === 'content' && (
                                     <div className="flex flex-col h-full min-h-0">
                                         {/* Tiêu đề + preview nội dung — cố định */}
                                         <div className="shrink-0 px-4 py-2.5 bg-zinc-900 border-b border-zinc-800">
@@ -241,18 +250,25 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                                             )}
                                         </div>
 
-                                        {/* AssignmentForm — có sticky header + cuộn nội bộ */}
-                                        <div className="flex-1 h-full min-h-0">
-                                            <AssignmentForm
-                                                key={currentLessonId}
-                                                lessonId={currentLessonId!}
-                                                lessonOrder={currentLesson?.order ?? 1}
-                                                startedAt={startedAt}
-                                                videoPercent={videoPercent}
-                                                onSubmit={handleSubmitAssignment}
-                                                initialData={currentProgress}
-                                            />
+                                        {/* Phần Tương tác - Chat */}
+                                        <div className="flex-1 h-full min-h-0 overflow-hidden">
+                                            <ChatSection lessonId={currentLessonId!} session={session} />
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Tab: Ghi nhận */}
+                                {mobileTab === 'record' && (
+                                    <div className="flex flex-col h-full min-h-0">
+                                        <AssignmentForm
+                                            key={currentLessonId}
+                                            lessonId={currentLessonId!}
+                                            lessonOrder={currentLesson?.order ?? 1}
+                                            startedAt={startedAt}
+                                            videoPercent={videoPercent}
+                                            onSubmit={handleSubmitAssignment}
+                                            initialData={currentProgress}
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -260,8 +276,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment }: 
                             {/* Tab bar — cố định ở dưới cùng */}
                             <nav className="shrink-0 h-14 bg-zinc-900 border-t border-zinc-800 flex items-stretch">
                                 {([
-                                    { id: 'lessons', icon: ListVideo, label: 'Nội dung' },
-                                    { id: 'learn', icon: FileText, label: 'Ghi nhận' },
+                                    { id: 'list', icon: ListVideo, label: 'Danh sách' },
+                                    { id: 'content', icon: FileText, label: 'Nội dung' },
+                                    { id: 'record', icon: ClipboardCheck, label: 'Ghi nhận' },
                                 ] as { id: MobileTab; icon: any; label: string }[]).map(tab => (
                                     <button
                                         key={tab.id}

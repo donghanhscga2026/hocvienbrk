@@ -47,6 +47,7 @@ export default async function CourseLearnPage({ params }: { params: Promise<{ id
             <CoursePlayer
                 course={enrollment.course}
                 enrollment={enrollment}
+                session={session}
             />
         </div>
     )
