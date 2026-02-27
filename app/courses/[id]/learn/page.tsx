@@ -9,39 +9,43 @@ export default async function CourseLearnPage({ params }: { params: Promise<{ id
     const session = await auth()
     if (!session?.user?.id) redirect("/login")
 
-    // Lấy thông tin Enrollment dựa trên id_khoa
-    const course = await (prisma as any).course.findUnique({
-        where: { id_khoa: id },
-        include: {
-            lessons: {
-                orderBy: { order: 'asc' }
-            }
-        }
-    })
-
-    if (!course) redirect("/")
-
-    const enrollment = await (prisma as any).enrollment.findUnique({
+    // Lấy thông tin Enrollment + lessonProgress trong 1 query
+    const enrollment = await (prisma as any).enrollment.findFirst({
         where: {
-            userId_courseId: {
-                userId: parseInt(session.user.id),
-                courseId: course.id
-            }
+            userId: parseInt(session.user.id),
+            course: { id_khoa: id },
+            status: 'ACTIVE'
         },
         include: {
-            lessonProgress: true
+            course: {
+                include: {
+                    lessons: {
+                        orderBy: { order: 'asc' }
+                    }
+                }
+            },
+            lessonProgress: {
+                select: {
+                    lessonId: true,
+                    status: true,
+                    scores: true,
+                    totalScore: true,
+                    assignment: true,
+                    maxTime: true,
+                    duration: true,
+                    submittedAt: true,
+                    updatedAt: true
+                }
+            }
         }
     })
 
-    // Nếu chưa đăng ký thì không cho học
-    if (!enrollment || enrollment.status !== 'ACTIVE') {
-        redirect(`/courses/${id}`)
-    }
+    if (!enrollment || !enrollment.course) redirect(`/courses/${id}`)
 
     return (
         <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
             <CoursePlayer
-                course={course}
+                course={enrollment.course}
                 enrollment={enrollment}
             />
         </div>

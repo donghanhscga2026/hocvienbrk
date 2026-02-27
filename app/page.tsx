@@ -5,10 +5,71 @@ import prisma from "@/lib/prisma";
 
 export default async function Home() {
   const session = await auth();
+  
+  let userName = null;
+  let userId = null;
+  if (session?.user?.id) {
+    const user = await (prisma as any).user.findUnique({
+      where: { id: parseInt(session.user.id) },
+      select: { name: true, id: true }
+    });
+    if (user) {
+      userName = user.name;
+      userId = user.id;
+    }
+  }
+
   const courses = await (prisma as any).course.findMany({
     where: { status: true },
-    orderBy: { id: 'asc' }
+    orderBy: [
+      { pin: 'asc' },
+      { id: 'asc' }
+    ]
   });
+
+  let myCourseIds: Set<number> = new Set();
+  let enrollmentsMap: Record<number, any> = {};
+  if (session?.user?.id) {
+    const enrollments = await (prisma as any).enrollment.findMany({
+      where: {
+        userId: parseInt(session.user.id),
+        status: 'ACTIVE'
+      },
+      select: {
+        courseId: true,
+        status: true,
+        startedAt: true,
+        course: {
+          select: {
+            lessons: {
+              select: { id: true }
+            }
+          }
+        },
+        lessonProgress: {
+          select: {
+            lessonId: true,
+            status: true
+          }
+        }
+      }
+    });
+    enrollmentsMap = enrollments.reduce((acc: Record<number, any>, e: any) => {
+      const totalLessons = e.course?.lessons?.length || 0;
+      const completedCount = e.lessonProgress?.filter((lp: any) => lp.status === 'COMPLETED').length || 0;
+      myCourseIds.add(e.courseId);
+      acc[e.courseId] = {
+        status: e.status,
+        startedAt: e.startedAt,
+        completedCount,
+        totalLessons
+      };
+      return acc;
+    }, {});
+  }
+
+  const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
+  const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -36,7 +97,11 @@ export default async function Home() {
       {/* Intro Message */}
       <section className="container mx-auto max-w-5xl px-4 py-8 sm:py-12 text-center">
         <div className="rounded-2xl sm:rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-purple-50">
-          <h2 className="mb-4 text-xl sm:text-2xl font-bold text-[#7c3aed]">Xin chào Học viên thân mến!</h2>
+          <h2 className="mb-4 text-xl sm:text-2xl font-bold text-[#7c3aed]">
+            {session?.user 
+              ? `Mến chào ${userName || 'Học viên'} -   Mã học tập ${userId}!` 
+              : 'Xin chào bạn!'}
+          </h2>
           <p className="mx-auto max-w-3xl text-sm sm:text-base leading-relaxed text-gray-700">
             Cổng học viện này là nơi tập hợp những tri thức thực chiến đỉnh cao về kinh doanh online,
             nhân hiệu và A.I. Chúng tôi ở đây để đồng hành cùng bạn trên hành trình lan tỏa giá trị
@@ -47,21 +112,69 @@ export default async function Home() {
 
       {/* Course List Section */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
-        <div className="mb-12 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 ring-offset-current">Danh Sách Khóa Học</h2>
-          <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-blue-600"></div>
-        </div>
+        {session?.user ? (
+          <>
+            {/* Khóa học của tôi */}
+            {myCourses.length > 0 && (
+              <div className="mb-12">
+                <div className="mb-8 text-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Khóa học của tôi</h2>
+                  <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500"></div>
+                </div>
+                <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                  {myCourses.map((course: any, index: number) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      isLoggedIn={!!session}
+                      enrollment={enrollmentsMap[course.id] || null}
+                      priority={index < 3}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course: any, index: number) => (
-            <CourseCard
-              key={course.id}
-              course={course}
-              isLoggedIn={!!session}
-              priority={index < 6}
-            />
-          ))}
-        </div>
+            {/* Các khóa học khác */}
+            {otherCourses.length > 0 && (
+              <div>
+                <div className="mb-8 text-center">
+                  <h2 className="text-2xl font-bold text-gray-900">Tất cả khóa học</h2>
+                  <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-blue-600"></div>
+                </div>
+                <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                  {otherCourses.map((course: any, index: number) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      isLoggedIn={!!session}
+                      enrollment={enrollmentsMap[course.id] || null}
+                      priority={index < 3}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="mb-12 text-center">
+              <h2 className="text-3xl font-bold text-gray-900 ring-offset-current">Danh Sách Khóa Học</h2>
+              <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-blue-600"></div>
+            </div>
+            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+              {courses.map((course: any, index: number) => (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  isLoggedIn={false}
+                  enrollment={null}
+                  priority={index < 6}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       {/* Footer (Optional simple) */}

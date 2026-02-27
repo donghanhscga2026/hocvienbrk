@@ -85,6 +85,7 @@ model Course {
   name_khoa     String?
   date_join     String?
   status        Boolean      @default(true)
+  pin           Int          @default(0) // Thứ tự hiển thị: số nhỏ hiển thị trước, dùng để ghim khóa học lên đầu
   mo_ta_ngan    String?
   mo_ta_dai     String?
   link_anh_bia  String?      @map("link_anh_bia_khoa")

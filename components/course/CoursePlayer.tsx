@@ -24,10 +24,13 @@ type MobileTab = 'lessons' | 'learn'
 export default function CoursePlayer({ course, enrollment: initialEnrollment }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const [currentLessonId, setCurrentLessonId] = useState<string>(() => {
-        const sorted = [...enrollment.lessonProgress].sort(
-            (a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )
-        return sorted[0]?.lessonId || course.lessons[0]?.id
+        // Tìm bài học chưa hoàn thành gần nhất (theo updatedAt)
+        const incomplete = enrollment.lessonProgress
+            .filter((p: any) => p.status !== 'COMPLETED')
+            .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        
+        // Nếu có bài chưa hoàn thành, lấy bài gần nhất; không thì lấy bài đầu tiên
+        return incomplete[0]?.lessonId || course.lessons[0]?.id
     })
     const [videoPercent, setVideoPercent] = useState(0)
     const [mobileTab, setMobileTab] = useState<MobileTab>('learn')
