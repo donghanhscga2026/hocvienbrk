@@ -30,7 +30,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const incomplete = enrollment.lessonProgress
             .filter((p: any) => p.status !== 'COMPLETED')
             .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        
+
         // Nếu có bài chưa hoàn thành, lấy bài gần nhất; không thì lấy bài đầu tiên
         return incomplete[0]?.lessonId || course.lessons[0]?.id
     })
@@ -78,7 +78,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 duration: currentProgress.duration || 0
             })
         }
-        
+
         // Auto-submit assignment nếu đã có dữ liệu nhập nhưng chưa submit
         const currentProg = progressMap[currentLessonId!]
         if (currentProg?.assignment && !currentProg?.submittedAt && currentProgress) {
@@ -93,7 +93,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 })
             }
         }
-        
+
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
         setMobileTab('content')
@@ -185,7 +185,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 VideoPlayer vẫn sống trong cùng vị trí React tree → YouTube player
                 không bị phá hủy.
             */}
-            <div className={`flex flex-1 min-h-0 text-zinc-300 ${isMobile ? 'pt-14 pb-14' : ''}`}>
+            <div className={`flex flex-1 min-h-0 text-zinc-300 pt-14 ${isMobile ? 'pb-14' : ''}`}>
 
                 {/* LEFT: sidebar — desktop only */}
                 {!isMobile && (
@@ -205,7 +205,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     className={
                         isMobile
                             ? 'flex-1 flex flex-col min-h-0 bg-zinc-950 overflow-hidden'
-                            : 'flex-1 flex flex-col overflow-y-auto bg-zinc-950'
+                            : 'flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-zinc-950'
                     }
                 >
                     {/* VIDEO — luôn ở đây, không bao giờ bị unmount khi đổi layout */}
@@ -227,11 +227,22 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         <div className="p-5 flex-1 flex flex-col gap-4">
                             <div>
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
-                                {currentLesson?.content && (
-                                    <p className="text-zinc-400 mt-1 text-sm leading-relaxed">{currentLesson.content}</p>
-                                )}
+                                {currentLesson?.content && (() => {
+                                    const c = currentLesson.content
+                                    // Google Docs — đã hiển thị qua iframe bên trên, không cần hiện lại raw URL
+                                    if (c.includes('docs.google.com')) return null
+                                    // Link thường — hiện dạng clickable
+                                    if (c.startsWith('http')) return (
+                                        <a href={c} target="_blank" rel="noopener noreferrer"
+                                            className="text-orange-400 hover:text-orange-300 text-sm mt-1 break-all underline block">
+                                            {c}
+                                        </a>
+                                    )
+                                    // Text thường — chắc chắn xuống dòng
+                                    return <p className="text-zinc-400 mt-1 text-sm leading-relaxed break-words">{c}</p>
+                                })()}
                             </div>
-                            
+
                             {/* Phần Tương tác - Chat (Desktop) */}
                             <div className="flex-1 min-h-0 overflow-hidden border border-zinc-700 rounded-xl mt-2">
                                 <ChatSection lessonId={currentLessonId!} session={session} />
@@ -299,8 +310,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             lessonOrder={currentLesson?.order ?? 1}
                                             startedAt={startedAt}
                                             videoPercent={videoPercent}
+                                            videoUrl={currentLesson?.videoUrl || null}
                                             onSubmit={handleSubmitAssignment}
-                                            initialData={{...currentProgress, enrollmentId: enrollment.id}}
+                                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
                                             onSaveDraft={assignmentFormRef}
                                         />
                                     </div>
@@ -334,15 +346,16 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
                 {/* RIGHT: AssignmentForm — desktop only */}
                 {!isMobile && (
-                    <div className="w-[400px] shrink-0 border-l border-zinc-800 overflow-hidden">
+                    <div className="w-[400px] shrink-0 border-l border-zinc-800 flex flex-col">
                         <AssignmentForm
                             key={currentLessonId}
                             lessonId={currentLessonId!}
                             lessonOrder={currentLesson?.order ?? 1}
                             startedAt={startedAt}
                             videoPercent={videoPercent}
+                            videoUrl={currentLesson?.videoUrl || null}
                             onSubmit={handleSubmitAssignment}
-                            initialData={{...currentProgress, enrollmentId: enrollment.id}}
+                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
                             onSaveDraft={assignmentFormRef}
                         />
                     </div>

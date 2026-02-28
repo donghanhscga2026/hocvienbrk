@@ -11,6 +11,7 @@ interface AssignmentFormProps {
     lessonOrder: number
     startedAt: Date | null
     videoPercent: number
+    videoUrl: string | null  // Link video (null nếu không có video)
     onSubmit: (data: any) => Promise<{ success: boolean; totalScore: number } | void>
     initialData?: any
     onSaveDraft?: React.RefObject<(() => Promise<void>) | undefined>  // Ref để parent gọi khi cần lưu draft
@@ -95,6 +96,7 @@ export default function AssignmentForm({
     lessonOrder,
     startedAt,
     videoPercent = 0,
+    videoUrl = null,
     onSubmit,
     initialData,
     onSaveDraft,
@@ -171,11 +173,17 @@ export default function AssignmentForm({
     }, [onSaveDraft, saveDraft])
 
     // ── Realtime scoring ────────────────────────────────────────────────────
+    // Kiểm tra đúng: videoUrl có phải YouTube không (không phải chỉ check null)
+    const hasVideo = !!videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(videoUrl)
+    const displayPercent = hasVideo ? videoPercent : 100  // Không có video -> hiển thị 100%
+
     const vidScore = useMemo(() => {
+        // Bài không có video YouTube -> mặc định +2 điểm
+        if (!hasVideo) return 2
         if (videoPercent >= 95) return 2
         if (videoPercent >= 50) return 1
         return 0
-    }, [videoPercent])
+    }, [videoPercent, hasVideo])
 
     const refScore = useMemo(() => {
         if (reflection.trim().length >= 50) return 2
@@ -213,8 +221,8 @@ export default function AssignmentForm({
         <div className="flex flex-col h-full min-h-0 bg-[#FFFDE7]">
             {showRules && <RulesModal onClose={() => setShowRules(false)} />}
 
-            {/* ── Header sticky ── */}
-            <div className="sticky top-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-2">
+            {/* ── Header luôn hiển thị trên cùng ── */}
+            <div className="shrink-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-2">
                 {/* Row 1: Ngày hoàn thành + Tổng */}
                 <div className="flex items-center justify-between">
                     <p className="text-[11px] text-gray-500 leading-tight">
@@ -246,18 +254,22 @@ export default function AssignmentForm({
             </div>
 
             {/* ── 5 Sections (cuộn) ── */}
-            <div className="h-full overflow-y-auto flex flex-col gap-2 p-3">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-3">
 
                 {/* 1. Video */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={1} label="Mở TRÍ = học theo Video (2đ)" max={2} current={vidScore} />
+                    <SectionHead num={1} label={hasVideo ? "Mở TRÍ = học theo Video (2đ)" : "Mở TRÍ = Nội dung bài học (2đ)"} max={2} current={vidScore} />
                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-orange-400 transition-all duration-500 rounded-full"
-                            style={{ width: `${videoPercent}%` }}
+                            className={`h-full transition-all duration-500 rounded-full ${!hasVideo ? 'bg-emerald-500' : 'bg-orange-400'}`}
+                            style={{ width: `${displayPercent}%` }}
                         />
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Đang xem: {videoPercent.toFixed(0)}%</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                        {hasVideo
+                            ? `Đang xem: ${videoPercent.toFixed(0)}%`
+                            : '✓ Không có video - Đã hoàn thành nội dung'}
+                    </p>
                 </div>
 
                 {/* 2. Tâm đắc ngộ */}

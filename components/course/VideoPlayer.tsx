@@ -77,7 +77,7 @@ export default function VideoPlayer({
         const handleMessage = (event: MessageEvent) => {
             if (event.origin !== 'https://www.youtube.com') return
         }
-        
+
         // Lưu progress khi người dùng rời khỏi trang (refresh, đóng tab, chuyển trang)
         const handleBeforeUnload = () => {
             saveProgress()
@@ -196,34 +196,34 @@ export default function VideoPlayer({
 
     // Kiểm tra nếu là link Google Docs
     const isGoogleDocs = lessonContent?.includes('docs.google.com/document')
-    
+
     if (!videoId) {
         // Nếu có link Google Docs trong content -> hiển thị embed
         if (isGoogleDocs && lessonContent) {
             return (
-                <div className="w-full h-full min-h-[500px] bg-white">
+                <div className="relative w-full aspect-video bg-white overflow-hidden">
                     <iframe
                         src={lessonContent}
-                        className="w-full h-full min-h-[500px]"
+                        className="absolute inset-0 w-full h-full"
                         allow="autoplay"
                         title="Bài học"
                     />
                 </div>
             )
         }
-        
+
         // Nếu có HTML content -> hiển thị trực tiếp
         if (lessonContent && !isGoogleDocs) {
             return (
-                <div className="w-full h-full min-h-[400px] bg-zinc-900 overflow-y-auto p-6">
-                    <div 
+                <div className="w-full h-full min-h-[400px] bg-zinc-900 overflow-x-hidden overflow-y-auto p-6">
+                    <div
                         className="prose prose-invert max-w-none text-zinc-300"
                         dangerouslySetInnerHTML={{ __html: lessonContent }}
                     />
                 </div>
             )
         }
-        
+
         // Không có gì -> hiển thị thông báo
         return (
             <div className="aspect-video bg-zinc-900 flex items-center justify-center">
