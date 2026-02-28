@@ -267,7 +267,12 @@ export async function submitAssignmentAction({
     const submittedAt = new Date()
     const timingScore = calculateTimingScore(deadlineDate, submittedAt)
 
-    const vidScore = (existingProgress?.scores as any)?.vid ?? 0
+    // Bài không có video YouTube (null hoặc link khác như Docs) -> mặc định +2
+    const isYoutubeVideo = !!lesson.videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(lesson.videoUrl)
+    const vidScore = !isYoutubeVideo
+        ? 2
+        : ((existingProgress?.scores as any)?.vid ?? 0)
+
     const totalScore = vidScore + refScore + pracScore + supportScore + timingScore
 
     // Cập nhật Database
@@ -338,7 +343,7 @@ export async function saveAssignmentDraftAction({
         const deadline = new Date(enrollment.startedAt)
         deadline.setDate(deadline.getDate() + (lesson.order - 1))
         deadline.setHours(23, 59, 59, 999)
-        
+
         // Nếu đã trễ hạn thì không cho cập nhật điểm
         if (new Date() > deadline) {
             canUpdateScore = false
