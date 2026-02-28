@@ -214,6 +214,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             key={currentLessonId}
                             playerId="yt-player-main"
                             videoUrl={currentLesson?.videoUrl || null}
+                            lessonContent={currentLesson?.content || null}
                             initialMaxTime={currentProgress?.maxTime || 0}
                             initialPercent={initialPercent}
                             onProgress={handleVideoProgress}

@@ -11,6 +11,7 @@ interface VideoPlayerProps {
     initialPercent?: number   // % đã xem từ DB
     onProgress: (maxTime: number, duration: number) => void  // Chỉ gọi khi cần lưu (chuyển bài, rời trang)
     onPercentChange: (percent: number) => void  // UI update mượt mà mỗi 5s
+    lessonContent?: string | null  // Nội dung bài học (link Google Docs hoặc HTML)
 }
 
 function extractVideoId(url: string) {
@@ -26,6 +27,7 @@ export default function VideoPlayer({
     initialPercent,
     onProgress,
     onPercentChange,
+    lessonContent,
 }: VideoPlayerProps) {
     const playerRef = useRef<any>(null)
     const saveIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -192,7 +194,37 @@ export default function VideoPlayer({
         startTracking()
     }
 
+    // Kiểm tra nếu là link Google Docs
+    const isGoogleDocs = lessonContent?.includes('docs.google.com/document')
+    
     if (!videoId) {
+        // Nếu có link Google Docs trong content -> hiển thị embed
+        if (isGoogleDocs && lessonContent) {
+            return (
+                <div className="w-full h-full min-h-[500px] bg-white">
+                    <iframe
+                        src={lessonContent}
+                        className="w-full h-full min-h-[500px]"
+                        allow="autoplay"
+                        title="Bài học"
+                    />
+                </div>
+            )
+        }
+        
+        // Nếu có HTML content -> hiển thị trực tiếp
+        if (lessonContent && !isGoogleDocs) {
+            return (
+                <div className="w-full h-full min-h-[400px] bg-zinc-900 overflow-y-auto p-6">
+                    <div 
+                        className="prose prose-invert max-w-none text-zinc-300"
+                        dangerouslySetInnerHTML={{ __html: lessonContent }}
+                    />
+                </div>
+            )
+        }
+        
+        // Không có gì -> hiển thị thông báo
         return (
             <div className="aspect-video bg-zinc-900 flex items-center justify-center">
                 <p className="text-zinc-500 text-sm">Bài học này không có video hướng dẫn</p>

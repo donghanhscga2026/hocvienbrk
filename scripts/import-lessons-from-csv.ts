@@ -1,0 +1,94 @@
+
+import { PrismaClient } from '@prisma/client'
+import fs from 'fs'
+import csv from 'csv-parser'
+
+const prisma = new PrismaClient()
+const COURSE_ID = 16
+
+interface CSVRow {
+  STT: string
+  'Tên File': string
+  'Link Chia Sẻ': string
+}
+
+async function main() {
+  console.log('🚀 Bắt đầu import lessons từ CSV...')
+  
+  const results: CSVRow[] = []
+  
+  fs.createReadStream('Danh sach bai hoc Mentor 7.csv')
+    .pipe(csv())
+    .on('data', (data) => results.push(data))
+    .on('end', async () => {
+      console.log(`📊 Đọc được ${results.length} dòng từ CSV`)
+      
+      let successCount = 0
+      let errorCount = 0
+      
+      for (const row of results) {
+        try {
+          const order = parseInt(row.STT)
+          const fileName = row['Tên File']
+          const rawUrl = row['Link Chia Sẻ']
+          
+          if (isNaN(order)) {
+            console.log(`⚠️ STT không hợp lệ: ${row.STT}`)
+            errorCount++
+            continue
+          }
+          
+          // Chuyển đổi link: /edit -> /preview (để embed)
+          let embedUrl = rawUrl
+          if (embedUrl.includes('/edit')) {
+            embedUrl = embedUrl.replace('/edit', '/preview')
+          }
+          
+          // Tạo title từ tên file (lấy phần sau số ngày)
+          const title = fileName.replace(/^Ngay\d+-P💎\s*/, '').trim()
+          
+          // Upsert lesson
+          await prisma.lesson.upsert({
+            where: {
+              courseId_order: {
+                courseId: COURSE_ID,
+                order: order
+              }
+            },
+            update: {
+              title: title,
+              videoUrl: embedUrl,
+              content: embedUrl
+            },
+            create: {
+              courseId: COURSE_ID,
+              order: order,
+              title: title,
+              videoUrl: embedUrl,
+              content: embedUrl
+            }
+          })
+          
+          successCount++
+          console.log(`✅ Lesson ${order}: ${title.substring(0, 50)}...`)
+          
+        } catch (error) {
+          errorCount++
+          console.error(`❌ Lỗi khi xử lý dòng:`, error)
+        }
+      }
+      
+      console.log(`\n🎉 Hoàn thành!`)
+      console.log(`   - Thành công: ${successCount}`)
+      console.log(`   - Lỗi: ${errorCount}`)
+      
+      await prisma.$disconnect()
+      process.exit(0)
+    })
+}
+
+main().catch(async (e) => {
+  console.error('❌ Lỗi nghiêm trọng:', e)
+  await prisma.$disconnect()
+  process.exit(1)
+})
