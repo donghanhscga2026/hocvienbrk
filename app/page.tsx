@@ -14,14 +14,15 @@ export default async function Home() {
     }),
     session?.user?.id
       ? (prisma as any).user.findUnique({
-        where: { id: parseInt(session.user.id) },
-        select: { name: true, id: true }
-      })
+          where: { id: parseInt(session.user.id) },
+          select: { name: true, id: true, image: true }
+        })
       : Promise.resolve(null)
   ]);
 
   const userName = userRecord?.name ?? null;
   const userId = userRecord?.id ?? null;
+  const userImage = userRecord?.image ?? session?.user?.image ?? null;
 
   let myCourseIds: Set<number> = new Set();
   let enrollmentsMap: Record<number, any> = {};
@@ -71,7 +72,7 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
-      <Header session={session} />
+      <Header session={session} userImage={userImage} />
 
       {/* Hero Section */}
       <section className="relative flex min-h-[320px] sm:min-h-[440px] flex-col items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-black px-4 pt-20 pb-12 text-center text-white overflow-hidden">

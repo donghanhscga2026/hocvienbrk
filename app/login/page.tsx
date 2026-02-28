@@ -5,11 +5,12 @@ import { useForm } from "react-hook-form"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
     const router = useRouter()
 
     const { register, handleSubmit, formState: { errors } } = useForm({
@@ -90,13 +91,22 @@ export default function LoginPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-zinc-300 mb-1.5">Mật khẩu</label>
-                            <input
-                                {...register("password", { required: "Vui lòng nhập mật khẩu" })}
-                                type="password"
-                                autoComplete="current-password"
-                                className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 text-white text-sm placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
-                                placeholder="••••••••"
-                            />
+                            <div className="relative">
+                                <input
+                                    {...register("password", { required: "Vui lòng nhập mật khẩu" })}
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete="current-password"
+                                    className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 pr-10 text-white text-sm placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    placeholder="••••••••"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
+                            </div>
                             {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
                         </div>
                         <button

@@ -4,13 +4,14 @@ import { useForm } from "react-hook-form"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Loader2, Eye, EyeOff } from "lucide-react"
 import { registerUser } from "../actions/auth-actions"
 
 export default function RegisterPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
     const router = useRouter()
 
     const { register, handleSubmit, formState: { errors } } = useForm({
@@ -143,14 +144,23 @@ export default function RegisterPage() {
                             <label className="block text-sm font-medium text-gray-700">
                                 Password
                             </label>
-                            <input
-                                {...register("password", {
-                                    required: "Password is required",
-                                    minLength: { value: 6, message: "Min 6 characters" }
-                                })}
-                                type="password"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                            />
+                            <div className="relative">
+                                <input
+                                    {...register("password", {
+                                        required: "Password is required",
+                                        minLength: { value: 6, message: "Min 6 characters" }
+                                    })}
+                                    type={showPassword ? "text" : "password"}
+                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
+                            </div>
                             {errors.password && (
                                 <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
                             )}

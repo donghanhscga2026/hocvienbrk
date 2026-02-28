@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import { User, Settings, LogOut, ChevronDown } from 'lucide-react'
 
-export default function Header({ session }: { session: any }) {
+export default function Header({ session, userImage }: { session: any, userImage?: string | null }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const userMenuRef = useRef<HTMLDivElement>(null)
@@ -56,10 +56,18 @@ export default function Header({ session }: { session: any }) {
                                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                                 className="flex items-center gap-2 rounded-full bg-zinc-800 px-3 py-1.5 pr-4 transition-all hover:bg-zinc-700"
                             >
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-yellow-400 text-xs font-black text-black">
-                                    {userInitials}
-                                </div>
-                                <span className="text-[11px] sm:text-[12px] font-black text-white whitespace-nowrap max-w-[100px] truncate">
+                                {userImage || session?.user?.image ? (
+                                    <img 
+                                        src={userImage || session?.user?.image} 
+                                        alt="Avatar"
+                                        className="h-7 w-7 rounded-full object-cover border-2 border-yellow-400"
+                                    />
+                                ) : (
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-yellow-400 text-xs font-black text-black">
+                                        {userInitials}
+                                    </div>
+                                )}
+                                <span className="text-[11px] sm:text-[12px] font-black text-white whitespace-nowrap max-w-[200px] truncate">
                                     {session.user?.name}
                                 </span>
                                 <ChevronDown className={`h-3 w-3 text-zinc-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
@@ -122,11 +130,6 @@ export default function Header({ session }: { session: any }) {
                         <Link href="/" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">TRANG CHỦ</Link>
                         <Link href="#khoa-hoc" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">KHÓA HỌC</Link>
                         <Link href="#" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">GIỚI THIỆU</Link>
-                        {session && (
-                            <>
-                                <Link href="/account-settings" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">CÀI ĐẶT TÀI KHOẢN</Link>
-                            </>
-                        )}
                         {!session ? (
                             <Link href="/login" onClick={() => setIsMenuOpen(false)} className="mt-4 rounded-xl bg-white py-4 text-black shadow-lg">ĐĂNG NHẬP</Link>
                         ) : (
