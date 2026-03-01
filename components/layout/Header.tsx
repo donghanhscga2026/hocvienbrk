@@ -26,7 +26,7 @@ export default function Header({ session, userImage }: { session: any, userImage
         : '?'
 
     return (
-        <header className="fixed top-0 z-50 w-full bg-black text-white shadow-xl border-b border-white/5">
+        <header className="fixed top-0 z-[60] w-full bg-black text-white shadow-xl border-b border-white/5">
             <div className="container mx-auto flex h-16 items-center justify-between px-4 lg:px-8">
                 {/* Logo & Brand */}
                 <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
