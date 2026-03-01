@@ -16,9 +16,9 @@ export default async function Home() {
     }),
     session?.user?.id
       ? (prisma as any).user.findUnique({
-          where: { id: parseInt(session.user.id) },
-          select: { name: true, id: true, image: true }
-        })
+        where: { id: parseInt(session.user.id) },
+        select: { name: true, id: true, image: true }
+      })
       : Promise.resolve(null),
     getRandomMessage()
   ]);
@@ -78,37 +78,9 @@ export default async function Home() {
       <Header session={session} userImage={userImage} />
 
       {/* Hero Section */}
-      <section className="relative flex min-h-[320px] sm:min-h-[440px] flex-col items-center justify-center bg-gradient-to-br from-black via-zinc-900 to-black px-4 pt-20 pb-12 text-center text-white overflow-hidden">
-        {/* Subtle Decorative Elements */}
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-yellow-400/5 blur-[100px] rounded-full"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-yellow-400/5 blur-[100px] rounded-full"></div>
-
-        <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
-          <h1 className="mb-4 flex flex-col gap-0 sm:gap-0 font-black tracking-tighter">
-            <span className="text-xl sm:text-5xl lg:text-6xl uppercase text-white drop-shadow-2xl opacity-90 pb-2">HỌC VIỆN BRK</span>
-            <span className="text-glow-3d text-lg sm:text-4xl lg:text-5xl uppercase drop-shadow-2xl leading-tight">NGÂN HÀNG PHƯỚC BÁU</span>
-          </h1>
-          <p className="mb-10 text-lg sm:text-2xl font-medium text-gray-400 italic">
-            Nơi khơi nguồn tri thức, xây dựng tương lai
-          </p>
-          <div className="mx-auto h-1.5 w-32 rounded-full bg-gradient-to-r from-transparent via-yellow-400/50 to-transparent"></div>
-        </div>
-      </section>
-
-      {/* Intro Message */}
-      <section className="container mx-auto max-w-5xl px-4 py-8 sm:py-12 text-center">
-        <div className="rounded-2xl sm:rounded-3xl bg-white p-6 sm:p-8 shadow-sm border border-purple-50">
-          <h2 className="mb-4 text-xl sm:text-2xl font-bold text-[#7c3aed]">
-            {session?.user
-              ? `Mến chào ${userName || 'Học viên'} -   Mã học tập ${userId}!`
-              : 'Xin chào bạn!'}
-          </h2>
-          {/* Message Card - Hiển thị thông điệp ngẫu nhiên */}
-      <MessageCard message={message} />
-        </div>
-      </section>
-
-      
+      <div className="pt-1">
+        <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
+      </div>
 
       {/* Course List Section */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
