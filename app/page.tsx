@@ -78,7 +78,7 @@ export default async function Home() {
       <Header session={session} userImage={userImage} />
 
       {/* Hero Section */}
-      <div className="pt-1">
+      <div className="pt-16">
         <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
       </div>
 
@@ -88,9 +88,9 @@ export default async function Home() {
           <>
             {/* Khóa học của tôi */}
             {myCourses.length > 0 && (
-              <div className="mb-12">
+              <div className="mb-12 -mx-4 px-4 py-8 bg-zinc-950 rounded-b-3xl">
                 <div className="mb-8 text-center">
-                  <h2 className="text-2xl font-bold text-gray-900">Khóa học của tôi</h2>
+                  <h2 className="text-2xl font-bold text-white">Khóa học của tôi</h2>
                   <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500"></div>
                 </div>
                 <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -101,6 +101,7 @@ export default async function Home() {
                       isLoggedIn={!!session}
                       enrollment={enrollmentsMap[course.id] || null}
                       priority={index < 3}
+                      darkMode={true}
                     />
                   ))}
                 </div>

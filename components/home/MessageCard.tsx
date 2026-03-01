@@ -40,7 +40,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
     return (
         <>
             {/* Tỉ lệ 5:3 chuẩn xác bằng Aspect Ratio - Giúp trình duyệt tính toán Layout cực nhanh */}
-            <div className="relative w-full aspect-[5/3] sm:overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl border border-white/5 group cursor-pointer"
+            <div className="relative w-full aspect-[5/3] sm:overflow-hidden rounded-2xl md:rounded-none shadow-2xl border border-white/5 group cursor-pointer"
                 onClick={() => setIsOpen(true)}>
 
                 {/* ── Ảnh nền tối ưu ── */}

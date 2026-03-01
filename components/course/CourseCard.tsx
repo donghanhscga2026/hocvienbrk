@@ -16,9 +16,10 @@ interface CourseCardProps {
         totalLessons: number
     } | null
     priority?: boolean
+    darkMode?: boolean
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment, priority = false }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment, priority = false, darkMode = false }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [loading, setLoading] = useState(false)
 
@@ -77,7 +78,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
 
     return (
         <>
-            <div className="group overflow-hidden rounded-2xl bg-white shadow-lg transition-all hover:shadow-2xl border border-gray-100 flex flex-col h-full">
+            <div className={`group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full ${darkMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-gray-100'}`}>
                 {/* Ảnh bìa */}
                 <div className="relative aspect-[16/9] w-full overflow-hidden shrink-0">
                     <Image
@@ -95,7 +96,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                     {/* Title */}
                     <div className="mb-3 flex items-center gap-2.5">
                         <span className="text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
-                        <h3 className="text-base sm:text-lg font-black text-black leading-tight truncate flex-1"
+                        <h3 className={`text-base sm:text-lg font-black leading-tight truncate flex-1 ${darkMode ? 'text-white' : 'text-black'}`}
                             style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
                             {course.name_lop}
                         </h3>
@@ -120,7 +121,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                     </div>
 
                     {/* Mô tả */}
-                    <p className="mb-5 flex-grow text-[14px] font-medium text-gray-500 leading-relaxed"
+                    <p className={`mb-5 flex-grow text-[14px] font-medium leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}
                         dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }} />
 
                     {/* Button */}
