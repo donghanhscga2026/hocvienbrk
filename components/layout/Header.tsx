@@ -21,7 +21,7 @@ export default function Header({ session, userImage }: { session: any, userImage
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const userInitials = session?.user?.name 
+    const userInitials = session?.user?.name
         ? session.user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
         : '?'
 
@@ -54,11 +54,11 @@ export default function Header({ session, userImage }: { session: any, userImage
                         <div className="relative" ref={userMenuRef}>
                             <button
                                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                                className="flex items-center gap-2 rounded-full bg-zinc-800 px-3 py-1.5 pr-4 transition-all hover:bg-zinc-700"
+                                className="flex items-center gap-1.5 rounded-full bg-zinc-800 px-2 py-1.5 transition-all hover:bg-zinc-700"
                             >
                                 {userImage || session?.user?.image ? (
-                                    <img 
-                                        src={userImage || session?.user?.image} 
+                                    <img
+                                        src={userImage || session?.user?.image}
                                         alt="Avatar"
                                         className="h-7 w-7 rounded-full object-cover border-2 border-yellow-400"
                                     />
@@ -67,9 +67,6 @@ export default function Header({ session, userImage }: { session: any, userImage
                                         {userInitials}
                                     </div>
                                 )}
-                                <span className="text-[11px] sm:text-[12px] font-black text-white whitespace-nowrap max-w-[200px] truncate">
-                                    {session.user?.name}
-                                </span>
                                 <ChevronDown className={`h-3 w-3 text-zinc-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
 
