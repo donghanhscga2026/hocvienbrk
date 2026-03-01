@@ -175,6 +175,15 @@ model LessonComment {
   @@index([userId])
 }
 
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String
+  detail    String
+  imageUrl  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
 enum EnrollmentStatus {
   PENDING
   ACTIVE
