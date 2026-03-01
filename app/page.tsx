@@ -1,13 +1,15 @@
 import { auth } from "@/auth";
 import Header from "@/components/layout/Header";
 import CourseCard from "@/components/course/CourseCard";
+import MessageCard from "@/components/home/MessageCard";
 import prisma from "@/lib/prisma";
+import { getRandomMessage } from "./actions/message-actions";
 
 export default async function Home() {
   const session = await auth();
 
-  // Parallel: lấy user + courses cùng lúc (tiết kiệm 1 round-trip ~150ms)
-  const [courses, userRecord] = await Promise.all([
+  // Parallel: lấy user + courses + message cùng lúc
+  const [courses, userRecord, message] = await Promise.all([
     (prisma as any).course.findMany({
       where: { status: true },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
@@ -17,7 +19,8 @@ export default async function Home() {
           where: { id: parseInt(session.user.id) },
           select: { name: true, id: true, image: true }
         })
-      : Promise.resolve(null)
+      : Promise.resolve(null),
+    getRandomMessage()
   ]);
 
   const userName = userRecord?.name ?? null;
@@ -82,8 +85,8 @@ export default async function Home() {
 
         <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700 relative z-10">
           <h1 className="mb-4 flex flex-col gap-0 sm:gap-0 font-black tracking-tighter">
-            <span className="text-3xl sm:text-5xl lg:text-6xl uppercase text-white drop-shadow-2xl opacity-90 pb-2">HỌC VIỆN BRK</span>
-            <span className="text-glow-3d text-2xl sm:text-4xl lg:text-5xl uppercase drop-shadow-2xl leading-tight">NGÂN HÀNG PHƯỚC BÁU</span>
+            <span className="text-xl sm:text-5xl lg:text-6xl uppercase text-white drop-shadow-2xl opacity-90 pb-2">HỌC VIỆN BRK</span>
+            <span className="text-glow-3d text-lg sm:text-4xl lg:text-5xl uppercase drop-shadow-2xl leading-tight">NGÂN HÀNG PHƯỚC BÁU</span>
           </h1>
           <p className="mb-10 text-lg sm:text-2xl font-medium text-gray-400 italic">
             Nơi khơi nguồn tri thức, xây dựng tương lai
@@ -100,13 +103,12 @@ export default async function Home() {
               ? `Mến chào ${userName || 'Học viên'} -   Mã học tập ${userId}!`
               : 'Xin chào bạn!'}
           </h2>
-          <p className="mx-auto max-w-3xl text-sm sm:text-base leading-relaxed text-gray-700">
-            Cổng học viện này là nơi tập hợp những tri thức thực chiến đỉnh cao về kinh doanh online,
-            nhân hiệu và A.I. Chúng tôi ở đây để đồng hành cùng bạn trên hành trình lan tỏa giá trị
-            và kiến tạo sự thịnh vượng bền vững từ gốc.
-          </p>
+          {/* Message Card - Hiển thị thông điệp ngẫu nhiên */}
+      <MessageCard message={message} />
         </div>
       </section>
+
+      
 
       {/* Course List Section */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
