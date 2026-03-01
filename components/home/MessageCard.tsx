@@ -59,82 +59,47 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                         <div className="w-full h-full bg-gradient-to-br from-black via-zinc-900 to-indigo-950" />
                     )}
                     {/* Lớp phủ tối nhẹ để nổi bật chữ */}
-                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-colors duration-500 group-hover:bg-black/20" />
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-colors duration-500 group-hover:bg-black/33" />
                 </div>
 
                 {/* ── TOÀN BỘ NỘI DUNG: Flex layout ── */}
 
                 <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[70px] pb-[4%] text-center">
-
-
-
                     {/* ── TOP: Tiêu đề & Lời chào ── */}
-
                     <div className="flex flex-col items-center shrink-0">
-
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
-
                             <span
-
-                                className="uppercase text-white drop-shadow-2xl"
-
-                                style={{ fontSize: 'clamp(1.5rem, 6.2vw, 5rem)' }}
-
+                                className="uppercase text-white drop-shadow-xl"
+                                style={{ fontSize: 'clamp(0.5rem, 5vw, 4rem)' }}
                             >
-
                                 HỌC VIỆN BRK
-
                             </span>
 
                             <span
-
-                                className="text-glow-3d uppercase drop-shadow-2xl"
-
-                                style={{ fontSize: 'clamp(0.85rem, 5.2vw, 4.5rem)' }}
-
+                                className="text-glow-3d uppercase drop-shadow-xl"
+                                style={{ fontSize: 'clamp(0.5rem, 4vw, 3rem)' }}
                             >
-
                                 NGÂN HÀNG PHƯỚC BÁU
-
                             </span>
 
                             <span
-
                                 className="rounded-full bg-white/10 border border-white/20 backdrop-blur-md"
-
                                 style={{
-
                                     padding: 'clamp(3px,0.8%,8px) clamp(8px,4%,20px)',
-
-                                    marginTop: 'clamp(6px, 2%, 16px)'
-
+                                    marginTop: 'clamp(10px, 2%, 16px)'
                                 }}
-
                             >
-
                                 <p
-
                                     className="font-semibold text-white whitespace-nowrap"
-
                                     style={{ fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)' }}
-
                                 >
-
                                     {session?.user
-
                                         ? `Mến chào ${userName || 'Học viên'} - Mã học tập ${userId}`
-
                                         : 'Mến chào bạn hữu đường xa!'}
-
                                 </p>
-
                             </span>
-
                         </h1>
-
                     </div>
-
-
 
                     {/* ── BOTTOM: Thông điệp (Chiếm trọn không gian dưới dòng Mến chào) ── */}
                     <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full"
@@ -150,7 +115,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 className="text-yellow-400 font-medium italic leading-tight drop-shadow-lg whitespace-pre-line overflow-visible"
                                 style={{
                                     /* Font size đơn giản: tự động điều chỉnh theo độ dài nội dung */
-                                    fontSize: `clamp(0.75rem, 2.5vw, 2rem)`,
+                                    fontSize: `clamp(0.7rem, 2.5vw, 2rem)`,
                                 }}
                             >
                                 &ldquo;{displayMessage.content}&rdquo;
@@ -179,9 +144,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                             Nhấn để xem chi tiết →
                         </p>
                     </div>
-
                 </div>
-
             </div>
             {/* ── Kết thúc card ảnh nền ── */}
 
@@ -205,7 +168,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 <div className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center mb-4 shadow-xl scale-110">
                                     <Lightbulb className="w-6 h-6 text-black" />
                                 </div>
-                                <p className="text-yellow-400 text-xl font-bold italic leading-tight drop-shadow-md">
+                                <p className="text-yellow-400 text-xl font-bold italic leading-tight whitespace-pre-line drop-shadow-md">
                                     &ldquo;{displayMessage.content}&rdquo;
                                 </p>
                             </div>
@@ -216,7 +179,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 {displayMessage.detail}
                             </div>
                             <p className="text-zinc-600 text-[11px] text-center pt-2 italic tracking-widest">
-                                💡 HỌC VIỆN BRK - NHÂN HIỆU TỪ GỐC
+                                💡 HỌC VIỆN BRK - NGÂN HÀNG PHƯỚC BÁU
                             </p>
                         </div>
 
