@@ -73,17 +73,17 @@ export default async function Home() {
   const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Header */}
       <Header session={session} userImage={userImage} />
 
-      {/* Hero Section */}
-      <div className="pt-16">
+      {/* Hero Section - Fixed on mobile */}
+      <div className="md:static md:block fixed top-16 left-0 right-0 z-30">
         <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
       </div>
 
       {/* Course List Section */}
-      <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
+      <section id="khoa-hoc" className="md:container md:mx-auto md:px-4 pb-24 pt-[20rem] md:pt-0">
         {session?.user ? (
           <>
             {/* Khóa học của tôi */}
