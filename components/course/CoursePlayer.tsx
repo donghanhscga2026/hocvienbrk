@@ -10,7 +10,8 @@ import StartDateModal from "./StartDateModal"
 import {
     confirmStartDateAction,
     saveVideoProgressAction,
-    submitAssignmentAction
+    submitAssignmentAction,
+    updateLastLessonAction
 } from "@/app/actions/course-actions"
 import { ArrowLeft, ListVideo, FileText, X, ClipboardCheck } from "lucide-react"
 import Link from "next/link"
@@ -25,25 +26,39 @@ type MobileTab = 'list' | 'content' | 'record'
 
 export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
+    
+    // Lọc progress chỉ lấy các bài học không bị reset (lộ trình hiện tại)
+    const filteredLessonProgress = enrollment.lessonProgress.filter((p: any) => {
+        return p.status !== 'RESET' // Chỉ hiển thị progress chưa bị reset
+    })
+    
     const [currentLessonId, setCurrentLessonId] = useState<string>(() => {
-        // Tìm bài học chưa hoàn thành gần nhất (theo updatedAt)
-        const incomplete = enrollment.lessonProgress
+        // Ưu tiên: lastLessonId đã lưu → bài chưa hoàn thành gần nhất → bài đầu tiên
+        if (enrollment.lastLessonId) {
+            return enrollment.lastLessonId
+        }
+        
+        const incomplete = filteredLessonProgress
             .filter((p: any) => p.status !== 'COMPLETED')
             .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
-        // Nếu có bài chưa hoàn thành, lấy bài gần nhất; không thì lấy bài đầu tiên
         return incomplete[0]?.lessonId || course.lessons[0]?.id
     })
     const [videoPercent, setVideoPercent] = useState(0)
     const [mobileTab, setMobileTab] = useState<MobileTab>('content')
     const [progressMap, setProgressMap] = useState<Record<string, any>>(() =>
-        enrollment.lessonProgress.reduce((acc: any, p: any) => {
+        filteredLessonProgress.reduce((acc: any, p: any) => {
             acc[p.lessonId] = p
             return acc
         }, {})
     )
     const [showContentModal, setShowContentModal] = useState(false)
     const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
+    const prevMobileTabRef = useRef(mobileTab)
+    const prevShowContentModalRef = useRef(showContentModal)
+    
+    // Lưu video progress để auto-save
+    const videoProgressRef = useRef<{ maxTime: number; duration: number } | null>(null)
 
     // JS media query — kiểm tra thiết bị client-side
     const [isMobile, setIsMobile] = useState(false)
@@ -54,6 +69,84 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         mq.addEventListener('change', handler)
         return () => mq.removeEventListener('change', handler)
     }, [])
+
+    // Auto-save draft + video progress khi chuyển tab hoặc mở danh sách bài
+    useEffect(() => {
+        const prevTab = prevMobileTabRef.current
+        const prevModal = prevShowContentModalRef.current
+        
+        // Chỉ save khi: tab thay đổi HOẶC modal mở (từ false -> true)
+        const tabChanged = mobileTab !== prevTab
+        const modalOpened = showContentModal && !prevModal
+        
+        if (tabChanged || modalOpened) {
+            // Lưu assignment draft
+            if (assignmentFormRef.current) {
+                assignmentFormRef.current()
+            }
+            // Lưu video progress
+            if (videoProgressRef.current && currentLessonId) {
+                saveVideoProgressAction({
+                    enrollmentId: enrollment.id,
+                    lessonId: currentLessonId,
+                    maxTime: videoProgressRef.current.maxTime,
+                    duration: videoProgressRef.current.duration
+                })
+            }
+        }
+        
+        prevMobileTabRef.current = mobileTab
+        prevShowContentModalRef.current = showContentModal
+    }, [mobileTab, showContentModal, currentLessonId, enrollment.id])
+
+    // Auto-save draft + video progress khi rời khỏi trang
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            // Lưu assignment draft
+            if (assignmentFormRef.current) {
+                assignmentFormRef.current()
+            }
+            // Lưu video progress
+            if (videoProgressRef.current && currentLessonId) {
+                saveVideoProgressAction({
+                    enrollmentId: enrollment.id,
+                    lessonId: currentLessonId,
+                    maxTime: videoProgressRef.current.maxTime,
+                    duration: videoProgressRef.current.duration
+                })
+            }
+        }
+        
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }, [currentLessonId, enrollment.id])
+
+    // Lưu bài học hiện tại vào database khi load trang
+    useEffect(() => {
+        if (currentLessonId && enrollment.id) {
+            updateLastLessonAction(enrollment.id, currentLessonId)
+        }
+    }, [currentLessonId, enrollment.id])
+
+    // Cập nhật progressMap khi enrollment thay đổi (sau khi reset)
+    useEffect(() => {
+        // Lọc progress chỉ lấy các bài học không bị reset
+        const newFilteredProgress = enrollment.lessonProgress.filter((p: any) => {
+            return p.status !== 'RESET'
+        })
+        
+        const newProgressMap = newFilteredProgress.reduce((acc: any, p: any) => {
+            acc[p.lessonId] = p
+            return acc
+        }, {})
+        
+        setProgressMap(newProgressMap)
+        
+        // Đặt lại bài học hiện tại về bài 1 nếu đã reset
+        if (enrollment.resetAt) {
+            setCurrentLessonId(course.lessons[0]?.id)
+        }
+    }, [enrollment.resetAt])
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
@@ -98,6 +191,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setVideoPercent(0)
         setMobileTab('content')
         setShowContentModal(false)
+        
+        // Lưu bài học cuối đang học vào database
+        await updateLastLessonAction(enrollment.id, lessonId)
     }
 
     const handleConfirmStartDate = async (date: Date) => {
@@ -108,6 +204,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
         if (!currentLessonId || duration === 0) return
         setVideoPercent(Math.min(100, Math.round((maxTime / duration) * 100)))
+        
+        // Lưu vào ref để auto-save
+        videoProgressRef.current = { maxTime, duration }
+        
         await saveVideoProgressAction({
             enrollmentId: enrollment.id,
             lessonId: currentLessonId,
@@ -149,7 +249,17 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const handleResetStartDate = async (date: Date) => {
         await confirmStartDateAction(course.id, date)
-        setEnrollment((prev: any) => ({ ...prev, startedAt: date }))
+        const now = new Date()
+        
+        // Cập nhật enrollment với resetAt và lọc bỏ progress cũ
+        const newLessonProgress = enrollment.lessonProgress.filter((p: any) => p.status !== 'RESET')
+        
+        setEnrollment((prev: any) => ({ 
+            ...prev, 
+            startedAt: date, 
+            resetAt: now,
+            lessonProgress: newLessonProgress // Cập nhật lessonProgress mới
+        }))
     }
 
     const completedCount = Object.values(progressMap).filter((p: any) => p.status === 'COMPLETED').length
@@ -195,6 +305,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         onLessonSelect={handleLessonSelect}
                         progress={progressMap}
                         startedAt={startedAt}
+                        resetAt={enrollment.resetAt}
                         onResetStartDate={handleResetStartDate}
                     />
                 )}
@@ -266,6 +377,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             onLessonSelect={handleLessonSelect}
                                             progress={progressMap}
                                             startedAt={startedAt}
+                                            resetAt={enrollment.resetAt}
                                             onResetStartDate={handleResetStartDate}
                                         />
                                     </div>
@@ -455,13 +567,31 @@ function LessonBtn({ lesson, prog, isActive, unlocked, onLessonSelect }: any) {
     )
 }
 
-function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progress, startedAt, onResetStartDate }: any) {
+function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progress, startedAt, resetAt, onResetStartDate }: any) {
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dateInput, setDateInput] = useState(toInputValueMobile(startedAt))
     const [saving, setSaving] = useState(false)
 
+    // Lọc progress chỉ hiển thị các bài học không bị reset (lộ trình hiện tại)
+    const filteredProgress = Object.entries(progress).reduce((acc: any, [lessonId, p]: [string, any]) => {
+        if (p.status !== 'RESET') {
+            acc[lessonId] = p
+        }
+        return acc
+    }, {})
+
     const handleReset = async () => {
         if (!dateInput) return
+        
+        // Hiển thị cảnh báo trước khi reset
+        const confirmReset = window.confirm(
+            "⚠️ Cảnh báo: Dữ liệu học tập cũ sẽ không được tính vào lộ trình mới.\n\n" +
+            "Bạn sẽ bắt đầu lại từ bài 1. Tiến trình cũ vẫn lưu trong hệ thống để admin xem lại.\n\n" +
+            "Nhấn OK để xác nhận đổi ngày bắt đầu mới."
+        )
+        
+        if (!confirmReset) return
+        
         setSaving(true)
         try {
             await onResetStartDate(new Date(dateInput))
@@ -471,7 +601,7 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
         }
     }
 
-    const completedCount = lessons.filter((l: any) => progress[l.id]?.status === 'COMPLETED').length
+    const completedCount = lessons.filter((l: any) => filteredProgress[l.id]?.status === 'COMPLETED').length
     const totalCount = lessons.length
 
     return (
@@ -526,9 +656,9 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
             {/* Tất cả bài học — cuộn từ bài 1 */}
             <div className="flex-1 overflow-y-auto overscroll-contain">
                 {lessons.map((lesson: any) => {
-                    const prog = progress[lesson.id]
+                    const prog = filteredProgress[lesson.id]
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = isLessonUnlockedMobile(lesson, lessons, progress)
+                    const unlocked = isLessonUnlockedMobile(lesson, lessons, filteredProgress)
                     return (
                         <LessonBtn key={lesson.id} lesson={lesson} prog={prog} isActive={isActive} unlocked={unlocked} onLessonSelect={onLessonSelect} />
                     )

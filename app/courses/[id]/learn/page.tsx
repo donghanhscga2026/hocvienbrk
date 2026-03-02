@@ -16,7 +16,13 @@ export default async function CourseLearnPage({ params }: { params: Promise<{ id
             course: { id_khoa: id },
             status: 'ACTIVE'
         },
-        include: {
+        select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            resetAt: true,
+            lastLessonId: true,
+            createdAt: true,
             course: {
                 include: {
                     lessons: {
@@ -25,6 +31,9 @@ export default async function CourseLearnPage({ params }: { params: Promise<{ id
                 }
             },
             lessonProgress: {
+                where: {
+                    status: { not: 'RESET' } // Chỉ lấy progress chưa bị reset
+                },
                 select: {
                     lessonId: true,
                     status: true,
@@ -34,7 +43,8 @@ export default async function CourseLearnPage({ params }: { params: Promise<{ id
                     maxTime: true,
                     duration: true,
                     submittedAt: true,
-                    updatedAt: true
+                    updatedAt: true,
+                    createdAt: true
                 }
             }
         }
