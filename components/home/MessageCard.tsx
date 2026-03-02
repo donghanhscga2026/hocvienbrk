@@ -64,7 +64,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
 
                 {/* ── TOÀN BỘ NỘI DUNG: Flex layout ── */}
 
-                <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[10px] md:pt-[70px] pb-[4%] text-center">
+                <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[30px] md:pt-[70px] pb-[4%] text-center">
                     {/* ── TOP: Tiêu đề & Lời chào ── */}
                     <div className="flex flex-col items-center shrink-0">
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">

@@ -121,8 +121,12 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                     </div>
 
                     {/* Mô tả */}
-                    <p className={`mb-5 flex-grow text-[14px] font-medium leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}
-                        dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }} />
+                    <div
+  className={`mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words ${
+    darkMode ? 'text-gray-300' : 'text-gray-500'
+  }`}
+  dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }}
+/>
 
                     {/* Button */}
                     <button
