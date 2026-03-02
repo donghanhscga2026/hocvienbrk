@@ -39,6 +39,7 @@ export default async function Home() {
         courseId: true,
         status: true,
         startedAt: true,
+        resetAt: true,
         course: {
           select: {
             lessons: {
@@ -47,16 +48,26 @@ export default async function Home() {
           }
         },
         lessonProgress: {
+          where: {
+            status: { not: 'RESET' } // Chỉ lấy progress chưa bị reset
+          },
           select: {
             lessonId: true,
-            status: true
+            status: true,
+            createdAt: true
           }
         }
       }
     });
     enrollmentsMap = enrollments.reduce((acc: Record<number, any>, e: any) => {
       const totalLessons = e.course?.lessons?.length || 0;
-      const completedCount = e.lessonProgress?.filter((lp: any) => lp.status === 'COMPLETED').length || 0;
+      
+      // Lọc progress chỉ tính các bài học không bị reset
+      const filteredProgress = e.lessonProgress?.filter((lp: any) => {
+        return lp.status !== 'RESET'
+      }) || []
+      
+      const completedCount = filteredProgress.filter((lp: any) => lp.status === 'COMPLETED').length;
       myCourseIds.add(e.courseId);
       acc[e.courseId] = {
         status: e.status,

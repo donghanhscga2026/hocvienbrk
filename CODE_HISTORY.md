@@ -3008,3 +3008,69 @@ MÔ TẢ CHI TIẾT:
 ================================================================================
 HẾT PHIÊN BẢN 3
 ================================================================================
+
+================================================================================
+PHIÊN BẢN: 4
+NGÀY: 2026-03-02
+THAY ĐỔI: Nâng cấp StartDateModal với calendar UI, thêm tính năng reset lộ trình học
+
+FILES ĐƯỢC SỬA:
+- components/course/StartDateModal.tsx: 
+  * Thêm calendar UI với react-day-picker
+  * Giới hạn chọn ngày trong 90 ngày
+  * Hiển thị deadline dự kiến và số ngày còn lại
+  * Sử dụng date-fns cho xử lý ngày tháng
+
+MÔ TẢ CHI TIẾT:
+1. StartDateModal.tsx:
+   - Sử dụng DayPicker từ react-day-picker thay cho input date
+   - Giới hạn chọn ngày: từ hôm nay đến +90 ngày
+   - Hiển thị thông tin:
+     * Ngày bắt đầu đã chọn
+     * Deadline dự kiến (startedAt + 60 ngày)
+     * Số ngày còn lại từ hôm nay
+   - Sử dụng date-fns với locale việt nam
+
+2. Cần cài đặt dependencies:
+   - npm install date-fns react-day-picker
+
+================================================================================
+HẾT PHIÊN BẢN 4
+================================================================================
+
+================================================================================
+PHIÊN BẢN: 5
+NGÀY: 2026-03-02
+THAY ĐỔI: Thêm tính năng reset lộ trình học - đặt lại ngày bắt đầu mới
+
+FILES ĐƯỢC THÊM:
+- prisma/schema.prisma: Thêm trường resetAt vào Enrollment
+
+FILES ĐƯỢC SỬA:
+- app/actions/course-actions.ts: 
+  * confirmStartDateAction - thêm cập nhật resetAt khi đổi ngày bắt đầu
+- components/course/CoursePlayer.tsx:
+  * Thêm confirm dialog (alert) khi đổi ngày bắt đầu
+  * Sửa logic hiển thị tiến độ: lọc theo resetAt
+
+MÔ TẢ CHI TIẾT:
+1. Database - Thêm trường resetAt:
+   - model Enrollment: thêm resetAt DateTime? 
+   - Lưu thời điểm reset để phân biệt lộ trình cũ/mới
+   - Dữ liệu cũ không bị xóa, chỉ không hiển thị trong lộ trình mới
+
+2. Server Action - confirmStartDateAction:
+   - Cập nhật startedAt = ngày mới
+   - Cập nhật resetAt = thời điểm hiện tại (new Date())
+   - Revalidate path để refresh dữ liệu
+
+3. CoursePlayer.tsx:
+   - Thêm alert cảnh báo trước khi xác nhận:
+     "Dữ liệu học tập cũ sẽ không được tính vào lộ trình mới. 
+      Bạn sẽ bắt đầu lại từ bài 1. Tiến trình cũ vẫn lưu trong hệ thống."
+   - Sửa logic progress: chỉ hiển thị các lesson được tạo SAU resetAt
+   - Nếu resetAt = null (chưa reset), hiển thị tất cả
+
+================================================================================
+HẾT PHIÊN BẢN 5
+================================================================================

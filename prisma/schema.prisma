@@ -131,6 +131,8 @@ model Enrollment {
   link_anh_coc String?
   phi_coc      Int              @default(0)
   startedAt    DateTime?
+  resetAt      DateTime?        // Thời điểm reset lộ trình học
+  lastLessonId String?          // Bài học cuối đang học (để quay lại đúng bài)
   challengeDays Int?
   course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -148,7 +150,7 @@ model LessonProgress {
   scores       Json?      // {vid: 2, ref: 2, prac: 3, support: 2, timing: 1/-1}
   totalScore   Int        @default(0)
   assignment   Json?      // {reflection: "", links: [], supports: []}
-  status       String     @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED
+  status       String     @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, RESET (archived)
   maxTime      Float      @default(0)
   duration     Float      @default(0)
   submittedAt  DateTime?
@@ -157,9 +159,9 @@ model LessonProgress {
   enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  @@unique([enrollmentId, lessonId])
   @@index([enrollmentId])   // Tăng tốc query theo enrollment
   @@index([lessonId])       // Tăng tốc query comment/progress theo lesson
+  @@index([status])         // Tăng tốc lọc theo status
 }
 
 model LessonComment {

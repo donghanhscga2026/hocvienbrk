@@ -17,6 +17,7 @@ interface LessonSidebarProps {
     onLessonSelect: (lessonId: string) => void
     progress: Record<string, any>
     startedAt: Date | null
+    resetAt: Date | null
     onResetStartDate: (date: Date) => Promise<void>
 }
 
@@ -41,14 +42,33 @@ function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<st
 }
 
 export default function LessonSidebar({
-    lessons, currentLessonId, onLessonSelect, progress, startedAt, onResetStartDate
+    lessons, currentLessonId, onLessonSelect, progress, startedAt, resetAt, onResetStartDate
 }: LessonSidebarProps) {
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dateInput, setDateInput] = useState(toInputValue(startedAt))
     const [saving, setSaving] = useState(false)
+    
+    // Lọc progress chỉ hiển thị các bài học không bị reset (lộ trình hiện tại)
+    const filteredProgress = Object.entries(progress).reduce((acc, [lessonId, p]: [string, any]) => {
+        // Chỉ hiển thị progress không có status RESET
+        if (p.status !== 'RESET') {
+            acc[lessonId] = p
+        }
+        return acc
+    }, {} as Record<string, any>)
 
     const handleReset = async () => {
         if (!dateInput) return
+        
+        // Hiển thị cảnh báo trước khi reset
+        const confirmReset = window.confirm(
+            "⚠️ Cảnh báo: Dữ liệu học tập cũ sẽ không được tính vào lộ trình mới.\n\n" +
+            "Bạn sẽ bắt đầu lại từ bài 1. Tiến trình cũ vẫn lưu trong hệ thống để admin xem lại.\n\n" +
+            "Nhấn OK để xác nhận đổi ngày bắt đầu mới."
+        )
+        
+        if (!confirmReset) return
+        
         setSaving(true)
         try {
             await onResetStartDate(new Date(dateInput))
@@ -117,10 +137,10 @@ export default function LessonSidebar({
             {/* ── Danh sách bài ── */}
             <div className="flex-1 overflow-y-auto">
                 {lessons.map((lesson) => {
-                    const prog = progress[lesson.id]
+                    const prog = filteredProgress[lesson.id]
                     const isCompleted = prog?.status === 'COMPLETED'
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = isLessonUnlocked(lesson, lessons, progress)
+                    const unlocked = isLessonUnlocked(lesson, lessons, filteredProgress)
 
                     return (
                         <button
