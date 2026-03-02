@@ -2960,3 +2960,51 @@ MÔ TẢ CHI TIẾT:
 ================================================================================
 HẾT PHIÊN BẢN 2
 ================================================================================
+
+================================================================================
+PHIÊN BẢN: 3
+NGÀY: 2026-03-02
+THAY ĐỔI: Thêm tính năng MessageCard, tự động chấm điểm video, dark mode cho khóa học
+
+FILES ĐƯỢC THÊM:
+- components/home/MessageCard.tsx: Component hiển thị thông điệp động với ảnh nền
+- app/actions/message-actions.ts: Server action lấy thông điệp ngẫu nhiên
+- scripts/seed-messages.ts: Script seed 10 messages với ảnh nền từ postimg.cc
+- prisma/schema.prisma: Thêm model Message
+
+FILES ĐƯỢC SỬA:
+- components/course/CourseCard.tsx: Thêm prop darkMode cho phần "Khóa học của tôi"
+- components/course/AssignmentForm.tsx: Thêm auto-scoring +2 cho lesson không có video
+- next.config.ts: Thêm domain postimg.cc cho Image component
+- components/home/MessageCard.tsx: 
+  * pt-[30px] md:pt-[70px] - Điều chỉnh padding top cho mobile/desktop
+  * bo tròn góc trên desktop: md:rounded-none bỏ bo tròn
+  * Font size sử dụng clamp() để tự động điều chỉnh theo màn hình
+- app/page.tsx:
+  * darkMode={true} cho "Khóa học của tôi"
+  * Nền tối bg-zinc-950 cho section "Khóa học của tôi"
+  * Bỏ bo tròn góc trên: rounded-b-3xl
+
+MÔ TẢ CHI TIẾT:
+1. MessageCard.tsx:
+   - Hiển thị thông điệp ngẫu nhiên từ database
+   - Ảnh nền từ postimg.cc với lớp phủ tối
+   - Responsive: font size tự động với clamp()
+   - Modal chi tiết khi click vào card
+
+2. Auto-scoring cho lesson không có video:
+   - AssignmentForm nhận prop videoUrl
+   - Nếu không có videoUrl hoặc rỗng -> auto cộng 2 điểm
+
+3. Dark mode cho "Khóa học của tôi":
+   - Nền: bg-zinc-950 thay vì mặc định
+   - CourseCard với darkMode={true}: text-white, bg-zinc-900
+
+4. Layout:
+   - Header: fixed top-0
+   - MessageCard: pt-16 (padding-top = 64px để tránh header)
+   - Container: mx-auto với lề 2 bên
+
+================================================================================
+HẾT PHIÊN BẢN 3
+================================================================================
