@@ -15,6 +15,7 @@ interface AssignmentFormProps {
     onSubmit: (data: any) => Promise<{ success: boolean; totalScore: number } | void>
     initialData?: any
     onSaveDraft?: React.RefObject<(() => Promise<void>) | undefined>  // Ref để parent gọi khi cần lưu draft
+    onDraftSaved?: (draftInfo: any) => void  // Báo cho parent cập nhật state local sau khi lưu thành công
 }
 
 function formatDate(date: Date | null) {
@@ -100,6 +101,7 @@ export default function AssignmentForm({
     onSubmit,
     initialData,
     onSaveDraft,
+    onDraftSaved,
 }: AssignmentFormProps) {
     const [loading, setLoading] = useState(false)
     const [showRules, setShowRules] = useState(false)
@@ -122,55 +124,66 @@ export default function AssignmentForm({
         // Luôn lưu draft khi có dữ liệu (cả khi đã hoàn thành - để cập nhật)
         if (reflection.trim() || links.some(l => l.trim()) || supports.some(s => s)) {
             try {
+                const draftData = { reflection, links, supports }
                 await saveAssignmentDraftAction({
                     enrollmentId: initialData?.enrollmentId,
                     lessonId,
-                    reflection,
-                    links,
-                    supports
+                    ...draftData
                 })
+                if (onDraftSaved) {
+                    onDraftSaved(draftData)
+                }
             } catch (error) {
                 console.error('Failed to save draft:', error)
             }
         }
-    }, [reflection, links, supports, lessonId, initialData?.enrollmentId])
+    }, [reflection, links, supports, lessonId, initialData?.enrollmentId, onDraftSaved])
 
-    // Lưu draft khi rời khỏi trang (refresh, đóng tab, chuyển trang)
+    // Sử dụng isDirtyRef để track thay đổi => tránh loop render
+    const isDirtyRef = useRef(false)
+    const initialRenderRef = useRef(true)
+
     useEffect(() => {
-        window.addEventListener('beforeunload', saveDraft)
-        window.addEventListener('pagehide', saveDraft)
+        if (initialRenderRef.current) {
+            initialRenderRef.current = false
+            return
+        }
+        isDirtyRef.current = true
+    }, [reflection, links, supports])
 
+    // Đăng ký ref để parent có thể ép gọi saveDraft (khi tab change on mobile)
+    useEffect(() => {
+        if (onSaveDraft) {
+            onSaveDraft.current = () => {
+                if (isDirtyRef.current) {
+                    saveDraft()
+                    isDirtyRef.current = false
+                }
+            }
+        }
+    }, [onSaveDraft, saveDraft])
+
+    // Lưu ngay khi form bị unmount (khi chuyển bài, hoặc NextJS component unmount)
+    useEffect(() => {
         return () => {
-            window.removeEventListener('beforeunload', saveDraft)
-            window.removeEventListener('pagehide', saveDraft)
+            if (isDirtyRef.current) {
+                saveDraft()
+            }
         }
     }, [saveDraft])
 
-    // Lưu draft khi chuyển trang - dùng useEffect với pathname
-    // Khi pathname thay đổi (chuyển sang trang khác), lưu draft trước
-    const prevPathname = useRef(pathname)
+    // Lưu draft khi rời khỏi trang hoàn toàn (đóng tab)
     useEffect(() => {
-        if (prevPathname.current !== pathname && pathname) {
-            saveDraft()
+        const handleBeforeUnload = () => {
+            if (isDirtyRef.current) saveDraft()
         }
-        prevPathname.current = pathname
-    }, [pathname, saveDraft])
-
-    // Lưu draft khi lessonId thay đổi (chuyển bài trong cùng trang)
-    const prevLessonId = useRef(lessonId)
-    useEffect(() => {
-        if (prevLessonId.current !== lessonId && prevLessonId.current) {
-            saveDraft()
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        window.addEventListener('pagehide', handleBeforeUnload)
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload)
+            window.removeEventListener('pagehide', handleBeforeUnload)
         }
-        prevLessonId.current = lessonId
-    }, [lessonId, saveDraft])
-
-    // Đăng ký ref để parent có thể gọi saveDraft
-    useEffect(() => {
-        if (onSaveDraft) {
-            onSaveDraft.current = saveDraft
-        }
-    }, [onSaveDraft, saveDraft])
+    }, [saveDraft])
 
     // ── Realtime scoring ────────────────────────────────────────────────────
     // Kiểm tra đúng: videoUrl có phải YouTube không (không phải chỉ check null)
