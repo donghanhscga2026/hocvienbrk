@@ -75,13 +75,14 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const prevTab = prevMobileTabRef.current
         const prevModal = prevShowContentModalRef.current
 
-        // Chỉ save khi: tab thay đổi HOẶC modal mở (từ false -> true)
+        // tab thay đổi HOẶC modal mở (từ false -> true)
         const tabChanged = mobileTab !== prevTab
         const modalOpened = showContentModal && !prevModal
 
         if (tabChanged || modalOpened) {
-            // Lưu assignment draft
-            if (assignmentFormRef.current) {
+            // Chỉ lưu assignment draft NẾU người dùng đang ở tab 'record' (Ghi nhận) và chuyển sang tab khác, hoặc mở modal Danh sách.
+            // Điều này tránh tình trạng lưu ngầm dư thừa khi chuyển từ tab khác sang tab Ghi nhận.
+            if ((prevTab === 'record' || modalOpened) && assignmentFormRef.current) {
                 assignmentFormRef.current()
             }
             // Lưu video progress
