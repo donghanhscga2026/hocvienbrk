@@ -4,13 +4,14 @@ import Google from "next-auth/providers/google"
 import { z } from "zod"
 import prisma from "@/lib/prisma"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import type { User, Role } from "@prisma/client"
+import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig,
-    adapter: PrismaAdapter(prisma) as any,
+    // Sử dụng 'as any' tại đây để giải quyết xung đột Type giữa các phiên bản nội bộ của NextAuth v5
+    adapter: PrismaAdapter(prisma) as any, 
     session: { strategy: "jwt" },
     providers: [
         Google({
@@ -28,78 +29,52 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     .object({ identifier: z.string(), password: z.string() })
                     .safeParse(credentials)
 
-                if (parsedCredentials.success) {
-                    const { identifier, password } = parsedCredentials.data
+                if (!parsedCredentials.success) return null;
 
-                    // Determine if identifier is ID (number), Email, or Phone
-                    let user = null;
-                    const isNumeric = /^\d+$/.test(identifier);
-                    const isEmail = identifier.includes("@");
+                const { identifier, password } = parsedCredentials.data
+                const isNumeric = /^\d+$/.test(identifier);
+                const isEmail = identifier.includes("@");
 
-                    if (isNumeric) {
-                        // Try as Student ID first, then Phone
-                        user = await prisma.user.findUnique({
-                            where: { id: parseInt(identifier) }
-                        });
-                        if (!user) {
-                            user = await prisma.user.findUnique({
-                                where: { phone: identifier }
-                            });
-                        }
-                    } else if (isEmail) {
-                        user = await prisma.user.findUnique({
-                            where: { email: identifier }
-                        });
-                    } else {
-                        // Fallback to phone if string but not email
-                        user = await prisma.user.findUnique({
-                            where: { phone: identifier }
-                        });
+                // Tối ưu: Chỉ 1 lần truy vấn Database với OR
+                const user = await prisma.user.findFirst({
+                    where: {
+                        OR: [
+                            ...(isNumeric ? [{ id: parseInt(identifier) }, { phone: identifier }] : []),
+                            ...(isEmail ? [{ email: identifier }] : []),
+                            ...(!isNumeric && !isEmail ? [{ phone: identifier }] : [])
+                        ]
                     }
+                });
 
-                    if (!user) return null;
+                if (!user || !user.password) return null;
 
-                    // Verify password
-                    if (!user.password) return null; // Google users might not have password set
-
-                    const passwordsMatch = await bcrypt.compare(password, user.password);
-                    if (passwordsMatch) {
-                        return {
-                            id: user.id.toString(),
-                            name: user.name,
-                            email: user.email,
-                            role: user.role,
-                            image: user.image,
-                        };
-                    }
+                const passwordsMatch = await bcrypt.compare(password, user.password);
+                if (passwordsMatch) {
+                    return {
+                        id: user.id.toString(),
+                        name: user.name,
+                        email: user.email,
+                        role: user.role,
+                        image: user.image,
+                    };
                 }
-
-                console.log("Invalid credentials");
                 return null;
             },
         }),
     ],
     callbacks: {
         async jwt({ token, user, trigger, session }) {
-            if (user && user.id) {
-                token.id = user.id.toString();
-                token.role = user.role;
+            // Lưu thông tin vào JWT để tránh truy vấn Database ở các request sau
+            if (user) {
+                token.id = user.id;
+                token.role = (user as any).role;
             }
 
-            // Force refresh role from DB to handle role updates
-            if (token.id) {
-                try {
-                    const freshUser = await prisma.user.findUnique({
-                        where: { id: parseInt(token.id as string) },
-                        select: { role: true }
-                    });
-                    if (freshUser) {
-                        token.role = freshUser.role;
-                    }
-                } catch (error) {
-                    // console.error("Error refreshing role:", error);
-                }
+            // Chỉ cập nhật khi có tín hiệu update session chủ động
+            if (trigger === "update" && session?.role) {
+                token.role = session.role;
             }
+            
             return token;
         },
         async session({ session, token }) {
@@ -108,12 +83,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.role = token.role as Role;
             }
             return session;
-        },
-        async signIn({ user, account, profile }) {
-            if (account?.provider === 'google') {
-                return true;
-            }
-            return true;
         }
     },
     pages: {
