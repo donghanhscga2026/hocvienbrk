@@ -79,7 +79,7 @@ export default function LessonSidebar({
     }
 
     return (
-        <div className="flex flex-col h-full bg-zinc-900 border-r border-zinc-800 w-72 shrink-0">
+        <div className="flex flex-col h-full bg-zinc-900 border-r border-zinc-800 w-80 shrink-0">
             {/* ── Ngày bắt đầu block ── */}
             <div className="p-4 border-b border-zinc-800 space-y-2">
                 <div className="flex items-center justify-between">

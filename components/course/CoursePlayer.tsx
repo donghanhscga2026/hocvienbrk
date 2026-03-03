@@ -656,30 +656,28 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 {/* CENTER: video + content — LUÔN TRONG DOM, key ổn định */}
                 <div
                     key="center-col"
-                    className={
-                        isMobile
-                            ? 'flex-1 flex flex-col min-h-0 bg-zinc-950 overflow-hidden'
-                            : 'flex-1 flex flex-col overflow-y-auto overflow-x-hidden bg-zinc-950'
-                    }
+                    className="flex-1 flex flex-col min-h-0 bg-zinc-950 overflow-hidden items-center"
                 >
                     {/* VIDEO — luôn ở đây, không bao giờ bị unmount khi đổi layout */}
-                    <div className={isMobile ? 'shrink-0 w-full bg-black' : 'p-5 pb-0 shrink-0'}>
-                        <VideoPlayer
-                            key={currentLessonId}
-                            playerId="yt-player-main"
-                            videoUrl={currentLesson?.videoUrl || null}
-                            lessonContent={currentLesson?.content || null}
-                            initialMaxTime={currentProgress?.maxTime || 0}
-                            initialPercent={initialPercent}
-                            onProgress={handleVideoProgress}
-                            onPercentChange={setVideoPercent}
-                        />
+                    <div className={isMobile ? 'shrink-0 w-full bg-black' : 'p-5 pb-0 shrink-0 w-full max-w-5xl mx-auto'}>
+                        <div className={isMobile ? '' : 'rounded-2xl overflow-hidden border-2 border-white shadow-2xl bg-black'}>
+                            <VideoPlayer
+                                key={currentLessonId}
+                                playerId="yt-player-main"
+                                videoUrl={currentLesson?.videoUrl || null}
+                                lessonContent={currentLesson?.content || null}
+                                initialMaxTime={currentProgress?.maxTime || 0}
+                                initialPercent={initialPercent}
+                                onProgress={handleVideoProgress}
+                                onPercentChange={setVideoPercent}
+                            />
+                        </div>
                     </div>
 
                     {/* Desktop: tiêu đề + nội dung bài học + Tương tác */}
                     {!isMobile && (
-                        <div className="p-5 flex-1 flex flex-col gap-4">
-                            <div>
+                        <div className="p-5 flex-1 flex flex-col gap-4 min-h-0 overflow-hidden w-full max-w-5xl mx-auto">
+                            <div className="shrink-0">
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
                                 {currentLesson?.content && (() => {
                                     const c = currentLesson.content
@@ -693,12 +691,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                         </a>
                                     )
                                     // Text thường — chắc chắn xuống dòng
-                                    return <p className="text-zinc-400 mt-1 text-sm leading-relaxed break-words">{c}</p>
+                                    return <p className="text-zinc-400 mt-1 text-sm leading-relaxed break-words line-clamp-2 hover:line-clamp-none transition-all cursor-default" title={c}>{c}</p>
                                 })()}
                             </div>
 
-                            {/* Phần Tương tác - Chat (Desktop) */}
-                            <div className="flex-1 min-h-0 overflow-hidden border border-zinc-700 rounded-xl mt-2">
+                            {/* Phần Tương tác - Chat (Desktop) - CHIẾM TOÀN BỘ KHÔNG GIAN CÒN LẠI VÀ TỰ CUỘN */}
+                            <div className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden">
                                 <ChatSection lessonId={currentLessonId!} session={session} />
                             </div>
                         </div>
@@ -708,7 +706,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     {isMobile && (
                         <>
                             {/* Nội dung cuộn — chỉ phần này scroll */}
-                            <div className="flex-1 min-h-0">
+                            <div className="flex-1 min-h-0 w-full">
 
                                 {/* Tab: Danh sách */}
                                 {mobileTab === 'list' && (
