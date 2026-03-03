@@ -10,7 +10,7 @@ import { authConfig } from "./auth.config"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig,
-    // Sử dụng 'as any' tại đây để giải quyết xung đột Type giữa các phiên bản nội bộ của NextAuth v5
+    // Sử dụng 'as any' để giải quyết xung đột Type hệ thống
     adapter: PrismaAdapter(prisma) as any, 
     session: { strategy: "jwt" },
     providers: [
@@ -35,7 +35,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const isNumeric = /^\d+$/.test(identifier);
                 const isEmail = identifier.includes("@");
 
-                // Tối ưu: Chỉ 1 lần truy vấn Database với OR
+                // Tìm kiếm người dùng 1 lần duy nhất
                 const user = await prisma.user.findFirst({
                     where: {
                         OR: [
@@ -64,13 +64,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ],
     callbacks: {
         async jwt({ token, user, trigger, session }) {
-            // Lưu thông tin vào JWT để tránh truy vấn Database ở các request sau
+            // Sử dụng trường 'sub' làm định danh chuẩn của JWT
             if (user) {
-                token.id = user.id;
+                token.sub = user.id;
                 token.role = (user as any).role;
             }
 
-            // Chỉ cập nhật khi có tín hiệu update session chủ động
+            // Cập nhật khi có tín hiệu update chủ động
             if (trigger === "update" && session?.role) {
                 token.role = session.role;
             }
@@ -78,8 +78,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return token;
         },
         async session({ session, token }) {
-            if (token && session.user) {
-                session.user.id = token.id as string;
+            // Map từ 'sub' của token ngược lại 'id' của session cho đồng bộ UI
+            if (token.sub && session.user) {
+                session.user.id = token.sub;
                 session.user.role = token.role as Role;
             }
             return session;
