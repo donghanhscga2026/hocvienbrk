@@ -143,7 +143,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     existingVideoScore: currentProg?.scores?.videoScore,
                                     existingTimingScore: currentProg?.scores?.timing
                                 })
-                                if (result?.success) {
+                                if ((result as any)?.success) {
+                                    const res = result as any
                                     setProgressMap((prev: any) => ({
                                         ...prev,
                                         [currentLessonId!]: {
@@ -153,19 +154,19 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                                 links: currentFormData.links,
                                                 supports: currentFormData.supports
                                             },
-                                            status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
-                                            totalScore: result.totalScore
+                                            status: res.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
+                                            totalScore: res.totalScore
                                         }
                                     }))
                                     setEnrollment((prev: any) => ({
                                         ...prev,
                                         lessonProgress: prev.lessonProgress.map((p: any) => 
                                             p.lessonId === currentLessonId
-                                                ? { ...p, assignment: { reflection: currentFormData.reflection, links: currentFormData.links, supports: currentFormData.supports }, status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS', totalScore: result.totalScore }
+                                                ? { ...p, assignment: { reflection: currentFormData.reflection, links: currentFormData.links, supports: currentFormData.supports }, status: res.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS', totalScore: res.totalScore }
                                                 : p
                                         )
                                     }))
-                                    alert(`✅ Cập nhật thành công! Điểm: ${result.totalScore}/10`)
+                                    alert(`✅ Cập nhật thành công! Điểm: ${res.totalScore}/10`)
                                 }
                             }
                         } else {
