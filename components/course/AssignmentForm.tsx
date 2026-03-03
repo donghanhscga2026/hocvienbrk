@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
@@ -44,7 +43,6 @@ function RulesModal({ onClose }: { onClose: () => void }) {
                     <button onClick={onClose}><X className="w-4 h-4" /></button>
                 </div>
                 <div className="p-4 space-y-3">
-                    {/* Quy tắc hoàn thành — chuyển từ note cuối form vào đây */}
                     <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                         <p className="text-orange-700 text-xs font-semibold">✅ Điểm ≥ 5/10: Hoàn thành bài học và mở khóa bài tiếp theo.</p>
                     </div>
@@ -81,7 +79,6 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     )
 }
 
-// ─── Section header ────────────────────────────────────────────────────────
 function SectionHead({ num, label, max, current }: { num: number; label: string; max: number; current: number }) {
     return (
         <div className="flex items-center justify-between mb-1.5">
@@ -114,8 +111,10 @@ export default function AssignmentForm({
             : ["", "", ""]
     )
     const [supports, setSupports] = useState<boolean[]>(initialData?.assignment?.supports || [false, false])
-    const router = useRouter()
-    const pathname = usePathname()
+    
+    // Refs
+    const isDirtyRef = useRef(false)
+    const initialRenderRef = useRef(true)
 
     const deadline = calcDeadline(startedAt, lessonOrder)
     const isCompleted = initialData?.status === 'COMPLETED'
@@ -124,44 +123,38 @@ export default function AssignmentForm({
 
     const saveDraft = useCallback(async () => {
         if (isCompleted) return
-        if (reflection.trim() || links.some(l => l.trim()) || supports.some(s => s)) {
+        
+        const hasData = reflection.trim() || links.some(l => l.trim()) || supports.some(s => s)
+        if (hasData) {
+            const draftData = { reflection, links, supports }
+            
             try {
-                const draftData = { reflection, links, supports }
                 await saveAssignmentDraftAction({
                     enrollmentId: initialData?.enrollmentId,
                     lessonId,
                     ...draftData
                 })
-                if (onDraftSaved) {
-                    onDraftSaved(draftData)
-                }
-                if (onFormDataChange) {
-                    onFormDataChange(draftData)
-                }
+                if (onDraftSaved) onDraftSaved(draftData)
+                isDirtyRef.current = false
             } catch (error) {
                 console.error('Failed to save draft:', error)
             }
         }
-    }, [reflection, links, supports, lessonId, initialData?.enrollmentId, onDraftSaved, onFormDataChange])
+    }, [reflection, links, supports, lessonId, initialData?.enrollmentId, onDraftSaved, isCompleted])
 
-    // Sử dụng isDirtyRef để track thay đổi => tránh loop render
-    const isDirtyRef = useRef(false)
-    const initialRenderRef = useRef(true)
-
+    // Track thay đổi để bật flag isDirty
     useEffect(() => {
         if (initialRenderRef.current) {
             initialRenderRef.current = false
             return
         }
         isDirtyRef.current = true
-        
-        // Gọi callback khi form data thay đổi
         if (onFormDataChange) {
             onFormDataChange({ reflection, links, supports })
         }
     }, [reflection, links, supports, onFormDataChange])
 
-    // Đăng ký ref để parent có thể ép gọi saveDraft (khi tab change on mobile)
+    // Đăng ký ref để parent ép lưu draft
     useEffect(() => {
         if (onSaveDraft) {
             onSaveDraft.current = async () => {
@@ -173,7 +166,7 @@ export default function AssignmentForm({
         }
     }, [onSaveDraft, saveDraft])
 
-    // Lưu draft khi rời khỏi trang hoàn toàn (đóng tab)
+    // Lưu draft khi rời trang
     useEffect(() => {
         if (isCompleted) return
         const handleBeforeUnload = () => {
@@ -187,13 +180,11 @@ export default function AssignmentForm({
         }
     }, [saveDraft, isCompleted])
 
-    // ── Realtime scoring ────────────────────────────────────────────────────
-    // Kiểm tra đúng: videoUrl có phải YouTube không (không phải chỉ check null)
+    // Realtime scoring
     const hasVideo = !!videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(videoUrl)
-    const displayPercent = hasVideo ? videoPercent : 100  // Không có video -> hiển thị 100%
+    const displayPercent = hasVideo ? videoPercent : 100
 
     const vidScore = useMemo(() => {
-        // Bài không có video YouTube -> mặc định +2 điểm
         if (!hasVideo) return 2
         if (videoPercent >= 95) return 2
         if (videoPercent >= 50) return 1
@@ -206,8 +197,8 @@ export default function AssignmentForm({
         return 0
     }, [reflection])
 
-    const validLinks = useMemo(() => links.filter(l => l.trim().length > 0), [links])
-    const pracScore = useMemo(() => Math.min(validLinks.length, 3), [validLinks.length])
+    const validLinksCount = useMemo(() => links.filter(l => l.trim().length > 0).length, [links])
+    const pracScore = useMemo(() => Math.min(validLinksCount, 3), [validLinksCount])
     const supportScore = useMemo(() => supports.filter(Boolean).length, [supports])
 
     const currentTimingScore = useMemo(() => {
@@ -217,9 +208,8 @@ export default function AssignmentForm({
         return new Date() <= dl ? 1 : -1
     }, [deadline])
 
-    const isOverdue = currentTimingScore === -1
-
     const timingScore = isCompleted ? existingScores.timing ?? 0 : currentTimingScore
+    const isOverdue = currentTimingScore === -1
 
     const total = isCompleted
         ? existingTotalScore
@@ -227,7 +217,6 @@ export default function AssignmentForm({
 
     const handleSubmit = async () => {
         if (!startedAt) { alert("Bạn chưa xác nhận ngày bắt đầu lộ trình!"); return }
-        
         if (isCompleted && isOverdue) {
             alert("Bài học đã nộp trễ hạn. Không thể cập nhật.")
             return
@@ -238,7 +227,8 @@ export default function AssignmentForm({
         try {
             const result = await onSubmit({ reflection, links, supports }, isUpdate)
             if (result?.success) {
-                if (onFormDataChange) {
+                isDirtyRef.current = false
+                if (onFormDataChange && !isUpdate) {
                     onFormDataChange({ reflection: '', links: ['', '', ''], supports: [false, false] })
                 }
             }
@@ -251,9 +241,7 @@ export default function AssignmentForm({
         <div className="flex flex-col h-full min-h-0 bg-[#FFFDE7]">
             {showRules && <RulesModal onClose={() => setShowRules(false)} />}
 
-            {/* ── Header luôn hiển thị trên cùng ── */}
             <div className="shrink-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-2">
-                {/* Row 1: Ngày hoàn thành + Tổng */}
                 <div className="flex items-center justify-between">
                     <p className="text-[11px] text-gray-500 leading-tight">
                         Hoàn thành trước 23:59 ngày <span className="font-semibold text-gray-700">{formatDate(deadline)}</span>
@@ -261,7 +249,6 @@ export default function AssignmentForm({
                     <span className="text-sm font-black text-orange-500">Tổng: {total}/10</span>
                 </div>
 
-                {/* Row 2: Nút GHI NHẬN + Quy tắc (icon nhỏ kế bên) */}
                 <div className="flex gap-1.5 mt-1.5">
                     {!(isCompleted && isOverdue) && (
                         <button
@@ -290,10 +277,7 @@ export default function AssignmentForm({
                 </div>
             </div>
 
-            {/* ── 5 Sections (cuộn) ── */}
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-3">
-
-                {/* 1. Video */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={1} label={hasVideo ? "Mở TRÍ = học theo Video (2đ)" : "Mở TRÍ = Nội dung bài học (2đ)"} max={2} current={vidScore} />
                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -309,7 +293,6 @@ export default function AssignmentForm({
                     </p>
                 </div>
 
-                {/* 2. Tâm đắc ngộ */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={2} label="Bồi NHÂN = Bài học Tâm đắc Ngộ (2đ)" max={2} current={refScore} />
                     <textarea
@@ -322,7 +305,6 @@ export default function AssignmentForm({
                     <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>
                 </div>
 
-                {/* 3. Link video */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={3} label="Hành LỄ = Link thực hành mỗi ngày (3đ)" max={3} current={pracScore} />
                     <div className="flex flex-col gap-1.5">
@@ -343,7 +325,6 @@ export default function AssignmentForm({
                     </div>
                 </div>
 
-                {/* 4. Hỗ trợ */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={4} label="Trọng NGHĨA = hỗ trợ đồng đội (2đ)" max={2} current={supportScore} />
                     <div className="flex flex-col gap-1.5">
@@ -370,7 +351,6 @@ export default function AssignmentForm({
                     </div>
                 </div>
 
-                {/* 5. Đúng hạn */}
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={5} label="Giữ TÍN = Làm đúng hạn (1đ)" max={1} current={timingScore === 1 ? 1 : 0} />
                     <div className="flex flex-col gap-1 text-sm">

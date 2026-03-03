@@ -54,7 +54,17 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     )
     const [showContentModal, setShowContentModal] = useState(false)
     const [currentFormData, setCurrentFormData] = useState<{ reflection: string; links: string[]; supports: boolean[] } | null>(null)
+    const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'loading' | 'success' | 'error' } | null>(null)
     const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
+
+    // Helper tự động tắt thông báo
+    const notify = useCallback((text: string, type: 'loading' | 'success' | 'error' = 'success', duration = 3000) => {
+        setStatusMsg({ text, type })
+        if (type !== 'loading') {
+            setTimeout(() => setStatusMsg(null), duration)
+        }
+    }, [])
+
     const prevMobileTabRef = useRef(mobileTab)
     const prevShowContentModalRef = useRef(showContentModal)
 
@@ -84,17 +94,134 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     useEffect(() => {
         const handleTabChange = async () => {
             const prevTab = prevMobileTabRef.current
+            const currentTab = mobileTab
             const prevModal = prevShowContentModalRef.current
 
             // tab thay đổi HOẶC modal mở (từ false -> true)
-            const tabChanged = mobileTab !== prevTab
+            const tabChanged = currentTab !== prevTab
             const modalOpened = showContentModal && !prevModal
 
             if (tabChanged || modalOpened) {
-                // Chỉ lưu assignment draft NẾU người dùng đang ở tab 'record' (Ghi nhận) và chuyển sang tab khác, hoặc mở modal Danh sách.
-                if ((prevTab === 'record' || modalOpened) && assignmentFormRef.current) {
+                const currentProg = progressMap[currentLessonId!]
+                const currentLessonOrder = course.lessons.find((l: any) => l.id === currentLessonId)?.order ?? 1
+                const isOnTime = checkIsOnTime(new Date(enrollment.startedAt), currentLessonOrder)
+
+                const hasFormData = currentFormData && (
+                    currentFormData.reflection.trim() || 
+                    currentFormData.links.some((l: string) => l.trim()) || 
+                    currentFormData.supports.some((s: boolean) => s)
+                )
+
+                // Nếu đúng hạn và có dữ liệu form → kiểm tra xem có khác DB không
+                if (isOnTime && hasFormData) {
+                    const dbAssignment = currentProg?.assignment as any
+                    const dbReflection = dbAssignment?.reflection?.trim() || ''
+                    const dbLinks = dbAssignment?.links || []
+                    const dbSupports = dbAssignment?.supports || []
+
+                    const currentLinks = currentFormData.links.filter((l: string) => l.trim())
+                    const dbLinksFiltered = dbLinks.map((l: any) => String(l).trim()).filter((l: string) => l)
+
+                    const hasChanges = 
+                        currentFormData.reflection.trim() !== dbReflection ||
+                        JSON.stringify(currentLinks) !== JSON.stringify(dbLinksFiltered) ||
+                        JSON.stringify(currentFormData.supports) !== JSON.stringify(dbSupports)
+
+                    if (hasChanges) {
+                        if (currentProg?.status === 'COMPLETED') {
+                            const shouldUpdate = window.confirm("Bạn có dữ liệu mới chưa cập nhật. Tự động cập nhật ngay?")
+                            if (shouldUpdate) {
+                                const result = await submitAssignmentAction({
+                                    enrollmentId: enrollment.id,
+                                    lessonId: currentLessonId!,
+                                    reflection: currentFormData.reflection,
+                                    links: currentFormData.links,
+                                    supports: currentFormData.supports,
+                                    isUpdate: true,
+                                    lessonOrder: currentLessonOrder,
+                                    startedAt: enrollment.startedAt,
+                                    existingVideoScore: currentProg?.scores?.videoScore,
+                                    existingTimingScore: currentProg?.scores?.timing
+                                })
+                                if (result?.success) {
+                                    setProgressMap((prev: any) => ({
+                                        ...prev,
+                                        [currentLessonId!]: {
+                                            ...prev[currentLessonId!],
+                                            assignment: {
+                                                reflection: currentFormData.reflection,
+                                                links: currentFormData.links,
+                                                supports: currentFormData.supports
+                                            },
+                                            status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
+                                            totalScore: result.totalScore
+                                        }
+                                    }))
+                                    setEnrollment((prev: any) => ({
+                                        ...prev,
+                                        lessonProgress: prev.lessonProgress.map((p: any) => 
+                                            p.lessonId === currentLessonId
+                                                ? { ...p, assignment: { reflection: currentFormData.reflection, links: currentFormData.links, supports: currentFormData.supports }, status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS', totalScore: result.totalScore }
+                                                : p
+                                        )
+                                    }))
+                                    alert(`✅ Cập nhật thành công! Điểm: ${result.totalScore}/10`)
+                                }
+                            }
+                        } else {
+                            const shouldSubmit = window.confirm("Bạn có dữ liệu chưa ghi nhận. Tự động ghi nhận ngay?")
+                            if (shouldSubmit) {
+                                const result = await submitAssignmentAction({
+                                    enrollmentId: enrollment.id,
+                                    lessonId: currentLessonId!,
+                                    reflection: currentFormData.reflection,
+                                    links: currentFormData.links,
+                                    supports: currentFormData.supports,
+                                    isUpdate: false,
+                                    lessonOrder: currentLessonOrder,
+                                    startedAt: enrollment.startedAt,
+                                    existingVideoScore: currentProg?.scores?.videoScore,
+                                    existingTimingScore: currentProg?.scores?.timing
+                                })
+                                if (result?.success) {
+                                    setProgressMap((prev: any) => ({
+                                        ...prev,
+                                        [currentLessonId!]: {
+                                            ...prev[currentLessonId!],
+                                            assignment: {
+                                                reflection: currentFormData.reflection,
+                                                links: currentFormData.links,
+                                                supports: currentFormData.supports
+                                            },
+                                            status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
+                                            totalScore: result.totalScore
+                                        }
+                                    }))
+                                    setEnrollment((prev: any) => ({
+                                        ...prev,
+                                        lessonProgress: prev.lessonProgress.map((p: any) => 
+                                            p.lessonId === currentLessonId
+                                                ? { ...p, assignment: { reflection: currentFormData.reflection, links: currentFormData.links, supports: currentFormData.supports }, status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS', totalScore: result.totalScore }
+                                                : p
+                                        )
+                                    }))
+                                    if (result.totalScore >= 5) {
+                                        alert(`✅ Ghi nhận thành công! Điểm: ${result.totalScore}/10. Bạn đã hoàn thành bài học!`)
+                                    } else {
+                                        alert(`📊 Ghi nhận thành công! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // CHỈ lưu draft nếu chuyển từ tab 'record' sang tab 'content' (Nội dung)
+                if (prevTab === 'record' && currentTab === 'content' && assignmentFormRef.current) {
                     await assignmentFormRef.current()
                 }
+                // Nếu chuyển sang tab khác (ví dụ: 'list') thì không tự động lưu draft trừ khi bạn muốn
+                
                 // Lưu video progress
                 if (videoProgressRef.current && currentLessonId) {
                     const { maxTime, duration } = videoProgressRef.current
@@ -125,7 +252,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         }
 
         handleTabChange()
-    }, [mobileTab, showContentModal, currentLessonId, enrollment.id])
+    }, [mobileTab, showContentModal, currentLessonId, enrollment.id, currentFormData, progressMap, course.lessons, enrollment.startedAt, checkIsOnTime])
 
     // Lưu video progress lần cuối khi rời khỏi trang hoặc unmount (chuyển bài)
     useEffect(() => {
@@ -385,8 +512,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     }
 
     const handleConfirmStartDate = async (date: Date) => {
+        notify('Đang xác nhận ngày bắt đầu...', 'loading')
         await confirmStartDateAction(course.id, date)
         setEnrollment({ ...enrollment, startedAt: date })
+        notify('Xác nhận thành công!', 'success')
     }
 
     const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
@@ -405,6 +534,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     }, [currentLessonId, enrollment.id])
 
     const handleSubmitAssignment = async (data: any, isUpdate: boolean = false) => {
+        notify(isUpdate ? 'Đang cập nhật bài học...' : 'Đang chấm điểm...', 'loading')
         const result = await submitAssignmentAction({
             enrollmentId: enrollment.id,
             lessonId: currentLessonId!,
@@ -415,7 +545,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             existingVideoScore: currentProgress?.scores?.videoScore,
             existingTimingScore: currentProgress?.scores?.timing
         })
-        if (!result.success) return
+        if (!result.success) {
+            notify('Lỗi xử lý dữ liệu!', 'error')
+            return
+        }
 
         const updatedProgress = {
             ...(progressMap[currentLessonId!] || {}),
@@ -425,22 +558,20 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setProgressMap(prev => ({ ...prev, [currentLessonId!]: updatedProgress }))
 
         if (result.totalScore >= 5) {
-            if (isUpdate) {
-                alert(`✅ Cập nhật thành công! Điểm: ${result.totalScore}/10`)
-            } else {
+            notify(`✅ Thành công! Điểm: ${result.totalScore}/10`, 'success')
+            if (!isUpdate) {
                 const currentIndex = course.lessons.findIndex((l: any) => l.id === currentLessonId)
                 const isLast = currentIndex === course.lessons.length - 1
                 const nextId = isLast ? course.lessons[0].id : course.lessons[currentIndex + 1].id
-                const msg = isLast
-                    ? `🎉 Hoàn thành bài cuối (${result.totalScore}đ)! Quay về Bài 1.`
-                    : `✅ Hoàn thành! ${result.totalScore}đ. Chuyển sang bài tiếp theo.`
-                alert(msg)
-                setCurrentLessonId(nextId)
-                setVideoPercent(0)
-                setMobileTab('content')
+                
+                setTimeout(() => {
+                    setCurrentLessonId(nextId)
+                    setVideoPercent(0)
+                    setMobileTab('content')
+                }, 1500)
             }
         } else {
-            alert(`📊 Đã ghi nhận! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
+            notify(`📊 Đã ghi nhận: ${result.totalScore}/10đ. Cần ≥5đ`, 'success')
         }
     }
 
@@ -476,6 +607,18 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </Link>
                     <h1 className="font-bold text-white truncate text-sm sm:text-base">{course.name_lop}</h1>
                 </div>
+                
+                {/* Status Message (Toast) */}
+                {statusMsg && (
+                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${
+                        statusMsg.type === 'loading' ? 'bg-orange-500 text-white' :
+                        statusMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
+                        {statusMsg.type === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {statusMsg.text}
+                    </div>
+                )}
+
                 <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-zinc-400">{completedCount}/{course.lessons.length}</span>
                     <div className="relative h-2.5 w-24 sm:w-32 bg-zinc-800 rounded-full overflow-hidden">
@@ -628,12 +771,13 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             onSaveDraft={assignmentFormRef}
                                             onFormDataChange={setCurrentFormData}
                                             onDraftSaved={(draftData) => {
+                                                const targetLessonId = currentLessonId // Capture current lesson ID
                                                 setCurrentFormData(draftData)
                                                 setProgressMap((prev: any) => {
-                                                    const existing = prev[currentLessonId!] || {}
+                                                    const existing = prev[targetLessonId!] || {}
                                                     return {
                                                         ...prev,
-                                                        [currentLessonId!]: {
+                                                        [targetLessonId!]: {
                                                             ...existing,
                                                             assignment: {
                                                                 ...existing.assignment,
@@ -687,6 +831,22 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
                             onSaveDraft={assignmentFormRef}
                             onFormDataChange={setCurrentFormData}
+                            onDraftSaved={(draftData) => {
+                                // Đồng bộ ngay lập tức vào progressMap để khi quay lại không bị cũ
+                                setProgressMap((prev: any) => {
+                                    const existing = prev[currentLessonId!] || {}
+                                    return {
+                                        ...prev,
+                                        [currentLessonId!]: {
+                                            ...existing,
+                                            assignment: {
+                                                ...existing.assignment,
+                                                ...draftData
+                                            }
+                                        }
+                                    }
+                                })
+                            }}
                         />
                     </div>
                 )}

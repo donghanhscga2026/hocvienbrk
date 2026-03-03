@@ -262,6 +262,25 @@ export async function submitAssignmentAction({
 
     const now = new Date()
 
+    // 1. Kiểm tra nếu là Update thì có cho phép không
+    if (isUpdate && startedAt && lessonOrder) {
+        const deadline = new Date(startedAt)
+        deadline.setDate(deadline.getDate() + (lessonOrder - 1))
+        deadline.setHours(23, 59, 59, 999)
+        
+        if (now > deadline) {
+            // Nếu đã quá hạn, ta chỉ cho phép update nếu trạng thái HIỆN TẠI chưa hoàn thành (đang nộp muộn để xong bài)
+            // Nếu đã COMPLETED rồi thì KHÓA LUÔN.
+            const existing = await prisma.lessonProgress.findUnique({
+                where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+                select: { status: true }
+            })
+            if (existing?.status === 'COMPLETED') {
+                return { success: false, message: "Bài học đã hết hạn cập nhật." }
+            }
+        }
+    }
+
     let videoScore = 0
     let reflectionScore = 0
     let linkScore = 0
@@ -305,13 +324,17 @@ export async function submitAssignmentAction({
     supportScore = supports.filter(s => s === true).length
 
     // Tính timingScore
-    if (isUpdate) {
-        timingScore = existingTimingScore ?? 0
-    } else {
-        if (startedAt) {
+    if (startedAt && lessonOrder) {
+        // Nếu đã có điểm timing từ trước (1 hoặc -1) -> GIỮ NGUYÊN, không tính lại
+        if (existingTimingScore === 1 || existingTimingScore === -1) {
+            timingScore = existingTimingScore
+        } else {
+            // Nếu chưa có điểm (lần đầu nộp) -> tính dựa trên deadline
             const deadline = new Date(startedAt)
-            deadline.setDate(deadline.getDate() + (lessonOrder! - 1))
+            deadline.setDate(deadline.getDate() + (lessonOrder - 1))
             deadline.setHours(23, 59, 59, 999)
+            
+            // Nộp trước hoặc đúng 23:59 ngày hết hạn -> +1, ngược lại -> -1
             timingScore = now <= deadline ? 1 : -1
         }
     }
