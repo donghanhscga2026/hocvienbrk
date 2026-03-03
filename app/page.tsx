@@ -27,57 +27,55 @@ export default async function Home() {
   const userId = userRecord?.id ?? null;
   const userImage = userRecord?.image ?? session?.user?.image ?? null;
 
-  let myCourseIds: Set<number> = new Set();
-  let enrollmentsMap: Record<number, any> = {};
-  if (session?.user?.id) {
-    const enrollments = await (prisma as any).enrollment.findMany({
-      where: {
-        userId: parseInt(session.user.id),
-        status: 'ACTIVE'
-      },
-      select: {
-        courseId: true,
-        status: true,
-        startedAt: true,
-        resetAt: true,
-        course: {
-          select: {
-            lessons: {
-              select: { id: true }
-            }
+  // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
+  // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
+let myCourseIds = new Set<number>();
+
+let enrollmentsMap: Record<number, { 
+  status: string; 
+  startedAt: Date | null; 
+  completedCount: number; 
+  totalLessons: number;
+}> = {};
+
+if (session?.user?.id) {
+  const userId = parseInt(session.user.id);
+
+  const enrollments = await (prisma as any).enrollment.findMany({
+    where: { userId, status: 'ACTIVE' },
+    select: {
+      courseId: true,
+      status: true,
+      startedAt: true,
+      course: {
+        select: {
+          _count: {
+            select: { lessons: true }
           }
-        },
-        lessonProgress: {
-          where: {
-            status: { not: 'RESET' } // Chỉ lấy progress chưa bị reset
-          },
-          select: {
-            lessonId: true,
-            status: true,
-            createdAt: true
+        }
+      },
+      _count: {
+        select: {
+          lessonProgress: {
+            where: { status: 'COMPLETED' }
           }
         }
       }
-    });
-    enrollmentsMap = enrollments.reduce((acc: Record<number, any>, e: any) => {
-      const totalLessons = e.course?.lessons?.length || 0;
-      
-      // Lọc progress chỉ tính các bài học không bị reset
-      const filteredProgress = e.lessonProgress?.filter((lp: any) => {
-        return lp.status !== 'RESET'
-      }) || []
-      
-      const completedCount = filteredProgress.filter((lp: any) => lp.status === 'COMPLETED').length;
-      myCourseIds.add(e.courseId);
-      acc[e.courseId] = {
-        status: e.status,
-        startedAt: e.startedAt,
-        completedCount,
-        totalLessons
-      };
-      return acc;
-    }, {});
-  }
+    }
+  });
+
+  enrollments.forEach((e: any) => {
+    myCourseIds.add(e.courseId);
+
+    enrollmentsMap[e.courseId] = {
+      status: e.status,
+      startedAt: e.startedAt,
+      completedCount: e._count?.lessonProgress || 0,
+      totalLessons: e.course?._count?.lessons || 0
+    };
+  });
+}
+
 
 
   const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
