@@ -4,6 +4,59 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
+/**
+ * Đăng ký khóa học mới
+ */
+export async function enrollInCourseAction(courseId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) throw new Error("Vui lòng đăng nhập để tiếp tục.")
+
+        const userId = Number(session.user.id)
+
+        // Kiểm tra khóa học có tồn tại không
+        const course = await prisma.course.findUnique({
+            where: { id: courseId },
+            select: { phi_coc: true }
+        })
+
+        if (!course) throw new Error("Khóa học không tồn tại.")
+
+        // Kiểm tra xem đã đăng ký chưa
+        const existing = await prisma.enrollment.findUnique({
+            where: {
+                userId_courseId: { userId, courseId }
+            }
+        })
+
+        if (existing) {
+            return { success: true, status: existing.status }
+        }
+
+        // Tạo bản ghi enrollment mới
+        // Nếu khóa học miễn phí (phi_coc === 0), trạng thái là ACTIVE
+        // Nếu có phí, trạng thái mặc định là PENDING
+        const newEnrollment = await prisma.enrollment.create({
+            data: {
+                userId,
+                courseId,
+                status: course.phi_coc === 0 ? "ACTIVE" : "PENDING"
+            }
+        })
+
+        revalidatePath('/')
+        revalidatePath('/courses')
+
+        return { success: true, status: newEnrollment.status }
+    } catch (error: any) {
+        console.error("Enroll Course Error:", error)
+        throw new Error(error.message || "Không thể đăng ký khóa học.")
+    }
+}
+
+/**
+ * Xác nhận ngày bắt đầu lộ trình học
+ */
 export async function confirmStartDateAction(courseId: number, date: any) {
     try {
         const session = await auth()
@@ -42,6 +95,9 @@ export async function confirmStartDateAction(courseId: number, date: any) {
     }
 }
 
+/**
+ * Lưu tiến độ video (chạy ngầm)
+ */
 export async function saveVideoProgressAction({
     enrollmentId,
     lessonId,
@@ -53,42 +109,50 @@ export async function saveVideoProgressAction({
     maxTime: number,
     duration: number
 }) {
-    const session = await auth()
-    if (!session?.user?.id) throw new Error("Unauthorized")
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { success: false }
 
-    const percent = duration > 0 ? maxTime / duration : 0
-    const vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+        const percent = duration > 0 ? maxTime / duration : 0
+        const vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
 
-    const existing = await prisma.lessonProgress.findUnique({
-        where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-        select: { scores: true, status: true }
-    })
+        const existing = await prisma.lessonProgress.findUnique({
+            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+            select: { scores: true, status: true }
+        })
 
-    const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as any ?? {})
+        const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as any ?? {})
 
-    await prisma.lessonProgress.upsert({
-        where: {
-            enrollmentId_lessonId: { enrollmentId, lessonId }
-        },
-        create: {
-            enrollmentId,
-            lessonId,
-            maxTime,
-            duration,
-            scores: { vid: vidScore } as any,
-            status: "IN_PROGRESS"
-        },
-        update: {
-            maxTime,
-            duration,
-            scores: { ...existingScores, vid: vidScore } as any,
-            ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
-        }
-    })
+        await prisma.lessonProgress.upsert({
+            where: {
+                enrollmentId_lessonId: { enrollmentId, lessonId }
+            },
+            create: {
+                enrollmentId,
+                lessonId,
+                maxTime,
+                duration,
+                scores: { vid: vidScore } as any,
+                status: "IN_PROGRESS"
+            },
+            update: {
+                maxTime,
+                duration,
+                scores: { ...existingScores, vid: vidScore } as any,
+                ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
+            }
+        })
 
-    return { success: true, vidScore, percent: Math.round(percent * 100) }
+        return { success: true, vidScore, percent: Math.round(percent * 100) }
+    } catch (error) {
+        console.error("Save Video Progress Error:", error)
+        return { success: false }
+    }
 }
 
+/**
+ * Nộp bài ghi nhận và tính điểm
+ */
 export async function submitAssignmentAction({
     enrollmentId,
     lessonId,
@@ -118,13 +182,12 @@ export async function submitAssignmentAction({
 
         const now = new Date()
 
-        // 1. Kiểm tra ngày bắt đầu
+        // 1. Kiểm tra ngày bắt đầu để tính timing
         let timingScore = 0
         if (startedAt && lessonOrder) {
             try {
                 const startDate = new Date(startedAt)
                 if (!isNaN(startDate.getTime())) {
-                    // Nếu đã có điểm timing từ trước -> GIỮ NGUYÊN
                     if (existingTimingScore === 1 || existingTimingScore === -1) {
                         timingScore = existingTimingScore
                     } else {
@@ -135,7 +198,11 @@ export async function submitAssignmentAction({
                     }
 
                     // Chặn cập nhật nếu đã quá hạn và đã hoàn thành
-                    if (isUpdate && now > (new Date(new Date(startDate).setDate(new Date(startDate).getDate() + (lessonOrder - 1))).setHours(23, 59, 59, 999))) {
+                    const dl = new Date(startDate)
+                    dl.setDate(dl.getDate() + (lessonOrder - 1))
+                    dl.setHours(23, 59, 59, 999)
+                    
+                    if (isUpdate && now > dl) {
                         const existingStatus = await prisma.lessonProgress.findUnique({
                             where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
                             select: { status: true }
@@ -193,7 +260,7 @@ export async function submitAssignmentAction({
             }
         })
 
-        // 4. Revalidate an toàn
+        // 4. Revalidate
         try {
             const enrollment = await prisma.enrollment.findUnique({
                 where: { id: enrollmentId },
@@ -214,6 +281,9 @@ export async function submitAssignmentAction({
     }
 }
 
+/**
+ * Lưu nháp bài ghi nhận
+ */
 export async function saveAssignmentDraftAction({
     enrollmentId,
     lessonId,
@@ -255,6 +325,9 @@ export async function saveAssignmentDraftAction({
     }
 }
 
+/**
+ * Cập nhật bài học đang học cuối cùng
+ */
 export async function updateLastLessonAction(enrollmentId: number, lessonId: string) {
     try {
         const session = await auth()
