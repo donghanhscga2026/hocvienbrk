@@ -3074,3 +3074,30 @@ MÔ TẢ CHI TIẾT:
 ================================================================================
 HẾT PHIÊN BẢN 5
 ================================================================================
+
+================================================================================
+PHIÊN BẢN: 6
+NGÀY: 2026-03-03
+THAY ĐỔI: Tối ưu logic lưu assignment draft - tránh lưu dư thừa khi chuyển tab
+
+FILES ĐƯỢC SỬA:
+- components/course/CoursePlayer.tsx:
+   * Sửa logic trong useEffect effect xử lý tab/modal changes
+   * Chỉ lưu assignment draft khi:
+     - Người dùng đang ở tab 'record' (Ghi nhận) VÀ chuyển sang tab khác
+     - HOẶC mở modal Danh sách (từ false -> true)
+   * Điều này tránh tình trạng lưu ngầm dư thừa khi chuyển từ tab khác sang tab Ghi nhận
+
+MÔ TẢ CHI TIẾT:
+1. Trước đây:
+   - Mỗi khi tab thay đổi HOẶC modal mở đều gọi assignmentFormRef.current()
+   - Gây ra việc lưu dư thừa khi người dùng vào tab 'record'
+
+2. Bây giờ:
+   - Chỉ lưu khi rời khỏi tab 'record' (prevTab === 'record') HOẶC khi mở modal
+   - Người dùng vào tab 'record' sẽ không bị trigger lưu ngầm
+   - Trải nghiệm mượt hơn, tránh các side effects không cần thiết
+
+================================================================================
+HẾT PHIÊN BẢN 6
+================================================================================
