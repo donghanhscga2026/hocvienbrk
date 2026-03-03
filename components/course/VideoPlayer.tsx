@@ -206,12 +206,17 @@ export default function VideoPlayer({
 
     // Kiểm tra nếu là link Google Docs/Drive
     const getEmbedUrl = (url: string | null | undefined) => {
-        if (!url || !url.includes('docs.google.com')) return null
-        const cleanUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].replace(/\/+$/, '')
-        return `${cleanUrl}/preview`
-    }
+    if (!url || !url.includes('docs.google.com')) return null;
+    
+    // Loại bỏ các hậu tố cũ
+    const baseUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].split('/pub')[0].replace(/\/+$/, '');
+    
+    // Sử dụng chế độ nhúng tối ưu nhất: preview kèm theo tham số rm=minimal để ẩn thanh công cụ
+    // Điều này giúp Google Docs tập trung vào nội dung và ít gây lỗi font hơn
+    return `${baseUrl}/preview?rm=minimal`;
+}
 
-    const embedUrl = getEmbedUrl(videoUrl) || getEmbedUrl(lessonContent)
+    const embedUrl = getEmbedUrl(videoUrl) || getEmbedUrl(lessonContent);
 
     if (!videoId) {
         // Nếu có link Google Docs (ở videoUrl hoặc content) -> hiển thị embed
@@ -220,9 +225,13 @@ export default function VideoPlayer({
                 <div className="relative w-full aspect-video bg-white overflow-hidden rounded-xl border border-zinc-800 shadow-2xl">
                     <iframe
                         src={embedUrl}
-                        className="absolute inset-0 w-full h-full"
+                        className="absolute inset-0 w-full h-full border-0"
                         allow="autoplay"
                         title="Tài liệu bài học"
+                        // Thêm thuộc tính này để giảm tải cho trình duyệt
+                loading="lazy"
+                // Ngăn chặn các script bên thứ ba gây nhiễu
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                     />
                 </div>
             )
