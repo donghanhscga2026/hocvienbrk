@@ -132,14 +132,13 @@ export async function saveVideoProgressAction({
                 lessonId,
                 maxTime,
                 duration,
-                scores: { vid: vidScore } as any,
+                scores: { video: vidScore } as any,
                 status: "IN_PROGRESS"
-            },
-            update: {
+                },
+                update: {
                 maxTime,
                 duration,
-                scores: { ...existingScores, vid: vidScore } as any,
-                ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
+                scores: { ...existingScores, video: vidScore } as any,                ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
             }
         })
 
@@ -176,15 +175,22 @@ export async function submitAssignmentAction({
     existingVideoScore?: number,
     existingTimingScore?: number
 }) {
+    const logId = `[SUBMIT-${lessonId}-${Date.now()}]`
+    console.log(`${logId} Bắt đầu xử lý. Nội dung dài: ${reflection.length} ký tự.`)
+    
     try {
         const session = await auth()
-        if (!session?.user?.id) return { success: false, message: "Phiên đăng nhập hết hạn." }
+        if (!session?.user?.id) {
+            console.warn(`${logId} Thất bại: Không có session.`)
+            return { success: false, message: "Phiên đăng nhập hết hạn." }
+        }
 
         const now = new Date()
 
         // 1. Kiểm tra ngày bắt đầu để tính timing
         let timingScore = 0
         if (startedAt && lessonOrder) {
+            console.log(`${logId} Đang tính điểm timing cho bài ${lessonOrder}...`)
             try {
                 const startDate = new Date(startedAt)
                 if (!isNaN(startDate.getTime())) {
@@ -196,28 +202,14 @@ export async function submitAssignmentAction({
                         deadline.setHours(23, 59, 59, 999)
                         timingScore = now <= deadline ? 1 : -1
                     }
-
-                    // Chặn cập nhật nếu đã quá hạn và đã hoàn thành
-                    const dl = new Date(startDate)
-                    dl.setDate(dl.getDate() + (lessonOrder - 1))
-                    dl.setHours(23, 59, 59, 999)
-                    
-                    if (isUpdate && now > dl) {
-                        const existingStatus = await prisma.lessonProgress.findUnique({
-                            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-                            select: { status: true }
-                        })
-                        if (existingStatus?.status === 'COMPLETED') {
-                            return { success: false, message: "Bài học đã hết hạn cập nhật." }
-                        }
-                    }
                 }
             } catch (e) {
-                console.error("Date calculation error:", e)
+                console.error(`${logId} Lỗi tính ngày:`, e)
             }
         }
 
         // 2. Tính toán điểm số
+        console.log(`${logId} Đang lấy thông tin bài học từ DB...`)
         const lesson = await prisma.lesson.findUnique({
             where: { id: lessonId },
             select: { videoUrl: true }
@@ -236,8 +228,10 @@ export async function submitAssignmentAction({
         const supportScore = supports.filter(s => s === true).length
 
         const totalScore = Math.max(0, videoScore + reflectionScore + linkScore + supportScore + timingScore)
+        console.log(`${logId} Tổng điểm tính toán: ${totalScore} (Video: ${videoScore}, Ref: ${reflectionScore}, Link: ${linkScore}, Support: ${supportScore}, Timing: ${timingScore})`)
 
         // 3. Cập nhật Database
+        console.log(`${logId} Đang thực hiện UPSERT vào Database...`)
         await prisma.lessonProgress.upsert({
             where: {
                 enrollmentId_lessonId: { enrollmentId, lessonId }
@@ -259,9 +253,11 @@ export async function submitAssignmentAction({
                 submittedAt: now
             }
         })
+        console.log(`${logId} Database cập nhật THÀNH CÔNG.`)
 
         // 4. Revalidate
         try {
+            console.log(`${logId} Đang làm mới cache...`)
             const enrollment = await prisma.enrollment.findUnique({
                 where: { id: enrollmentId },
                 select: { course: { select: { id_khoa: true } } }
@@ -270,13 +266,14 @@ export async function submitAssignmentAction({
                 revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`, 'page')
             }
         } catch (revError) {
-            console.error("Revalidate Error:", revError)
+            console.error(`${logId} Revalidate lỗi (bỏ qua):`, revError)
         }
 
+        console.log(`${logId} Hoàn tất toàn bộ quy trình.`)
         return { success: true, totalScore }
 
     } catch (error: any) {
-        console.error("CRITICAL ERROR in submitAssignmentAction:", error)
+        console.error(`${logId} LỖI NGHIÊM TRỌNG:`, error)
         return { success: false, message: "Lỗi hệ thống: " + (error.message || "Unknown error") }
     }
 }
