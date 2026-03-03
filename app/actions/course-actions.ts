@@ -114,7 +114,7 @@ export async function confirmStartDateAction(courseId: number, startDate: Date) 
 
     // Đánh dấu tất cả progress hiện tại thành RESET (lưu vào lịch sử)
     await (prisma as any).lessonProgress.updateMany({
-        where: { 
+        where: {
             enrollmentId: enrollment.id,
             status: { not: 'RESET' } // Chưa bị reset trước đó
         },
@@ -124,7 +124,7 @@ export async function confirmStartDateAction(courseId: number, startDate: Date) 
     // Cập nhật startedAt và resetAt để bắt đầu lộ trình mới
     await (prisma as any).enrollment.update({
         where: { userId_courseId: { userId, courseId } },
-        data: { 
+        data: {
             startedAt: startDate,
             resetAt: new Date() // Đánh dấu thời điểm reset lộ trình
         }
@@ -202,48 +202,34 @@ export async function saveVideoProgressAction({
     const percent = duration > 0 ? maxTime / duration : 0
     const vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
 
-    // Tìm progress chưa bị reset
-    const existing = await (prisma as any).lessonProgress.findFirst({
-        where: {
-            enrollmentId,
-            lessonId,
-            status: { not: 'RESET' }
-        },
-        select: { scores: true }
+    const existing = await prisma.lessonProgress.findUnique({
+        where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+        select: { scores: true, status: true }
     })
-    const existingScores = (existing?.scores as any) ?? {}
 
-    // Kiểm tra có progress active không
-    const activeProgress = await (prisma as any).lessonProgress.findFirst({
+    // Nếu status đang là RESET, ta coi như bắt đầu làm lại (xóa điểm rác cũ)
+    const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as any ?? {})
+
+    await prisma.lessonProgress.upsert({
         where: {
+            enrollmentId_lessonId: { enrollmentId, lessonId }
+        },
+        create: {
             enrollmentId,
             lessonId,
-            status: { not: 'RESET' }
+            maxTime,
+            duration,
+            scores: { vid: vidScore } as any,
+            status: "IN_PROGRESS"
+        },
+        update: {
+            maxTime,
+            duration,
+            scores: { ...existingScores, vid: vidScore } as any,
+            // Nếu học viên xem video lại bài cũ đã RESET, đánh dấu state thành đang học
+            ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
         }
     })
-
-    if (activeProgress) {
-        // Cập nhật progress hiện có
-        await (prisma as any).lessonProgress.update({
-            where: { id: activeProgress.id },
-            data: {
-                maxTime,
-                duration,
-                scores: { ...existingScores, vid: vidScore }
-            }
-        })
-    } else {
-        // Tạo progress mới (giữ nguyên record RESET cũ để admin xem lịch sử)
-        await (prisma as any).lessonProgress.create({
-            data: {
-                enrollmentId,
-                lessonId,
-                maxTime,
-                duration,
-                scores: { vid: vidScore }
-            }
-        })
-    }
 
     return { success: true, vidScore, percent: Math.round(percent * 100) }
 }
@@ -253,74 +239,100 @@ export async function submitAssignmentAction({
     lessonId,
     reflection,
     links,
-    supports
+    supports,
+    isUpdate = false,
+    lessonOrder,
+    startedAt,
+    existingVideoScore,
+    existingTimingScore
 }: {
     enrollmentId: number,
     lessonId: string,
     reflection: string,
     links: string[],
-    supports: string[]
+    supports: boolean[],
+    isUpdate?: boolean,
+    lessonOrder?: number,
+    startedAt?: string | null,
+    existingVideoScore?: number,
+    existingTimingScore?: number
 }) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
 
-    // 1. Lấy dữ liệu cần thiết trong 1 lần Query - Đã bổ sung include course
-    const [enrollment, lesson] = await Promise.all([
-        prisma.enrollment.findUnique({
-            where: { id: enrollmentId },
-            include: { 
-                lessonProgress: { where: { lessonId } },
-                course: { select: { id_khoa: true } } // Thêm dòng này để lấy id_khoa
-            }
-        }),
-        prisma.lesson.findUnique({
-            where: { id: lessonId },
-            select: { order: true, videoUrl: true }
-        })
-    ])
-
-    if (!enrollment || !lesson) throw new Error("Data not found")
-
-    const progress = enrollment.lessonProgress[0]
     const now = new Date()
 
-    // ... (Phần logic tính điểm giữ nguyên như tôi đã cung cấp ở bước trước)
     let videoScore = 0
     let reflectionScore = 0
     let linkScore = 0
     let supportScore = 0
     let timingScore = 0
 
+    // Lấy lesson từ DB chỉ để kiểm tra videoUrl
+    const lesson = await prisma.lesson.findUnique({
+        where: { id: lessonId },
+        select: { videoUrl: true }
+    })
+
+    if (!lesson) throw new Error("Lesson not found")
+
+    // Tính videoScore - ưu tiên dữ liệu từ client
     if (!lesson.videoUrl) {
         videoScore = 2
-    } else if (progress) {
-        const watchPercent = progress.maxTime / (progress.duration || 1)
-        videoScore = watchPercent >= 0.9 ? 2 : (watchPercent >= 0.5 ? 1 : 0)
+    } else if (existingVideoScore !== undefined) {
+        if (isUpdate) {
+            // Nếu đã đạt max 2đ từ trước → giữ nguyên
+            if (existingVideoScore === 2) {
+                videoScore = 2
+            } else {
+                // Nếu chưa đạt max → sẽ được tính lại ở client khi xem video
+                // Ở đây giữ nguyên điểm cũ
+                videoScore = existingVideoScore
+            }
+        } else {
+            videoScore = existingVideoScore
+        }
     }
 
+    // Tính reflectionScore
     if (reflection.trim().length > 0) {
         reflectionScore += 1
         if (reflection.trim().length > 50) reflectionScore += 1
     }
 
+    // Tính linkScore và supportScore
     linkScore = Math.min(links.filter(l => l.trim() !== "").length, 3)
-    supportScore = Math.min(supports.filter(s => s.trim() !== "").length, 2)
+    supportScore = supports.filter(s => s === true).length
 
-    if (enrollment.startedAt) {
-        const deadline = new Date(enrollment.startedAt)
-        deadline.setDate(deadline.getDate() + (lesson.order - 1))
-        deadline.setHours(23, 59, 59, 999)
-        timingScore = now <= deadline ? 1 : -1
+    // Tính timingScore
+    if (isUpdate) {
+        timingScore = existingTimingScore ?? 0
+    } else {
+        if (startedAt) {
+            const deadline = new Date(startedAt)
+            deadline.setDate(deadline.getDate() + (lessonOrder! - 1))
+            deadline.setHours(23, 59, 59, 999)
+            timingScore = now <= deadline ? 1 : -1
+        }
     }
 
     const totalScore = videoScore + reflectionScore + linkScore + supportScore + timingScore
 
-    // 3. Cập nhật Database
-    await prisma.lessonProgress.update({
+    // Cập nhật Database
+    await prisma.lessonProgress.upsert({
         where: {
             enrollmentId_lessonId: { enrollmentId, lessonId }
         },
-        data: {
+        create: {
+            enrollmentId,
+            lessonId,
+            assignment: { reflection, links, supports } as any,
+            scores: { videoScore, reflectionScore, linkScore, supportScore, timingScore } as any,
+            totalScore: Math.max(0, totalScore),
+            status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS",
+            submittedAt: now
+        },
+        update: {
             assignment: { reflection, links, supports } as any,
             scores: { videoScore, reflectionScore, linkScore, supportScore, timingScore } as any,
             totalScore: Math.max(0, totalScore),
@@ -329,10 +341,20 @@ export async function submitAssignmentAction({
         }
     })
 
-    // Sử dụng optional chaining để an toàn hơn
-    revalidatePath(`/courses/${enrollment.course?.id_khoa}/learn`, 'page')
+    // Lấy course id_khoa để revalidate
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { id: enrollmentId },
+        select: { course: { select: { id_khoa: true } } }
+    })
+
+    const result = { success: true, totalScore }
     
-    return { success: true, score: totalScore }
+    // Revalidate sau khi return để không chặn response
+    if (enrollment?.course?.id_khoa) {
+        revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`, 'page')
+    }
+
+    return result
 }
 
 export async function saveAssignmentDraftAction({
@@ -353,72 +375,20 @@ export async function saveAssignmentDraftAction({
 
     const validLinks = links.filter((l: string) => l && l.trim().length > 0)
 
-    // Lấy lesson hiện tại để kiểm tra deadline
-    const lesson = await (prisma as any).lesson.findUnique({
-        where: { id: lessonId },
-        select: { order: true }
-    })
-
-    // Lấy enrollment để kiểm tra startedAt
-    const enrollment = await (prisma as any).enrollment.findUnique({
-        where: { id: enrollmentId },
-        select: { startedAt: true }
-    })
-
-    // Lấy progress hiện tại (chưa bị reset)
-    const existingProgress = await (prisma as any).lessonProgress.findFirst({
+    await prisma.lessonProgress.upsert({
         where: {
+            enrollmentId_lessonId: { enrollmentId, lessonId }
+        },
+        create: {
             enrollmentId,
             lessonId,
-            status: { not: 'RESET' }
+            assignment: { reflection, links: validLinks, supports } as any,
+            status: "IN_PROGRESS"
+        },
+        update: {
+            assignment: { reflection, links: validLinks, supports } as any
         }
     })
-
-    const isCompleted = existingProgress?.status === 'COMPLETED'
-    let canUpdateScore = true
-
-    // Nếu đã hoàn thành, kiểm tra deadline
-    if (isCompleted && enrollment?.startedAt && lesson) {
-        const deadline = new Date(enrollment.startedAt)
-        deadline.setDate(deadline.getDate() + (lesson.order - 1))
-        deadline.setHours(23, 59, 59, 999)
-
-        // Nếu đã trễ hạn thì không cho cập nhật điểm
-        if (new Date() > deadline) {
-            canUpdateScore = false
-        }
-    }
-
-    // Nếu đã hoàn thành và trễ hạn: chỉ lưu assignment, không lưu scores/status
-    if (isCompleted && !canUpdateScore) {
-        if (existingProgress) {
-            await (prisma as any).lessonProgress.update({
-                where: { id: existingProgress.id },
-                data: {
-                    assignment: { reflection, links: validLinks, supports }
-                }
-            })
-        }
-    } else {
-        // Bình thường: lưu cả assignment
-        if (existingProgress) {
-            await (prisma as any).lessonProgress.update({
-                where: { id: existingProgress.id },
-                data: {
-                    assignment: { reflection, links: validLinks, supports }
-                }
-            })
-        } else {
-            // Tạo mới (giữ nguyên record RESET cũ để admin xem lịch sử)
-            await (prisma as any).lessonProgress.create({
-                data: {
-                    enrollmentId,
-                    lessonId,
-                    assignment: { reflection, links: validLinks, supports }
-                }
-            })
-        }
-    }
 
     return { success: true }
 }

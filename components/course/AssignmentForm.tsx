@@ -11,11 +11,12 @@ interface AssignmentFormProps {
     lessonOrder: number
     startedAt: Date | null
     videoPercent: number
-    videoUrl: string | null  // Link video (null nếu không có video)
-    onSubmit: (data: any) => Promise<{ success: boolean; totalScore: number } | void>
+    videoUrl: string | null
+    onSubmit: (data: any, isUpdate?: boolean) => Promise<{ success: boolean; totalScore: number } | void>
     initialData?: any
-    onSaveDraft?: React.MutableRefObject<(() => Promise<void>) | undefined>  // Ref để parent gọi khi cần lưu draft
-    onDraftSaved?: (draftInfo: any) => void  // Báo cho parent cập nhật state local sau khi lưu thành công
+    onSaveDraft?: React.MutableRefObject<(() => Promise<void>) | undefined>
+    onDraftSaved?: (draftInfo: any) => void
+    onFormDataChange?: (data: { reflection: string; links: string[]; supports: boolean[] }) => void
 }
 
 function formatDate(date: Date | null) {
@@ -102,6 +103,7 @@ export default function AssignmentForm({
     initialData,
     onSaveDraft,
     onDraftSaved,
+    onFormDataChange,
 }: AssignmentFormProps) {
     const [loading, setLoading] = useState(false)
     const [showRules, setShowRules] = useState(false)
@@ -121,7 +123,7 @@ export default function AssignmentForm({
     const existingScores = initialData?.scores ?? {}
 
     const saveDraft = useCallback(async () => {
-        // Luôn lưu draft khi có dữ liệu (cả khi đã hoàn thành - để cập nhật)
+        if (isCompleted) return
         if (reflection.trim() || links.some(l => l.trim()) || supports.some(s => s)) {
             try {
                 const draftData = { reflection, links, supports }
@@ -133,11 +135,14 @@ export default function AssignmentForm({
                 if (onDraftSaved) {
                     onDraftSaved(draftData)
                 }
+                if (onFormDataChange) {
+                    onFormDataChange(draftData)
+                }
             } catch (error) {
                 console.error('Failed to save draft:', error)
             }
         }
-    }, [reflection, links, supports, lessonId, initialData?.enrollmentId, onDraftSaved])
+    }, [reflection, links, supports, lessonId, initialData?.enrollmentId, onDraftSaved, onFormDataChange])
 
     // Sử dụng isDirtyRef để track thay đổi => tránh loop render
     const isDirtyRef = useRef(false)
@@ -149,7 +154,12 @@ export default function AssignmentForm({
             return
         }
         isDirtyRef.current = true
-    }, [reflection, links, supports])
+        
+        // Gọi callback khi form data thay đổi
+        if (onFormDataChange) {
+            onFormDataChange({ reflection, links, supports })
+        }
+    }, [reflection, links, supports, onFormDataChange])
 
     // Đăng ký ref để parent có thể ép gọi saveDraft (khi tab change on mobile)
     useEffect(() => {
@@ -163,17 +173,9 @@ export default function AssignmentForm({
         }
     }, [onSaveDraft, saveDraft])
 
-    // Lưu ngay khi form bị unmount (khi chuyển bài, hoặc NextJS component unmount)
-    useEffect(() => {
-        return () => {
-            if (isDirtyRef.current) {
-                saveDraft()
-            }
-        }
-    }, [saveDraft])
-
     // Lưu draft khi rời khỏi trang hoàn toàn (đóng tab)
     useEffect(() => {
+        if (isCompleted) return
         const handleBeforeUnload = () => {
             if (isDirtyRef.current) saveDraft()
         }
@@ -183,7 +185,7 @@ export default function AssignmentForm({
             window.removeEventListener('beforeunload', handleBeforeUnload)
             window.removeEventListener('pagehide', handleBeforeUnload)
         }
-    }, [saveDraft])
+    }, [saveDraft, isCompleted])
 
     // ── Realtime scoring ────────────────────────────────────────────────────
     // Kiểm tra đúng: videoUrl có phải YouTube không (không phải chỉ check null)
@@ -208,13 +210,16 @@ export default function AssignmentForm({
     const pracScore = useMemo(() => Math.min(validLinks.length, 3), [validLinks.length])
     const supportScore = useMemo(() => supports.filter(Boolean).length, [supports])
 
-    const timingScore = useMemo(() => {
-        if (isCompleted) return existingScores.timing ?? 0
+    const currentTimingScore = useMemo(() => {
         if (!deadline) return 0
         const dl = new Date(deadline)
         dl.setHours(23, 59, 59, 999)
         return new Date() <= dl ? 1 : -1
-    }, [deadline, isCompleted, existingScores.timing])
+    }, [deadline])
+
+    const isOverdue = currentTimingScore === -1
+
+    const timingScore = isCompleted ? existingScores.timing ?? 0 : currentTimingScore
 
     const total = isCompleted
         ? existingTotalScore
@@ -222,9 +227,21 @@ export default function AssignmentForm({
 
     const handleSubmit = async () => {
         if (!startedAt) { alert("Bạn chưa xác nhận ngày bắt đầu lộ trình!"); return }
+        
+        if (isCompleted && isOverdue) {
+            alert("Bài học đã nộp trễ hạn. Không thể cập nhật.")
+            return
+        }
+
+        const isUpdate = isCompleted
         setLoading(true)
         try {
-            await onSubmit({ reflection, links, supports })
+            const result = await onSubmit({ reflection, links, supports }, isUpdate)
+            if (result?.success) {
+                if (onFormDataChange) {
+                    onFormDataChange({ reflection: '', links: ['', '', ''], supports: [false, false] })
+                }
+            }
         } finally {
             setLoading(false)
         }
@@ -246,16 +263,23 @@ export default function AssignmentForm({
 
                 {/* Row 2: Nút GHI NHẬN + Quy tắc (icon nhỏ kế bên) */}
                 <div className="flex gap-1.5 mt-1.5">
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black rounded-xl py-2 transition-all shadow-md disabled:opacity-60 text-sm"
-                    >
-                        {loading
-                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                            : <><Send className="w-3.5 h-3.5" /> {isCompleted ? 'CẬP NHẬT' : 'GHI NHẬN KẾT QUẢ'}</>
-                        }
-                    </button>
+                    {!(isCompleted && isOverdue) && (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={loading}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black rounded-xl py-2 transition-all shadow-md disabled:opacity-60 text-sm"
+                        >
+                            {loading
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <><Send className="w-3.5 h-3.5" /> {isCompleted ? 'CẬP NHẬT' : 'GHI NHẬN KẾT QUẢ'}</>
+                            }
+                        </button>
+                    )}
+                    {isCompleted && isOverdue && (
+                        <div className="flex-1 flex items-center justify-center gap-1.5 bg-gray-300 text-gray-500 font-black rounded-xl py-2 text-sm">
+                            ĐÃ HOÀN THÀNH CẬP NHẬT
+                        </div>
+                    )}
                     <button
                         onClick={() => setShowRules(true)}
                         className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded-xl border border-orange-300 transition text-xs font-semibold"
