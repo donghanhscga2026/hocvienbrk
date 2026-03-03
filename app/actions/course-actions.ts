@@ -342,42 +342,48 @@ export async function submitAssignmentAction({
     const totalScore = videoScore + reflectionScore + linkScore + supportScore + timingScore
 
     // Cập nhật Database
-    await prisma.lessonProgress.upsert({
-        where: {
-            enrollmentId_lessonId: { enrollmentId, lessonId }
-        },
-        create: {
-            enrollmentId,
-            lessonId,
-            assignment: { reflection, links, supports } as any,
-            scores: { videoScore, reflectionScore, linkScore, supportScore, timingScore } as any,
-            totalScore: Math.max(0, totalScore),
-            status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS",
-            submittedAt: now
-        },
-        update: {
-            assignment: { reflection, links, supports } as any,
-            scores: { videoScore, reflectionScore, linkScore, supportScore, timingScore } as any,
-            totalScore: Math.max(0, totalScore),
-            status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS",
-            submittedAt: now
+    try {
+        await prisma.lessonProgress.upsert({
+            where: {
+                enrollmentId_lessonId: { enrollmentId, lessonId }
+            },
+            create: {
+                enrollmentId,
+                lessonId,
+                assignment: { reflection, links, supports } as any,
+                scores: { video: videoScore, reflection: reflectionScore, link: linkScore, support: supportScore, timing: timingScore } as any,
+                totalScore: Math.max(0, totalScore),
+                status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS",
+                submittedAt: now
+            },
+            update: {
+                assignment: { reflection, links, supports } as any,
+                scores: { video: videoScore, reflection: reflectionScore, link: linkScore, support: supportScore, timing: timingScore } as any,
+                totalScore: Math.max(0, totalScore),
+                status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS",
+                submittedAt: now
+            }
+        })
+
+        // Lấy course id_khoa để revalidate
+        const enrollment = await prisma.enrollment.findUnique({
+            where: { id: enrollmentId },
+            select: { course: { select: { id_khoa: true } } }
+        })
+
+        if (enrollment?.course?.id_khoa) {
+            try {
+                revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`, 'page')
+            } catch (revalidateError) {
+                console.error("Revalidation error (ignored):", revalidateError)
+            }
         }
-    })
 
-    // Lấy course id_khoa để revalidate
-    const enrollment = await prisma.enrollment.findUnique({
-        where: { id: enrollmentId },
-        select: { course: { select: { id_khoa: true } } }
-    })
-
-    const result = { success: true, totalScore }
-    
-    // Revalidate sau khi return để không chặn response
-    if (enrollment?.course?.id_khoa) {
-        revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`, 'page')
+        return { success: true, totalScore }
+    } catch (dbError) {
+        console.error("Database error in submitAssignmentAction:", dbError)
+        return { success: false, message: "Không thể lưu kết quả vào hệ thống." }
     }
-
-    return result
 }
 
 export async function saveAssignmentDraftAction({
