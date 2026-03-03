@@ -14,7 +14,7 @@ interface AssignmentFormProps {
     videoUrl: string | null  // Link video (null nếu không có video)
     onSubmit: (data: any) => Promise<{ success: boolean; totalScore: number } | void>
     initialData?: any
-    onSaveDraft?: React.RefObject<(() => Promise<void>) | undefined>  // Ref để parent gọi khi cần lưu draft
+    onSaveDraft?: React.MutableRefObject<(() => Promise<void>) | undefined>  // Ref để parent gọi khi cần lưu draft
     onDraftSaved?: (draftInfo: any) => void  // Báo cho parent cập nhật state local sau khi lưu thành công
 }
 
@@ -154,9 +154,9 @@ export default function AssignmentForm({
     // Đăng ký ref để parent có thể ép gọi saveDraft (khi tab change on mobile)
     useEffect(() => {
         if (onSaveDraft) {
-            onSaveDraft.current = () => {
+            onSaveDraft.current = async () => {
                 if (isDirtyRef.current) {
-                    saveDraft()
+                    await saveDraft()
                     isDirtyRef.current = false
                 }
             }
