@@ -53,9 +53,19 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         }, {})
     )
     const [showContentModal, setShowContentModal] = useState(false)
+    const [currentFormData, setCurrentFormData] = useState<{ reflection: string; links: string[]; supports: boolean[] } | null>(null)
     const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
     const prevMobileTabRef = useRef(mobileTab)
     const prevShowContentModalRef = useRef(showContentModal)
+
+    // Helper function kiểm tra đúng hạn
+    const checkIsOnTime = useCallback((startedAt: Date | null, lessonOrder: number): boolean => {
+        if (!startedAt) return false
+        const deadline = new Date(startedAt)
+        deadline.setDate(deadline.getDate() + (lessonOrder - 1))
+        deadline.setHours(23, 59, 59, 999)
+        return new Date() <= deadline
+    }, [])
 
     // Lưu video progress để auto-save
     const videoProgressRef = useRef<{ maxTime: number; duration: number } | null>(null)
@@ -72,51 +82,55 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     // Auto-save draft + video progress khi chuyển tab hoặc mở danh sách bài
     useEffect(() => {
-        const prevTab = prevMobileTabRef.current
-        const prevModal = prevShowContentModalRef.current
+        const handleTabChange = async () => {
+            const prevTab = prevMobileTabRef.current
+            const prevModal = prevShowContentModalRef.current
 
-        // tab thay đổi HOẶC modal mở (từ false -> true)
-        const tabChanged = mobileTab !== prevTab
-        const modalOpened = showContentModal && !prevModal
+            // tab thay đổi HOẶC modal mở (từ false -> true)
+            const tabChanged = mobileTab !== prevTab
+            const modalOpened = showContentModal && !prevModal
 
-        if (tabChanged || modalOpened) {
-            // Chỉ lưu assignment draft NẾU người dùng đang ở tab 'record' (Ghi nhận) và chuyển sang tab khác, hoặc mở modal Danh sách.
-            // Điều này tránh tình trạng lưu ngầm dư thừa khi chuyển từ tab khác sang tab Ghi nhận.
-            if ((prevTab === 'record' || modalOpened) && assignmentFormRef.current) {
-                assignmentFormRef.current()
-            }
-            // Lưu video progress
-            if (videoProgressRef.current && currentLessonId) {
-                const { maxTime, duration } = videoProgressRef.current
-                saveVideoProgressAction({
-                    enrollmentId: enrollment.id,
-                    lessonId: currentLessonId,
-                    maxTime,
-                    duration
-                })
+            if (tabChanged || modalOpened) {
+                // Chỉ lưu assignment draft NẾU người dùng đang ở tab 'record' (Ghi nhận) và chuyển sang tab khác, hoặc mở modal Danh sách.
+                if ((prevTab === 'record' || modalOpened) && assignmentFormRef.current) {
+                    await assignmentFormRef.current()
+                }
+                // Lưu video progress
+                if (videoProgressRef.current && currentLessonId) {
+                    const { maxTime, duration } = videoProgressRef.current
+                    saveVideoProgressAction({
+                        enrollmentId: enrollment.id,
+                        lessonId: currentLessonId,
+                        maxTime,
+                        duration
+                    })
 
-                // Cập nhật state local
-                setProgressMap((prev: any) => {
-                    const existing = prev[currentLessonId] || {}
-                    return {
-                        ...prev,
-                        [currentLessonId]: {
-                            ...existing,
-                            maxTime,
-                            duration
+                    // Cập nhật state local
+                    setProgressMap((prev: any) => {
+                        const existing = prev[currentLessonId] || {}
+                        return {
+                            ...prev,
+                            [currentLessonId]: {
+                                ...existing,
+                                maxTime,
+                                duration
+                            }
                         }
-                    }
-                })
+                    })
+                }
             }
+
+            prevMobileTabRef.current = mobileTab
+            prevShowContentModalRef.current = showContentModal
         }
 
-        prevMobileTabRef.current = mobileTab
-        prevShowContentModalRef.current = showContentModal
+        handleTabChange()
     }, [mobileTab, showContentModal, currentLessonId, enrollment.id])
 
     // Lưu video progress lần cuối khi rời khỏi trang hoặc unmount (chuyển bài)
     useEffect(() => {
-        const handleBeforeUnload = () => {
+        const handleBeforeUnload = async () => {
+            // Lưu video progress
             if (videoProgressRef.current && currentLessonId) {
                 saveVideoProgressAction({
                     enrollmentId: enrollment.id,
@@ -124,6 +138,49 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     maxTime: videoProgressRef.current.maxTime,
                     duration: videoProgressRef.current.duration
                 })
+            }
+
+            // Kiểm tra draft + đúng hạn để tự động submit
+            const currentProg = progressMap[currentLessonId!]
+            const currentLessonOrder = course.lessons.find((l: any) => l.id === currentLessonId)?.order ?? 1
+            const isOnTime = checkIsOnTime(new Date(enrollment.startedAt), currentLessonOrder)
+            
+            const hasFormData = currentFormData && (
+                currentFormData.reflection.trim() || 
+                currentFormData.links.some((l: string) => l.trim()) || 
+                currentFormData.supports.some((s: boolean) => s)
+            )
+
+            // Nếu đúng hạn và có dữ liệu form → kiểm tra xem có khác DB không
+            if (isOnTime && hasFormData) {
+                const dbAssignment = currentProg?.assignment as any
+                const dbReflection = dbAssignment?.reflection?.trim() || ''
+                const dbLinks = dbAssignment?.links || []
+                const dbSupports = dbAssignment?.supports || []
+                
+                const currentLinks = currentFormData.links.filter((l: string) => l.trim())
+                const dbLinksFiltered = dbLinks.map((l: any) => String(l).trim()).filter((l: string) => l)
+                
+                const hasChanges = 
+                    currentFormData.reflection.trim() !== dbReflection ||
+                    JSON.stringify(currentLinks) !== JSON.stringify(dbLinksFiltered) ||
+                    JSON.stringify(currentFormData.supports) !== JSON.stringify(dbSupports)
+
+                if (hasChanges) {
+                    const isUpdate = currentProg?.status === 'COMPLETED'
+                    submitAssignmentAction({
+                        enrollmentId: enrollment.id,
+                        lessonId: currentLessonId!,
+                        reflection: currentFormData.reflection,
+                        links: currentFormData.links,
+                        supports: currentFormData.supports,
+                        isUpdate,
+                        lessonOrder: currentLesson?.order,
+                        startedAt: enrollment.startedAt,
+                        existingVideoScore: currentProgress?.scores?.videoScore,
+                        existingTimingScore: currentProgress?.scores?.timing
+                    })
+                }
             }
         }
 
@@ -134,7 +191,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             window.removeEventListener('pagehide', handleBeforeUnload)
             handleBeforeUnload()
         }
-    }, [currentLessonId, enrollment.id])
+    }, [currentLessonId, enrollment.id, currentFormData, progressMap, course.lessons, enrollment.startedAt, checkIsOnTime])
 
     // Lưu bài học hiện tại vào database khi load trang
     useEffect(() => {
@@ -166,15 +223,15 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         : undefined
 
     const handleLessonSelect = async (lessonId: string) => {
-        // Lưu assignment draft trước khi chuyển bài
+        // Lưu assignment draft trước khi chuyển bài (chạy ngầm, không await để tránh khựng UI)
         if (assignmentFormRef.current) {
-            await assignmentFormRef.current()
+            assignmentFormRef.current()
         }
 
         // Lưu video progress của bài hiện tại trước khi chuyển
         if (currentLessonId && videoPercent > 0 && currentProgress) {
             const maxTime = (videoPercent / 100) * (currentProgress.duration || 0)
-            await saveVideoProgressAction({
+            saveVideoProgressAction({
                 enrollmentId: enrollment.id,
                 lessonId: currentLessonId,
                 maxTime,
@@ -182,20 +239,141 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             })
         }
 
-        // Auto-submit assignment nếu đã có dữ liệu nhập nhưng chưa submit
+        // Kiểm tra draft + đúng hạn để tự động submit
         const currentProg = progressMap[currentLessonId!]
-        if (currentProg?.assignment && !currentProg?.submittedAt && currentProgress) {
-            const assignmentData = currentProgress.assignment as any
-            if (assignmentData?.reflection || assignmentData?.links?.length > 0) {
-                await submitAssignmentAction({
-                    enrollmentId: enrollment.id,
-                    lessonId: currentLessonId!,
-                    reflection: assignmentData.reflection || '',
-                    links: assignmentData.links || [],
-                    supports: assignmentData.supports || []
-                })
+        const currentLessonOrder = currentLesson?.order ?? 1
+        const isOnTime = checkIsOnTime(new Date(enrollment.startedAt), currentLessonOrder)
+        const currentLessonIdToUpdate = currentLessonId
+        
+        // Kiểm tra có dữ liệu trong form không
+        const hasFormData = currentFormData && (
+            currentFormData.reflection.trim() || 
+            currentFormData.links.some((l: string) => l.trim()) || 
+            currentFormData.supports.some((s: boolean) => s)
+        )
+
+        // Nếu đúng hạn và có dữ liệu form → kiểm tra xem có khác DB không
+        if (isOnTime && hasFormData) {
+            const dbAssignment = currentProg?.assignment as any
+            const dbReflection = dbAssignment?.reflection?.trim() || ''
+            const dbLinks = dbAssignment?.links || []
+            const dbSupports = dbAssignment?.supports || []
+            
+            // Lọc empty strings từ form và DB để so sánh
+            const currentLinks = currentFormData.links.filter((l: string) => l.trim())
+            const dbLinksFiltered = dbLinks.map((l: any) => String(l).trim()).filter((l: string) => l)
+            
+            // Kiểm tra dữ liệu khác với DB (có thay đổi mới)
+            const hasChanges = 
+                currentFormData.reflection.trim() !== dbReflection ||
+                JSON.stringify(currentLinks) !== JSON.stringify(dbLinksFiltered) ||
+                JSON.stringify(currentFormData.supports) !== JSON.stringify(dbSupports)
+
+            if (hasChanges) {
+                if (currentProg?.status === 'COMPLETED') {
+                    const shouldUpdate = window.confirm("Bạn có dữ liệu mới chưa cập nhật. Tự động cập nhật ngay?")
+                    if (shouldUpdate) {
+                        const result = await submitAssignmentAction({
+                            enrollmentId: enrollment.id,
+                            lessonId: currentLessonIdToUpdate!,
+                            reflection: currentFormData.reflection,
+                            links: currentFormData.links,
+                            supports: currentFormData.supports,
+                            isUpdate: true,
+                            lessonOrder: currentLesson?.order,
+                            startedAt: enrollment.startedAt,
+                            existingVideoScore: currentProgress?.scores?.videoScore,
+                            existingTimingScore: currentProgress?.scores?.timing
+                        })
+                        // Cập nhật progressMap và enrollment với dữ liệu mới
+                        if (result?.success) {
+                            setProgressMap((prev: any) => ({
+                                ...prev,
+                                [currentLessonIdToUpdate!]: {
+                                    ...prev[currentLessonIdToUpdate!],
+                                    assignment: {
+                                        reflection: currentFormData.reflection,
+                                        links: currentFormData.links,
+                                        supports: currentFormData.supports
+                                    },
+                                    status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
+                                    totalScore: result.totalScore
+                                }
+                            }))
+                            setEnrollment((prev: any) => ({
+                                ...prev,
+                                lessonProgress: prev.lessonProgress.map((p: any) => 
+                                    p.lessonId === currentLessonIdToUpdate
+                                        ? { ...p, assignment: { reflection: currentFormData.reflection, links: currentFormData.links, supports: currentFormData.supports }, status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS', totalScore: result.totalScore }
+                                        : p
+                                )
+                            }))
+                            
+                            // Thông báo thành công
+                            if (currentProg?.status === 'COMPLETED') {
+                                alert(`✅ Cập nhật thành công! Điểm: ${result.totalScore}/10`)
+                            } else {
+                                if (result.totalScore >= 5) {
+                                    alert(`✅ Ghi nhận thành công! Điểm: ${result.totalScore}/10. Bạn đã hoàn thành bài học!`)
+                                } else {
+                                    alert(`📊 Ghi nhận thành công! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    const shouldSubmit = window.confirm("Bạn có dữ liệu chưa ghi nhận. Tự động ghi nhận ngay?")
+                    if (shouldSubmit) {
+                        const result = await submitAssignmentAction({
+                            enrollmentId: enrollment.id,
+                            lessonId: currentLessonIdToUpdate!,
+                            reflection: currentFormData.reflection,
+                            links: currentFormData.links,
+                            supports: currentFormData.supports,
+                            isUpdate: false,
+                            lessonOrder: currentLesson?.order,
+                            startedAt: enrollment.startedAt,
+                            existingVideoScore: currentProgress?.scores?.videoScore,
+                            existingTimingScore: currentProgress?.scores?.timing
+                        })
+                        // Cập nhật progressMap và enrollment với dữ liệu mới
+                        if (result?.success) {
+                            setProgressMap((prev: any) => ({
+                                ...prev,
+                                [currentLessonIdToUpdate!]: {
+                                    ...prev[currentLessonIdToUpdate!],
+                                    assignment: {
+                                        reflection: currentFormData.reflection,
+                                        links: currentFormData.links,
+                                        supports: currentFormData.supports
+                                    },
+                                    status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
+                                    totalScore: result.totalScore
+                                }
+                            }))
+                            setEnrollment((prev: any) => ({
+                                ...prev,
+                                lessonProgress: prev.lessonProgress.map((p: any) => 
+                                    p.lessonId === currentLessonIdToUpdate
+                                        ? { ...p, assignment: { reflection: currentFormData.reflection, links: currentFormData.links, supports: currentFormData.supports }, status: result.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS', totalScore: result.totalScore }
+                                        : p
+                                )
+                            }))
+                            
+                            // Thông báo thành công
+                            if (result.totalScore >= 5) {
+                                alert(`✅ Ghi nhận thành công! Điểm: ${result.totalScore}/10. Bạn đã hoàn thành bài học!`)
+                            } else {
+                                alert(`📊 Ghi nhận thành công! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
+                            }
+                        }
+                    }
+                }
             }
         }
+
+        // Reset form data sau khi chuyển bài
+        setCurrentFormData(null)
 
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
@@ -203,7 +381,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setShowContentModal(false)
 
         // Lưu bài học cuối đang học vào database
-        await updateLastLessonAction(enrollment.id, lessonId)
+        updateLastLessonAction(enrollment.id, lessonId)
     }
 
     const handleConfirmStartDate = async (date: Date) => {
@@ -226,11 +404,16 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         })
     }, [currentLessonId, enrollment.id])
 
-    const handleSubmitAssignment = async (data: any) => {
+    const handleSubmitAssignment = async (data: any, isUpdate: boolean = false) => {
         const result = await submitAssignmentAction({
             enrollmentId: enrollment.id,
             lessonId: currentLessonId!,
-            ...data
+            ...data,
+            isUpdate,
+            lessonOrder: currentLesson?.order,
+            startedAt: enrollment.startedAt,
+            existingVideoScore: currentProgress?.scores?.videoScore,
+            existingTimingScore: currentProgress?.scores?.timing
         })
         if (!result.success) return
 
@@ -242,16 +425,20 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setProgressMap(prev => ({ ...prev, [currentLessonId!]: updatedProgress }))
 
         if (result.totalScore >= 5) {
-            const currentIndex = course.lessons.findIndex((l: any) => l.id === currentLessonId)
-            const isLast = currentIndex === course.lessons.length - 1
-            const nextId = isLast ? course.lessons[0].id : course.lessons[currentIndex + 1].id
-            const msg = isLast
-                ? `🎉 Hoàn thành bài cuối (${result.totalScore}đ)! Quay về Bài 1.`
-                : `✅ Hoàn thành! ${result.totalScore}đ. Chuyển sang bài tiếp theo.`
-            alert(msg)
-            setCurrentLessonId(nextId)
-            setVideoPercent(0)
-            setMobileTab('content')
+            if (isUpdate) {
+                alert(`✅ Cập nhật thành công! Điểm: ${result.totalScore}/10`)
+            } else {
+                const currentIndex = course.lessons.findIndex((l: any) => l.id === currentLessonId)
+                const isLast = currentIndex === course.lessons.length - 1
+                const nextId = isLast ? course.lessons[0].id : course.lessons[currentIndex + 1].id
+                const msg = isLast
+                    ? `🎉 Hoàn thành bài cuối (${result.totalScore}đ)! Quay về Bài 1.`
+                    : `✅ Hoàn thành! ${result.totalScore}đ. Chuyển sang bài tiếp theo.`
+                alert(msg)
+                setCurrentLessonId(nextId)
+                setVideoPercent(0)
+                setMobileTab('content')
+            }
         } else {
             alert(`📊 Đã ghi nhận! Điểm: ${result.totalScore}/10. Cần ≥5đ để hoàn thành.`)
         }
@@ -439,8 +626,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             onSubmit={handleSubmitAssignment}
                                             initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
                                             onSaveDraft={assignmentFormRef}
+                                            onFormDataChange={setCurrentFormData}
                                             onDraftSaved={(draftData) => {
-                                                // Cập nhật lại progressMap của client ngay lập tức
+                                                setCurrentFormData(draftData)
                                                 setProgressMap((prev: any) => {
                                                     const existing = prev[currentLessonId!] || {}
                                                     return {
@@ -498,6 +686,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             onSubmit={handleSubmitAssignment}
                             initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
                             onSaveDraft={assignmentFormRef}
+                            onFormDataChange={setCurrentFormData}
                         />
                     </div>
                 )}
