@@ -186,6 +186,16 @@ export default function VideoPlayer({
         }
     }
 
+    // Nhận diện mobile cho style
+    const [isMobile, setIsMobile] = useState(false)
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 767px)')
+        setIsMobile(mq.matches)
+        const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+        mq.addEventListener('change', handler)
+        return () => mq.removeEventListener('change', handler)
+    }, [])
+
     // "Xem lại từ đầu": reset completed, seek về 0, bắt đầu track lại
     const handleRewatch = () => {
         setCompleted(false)
@@ -194,26 +204,32 @@ export default function VideoPlayer({
         startTracking()
     }
 
-    // Kiểm tra nếu là link Google Docs
-    const isGoogleDocs = lessonContent?.includes('docs.google.com/document')
+    // Kiểm tra nếu là link Google Docs/Drive
+    const getEmbedUrl = (url: string | null | undefined) => {
+        if (!url || !url.includes('docs.google.com')) return null
+        const cleanUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].replace(/\/+$/, '')
+        return `${cleanUrl}/preview`
+    }
+
+    const embedUrl = getEmbedUrl(videoUrl) || getEmbedUrl(lessonContent)
 
     if (!videoId) {
-        // Nếu có link Google Docs trong content -> hiển thị embed
-        if (isGoogleDocs && lessonContent) {
+        // Nếu có link Google Docs (ở videoUrl hoặc content) -> hiển thị embed
+        if (embedUrl) {
             return (
-                <div className="relative w-full aspect-video bg-white overflow-hidden">
+                <div className="relative w-full aspect-video bg-white overflow-hidden rounded-xl border border-zinc-800 shadow-2xl">
                     <iframe
-                        src={lessonContent}
+                        src={embedUrl}
                         className="absolute inset-0 w-full h-full"
                         allow="autoplay"
-                        title="Bài học"
+                        title="Tài liệu bài học"
                     />
                 </div>
             )
         }
 
         // Nếu có HTML content -> hiển thị trực tiếp
-        if (lessonContent && !isGoogleDocs) {
+        if (lessonContent) {
             return (
                 <div className="w-full h-full min-h-[400px] bg-zinc-900 overflow-x-hidden overflow-y-auto p-6">
                     <div
