@@ -158,7 +158,8 @@ model LessonProgress {
   updatedAt    DateTime   @updatedAt
   enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-
+  
+@@unique([enrollmentId, lessonId])
   @@index([enrollmentId])   // Tăng tốc query theo enrollment
   @@index([lessonId])       // Tăng tốc query comment/progress theo lesson
   @@index([status])         // Tăng tốc lọc theo status

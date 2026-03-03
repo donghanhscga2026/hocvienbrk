@@ -248,7 +248,6 @@ export async function saveVideoProgressAction({
     return { success: true, vidScore, percent: Math.round(percent * 100) }
 }
 
-
 export async function submitAssignmentAction({
     enrollmentId,
     lessonId,
@@ -260,121 +259,80 @@ export async function submitAssignmentAction({
     lessonId: string,
     reflection: string,
     links: string[],
-    supports: boolean[]
+    supports: string[]
 }) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
-    const userId = parseInt(session.user.id)
 
-    // Batch 1: Lấy enrollment + lesson song song
+    // 1. Lấy dữ liệu cần thiết trong 1 lần Query - Đã bổ sung include course
     const [enrollment, lesson] = await Promise.all([
-        (prisma as any).enrollment.findUnique({
+        prisma.enrollment.findUnique({
             where: { id: enrollmentId },
-            include: { course: true }
+            include: { 
+                lessonProgress: { where: { lessonId } },
+                course: { select: { id_khoa: true } } // Thêm dòng này để lấy id_khoa
+            }
         }),
-        (prisma as any).lesson.findUnique({
-            where: { id: lessonId }
+        prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { order: true, videoUrl: true }
         })
     ])
 
-    if (!enrollment || !lesson || !enrollment.startedAt) {
-        throw new Error("Dữ liệu không hợp lệ hoặc chưa xác nhận ngày bắt đầu.")
+    if (!enrollment || !lesson) throw new Error("Data not found")
+
+    const progress = enrollment.lessonProgress[0]
+    const now = new Date()
+
+    // ... (Phần logic tính điểm giữ nguyên như tôi đã cung cấp ở bước trước)
+    let videoScore = 0
+    let reflectionScore = 0
+    let linkScore = 0
+    let supportScore = 0
+    let timingScore = 0
+
+    if (!lesson.videoUrl) {
+        videoScore = 2
+    } else if (progress) {
+        const watchPercent = progress.maxTime / (progress.duration || 1)
+        videoScore = watchPercent >= 0.9 ? 2 : (watchPercent >= 0.5 ? 1 : 0)
     }
 
-    const validLinks = links.filter((l: string) => l && l.trim().length > 0)
-
-    // Batch 2: Kiểm tra link trùng + lấy video score song song
-    const [otherProgresses, existingProgress] = await Promise.all([
-        (prisma as any).lessonProgress.findMany({
-            where: {
-                enrollment: { userId },
-                NOT: { lessonId }
-            },
-            select: { assignment: true }
-        }),
-        (prisma as any).lessonProgress.findFirst({
-            where: {
-                enrollmentId,
-                lessonId,
-                status: { not: 'RESET' } // Chỉ lấy progress chưa bị reset
-            },
-            select: { scores: true }
-        })
-    ])
-
-    const allPastLinks = otherProgresses.flatMap((p: any) => p.assignment?.links || [])
-
-    const currentUniqueLinks = new Set(validLinks)
-    if (currentUniqueLinks.size < validLinks.length) {
-        throw new Error("Phát hiện các link trùng nhau trong cùng một bài nộp. Vui lòng nộp các link khác nhau.")
+    if (reflection.trim().length > 0) {
+        reflectionScore += 1
+        if (reflection.trim().length > 50) reflectionScore += 1
     }
 
-    const duplicates = validLinks.filter((link: string) => allPastLinks.includes(link))
-    if (duplicates.length > 0) {
-        throw new Error(`Phát hiện link đã nộp trong các bài trước: ${duplicates.join(', ')}. Vui lòng nộp nội dung mới.`)
+    linkScore = Math.min(links.filter(l => l.trim() !== "").length, 3)
+    supportScore = Math.min(supports.filter(s => s.trim() !== "").length, 2)
+
+    if (enrollment.startedAt) {
+        const deadline = new Date(enrollment.startedAt)
+        deadline.setDate(deadline.getDate() + (lesson.order - 1))
+        deadline.setHours(23, 59, 59, 999)
+        timingScore = now <= deadline ? 1 : -1
     }
 
-    // Tính điểm
-    let refScore = 0
-    if (reflection.trim().length >= 50) refScore = 2
-    else if (reflection.trim().length > 0) refScore = 1
+    const totalScore = videoScore + reflectionScore + linkScore + supportScore + timingScore
 
-    const pracScore = Math.min(validLinks.length, 3)
-    const supportScore = supports.filter((s: boolean) => s === true).length
-
-    const deadlineDate = new Date(enrollment.startedAt)
-    deadlineDate.setDate(deadlineDate.getDate() + (lesson.order - 1))
-    const submittedAt = new Date()
-    const timingScore = calculateTimingScore(deadlineDate, submittedAt)
-
-    // Bài không có video YouTube (null hoặc link khác như Docs) -> mặc định +2
-    const isYoutubeVideo = !!lesson.videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(lesson.videoUrl)
-    const vidScore = !isYoutubeVideo
-        ? 2
-        : ((existingProgress?.scores as any)?.vid ?? 0)
-
-    const totalScore = vidScore + refScore + pracScore + supportScore + timingScore
-
-    // Xử lý tạo/cập nhật progress
-    // Nếu đã có progress chưa bị reset -> cập nhật
-    // Nếu chưa có hoặc đã bị reset -> tạo mới
-    const activeProgress = await (prisma as any).lessonProgress.findFirst({
+    // 3. Cập nhật Database
+    await prisma.lessonProgress.update({
         where: {
-            enrollmentId,
-            lessonId,
-            status: { not: 'RESET' }
+            enrollmentId_lessonId: { enrollmentId, lessonId }
+        },
+        data: {
+            assignment: { reflection, links, supports } as any,
+            scores: { videoScore, reflectionScore, linkScore, supportScore, timingScore } as any,
+            totalScore: Math.max(0, totalScore),
+            status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS",
+            submittedAt: now
         }
     })
 
-    if (activeProgress) {
-        // Cập nhật progress hiện có
-        await (prisma as any).lessonProgress.update({
-            where: { id: activeProgress.id },
-            data: {
-                scores: { vid: vidScore, ref: refScore, prac: pracScore, support: supportScore, timing: timingScore },
-                totalScore: Math.max(0, totalScore),
-                assignment: { reflection, links: validLinks, supports },
-                status: 'COMPLETED',
-                submittedAt
-            }
-        })
-    } else {
-        // Tạo progress mới (giữ nguyên record RESET cũ để admin xem lịch sử)
-        await (prisma as any).lessonProgress.create({
-            data: {
-                enrollmentId,
-                lessonId,
-                scores: { vid: vidScore, ref: refScore, prac: pracScore, support: supportScore, timing: timingScore },
-                totalScore: Math.max(0, totalScore),
-                assignment: { reflection, links: validLinks, supports },
-                status: 'COMPLETED',
-                submittedAt
-            }
-        })
-    }
-
-    revalidatePath(`/courses/[id]/learn`, 'layout')
-    return { success: true, totalScore }
+    // Sử dụng optional chaining để an toàn hơn
+    revalidatePath(`/courses/${enrollment.course?.id_khoa}/learn`, 'page')
+    
+    return { success: true, score: totalScore }
 }
 
 export async function saveAssignmentDraftAction({
