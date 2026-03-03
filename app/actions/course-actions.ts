@@ -216,11 +216,21 @@ export async function submitAssignmentAction({
         })
         if (!lesson) return { success: false, message: "Không tìm thấy bài học." }
 
+        // Kiểm tra videoUrl có thực sự là video hay không
+        const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
+        
+        // Regex kiểm tra xem có phải link YouTube không
+        const isYouTube = /youtu\.be\/|youtube\.com\/|v=/.test(rawUrl)
+
         let videoScore = 0
-        if (!lesson.videoUrl) {
+        if (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) {
+            // Không có link HOẶC link là tài liệu (Docs) -> auto 2đ
             videoScore = 2
-        } else if (existingVideoScore !== undefined) {
-            videoScore = existingVideoScore
+            console.log(`${logId} XÁC NHẬN: Bài học không dùng video (Tài liệu/Docs) -> Tự động tính +2đ`)
+        } else {
+            // Là link video YouTube -> dùng điểm tích lũy từ client gửi lên
+            videoScore = existingVideoScore ?? 0
+            console.log(`${logId} XÁC NHẬN: Bài học có video YouTube -> Lấy điểm tích lũy: ${videoScore}đ`)
         }
 
         const reflectionScore = reflection.trim().length >= 50 ? 2 : reflection.trim().length > 0 ? 1 : 0
@@ -228,7 +238,7 @@ export async function submitAssignmentAction({
         const supportScore = supports.filter(s => s === true).length
 
         const totalScore = Math.max(0, videoScore + reflectionScore + linkScore + supportScore + timingScore)
-        console.log(`${logId} Tổng điểm tính toán: ${totalScore} (Video: ${videoScore}, Ref: ${reflectionScore}, Link: ${linkScore}, Support: ${supportScore}, Timing: ${timingScore})`)
+        console.log(`${logId} TÍNH ĐIỂM: Video(${videoScore}) + Ref(${reflectionScore}) + Link(${linkScore}) + Support(${supportScore}) + Timing(${timingScore}) = ${totalScore}đ`)
 
         // 3. Cập nhật Database
         console.log(`${logId} Đang thực hiện UPSERT vào Database...`)

@@ -12,7 +12,7 @@ import {
     submitAssignmentAction,
     updateLastLessonAction
 } from "@/app/actions/course-actions"
-import { ArrowLeft, ListVideo, FileText, X, ClipboardCheck, Loader2, Terminal } from "lucide-react"
+import { ArrowLeft, ListVideo, FileText, X, ClipboardCheck, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface CoursePlayerProps {
@@ -25,16 +25,7 @@ type MobileTab = 'list' | 'content' | 'record'
 
 export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
-    const [debugLogs, setDebugLogs] = useState<{msg: string, time: string}[]>([])
-    const [showDebug, setShowDebug] = useState(false)
     const isSubmittingRef = useRef(false)
-
-    // Helper ghi log
-    const addLog = useCallback((msg: string) => {
-        const time = new Date().toLocaleTimeString('vi-VN', { hour12: false })
-        setDebugLogs(prev => [{msg, time}, ...prev].slice(0, 50))
-        console.log(`[DEBUG] ${time} - ${msg}`)
-    }, [])
 
     // Lọc progress chỉ lấy các bài học không bị reset
     const filteredLessonProgress = enrollment.lessonProgress.filter((p: any) => p.status !== 'RESET')
@@ -62,14 +53,13 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const notify = useCallback((text: string, type: 'loading' | 'success' | 'error' = 'success', duration = 3000) => {
         setStatusMsg({ text, type })
-        addLog(`[UI] Thông báo: ${text} (${type})`)
+        console.log(`[UI-NOTIFY] ${text} (${type})`)
         if (type !== 'loading') {
             setTimeout(() => setStatusMsg(null), duration)
         }
-    }, [addLog])
+    }, [])
 
     const prevMobileTabRef = useRef(mobileTab)
-    const prevShowContentModalRef = useRef(showContentModal)
 
     const checkIsOnTime = useCallback((startedAt: Date | null, lessonOrder: number): boolean => {
         if (!startedAt) return false
@@ -95,31 +85,25 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             const prevTab = prevMobileTabRef.current
             const currentTab = mobileTab
             if (currentTab !== prevTab) {
-                addLog(`[TAB] Chuyển từ ${prevTab} sang ${currentTab}`)
-                
                 // CHỈ lưu draft nếu chuyển từ record -> content và KHÔNG đang nộp bài
                 if (prevTab === 'record' && currentTab === 'content' && assignmentFormRef.current && !isSubmittingRef.current) {
-                    addLog(`[DRAFT] Bắt đầu lưu nháp tự động khi chuyển tab...`)
-                    await assignmentFormRef.current().catch(e => addLog(`[DRAFT] Lỗi: ${e.message}`))
-                    addLog(`[DRAFT] Lưu nháp hoàn tất.`)
+                    console.log(`[DRAFT] Auto-saving draft on tab change...`)
+                    await assignmentFormRef.current().catch(e => console.error(`[DRAFT] Error: ${e.message}`))
                 }
             }
             prevMobileTabRef.current = mobileTab
         }
         handleTabChange()
-    }, [mobileTab, addLog])
+    }, [mobileTab])
 
     const handleLessonSelect = async (lessonId: string) => {
         if (isSubmittingRef.current) return
-        addLog(`[LESSON] Chọn bài học mới: ${lessonId}`)
-
+        
         if (assignmentFormRef.current) {
-            addLog(`[DRAFT] Đang lưu nháp bài cũ trước khi chuyển...`)
             await assignmentFormRef.current().catch(() => {})
         }
 
         if (currentLessonId && videoProgressRef.current) {
-            addLog(`[VIDEO] Lưu tiến độ bài cũ: ${videoPercent}%`)
             await saveVideoProgressAction({
                 enrollmentId: enrollment.id,
                 lessonId: currentLessonId,
@@ -143,29 +127,22 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setVideoPercent(pct)
         videoProgressRef.current = { maxTime, duration }
         
-        // CHỈ lưu DB nếu bước sang một ngưỡng 10% mới (10, 20, 30...) hoặc 100%
-        // Việc này làm giảm 90% số lượng request thừa, giúp server phản hồi nhanh hơn
         const threshold = Math.floor(pct / 10) * 10
         if ((threshold > lastSavedPercentRef.current || pct === 100) && threshold <= 100) {
             lastSavedPercentRef.current = threshold
-            addLog(`[VIDEO] Lưu mốc tiến độ: ${threshold}%`)
             saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => {})
         }
-    }, [currentLessonId, enrollment.id, addLog])
+    }, [currentLessonId, enrollment.id])
 
     const handleSubmitAssignment = async (data: any, isUpdate: boolean = false) => {
-        if (isSubmittingRef.current) {
-            addLog(`[WARN] Đang có một tiến trình nộp bài khác, bỏ qua click này.`)
-            return
-        }
+        if (isSubmittingRef.current) return
 
         isSubmittingRef.current = true
-        addLog(`[SUBMIT] Bắt đầu Ghi nhận kết quả...`)
         notify(isUpdate ? 'Đang cập nhật bài học...' : 'Đang chấm điểm...', 'loading')
         
         try {
             const currentProg = progressMap[currentLessonId!]
-            addLog(`[SUBMIT] Gửi dữ liệu lên Server... (Nội dung: ${data.reflection.length} ký tự)`)
+            const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
             
             const result = await submitAssignmentAction({
                 enrollmentId: enrollment.id,
@@ -174,20 +151,19 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 links: data.links,
                 supports: data.supports,
                 isUpdate,
-                lessonOrder: currentLesson?.order,
+                lessonOrder: currentLessonData?.order,
                 startedAt: enrollment.startedAt,
                 existingVideoScore: currentProg?.scores?.video,
                 existingTimingScore: currentProg?.scores?.timing
             })
             
             if (!(result as any)?.success) {
-                addLog(`[SUBMIT] Server trả về lỗi: ${(result as any)?.message}`)
                 notify((result as any)?.message || 'Lỗi xử lý dữ liệu!', 'error')
                 return
             }
 
             const res = result as any
-            addLog(`[SUBMIT] THÀNH CÔNG! Điểm: ${res.totalScore}/10`)
+            notify(res.totalScore >= 5 ? `✅ Hoàn thành! Điểm: ${res.totalScore}/10` : `📊 Đã ghi nhận: ${res.totalScore}/10đ`, 'success')
             
             const updatedProgress = {
                 ...(progressMap[currentLessonId!] || {}),
@@ -197,31 +173,27 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             }
             setProgressMap(prev => ({ ...prev, [currentLessonId!]: updatedProgress }))
 
-            notify(res.totalScore >= 5 ? `✅ Hoàn thành! Điểm: ${res.totalScore}/10` : `📊 Đã ghi nhận: ${res.totalScore}/10đ`, 'success')
-
             if (res.totalScore >= 5 && !isUpdate) {
                 const currentIndex = course.lessons.findIndex((l: any) => l.id === currentLessonId)
                 if (currentIndex < course.lessons.length - 1) {
-                    addLog(`[SUBMIT] Tự động chuyển bài sau 2s...`)
                     setTimeout(() => handleLessonSelect(course.lessons[currentIndex + 1].id), 2000)
                 }
             }
         } catch (error: any) {
-            addLog(`[SUBMIT] LỖI MẠNG/HỆ THỐNG: ${error.message}`)
+            console.error("[SUBMIT-ERROR]", error)
             notify('Lỗi kết nối máy chủ!', 'error')
         } finally {
             isSubmittingRef.current = false
             setStatusMsg(null)
-            addLog(`[SUBMIT] Đã mở khóa nút bấm.`)
         }
     }
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
-    const hasDuration = currentProgress?.duration && currentProgress.duration > 0
-    const initialPercent = hasDuration && currentProgress?.maxTime
-        ? (currentProgress.maxTime / currentProgress.duration) * 100
-        : 0
+    
+    const initialPercent = !currentLesson?.videoUrl ? 100 : (
+        currentProgress?.duration ? (currentProgress.maxTime / currentProgress.duration) * 100 : 0
+    )
 
     const completedCount = Object.values(progressMap).filter((p: any) => p.status === 'COMPLETED').length
     const startedAt = enrollment.startedAt ? new Date(enrollment.startedAt) : null
@@ -248,38 +220,17 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 )}
 
                 <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => setShowDebug(!showDebug)} className="p-2 text-zinc-500 hover:text-orange-400 transition-colors" title="Xem nhật ký hệ thống">
-                        <Terminal className="w-4 h-4" />
-                    </button>
-                    <div className="hidden sm:flex items-center gap-2">
-                        <span className="text-xs text-zinc-400">{completedCount}/{course.lessons.length}</span>
-                        <div className="relative h-2 w-24 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] sm:text-xs text-zinc-400 font-mono">{completedCount}/{course.lessons.length}</span>
+                        <div className="relative h-2 w-16 sm:w-24 bg-zinc-800 rounded-full overflow-hidden">
                             <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(completedCount / course.lessons.length) * 100}%` }} />
                         </div>
+                        <span className="text-[10px] sm:text-xs font-bold text-emerald-400 min-w-[35px] text-right">
+                            {Math.round((completedCount / course.lessons.length) * 100)}%
+                        </span>
                     </div>
                 </div>
             </header>
-
-            {/* Debug Console Overlay */}
-            {showDebug && (
-                <div className="fixed bottom-20 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 max-h-[300px] bg-zinc-900/95 border border-zinc-700 rounded-xl shadow-2xl z-[60] flex flex-col overflow-hidden backdrop-blur-md">
-                    <div className="bg-zinc-800 px-3 py-2 flex items-center justify-between border-b border-zinc-700">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                            <Terminal className="w-3 h-3 text-emerald-500" /> Nhật ký hệ thống
-                        </span>
-                        <button onClick={() => setShowDebug(false)}><X className="w-4 h-4 text-zinc-500" /></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-2 font-mono text-[10px] space-y-1 custom-scrollbar">
-                        {debugLogs.length === 0 && <p className="text-zinc-600 italic">Chưa có dữ liệu hoạt động...</p>}
-                        {debugLogs.map((log, i) => (
-                            <div key={i} className="flex gap-2 leading-relaxed border-b border-zinc-800/50 pb-1">
-                                <span className="text-emerald-600 shrink-0">[{log.time}]</span>
-                                <span className="text-zinc-300 break-words">{log.msg}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             <div className={`flex flex-1 min-h-0 pt-14 ${isMobile ? 'pb-14' : ''}`}>
                 {!isMobile && (
@@ -291,7 +242,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         startedAt={startedAt}
                         resetAt={enrollment.resetAt}
                         onResetStartDate={async (d: Date) => {
-                            addLog(`[RESET] Yêu cầu đặt lại ngày bắt đầu: ${d.toLocaleDateString()}`)
                             await confirmStartDateAction(course.id, d)
                             window.location.reload()
                         }}
@@ -306,7 +256,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 videoUrl={currentLesson?.videoUrl || null}
                                 lessonContent={currentLesson?.content || null}
                                 initialMaxTime={currentProgress?.maxTime || 0}
-                                initialPercent={currentProgress?.duration ? (currentProgress.maxTime / currentProgress.duration) * 100 : 0}
+                                initialPercent={initialPercent}
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                             />
