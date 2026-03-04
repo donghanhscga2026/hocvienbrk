@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from "next/link"
-import {
-    ArrowLeft, ListVideo, FileText, X, ClipboardCheck,
-    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw
+import { 
+    ArrowLeft, ListVideo, FileText, X, ClipboardCheck, 
+    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw 
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +56,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     // [HYDRATION FIX] Đảm bảo component đã mount trên client mới thực hiện các tính toán logic và render giao diện chính
     useEffect(() => {
         setIsMounted(true)
-
+        
         // Chỉ tìm bài học cũ khi đã ở client
         if (enrollment.lastLessonId) {
             setCurrentLessonId(enrollment.lastLessonId)
@@ -100,7 +100,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             const currentTab = mobileTab
             if (currentTab !== prevTab) {
                 if (prevTab === 'record' && currentTab === 'content' && assignmentFormRef.current && !isSubmittingRef.current) {
-                    await assignmentFormRef.current().catch(() => { })
+                    await assignmentFormRef.current().catch(() => {})
                 }
             }
             prevMobileTabRef.current = mobileTab
@@ -110,9 +110,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const handleLessonSelect = async (lessonId: string) => {
         if (isSubmittingRef.current) return
-
+        
         if (assignmentFormRef.current) {
-            await assignmentFormRef.current().catch(() => { })
+            await assignmentFormRef.current().catch(() => {})
         }
 
         if (currentLessonId && videoProgressRef.current) {
@@ -121,14 +121,14 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 lessonId: currentLessonId,
                 maxTime: videoProgressRef.current.maxTime,
                 duration: videoProgressRef.current.duration
-            }).catch(() => { })
+            }).catch(() => {})
         }
 
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
         setMobileTab('content')
         setShowContentModal(false)
-        updateLastLessonAction(enrollment.id, lessonId).catch(() => { })
+        updateLastLessonAction(enrollment.id, lessonId).catch(() => {})
     }
 
     const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
@@ -136,11 +136,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const pct = Math.min(100, Math.round((maxTime / duration) * 100))
         setVideoPercent(pct)
         videoProgressRef.current = { maxTime, duration }
-
+        
         const threshold = Math.floor(pct / 10) * 10
         if ((threshold > lastSavedPercentRef.current || pct === 100) && threshold <= 100) {
             lastSavedPercentRef.current = threshold
-            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => { })
+            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => {})
         }
     }, [currentLessonId, enrollment.id])
 
@@ -149,11 +149,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
         isSubmittingRef.current = true
         notify(isUpdate ? 'Đang cập nhật bài học...' : 'Đang chấm điểm...', 'loading')
-
+        
         try {
             const currentProg = progressMap[currentLessonId!]
             const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
-
+            
             const result = await submitAssignmentAction({
                 enrollmentId: enrollment.id,
                 lessonId: currentLessonId!,
@@ -166,7 +166,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 existingVideoScore: currentProg?.scores?.video,
                 existingTimingScore: currentProg?.scores?.timing
             })
-
+            
             if (!(result as any)?.success) {
                 notify((result as any)?.message || 'Lỗi xử lý dữ liệu!', 'error')
                 return
@@ -174,7 +174,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
             const res = result as any
             notify(res.totalScore >= 5 ? `✅ Hoàn thành! Điểm: ${res.totalScore}/10` : `📊 Đã ghi nhận: ${res.totalScore}/10đ`, 'success')
-
+            
             const updatedProgress = {
                 ...(progressMap[currentLessonId!] || {}),
                 assignment: { reflection: data.reflection, links: data.links, supports: data.supports },
@@ -200,7 +200,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
-
+    
     const initialPercent = !currentLesson?.videoUrl ? 100 : (
         currentProgress?.duration ? (currentProgress.maxTime / currentProgress.duration) * 100 : 0
     )
@@ -223,11 +223,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </Link>
                     <h1 className="font-bold text-white truncate text-sm sm:text-base">{course.name_lop}</h1>
                 </div>
-
+                
                 {statusMsg && (
-                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${statusMsg.type === 'loading' ? 'bg-orange-500 text-white' :
-                            statusMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-                        }`}>
+                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${
+                        statusMsg.type === 'loading' ? 'bg-orange-500 text-white' :
+                        statusMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
                         {statusMsg.type === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
                         {statusMsg.text}
                     </div>
@@ -361,6 +362,29 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         </>
                     )}
                 </main>
+
+                {!isMobile && (
+                    <div className="w-[400px] shrink-0 border-l border-zinc-800 flex flex-col">
+                        <AssignmentForm
+                            key={currentLessonId}
+                            lessonId={currentLessonId!}
+                            lessonOrder={currentLesson?.order ?? 1}
+                            startedAt={startedAt}
+                            videoPercent={videoPercent}
+                            videoUrl={currentLesson?.videoUrl || null}
+                            onSubmit={handleSubmitAssignment}
+                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
+                            onSaveDraft={assignmentFormRef}
+                            onFormDataChange={setCurrentFormData}
+                            onDraftSaved={(draftData) => {
+                                setProgressMap(prev => ({
+                                    ...prev,
+                                    [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
+                                }))
+                            }}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Content Modal */}
@@ -384,33 +408,116 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 }
 
 function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progress, startedAt, onResetStartDate }: any) {
-    const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => { if (p.status !== 'RESET') acc[id] = p; return acc }, {})
+    const [showDatePicker, setShowDatePicker] = useState(false)
+    const [dateInput, setDateInput] = useState(startedAt ? new Date(startedAt).toISOString().slice(0, 10) : '')
+    const [saving, setSaving] = useState(false)
+
+    // Lọc progress chỉ hiển thị các bài học không bị reset
+    const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => { 
+        if (p.status !== 'RESET') acc[id] = p; 
+        return acc 
+    }, {})
+
+    const handleReset = async () => {
+        if (!dateInput) return
+        const confirmReset = window.confirm("⚠️ Cảnh báo: Dữ liệu học tập cũ sẽ không được tính vào lộ trình mới.\n\nNhấn OK để xác nhận đổi ngày bắt đầu mới.")
+        if (!confirmReset) return
+        setSaving(true)
+        try {
+            await onResetStartDate(new Date(dateInput))
+            setShowDatePicker(false)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const completedCount = lessons.filter((l: any) => filteredProgress[l.id]?.status === 'COMPLETED').length
+
     return (
-        <div className="flex flex-col bg-zinc-900 h-full">
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Lộ trình học tập</span>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">{lessons.filter((l: any) => filteredProgress[l.id]?.status === 'COMPLETED').length}/{lessons.length}</span>
-            </div>
-            {lessons.map((lesson: any) => {
-                const prog = filteredProgress[lesson.id]
-                const isActive = currentLessonId === lesson.id
-                const unlocked = lesson.order === 1 || (filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]?.status === 'COMPLETED')
-                return (
-                    <button
-                        key={lesson.id}
-                        onClick={() => unlocked && onLessonSelect(lesson.id)}
-                        className={cn('w-full flex items-center gap-3 px-4 py-3 text-left border-b border-zinc-800/50', isActive && 'bg-zinc-800/80 border-l-2 border-l-orange-500', !unlocked && 'opacity-40')}
+        <div className="flex flex-col h-full w-full bg-zinc-900 overflow-hidden">
+            {/* ─ Cố định: ngày bắt đầu ─ */}
+            <div className="shrink-0 bg-zinc-900 border-b border-zinc-800 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <CalendarDays className="w-4 h-4 text-orange-400 shrink-0" />
+                        <div>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Ngày bắt đầu</p>
+                            <p className="text-sm font-bold text-white leading-tight">
+                                {startedAt ? new Date(startedAt).toLocaleDateString('vi-VN') : '-- / -- / ----'}
+                            </p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setShowDatePicker(!showDatePicker)}
+                        className="flex items-center gap-1 text-[11px] text-orange-400 border border-orange-500/30 rounded-lg px-2.5 py-1 font-bold active:scale-95 transition-all"
                     >
-                        <div className="shrink-0">
-                            {prog?.status === 'COMPLETED' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : isActive ? <PlayCircle className="w-4 h-4 text-orange-400 animate-pulse" /> : !unlocked ? <Lock className="w-3.5 h-3.5 text-zinc-600" /> : <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center text-[8px] text-zinc-500">{lesson.order}</div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className={cn('text-sm truncate', isActive ? 'text-white font-bold' : 'text-zinc-400')}>{lesson.title}</p>
-                            {prog?.totalScore !== undefined && <p className="text-[9px] text-zinc-500 mt-0.5 font-mono">Kết quả: {prog.totalScore}/10đ</p>}
-                        </div>
+                        <RefreshCw className="w-3 h-3" /> Đặt lại
                     </button>
-                )
-            })}
+                </div>
+
+                {showDatePicker && (
+                    <div className="bg-zinc-800 rounded-xl p-3 space-y-2.5 border border-zinc-700 shadow-xl">
+                        <p className="text-[10px] text-zinc-400 font-medium">Chọn ngày mới cho lộ trình:</p>
+                        <input 
+                            type="date" 
+                            value={dateInput} 
+                            onChange={e => setDateInput(e.target.value)} 
+                            className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500" 
+                        />
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={handleReset} 
+                                disabled={!dateInput || saving} 
+                                className="flex-1 text-xs font-black bg-orange-500 text-white rounded-lg py-2 disabled:opacity-50"
+                            >
+                                {saving ? 'Đang lưu...' : 'XÁC NHẬN'}
+                            </button>
+                            <button 
+                                onClick={() => setShowDatePicker(false)} 
+                                className="flex-1 text-xs font-bold text-zinc-400 border border-zinc-700 rounded-lg py-2"
+                            >
+                                HỦY
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ─ Tiêu đề danh sách ─ */}
+            <div className="shrink-0 px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-white/60">Lộ trình học tập</span>
+                <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                    {completedCount}/{lessons.length} BÀI
+                </span>
+            </div>
+
+            {/* ─ Danh sách cuộn ─ */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+                {lessons.map((lesson: any) => {
+                    const prog = filteredProgress[lesson.id]
+                    const isActive = currentLessonId === lesson.id
+                    const unlocked = lesson.order === 1 || (filteredProgress[lessons.find((l:any)=>l.order===lesson.order-1)?.id]?.status === 'COMPLETED')
+                    return (
+                        <button
+                            key={lesson.id}
+                            onClick={() => unlocked && onLessonSelect(lesson.id)}
+                            className={cn(
+                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b border-zinc-800/50 transition-all active:bg-zinc-800', 
+                                isActive && 'bg-zinc-800 border-l-4 border-l-orange-500', 
+                                !unlocked && 'opacity-40 grayscale'
+                            )}
+                        >
+                            <div className="shrink-0">
+                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : isActive ? <PlayCircle className="w-5 h-5 text-orange-400 animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-zinc-600" /> : <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center text-[8px] text-zinc-500">{lesson.order}</div>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className={cn('text-sm leading-snug', isActive ? 'text-white font-black' : 'text-zinc-400 font-medium')}>{lesson.title}</p>
+                                {prog?.totalScore !== undefined && <p className={cn('text-[10px] mt-1 font-bold', prog.totalScore >= 5 ? 'text-emerald-500' : 'text-orange-400')}>{prog.totalScore >= 5 ? '✓' : '✗'} Kết quả: {prog.totalScore}/10đ</p>}
+                            </div>
+                        </button>
+                    )
+                })}
+            </div>
         </div>
     )
 }
