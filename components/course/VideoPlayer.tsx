@@ -57,7 +57,9 @@ export default function VideoPlayer({
 
   const [isCompleted, setIsCompleted] = useState(initCompleted)
   const [docHtml, setDocHtml] = useState<string | null>(null)
-const [isLoadingDoc, setIsLoadingDoc] = useState(false)
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false)
+const [mounted, setMounted] = useState(false)
+
   const videoId = videoUrl ? extractVideoId(videoUrl) : null
 
   const setCompleted = (val: boolean) => {
@@ -113,6 +115,9 @@ const [isLoadingDoc, setIsLoadingDoc] = useState(false)
       setIsLoadingDoc(false)
     })
 }, [lessonContent, videoUrl])
+useEffect(() => {
+  setMounted(true)
+}, [])
 
 
   /* --------------------------
@@ -255,23 +260,31 @@ const [isLoadingDoc, setIsLoadingDoc] = useState(false)
     <><div className="relative w-full aspect-video bg-zinc-900 overflow-hidden rounded-xl">
           <div className="absolute inset-0 overflow-y-auto p-6">
 
-              {isLoadingDoc && (
-                  <div className="flex items-center justify-center h-full text-zinc-400">
-                      Đang tải nội dung bài học...
-                  </div>
-              )}
+              {!mounted && (
+  <div className="flex items-center justify-center h-full text-zinc-500">
+    Đang khởi tạo...
+  </div>
+)}
 
-              {!isLoadingDoc && docHtml && (
-                  <div
-                      className="prose prose-invert max-w-none text-zinc-300"
-                      dangerouslySetInnerHTML={{ __html: docHtml }} />
-              )}
+{mounted && isLoadingDoc && (
+  <div className="flex items-center justify-center h-full text-zinc-400">
+    Đang tải nội dung bài học...
+  </div>
+)}
 
-              {!isLoadingDoc && !docHtml && (
-                  <div className="flex items-center justify-center h-full text-zinc-500">
-                      Bài học này không có nội dung
-                  </div>
-              )}
+{mounted && !isLoadingDoc && docHtml && (
+  <div
+    className="prose prose-invert max-w-none text-zinc-300"
+    dangerouslySetInnerHTML={{ __html: docHtml }}
+  />
+)}
+
+{mounted && !isLoadingDoc && !docHtml && (
+  <div className="flex items-center justify-center h-full text-zinc-500">
+    Bài học này không có nội dung
+  </div>
+)}
+
 
           </div>
       </div><ImageViewer /></>
