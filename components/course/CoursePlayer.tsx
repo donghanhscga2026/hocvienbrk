@@ -1,6 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import Link from "next/link"
+import { 
+    ArrowLeft, ListVideo, FileText, X, ClipboardCheck, 
+    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw 
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+
 import LessonSidebar from "./LessonSidebar"
 import VideoPlayer from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
@@ -12,8 +19,6 @@ import {
     submitAssignmentAction,
     updateLastLessonAction
 } from "@/app/actions/course-actions"
-import { ArrowLeft, ListVideo, FileText, X, ClipboardCheck, Loader2 } from "lucide-react"
-import Link from "next/link"
 
 interface CoursePlayerProps {
     course: any
@@ -26,24 +31,12 @@ type MobileTab = 'list' | 'content' | 'record'
 export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const isSubmittingRef = useRef(false)
-    
-    // [HYDRATION FIX] Đảm bảo component đã mount trên client mới render logic isMobile/Date
     const [isMounted, setIsMounted] = useState(false)
-    useEffect(() => {
-        setIsMounted(true)
-    }, [])
 
     // Lọc progress chỉ lấy các bài học không bị reset
     const filteredLessonProgress = enrollment.lessonProgress.filter((p: any) => p.status !== 'RESET')
 
-    const [currentLessonId, setCurrentLessonId] = useState<string>(() => {
-        if (enrollment.lastLessonId) return enrollment.lastLessonId
-        const incomplete = filteredLessonProgress
-            .filter((p: any) => p.status !== 'COMPLETED')
-            .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        return incomplete[0]?.lessonId || course.lessons[0]?.id
-    })
-
+    const [currentLessonId, setCurrentLessonId] = useState<string>(course.lessons[0]?.id)
     const [videoPercent, setVideoPercent] = useState(0)
     const [mobileTab, setMobileTab] = useState<MobileTab>('content')
     const [progressMap, setProgressMap] = useState<Record<string, any>>(() =>
@@ -56,16 +49,33 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const [currentFormData, setCurrentFormData] = useState<{ reflection: string; links: string[]; supports: boolean[] } | null>(null)
     const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'loading' | 'success' | 'error' } | null>(null)
     const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
+    const lastSavedPercentRef = useRef<number>(-1)
+    const videoProgressRef = useRef<{ maxTime: number; duration: number } | null>(null)
+    const prevMobileTabRef = useRef(mobileTab)
+
+    // [HYDRATION FIX] Đảm bảo component đã mount trên client mới thực hiện các tính toán logic và render giao diện chính
+    useEffect(() => {
+        setIsMounted(true)
+        
+        // Chỉ tìm bài học cũ khi đã ở client
+        if (enrollment.lastLessonId) {
+            setCurrentLessonId(enrollment.lastLessonId)
+        } else {
+            const incomplete = filteredLessonProgress
+                .filter((p: any) => p.status !== 'COMPLETED')
+                .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+            if (incomplete[0]?.lessonId) {
+                setCurrentLessonId(incomplete[0].lessonId)
+            }
+        }
+    }, [])
 
     const notify = useCallback((text: string, type: 'loading' | 'success' | 'error' = 'success', duration = 3000) => {
         setStatusMsg({ text, type })
-        console.log(`[UI-NOTIFY] ${text} (${type})`)
         if (type !== 'loading') {
             setTimeout(() => setStatusMsg(null), duration)
         }
     }, [])
-
-    const prevMobileTabRef = useRef(mobileTab)
 
     const checkIsOnTime = useCallback((startedAt: Date | null, lessonOrder: number): boolean => {
         if (!startedAt) return false
@@ -74,8 +84,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         deadline.setHours(23, 59, 59, 999)
         return new Date() <= deadline
     }, [])
-
-    const videoProgressRef = useRef<{ maxTime: number; duration: number } | null>(null)
 
     const [isMobile, setIsMobile] = useState(false)
     useEffect(() => {
@@ -91,10 +99,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             const prevTab = prevMobileTabRef.current
             const currentTab = mobileTab
             if (currentTab !== prevTab) {
-                // CHỈ lưu draft nếu chuyển từ record -> content và KHÔNG đang nộp bài
                 if (prevTab === 'record' && currentTab === 'content' && assignmentFormRef.current && !isSubmittingRef.current) {
-                    console.log(`[DRAFT] Auto-saving draft on tab change...`)
-                    await assignmentFormRef.current().catch(e => console.error(`[DRAFT] Error: ${e.message}`))
+                    await assignmentFormRef.current().catch(() => {})
                 }
             }
             prevMobileTabRef.current = mobileTab
@@ -124,8 +130,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setShowContentModal(false)
         updateLastLessonAction(enrollment.id, lessonId).catch(() => {})
     }
-
-    const lastSavedPercentRef = useRef<number>(-1)
 
     const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
         if (!currentLessonId || duration === 0) return
@@ -204,6 +208,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const completedCount = Object.values(progressMap).filter((p: any) => p.status === 'COMPLETED').length
     const startedAt = enrollment.startedAt ? new Date(enrollment.startedAt) : null
 
+    // [HYDRATION SAFEGUARD] Trả về giao diện trống tối giản trên server
+    if (!isMounted) {
+        return <div className="h-screen w-full bg-black flex items-center justify-center text-zinc-700 font-mono text-xs">Đang tải ứng dụng...</div>
+    }
+
     return (
         <div className="flex flex-col h-full bg-black text-zinc-300">
             {/* Header */}
@@ -274,7 +283,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             <div className="shrink-0">
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
                                 {currentLesson?.content && !currentLesson.content.includes('docs.google.com') && (
-                                    <p className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all">{currentLesson.content}</p>
+                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all">{currentLesson.content}</div>
                                 )}
                             </div>
                             <div className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden">
@@ -397,10 +406,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         </div>
     )
 }
-
-// Reuse mobile sidebar components
-import { CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progress, startedAt, onResetStartDate }: any) {
     const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => { if (p.status !== 'RESET') acc[id] = p; return acc }, {})
