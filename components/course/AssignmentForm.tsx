@@ -181,18 +181,19 @@ export default function AssignmentForm({
     }, [saveDraft, isCompleted])
 
     // Realtime scoring
-    const hasVideo = !!videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(videoUrl)
-    const displayPercent = hasVideo ? videoPercent : 100
+    // Rule: Nếu không có link video YouTube -> mặc định 2đ video
+    const hasYouTubeVideo = !!videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(videoUrl)
+    const displayPercent = hasYouTubeVideo ? videoPercent : 100
 
     const vidScore = useMemo(() => {
-        if (!hasVideo) return 2
+        if (!hasYouTubeVideo) return 2 // Không có video -> auto 2đ
         if (videoPercent >= 95) return 2
         if (videoPercent >= 50) return 1
         return 0
-    }, [videoPercent, hasVideo])
+    }, [videoPercent, hasYouTubeVideo])
 
     const refScore = useMemo(() => {
-        if (reflection.trim().length >= 50) return 2
+        if (reflection.trim().length >= 86) return 2 // Mentor 7 yêu cầu 86 ký tự cho bài học tâm đắc ngộ
         if (reflection.trim().length > 0) return 1
         return 0
     }, [reflection])
@@ -205,15 +206,22 @@ export default function AssignmentForm({
         if (!deadline) return 0
         const dl = new Date(deadline)
         dl.setHours(23, 59, 59, 999)
-        return new Date() <= dl ? 1 : -1
-    }, [deadline])
+        const isNowOnTime = new Date().getTime() <= dl.getTime()
 
-    const timingScore = isCompleted ? existingScores.timing ?? 0 : currentTimingScore
-    const isOverdue = currentTimingScore === -1
+        if (isCompleted) {
+            // Nếu đã xong: 
+            // - Nếu bây giờ vẫn trong hạn -> auto +1 (để gỡ điểm trễ)
+            // - Nếu bây giờ quá hạn -> giữ nguyên điểm cũ (bảo vệ điểm đúng hạn)
+            if (isNowOnTime) return 1
+            return existingScores.timing ?? -1
+        }
+        
+        return isNowOnTime ? 1 : -1
+    }, [deadline, isCompleted, existingScores.timing])
 
-    const total = isCompleted
-        ? existingTotalScore
-        : Math.max(0, vidScore + refScore + pracScore + supportScore + timingScore)
+    const total = Math.max(0, vidScore + refScore + pracScore + supportScore + currentTimingScore)
+
+    const isOverdue = currentTimingScore === -1 && !isCompleted // Chỉ coi là trễ nếu chưa xong bài và hết hạn
 
     const handleSubmit = async () => {
         if (!startedAt) { alert("Bạn chưa xác nhận ngày bắt đầu lộ trình!"); return }
@@ -279,15 +287,15 @@ export default function AssignmentForm({
 
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-3">
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={1} label={hasVideo ? "Mở TRÍ = học theo Video (2đ)" : "Mở TRÍ = Nội dung bài học (2đ)"} max={2} current={vidScore} />
+                    <SectionHead num={1} label={hasYouTubeVideo ? "Mở TRÍ = học theo Video (2đ)" : "Mở TRÍ = Nội dung bài học (2đ)"} max={2} current={vidScore} />
                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                            className={`h-full transition-all duration-500 rounded-full ${!hasVideo ? 'bg-emerald-500' : 'bg-orange-400'}`}
+                            className={`h-full transition-all duration-500 rounded-full ${!hasYouTubeVideo ? 'bg-emerald-500' : 'bg-orange-400'}`}
                             style={{ width: `${displayPercent}%` }}
                         />
                     </div>
                     <p className="text-[10px] text-gray-400 mt-0.5">
-                        {hasVideo
+                        {hasYouTubeVideo
                             ? `Đang xem: ${videoPercent.toFixed(0)}%`
                             : '✓ Không có video - Đã hoàn thành nội dung'}
                     </p>
@@ -352,7 +360,7 @@ export default function AssignmentForm({
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={5} label="Giữ TÍN = Làm đúng hạn (1đ)" max={1} current={timingScore === 1 ? 1 : 0} />
+                    <SectionHead num={5} label="Giữ TÍN = Làm đúng hạn (1đ)" max={1} current={currentTimingScore === 1 ? 1 : 0} />
                     <div className="flex flex-col gap-1 text-sm">
                         <div className="flex justify-between">
                             <span className="text-gray-500">Đúng hạn (Trước 23:59):</span>
