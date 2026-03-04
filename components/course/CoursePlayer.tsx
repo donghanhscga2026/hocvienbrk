@@ -265,7 +265,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
                 <main className="flex-1 flex flex-col min-h-0 overflow-hidden items-center bg-zinc-950">
                     <div className={isMobile ? 'shrink-0 w-full' : 'p-5 pb-0 shrink-0 w-full max-w-5xl'}>
-                        <div className={isMobile ? '' : 'rounded-2xl overflow-hidden border-2 border-white shadow-2xl bg-black'}>
+                        <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black'}>
                             <VideoPlayer
                                 key={currentLessonId}
                                 videoUrl={currentLesson?.videoUrl || null}

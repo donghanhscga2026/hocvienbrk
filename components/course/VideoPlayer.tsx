@@ -255,7 +255,7 @@ useEffect(() => {
   // 👉 Nếu không phải YouTube mà là Google Docs
   if (!videoId) {
   return (
-    <><div className="relative w-full aspect-video bg-white overflow-hidden rounded-b-xl border border-zinc-200 shadow-sm">
+    <><div className="relative w-full aspect-video bg-white overflow-hidden border border-zinc-200 shadow-sm">
           <div className="absolute inset-0 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-300">
 
               {!mounted && (
