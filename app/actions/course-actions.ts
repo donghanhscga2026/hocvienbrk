@@ -90,19 +90,34 @@ export async function confirmStartDateAction(courseId: number, date: any) {
 }
 
 /**
- * Lưu tiến độ video
+ * Lưu tiến độ video (Hỗ trợ đa video/playlist)
  */
 export async function saveVideoProgressAction({
-    enrollmentId, lessonId, maxTime, duration
+    enrollmentId, lessonId, maxTime, duration, lastIndex, playlistScores
 }: {
-    enrollmentId: number, lessonId: string, maxTime: number, duration: number
+    enrollmentId: number, lessonId: string, maxTime: number, duration: number,
+    lastIndex?: number, playlistScores?: any
 }) {
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false }
 
-        const percent = duration > 0 ? maxTime / duration : 0
-        const vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+        // [PLAYLIST LOGIC] Nếu có playlistScores, tính vidScore dựa trên tổng thể
+        let vidScore = 0
+        if (playlistScores) {
+            let totalMax = 0
+            let totalDur = 0
+            Object.values(playlistScores).forEach((p: any) => {
+                totalMax += p.maxTime || 0
+                totalDur += p.duration || 0
+            })
+            const percent = totalDur > 0 ? totalMax / totalDur : 0
+            vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+        } else {
+            // Logic cũ cho 1 video
+            const percent = duration > 0 ? maxTime / duration : 0
+            vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+        }
 
         const existing = await prisma.lessonProgress.findUnique({
             where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
@@ -110,23 +125,31 @@ export async function saveVideoProgressAction({
         })
 
         const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as any ?? {})
+        
+        const updatedScores = { 
+            ...existingScores, 
+            video: vidScore,
+            lastVideoIndex: lastIndex ?? existingScores.lastVideoIndex ?? 0,
+            playlist: playlistScores ?? existingScores.playlist ?? null
+        }
 
         await prisma.lessonProgress.upsert({
             where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
             create: {
                 enrollmentId, lessonId, maxTime, duration,
-                scores: { video: vidScore } as any,
+                scores: updatedScores as any,
                 status: "IN_PROGRESS"
             },
             update: {
                 maxTime, duration,
-                scores: { ...existingScores, video: vidScore } as any,
+                scores: updatedScores as any,
                 ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
             }
         })
 
         return { success: true, vidScore }
     } catch (error) {
+        console.error("Save Video Progress Error:", error)
         return { success: false }
     }
 }
@@ -201,9 +224,38 @@ export async function submitAssignmentAction({
         const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
         const isYouTube = /youtu\.be\/|youtube\.com\/|v=/.test(rawUrl)
 
-        let videoScore = (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) 
-            ? 2 
-            : (existingVideoScore ?? 0)
+        let videoScore = 0
+        if (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) {
+            videoScore = 2 // Không dùng video Youtube -> Auto +2
+        } else {
+            // Lấy dữ liệu mới nhất
+            const currentProg = await prisma.lessonProgress.findUnique({
+                where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+                select: { scores: true, maxTime: true, duration: true }
+            })
+            const scoresJson = (currentProg?.scores as any) || {}
+            
+            // ƯU TIÊN 1: Tính từ Playlist detail nếu có
+            if (scoresJson.playlist) {
+                let totalMax = 0
+                let totalDur = 0
+                Object.values(scoresJson.playlist).forEach((p: any) => {
+                    totalMax += p.maxTime || 0
+                    totalDur += p.duration || 0
+                })
+                const percent = totalDur > 0 ? totalMax / totalDur : 0
+                videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+            } 
+            // ƯU TIÊN 2: Nếu mất playlist detail nhưng có maxTime/duration tổng ở ngoài (trường hợp bị ghi đè)
+            else if (currentProg?.duration && currentProg.duration > 0) {
+                const percent = currentProg.maxTime / currentProg.duration
+                videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+            }
+            // ƯU TIÊN 3: Dùng điểm gửi từ client
+            else {
+                videoScore = existingVideoScore ?? 0
+            }
+        }
 
         const reflectionScore = reflection.trim().length >= 50 ? 2 : reflection.trim().length > 0 ? 1 : 0
         const linkScore = Math.min(links.filter(l => l && l.trim() !== "").length, 3)

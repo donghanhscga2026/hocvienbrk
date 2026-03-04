@@ -1,328 +1,317 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { RotateCcw, CheckCircle } from 'lucide-react'
-import { normalizeGoogleDocsHtml } from "@/lib/normalizeGoogleDocsHtml"
-import ImageViewer from "@/components/ImageViewer"
-
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { 
+    RotateCcw, CheckCircle, List, ChevronLeft, ChevronRight, 
+    Play, CheckCircle2, X, FileText, Clock, Loader2, PlayCircle, SkipBack, SkipForward, Maximize2
+} from 'lucide-react'
+import { cn } from "@/lib/utils"
+import { saveVideoProgressAction } from '@/app/actions/course-actions'
 
 interface VideoPlayerProps {
-  videoUrl: string | null
-  playerId?: string
-  initialMaxTime?: number
-  initialPercent?: number
-  onProgress: (maxTime: number, duration: number) => void
-  onPercentChange: (percent: number) => void
-  lessonContent?: string | null
+    enrollmentId: number
+    lessonId: string
+    videoUrl: string | null
+    lessonContent: string | null
+    initialMaxTime: number
+    onProgress: (maxTime: number, duration: number) => void
+    onPercentChange: (percent: number) => void
+    playlistData?: any 
+    lastVideoIndex?: number 
 }
 
-/* --------------------------
-   YOUTUBE LOGIC (GIỮ NGUYÊN)
---------------------------- */
-
-function extractVideoId(url: string) {
-  const regExp =
-    /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-  const match = url.match(regExp)
-  return match && match[2].length === 11 ? match[2] : null
-}
-
-/* --------------------------
-   GOOGLE DOCS HELPER
---------------------------- */
-
-function getDocsHtmlUrl(url: string | null | undefined) {
-  if (!url || !url.includes('docs.google.com')) return null
-  const match = url.match(/document\/d\/([^/]+)/)
-  if (!match) return null
-  const docId = match[1]
-  return `https://docs.google.com/document/d/${docId}/export?format=html`
+type PlaylistItem = {
+    type: 'video' | 'doc'
+    title: string
+    url: string
+    id?: string | null
 }
 
 export default function VideoPlayer({
-  videoUrl,
-  playerId = 'yt-player',
-  initialMaxTime = 0,
-  initialPercent,
-  onProgress,
-  onPercentChange,
-  lessonContent,
+    enrollmentId,
+    lessonId,
+    videoUrl,
+    lessonContent,
+    initialMaxTime,
+    onProgress,
+    onPercentChange,
+    playlistData,
+    lastVideoIndex = 0
 }: VideoPlayerProps) {
-  const playerRef = useRef<any>(null)
-  const saveIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isCompletedRef = useRef(false)
+    const playlist = useMemo(() => {
+        if (!videoUrl) return []
+        return videoUrl.split('|').map((item, index) => {
+            const videoMatch = item.match(/^\[(.*?)\](.*)$/)
+            if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
+            const docMatch = item.match(/^\((.*?)\)(.*)$/)
+            if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
+            return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
+        })
+    }, [videoUrl])
+const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
+const [showPlaylist, setShowPlaylist] = useState(false)
+const [isMounted, setIsMounted] = useState(false)
+const [isFullscreen, setIsFullscreen] = useState(false) // State cho lớp phủ toàn màn hình
 
-  
+// Timer cho tài liệu (30s)
+const [docTimer, setDocTimer] = useState<number>(0)
+const [isReading, setIsReading] = useState(false)
 
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [docHtml, setDocHtml] = useState<string | null>(null)
-  const [isLoadingDoc, setIsLoadingDoc] = useState(false)
-const [mounted, setMounted] = useState(false)
-
-  const videoId = videoUrl ? extractVideoId(videoUrl) : null
-
-  const setCompleted = (val: boolean) => {
-    isCompletedRef.current = val
-    setIsCompleted(val)
-  }
-
-  const trackProgress = () => {
-    const player = playerRef.current
-    if (!player?.getCurrentTime || !player?.getDuration) return
-    const cur = player.getCurrentTime()
-    const dur = player.getDuration()
-    if (dur > 0) {
-      const pct = cur / dur
-      onPercentChange(Math.round(pct * 100))
-      if (pct >= 0.999 && !isCompletedRef.current) {
-        setCompleted(true)
-      }
-    }
-  }
-
-  const saveProgress = useCallback(() => {
-    const player = playerRef.current
-    if (!player?.getCurrentTime || !player?.getDuration) return
-    const cur = player.getCurrentTime()
-    const dur = player.getDuration()
-    if (cur > 0 && dur > 0) {
-      onProgress(cur, dur)
-    }
-  }, [onProgress])
-
-  /* --------------------------
-     GOOGLE DOCS FETCH
-  --------------------------- */
-
-  useEffect(() => {
-  const docsUrl = getDocsHtmlUrl(lessonContent || videoUrl)
-  if (!docsUrl) return
-
-  setIsLoadingDoc(true)
-
-  fetch(`/api/docs?url=${encodeURIComponent(docsUrl)}`)
-    .then((res) => res.text())
-    .then((html) => {
-  const clean = normalizeGoogleDocsHtml(html)
-  setDocHtml(clean)
+// Tiến độ chi tiết từng mục: { index: { maxTime, duration } }
+const [granularProgress, setGranularProgress] = useState<Record<number, {maxTime: number, duration: number}>>(() => {
+    return playlistData || {}
 })
 
-    .catch(() => {
-      setDocHtml('')
-    })
-    .finally(() => {
-      setIsLoadingDoc(false)
-    })
-}, [lessonContent, videoUrl])
+    const playerRef = useRef<any>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+const saveIntervalRef = useRef<any>(null)
+const docTimerRef = useRef<any>(null)
+const currentItem = playlist[currentIndex]
+
+useEffect(() => { setIsMounted(true) }, [])
+
+// Xử lý phím Esc để thoát full màn hình
 useEffect(() => {
-  setMounted(true)
+    const handleEsc = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setIsFullscreen(false)
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
 }, [])
 
+const toggleFullScreen = () => {
+    setIsFullscreen(!isFullscreen)
+}
+    const calculateAggregateProgress = useCallback((updatedGranular: any) => {
+        let totalMaxTime = 0
+        let totalDuration = 0
+        playlist.forEach((item, idx) => {
+            const p = updatedGranular[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
+            totalMaxTime += p.maxTime
+            totalDuration += p.duration
+        })
+        if (totalDuration === 0) return { maxTime: initialMaxTime, duration: 0 }
+        return { maxTime: totalMaxTime, duration: totalDuration }
+    }, [playlist, initialMaxTime])
 
-  /* --------------------------
-     YOUTUBE INIT (GIỮ NGUYÊN)
-  --------------------------- */
+    const saveProgress = useCallback(async (index: number, maxTime: number, duration: number) => {
+        const nextGranular = { ...granularProgress, [index]: { maxTime, duration } }
+        setGranularProgress(nextGranular)
 
-  useEffect(() => {
-    if (!videoId) return
+        const aggregate = calculateAggregateProgress(nextGranular)
+        
+        // [FIX] Sử dụng setTimeout để đẩy các thay đổi state ra khỏi chu kỳ render hiện tại
+        setTimeout(() => {
+            onProgress(aggregate.maxTime, aggregate.duration)
+            if (aggregate.duration > 0) {
+                onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
+            }
+            // Gọi Server Action an toàn sau render
+            saveVideoProgressAction({ 
+                enrollmentId, 
+                lessonId, 
+                maxTime: aggregate.maxTime, 
+                duration: aggregate.duration, 
+                lastIndex: index, 
+                playlistScores: nextGranular 
+            }).catch(() => {})
+        }, 0)
+    }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
 
-    const handleBeforeUnload = () => {
-      saveProgress()
-    }
+    const trackVideoProgress = useCallback(() => {
+        if (!playerRef.current || typeof playerRef.current.getCurrentTime !== 'function') return
+        const currentTime = playerRef.current.getCurrentTime()
+        const duration = playerRef.current.getDuration()
+        const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
+        if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
+    }, [currentIndex, granularProgress, saveProgress])
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('pagehide', handleBeforeUnload)
-
-    const initPlayer = () => {
-      if (playerRef.current) {
-        playerRef.current.destroy()
-      }
-
-      const startTime = Math.floor(initialMaxTime)
-
-
-      playerRef.current = new (window as any).YT.Player(
-        playerId,
-        {
-          height: '100%',
-          width: '100%',
-          videoId,
-          playerVars: {
-            autoplay: 1,
-            modestbranding: 1,
-            rel: 0,
-            start: startTime,
-            playsinline: 1,
-            enablejsapi: 1,
-            fs: 1,
-          },
-          events: {
-            onReady: (e: any) => {
-              const duration = e.target.getDuration()
-              let pct = 0
-
-              if (initialPercent !== undefined) {
-                pct = initialPercent
-              } else if (initialMaxTime > 0 && duration > 0) {
-                pct = (initialMaxTime / duration) * 100
-              }
-
-              if (pct >= 99.9) {
-                setCompleted(true)
-                onPercentChange(100)
-              } else {
-                onPercentChange(Math.round(pct))
-                startTracking()
-              }
-            },
-            onStateChange: (e: any) => {
-              const YT = (window as any).YT.PlayerState
-              if (
-                e.data === YT.PLAYING ||
-                e.data === YT.BUFFERING
-              ) {
-                startTracking()
-              } else {
-                stopTracking()
-              }
-
-              if (e.data === YT.ENDED) {
-                const dur =
-                  playerRef.current?.getDuration?.() || 0
-                if (dur > 0) {
-                  onProgress(dur, dur)
-                  onPercentChange(100)
-                  setCompleted(true)
-                }
-              }
-            },
-          },
+    useEffect(() => {
+        if (currentItem?.type === 'doc') {
+            const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 30 }
+            if (currentStored.maxTime < 30) {
+                setDocTimer(currentStored.maxTime)
+                setIsReading(true)
+                docTimerRef.current = setInterval(() => {
+                    setDocTimer(prev => {
+                        const next = prev + 1
+                        if (next >= 30) {
+                            clearInterval(docTimerRef.current)
+                            setIsReading(false)
+                            saveProgress(currentIndex, 30, 30)
+                            return 30
+                        }
+                        if (next % 5 === 0) saveProgress(currentIndex, next, 30)
+                        return next
+                    })
+                }, 1000)
+            } else { setDocTimer(30); setIsReading(false); }
         }
-      )
+        return () => { if (docTimerRef.current) clearInterval(docTimerRef.current) }
+    }, [currentIndex, currentItem?.type])
+
+    useEffect(() => {
+        if (!isMounted || currentItem?.type !== 'video' || !currentItem?.id) return
+        const initPlayer = () => {
+            if (playerRef.current) playerRef.current.destroy()
+            
+            const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
+            // [FIX] Luôn bắt đầu từ mốc đã lưu (nếu đã xong thì đứng ở cuối)
+            const startTime = Math.floor(stored.maxTime)
+            
+            playerRef.current = new (window as any).YT.Player(`multimedia-player`, {
+                videoId: currentItem.id,
+                playerVars: { 
+                    autoplay: 1, 
+                    modestbranding: 1, 
+                    rel: 0, 
+                    start: startTime 
+                },
+                events: {
+                    onStateChange: (e: any) => {
+                        const YT = (window as any).YT.PlayerState
+                        if (e.data === YT.PLAYING) {
+                            if (!saveIntervalRef.current) saveIntervalRef.current = setInterval(trackVideoProgress, 5000)
+                        } else {
+                            if (saveIntervalRef.current) { clearInterval(saveIntervalRef.current); saveIntervalRef.current = null; }
+                        }
+                        if (e.data === YT.ENDED) {
+                            const dur = playerRef.current.getDuration()
+                            saveProgress(currentIndex, dur, dur)
+                        }
+                    }
+                }
+            })
+        }
+        if ((window as any).YT?.Player) initPlayer()
+        else {
+            const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag)
+            ;(window as any).onYouTubeIframeAPIReady = initPlayer
+        }
+        return () => { if (saveIntervalRef.current) clearInterval(saveIntervalRef.current); if (playerRef.current?.destroy) playerRef.current.destroy() }
+    }, [currentIndex, isMounted, currentItem?.type, currentItem?.id])
+
+    const handleNext = () => setCurrentVideoIndex((prev) => (prev + 1) % playlist.length)
+    const handlePrev = () => setCurrentVideoIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
+
+    const getEmbedUrl = (url: string) => {
+        if (!url.includes('docs.google.com')) return url
+        if (url.includes('/pub')) return url
+        const cleanUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].replace(/\/+$/, '')
+        return `${cleanUrl}/preview`
     }
 
-    if ((window as any).YT?.Player) {
-      initPlayer()
-    } else {
-      const tag = document.createElement('script')
-      tag.src = 'https://www.youtube.com/iframe_api'
-      document.head.appendChild(tag)
-      ;(window as any).onYouTubeIframeAPIReady =
-        initPlayer
-    }
+    if (!isMounted) return <div className="w-full aspect-video bg-black animate-pulse" />
 
-    return () => {
-      window.removeEventListener(
-        'beforeunload',
-        handleBeforeUnload
-      )
-      window.removeEventListener(
-        'pagehide',
-        handleBeforeUnload
-      )
-      stopTracking()
-      playerRef.current?.destroy?.()
-      playerRef.current = null
-    }
-  }, [videoId, saveProgress])
+    return (
+        <div className={cn(
+            "flex flex-col bg-zinc-950 transition-all duration-300",
+            isFullscreen ? "fixed inset-0 z-[9999] h-screen w-screen" : "w-full"
+        )}>
+            <div className={cn(
+                "relative bg-black overflow-hidden shadow-2xl transition-all",
+                isFullscreen ? "flex-1" : "w-full aspect-video"
+            )}>
+                {currentItem?.type === 'video' ? (
+                    <div id="multimedia-player" className="w-full h-full" />
+                ) : (
+                    <div className="w-full h-full bg-white relative flex flex-col">
+                        <iframe src={getEmbedUrl(currentItem.url)} className="flex-1 border-0" allow="autoplay" title="Tài liệu" />
+                        {isReading && (
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-zinc-200 z-10">
+                                <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${(docTimer / 30) * 100}%` }} />
+                            </div>
+                        )}
+                    </div>
+                )}
 
-  const startTracking = () => {
-    if (saveIntervalRef.current) return
-    saveIntervalRef.current = setInterval(
-      trackProgress,
-      5000
+                {/* PLAYLIST POPUP */}
+                {showPlaylist && (
+                    <div className="absolute inset-0 bg-black/95 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
+                        <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
+                            <h3 className="text-white font-black text-base flex items-center gap-3">
+                                <List className="w-5 h-5 text-orange-500" /> DANH SÁCH HỌC ({playlist.length})
+                            </h3>
+                            <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[66vh] custom-scrollbar">
+                            {playlist.map((item, idx) => {
+                                const isCurrent = idx === currentIndex
+                                const prog = granularProgress[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
+                                const pct = prog.duration > 0 ? Math.round((prog.maxTime / prog.duration) * 100) : 0
+                                return (
+                                    <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false); }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-orange-500/10 border-orange-500 shadow-lg' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}>
+                                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{item.type === 'video' ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}</div>
+                                        <div className="flex-1 text-left min-w-0">
+                                            <p className={`text-xs font-bold truncate ${isCurrent ? 'text-white' : 'text-zinc-400'}`}>{item.title}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${pct >= 100 ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${pct}%` }} /></div>
+                                                <span className="text-[9px] text-zinc-500 font-bold">{pct}%</span>
+                                            </div>
+                                        </div>
+                                        {pct >= 95 && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ── 2. EXTERNAL CONTROL BAR ──────────────────────────────── */}
+            <div className="bg-zinc-900 border-t border-zinc-800 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
+                {/* Playlist Toggle */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <button 
+                        onClick={() => setShowPlaylist(!showPlaylist)}
+                        className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-700 shadow-sm"
+                    >
+                        <List className="w-4 h-4 text-orange-500" />
+                        <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Lộ trình ({currentIndex + 1}/{playlist.length})</span>
+                    </button>
+                </div>
+
+                {/* Info & Type Icon */}
+                <div className="flex-1 flex flex-col items-center min-w-0 px-1">
+                    <div className="flex items-center gap-1.5 max-w-full">
+                        {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-zinc-500 shrink-0" /> : <FileText className="w-3 h-3 text-zinc-500 shrink-0" />}
+                        <p className="text-[10px] sm:text-[11px] font-black text-orange-400 truncate tracking-tight uppercase">{currentItem?.title}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                        {currentItem?.type === 'doc' ? (
+                            isReading ? (
+                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase"><Clock className="w-2.5 h-2.5 animate-spin" /> {30 - docTimer}s</span>
+                            ) : (
+                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-emerald-500 font-bold uppercase"><CheckCircle2 className="w-2.5 h-2.5" /> Xong</span>
+                            )
+                        ) : (
+                            <span className="text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Video</span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Navigation & Fullscreen Buttons */}
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                    <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-400 hover:text-white rounded-lg transition-all border border-zinc-700 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
+                    <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-400 hover:text-white rounded-lg transition-all border border-zinc-700 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
+                    
+                    {/* Fullscreen Button - Nổi bật hơn trên mobile */}
+                    <button 
+                        onClick={toggleFullScreen}
+                        className="p-1.5 sm:p-2 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-lg transition-all border border-orange-500/20 active:scale-90 ml-1"
+                        title="Xem toàn màn hình"
+                    >
+                        <Maximize2 className="w-3.5 h-3.5 sm:w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+        </div>
     )
-  }
-
-  const stopTracking = () => {
-    if (saveIntervalRef.current) {
-      clearInterval(saveIntervalRef.current)
-      saveIntervalRef.current = null
-    }
-  }
-
-  const handleRewatch = () => {
-    setCompleted(false)
-    playerRef.current?.seekTo?.(0, true)
-    playerRef.current?.playVideo?.()
-    startTracking()
-  }
-
-  /* --------------------------
-     RENDER LOGIC
-  --------------------------- */
-
-  // 👉 Nếu không phải YouTube mà là Google Docs
-  if (!videoId) {
-  return (
-    <><div className="relative w-full aspect-video bg-white overflow-hidden border border-zinc-200 shadow-sm">
-          <div className="absolute inset-0 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-300">
-
-              {!mounted && (
-  <div className="flex items-center justify-center h-full text-zinc-400">
-    Đang khởi tạo...
-  </div>
-)}
-
-{mounted && isLoadingDoc && (
-  <div className="flex items-center justify-center h-full text-zinc-500">
-    Đang tải nội dung bài học...
-  </div>
-)}
-
-{mounted && !isLoadingDoc && docHtml && (
-  <div
-    className="prose prose-zinc max-w-none text-zinc-900 
-      [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-zinc-300
-      [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:bg-zinc-50
-      [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2"
-    dangerouslySetInnerHTML={{ __html: docHtml }}
-  />
-)}
-
-{mounted && !isLoadingDoc && !docHtml && (
-  <div className="flex items-center justify-center h-full text-zinc-400">
-    Bài học này không có nội dung
-  </div>
-)}
-
-
-          </div>
-      </div><ImageViewer /></>
-  )
 }
 
-  // 👉 YouTube Player
-  return (
-    <div className="relative w-full aspect-video bg-black overflow-hidden">
-      <div
-        className={
-          isCompleted
-            ? 'hidden'
-            : 'w-full h-full relative'
-        }
-      >
-        <div
-          id={playerId}
-          className="w-full h-full absolute inset-0"
-        />
-      </div>
-
-      {isCompleted && (
-        <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-3">
-          <CheckCircle className="w-16 h-16 text-emerald-500" />
-          <p className="text-white text-xl font-bold">
-            Video đã xem hết!
-          </p>
-          <button
-            onClick={handleRewatch}
-            className="flex items-center gap-2 px-5 py-2 rounded-full border border-zinc-600 text-zinc-300 hover:text-white hover:border-white transition"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Xem lại từ đầu
-          </button>
-        </div>
-      )}
-    </div>
-  )
+function extractVideoId(url: string) {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(\&v=))([^#\&\?]*).*/
+    const match = url.match(regExp)
+    return (match && match[9].length === 11) ? match[9] : null
 }
