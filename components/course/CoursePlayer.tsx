@@ -26,6 +26,12 @@ type MobileTab = 'list' | 'content' | 'record'
 export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const isSubmittingRef = useRef(false)
+    
+    // [HYDRATION FIX] Đảm bảo component đã mount trên client mới render logic isMobile/Date
+    const [isMounted, setIsMounted] = useState(false)
+    useEffect(() => {
+        setIsMounted(true)
+    }, [])
 
     // Lọc progress chỉ lấy các bài học không bị reset
     const filteredLessonProgress = enrollment.lessonProgress.filter((p: any) => p.status !== 'RESET')
