@@ -89,14 +89,14 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                     marginTop: 'clamp(10px, 2%, 16px)'
                                 }}
                             >
-                                <p
-                                    className="font-semibold text-white whitespace-nowrap"
+                                <span
+                                    className="block font-semibold text-white whitespace-nowrap"
                                     style={{ fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)' }}
                                 >
                                     {session?.user
                                         ? `Mến chào ${userName || 'Học viên'} - Mã học tập ${userId}`
                                         : 'Mến chào bạn hữu đường xa!'}
-                                </p>
+                                </span>
                             </span>
                         </h1>
                     </div>

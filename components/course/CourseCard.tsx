@@ -111,7 +111,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
                                 Đã kích hoạt
                                 {enrollment?.startedAt && (
-                                    <span className="opacity-80 font-normal">
+                                    <span className="opacity-80 font-normal" suppressHydrationWarning>
                                         · Từ {new Date(enrollment.startedAt).toLocaleDateString('vi-VN')}
                                     </span>
                                 )}
