@@ -155,24 +155,35 @@ export async function submitAssignmentAction({
         if (startedAt && lessonOrder) {
             const startDate = new Date(startedAt)
             if (!isNaN(startDate.getTime())) {
-                if (existingTimingScore === 1 || existingTimingScore === -1) {
-                    timingScore = existingTimingScore
+                const deadline = new Date(startDate)
+                deadline.setDate(deadline.getDate() + (lessonOrder - 1))
+                deadline.setHours(23, 59, 59, 999)
+                
+                const isCurrentlyOnTime = now.getTime() <= deadline.getTime()
+
+                if (isUpdate) {
+                    // CẬP NHẬT: 
+                    // Nếu bây giờ vẫn trong hạn -> LUÔN tính là +1 (để gỡ điểm nếu trước đó trễ)
+                    // Nếu bây giờ đã quá hạn -> GIỮ NGUYÊN điểm cũ (để bảo vệ nếu trước đó đã đạt +1)
+                    if (isCurrentlyOnTime) {
+                        timingScore = 1
+                    } else {
+                        timingScore = existingTimingScore ?? -1
+                    }
                 } else {
-                    const deadline = new Date(startDate)
-                    deadline.setDate(deadline.getDate() + (lessonOrder - 1))
-                    deadline.setHours(23, 59, 59, 999)
-                    
-                    // So sánh Timestamp để chính xác tuyệt đối
-                    timingScore = now.getTime() <= deadline.getTime() ? 1 : -1
+                    // NỘP MỚI: Tính theo thời điểm hiện tại
+                    timingScore = isCurrentlyOnTime ? 1 : -1
                 }
 
-                // Chặn cập nhật nếu đã quá hạn
-                if (isUpdate && timingScore === -1) {
+                // Chặn cập nhật nếu đã quá hạn và đã hoàn thành (Bảo vệ tính nghiêm túc)
+                if (isUpdate && !isCurrentlyOnTime) {
                     const existingStatus = await prisma.lessonProgress.findUnique({
                         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
                         select: { status: true }
                     })
                     if (existingStatus?.status === 'COMPLETED') {
+                        // Nếu đã xong và đã quá hạn thì không cho sửa nữa để tránh hack điểm
+                        // (Trừ khi timingScore cũ là -1 và giờ muốn nộp lại? Không, đã quá hạn thì luôn là -1)
                         return { success: false, message: "Bài học đã hết hạn cập nhật." }
                     }
                 }
