@@ -52,10 +52,9 @@ export default function VideoPlayer({
   const saveIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isCompletedRef = useRef(false)
 
-  const initCompleted =
-    initialPercent !== undefined && initialPercent >= 99.9
+  
 
-  const [isCompleted, setIsCompleted] = useState(initCompleted)
+  const [isCompleted, setIsCompleted] = useState(false)
   const [docHtml, setDocHtml] = useState<string | null>(null)
   const [isLoadingDoc, setIsLoadingDoc] = useState(false)
 const [mounted, setMounted] = useState(false)
@@ -139,9 +138,8 @@ useEffect(() => {
         playerRef.current.destroy()
       }
 
-      const startTime = initCompleted
-        ? 0
-        : Math.floor(initialMaxTime)
+      const startTime = Math.floor(initialMaxTime)
+
 
       playerRef.current = new (window as any).YT.Player(
         playerId,
@@ -150,7 +148,7 @@ useEffect(() => {
           width: '100%',
           videoId,
           playerVars: {
-            autoplay: initCompleted ? 0 : 1,
+            autoplay: 1,
             modestbranding: 1,
             rel: 0,
             start: startTime,
