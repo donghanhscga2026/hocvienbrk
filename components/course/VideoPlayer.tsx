@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { RotateCcw, CheckCircle } from 'lucide-react'
-import DOMPurify from 'dompurify'
+import { normalizeGoogleDocsHtml } from "@/lib/normalizeGoogleDocsHtml"
+import ImageViewer from "@/components/ImageViewer"
+
 
 interface VideoPlayerProps {
   videoUrl: string | null
@@ -100,9 +102,10 @@ const [isLoadingDoc, setIsLoadingDoc] = useState(false)
   fetch(`/api/docs?url=${encodeURIComponent(docsUrl)}`)
     .then((res) => res.text())
     .then((html) => {
-      const clean = DOMPurify.sanitize(html)
-      setDocHtml(clean)
-    })
+  const clean = normalizeGoogleDocsHtml(html)
+  setDocHtml(clean)
+})
+
     .catch(() => {
       setDocHtml('')
     })
@@ -249,45 +252,31 @@ const [isLoadingDoc, setIsLoadingDoc] = useState(false)
   // 👉 Nếu không phải YouTube mà là Google Docs
   if (!videoId) {
   return (
-    <div className="relative w-full aspect-video bg-zinc-900 overflow-hidden rounded-xl">
-      <div className="absolute inset-0 overflow-y-auto p-6">
+    <><div className="relative w-full aspect-video bg-zinc-900 overflow-hidden rounded-xl">
+          <div className="absolute inset-0 overflow-y-auto p-6">
 
-        {isLoadingDoc && (
-          <div className="flex items-center justify-center h-full text-zinc-400">
-            Đang tải nội dung bài học...
+              {isLoadingDoc && (
+                  <div className="flex items-center justify-center h-full text-zinc-400">
+                      Đang tải nội dung bài học...
+                  </div>
+              )}
+
+              {!isLoadingDoc && docHtml && (
+                  <div
+                      className="prose prose-invert max-w-none text-zinc-300"
+                      dangerouslySetInnerHTML={{ __html: docHtml }} />
+              )}
+
+              {!isLoadingDoc && !docHtml && (
+                  <div className="flex items-center justify-center h-full text-zinc-500">
+                      Bài học này không có nội dung
+                  </div>
+              )}
+
           </div>
-        )}
-
-        {!isLoadingDoc && docHtml && (
-          <div
-            className="prose prose-invert max-w-none text-zinc-300"
-            dangerouslySetInnerHTML={{ __html: docHtml }}
-          />
-        )}
-
-        {!isLoadingDoc && !docHtml && (
-          <div className="flex items-center justify-center h-full text-zinc-500">
-            Bài học này không có nội dung
-          </div>
-        )}
-
-      </div>
-    </div>
+      </div><ImageViewer /></>
   )
 }
-
-
-
-  // 👉 Không có gì
-  if (!videoId) {
-    return (
-      <div className="aspect-video bg-zinc-900 flex items-center justify-center">
-        <p className="text-zinc-500 text-sm">
-          Bài học này không có nội dung
-        </p>
-      </div>
-    )
-  }
 
   // 👉 YouTube Player
   return (
