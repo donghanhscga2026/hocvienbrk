@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
 
+export const dynamic = "force-dynamic";
+
 export default async function CourseLearnPage({
   params,
 }: {
