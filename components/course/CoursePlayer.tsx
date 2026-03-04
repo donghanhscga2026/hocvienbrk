@@ -268,10 +268,13 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black'}>
                             <VideoPlayer
                                 key={currentLessonId}
+                                enrollmentId={enrollment.id}
+                                lessonId={currentLessonId!}
                                 videoUrl={currentLesson?.videoUrl || null}
                                 lessonContent={currentLesson?.content || null}
                                 initialMaxTime={currentProgress?.maxTime || 0}
-                                initialPercent={initialPercent}
+                                playlistData={currentProgress?.scores?.playlist}
+                                lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                             />
