@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from "next/link"
-import { 
-    ArrowLeft, ListVideo, FileText, X, ClipboardCheck, 
-    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw 
+import {
+    ArrowLeft, ListVideo, FileText, X, ClipboardCheck,
+    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +56,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     // [HYDRATION FIX] Đảm bảo component đã mount trên client mới thực hiện các tính toán logic và render giao diện chính
     useEffect(() => {
         setIsMounted(true)
-        
+
         // Chỉ tìm bài học cũ khi đã ở client
         if (enrollment.lastLessonId) {
             setCurrentLessonId(enrollment.lastLessonId)
@@ -100,7 +100,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             const currentTab = mobileTab
             if (currentTab !== prevTab) {
                 if (prevTab === 'record' && currentTab === 'content' && assignmentFormRef.current && !isSubmittingRef.current) {
-                    await assignmentFormRef.current().catch(() => {})
+                    await assignmentFormRef.current().catch(() => { })
                 }
             }
             prevMobileTabRef.current = mobileTab
@@ -110,9 +110,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const handleLessonSelect = async (lessonId: string) => {
         if (isSubmittingRef.current) return
-        
+
         if (assignmentFormRef.current) {
-            await assignmentFormRef.current().catch(() => {})
+            await assignmentFormRef.current().catch(() => { })
         }
 
         if (currentLessonId && videoProgressRef.current) {
@@ -121,14 +121,14 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 lessonId: currentLessonId,
                 maxTime: videoProgressRef.current.maxTime,
                 duration: videoProgressRef.current.duration
-            }).catch(() => {})
+            }).catch(() => { })
         }
 
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
         setMobileTab('content')
         setShowContentModal(false)
-        updateLastLessonAction(enrollment.id, lessonId).catch(() => {})
+        updateLastLessonAction(enrollment.id, lessonId).catch(() => { })
     }
 
     const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
@@ -136,11 +136,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const pct = Math.min(100, Math.round((maxTime / duration) * 100))
         setVideoPercent(pct)
         videoProgressRef.current = { maxTime, duration }
-        
+
         const threshold = Math.floor(pct / 10) * 10
         if ((threshold > lastSavedPercentRef.current || pct === 100) && threshold <= 100) {
             lastSavedPercentRef.current = threshold
-            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => {})
+            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => { })
         }
     }, [currentLessonId, enrollment.id])
 
@@ -149,11 +149,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
         isSubmittingRef.current = true
         notify(isUpdate ? 'Đang cập nhật bài học...' : 'Đang chấm điểm...', 'loading')
-        
+
         try {
             const currentProg = progressMap[currentLessonId!]
             const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
-            
+
             const result = await submitAssignmentAction({
                 enrollmentId: enrollment.id,
                 lessonId: currentLessonId!,
@@ -166,7 +166,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 existingVideoScore: currentProg?.scores?.video,
                 existingTimingScore: currentProg?.scores?.timing
             })
-            
+
             if (!(result as any)?.success) {
                 notify((result as any)?.message || 'Lỗi xử lý dữ liệu!', 'error')
                 return
@@ -174,7 +174,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
             const res = result as any
             notify(res.totalScore >= 5 ? `✅ Hoàn thành! Điểm: ${res.totalScore}/10` : `📊 Đã ghi nhận: ${res.totalScore}/10đ`, 'success')
-            
+
             const updatedProgress = {
                 ...(progressMap[currentLessonId!] || {}),
                 assignment: { reflection: data.reflection, links: data.links, supports: data.supports },
@@ -200,7 +200,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
-    
+
     const initialPercent = !currentLesson?.videoUrl ? 100 : (
         currentProgress?.duration ? (currentProgress.maxTime / currentProgress.duration) * 100 : 0
     )
@@ -223,12 +223,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </Link>
                     <h1 className="font-bold text-white truncate text-sm sm:text-base">{course.name_lop}</h1>
                 </div>
-                
+
                 {statusMsg && (
-                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${
-                        statusMsg.type === 'loading' ? 'bg-orange-500 text-white' :
-                        statusMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
-                    }`}>
+                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${statusMsg.type === 'loading' ? 'bg-orange-500 text-white' :
+                            statusMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                        }`}>
                         {statusMsg.type === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
                         {statusMsg.text}
                     </div>
@@ -292,100 +291,77 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         </div>
                     )}
 
-                    {isMobile && (
-                        <div className="flex-1 min-h-0 w-full flex flex-col">
-                            {mobileTab === 'list' && (
-                                <div className="flex-1 overflow-y-auto">
-                                    <LessonSidebarMobile
-                                        lessons={course.lessons}
-                                        currentLessonId={currentLessonId}
-                                        onLessonSelect={handleLessonSelect}
-                                        progress={progressMap}
-                                        startedAt={startedAt}
-                                        onResetStartDate={async (d: Date) => { await confirmStartDateAction(course.id, d); window.location.reload(); }}
-                                    />
-                                </div>
-                            )}
-                            {mobileTab === 'content' && (
-                                <div className="flex-1 flex flex-col min-h-0">
-                                    <div className="px-4 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
-                                        <p className="text-base font-bold text-white leading-tight">{currentLesson?.title}</p>
-                                        <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung →</button>
+                    {/* [HYDRATION FIX] Chỉ render Mobile logic khi đã Mounted và là Mobile */}
+                    {isMounted && isMobile && (
+                        <>
+                            <div className="flex-1 min-h-0 w-full flex flex-col">
+                                {mobileTab === 'list' && (
+                                    <div className="flex-1 overflow-y-auto">
+                                        <LessonSidebarMobile
+                                            lessons={course.lessons}
+                                            currentLessonId={currentLessonId}
+                                            onLessonSelect={handleLessonSelect}
+                                            progress={progressMap}
+                                            startedAt={startedAt}
+                                            onResetStartDate={async (d: Date) => { await confirmStartDateAction(course.id, d); window.location.reload(); }}
+                                        />
                                     </div>
-                                    <div className="flex-1 min-h-0">
-                                        <ChatSection lessonId={currentLessonId!} session={session} />
+                                )}
+                                {mobileTab === 'content' && (
+                                    <div className="flex-1 flex flex-col min-h-0">
+                                        <div className="px-4 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
+                                            <p className="text-base font-bold text-white leading-tight">{currentLesson?.title}</p>
+                                            <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung →</button>
+                                        </div>
+                                        <div className="flex-1 min-h-0">
+                                            <ChatSection lessonId={currentLessonId!} session={session} />
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                            {mobileTab === 'record' && (
-                                <div className="flex-1 overflow-hidden">
-                                    <AssignmentForm
-                                        key={currentLessonId}
-                                        lessonId={currentLessonId!}
-                                        lessonOrder={currentLesson?.order ?? 1}
-                                        startedAt={startedAt}
-                                        videoPercent={videoPercent}
-                                        videoUrl={currentLesson?.videoUrl || null}
-                                        onSubmit={handleSubmitAssignment}
-                                        initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
-                                        onSaveDraft={assignmentFormRef}
-                                        onFormDataChange={setCurrentFormData}
-                                        onDraftSaved={(draftData) => {
-                                            setProgressMap(prev => ({
-                                                ...prev,
-                                                [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
-                                            }))
-                                        }}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                                )}
+                                {mobileTab === 'record' && (
+                                    <div className="flex-1 overflow-hidden">
+                                        <AssignmentForm
+                                            key={currentLessonId}
+                                            lessonId={currentLessonId!}
+                                            lessonOrder={currentLesson?.order ?? 1}
+                                            startedAt={startedAt}
+                                            videoPercent={videoPercent}
+                                            videoUrl={currentLesson?.videoUrl || null}
+                                            onSubmit={handleSubmitAssignment}
+                                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
+                                            onSaveDraft={assignmentFormRef}
+                                            onFormDataChange={setCurrentFormData}
+                                            onDraftSaved={(draftData) => {
+                                                setProgressMap(prev => ({
+                                                    ...prev,
+                                                    [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
+                                                }))
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <nav className="h-14 bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-50">
+                                {[
+                                    { id: 'list', icon: ListVideo, label: 'Danh sách' },
+                                    { id: 'content', icon: FileText, label: 'Nội dung' },
+                                    { id: 'record', icon: ClipboardCheck, label: 'Ghi nhận' },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setMobileTab(tab.id as MobileTab)}
+                                        className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] ${mobileTab === tab.id ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'text-zinc-500'}`}
+                                    >
+                                        <tab.icon className="w-5 h-5" />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </nav>
+                        </>
                     )}
                 </main>
-
-                {!isMobile && (
-                    <div className="w-[400px] shrink-0 border-l border-zinc-800 flex flex-col">
-                        <AssignmentForm
-                            key={currentLessonId}
-                            lessonId={currentLessonId!}
-                            lessonOrder={currentLesson?.order ?? 1}
-                            startedAt={startedAt}
-                            videoPercent={videoPercent}
-                            videoUrl={currentLesson?.videoUrl || null}
-                            onSubmit={handleSubmitAssignment}
-                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
-                            onSaveDraft={assignmentFormRef}
-                            onFormDataChange={setCurrentFormData}
-                            onDraftSaved={(draftData) => {
-                                setProgressMap(prev => ({
-                                    ...prev,
-                                    [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
-                                }))
-                            }}
-                        />
-                    </div>
-                )}
             </div>
-
-            {/* Mobile Navigation */}
-            {isMobile && (
-                <nav className="h-14 bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-50">
-                    {[
-                        { id: 'list', icon: ListVideo, label: 'Danh sách' },
-                        { id: 'content', icon: FileText, label: 'Nội dung' },
-                        { id: 'record', icon: ClipboardCheck, label: 'Ghi nhận' },
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setMobileTab(tab.id as MobileTab)}
-                            className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] ${mobileTab === tab.id ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'text-zinc-500'}`}
-                        >
-                            <tab.icon className="w-5 h-5" />
-                            {tab.label}
-                        </button>
-                    ))}
-                </nav>
-            )}
 
             {/* Content Modal */}
             {showContentModal && (
@@ -413,12 +389,12 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
         <div className="flex flex-col bg-zinc-900 h-full">
             <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Lộ trình học tập</span>
-                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">{lessons.filter((l:any)=>filteredProgress[l.id]?.status==='COMPLETED').length}/{lessons.length}</span>
+                <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">{lessons.filter((l: any) => filteredProgress[l.id]?.status === 'COMPLETED').length}/{lessons.length}</span>
             </div>
             {lessons.map((lesson: any) => {
                 const prog = filteredProgress[lesson.id]
                 const isActive = currentLessonId === lesson.id
-                const unlocked = lesson.order === 1 || (filteredProgress[lessons.find((l:any)=>l.order===lesson.order-1)?.id]?.status === 'COMPLETED')
+                const unlocked = lesson.order === 1 || (filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]?.status === 'COMPLETED')
                 return (
                     <button
                         key={lesson.id}
