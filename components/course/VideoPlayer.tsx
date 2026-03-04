@@ -255,30 +255,33 @@ useEffect(() => {
   // 👉 Nếu không phải YouTube mà là Google Docs
   if (!videoId) {
   return (
-    <><div className="relative w-full aspect-video bg-zinc-900 overflow-hidden rounded-xl">
-          <div className="absolute inset-0 overflow-y-auto p-6">
+    <><div className="relative w-full aspect-video bg-white overflow-hidden rounded-b-xl border border-zinc-200 shadow-sm">
+          <div className="absolute inset-0 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-300">
 
               {!mounted && (
-  <div className="flex items-center justify-center h-full text-zinc-500">
+  <div className="flex items-center justify-center h-full text-zinc-400">
     Đang khởi tạo...
   </div>
 )}
 
 {mounted && isLoadingDoc && (
-  <div className="flex items-center justify-center h-full text-zinc-400">
+  <div className="flex items-center justify-center h-full text-zinc-500">
     Đang tải nội dung bài học...
   </div>
 )}
 
 {mounted && !isLoadingDoc && docHtml && (
   <div
-    className="prose prose-invert max-w-none text-zinc-300"
+    className="prose prose-zinc max-w-none text-zinc-900 
+      [&_table]:border-collapse [&_table]:w-full [&_table]:border [&_table]:border-zinc-300
+      [&_th]:border [&_th]:border-zinc-300 [&_th]:p-2 [&_th]:bg-zinc-50
+      [&_td]:border [&_td]:border-zinc-300 [&_td]:p-2"
     dangerouslySetInnerHTML={{ __html: docHtml }}
   />
 )}
 
 {mounted && !isLoadingDoc && !docHtml && (
-  <div className="flex items-center justify-center h-full text-zinc-500">
+  <div className="flex items-center justify-center h-full text-zinc-400">
     Bài học này không có nội dung
   </div>
 )}
