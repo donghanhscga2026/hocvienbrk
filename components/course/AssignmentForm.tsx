@@ -243,8 +243,8 @@ export default function AssignmentForm({
 
             <div className="shrink-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-2">
                 <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-gray-500 leading-tight">
-                        Hoàn thành trước 23:59 ngày <span className="font-semibold text-gray-700">{formatDate(deadline)}</span>
+                    <p className="text-[11px] text-gray-500 leading-tight" suppressHydrationWarning>
+                        Hoàn thành trước 23:59 ngày <span className="font-semibold text-gray-700" suppressHydrationWarning>{formatDate(deadline)}</span>
                     </p>
                     <span className="text-sm font-black text-orange-500">Tổng: {total}/10</span>
                 </div>

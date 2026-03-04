@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"; //test thử xem lỗi gì - dùng xong xóa
 
 export default async function CourseLearnPage({
   params,
