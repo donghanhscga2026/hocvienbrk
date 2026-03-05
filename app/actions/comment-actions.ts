@@ -27,19 +27,19 @@ export async function getCommentsByLesson(lessonId: string) {
         }
     })
 
-    return comments.map(comment => {
+    return comments.map((comment: any) => {
         // Get avatar priority: user.image > Google image > Facebook image > null
         let avatar = comment.user.image
         
         if (!avatar) {
-            const googleAccount = comment.user.accounts.find(a => a.provider === 'google')
+            const googleAccount = comment.user.accounts.find((a: any) => a.provider === 'google')
             if (googleAccount) {
                 avatar = `https://www.googleapis.com/plus/v1/people/${googleAccount.providerAccountId}?picture`
             }
         }
 
         if (!avatar) {
-            const facebookAccount = comment.user.accounts.find(a => a.provider === 'facebook')
+            const facebookAccount = comment.user.accounts.find((a: any) => a.provider === 'facebook')
             if (facebookAccount) {
                 avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture`
             }
@@ -91,7 +91,7 @@ export async function createComment(lessonId: string, content: string) {
         // Get avatar with same priority logic
         let avatar = comment.user.image
         if (!avatar) {
-            const googleAccount = comment.user.accounts.find(a => a.provider === 'google')
+            const googleAccount = comment.user.accounts.find((a: any) => a.provider === 'google')
             if (googleAccount) {
                 avatar = `https://www.googleapis.com/plus/v1/people/${googleAccount.providerAccountId}?picture`
             }

@@ -14,7 +14,7 @@ export async function getNextAvailableId(): Promise<number> {
     const reservedIds = await prisma.reservedId.findMany({
         select: { id: true }
     })
-    const reservedIdList = reservedIds.map(r => r.id)
+    const reservedIdList = reservedIds.map((r: any) => r.id)
 
     // 2. Lấy User có ID lớn nhất mà KHÔNG nằm trong danh sách đặc biệt
     const maxNormalUser = await prisma.user.findFirst({

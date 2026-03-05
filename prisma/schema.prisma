@@ -131,16 +131,17 @@ model Enrollment {
   link_anh_coc String?
   phi_coc      Int              @default(0)
   startedAt    DateTime?
-  resetAt      DateTime?        // Thời điểm reset lộ trình học
-  lastLessonId String?          // Bài học cuối đang học (để quay lại đúng bài)
+  resetAt      DateTime?
+  lastLessonId String?
   challengeDays Int?
   course       Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   lessonProgress LessonProgress[]
+  payment      Payment?
 
   @@unique([userId, courseId])
-  @@index([userId])     // Tăng tốc: findMany enrollments của một user
-  @@index([courseId])   // Tăng tốc: đếm học viên theo khóa
+  @@index([userId])
+  @@index([courseId])
 }
 
 model LessonProgress {
@@ -202,4 +203,33 @@ enum Role {
 enum CourseType {
   NORMAL
   CHALLENGE
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  CANCELLED
+}
+
+model Payment {
+  id              Int            @id @default(autoincrement())
+  enrollmentId    Int            @unique
+  amount          Int
+  bankName        String?
+  accountNumber   String?
+  transferTime    DateTime?
+  content         String?
+  phone           String?
+  courseCode      String?
+  proofImage      String?
+  status          PaymentStatus  @default(PENDING)
+  verifiedAt      DateTime?
+  verifyMethod    String?
+  note            String?
+  transferContent String?       // "SDT0389758138MHV372COCNH"
+  qrCodeUrl       String?       // QR code từ VietQR API
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  enrollment      Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
 }

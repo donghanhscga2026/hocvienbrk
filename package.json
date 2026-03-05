@@ -19,7 +19,8 @@
     "seed-courses": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed-courses.ts",
     "seed-enrollments": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed-enrollments.ts",
     "import-v3": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-v3-data.ts",
-    "push": "powershell -ExecutionPolicy Bypass -File ./scripts/push.ps1"
+    "push": "powershell -ExecutionPolicy Bypass -File ./scripts/push.ps1",
+    "code-history": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/generate-code-history.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -35,6 +36,7 @@
     "dompurify": "^3.3.1",
     "dotenv": "^17.3.1",
     "fs": "^0.0.1-security",
+    "googleapis": "^171.4.0",
     "lucide-react": "^0.570.0",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",

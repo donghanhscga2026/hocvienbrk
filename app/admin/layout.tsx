@@ -39,8 +39,8 @@ export default async function AdminLayout({
             <div className="flex flex-1">
                 <aside className="w-64 bg-gray-100 p-4 border-r hidden md:block">
                     <nav className="flex flex-col space-y-2">
+                        <a href="/admin/payments" className="p-2 rounded hover:bg-gray-200 font-medium text-gray-700">💰 Quản lý Thanh toán</a>
                         <a href="/admin/reserved-ids" className="p-2 rounded hover:bg-gray-200 font-medium text-gray-700">💎 Quản lý Số Đẹp</a>
-                        {/* Có thể thêm các menu khác sau này */}
                     </nav>
                 </aside>
                 <main className="flex-1 p-6 bg-white">
