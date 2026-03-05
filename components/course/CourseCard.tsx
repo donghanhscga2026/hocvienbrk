@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import Image from 'next/image' // Sử dụng Next.js Image để tối ưu
+import Image from 'next/image'
 import PaymentModal from './PaymentModal'
+import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
 
 interface CourseCardProps {
@@ -13,14 +14,26 @@ interface CourseCardProps {
         startedAt: Date | null
         completedCount: number
         totalLessons: number
+        enrollmentId?: number
+        payment?: {
+            id: number
+            status: string
+            proofImage?: string | null
+        }
     } | null
+    isCourseOneActive?: boolean
+    userPhone?: string | null
+    userId?: number | null
     priority?: boolean
     darkMode?: boolean
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment, priority = false, darkMode = false }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [loading, setLoading] = useState(false)
+
+    // Override phi_coc nếu đã kích hoạt khóa 1
+    const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
 
     const isActive = enrollment?.status === 'ACTIVE'
     const isPending = enrollment?.status === 'PENDING'
@@ -40,7 +53,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
             return
         }
 
-        if (course.phi_coc === 0) {
+        if (effectivePhiCoc === 0) {
             setLoading(true)
             try {
                 const res = await enrollInCourseAction(course.id)
@@ -103,8 +116,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
 
                     {/* Badges + Trạng thái + Ngày bắt đầu */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${course.phi_coc === 0 ? 'bg-yellow-400 text-gray-900' : 'bg-red-600 text-white'}`}>
-                            {course.phi_coc === 0 ? 'Miễn phí' : 'Phí cam kết'}
+                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-yellow-400 text-gray-900' : 'bg-red-600 text-white'}`}>
+                            {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
                         </span>
                         {isActive && (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-sky-400">
@@ -115,6 +128,12 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                                         · Từ {new Date(enrollment.startedAt).toLocaleDateString('vi-VN')}
                                     </span>
                                 )}
+                            </span>
+                        )}
+                        {isPending && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-orange-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+                                Chờ thanh toán
                             </span>
                         )}
                     </div>
@@ -133,6 +152,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                         className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
                             ${loading ? 'bg-gray-400 text-white cursor-not-allowed' :
                                 isActive ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-emerald-200' :
+                                isPending ? 'bg-orange-500 text-white hover:bg-orange-600 hover:shadow-orange-200' :
                                     'bg-sky-500 text-white hover:bg-sky-600 hover:shadow-sky-200'}`}
                     >
                         {loading ? (
@@ -153,9 +173,9 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
                                     />
                                 )}
                                 <span className="relative z-10 flex items-center gap-2">
-                                    <span>{isActive ? '📖' : '⚡'}</span>
+                                    <span>{isActive ? '📖' : isPending ? '💰' : '⚡'}</span>
                                     <span>
-                                        {isActive ? 'Vào học tiếp' : course.phi_coc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
+                                        {isActive ? 'Vào học tiếp' : isPending ? 'Xem thông tin thanh toán' : effectivePhiCoc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
                                         {isActive && enrollment && enrollment.totalLessons > 0 && (
                                             <span className="ml-1.5 font-normal opacity-90 text-[12px]">
                                                 {enrollment.completedCount}/{enrollment.totalLessons} bài · {progressPct}%
@@ -179,6 +199,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment, priority = 
             {showPayment && (
                 <PaymentModal
                     course={course}
+                    enrollment={enrollment}
+                    isCourseOneActive={isCourseOneActive}
+                    userPhone={userPhone}
+                    userId={userId}
                     onClose={() => setShowPayment(false)}
                 />
             )}

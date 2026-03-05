@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { writeFile, mkdir } from 'fs/promises'
+import path from 'path'
+import { existsSync } from 'fs'
+
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file uploaded' },
+        { status: 400 }
+      )
+    }
+
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads')
+    
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true })
+    }
+
+    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`
+    const ext = file.name.split('.').pop() || 'jpg'
+    const filename = `payment-${uniqueSuffix}.${ext}`
+    const filepath = path.join(uploadDir, filename)
+
+    await writeFile(filepath, buffer)
+
+    const url = `/uploads/${filename}`
+
+    return NextResponse.json({ url, filename })
+  } catch (error) {
+    console.error('Upload error:', error)
+    return NextResponse.json(
+      { error: 'Upload failed' },
+      { status: 500 }
+    )
+  }
+}

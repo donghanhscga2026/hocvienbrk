@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { createPaymentQR } from "@/lib/vietqr"
 
 /**
  * Đăng ký khóa học mới
@@ -16,10 +17,27 @@ export async function enrollInCourseAction(courseId: number) {
 
         const course = await prisma.course.findUnique({
             where: { id: courseId },
-            select: { phi_coc: true }
+            select: { 
+                phi_coc: true,
+                id_khoa: true,
+                stk: true,
+                name_stk: true,
+                bank_stk: true
+            }
         })
 
         if (!course) throw new Error("Khóa học không tồn tại.")
+
+        // Kiểm tra xem user có active course 1 không
+        const vipEnrollment = await prisma.enrollment.findFirst({
+            where: {
+                userId,
+                courseId: 1,
+                status: 'ACTIVE'
+            }
+        })
+
+        const effectivePhiCoc = vipEnrollment ? 0 : course.phi_coc
 
         const existing = await prisma.enrollment.findUnique({
             where: { userId_courseId: { userId, courseId } }
@@ -31,9 +49,59 @@ export async function enrollInCourseAction(courseId: number) {
             data: {
                 userId,
                 courseId,
-                status: course.phi_coc === 0 ? "ACTIVE" : "PENDING"
+                status: effectivePhiCoc === 0 ? "ACTIVE" : "PENDING"
             }
         })
+
+        if (effectivePhiCoc > 0 && course.stk && course.name_stk) {
+            // Lấy thông tin user
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { phone: true }
+            })
+
+            let qrCodeUrl = null
+            let transferContent = null
+
+            // Tạo QR code nếu có đủ thông tin
+            if (user?.phone && course.stk) {
+                try {
+                    const qrResult = await createPaymentQR({
+                        phone: user.phone,
+                        userId: userId,
+                        courseId: courseId,
+                        courseCode: course.id_khoa,
+                        accountNo: course.stk,
+                        accountName: course.name_stk,
+                        amount: effectivePhiCoc
+                    })
+                    qrCodeUrl = qrResult.qrCodeUrl
+                    transferContent = qrResult.transferContent
+                } catch (qrError) {
+                    console.error("Failed to generate QR:", qrError)
+                }
+            }
+
+            // Fallback content nếu không tạo được qua API
+            if (!transferContent) {
+                const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
+                transferContent = `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase()
+            }
+
+
+            await prisma.payment.create({
+                data: {
+                    enrollmentId: newEnrollment.id,
+                    amount: effectivePhiCoc,
+                    status: 'PENDING',
+                    transferContent: transferContent,
+                    qrCodeUrl: qrCodeUrl,
+                    bankName: course.bank_stk || 'Sacombank',
+                    accountNumber: course.stk,
+                    phone: user?.phone // Lưu thêm phone vào Payment record
+                }
+            })
+        }
 
         revalidatePath('/')
         revalidatePath('/courses')

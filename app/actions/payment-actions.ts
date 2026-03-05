@@ -1,0 +1,242 @@
+'use server'
+
+import { auth } from "@/auth"
+import prisma from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
+
+export async function getPaymentByEnrollmentId(enrollmentId: number) {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: { enrollmentId }
+    })
+    return { success: true, payment }
+  } catch (error: any) {
+    console.error("Get Payment Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createPaymentForEnrollment(enrollmentId: number, courseFee: number) {
+  try {
+    const existingPayment = await prisma.payment.findUnique({
+      where: { enrollmentId }
+    })
+
+    if (existingPayment) {
+      return { success: true, payment: existingPayment }
+    }
+
+    const payment = await prisma.payment.create({
+      data: {
+        enrollmentId,
+        amount: courseFee,
+        status: 'PENDING'
+      }
+    })
+
+    return { success: true, payment }
+  } catch (error: any) {
+    console.error("Create Payment Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updatePaymentProof(enrollmentId: number, proofImageUrl: string) {
+  try {
+    const payment = await prisma.payment.update({
+      where: { enrollmentId },
+      data: {
+        proofImage: proofImageUrl,
+        verifyMethod: 'MANUAL_UPLOAD'
+      }
+    })
+
+    revalidatePath('/')
+    revalidatePath('/courses')
+    
+    return { success: true, payment }
+  } catch (error: any) {
+    console.error("Update Payment Proof Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function verifyPaymentAction(
+  enrollmentId: number,
+  method: 'AUTO_EMAIL' | 'MANUAL_UPLOAD' | 'MANUAL_ADMIN',
+  note?: string
+) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { course: true, payment: true }
+    })
+
+    if (!enrollment) {
+      return { success: false, error: "Enrollment not found" }
+    }
+
+    if (enrollment.status === 'ACTIVE') {
+      return { success: false, error: "Enrollment already active" }
+    }
+
+    const [payment, updatedEnrollment] = await prisma.$transaction([
+      prisma.payment.update({
+        where: { enrollmentId },
+        data: {
+          status: 'VERIFIED',
+          verifiedAt: new Date(),
+          verifyMethod: method,
+          note: note || null
+        }
+      }),
+      prisma.enrollment.update({
+        where: { id: enrollmentId },
+        data: { status: 'ACTIVE' }
+      })
+    ])
+
+    revalidatePath('/')
+    revalidatePath('/courses')
+    revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`)
+
+    return { 
+      success: true, 
+      payment,
+      enrollment: updatedEnrollment,
+      message: `Đã kích hoạt khóa học "${enrollment.course.name_lop}" thành công!`
+    }
+  } catch (error: any) {
+    console.error("Verify Payment Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function rejectPaymentAction(enrollmentId: number, reason: string) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { course: true }
+    })
+
+    if (!enrollment) {
+      return { success: false, error: "Enrollment not found" }
+    }
+
+    const payment = await prisma.payment.update({
+      where: { enrollmentId },
+      data: {
+        status: 'REJECTED',
+        note: reason,
+        verifyMethod: 'MANUAL_ADMIN'
+      }
+    })
+
+    revalidatePath('/')
+    revalidatePath('/courses')
+
+    return { success: true, payment }
+  } catch (error: any) {
+    console.error("Reject Payment Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getPendingPayments() {
+  try {
+    const payments = await prisma.payment.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        enrollment: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, phone: true }
+            },
+            course: {
+              select: { id: true, id_khoa: true, name_lop: true, phi_coc: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    return { success: true, payments }
+  } catch (error: any) {
+    console.error("Get Pending Payments Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getAllPayments() {
+  try {
+    const payments = await prisma.payment.findMany({
+      include: {
+        enrollment: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, phone: true }
+            },
+            course: {
+              select: { id: true, id_khoa: true, name_lop: true, phi_coc: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    return { success: true, payments }
+  } catch (error: any) {
+    console.error("Get All Payments Error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function autoVerifyPayment(enrollmentId: number, transferData: {
+  amount: number;
+  phone: string | null;
+  courseCode: string | null;
+  bankName: string | null;
+  accountNumber: string | null;
+  transferTime: Date | null;
+  content: string;
+}) {
+  try {
+    const payment = await prisma.payment.update({
+      where: { enrollmentId },
+      data: {
+        amount: transferData.amount,
+        phone: transferData.phone,
+        courseCode: transferData.courseCode,
+        bankName: transferData.bankName,
+        accountNumber: transferData.accountNumber,
+        transferTime: transferData.transferTime,
+        content: transferData.content,
+        status: 'VERIFIED',
+        verifiedAt: new Date(),
+        verifyMethod: 'AUTO_EMAIL'
+      }
+    })
+
+    await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { status: 'ACTIVE' }
+    })
+
+    return { success: true, payment }
+  } catch (error: any) {
+    console.error("Auto Verify Payment Error:", error)
+    return { success: false, error: error.message }
+  }
+}

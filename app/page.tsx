@@ -17,7 +17,7 @@ export default async function Home() {
     session?.user?.id
       ? (prisma as any).user.findUnique({
         where: { id: parseInt(session.user.id) },
-        select: { name: true, id: true, image: true }
+        select: { name: true, id: true, image: true, phone: true }
       })
       : Promise.resolve(null),
     getRandomMessage()
@@ -26,6 +26,7 @@ export default async function Home() {
   const userName = userRecord?.name ?? null;
   const userId = userRecord?.id ?? null;
   const userImage = userRecord?.image ?? session?.user?.image ?? null;
+  const userPhone = userRecord?.phone ?? null;
 
   // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
   // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
@@ -36,17 +37,31 @@ let enrollmentsMap: Record<number, {
   startedAt: Date | null; 
   completedCount: number; 
   totalLessons: number;
+  enrollmentId?: number;
+  payment?: {
+    id: number;
+    status: string;
+    proofImage?: string | null;
+  };
 }> = {};
 
 if (session?.user?.id) {
   const userId = parseInt(session.user.id);
 
   const enrollments = await (prisma as any).enrollment.findMany({
-    where: { userId, status: 'ACTIVE' },
+    where: { userId },
     select: {
+      id: true,
       courseId: true,
       status: true,
       startedAt: true,
+      payment: {
+        select: {
+          id: true,
+          status: true,
+          proofImage: true
+        }
+      },
       course: {
         select: {
           _count: {
@@ -71,7 +86,9 @@ if (session?.user?.id) {
       status: e.status,
       startedAt: e.startedAt,
       completedCount: e._count?.lessonProgress || 0,
-      totalLessons: e.course?._count?.lessons || 0
+      totalLessons: e.course?._count?.lessons || 0,
+      enrollmentId: e.id,
+      payment: e.payment
     };
   });
 }
@@ -80,6 +97,9 @@ if (session?.user?.id) {
 
   const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
   const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
+
+  // Kiểm tra user có kích hoạt khóa 1 (86 ngày) không
+  const isCourseOneActive = enrollmentsMap[1]?.status === 'ACTIVE';
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -109,6 +129,9 @@ if (session?.user?.id) {
                       course={course}
                       isLoggedIn={!!session}
                       enrollment={enrollmentsMap[course.id] || null}
+                      isCourseOneActive={isCourseOneActive}
+                      userPhone={userPhone}
+                      userId={userId}
                       priority={index < 3}
                       darkMode={true}
                     />
@@ -131,6 +154,9 @@ if (session?.user?.id) {
                       course={course}
                       isLoggedIn={!!session}
                       enrollment={enrollmentsMap[course.id] || null}
+                      isCourseOneActive={isCourseOneActive}
+                      userPhone={userPhone}
+                      userId={userId}
                       priority={index < 3}
                     />
                   ))}
@@ -151,6 +177,9 @@ if (session?.user?.id) {
                   course={course}
                   isLoggedIn={false}
                   enrollment={null}
+                  isCourseOneActive={false}
+                  userPhone={null}
+                  userId={null}
                   priority={index < 6}
                 />
               ))}

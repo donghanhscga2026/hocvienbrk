@@ -1,0 +1,66 @@
+require('dotenv').config()
+const { google } = require('googleapis')
+
+async function getGmailClient() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'http://localhost'
+  )
+
+  oAuth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN
+  })
+
+  return google.gmail({ version: 'v1', auth: oAuth2Client })
+}
+
+async function getSacombankEmails() {
+  console.log('🔍 Tìm email Sacombank...')
+
+  const gmail = await getGmailClient()
+
+  // Tìm email Sacombank - dùng search rộng hơn
+  const response = await gmail.users.messages.list({
+    userId: 'me',
+    q: 'sacombank thong bao',
+    maxResults: 10
+  })
+
+  const messages = response.data.messages || []
+  console.log(`📧 Tìm thấy ${messages.length} email Sacombank`)
+
+  for (const msg of messages) {
+    const message = await gmail.users.messages.get({
+      userId: 'me',
+      id: msg.id,
+      format: 'full'
+    })
+
+    const headers = message.data.payload?.headers || []
+    const subject = headers.find((h: any) => h.name === 'Subject')?.value || ''
+    const from = headers.find((h: any) => h.name === 'From')?.value || ''
+    const date = headers.find((h: any) => h.name === 'Date')?.value || ''
+
+    // Lấy body
+    let body = ''
+    if (message.data.payload?.body?.data) {
+      body = Buffer.from(message.data.payload.body.data, 'base64').toString('utf-8')
+    } else if (message.data.payload?.parts) {
+      for (const part of message.data.payload.parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString('utf-8')
+          break
+        }
+      }
+    }
+
+    console.log(`\n=== Email: ${subject} ===`)
+    console.log(`From: ${from}`)
+    console.log(`Date: ${date}`)
+    console.log(`\n--- Nội dung email (text) ---`)
+    console.log(body.substring(0, 2000))
+  }
+}
+
+getSacombankEmails().catch(console.error)

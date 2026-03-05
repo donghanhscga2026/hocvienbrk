@@ -27,7 +27,7 @@ export default async function ReservedIdsPage() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {reservedIds.map((item) => (
+                                {reservedIds.map((item: any) => (
                                     <tr key={item.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-purple-600">{item.id}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.note}</td>
