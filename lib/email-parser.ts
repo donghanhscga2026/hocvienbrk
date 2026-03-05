@@ -46,6 +46,7 @@ const bankParsers: BankParser[] = [
     pattern: /ND:\s*(\d{10,11})\s+(\w+)|(\w+)\s+(\d{10,11})/i,
     extract: (matches) => ({
       phone: matches[1] || matches[4] || null,
+      userId: null,
       amount: 0,
       courseCode: matches[2] || matches[3] || null,
       bankName: null,
@@ -58,6 +59,7 @@ const bankParsers: BankParser[] = [
     pattern: /(\d{10,11}).*?(c[oó]?|nạp).*?(\w{2,10})/i,
     extract: (matches) => ({
       phone: matches[1] || null,
+      userId: null,
       amount: 0,
       courseCode: matches[3] || null,
       bankName: null,
@@ -84,6 +86,7 @@ export function parseBankEmail(content: string): ParsedTransfer | null {
   if (phoneMatch || courseMatch) {
     return {
       phone: phoneMatch?.[1] || null,
+      userId: null,
       amount: 0,
       courseCode: courseMatch?.[1] || courseMatch?.[2] || null,
       bankName: null,
