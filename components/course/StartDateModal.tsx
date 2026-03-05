@@ -64,37 +64,27 @@ export default function StartDateModal({
 
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-[520px] bg-zinc-900 border-zinc-800 text-white animate-in fade-in zoom-in-95 duration-200">
+      <DialogContent className="max-w-[92vw] sm:max-w-[400px] w-full bg-zinc-900 border-zinc-800 text-white animate-in fade-in zoom-in-95 duration-200 p-3 sm:p-5 overflow-y-auto max-h-[95vh] gap-3">
 
-        <DialogHeader>
-          <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center mb-4">
-            <CalendarDays className="w-6 h-6 text-sky-500" />
-          </div>
-
-          <DialogTitle className="text-xl font-bold">
-            Xác nhận ngày bắt đầu
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-base sm:text-lg font-bold text-left flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-sky-500" />
+            Chọn ngày bắt đầu
           </DialogTitle>
-
-          <DialogDescription className="text-zinc-400">
-            Hệ thống sẽ dựa vào ngày này để tính Deadline cho toàn bộ các bài học.
-            Bạn chỉ có thể chọn trong vòng 90 ngày kể từ hôm nay.
+          <DialogDescription className="text-zinc-500 text-[10px] sm:text-xs text-left leading-tight">
+            Hệ thống tính Deadline dựa trên ngày này (trong 90 ngày tới).
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-6">
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-zinc-300">
-              Ngày bắt đầu:
-            </Label>
-
-            <div className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm font-medium">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between bg-zinc-950/50 border border-zinc-800/50 rounded px-2 py-1.5">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-zinc-500">Ngày chọn:</span>
+            <span className="text-xs font-bold text-sky-400">
               {format(selectedDate, 'dd/MM/yyyy', { locale: vi })}
-            </div>
+            </span>
           </div>
 
-          <div className="bg-zinc-950 border border-zinc-800 rounded-md p-3">
-
+          <div className="bg-zinc-950/30 border border-zinc-800/50 rounded flex justify-center p-0.5">
             <DayPicker
               mode="single"
               selected={selectedDate}
@@ -113,52 +103,53 @@ export default function StartDateModal({
                 isAfter(date, maxSelectableDate)
               }
               classNames={{
-                day_selected:
-                  "bg-sky-600 text-white hover:bg-sky-500",
-                day_today:
-                  "border border-sky-500",
-                head_cell: "text-zinc-400 text-xs",
-                cell: "text-sm",
+                months: "flex flex-col",
+                month: "space-y-1",
+                caption: "flex justify-center pt-1 relative items-center px-6 mb-1",
+                caption_label: "text-xs font-bold text-zinc-300",
+                nav: "flex items-center",
+                nav_button: "h-5 w-5 bg-transparent p-0 opacity-50 hover:opacity-100",
+                nav_button_previous: "absolute left-0",
+                nav_button_next: "absolute right-0",
+                table: "w-full border-collapse",
+                head_row: "flex",
+                head_cell: "text-zinc-600 w-7 sm:w-8 font-normal text-[0.6rem] uppercase",
+                row: "flex w-full mt-0.5",
+                cell: "relative p-0 text-center text-xs focus-within:relative focus-within:z-20",
+                day: "h-7 w-7 sm:h-8 sm:w-8 p-0 font-normal hover:bg-zinc-800 rounded transition-colors text-[11px]",
+                day_selected: "bg-sky-600 text-white hover:bg-sky-500 font-bold",
+                day_today: "text-sky-400 font-bold underline underline-offset-2",
+                day_outside: "text-zinc-700 opacity-30",
+                day_disabled: "text-zinc-800 opacity-10",
+                day_hidden: "invisible",
               }}
             />
           </div>
 
-          {/* Thông tin preview */}
-          <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-4 space-y-2 text-sm">
-
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Deadline dự kiến:</span>
-              <span className="font-semibold text-white">
+          <div className="grid grid-cols-2 gap-2 bg-sky-500/5 border border-sky-500/10 rounded p-2 text-[10px]">
+            <div className="flex flex-col">
+              <span className="text-zinc-500">Deadline:</span>
+              <span className="font-bold text-zinc-200">
                 {format(deadline, 'dd/MM/yyyy', { locale: vi })}
               </span>
             </div>
-
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Thời lượng khóa:</span>
-              <span className="font-semibold text-white">
-                {courseDuration} ngày
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-zinc-400">Số ngày còn lại từ hôm nay:</span>
-              <span className="font-semibold text-sky-400">
+            <div className="flex flex-col items-end">
+              <span className="text-zinc-500">Còn lại:</span>
+              <span className="font-bold text-sky-500">
                 {daysRemaining} ngày
               </span>
             </div>
-
           </div>
-
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="mt-1">
           <Button
             onClick={handleConfirm}
             disabled={loading}
-            className="w-full bg-sky-600 hover:bg-sky-500 text-white h-11 font-bold transition-all"
+            className="w-full bg-sky-600 hover:bg-sky-500 text-white h-9 font-bold text-xs"
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               "XÁC NHẬN BẮT ĐẦU"
             )}
