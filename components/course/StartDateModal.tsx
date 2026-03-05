@@ -62,27 +62,29 @@ export default function StartDateModal({
 
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="max-w-[90vw] sm:max-w-[340px] w-full bg-zinc-900 border-zinc-800 text-white p-3 gap-2 overflow-hidden rounded-xl">
+      <DialogContent className="max-w-[92vw] sm:max-w-[380px] w-full bg-zinc-900 border-zinc-800 text-white p-4 gap-4 overflow-hidden rounded-xl">
 
-        <DialogHeader className="space-y-0.5">
-          <DialogTitle className="text-sm sm:text-base font-bold flex items-center gap-1.5 text-sky-400">
-            <CalendarDays className="w-3.5 h-3.5" />
-            Chọn ngày bắt đầu học
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-sky-400">
+            <CalendarDays className="w-5 h-5" />
+            Xác nhận ngày bắt đầu học
           </DialogTitle>
-          <p className="text-[10px] text-zinc-500 italic">Hệ thống sẽ tính Deadline dựa trên ngày này.</p>
+          <p className="text-xs text-zinc-400 leading-tight">
+            Hệ thống sẽ tính Deadline dựa trên ngày này (trong 90 ngày tới).
+          </p>
         </DialogHeader>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {/* Display Current Selection */}
-          <div className="flex items-center justify-between bg-zinc-950/50 border border-zinc-800/50 rounded-lg px-2 py-1">
-            <span className="text-[9px] uppercase font-bold text-zinc-500">Ngày bắt đầu:</span>
-            <span className="text-[11px] font-black text-white bg-sky-600/20 px-1.5 py-0.5 rounded">
+          <div className="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2">
+            <span className="text-xs uppercase font-bold text-zinc-500">Ngày bạn chọn:</span>
+            <span className="text-sm font-bold text-sky-400">
               {format(selectedDate, 'dd/MM/yyyy', { locale: vi })}
             </span>
           </div>
 
-          {/* Calendar - Super Compact */}
-          <div className="bg-zinc-950/30 border border-zinc-800/30 rounded-lg flex justify-center p-0.5">
+          {/* Calendar - Compact but Readable */}
+          <div className="bg-zinc-950/50 border border-zinc-800 rounded-lg flex justify-center p-1">
             <DayPicker
               mode="single"
               selected={selectedDate}
@@ -95,54 +97,53 @@ export default function StartDateModal({
               disabled={(date) => isBefore(date, today) || isAfter(date, maxSelectableDate)}
               classNames={{
                 months: "flex flex-col",
-                month: "space-y-0.5",
-                caption: "flex justify-center pt-0.5 relative items-center px-4 mb-0.5",
-                caption_label: "text-[10px] font-bold text-zinc-400",
+                month: "space-y-1",
+                caption: "flex justify-center pt-1 relative items-center px-6 mb-1",
+                caption_label: "text-xs font-bold text-zinc-200",
                 nav: "flex items-center",
-                nav_button: "h-4 w-4 bg-transparent p-0 opacity-40 hover:opacity-100",
+                nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100",
                 nav_button_previous: "absolute left-0",
                 nav_button_next: "absolute right-0",
                 table: "w-full border-collapse",
                 head_row: "flex",
-                head_cell: "text-zinc-600 w-6 sm:w-7 font-normal text-[0.55rem] uppercase",
-                row: "flex w-full mt-0",
-                cell: "relative p-0 text-center text-[10px] focus-within:relative focus-within:z-20",
-                day: "h-6 w-6 sm:h-7 sm:w-7 p-0 font-normal hover:bg-zinc-800 rounded-sm transition-colors",
+                head_cell: "text-zinc-500 w-7 sm:w-8 font-normal text-[0.65rem] uppercase",
+                row: "flex w-full mt-0.5",
+                cell: "relative p-0 text-center text-xs focus-within:relative focus-within:z-20",
+                day: "h-7 w-7 sm:h-8 sm:w-8 p-0 font-normal hover:bg-zinc-800 rounded transition-colors text-xs",
                 day_selected: "bg-sky-600 text-white hover:bg-sky-500 font-bold !opacity-100",
-                day_today: "text-sky-500 font-bold border-b border-sky-500",
-                day_outside: "text-zinc-800 opacity-20",
-                day_disabled: "text-zinc-900 opacity-5",
+                day_today: "text-sky-400 font-bold underline underline-offset-4",
+                day_outside: "text-zinc-700 opacity-30",
+                day_disabled: "text-zinc-800 opacity-10",
                 day_hidden: "invisible",
               }}
             />
           </div>
 
-          {/* Info Summary - Horizontal & Tiny */}
-          <div className="flex items-center justify-between bg-sky-500/5 border border-sky-500/10 rounded-md px-2 py-1.5 text-[9px]">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-zinc-500 leading-none">Deadline dự kiến:</span>
-              <span className="font-bold text-zinc-300 leading-none">
+          {/* Info Summary - Clearer text */}
+          <div className="grid grid-cols-2 gap-3 bg-sky-500/5 border border-sky-500/10 rounded-lg p-3 text-xs">
+            <div className="flex flex-col gap-1">
+              <span className="text-zinc-500">Deadline dự kiến:</span>
+              <span className="font-bold text-zinc-100">
                 {format(deadline, 'dd/MM/yyyy', { locale: vi })}
               </span>
             </div>
-            <div className="h-6 w-px bg-zinc-800 mx-1"></div>
-            <div className="flex flex-col items-end gap-0.5">
-              <span className="text-zinc-500 leading-none">Thời lượng:</span>
-              <span className="font-bold text-sky-500 leading-none">
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-zinc-500">Thời lượng:</span>
+              <span className="font-bold text-sky-500">
                 {courseDuration} ngày ({daysRemaining} ngày còn lại)
               </span>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="mt-0.5">
+        <DialogFooter className="mt-2">
           <Button
             onClick={handleConfirm}
             disabled={loading}
-            className="w-full bg-sky-600 hover:bg-sky-500 text-white h-8 text-[11px] font-black uppercase tracking-widest rounded-lg transition-all active:scale-95"
+            className="w-full bg-sky-600 hover:bg-sky-500 text-white h-11 text-sm font-bold uppercase tracking-wider rounded-lg transition-all active:scale-95"
           >
             {loading ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               "XÁC NHẬN BẮT ĐẦU"
             )}
