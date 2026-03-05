@@ -1,0 +1,113 @@
+import { google } from 'googleapis';
+import prisma from '@/lib/prisma';
+
+function extractTextFromHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseSacombankEmail(htmlContent: string) {
+  const text = extractTextFromHtml(htmlContent);
+  const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i);
+  const description = contentMatch ? contentMatch[1].trim() : '';
+  const phoneMatch = description.match(/SDT[\s\._]*(\d{6})/i);
+  const userIdMatch = description.match(/HV[\s\._]*(\d+)/i);
+  const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i);
+  const amountMatch = text.match(/(?:Transaction|Phát sinh)[\s:+]*([\d,\.]+)\s*VND/i);
+  
+  let amount = 0;
+  if (amountMatch) {
+    const amountStr = amountMatch[1].replace(/\./g, '').replace(/,/g, '');
+    amount = parseInt(amountStr) || 0;
+  }
+  
+  return {
+    phone: phoneMatch ? phoneMatch[1] : null,
+    userId: userIdMatch ? parseInt(userIdMatch[1]) : null,
+    courseCode: courseCodeMatch ? courseCodeMatch[1].toUpperCase() : null,
+    amount: amount,
+    content: description,
+  };
+}
+
+export async function processPaymentEmails() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'http://localhost'
+  );
+  oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
+  const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
+
+  const response = await gmail.users.messages.list({
+    userId: 'me',
+    q: 'sacombank thong bao giao dich is:unread',
+    maxResults: 10
+  });
+
+  const messages = response.data.messages || [];
+  if (messages.length === 0) return { processed: 0, matched: 0 };
+
+  let matchedCount = 0;
+  const pendingEnrollments = await prisma.enrollment.findMany({
+    where: { status: 'PENDING' },
+    include: {
+      course: { select: { id_khoa: true, phi_coc: true } },
+      user: { select: { name: true, phone: true } }
+    }
+  });
+
+  for (const msg of messages) {
+    const message = await gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' });
+    let body = '';
+    const payload = message.data.payload;
+    if (payload?.body?.data) {
+      body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+    } else if (payload?.parts) {
+      for (const part of payload.parts) {
+        if (part.mimeType === 'text/html' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+          break;
+        }
+      }
+    }
+
+    const parsed = parseSacombankEmail(body);
+    
+    for (const enrollment of pendingEnrollments) {
+      const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
+      const emailPhone = parsed.phone || '';
+      const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
+      const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
+      const courseCodeMatch = parsed.courseCode && enrollment.course.id_khoa.toUpperCase().includes(parsed.courseCode);
+      const amountMatch = parsed.amount >= enrollment.course.phi_coc;
+      
+      if (((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) {
+        await prisma.payment.update({
+          where: { enrollmentId: enrollment.id },
+          data: {
+            amount: parsed.amount, phone: parsed.phone, content: parsed.content,
+            bankName: 'Sacombank', status: 'VERIFIED', verifiedAt: new Date(), verifyMethod: 'AUTO_EMAIL'
+          }
+        });
+        await prisma.enrollment.update({
+          where: { id: enrollment.id },
+          data: { status: 'ACTIVE' }
+        });
+        await gmail.users.messages.modify({
+          userId: 'me', id: msg.id || '',
+          requestBody: { removeLabelIds: ['UNREAD'] }
+        });
+        matchedCount++;
+      }
+    }
+  }
+  return { processed: messages.length, matched: matchedCount };
+}

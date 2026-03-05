@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { processPaymentEmails } from '@/lib/auto-verify';
 
 export async function GET(req: NextRequest) {
   // Kiểm tra Header bảo mật của Vercel Cron
-  // (Nếu không muốn ai cũng có thể gọi API này)
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -15,18 +15,26 @@ export async function GET(req: NextRequest) {
     'http://localhost'
   )
   oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN })
-
   const gmail = google.gmail({ version: 'v1', auth: oAuth2Client })
 
   try {
-    const response = await gmail.users.watch({
+    // 1. Gia hạn Watch
+    const watchResponse = await gmail.users.watch({
       userId: 'me',
       requestBody: {
         topicName: `projects/${process.env.GCP_PROJECT_ID}/topics/gmail-notifications`,
         labelIds: ['INBOX'],
       },
     })
-    return NextResponse.json({ success: true, data: response.data });
+
+    // 2. Tiện tay quét luôn mail mới (đảm bảo không sót giao dịch)
+    const scanResult = await processPaymentEmails();
+
+    return NextResponse.json({ 
+      success: true, 
+      watch: watchResponse.data,
+      scan: scanResult 
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
