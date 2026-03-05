@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { processPaymentEmails } from '@/lib/auto-verify';
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   // Kiểm tra Header bảo mật của Vercel Cron
