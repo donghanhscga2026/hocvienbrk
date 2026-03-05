@@ -100,6 +100,7 @@ export async function createPaymentQR(options: {
   courseCode: string
   accountNo: string
   accountName: string
+  acqId: string // Thêm acqId
   amount: number
 }): Promise<{
   transferContent: string
@@ -114,6 +115,7 @@ export async function createPaymentQR(options: {
   const qrResult = await generateVietQR({
     accountNo: options.accountNo,
     accountName: options.accountName,
+    acqId: options.acqId, // Truyền acqId vào
     amount: options.amount,
     addInfo: transferContent
   })
