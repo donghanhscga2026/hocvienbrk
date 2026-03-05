@@ -73,6 +73,7 @@ export async function enrollInCourseAction(courseId: number) {
                         courseCode: course.id_khoa,
                         accountNo: course.stk,
                         accountName: course.name_stk,
+                        acqId: course.bank_stk || 'SACOMBANK',
                         amount: effectivePhiCoc
                     })
                     qrCodeUrl = qrResult.qrCodeUrl
