@@ -1,7 +1,9 @@
 import { google } from 'googleapis';
 import prisma from '@/lib/prisma';
+import { sendTelegramAdmin, sendSuccessEmail } from './notifications';
 
 function extractTextFromHtml(html: string): string {
+// ... (giữ nguyên hàm này)
   return html
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
@@ -14,6 +16,7 @@ function extractTextFromHtml(html: string): string {
 }
 
 function parseSacombankEmail(htmlContent: string) {
+// ... (giữ nguyên hàm này)
   const text = extractTextFromHtml(htmlContent);
   const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i);
   const description = contentMatch ? contentMatch[1].trim() : '';
@@ -48,7 +51,7 @@ export async function processPaymentEmails() {
 
   const response = await gmail.users.messages.list({
     userId: 'me',
-    q: 'sacombank thong bao giao dich is:unread',
+    q: 'from:info@sacombank.com.vn "thong bao giao dich" is:unread',
     maxResults: 10
   });
 
@@ -59,8 +62,8 @@ export async function processPaymentEmails() {
   const pendingEnrollments = await prisma.enrollment.findMany({
     where: { status: 'PENDING' },
     include: {
-      course: { select: { id_khoa: true, phi_coc: true } },
-      user: { select: { name: true, phone: true } }
+      course: { select: { id_khoa: true, phi_coc: true, name_lop: true } },
+      user: { select: { id: true, name: true, phone: true, email: true } }
     }
   });
 
@@ -105,9 +108,30 @@ export async function processPaymentEmails() {
           userId: 'me', id: msg.id || '',
           requestBody: { removeLabelIds: ['UNREAD'] }
         });
+        
+        // Gửi thông báo Telegram cho Admin
+        const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +
+                         `👤 Học viên: <b>${enrollment.user.name}</b>\n` +
+                         `📞 SĐT: ${enrollment.user.phone}\n` +
+                         `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
+                         `💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
+                         `🏦 Ngân hàng: Sacombank\n` +
+                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+        await sendTelegramAdmin(msgAdmin);
+
+        // Gửi email cho học viên
+        if (enrollment.user.email) {
+          await sendSuccessEmail(
+            enrollment.user.email,
+            enrollment.user.name || 'Bạn',
+            enrollment.course.name_lop || enrollment.course.id_khoa
+          );
+        }
+
         matchedCount++;
       }
     }
   }
   return { processed: messages.length, matched: matchedCount };
 }
+
