@@ -43,9 +43,12 @@ export async function sendSuccessEmail(to: string, studentName: string, courseNa
   const subject = `[Học Viện BRK] Chúc mừng! Khóa học ${courseName} của bạn đã được kích hoạt`;
   const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
   
+  const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
+  
   const messageParts = [
-    `From: Học Viện BRK <${process.env.GMAIL_USER}>`,
+    `From: Học Viện BRK <${adminEmail}>`,
     `To: ${to}`,
+    `Bcc: ${adminEmail}`, // Gửi ẩn danh cho Admin để theo dõi
     `Content-Type: text/html; charset=utf-8`,
     `MIME-Version: 1.0`,
     `Subject: ${utf8Subject}`,
