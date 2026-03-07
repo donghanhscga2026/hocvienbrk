@@ -1,6 +1,6 @@
 'use server'
 
-import {prisma} from "@/lib/prisma"
+import prisma from "@/lib/prisma"
 
 export async function getRandomMessage() {
     const count = await prisma.message.count({ 
