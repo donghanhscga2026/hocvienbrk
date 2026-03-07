@@ -37,6 +37,14 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "**.postimg.cc",
+      },
+      {
+        protocol: "https",
+        hostname: "api.vietqr.io",
+      },
+      {
+        protocol: "https",
+        hostname: "img.vietqr.io",
       }
     ],
 
