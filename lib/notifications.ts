@@ -44,9 +44,11 @@ export async function sendSuccessEmail(to: string, studentName: string, courseNa
   const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
   
   const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
+  const fromName = 'Học Viện BRK';
+  const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
   
   const messageParts = [
-    `From: Học Viện BRK <${adminEmail}>`,
+    `From: ${encodedFromName} <${adminEmail}>`,
     `To: ${to}`,
     `Bcc: ${adminEmail}`, // Gửi ẩn danh cho Admin để theo dõi
     `Content-Type: text/html; charset=utf-8`,
