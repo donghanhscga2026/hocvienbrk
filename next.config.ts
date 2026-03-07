@@ -29,6 +29,14 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "i.imgur.com",
+      },
+      {
+        protocol: "https",
+        hostname: "postimg.cc",
+      },
+      {
+        protocol: "https",
+        hostname: "**.postimg.cc",
       }
     ],
 
