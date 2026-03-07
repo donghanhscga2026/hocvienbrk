@@ -1,29 +1,69 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: {
-    // 1. Tắt tính năng tối ưu hóa ảnh tạm thời để sửa lỗi 400 Bad Request ngay lập tức
-    // Nếu link ảnh của bạn đã được tối ưu (WebP/JPG sẵn), việc này giúp load ảnh nhanh mà không qua bộ lọc của Next.js
-    unoptimized: true,
+  // Tăng tốc phản hồi HTTP
+  compress: true,
 
-    // 2. Mở khóa toàn bộ các nguồn ảnh (Remote Patterns)
+  // Tối ưu serverless deploy
+  output: "standalone",
+
+  // Strict mode giúp phát hiện bug React
+  reactStrictMode: true,
+
+  // Tối ưu import package lớn
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
+
+  images: {
+    // Chỉ cho phép domain ảnh thực sự dùng
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '**', // Cho phép tất cả các tên miền
+        protocol: "https",
+        hostname: "**.supabase.co",
       },
       {
-        protocol: 'http',
-        hostname: '**',
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "i.imgur.com",
       }
     ],
 
-    // 3. Khai báo các mức chất lượng để tránh lỗi từ phía Component
-    qualities: [50, 70, 75, 80, 90],
+    // Format ảnh hiện đại
+    formats: ["image/avif", "image/webp"],
+
+    // Cache ảnh lâu hơn
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 ngày
   },
 
-  // 4. Kích hoạt nén tài nguyên để tăng tốc độ phản hồi
-  compress: true,
+  // Tắt source map production để giảm bundle
+  productionBrowserSourceMaps: false,
+
+  // Headers bảo mật cơ bản
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
