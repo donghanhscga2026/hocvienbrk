@@ -73,7 +73,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                 try {
                     const res = await enrollInCourseAction(course.id)
                     if (res.success) {
-                        setShowPayment(true)
+                        // Sau khi enroll thành công, component sẽ re-render do revalidatePath.
+                        // Chúng ta cần đảm bảo setShowPayment(true) được giữ lại.
+                        // Sử dụng timeout nhỏ để chạy sau chu kỳ re-render của Next.js
+                        setTimeout(() => setShowPayment(true), 100)
                     }
                 } catch (err: any) {
                     alert(err.message)
