@@ -73,7 +73,7 @@ export async function enrollInCourseAction(courseId: number) {
             await sendTelegram(msgAdmin, 'ACTIVATE');
 
             if (user?.email) {
-                await sendActivationEmail(user.email, user.name || '', course.name_lop || course.id_khoa, course.noidung_email);
+                await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email);
             }
         }
 

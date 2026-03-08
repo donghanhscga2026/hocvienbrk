@@ -91,24 +91,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     events: {
         async signIn({ user, account }) {
-            // Chỉ gửi thông báo cho đăng nhập thông thường (credentials) hoặc Google
+            console.log(`🔐 Sự kiện signIn kích hoạt cho user: ${user.email}, Provider: ${account?.provider}`);
+            
             if (user && (account?.provider === 'credentials' || account?.provider === 'google')) {
                 try {
                     const { headers } = await import("next/headers");
                     const headerList = await headers();
                     
-                    // Lấy IP từ headers (Vercel/Cloudflare standard)
                     const ip = headerList.get('x-forwarded-for')?.split(',')[0] || 
                                headerList.get('x-real-ip') || 
                                '127.0.0.1';
                     
                     const userAgent = headerList.get('user-agent') || 'Unknown';
 
+                    console.log(`📡 Đang gửi thông báo đăng nhập cho #${user.id} từ IP: ${ip}`);
                     const { sendLoginNotification } = await import("@/lib/notifications");
-                    // Không dùng await để tránh làm chậm quá trình đăng nhập của user
-                    sendLoginNotification(user, ip, userAgent);
-                } catch (error) {
-                    console.error("Lỗi khi gửi thông báo đăng nhập:", error);
+                    
+                    // BẮT BUỘC dùng await trên Vercel để tránh function bị đóng sớm
+                    await sendLoginNotification(user, ip, userAgent);
+                    console.log(`✅ Đã xử lý xong thông báo đăng nhập.`);
+                } catch (error: any) {
+                    console.error("❌ Lỗi trong sự kiện signIn:", error.message);
                 }
             }
         }
