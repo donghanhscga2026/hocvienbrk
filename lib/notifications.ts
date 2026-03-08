@@ -159,7 +159,7 @@ export async function sendLoginNotification(user: any, ip: string, userAgent: st
                 `📍 Vị trí: <b>${location}</b>\n` +
                 `🌐 IP: ${ip} (${isp})\n` +
                 `📱 Thiết bị: ${browser} on ${os}\n` +
-                `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+                `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
 
     await sendTelegram(msg, 'REGISTER');
   } catch (error) {

@@ -69,7 +69,7 @@ export async function enrollInCourseAction(courseId: number) {
             const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ</b>\n\n` +
                              `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
                              `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
-                             `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+                             `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
             await sendTelegram(msgAdmin, 'ACTIVATE');
 
             if (user?.email) {
@@ -247,11 +247,13 @@ export async function saveVideoProgressAction({
 export async function submitAssignmentAction({
     enrollmentId, lessonId, reflection, links, supports,
     isUpdate = false, lessonOrder, startedAt,
-    existingVideoScore, existingTimingScore
+    existingVideoScore, existingTimingScore,
+    clientTimeZone = 'Asia/Ho_Chi_Minh' // Mặc định là giờ VN nếu không có
 }: {
     enrollmentId: number, lessonId: string, reflection: string, links: string[], supports: boolean[],
     isUpdate?: boolean, lessonOrder?: number, startedAt?: any,
-    existingVideoScore?: number, existingTimingScore?: number
+    existingVideoScore?: number, existingTimingScore?: number,
+    clientTimeZone?: string
 }) {
     const logId = `[SUBMIT-${lessonId}]`
     try {
@@ -261,39 +263,34 @@ export async function submitAssignmentAction({
         const now = new Date()
         let timingScore = 0
 
-        // 1. Tính timingScore (Dựa trên ngày Việt Nam)
+        // 1. Tính timingScore dựa trên múi giờ địa phương của học viên
         if (startedAt && lessonOrder) {
             const startDate = new Date(startedAt)
             if (!isNaN(startDate.getTime())) {
-                const deadline = new Date(startDate)
-                deadline.setDate(deadline.getDate() + (lessonOrder - 1))
-                deadline.setHours(23, 59, 59, 999)
+                // Lấy thời điểm hiện tại theo múi giờ học viên
+                const nowStr = new Date().toLocaleString('en-US', { timeZone: clientTimeZone });
+                const nowLocal = new Date(nowStr);
+
+                // Tạo Deadline theo múi giờ học viên
+                const deadlineStr = new Date(startDate).toLocaleString('en-US', { timeZone: clientTimeZone });
+                const deadlineLocal = new Date(deadlineStr);
+                deadlineLocal.setDate(deadlineLocal.getDate() + (lessonOrder - 1));
+                deadlineLocal.setHours(23, 59, 59, 999);
                 
-                const isCurrentlyOnTime = now.getTime() <= deadline.getTime()
+                const isCurrentlyOnTime = nowLocal.getTime() <= deadlineLocal.getTime();
 
                 if (isUpdate) {
-                    // CẬP NHẬT: 
-                    // Nếu bây giờ vẫn trong hạn -> LUÔN tính là +1 (để gỡ điểm nếu trước đó trễ)
-                    // Nếu bây giờ đã quá hạn -> GIỮ NGUYÊN điểm cũ (để bảo vệ nếu trước đó đã đạt +1)
-                    if (isCurrentlyOnTime) {
-                        timingScore = 1
-                    } else {
-                        timingScore = existingTimingScore ?? -1
-                    }
+                    timingScore = isCurrentlyOnTime ? 1 : (existingTimingScore ?? -1);
                 } else {
-                    // NỘP MỚI: Tính theo thời điểm hiện tại
-                    timingScore = isCurrentlyOnTime ? 1 : -1
+                    timingScore = isCurrentlyOnTime ? 1 : -1;
                 }
 
-                // Chặn cập nhật nếu đã quá hạn và đã hoàn thành (Bảo vệ tính nghiêm túc)
                 if (isUpdate && !isCurrentlyOnTime) {
                     const existingStatus = await prisma.lessonProgress.findUnique({
                         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
                         select: { status: true }
                     })
                     if (existingStatus?.status === 'COMPLETED') {
-                        // Nếu đã xong và đã quá hạn thì không cho sửa nữa để tránh hack điểm
-                        // (Trừ khi timingScore cũ là -1 và giờ muốn nộp lại? Không, đã quá hạn thì luôn là -1)
                         return { success: false, message: "Bài học đã hết hạn cập nhật." }
                     }
                 }
@@ -390,7 +387,7 @@ export async function submitAssignmentAction({
                                  `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
                                  `📖 Bài học: <b>${lesson?.title}</b>\n` +
                                  `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
-                                 `📅 Thời gian: ${now.toLocaleString('vi-VN')}`;
+                                 `📅 Thời gian: ${now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
                 
                 console.log(`📡 Đang gửi thông báo Telegram LESSON đến ChatID: ${process.env.TELEGRAM_CHAT_ID_LESSON}`);
                 await sendTelegram(msgAdmin, 'LESSON');

@@ -116,7 +116,7 @@ export async function processPaymentEmails() {
                          `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
                          `💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
                          `🏦 Ngân hàng: Sacombank\n` +
-                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
         await sendTelegramAdmin(msgAdmin);
 
         // Gửi email cho học viên
