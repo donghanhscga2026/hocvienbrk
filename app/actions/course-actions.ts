@@ -369,27 +369,35 @@ export async function submitAssignmentAction({
         })
 
         // Gửi thông báo Hoàn thành bài tập qua Telegram (Group LESSON)
+        console.log(`🔍 Kiểm tra trạng thái bài học: ${updatedProgress.status}, Điểm: ${totalScore}`);
         if (updatedProgress.status === 'COMPLETED') {
-            const { sendTelegram } = await import("@/lib/notifications")
-            const enrollment = await prisma.enrollment.findUnique({
-                where: { id: enrollmentId },
-                include: { 
-                    user: { select: { name: true, id: true } },
-                    course: { select: { name_lop: true } }
-                }
-            })
-            const lesson = await prisma.lesson.findUnique({
-                where: { id: lessonId },
-                select: { title: true }
-            })
+            try {
+                const { sendTelegram } = await import("@/lib/notifications")
+                const enrollment = await prisma.enrollment.findUnique({
+                    where: { id: enrollmentId },
+                    include: { 
+                        user: { select: { name: true, id: true } },
+                        course: { select: { name_lop: true } }
+                    }
+                })
+                const lesson = await prisma.lesson.findUnique({
+                    where: { id: lessonId },
+                    select: { title: true }
+                })
 
-            const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
-                             `👤 Học viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
-                             `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
-                             `📖 Bài học: <b>${lesson?.title}</b>\n` +
-                             `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
-                             `📅 Thời gian: ${now.toLocaleString('vi-VN')}`;
-            await sendTelegram(msgAdmin, 'LESSON');
+                const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
+                                 `👤 Học viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
+                                 `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
+                                 `📖 Bài học: <b>${lesson?.title}</b>\n` +
+                                 `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
+                                 `📅 Thời gian: ${now.toLocaleString('vi-VN')}`;
+                
+                console.log(`📡 Đang gửi thông báo Telegram LESSON đến ChatID: ${process.env.TELEGRAM_CHAT_ID_LESSON}`);
+                await sendTelegram(msgAdmin, 'LESSON');
+                console.log(`✅ Đã gửi thông báo Telegram LESSON thành công!`);
+            } catch (teleError: any) {
+                console.error(`❌ Lỗi khi gửi thông báo Telegram LESSON:`, teleError.message);
+            }
         }
 
         // 5. Revalidate
