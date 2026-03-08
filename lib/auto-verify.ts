@@ -121,10 +121,13 @@ export async function processPaymentEmails() {
 
         // Gửi email cho học viên
         if (enrollment.user.email) {
-          await sendSuccessEmail(
+          const { sendActivationEmail } = await import("./notifications");
+          await sendActivationEmail(
             enrollment.user.email,
             enrollment.user.name || 'Bạn',
-            enrollment.course.name_lop || enrollment.course.id_khoa
+            enrollment.user.id,
+            enrollment.course.name_lop || enrollment.course.id_khoa,
+            null
           );
         }
 

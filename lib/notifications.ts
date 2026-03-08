@@ -114,12 +114,12 @@ export async function sendWelcomeEmail(to: string, studentName: string, studentI
 /**
  * Email thông báo kích hoạt khóa học (Dùng nội dung từ bảng Course)
  */
-export async function sendActivationEmail(to: string, studentName: string, courseName: string, customContent: string | null) {
+export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
   const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
   const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
   
   const htmlBody = `
-    Chào <b>${studentName}</b>,<br><br>
+    Chào <b>${studentName}</b> (Mã số học tập: <b>#${studentId}</b>),<br><br>
     Chúc mừng bạn! Khóa học <b>${courseName}</b> của bạn đã được <b>kích hoạt thành công</b>.<br><br>
     ${customContent ? `---<br><b>Thông tin bổ sung từ giảng viên:</b><br>${customContent}<br>---<br><br>` : ''}
     Bây giờ bạn có thể đăng nhập để bắt đầu lộ trình học tập.<br><br>
@@ -133,6 +133,7 @@ export async function sendActivationEmail(to: string, studentName: string, cours
  * Thông báo khi có người đăng nhập thành công
  */
 export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
+// ... (giữ nguyên hàm này)
   try {
     // 1. Tra cứu vị trí từ IP (Sử dụng IP-API miễn phí)
     let location = 'Không xác định';
@@ -168,4 +169,4 @@ export async function sendLoginNotification(user: any, ip: string, userAgent: st
 
 // Giữ lại các hàm cũ để không làm gãy logic hiện tại (nhưng trỏ về hàm mới)
 export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
-export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, course, null);
+export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
