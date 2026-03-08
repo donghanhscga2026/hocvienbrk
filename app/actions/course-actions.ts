@@ -20,13 +20,21 @@ export async function enrollInCourseAction(courseId: number) {
             select: { 
                 phi_coc: true,
                 id_khoa: true,
+                name_lop: true,
                 stk: true,
                 name_stk: true,
-                bank_stk: true
+                bank_stk: true,
+                noidung_email: true
             }
         })
 
         if (!course) throw new Error("Khóa học không tồn tại.")
+
+        // Lấy thông tin user
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true, phone: true, email: true }
+        })
 
         // Kiểm tra xem user có active course 1 không
         const vipEnrollment = await prisma.enrollment.findFirst({
@@ -45,21 +53,31 @@ export async function enrollInCourseAction(courseId: number) {
 
         if (existing) return { success: true, status: existing.status }
 
+        const isAutoActive = effectivePhiCoc === 0
         const newEnrollment = await prisma.enrollment.create({
             data: {
                 userId,
                 courseId,
-                status: effectivePhiCoc === 0 ? "ACTIVE" : "PENDING"
+                status: isAutoActive ? "ACTIVE" : "PENDING"
             }
         })
 
-        if (effectivePhiCoc > 0 && course.stk && course.name_stk) {
-            // Lấy thông tin user
-            const user = await prisma.user.findUnique({
-                where: { id: userId },
-                select: { phone: true }
-            })
+        const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
 
+        if (isAutoActive) {
+            // Gửi thông báo kích hoạt MIỄN PHÍ
+            const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ</b>\n\n` +
+                             `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
+                             `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
+                             `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+            await sendTelegram(msgAdmin, 'ACTIVATE');
+
+            if (user?.email) {
+                await sendActivationEmail(user.email, user.name || '', course.name_lop || course.id_khoa, course.noidung_email);
+            }
+        }
+
+        if (effectivePhiCoc > 0 && course.stk && course.name_stk) {
             let qrCodeUrl = null
             let transferContent = null
 
@@ -335,7 +353,7 @@ export async function submitAssignmentAction({
         console.log(`${logId} POINT: V:${videoScore} R:${reflectionScore} L:${linkScore} S:${supportScore} T:${timingScore} => TOTAL:${totalScore}`)
 
         // 4. Lưu Database
-        await prisma.lessonProgress.upsert({
+        const updatedProgress = await prisma.lessonProgress.upsert({
             where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
             create: {
                 enrollmentId, lessonId,
@@ -349,6 +367,30 @@ export async function submitAssignmentAction({
                 totalScore, status: totalScore >= 5 ? "COMPLETED" : "IN_PROGRESS", submittedAt: now
             }
         })
+
+        // Gửi thông báo Hoàn thành bài tập qua Telegram (Group LESSON)
+        if (updatedProgress.status === 'COMPLETED') {
+            const { sendTelegram } = await import("@/lib/notifications")
+            const enrollment = await prisma.enrollment.findUnique({
+                where: { id: enrollmentId },
+                include: { 
+                    user: { select: { name: true, id: true } },
+                    course: { select: { name_lop: true } }
+                }
+            })
+            const lesson = await prisma.lesson.findUnique({
+                where: { id: lessonId },
+                select: { title: true }
+            })
+
+            const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
+                             `👤 Học viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
+                             `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
+                             `📖 Bài học: <b>${lesson?.title}</b>\n` +
+                             `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
+                             `📅 Thời gian: ${now.toLocaleString('vi-VN')}`;
+            await sendTelegram(msgAdmin, 'LESSON');
+        }
 
         // 5. Revalidate
         try {
