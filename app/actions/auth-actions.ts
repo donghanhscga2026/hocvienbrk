@@ -47,9 +47,10 @@ export async function registerUser(prevState: any, formData: FormData) {
 
     try {
         const { getNextAvailableId } = await import("@/lib/id-helper")
+        const { sendTelegram, sendWelcomeEmail } = await import("@/lib/notifications")
         const newId = await getNextAvailableId()
 
-        await prisma.user.create({
+        const user = await prisma.user.create({
             data: {
                 id: newId, // Sử dụng ID đã tính toán (tránh số đẹp)
                 name,
@@ -59,6 +60,19 @@ export async function registerUser(prevState: any, formData: FormData) {
                 role: Role.STUDENT,
             },
         })
+
+        // 1. Gửi Email chào mừng cho học viên
+        await sendWelcomeEmail(email, name, user.id)
+
+        // 2. Gửi thông báo Telegram cho Admin (Group REGISTER)
+        const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ</b>\n\n` +
+                         `🆔 Mã số: <b>#${user.id}</b>\n` +
+                         `👤 Họ tên: <b>${user.name}</b>\n` +
+                         `📧 Email: ${user.email}\n` +
+                         `📞 SĐT: ${user.phone}\n` +
+                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+        await sendTelegram(msgAdmin, 'REGISTER');
+
     } catch (error) {
         console.error("Failed to create user:", error)
         return {

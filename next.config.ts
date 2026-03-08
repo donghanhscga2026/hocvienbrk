@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    // Tắt tối ưu hóa ảnh để sửa lỗi 400 Bad Request và cảnh báo chất lượng
+    unoptimized: true,
+
+    // Cấu hình các mức chất lượng được phép
+    qualities: [50, 70, 75, 80, 90],
+
     // Chỉ cho phép domain ảnh thực sự dùng
     remotePatterns: [
       {
