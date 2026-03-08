@@ -233,7 +233,16 @@ export default function AssignmentForm({
         const isUpdate = isCompleted
         setLoading(true)
         try {
-            const result = await onSubmit({ reflection, links, supports }, isUpdate)
+            // Lấy múi giờ hiện tại của thiết bị học viên
+            const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
+            
+            const result = await onSubmit({ 
+                reflection, 
+                links, 
+                supports,
+                clientTimeZone // Gửi kèm múi giờ về server
+            }, isUpdate)
+            
             if (result?.success) {
                 isDirtyRef.current = false
                 if (onFormDataChange && !isUpdate) {

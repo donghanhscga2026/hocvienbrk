@@ -70,7 +70,7 @@ export async function registerUser(prevState: any, formData: FormData) {
                          `👤 Họ tên: <b>${user.name}</b>\n` +
                          `📧 Email: ${user.email}\n` +
                          `📞 SĐT: ${user.phone}\n` +
-                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
         await sendTelegram(msgAdmin, 'REGISTER');
 
     } catch (error) {
