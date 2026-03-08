@@ -129,6 +129,43 @@ export async function sendActivationEmail(to: string, studentName: string, cours
   await sendGmail(to, subject, htmlBody, adminEmail);
 }
 
+/**
+ * Thông báo khi có người đăng nhập thành công
+ */
+export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
+  try {
+    // 1. Tra cứu vị trí từ IP (Sử dụng IP-API miễn phí)
+    let location = 'Không xác định';
+    let isp = '';
+    try {
+      const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp`);
+      const geoData = await geoRes.json();
+      if (geoData.status === 'success') {
+        location = `${geoData.city}, ${geoData.regionName}, ${geoData.country}`;
+        isp = geoData.isp || '';
+      }
+    } catch (e) {
+      console.error('Lỗi tra cứu GeoIP:', e);
+    }
+
+    // 2. Phân tích User Agent đơn giản (Trình duyệt/Hệ điều hành)
+    const browser = userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : 'Trình duyệt khác';
+    const os = userAgent.includes('Windows') ? 'Windows' : userAgent.includes('Android') ? 'Android' : userAgent.includes('iPhone') ? 'iPhone/iOS' : 'Hệ điều hành khác';
+
+    const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n\n` +
+                `👤 Học viên: <b>${user.name}</b> (#${user.id})\n` +
+                `📧 Email: ${user.email}\n` +
+                `📍 Vị trí: <b>${location}</b>\n` +
+                `🌐 IP: ${ip} (${isp})\n` +
+                `📱 Thiết bị: ${browser} on ${os}\n` +
+                `📅 Thời gian: ${new Date().toLocaleString('vi-VN')}`;
+
+    await sendTelegram(msg, 'REGISTER');
+  } catch (error) {
+    console.error('Lỗi gửi thông báo đăng nhập:', error);
+  }
+}
+
 // Giữ lại các hàm cũ để không làm gãy logic hiện tại (nhưng trỏ về hàm mới)
 export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
 export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, course, null);

@@ -89,4 +89,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     pages: {
         signIn: '/login',
     },
+    events: {
+        async signIn({ user, account }) {
+            // Chỉ gửi thông báo cho đăng nhập thông thường (credentials) hoặc Google
+            if (user && (account?.provider === 'credentials' || account?.provider === 'google')) {
+                try {
+                    const { headers } = await import("next/headers");
+                    const headerList = await headers();
+                    
+                    // Lấy IP từ headers (Vercel/Cloudflare standard)
+                    const ip = headerList.get('x-forwarded-for')?.split(',')[0] || 
+                               headerList.get('x-real-ip') || 
+                               '127.0.0.1';
+                    
+                    const userAgent = headerList.get('user-agent') || 'Unknown';
+
+                    const { sendLoginNotification } = await import("@/lib/notifications");
+                    // Không dùng await để tránh làm chậm quá trình đăng nhập của user
+                    sendLoginNotification(user, ip, userAgent);
+                } catch (error) {
+                    console.error("Lỗi khi gửi thông báo đăng nhập:", error);
+                }
+            }
+        }
+    }
 })
