@@ -22,7 +22,7 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
 
   try {
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -31,8 +31,15 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
         parse_mode: 'HTML',
       }),
     });
+    
+    const result = await response.json();
+    if (!result.ok) {
+        console.error(`❌ Telegram API Error (${type}):`, result.description);
+    } else {
+        console.log(`✅ Telegram API Success (${type}): Tin nhắn đã được gửi đến ID ${chatId}`);
+    }
   } catch (error) {
-    console.error(`❌ Lỗi gửi Telegram (${type}):`, error);
+    console.error(`❌ Lỗi hệ thống khi gửi Telegram (${type}):`, error);
   }
 }
 
