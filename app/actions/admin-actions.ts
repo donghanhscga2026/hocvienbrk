@@ -217,3 +217,84 @@ export async function getStudentDetailsAction(userId: number) {
         return { success: false, error: error.message }
     }
 }
+
+export async function getAdminCoursesAction() {
+    await checkAdmin()
+
+    try {
+        const courses = await prisma.course.findMany({
+            include: {
+                _count: {
+                    select: { 
+                        lessons: true,
+                        enrollments: true
+                    }
+                }
+            },
+            orderBy: { id: 'asc' }
+        })
+
+        return { success: true, courses }
+    } catch (error: any) {
+        console.error("Get Admin Courses Error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateCourseAction(courseId: number, data: {
+    name_lop?: string,
+    phi_coc?: number,
+    id_khoa?: string,
+    noidung_email?: string | null,
+    stk?: string | null,
+    name_stk?: string | null,
+    bank_stk?: string | null
+}) {
+    await checkAdmin()
+
+    try {
+        const updatedCourse = await prisma.course.update({
+            where: { id: courseId },
+            data
+        })
+
+        revalidatePath('/admin/courses')
+        revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
+        
+        return { success: true, course: updatedCourse }
+    } catch (error: any) {
+        console.error("Update Course Error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateLessonAction(lessonId: string, data: {
+    title?: string,
+    content?: string | null,
+    videoUrl?: string | null,
+    order?: number
+}) {
+    await checkAdmin()
+
+    try {
+        const updatedLesson = await prisma.lesson.update({
+            where: { id: lessonId },
+            data
+        })
+
+        // Revalidate các trang liên quan
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { course: { select: { id_khoa: true } } }
+        })
+        
+        if (lesson?.course?.id_khoa) {
+            revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
+        }
+
+        return { success: true, lesson: updatedLesson }
+    } catch (error: any) {
+        console.error("Update Lesson Error:", error)
+        return { success: false, error: error.message }
+    }
+}
