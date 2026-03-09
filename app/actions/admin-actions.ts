@@ -88,3 +88,132 @@ export async function getReservedIds() {
         orderBy: { id: 'asc' }
     })
 }
+
+export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS') {
+    await checkAdmin()
+
+    try {
+        let where: any = {};
+        
+        if (role === 'COURSE_86_DAYS') {
+            where.enrollments = {
+                some: { courseId: 1 }
+            };
+        } else if (role && role !== 'ALL') {
+            where.role = role;
+        }
+
+        if (query) {
+            const trimmedQuery = query.trim();
+            
+            // 1. Nếu bắt đầu bằng # -> Tìm ID chính xác
+            if (trimmedQuery.startsWith('#')) {
+                const id = parseInt(trimmedQuery.substring(1));
+                if (!isNaN(id)) {
+                    where.id = id;
+                } else {
+                    return { success: true, students: [] };
+                }
+            } 
+            // 2. Nếu là số thuần túy
+            else if (/^\d+$/.test(trimmedQuery)) {
+                const id = parseInt(trimmedQuery);
+                const searchFields = [
+                    { id: id },
+                    { name: { contains: trimmedQuery, mode: 'insensitive' } },
+                    { email: { contains: trimmedQuery, mode: 'insensitive' } },
+                ];
+                
+                if (trimmedQuery.length >= 6) {
+                    searchFields.push({ phone: { contains: trimmedQuery, mode: 'insensitive' } } as any);
+                }
+
+                if (where.role) {
+                    where = {
+                        AND: [
+                            { role: where.role },
+                            { OR: searchFields }
+                        ]
+                    };
+                } else {
+                    where.OR = searchFields;
+                }
+            }
+            // 3. Tìm kiếm chuỗi bình thường
+            else {
+                const searchFields = [
+                    { name: { contains: trimmedQuery, mode: 'insensitive' } },
+                    { email: { contains: trimmedQuery, mode: 'insensitive' } },
+                    { phone: { contains: trimmedQuery, mode: 'insensitive' } },
+                ];
+
+                if (where.role) {
+                    where = {
+                        AND: [
+                            { role: where.role },
+                            { OR: searchFields }
+                        ]
+                    };
+                } else {
+                    where.OR = searchFields;
+                }
+            }
+        }
+
+        const students = await prisma.user.findMany({
+            where,
+            include: {
+                enrollments: {
+                    include: {
+                        course: { select: { name_lop: true } },
+                        _count: {
+                            select: { lessonProgress: { where: { status: 'COMPLETED' } } }
+                        }
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        })
+
+        return { success: true, students }
+    } catch (error: any) {
+        console.error("Get Students Error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function getStudentDetailsAction(userId: number) {
+    await checkAdmin()
+
+    try {
+        const student = await prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                enrollments: {
+                    include: {
+                        course: {
+                            include: {
+                                lessons: {
+                                    orderBy: { order: 'asc' }
+                                }
+                            }
+                        },
+                        lessonProgress: {
+                            include: {
+                                lesson: { select: { title: true, order: true } }
+                            }
+                        }
+                    },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        })
+
+        if (!student) return { success: false, error: "Không tìm thấy học viên." }
+
+        return { success: true, student }
+    } catch (error: any) {
+        console.error("Get Student Details Error:", error)
+        return { success: false, error: error.message }
+    }
+}
