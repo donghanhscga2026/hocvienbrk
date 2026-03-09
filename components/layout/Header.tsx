@@ -77,6 +77,16 @@ export default function Header({ session, userImage }: { session: any, userImage
                                         <p className="text-xs font-bold text-white truncate">{session.user?.name}</p>
                                         <p className="text-[10px] text-zinc-500 truncate">{session.user?.email}</p>
                                     </div>
+                                    {session.user?.role === 'ADMIN' && (
+                                        <Link
+                                            href="/admin/students"
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-400 hover:bg-zinc-800 transition-colors font-bold"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                            Quản trị hệ thống
+                                        </Link>
+                                    )}
                                     <Link
                                         href="/account-settings"
                                         onClick={() => setIsUserMenuOpen(false)}
