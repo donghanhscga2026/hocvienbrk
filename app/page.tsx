@@ -1,7 +1,9 @@
 import { auth } from "@/auth";
 import Header from "@/components/layout/Header";
 import CourseCard from "@/components/course/CourseCard";
+import CourseSection from "@/components/home/CourseSection";
 import MessageCard from "@/components/home/MessageCard";
+import CommunityBoard from "@/components/home/CommunityBoard";
 import prisma from "@/lib/prisma";
 import { getRandomMessage } from "./actions/message-actions";
 
@@ -111,80 +113,55 @@ if (session?.user?.id) {
         <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
       </div>
 
+      {/* Community Board Module */}
+      <section className="container mx-auto px-4 py-8">
+        <CommunityBoard isAdmin={session?.user?.role === 'ADMIN'} />
+      </section>
+
       {/* Course List Section */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
         {session?.user ? (
           <>
             {/* Khóa học của tôi */}
             {myCourses.length > 0 && (
-              <div className="mb-12 -mx-4 px-4 py-8 bg-zinc-950 rounded-b-3xl">
-                <div className="mb-8 text-center">
-                  <h2 className="text-2xl font-bold text-white">Khóa học của tôi</h2>
-                  <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500"></div>
-                </div>
-                <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                  {myCourses.map((course: any, index: number) => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isLoggedIn={!!session}
-                      enrollment={enrollmentsMap[course.id] || null}
-                      isCourseOneActive={isCourseOneActive}
-                      userPhone={userPhone}
-                      userId={userId}
-                      priority={index < 3}
-                      darkMode={true}
-                    />
-                  ))}
-                </div>
-              </div>
+              <CourseSection 
+                title="Khóa học của tôi"
+                courses={myCourses}
+                session={session}
+                enrollmentsMap={enrollmentsMap}
+                isCourseOneActive={isCourseOneActive}
+                userPhone={userPhone}
+                userId={userId}
+                darkMode={true}
+                accentColor="bg-emerald-500"
+              />
             )}
 
             {/* Các khóa học khác */}
             {otherCourses.length > 0 && (
-              <div>
-                <div className="mb-8 text-center">
-                  <h2 className="text-2xl font-bold text-gray-900">Tất cả khóa học</h2>
-                  <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-blue-600"></div>
-                </div>
-                <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                  {otherCourses.map((course: any, index: number) => (
-                    <CourseCard
-                      key={course.id}
-                      course={course}
-                      isLoggedIn={!!session}
-                      enrollment={enrollmentsMap[course.id] || null}
-                      isCourseOneActive={isCourseOneActive}
-                      userPhone={userPhone}
-                      userId={userId}
-                      priority={index < 3}
-                    />
-                  ))}
-                </div>
-              </div>
+              <CourseSection 
+                title="Tất cả khóa học"
+                courses={otherCourses}
+                session={session}
+                enrollmentsMap={enrollmentsMap}
+                isCourseOneActive={isCourseOneActive}
+                userPhone={userPhone}
+                userId={userId}
+                accentColor="bg-blue-600"
+              />
             )}
           </>
         ) : (
-          <>
-            <div className="mb-12 text-center">
-              <h2 className="text-3xl font-bold text-gray-900 ring-offset-current">Danh Sách Khóa Học</h2>
-              <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-blue-600"></div>
-            </div>
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {courses.map((course: any, index: number) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  isLoggedIn={false}
-                  enrollment={null}
-                  isCourseOneActive={false}
-                  userPhone={null}
-                  userId={null}
-                  priority={index < 6}
-                />
-              ))}
-            </div>
-          </>
+          <CourseSection 
+            title="Danh Sách Khóa Học"
+            courses={courses}
+            session={null}
+            enrollmentsMap={{}}
+            isCourseOneActive={false}
+            userPhone={null}
+            userId={null}
+            accentColor="bg-blue-600"
+          />
         )}
       </section>
 

@@ -23,13 +23,50 @@ model User {
   accounts      Account[]
   enrollments   Enrollment[]
   sessions      Session[]
-  comments      LessonComment[]
+  lessonComments LessonComment[] @relation("UserToLessonComment")
+  posts         Post[]          @relation("UserToPost")
+  postComments  PostComment[]   @relation("UserToPostComment")
   referrer      User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
   referrals     User[]       @relation("ReferrerToReferee")
+  
+  // Zero 2 Hero Data
+  goal          String?      // Mục tiêu học tập
+  surveyResults Json?        // Kết quả khảo sát đầu vào
+  customPath    Json?        // Lộ trình cá nhân hóa (danh sách ID khóa học)
 
   @@index([email])
   @@index([phone])
   @@index([referrerId])
+}
+
+model Post {
+  id        String        @id @default(cuid())
+  title     String
+  content   String        @db.Text
+  image     String?
+  published Boolean       @default(true)
+  pin       Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  authorId  Int
+  author    User          @relation("UserToPost", fields: [authorId], references: [id], onDelete: Cascade)
+  comments  PostComment[]
+
+  @@index([authorId])
+}
+
+model PostComment {
+  id        Int      @id @default(autoincrement())
+  postId    String
+  userId    Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserToPostComment", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
 }
 
 model Account {
@@ -86,7 +123,7 @@ model Course {
   name_khoa     String?
   date_join     String?
   status        Boolean      @default(true)
-  pin           Int          @default(0) // Thứ tự hiển thị: số nhỏ hiển thị trước, dùng để ghim khóa học lên đầu
+  pin           Int          @default(0)
   mo_ta_ngan    String?
   mo_ta_dai     String?
   link_anh_bia  String?      @map("link_anh_bia_khoa")
@@ -148,10 +185,10 @@ model LessonProgress {
   id           Int        @id @default(autoincrement())
   enrollmentId Int
   lessonId     String
-  scores       Json?      // {vid: 2, ref: 2, prac: 3, support: 2, timing: 1/-1}
+  scores       Json?
   totalScore   Int        @default(0)
-  assignment   Json?      // {reflection: "", links: [], supports: []}
-  status       String     @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, RESET (archived)
+  assignment   Json?
+  status       String     @default("IN_PROGRESS")
   maxTime      Float      @default(0)
   duration     Float      @default(0)
   submittedAt  DateTime?
@@ -160,10 +197,10 @@ model LessonProgress {
   enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
   lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   
-@@unique([enrollmentId, lessonId])
-  @@index([enrollmentId])   // Tăng tốc query theo enrollment
-  @@index([lessonId])       // Tăng tốc query comment/progress theo lesson
-  @@index([status])         // Tăng tốc lọc theo status
+  @@unique([enrollmentId, lessonId])
+  @@index([enrollmentId])
+  @@index([lessonId])
+  @@index([status])
 }
 
 model LessonComment {
@@ -172,7 +209,7 @@ model LessonComment {
   userId    Int
   content   String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserToLessonComment", fields: [userId], references: [id], onDelete: Cascade)
   lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@index([lessonId])
@@ -227,8 +264,8 @@ model Payment {
   verifiedAt      DateTime?
   verifyMethod    String?
   note            String?
-  transferContent String?       // "SDT0389758138MHV372COCNH"
-  qrCodeUrl       String?       // QR code từ VietQR API
+  transferContent String?
+  qrCodeUrl       String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   enrollment      Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
