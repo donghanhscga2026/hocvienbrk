@@ -1,0 +1,162 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { getPostsAction, createPostAction } from '@/app/actions/post-actions'
+import { Plus, Newspaper, Save, Loader2, Image as ImageIcon, X, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+
+export default function AdminPostsPage() {
+    const [posts, setPosts] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showCreate, setShowCreate] = useState(false)
+    const [title, setTitle] = useState('')
+    const [content, setContent] = useState('')
+    const [image, setImage] = useState('')
+    const [saving, setSaving] = useState(false)
+
+    const fetchPosts = async () => {
+        setLoading(true)
+        const res = await getPostsAction()
+        if (res.success) {
+            setPosts(res.posts || [])
+        }
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        fetchPosts()
+    }, [])
+
+    const handleCreate = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setSaving(true)
+        const res = await createPostAction({ title, content, image })
+        if (res.success) {
+            setTitle('')
+            setContent('')
+            setImage('')
+            setShowCreate(false)
+            fetchPosts()
+        } else {
+            alert(res.error)
+        }
+        setSaving(false)
+    }
+
+    return (
+        <div className="space-y-6 pb-20">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 leading-tight">Bảng tin</h1>
+                    <p className="text-gray-500 text-xs font-medium">Quản lý bài viết cộng đồng</p>
+                </div>
+                <button 
+                    onClick={() => setShowCreate(!showCreate)}
+                    className="bg-black text-yellow-400 p-2.5 rounded-2xl shadow-lg active:scale-95 transition-all"
+                >
+                    {showCreate ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                </button>
+            </div>
+
+            {/* Form Đăng bài mới */}
+            {showCreate && (
+                <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-purple-100 animate-in slide-in-from-top-4 duration-300">
+                    <h2 className="text-lg font-black text-gray-900 mb-4 uppercase tracking-tight flex items-center gap-2">
+                        <Newspaper className="w-5 h-5 text-purple-500" /> Đăng bài mới
+                    </h2>
+                    <form onSubmit={handleCreate} className="space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tiêu đề bản tin</label>
+                            <input 
+                                type="text" 
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                                placeholder="Nhập tiêu đề thu hút..."
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chi tiết</label>
+                            <textarea 
+                                value={content}
+                                onChange={(e) => setContent(e.target.value)}
+                                rows={5}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                                placeholder="Bạn muốn chia sẻ điều gì với cộng đồng?"
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh minh họa (không bắt buộc)</label>
+                            <div className="relative">
+                                <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input 
+                                    type="text" 
+                                    value={image}
+                                    onChange={(e) => setImage(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-11 pr-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                                    placeholder="https://postimg.cc/..."
+                                />
+                            </div>
+                        </div>
+                        <button 
+                            type="submit"
+                            disabled={saving}
+                            className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                        >
+                            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                            Đăng bản tin ngay
+                        </button>
+                    </form>
+                </div>
+            )}
+
+            {/* Danh sách bài viết hiện có */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="w-full">
+                    <table className="w-full text-left border-collapse table-fixed">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="px-3 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Bản tin đã đăng</th>
+                                <th className="px-3 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center w-16">Xóa</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={2} className="px-6 py-12 text-center text-gray-500">
+                                        <Loader2 className="w-6 h-6 animate-spin text-purple-500 mx-auto mb-2" />
+                                        <p className="text-[10px] font-black uppercase">Đang tải bản tin...</p>
+                                    </td>
+                                </tr>
+                            ) : posts.length === 0 ? (
+                                <tr>
+                                    <td colSpan={2} className="px-6 py-12 text-center text-gray-400 text-[10px] font-black uppercase">
+                                        Chưa có bài viết nào
+                                    </td>
+                                </tr>
+                            ) : (
+                                posts.map((post) => (
+                                    <tr key={post.id} className="hover:bg-purple-50/30 transition-colors">
+                                        <td className="px-3 py-4">
+                                            <div className="font-black text-gray-900 text-sm truncate leading-tight uppercase">{post.title}</div>
+                                            <div className="text-[10px] text-gray-400 font-bold uppercase mt-1">
+                                                {new Date(post.createdAt).toLocaleDateString('vi-VN')} • {post._count?.comments || 0} bình luận
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-4 text-center">
+                                            <button className="p-2 text-gray-300 hover:text-red-600 transition-colors">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    )
+}

@@ -19,6 +19,7 @@ export default async function AdminLayout({
         { label: 'Thanh toán', href: '/admin/payments', icon: '💰' },
         { label: 'Thành viên', href: '/admin/students', icon: '👥' },
         { label: 'Khóa học', href: '/admin/courses', icon: '📘' },
+        { label: 'Bảng tin', href: '/admin/posts', icon: '📰' },
         { label: 'Số đẹp', href: '/admin/reserved-ids', icon: '💎' },
     ]
 
