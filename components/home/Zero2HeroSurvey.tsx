@@ -1,0 +1,214 @@
+'use client'
+
+import React, { useState } from 'react'
+import { surveyQuestions } from '@/lib/survey-data'
+import { saveSurveyResultAction } from '@/app/actions/survey-actions'
+import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, HelpCircle, Play, Info, Send } from 'lucide-react'
+
+// ─── Component Popup Tư Vấn ────────────────────────────────────────────────
+function AdviceModal({ type, onClose }: { type: string, onClose: () => void }) {
+    return (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-zinc-900 w-full max-w-xl rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
+                <div className="aspect-video bg-black relative flex items-center justify-center group cursor-pointer">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <Play className="w-16 h-16 text-yellow-400 fill-current group-hover:scale-110 transition-transform" />
+                    <p className="absolute bottom-4 left-6 text-white font-black uppercase tracking-widest text-xs">Video tư vấn lộ trình BRK</p>
+                </div>
+                <div className="p-8 space-y-4">
+                    <h3 className="text-2xl font-black text-white uppercase">Cố vấn định hướng</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed font-medium">
+                        Chúng tôi hiểu bạn đang phân vân. Video trên sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện. 
+                        Sau khi xem xong, hãy quay lại và chọn mục tiêu mà bạn cảm thấy tự tin nhất để bắt đầu.
+                    </p>
+                    <button 
+                        onClick={onClose}
+                        className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-yellow-500 transition-all active:scale-95"
+                    >
+                        Tôi đã hiểu - Quay lại chọn
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
+    const [currentStep, setCurrentStep] = useState('q1')
+    const [history, setHistory] = useState<string[]>([])
+    const [answers, setAnswers] = useState<Record<string, any>>({})
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [showSuccess, setShowSuccess] = useState(false)
+    const [showAdvice, setShowAdvice] = useState(false)
+
+    // Form inputs state
+    const [input1, setInput1] = useState('') // Tên kênh/shop/lĩnh vực
+    const [input2, setInput2] = useState('') // ID TikTok
+    const [videoPerDay, setVideoPerDay] = useState('1')
+    const [days, setDays] = useState('30')
+    const [targetVal, setTargetVal] = useState('1000')
+
+    const question = surveyQuestions[currentStep]
+
+    const handleBack = () => {
+        if (history.length > 0) {
+            const prev = [...history]
+            const last = prev.pop()!
+            setHistory(prev)
+            setCurrentStep(last)
+        }
+    }
+
+    const handleNext = async (optionId: string, nextId?: string, isAdvice?: boolean) => {
+        if (isAdvice) {
+            setShowAdvice(true)
+            return
+        }
+
+        const newAnswers = { ...answers, [currentStep]: optionId }
+        
+        // Xử lý các Input đặc biệt trước khi đi tiếp
+        if (question.type === 'INPUT_ACCOUNT') {
+            newAnswers[`${currentStep}_name`] = input1
+            newAnswers[`${currentStep}_id`] = input2
+            newAnswers[`${currentStep}_status`] = optionId
+        }
+        
+        if (question.type === 'INPUT_GOAL') {
+            newAnswers['goal_config'] = { videoPerDay, days, targetVal }
+        }
+
+        setAnswers(newAnswers)
+
+        if (nextId && nextId !== 'done') {
+            setHistory([...history, currentStep])
+            setCurrentStep(nextId)
+            // Reset inputs cho bước sau
+            setInput1('')
+            setInput2('')
+        } else {
+            setIsSubmitting(true)
+            const res = await saveSurveyResultAction(newAnswers)
+            if (res.success) {
+                setShowSuccess(true)
+                if (onComplete) setTimeout(onComplete, 3000)
+            } else {
+                alert(res.error)
+                setIsSubmitting(false)
+            }
+        }
+    }
+
+    if (showSuccess) return (
+        <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
+            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/20">
+                <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <h2 className="text-3xl font-black uppercase tracking-tight mb-4">Lộ trình đã sẵn sàng!</h2>
+            <p className="text-gray-400 text-sm mb-8">AI đã thiết kế xong Bức tranh hiện thực của riêng bạn.</p>
+            <Loader2 className="w-6 h-6 animate-spin text-yellow-400 mx-auto" />
+        </div>
+    )
+
+    return (
+        <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px]"></div>
+            
+            <div className="relative z-10">
+                {/* Header Survey */}
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20">
+                            <Target className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-black uppercase tracking-tight">Zero 2 Hero</h2>
+                            <div className="flex gap-1 mt-1">
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <div key={i} className={`h-1 w-4 rounded-full ${i <= history.length ? 'bg-yellow-400' : 'bg-white/10'}`}></div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    {history.length > 0 && (
+                        <button onClick={handleBack} className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400"><ArrowLeft className="w-5 h-5" /></button>
+                    )}
+                </div>
+
+                <div className="animate-in slide-in-from-right-4 fade-in duration-300">
+                    <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{question.question}</h3>
+                    <p className="text-gray-400 text-sm mb-8 font-medium">{question.subtitle || 'Hãy cung cấp thông tin chính xác để AI thiết kế lộ trình.'}</p>
+
+                    {/* CHOICE TYPE */}
+                    {question.type === 'CHOICE' && (
+                        <div className="grid grid-cols-1 gap-3">
+                            {question.options?.map(opt => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => handleNext(opt.id, opt.nextQuestionId, opt.isAdvice)}
+                                    className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]"
+                                >
+                                    <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
+                                    <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-yellow-400" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* INPUT ACCOUNT TYPE */}
+                    {question.type === 'INPUT_ACCOUNT' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Tên Shop / Kênh / Lĩnh vực</label>
+                                    <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500" placeholder="Nhập tên..." />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1">ID TikTok / Link Kênh</label>
+                                    <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500" placeholder="@id_cua_ban" />
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                {question.options?.map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => handleNext(opt.id, opt.nextQuestionId)}
+                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* INPUT GOAL TYPE */}
+                    {question.type === 'INPUT_GOAL' && (
+                        <div className="space-y-6">
+                            <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 space-y-6">
+                                <div className="flex flex-wrap items-center gap-3 text-sm font-bold leading-relaxed">
+                                    <span>Tôi sẽ làm</span>
+                                    <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-16 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
+                                    <span>video/ngày đều đặn trong</span>
+                                    <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-16 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
+                                    <span>ngày để đạt</span>
+                                    <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-24 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
+                                    <span className="text-gray-400 font-medium">Follow / Đơn hàng</span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => handleNext('yes', 'done')}
+                                className="w-full bg-black text-yellow-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-zinc-800 transition-all active:scale-95"
+                            >
+                                <Send className="w-4 h-4" /> Xác nhận lộ trình & Cam kết
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Advice Modal */}
+            {showAdvice && <AdviceModal type={currentStep} onClose={() => setShowAdvice(false)} />}
+        </div>
+    )
+}

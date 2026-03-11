@@ -4,8 +4,11 @@ import CourseCard from "@/components/course/CourseCard";
 import CourseSection from "@/components/home/CourseSection";
 import MessageCard from "@/components/home/MessageCard";
 import CommunityBoard from "@/components/home/CommunityBoard";
+import Zero2HeroSurvey from "@/components/home/Zero2HeroSurvey";
+import RealityMap from "@/components/home/RealityMap";
 import prisma from "@/lib/prisma";
 import { getRandomMessage } from "./actions/message-actions";
+import { resetSurveyAction } from "./actions/survey-actions";
 
 export default async function Home() {
   const session = await auth();
@@ -19,7 +22,7 @@ export default async function Home() {
     session?.user?.id
       ? (prisma as any).user.findUnique({
         where: { id: parseInt(session.user.id) },
-        select: { name: true, id: true, image: true, phone: true }
+        select: { name: true, id: true, image: true, phone: true, customPath: true, goal: true }
       })
       : Promise.resolve(null),
     getRandomMessage()
@@ -29,10 +32,11 @@ export default async function Home() {
   const userId = userRecord?.id ?? null;
   const userImage = userRecord?.image ?? session?.user?.image ?? null;
   const userPhone = userRecord?.phone ?? null;
+  const customPath = userRecord?.customPath as number[] | null;
+  const userGoal = userRecord?.goal ?? null;
 
   // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
-  // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
-let myCourseIds = new Set<number>();
+  let myCourseIds = new Set<number>();
 
 let enrollmentsMap: Record<number, { 
   status: string; 
@@ -112,6 +116,23 @@ if (session?.user?.id) {
       <div className="pt-16">
         <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
       </div>
+
+      {/* Lộ trình Zero 2 Hero */}
+      {session?.user && (
+        <section className="container mx-auto px-4 py-8">
+          {!customPath || customPath.length === 0 ? (
+            <Zero2HeroSurvey />
+          ) : (
+            <RealityMap 
+              customPath={customPath}
+              enrollmentsMap={enrollmentsMap}
+              allCourses={courses}
+              userGoal={userGoal || 'Hoàn thiện kỹ năng'}
+              onReset={resetSurveyAction}
+            />
+          )}
+        </section>
+      )}
 
       {/* Community Board Module */}
       <section className="container mx-auto px-4 py-8">
