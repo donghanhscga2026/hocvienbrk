@@ -133,7 +133,6 @@ export async function sendActivationEmail(to: string, studentName: string, stude
  * Thông báo khi có người đăng nhập thành công
  */
 export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
-// ... (giữ nguyên hàm này)
   try {
     // 1. Tra cứu vị trí từ IP (Sử dụng IP-API miễn phí)
     let location = 'Không xác định';
