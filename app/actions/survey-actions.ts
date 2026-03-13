@@ -71,12 +71,13 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         const userId = parseInt(session.user.id)
         
         // 1. Lấy bài khảo sát ĐANG KÍCH HOẠT từ Database (Động)
-        const flow = await getActiveSurvey()
+        const flowData = await getActiveSurvey()
+        const flow = flowData as any
         
         let customPath: number[] = []
         let goal = ''
 
-        if (flow && flow.nodes && flow.nodes.length > 0) {
+        if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
             // SỬ DỤNG BỘ MÁY TÍNH TOÁN TỪ SƠ ĐỒ MỚI
             console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG ĐANG KÍCH HOẠT...')
             const result = resolvePathFromFlow(flow, answers)
