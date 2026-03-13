@@ -150,7 +150,7 @@ export async function resetSurveyAction() {
     try {
         await prisma.user.update({
             where: { id: parseInt(session.user.id) },
-            data: { customPath: null }
+            data: { customPath: null as any }
         })
         revalidatePath('/')
         return { success: true }
