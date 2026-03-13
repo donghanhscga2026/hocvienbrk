@@ -47,7 +47,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     const [isLoadingFlow, setIsLoadingFlow] = useState(true)
 
     // State kế thừa từ bản cũ
-    const [currentStep, setCurrentStep] = useState('q1') // Chỉ dùng cho Fallback
+    const [currentStep, setCurrentStep] = useState('q1')
     const [history, setHistory] = useState<any[]>([])
     const [answers, setAnswers] = useState<Record<string, any>>({})
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,26 +64,29 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     // Tải bài khảo sát ĐANG KÍCH HOẠT từ Database
     useEffect(() => {
         const loadFlow = async () => {
-            setIsLoadingFlow(true)
-            const data = await getActiveSurvey()
-            if (data && data.nodes && data.nodes.length > 0) {
-                setFlow(data)
-                // Tìm node câu hỏi đầu tiên
-                const startNode = data.nodes.find((n: any) => n.type === 'questionNode')
-                if (startNode) setCurrentNodeId(startNode.id)
+            try {
+                setIsLoadingFlow(true)
+                const data = await getActiveSurvey() as any
+                if (data && data.nodes && Array.isArray(data.nodes) && data.nodes.length > 0) {
+                    setFlow(data)
+                    const startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+                    if (startNode) setCurrentNodeId(startNode.id)
+                }
+            } catch (err) {
+                console.error("Failed to load flow:", err)
+            } finally {
+                setIsLoadingFlow(false)
             }
-            setIsLoadingFlow(false)
         }
         loadFlow()
     }, [])
 
     // Lấy dữ liệu câu hỏi hiện tại (Động hoặc Tĩnh)
     const getActiveQuestion = () => {
-        if (flow && currentNodeId) {
+        if (flow && currentNodeId && Array.isArray(flow.nodes)) {
             const node = flow.nodes.find((n: any) => n.id === currentNodeId)
             if (node) {
-                // Tìm các đáp án nối từ node này
-                const optionEdges = flow.edges.filter((e: any) => e.source === currentNodeId)
+                const optionEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === currentNodeId) : []
                 const options = optionEdges.map((edge: any) => {
                     const optNode = flow.nodes.find((n: any) => n.id === edge.target)
                     return {
@@ -95,15 +98,22 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
                 return {
                     id: node.id,
-                    question: node.data?.label,
+                    question: node.data?.label || 'Câu hỏi không có nội dung',
                     type: node.data?.type || 'CHOICE',
                     options: options,
                     isDynamic: true
                 }
             }
         }
-        // Fallback sang dữ liệu tĩnh cũ
-        return { ...surveyQuestions[currentStep], id: currentStep, isDynamic: false }
+        
+        const staticQ = (surveyQuestions as any)[currentStep]
+        return { 
+            ...staticQ, 
+            id: currentStep, 
+            isDynamic: false,
+            question: staticQ?.question || 'Câu hỏi không tìm thấy',
+            options: staticQ?.options || []
+        }
     }
 
     const currentQuestion = getActiveQuestion()
@@ -136,8 +146,8 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
         setAnswers(newAnswers)
 
-        if (currentQuestion.isDynamic) {
-            const nextEdge = flow.edges.find((e: any) => e.source === optionId)
+        if (currentQuestion.isDynamic && flow) {
+            const nextEdge = Array.isArray(flow.edges) ? flow.edges.find((e: any) => e.source === optionId) : null
             if (nextEdge) {
                 const nextNode = flow.nodes.find((n: any) => n.id === nextEdge.target)
                 if (nextNode) {
@@ -165,7 +175,8 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             }
             finishSurvey(newAnswers)
         } else {
-            const staticOpt = surveyQuestions[currentStep].options.find(o => o.id === optionId)
+            const staticQData = (surveyQuestions as any)[currentStep]
+            const staticOpt = staticQData?.options?.find((o: any) => o.id === optionId)
             if (staticOpt?.isAdvice) {
                 setShowAdvice('https://youtube.com')
                 return
@@ -184,12 +195,17 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
     const finishSurvey = async (finalAnswers: any) => {
         setIsSubmitting(true)
-        const res = await saveSurveyResultAction(finalAnswers)
-        if (res.success) {
-            setShowSuccess(true)
-            if (onComplete) setTimeout(onComplete, 3000)
-        } else {
-            alert(res.error)
+        try {
+            const res = await saveSurveyResultAction(finalAnswers)
+            if (res.success) {
+                setShowSuccess(true)
+                if (onComplete) setTimeout(onComplete, 3000)
+            } else {
+                alert(res.error)
+                setIsSubmitting(false)
+            }
+        } catch (err) {
+            console.error(err)
             setIsSubmitting(false)
         }
     }
@@ -240,6 +256,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
                     <p className="text-gray-400 text-sm mb-8 font-medium">{'Hãy cung cấp thông tin chính xác để AI thiết kế lộ trình.'}</p>
 
+                    {/* CHOICE TYPE */}
                     {currentQuestion.type === 'CHOICE' && (
                         <div className="grid grid-cols-1 gap-3">
                             {currentQuestion.options?.map((opt: any) => (
@@ -255,6 +272,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         </div>
                     )}
 
+                    {/* INPUT ACCOUNT TYPE */}
                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -281,6 +299,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         </div>
                     )}
 
+                    {/* INPUT GOAL TYPE */}
                     {currentQuestion.type === 'INPUT_GOAL' && (
                         <div className="space-y-6">
                             <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 space-y-6">
@@ -295,10 +314,11 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                 </div>
                             </div>
                             <button
+                                disabled={isSubmitting}
                                 onClick={() => handleNext('yes', 'Xác nhận')}
-                                className="w-full bg-black text-yellow-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-zinc-800 transition-all active:scale-95"
+                                className="w-full bg-black text-yellow-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50"
                             >
-                                <Send className="w-4 h-4" /> Xác nhận lộ trình & Cam kết
+                                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết
                             </button>
                         </div>
                     )}
