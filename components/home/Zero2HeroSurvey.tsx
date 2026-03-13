@@ -132,7 +132,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     }
 
     const handleNext = async (optionId: string, label: string) => {
-        const newAnswers = { ...answers, [currentQuestion.id]: label }
+        const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
         
         if (currentQuestion.type === 'INPUT_ACCOUNT') {
             newAnswers[`${currentQuestion.id}_name`] = input1
