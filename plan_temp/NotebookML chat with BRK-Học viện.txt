@@ -1,0 +1,207 @@
+﻿HocVien-BRK Source Code
+1 source
+Tài liệu này cung cấp cái nhìn tổng quan về hệ thống mã nguồn của BRK Academy, một nền tảng đào tạo trực tuyến được xây dựng trên khung phần mềm Next.js. Nội dung bao gồm các tệp cấu hình hệ thống, cấu trúc thư mục chi tiết và các Server Actions quan trọng dùng để quản lý tài khoản, quy trình thanh toán và tương tác cộng đồng. Hệ thống tích hợp các công cụ hiện đại như Prisma để quản lý cơ sở dữ liệu, NextAuth cho bảo mật đăng nhập và các đoạn mã tự động hóa để đồng bộ dữ liệu với Google Drive. Ngoài ra, các nguồn tin còn mô tả chi tiết giao diện quản trị cho phép kiểm soát khóa học, phê duyệt học viên và theo dõi tiến độ học tập. Tổng thể bộ mã nguồn thể hiện một hệ sinh thái giáo dục số hoàn chỉnh, từ khâu tiếp nhận học viên đến việc phân phối nội dung bài giảng.
+Today • 10:50 AM
+Mô tả cho tôi những gì diễn ra khi 1 học viên đăng ký tài khoản mới và đăng nhập lần đầu tiên vào website, xử lý như thế nào
+Dưới đây là chi tiết toàn bộ quy trình từ lúc một học viên đăng ký tài khoản mới cho đến khi đăng nhập lần đầu tiên vào hệ thống Học Viện BRK, được xử lý qua các bước tự động hóa và cá nhân hóa:
+1. Quá trình Đăng ký tài khoản (Registration)
+Khi học viên điền form đăng ký tại trang /register (Gồm: Họ tên, Email, Số điện thoại, Mật khẩu), hệ thống sẽ xử lý như sau:
+* Kiểm tra dữ liệu: Hệ thống kiểm tra xem Email hoặc Số điện thoại này đã tồn tại trong cơ sở dữ liệu hay chưa để tránh trùng lặp. Mật khẩu được mã hóa bảo mật bằng bcrypt.
+* Cấp mã ID đặc biệt: Thay vì dùng ID tự tăng ngẫu nhiên, hệ thống gọi hàm getNextAvailableId(). Hàm này sẽ tính toán để cấp một mã học viên duy nhất và tự động bỏ qua các "số đẹp" (như 8668, 3773...) đã được Admin giữ lại trong danh sách ReservedId.
+* Lưu dữ liệu: Tài khoản được tạo với vai trò mặc định là STUDENT.
+* Gửi Email tự động: Hệ thống tự động gọi hàm sendWelcomeEmail để gửi một email chào mừng đến học viên, trong đó thông báo cho họ biết Mã số học tập (ID) vừa được cấp.
+* Báo cáo cho Admin: Ngay lập tức, một tin nhắn thông báo (chứa ID, Tên, Email, SĐT, Thời gian) sẽ được bot đẩy tự động về Group Telegram REGISTER của ban quản trị để nắm thông tin có học viên mới tham gia.
+* Chuyển hướng: Sau khi hoàn tất, học viên được chuyển hướng tự động về trang /login để đăng nhập.
+2. Quá trình Đăng nhập (Login)
+* Phương thức linh hoạt: Học viên có thể đăng nhập bằng tài khoản Google, hoặc sử dụng hệ thống thông tin (nhập Email, Số điện thoại, hoặc chính Mã học viên ID vừa được cấp + Mật khẩu).
+* Kiểm soát bảo mật & Định vị: Khi đăng nhập thành công (sự kiện signIn kích hoạt), hệ thống sẽ lấy địa chỉ IP và thông tin trình duyệt/thiết bị (User-Agent) của học viên.
+* Cảnh báo Telegram: Hệ thống gọi một API trung gian (ip-api.com) để tra cứu vị trí địa lý, nhà mạng từ IP đó, sau đó gửi một tin nhắn cảnh báo bảo mật về Telegram của Admin với nội dung: Tên, ID, Vị trí đăng nhập, IP, Thiết bị và Thời gian.
+3. Trải nghiệm lần đầu tiên tại Trang chủ (Onboarding)
+Ngay khi đăng nhập thành công và được đưa vào trang chủ (/), hệ thống sẽ mang lại trải nghiệm cá nhân hóa sâu sắc:
+* Lời chào đích danh: Thẻ thông điệp chính (Message Card) trên cùng sẽ không còn hiển thị câu chào chung chung nữa, mà đổi thành "Mến chào [Tên học viên] - Mã học tập [ID]".
+* Khảo sát bắt buộc (Zero 2 Hero): Do là tài khoản mới, hệ thống nhận diện học viên chưa có "Lộ trình học tập" (customPath đang rỗng). Lúc này, thay vì hiển thị trực tiếp danh sách khóa học ngẫu nhiên, hệ thống sẽ yêu cầu học viên làm bài khảo sát Zero 2 Hero.
+* Xây dựng lộ trình (Reality Map):
+   * Bài khảo sát sẽ hỏi học viên về mục tiêu (Bán hàng, Xây dựng nhân hiệu, hay Lan tỏa giá trị), tình trạng hiện tại (Đã có kênh chưa, đã có 1k follow chưa) và mục tiêu hành động cụ thể.
+   * Dựa vào câu trả lời, AI của hệ thống (generatePathFromAnswers) sẽ tự động nhặt các mảnh ghép khóa học phù hợp (VD: nếu chưa có 1k follow sẽ chèn thêm khóa ID 3 vào lộ trình) để tạo ra một lộ trình độc bản.
+* Hiển thị Bức tranh hiện thực: Sau khi hoàn thành khảo sát, màn hình sẽ chuyển sang giao diện "Bức tranh hiện thực" (Reality Map). Tại đây hiển thị rõ mục tiêu học viên vừa cam kết, thanh tiến trình các chặng đường, và "Ma trận mảnh ghép kiến thức" chứa các khóa học mà học viên cần phải mở khóa và hoàn thành.
+* Bắt đầu hành trình: Học viên bây giờ có thể cuộn xuống dưới, xem danh sách "Tất cả khóa học", bấm "Kích hoạt ngay" để lấy thông tin mã QR chuyển khoản đóng phí cam kết (nếu có) và chờ Admin hoặc hệ thống quét email tự động xác nhận để chính thức vào học.
+
+
+code cụ thể nào xử lý phần khảo sát cũng như đưa ra lộ trình, muốn thay đổi các câu hỏi hoặc đáp án cũng như cụ thể lộ trình tùy theo trường hợp cần làm gì
+Để xử lý phần khảo sát và đưa ra lộ trình (Zero 2 Hero), toàn bộ cấu hình dữ liệu và thuật toán cốt lõi đều được tập trung tại một file duy nhất: lib/survey-data.ts. Các file phụ trợ liên quan là giao diện components/home/Zero2HeroSurvey.tsx và server action app/actions/survey-actions.ts.
+Dưới đây là hướng dẫn cụ thể những gì bạn cần làm khi muốn thay đổi kịch bản:
+1. Thay đổi Câu hỏi, Đáp án và Rẽ nhánh (Flow)
+Bạn mở file lib/survey-data.ts. Trong này có một object lớn tên là surveyQuestions chứa toàn bộ câu hỏi.
+Cách thêm/sửa câu hỏi: Mỗi câu hỏi được định nghĩa bằng một block có cấu trúc như sau:
+q1: {
+    id: 'q1',
+    question: 'Bạn muốn học để làm gì?',
+    subtitle: 'Xác định hướng đi chính của bạn tại Học viện BRK.',
+    type: 'CHOICE', // Loại hiển thị: 'CHOICE', 'INPUT_ACCOUNT', hoặc 'INPUT_GOAL'
+    options: [
+        { id: 'selling', label: 'Bán hàng', nextQuestionId: 'q2_selling' },
+        { id: 'unknown', label: 'Chưa biết - cần tư vấn thêm', isAdvice: true }
+    ]
+}
+
+
+Muốn thay đổi gì, bạn làm như sau:
+* Sửa nội dung: Thay đổi text ở trường question (câu hỏi chính), subtitle (mô tả phụ), hoặc label (nội dung đáp án),.
+* Điều hướng rẽ nhánh (Logic Tree): Để đưa học viên đến câu hỏi tiếp theo dựa trên đáp án họ chọn, bạn sửa giá trị nextQuestionId. Ví dụ: Nếu chọn "Bán hàng", nextQuestionId là 'q2_selling'. Hệ thống sẽ tự động tìm block có id: 'q2_selling' để hiển thị tiếp.
+* Kết thúc khảo sát: Nếu đáp án đó dẫn đến việc kết thúc khảo sát, đặt nextQuestionId: 'done',.
+* Bật Video Tư vấn: Nếu muốn đáp án mở ra popup video khuyên học viên, bạn thêm isAdvice: true (không cần nextQuestionId),.
+Lưu ý về UI: Nếu bạn tạo ra một type mới (khác với CHOICE, INPUT_ACCOUNT, INPUT_GOAL), bạn bắt buộc phải sang file giao diện components/home/Zero2HeroSurvey.tsx để viết thêm code HTML/Tailwind để render loại form đó,,.
+2. Thay đổi Lộ trình (Roadmap) tùy theo trường hợp
+Khi học viên hoàn thành khảo sát, hệ thống sẽ gọi hàm generatePathFromAnswers(answers) nằm ở cuối file lib/survey-data.ts. Object answers sẽ chứa tất cả các đáp án mà học viên đã chọn, ví dụ: { q1: 'selling', q2_selling: 'affiliate', q3_account_1k_status: 'no' }.
+Cách sửa logic cấp khóa học: Trong hàm này, bạn dùng các câu lệnh if/else để kiểm tra kết quả answers và nhét ID của các khóa học (ID dạng số trong DB, không phải mã id_khoa dạng chữ) vào mảng finalPath,.
+Ví dụ code hiện tại:
+export function generatePathFromAnswers(answers: Record<string, any>): number[] {
+    // 1. Lộ trình nền tảng ai cũng phải học
+    const commonPath =;
+    let finalPath = [...commonPath];
+
+
+    // 2. Logic tùy biến theo trường hợp
+    // VD: Nếu đi nhánh Affiliate mà chưa có 1k follow -> Chèn thêm khóa ID 3
+    if (answers['q2_selling'] === 'affiliate' && answers['q3_account_1k_status'] === 'no') {
+        if (!finalPath.includes(3)) {
+            finalPath.splice(2, 0, 3); // Chèn khóa học số 3 vào vị trí thứ 2 trong lộ trình
+        }
+    }
+
+
+    // 3. Bạn có thể thêm các logic mới tại đây
+    /* Ví dụ bạn muốn thêm khóa ID 99 nếu chọn Xây dựng nhân hiệu:
+    if (answers['q1'] === 'branding') {
+        finalPath.push(99); // Thêm vào cuối lộ trình
+    }
+    */
+
+
+    return finalPath; // Trả về mảng các ID khóa học sẽ hiển thị trên Reality Map
+}
+
+
+Tóm lại quy trình thực hiện:
+1. Bạn muốn hỏi gì thêm/sửa luồng câu hỏi -> Chỉnh mảng surveyQuestions trong lib/survey-data.ts.
+2. Nhớ các khóa id của câu hỏi và id của options bạn vừa tạo.
+3. Kéo xuống hàm generatePathFromAnswers, dùng if (answers['id_câu_hỏi'] === 'id_đáp_án') để bắt logic,.
+4. Dùng .push(ID_Khóa_học) (vào cuối) hoặc .splice(vị_trí, 0, ID_Khóa_học) (chèn vào giữa) để nhào nặn ra finalPath theo đúng ý bạn,.
+
+
+có cách nào tạo ra 1 module chức năng này có giao diện dễ sử dụng hơn để thiết kế phần khảo sát cũng như quy định lộ trình không? ví dụ như kiểu kéo thả, mindmap... hãy tư vấn thêm cho tôi
+Hoàn toàn có thể. Ý tưởng chuyển từ việc code cứng (hardcode) trong file lib/survey-data.ts sang một giao diện kéo thả trực quan (như mindmap) là một bước nâng cấp rất đáng giá, giúp Admin dễ dàng thay đổi kịch bản mà không cần đụng vào code.
+Dựa trên cấu trúc hệ thống hiện tại của bạn (Next.js, Prisma, Tailwind CSS), tôi tư vấn cho bạn lộ trình và giải pháp để xây dựng module "Visual Survey & Roadmap Builder" như sau:
+1. Thư viện khuyên dùng cho Giao diện (Frontend)
+Để làm được giao diện dạng Mindmap / Kéo thả các nhánh logic (Flowchart) giống như ý bạn, bạn nên sử dụng thư viện React Flow (hoặc @xyflow/react).
+* Lý do: Đây là thư viện mạnh mẽ nhất hiện nay trong hệ sinh thái React để vẽ sơ đồ tư duy, node-based UI (giống giao diện của Zapier, Make hay các tool Chatbot).
+* Cách hoạt động: Bạn sẽ tạo ra các "Khối" (Node) đại diện cho: Câu hỏi, Đáp án, Khóa học. Sau đó bạn kéo các "Dây nối" (Edge) từ khối Đáp án sang khối Câu hỏi tiếp theo, hoặc nối vào khối Khóa học để tạo thành lộ trình.
+* (Lưu ý: Thư viện này hiện chưa có trong file package.json của dự án, bạn sẽ cần cài đặt thêm bằng lệnh npm install @xyflow/react).
+2. Phương án lưu trữ Cơ sở dữ liệu (Backend)
+Hiện tại, logic khảo sát đang được code cố định. Để làm cho nó "động" (dynamic), bạn có 2 cách lưu trữ trong Database:
+* Cách 1 (Nhanh và dễ nhất - Khuyên dùng): Tận dụng bảng SystemConfig có sẵn. Trong schema.prisma của bạn đã có sẵn bảng SystemConfig với trường value dạng Json. Bạn chỉ cần lưu toàn bộ cục dữ liệu Mindmap (gồm danh sách nodes, edges từ React Flow) vào bảng này với key ví dụ là "ZERO_TO_HERO_FLOW".
+* Cách 2 (Mở rộng quy mô): Tạo các bảng mới. Bạn cập nhật schema.prisma tạo thêm các bảng như SurveyQuestion, SurveyOption, RoadmapRule. Tuy nhiên cách này query sẽ phức tạp hơn khi vẽ lại giao diện mindmap.
+3. Lộ trình triển khai module (Implementation Steps)
+Bước 1: Xây dựng trang Admin UI (Sử dụng React Flow)
+* Tạo một trang mới trong khu vực Admin, ví dụ app/admin/roadmap-builder/page.tsx.
+* Sử dụng thư viện kéo thả, thiết kế một thanh công cụ (Sidebar) chứa các phần tử: Thêm câu hỏi mới, Thêm khóa học, Thêm video tư vấn.
+* Admin kéo các phần tử này vào màn hình giữa, nhập nội dung (text câu hỏi) và nối dây. Ví dụ: Kéo dây từ đáp án "Chưa có 1k follow" nối thẳng vào node "Khóa học Tiktok ID 3".
+Bước 2: Viết hàm Lưu & Đọc (Server Actions)
+* Trong app/actions/admin-actions.ts, thêm hàm saveRoadmapFlow(flowJson) để lưu cái Mindmap mà Admin vừa vẽ vào bảng SystemConfig.
+Bước 3: Sửa lại bộ máy tính toán (Path Engine)
+* Hiện tại, API saveSurveyResultAction đang import surveyQuestions và generatePathFromAnswers từ file tĩnh.
+* Bạn sẽ sửa lại hàm này: Thay vì đọc file tĩnh, nó sẽ gọi DB lấy cấu hình "ZERO_TO_HERO_FLOW" từ bảng SystemConfig.
+* Dựa trên các đáp án học viên chọn (ví dụ: q1 -> option_2 -> q3 -> option_1), code sẽ lần theo các "dây nối" (edges) trong file JSON để gom nhặt ra danh sách ID khóa học tương ứng rồi lưu vào customPath của User.
+Bước 4: Sửa lại giao diện làm bài của Học viên
+* Trang components/home/Zero2HeroSurvey.tsx hiện tại cũng đang fix cứng đọc từ file. Bạn sẽ đổi thành nhận dữ liệu JSON động truyền từ Server xuống để tự động render ra câu hỏi tương ứng với node hiện tại trong mindmap.
+Tóm lại: Việc này đòi hỏi kỹ năng xử lý cấu trúc dữ liệu dạng Đồ thị (Graph/Tree). Nếu bạn triển khai, hãy ưu tiên cài đặt thư viện React Flow, tạo ra bản nháp lưu thành chuỗi JSON trước, sau đó mới map chuỗi JSON này vào phần logic cấp khóa của dự án.
+
+
+hãy lập plan cụ thể chi tiết giúp tôi có thể triển khai được tính năng này nhé
+
+
+Dựa trên cấu trúc dự án Next.js 16, Prisma và Tailwind CSS của bạn, đây là kế hoạch chi tiết từng bước (Step-by-Step Plan) để triển khai tính năng Visual Survey & Roadmap Builder (Thiết kế khảo sát và lộ trình dạng kéo thả).
+Kế hoạch này được thiết kế để không làm gián đoạn hệ thống hiện tại, sử dụng lại tối đa các bảng Database có sẵn (đặc biệt là bảng SystemConfig).
+
+
+--------------------------------------------------------------------------------
+
+
+GIAI ĐOẠN 1: Chuẩn bị & Cài đặt (Ngày 1)
+1. Cài đặt thư viện cốt lõi Bạn cần cài đặt React Flow, thư viện mạnh mẽ nhất hiện nay cho giao diện Node-based:
+npm install @xyflow/react
+
+
+2. Định nghĩa Cấu trúc Dữ liệu (JSON Schema) Thay vì sửa Schema Database, ta sẽ lưu toàn bộ bản đồ Mindmap dưới dạng một chuỗi JSON vào bảng SystemConfig với key = 'ROADMAP_FLOW'. Cấu trúc JSON của React Flow sẽ gồm 2 phần chính:
+* nodes: Các khối (Câu hỏi, Đáp án, Khóa học, Tư vấn).
+* edges: Các dây nối giữa các khối.
+
+
+--------------------------------------------------------------------------------
+
+
+GIAI ĐOẠN 2: Xây dựng Giao diện Admin Builder (Ngày 2 - 3)
+Đây là khối lượng công việc lớn nhất. Bạn sẽ tạo một trang mới trong khu vực Admin: app/admin/roadmap-builder/page.tsx và thêm link vào menu ở app/admin/layout.tsx.
+1. Chia Layout cho trang Builder:
+* Sidebar (Bên trái/phải): Chứa các công cụ để kéo thả (Kéo "Câu hỏi mới", kéo "Khóa học", kéo "Kết thúc").
+* Canvas (Ở giữa): Khu vực hiển thị component <ReactFlow />.
+* Properties Panel: Khi Admin click vào một Node (ví dụ Node câu hỏi), panel này hiện ra để nhập Text câu hỏi, chọn loại câu hỏi (Trắc nghiệm, Nhập số, v.v.).
+2. Tạo Custom Nodes: Mặc định React Flow chỉ có hình chữ nhật cơ bản. Bạn cần tạo các component UI riêng cho từng loại Node để Admin dễ nhìn:
+* QuestionNode: Màu cam, có text câu hỏi.
+* OptionNode: Màu xám, là các đáp án để nối dây đi tiếp.
+* CourseNode: Màu tím, hiển thị tên Khóa học (Lấy danh sách từ DB đổ vào).
+3. Viết Server Actions lưu trữ: Trong file app/actions/admin-actions.ts, thêm 2 hàm:
+export async function getRoadmapFlow() {
+    // Gọi DB lấy SystemConfig where key = 'ROADMAP_FLOW'
+}
+
+
+export async function saveRoadmapFlow(nodes: any, edges: any) {
+    // Lưu {nodes, edges} dạng JSON vào SystemConfig
+}
+
+
+
+
+--------------------------------------------------------------------------------
+
+
+GIAI ĐOẠN 3: Viết lại "Bộ máy tính toán" Lộ trình (Ngày 4)
+Hiện tại, hàm generatePathFromAnswers đang hardcode bằng các lệnh if/else. Bạn cần viết một hàm mới để "đọc" bản đồ React Flow.
+Quy trình thuật toán (Graph Traversal):
+1. Khi học viên nộp bài, hệ thống nhận được object answers (ví dụ: [node_q1] -> [node_opt2]).
+2. Lấy dữ liệu Mindmap (nodes, edges) từ DB.
+3. Bắt đầu từ Node "Câu hỏi gốc". Lần theo các edges dựa trên đáp án học viên đã chọn.
+4. Trên đường đi (Traversal path), hễ đi qua đường dây nào được nối với một CourseNode, ta thu thập ID của khóa học đó (ví dụ ID 3, 19, 2).
+5. Kết hợp với Lộ trình gốc (các khóa bắt buộc ai cũng phải học) để tạo ra mảng customPath cuối cùng.
+Bạn sẽ viết thuật toán này trong app/actions/survey-actions.ts.
+
+
+--------------------------------------------------------------------------------
+
+
+GIAI ĐOẠN 4: Chuyển đổi Giao diện Học viên (Ngày 5)
+File components/home/Zero2HeroSurvey.tsx hiện đang đọc trực tiếp từ lib/survey-data.ts. Bạn cần refactor file này:
+1. Fetch dữ liệu động: Khi component load, gọi Server Action lấy JSON của Mindmap từ SystemConfig thay vì import file tĩnh.
+2. Trình thông dịch (Interpreter): Viết logic để chuyển đổi từ JSON của React Flow sang mảng cấu trúc câu hỏi hiện tại.
+   * Tìm Node "Câu hỏi 1".
+   * Tìm các Node "Đáp án" đang nối trực tiếp vào "Câu hỏi 1" qua edges.
+   * Render UI. Khi user click đáp án, dò theo edges để biết Node tiếp theo là gì.
+Lưu ý: Phần giao diện hiển thị cho Học viên gần như giữ nguyên (hiệu ứng, thiết kế Tailwind, màu sắc). Bạn chỉ thay đổi logic luân chuyển dữ liệu bên dưới.
+
+
+--------------------------------------------------------------------------------
+
+
+GIAI ĐOẠN 5: Kiểm thử và Triển khai (Ngày 6)
+1. Feature Flag (Tắt/Bật tính năng): Trong giai đoạn đầu, đừng xóa ngay lib/survey-data.ts. Hãy thêm 1 biến cờ (ví dụ USE_DYNAMIC_SURVEY = true trong biến môi trường .env). Nếu code mới có lỗi, bạn chỉ cần set về false là hệ thống chạy lại bằng code hardcode cũ ngay lập tức.
+2. Test các luồng rẽ nhánh: Đóng vai học viên, thử chọn các nhánh khác nhau (Bán hàng, Nhân hiệu...) và kiểm tra xem bảng Bức tranh hiện thực (RealityMap.tsx) có render đúng các khóa học tương ứng với Mindmap bạn vẽ không.
+3. Dọn dẹp code: Khi bản động đã chạy ổn định, xóa file lib/survey-data.ts và code tĩnh cũ đi.
+
+
+--------------------------------------------------------------------------------
+
+
+💡 Lời khuyên để code nhanh và hiệu quả hơn:
+* Bắt đầu với React Flow tĩnh: Khoan vội nối Database. Hãy cài @xyflow/react, tạo trang Admin, dùng hardcode JSON để vẽ thử Mindmap và xem thuật toán cấp khóa học (Giai đoạn 3) có chạy đúng ý không trước khi làm phần Lưu/Tải DB.
+* Bỏ qua Edge phức tạp ban đầu: Lúc đầu hãy thiết kế sao cho 1 Đáp án chỉ nối ra 1 Câu hỏi tiếp theo, và 1 Đáp án nối ra 1 hoặc nhiều Khóa học. Tránh các vòng lặp (loop) trong Mindmap để thuật toán không bị kẹt.
