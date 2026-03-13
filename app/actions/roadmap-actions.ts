@@ -3,67 +3,131 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
-const ROADMAP_FLOW_KEY = 'ZERO_TO_HERO_FLOW'
+/**
+ * Lấy danh sách tất cả các bài khảo sát
+ */
+export async function getAllSurveys() {
+    try {
+        return await prisma.survey.findMany({
+            orderBy: { createdAt: 'desc' }
+        })
+    } catch (error) {
+        console.error('Error fetching surveys:', error)
+        return []
+    }
+}
 
 /**
- * Lấy sơ đồ lộ trình từ Database
+ * Lấy bài khảo sát đang được kích hoạt (Cho học viên)
  */
-export async function getRoadmapFlow() {
+export async function getActiveSurvey() {
     try {
-        const config = await prisma.systemConfig.findUnique({
-            where: { key: ROADMAP_FLOW_KEY }
+        const active = await prisma.survey.findFirst({
+            where: { isActive: true }
         })
-        
-        if (!config || !config.value) {
-            return null
-        }
-        
-        return config.value as any
+        return active ? active.flow : null
     } catch (error) {
-        console.error('Error fetching roadmap flow:', error)
+        console.error('Error fetching active survey:', error)
         return null
     }
 }
 
 /**
- * Lưu sơ đồ lộ trình mới vào Database
+ * Lấy chi tiết một bài khảo sát
  */
-export async function saveRoadmapFlow(flow: any) {
+export async function getSurveyById(id: number) {
     try {
-        await prisma.systemConfig.upsert({
-            where: { key: ROADMAP_FLOW_KEY },
-            update: { value: flow },
-            create: {
-                key: ROADMAP_FLOW_KEY,
-                value: flow
-            }
+        return await prisma.survey.findUnique({
+            where: { id }
         })
-        
-        revalidatePath('/admin/roadmap')
-        return { success: true }
     } catch (error) {
-        console.error('Error saving roadmap flow:', error)
-        return { success: false, error: 'Không thể lưu sơ đồ. Vui lòng thử lại.' }
+        return null
     }
 }
 
 /**
- * Lấy danh sách khóa học để Admin chọn đưa vào sơ đồ
+ * Tạo mới một bài khảo sát
+ */
+export async function createSurvey(name: string, description: string = '') {
+    try {
+        const newSurvey = await prisma.survey.create({
+            data: {
+                name,
+                description,
+                flow: { nodes: [], edges: [] }
+            }
+        })
+        revalidatePath('/admin/roadmap')
+        return { success: true, survey: newSurvey }
+    } catch (error) {
+        return { success: false, error: 'Lỗi khi tạo mới.' }
+    }
+}
+
+/**
+ * Lưu sơ đồ của bài khảo sát
+ */
+export async function saveSurveyFlow(id: number, flow: any) {
+    try {
+        await prisma.survey.update({
+            where: { id },
+            data: { flow }
+        })
+        revalidatePath('/admin/roadmap')
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: 'Lỗi khi lưu sơ đồ.' }
+    }
+}
+
+/**
+ * Kích hoạt bài khảo sát này và hủy kích hoạt tất cả các bài khác
+ */
+export async function activateSurvey(id: number) {
+    try {
+        // Sử dụng transaction để đảm bảo tính toàn vẹn (chỉ 1 bài được active)
+        await prisma.$transaction([
+            prisma.survey.updateMany({
+                where: { isActive: true },
+                data: { isActive: false }
+            }),
+            prisma.survey.update({
+                where: { id },
+                data: { isActive: true }
+            })
+        ])
+        revalidatePath('/admin/roadmap')
+        revalidatePath('/')
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: 'Lỗi khi kích hoạt.' }
+    }
+}
+
+/**
+ * Xóa một bài khảo sát
+ */
+export async function deleteSurvey(id: number) {
+    try {
+        await prisma.survey.delete({ where: { id } })
+        revalidatePath('/admin/roadmap')
+        return { success: true }
+    } catch (error) {
+        return { success: false, error: 'Không thể xóa bài này.' }
+    }
+}
+
+/**
+ * Lấy danh sách khóa học cho builder
  */
 export async function getCoursesForBuilder() {
     try {
-        const courses = await prisma.course.findMany({
+        return await prisma.course.findMany({
             where: { status: true },
-            select: {
-                id: true,
-                id_khoa: true,
-                name_lop: true
-            },
+            select: { id: true, id_khoa: true, name_lop: true },
             orderBy: { id: 'asc' }
         })
-        return courses
     } catch (error) {
-        console.error('Error fetching courses:', error)
         return []
     }
 }

@@ -110,6 +110,16 @@ model SystemConfig {
   value Json
 }
 
+model Survey {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  flow        Json     // Lưu trữ nodes và edges của React Flow
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model ReservedId {
   id        Int      @id
   note      String?
