@@ -7,7 +7,9 @@ import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
 import { getActiveSurvey } from "./roadmap-actions"
 
 /**
- * Thuật toán duyệt sơ đồ Mindmap để lấy danh sách khóa học đề xuất
+ * [BẢN VÁ LOGIC]: Thuật toán duyệt sơ đồ Mindmap thông minh
+ * 1. Tự động xác định Node gốc (Root)
+ * 2. Thu thập khóa học xuyên thấu các nhánh
  */
 function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goal: string } {
     const { nodes, edges } = flow
@@ -16,7 +18,12 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
 
     if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goal: '' }
 
-    const startNode = nodes.find((n: any) => n.type === 'questionNode')
+    // [FIX 1]: Tìm đúng Node gốc (Là câu hỏi không có bất kỳ mũi tên nào trỏ vào)
+    const targetIds = new Set(edges.map((e: any) => e.target))
+    let startNode = nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
+    
+    // Fallback an toàn nếu không tìm thấy node gốc tuyệt đối
+    if (!startNode) startNode = nodes.find((n: any) => n.type === 'questionNode')
     if (!startNode) return { customPath: [], goal: '' }
 
     currentGoal = startNode.data?.label || ''
@@ -30,8 +37,8 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
 
             if (targetNode.type === 'optionNode') {
                 const optionLabel = targetNode.data?.label
-                // So khớp đáp án người dùng chọn cho câu hỏi nguồn
-                if (answers[currentNodeId] === optionLabel) {
+                // [FIX 3]: So khớp đáp án. Hỗ trợ luôn các nút "Xác nhận" từ Input Form
+                if (answers[currentNodeId] === optionLabel || answers[currentNodeId] === 'Xác nhận' || answers[currentNodeId] === 'Tiếp tục') {
                     traverse(targetNode.id)
                 }
             } 
@@ -39,6 +46,7 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
                 if (targetNode.data?.courseId) {
                     collectedCourseIds.add(Number(targetNode.data.courseId))
                 }
+                // [FIX 2]: Thu thập khóa học xong, đi tiếp nếu có câu hỏi hoặc khóa học khác nối sau
                 traverse(targetNode.id)
             }
             else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
@@ -66,7 +74,7 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
     try {
         const userId = parseInt(session.user.id)
         
-        // 1. Lấy bài khảo sát ĐANG KÍCH HOẠT
+        // 1. Lấy bài khảo sát ĐANG KÍCH HOẠT từ Database
         const flowData = await getActiveSurvey()
         const flow = flowData as any
         
@@ -74,28 +82,20 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         let goal = ''
 
         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
-            console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG...')
+            console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG (Bản vá 2.0)...')
             const result = resolvePathFromFlow(flow, answers)
             customPath = result.customPath
             goal = result.goal
         } else {
             console.log('📦 Đang sử dụng logic lộ trình tĩnh (Fallback)...')
-            // FALLBACK THÔNG MINH: Nếu UI gửi node_id nhưng logic cũ cần q1, q2
-            // Ta sẽ cố gắng trích xuất dữ liệu nếu có thể, hoặc dùng logic mặc định
             customPath = generatePathFromAnswers(answers)
-            
             const q1AnswerId = answers['q1'] || 'unknown'
             const q1Data = (surveyQuestions as any)['q1']
             const goalOption = q1Data?.options?.find((o: any) => o.id === q1AnswerId)
             goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
         }
 
-        // Đảm bảo customPath không rỗng để RealityMap có thể hiển thị
-        if (customPath.length === 0) {
-            customPath = [1] // Mặc định cấp khóa 1 nếu không tính toán được
-        }
-
-        // 2. Lấy dữ liệu cũ để lưu lịch sử
+        // 2. Lưu lịch sử và cập nhật Database
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { surveyResults: true, customPath: true, goal: true }
@@ -123,7 +123,6 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             history: newHistory
         };
 
-        // 3. Cập nhật Database (Dùng Transaction để tăng độ tin cậy)
         await prisma.user.update({
             where: { id: userId },
             data: {
@@ -138,11 +137,10 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
 
     } catch (error: any) {
         console.error("Lỗi khi lưu khảo sát:", error)
-        // Nếu lỗi do Database (Prisma), trả về thông báo chi tiết hơn
         if (error.message?.includes('reach database')) {
             return { success: false, error: "Lỗi kết nối Database. Vui lòng thử lại sau giây lát." }
         }
-        return { success: false, error: "Hệ thống đang bận (Error: " + error.message + ")" }
+        return { success: false, error: "Hệ thống đang bận. Vui lòng thử lại sau." }
     }
 }
 

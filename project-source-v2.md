@@ -30,7 +30,7 @@ The content is organized as follows:
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
 - Only files matching these patterns are included: app/**/*, components/**/*, lib/**/*, prisma/**/*, scripts/**/*, types/**/*, *.ts, *.json, *.md
-- Files matching these patterns are excluded: code_thamkhao/**, plan_temp/**, test-github-run/**, **/*.csv, CODE_HISTORY*.md, project-source*.md, backups/**
+- Files matching these patterns are excluded: code_thamkhao/**, plan_temp/**, test-github-run/**, **/*.csv, CODE_HISTORY*.md, project-source*.md, backups/**, public/**, *.bat
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Empty lines have been removed from all files
@@ -9468,6 +9468,42 @@ vercel.json
 68: }
 ````
 
+## File: app/layout.tsx
+````typescript
+ 1: import type { Metadata } from "next";
+ 2: import { Be_Vietnam_Pro, Inter } from "next/font/google";
+ 3: import "./globals.css";
+ 4: const beVietnamPro = Be_Vietnam_Pro({
+ 5:   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+ 6:   subsets: ["vietnamese", "latin"],
+ 7:   variable: "--font-be-vietnam-pro",
+ 8: });
+ 9: const inter = Inter({
+10:   subsets: ["vietnamese", "latin"],
+11:   variable: "--font-inter",
+12: });
+13: export const metadata: Metadata = {
+14:   title: "Học Viện BRK - Nâng Tầm Năng Lực",
+15:   description: "Học viện đào tạo thực chiến về AI, Nhân hiệu và Affiliate",
+16: };
+17: export default function RootLayout({
+18:   children,
+19: }: Readonly<{
+20:   children: React.ReactNode;
+21: }>) {
+22:   return (
+23:     <html lang="vi" suppressHydrationWarning>
+24:       <body
+25:         className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
+26:         suppressHydrationWarning
+27:       >
+28:         {children}
+29:       </body>
+30:     </html>
+31:   );
+32: }
+````
+
 ## File: components/course/ChatSection.tsx
 ````typescript
   1: 'use client'
@@ -9966,42 +10002,6 @@ vercel.json
 65: }
 ````
 
-## File: app/layout.tsx
-````typescript
- 1: import type { Metadata } from "next";
- 2: import { Be_Vietnam_Pro, Inter } from "next/font/google";
- 3: import "./globals.css";
- 4: const beVietnamPro = Be_Vietnam_Pro({
- 5:   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
- 6:   subsets: ["vietnamese", "latin"],
- 7:   variable: "--font-be-vietnam-pro",
- 8: });
- 9: const inter = Inter({
-10:   subsets: ["vietnamese", "latin"],
-11:   variable: "--font-inter",
-12: });
-13: export const metadata: Metadata = {
-14:   title: "Học Viện BRK - Nâng Tầm Năng Lực",
-15:   description: "Học viện đào tạo thực chiến về AI, Nhân hiệu và Affiliate",
-16: };
-17: export default function RootLayout({
-18:   children,
-19: }: Readonly<{
-20:   children: React.ReactNode;
-21: }>) {
-22:   return (
-23:     <html lang="vi" suppressHydrationWarning>
-24:       <body
-25:         className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
-26:         suppressHydrationWarning
-27:       >
-28:         {children}
-29:       </body>
-30:     </html>
-31:   );
-32: }
-````
-
 ## File: auth.ts
 ````typescript
   1: import NextAuth from "next-auth"
@@ -10110,313 +10110,6 @@ vercel.json
 104:         }
 105:     }
 106: })
-````
-
-## File: components/home/Zero2HeroSurvey.tsx
-````typescript
-  1: 'use client'
-  2: import React, { useState, useEffect } from 'react'
-  3: import { surveyQuestions } from '@/lib/survey-data'
-  4: import { saveSurveyResultAction } from '@/app/actions/survey-actions'
-  5: import { getActiveSurvey } from '@/app/actions/roadmap-actions'
-  6: import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send } from 'lucide-react'
-  7: // ─── Component Popup Tư Vấn ────────────────────────────────────────────────
-  8: function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
-  9:     return (
- 10:         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
- 11:             <div className="bg-zinc-900 w-full max-w-xl rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
- 12:                 <div 
- 13:                     className="aspect-video bg-black relative flex items-center justify-center group cursor-pointer"
- 14:                     onClick={() => videoUrl && window.open(videoUrl, '_blank')}
- 15:                 >
- 16:                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
- 17:                     <Play className="w-16 h-16 text-yellow-400 fill-current group-hover:scale-110 transition-transform" />
- 18:                     <p className="absolute bottom-4 left-6 text-white font-black uppercase tracking-widest text-xs">
- 19:                         {videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}
- 20:                     </p>
- 21:                 </div>
- 22:                 <div className="p-8 space-y-4">
- 23:                     <h3 className="text-2xl font-black text-white uppercase">Cố vấn định hướng</h3>
- 24:                     <p className="text-gray-400 text-sm leading-relaxed font-medium">
- 25:                         Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện. 
- 26:                         Sau khi xem xong, hãy quay lại và chọn mục tiêu mà bạn cảm thấy tự tin nhất để bắt đầu.
- 27:                     </p>
- 28:                     <button 
- 29:                         onClick={onClose}
- 30:                         className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-yellow-500 transition-all active:scale-95"
- 31:                     >
- 32:                         Tôi đã hiểu - Quay lại chọn
- 33:                     </button>
- 34:                 </div>
- 35:             </div>
- 36:         </div>
- 37:     )
- 38: }
- 39: export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
- 40:     // State cho Dynamic Flow
- 41:     const [flow, setFlow] = useState<any>(null)
- 42:     const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
- 43:     const [isLoadingFlow, setIsLoadingFlow] = useState(true)
- 44:     // State kế thừa từ bản cũ
- 45:     const [currentStep, setCurrentStep] = useState('q1')
- 46:     const [history, setHistory] = useState<any[]>([])
- 47:     const [answers, setAnswers] = useState<Record<string, any>>({})
- 48:     const [isSubmitting, setIsSubmitting] = useState(false)
- 49:     const [showSuccess, setShowSuccess] = useState(false)
- 50:     const [showAdvice, setShowAdvice] = useState<string | null>(null)
- 51:     // Form inputs state
- 52:     const [input1, setInput1] = useState('')
- 53:     const [input2, setInput2] = useState('')
- 54:     const [videoPerDay, setVideoPerDay] = useState('1')
- 55:     const [days, setDays] = useState('30')
- 56:     const [targetVal, setTargetVal] = useState('1000')
- 57:     // Tải bài khảo sát ĐANG KÍCH HOẠT từ Database
- 58:     useEffect(() => {
- 59:         const loadFlow = async () => {
- 60:             try {
- 61:                 setIsLoadingFlow(true)
- 62:                 const data = await getActiveSurvey() as any
- 63:                 if (data && data.nodes && Array.isArray(data.nodes) && data.nodes.length > 0) {
- 64:                     setFlow(data)
- 65:                     const startNode = data.nodes.find((n: any) => n.type === 'questionNode')
- 66:                     if (startNode) setCurrentNodeId(startNode.id)
- 67:                 }
- 68:             } catch (err) {
- 69:                 console.error("Failed to load flow:", err)
- 70:             } finally {
- 71:                 setIsLoadingFlow(false)
- 72:             }
- 73:         }
- 74:         loadFlow()
- 75:     }, [])
- 76:     // Lấy dữ liệu câu hỏi hiện tại (Động hoặc Tĩnh)
- 77:     const getActiveQuestion = () => {
- 78:         if (flow && currentNodeId && Array.isArray(flow.nodes)) {
- 79:             const node = flow.nodes.find((n: any) => n.id === currentNodeId)
- 80:             if (node) {
- 81:                 const optionEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === currentNodeId) : []
- 82:                 const options = optionEdges.map((edge: any) => {
- 83:                     const optNode = flow.nodes.find((n: any) => n.id === edge.target)
- 84:                     return {
- 85:                         id: optNode?.id,
- 86:                         label: optNode?.data?.label,
- 87:                         edgeId: edge.id
- 88:                     }
- 89:                 }).filter((o: any) => o.id)
- 90:                 return {
- 91:                     id: node.id,
- 92:                     question: node.data?.label || 'Câu hỏi không có nội dung',
- 93:                     type: node.data?.type || 'CHOICE',
- 94:                     options: options,
- 95:                     isDynamic: true
- 96:                 }
- 97:             }
- 98:         }
- 99:         const staticQ = (surveyQuestions as any)[currentStep]
-100:         return { 
-101:             ...staticQ, 
-102:             id: currentStep, 
-103:             isDynamic: false,
-104:             question: staticQ?.question || 'Câu hỏi không tìm thấy',
-105:             options: staticQ?.options || []
-106:         }
-107:     }
-108:     const currentQuestion = getActiveQuestion()
-109:     const handleBack = () => {
-110:         if (history.length > 0) {
-111:             const prev = [...history]
-112:             const last = prev.pop()!
-113:             setHistory(prev)
-114:             if (last.isDynamic) {
-115:                 setCurrentNodeId(last.id)
-116:             } else {
-117:                 setCurrentStep(last.id)
-118:             }
-119:         }
-120:     }
-121:     const handleNext = async (optionId: string, label: string) => {
-122:         const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
-123:         if (currentQuestion.type === 'INPUT_ACCOUNT') {
-124:             newAnswers[`${currentQuestion.id}_name`] = input1
-125:             newAnswers[`${currentQuestion.id}_id`] = input2
-126:             newAnswers[`${currentQuestion.id}_status`] = label
-127:         }
-128:         if (currentQuestion.type === 'INPUT_GOAL') {
-129:             newAnswers['goal_config'] = { videoPerDay, days, targetVal }
-130:         }
-131:         setAnswers(newAnswers)
-132:         if (currentQuestion.isDynamic && flow) {
-133:             const nextEdge = Array.isArray(flow.edges) ? flow.edges.find((e: any) => e.source === optionId) : null
-134:             if (nextEdge) {
-135:                 const nextNode = flow.nodes.find((n: any) => n.id === nextEdge.target)
-136:                 if (nextNode) {
-137:                     if (nextNode.type === 'adviceNode') {
-138:                         setShowAdvice(nextNode.data?.label || '')
-139:                         return
-140:                     }
-141:                     if (nextNode.type === 'questionNode') {
-142:                         setHistory([...history, { id: currentNodeId, isDynamic: true }])
-143:                         setCurrentNodeId(nextNode.id)
-144:                         return
-145:                     }
-146:                     if (nextNode.type === 'courseNode') {
-147:                         const afterCourseEdge = flow.edges.find((e: any) => e.source === nextNode.id)
-148:                         if (afterCourseEdge) {
-149:                             const afterCourseNode = flow.nodes.find((n: any) => n.id === afterCourseEdge.target)
-150:                             if (afterCourseNode && afterCourseNode.type === 'questionNode') {
-151:                                 setHistory([...history, { id: currentNodeId, isDynamic: true }])
-152:                                 setCurrentNodeId(afterCourseNode.id)
-153:                                 return
-154:                             }
-155:                         }
-156:                     }
-157:                 }
-158:             }
-159:             finishSurvey(newAnswers)
-160:         } else {
-161:             const staticQData = (surveyQuestions as any)[currentStep]
-162:             const staticOpt = staticQData?.options?.find((o: any) => o.id === optionId)
-163:             if (staticOpt?.isAdvice) {
-164:                 setShowAdvice('https://youtube.com')
-165:                 return
-166:             }
-167:             if (staticOpt?.nextQuestionId && staticOpt.nextQuestionId !== 'done') {
-168:                 setHistory([...history, { id: currentStep, isDynamic: false }])
-169:                 setCurrentStep(staticOpt.nextQuestionId)
-170:             } else {
-171:                 finishSurvey(newAnswers)
-172:             }
-173:         }
-174:         setInput1('')
-175:         setInput2('')
-176:     }
-177:     const finishSurvey = async (finalAnswers: any) => {
-178:         setIsSubmitting(true)
-179:         try {
-180:             const res = await saveSurveyResultAction(finalAnswers)
-181:             if (res.success) {
-182:                 setShowSuccess(true)
-183:                 if (onComplete) setTimeout(onComplete, 3000)
-184:             } else {
-185:                 alert(res.error)
-186:                 setIsSubmitting(false)
-187:             }
-188:         } catch (err) {
-189:             console.error(err)
-190:             setIsSubmitting(false)
-191:         }
-192:     }
-193:     if (isLoadingFlow) return (
-194:         <div className="bg-zinc-950 rounded-[3rem] p-20 flex flex-col items-center justify-center border border-white/10 shadow-2xl">
-195:             <Loader2 className="w-10 h-10 animate-spin text-yellow-400 mb-4" />
-196:             <p className="text-gray-500 font-black uppercase text-[10px] tracking-widest">Đang tải khảo sát...</p>
-197:         </div>
-198:     )
-199:     if (showSuccess) return (
-200:         <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
-201:             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/20">
-202:                 <CheckCircle2 className="w-10 h-10" />
-203:             </div>
-204:             <h2 className="text-3xl font-black uppercase tracking-tight mb-4">Lộ trình đã sẵn sàng!</h2>
-205:             <p className="text-gray-400 text-sm mb-8">AI đã thiết kế xong Bức tranh hiện thực của riêng bạn.</p>
-206:             <Loader2 className="w-6 h-6 animate-spin text-yellow-400 mx-auto" />
-207:         </div>
-208:     )
-209:     return (
-210:         <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
-211:             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px]"></div>
-212:             <div className="relative z-10">
-213:                 <div className="flex items-center justify-between mb-8">
-214:                     <div className="flex items-center gap-3">
-215:                         <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20">
-216:                             <Target className="w-5 h-5" />
-217:                         </div>
-218:                         <div>
-219:                             <h2 className="text-lg font-black uppercase tracking-tight">Zero 2 Hero</h2>
-220:                             <div className="flex gap-1 mt-1">
-221:                                 {Array.from({ length: 4 }).map((_, i) => (
-222:                                     <div key={i} className={`h-1 w-4 rounded-full ${i <= history.length ? 'bg-yellow-400' : 'bg-white/10'}`}></div>
-223:                                 ))}
-224:                             </div>
-225:                         </div>
-226:                     </div>
-227:                     {history.length > 0 && (
-228:                         <button onClick={handleBack} className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400"><ArrowLeft className="w-5 h-5" /></button>
-229:                     )}
-230:                 </div>
-231:                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-232:                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
-233:                     <p className="text-gray-400 text-sm mb-8 font-medium">{'Hãy cung cấp thông tin chính xác để AI thiết kế lộ trình.'}</p>
-234:                     {/* CHOICE TYPE */}
-235:                     {currentQuestion.type === 'CHOICE' && (
-236:                         <div className="grid grid-cols-1 gap-3">
-237:                             {currentQuestion.options?.map((opt: any) => (
-238:                                 <button
-239:                                     key={opt.id}
-240:                                     onClick={() => handleNext(opt.id, opt.label)}
-241:                                     className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]"
-242:                                 >
-243:                                     <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
-244:                                     <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-yellow-400" />
-245:                                 </button>
-246:                             ))}
-247:                         </div>
-248:                     )}
-249:                     {/* INPUT ACCOUNT TYPE */}
-250:                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
-251:                         <div className="space-y-6">
-252:                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-253:                                 <div className="space-y-1.5">
-254:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Tên Shop / Kênh / Lĩnh vực</label>
-255:                                     <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500" placeholder="Nhập tên..." />
-256:                                 </div>
-257:                                 <div className="space-y-1.5">
-258:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1">ID TikTok / Link Kênh</label>
-259:                                     <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500" placeholder="@id_cua_ban" />
-260:                                 </div>
-261:                             </div>
-262:                             <div className="flex gap-3">
-263:                                 {currentQuestion.options?.map((opt: any) => (
-264:                                     <button
-265:                                         key={opt.id}
-266:                                         onClick={() => handleNext(opt.id, opt.label)}
-267:                                         className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' || opt.label?.toLowerCase() === 'tiếp tục' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
-268:                                     >
-269:                                         {opt.label}
-270:                                     </button>
-271:                                 ))}
-272:                             </div>
-273:                         </div>
-274:                     )}
-275:                     {/* INPUT GOAL TYPE */}
-276:                     {currentQuestion.type === 'INPUT_GOAL' && (
-277:                         <div className="space-y-6">
-278:                             <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 space-y-6">
-279:                                 <div className="flex flex-wrap items-center gap-3 text-sm font-bold leading-relaxed">
-280:                                     <span>Tôi sẽ làm</span>
-281:                                     <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-16 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
-282:                                     <span>video/ngày đều đặn trong</span>
-283:                                     <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-16 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
-284:                                     <span>ngày để đạt</span>
-285:                                     <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-24 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
-286:                                     <span className="text-gray-400 font-medium">Follow / Đơn hàng</span>
-287:                                 </div>
-288:                             </div>
-289:                             <button
-290:                                 disabled={isSubmitting}
-291:                                 onClick={() => handleNext('yes', 'Xác nhận')}
-292:                                 className="w-full bg-black text-yellow-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50"
-293:                             >
-294:                                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết
-295:                             </button>
-296:                         </div>
-297:                     )}
-298:                 </div>
-299:             </div>
-300:             {showAdvice && <AdviceModal videoUrl={showAdvice} onClose={() => setShowAdvice(null)} />}
-301:         </div>
-302:     )
-303: }
 ````
 
 ## File: lib/auto-verify.ts
@@ -10545,148 +10238,6 @@ vercel.json
 122:   }
 123:   return { processed: messages.length, matched: matchedCount };
 124: }
-````
-
-## File: app/actions/survey-actions.ts
-````typescript
-  1: 'use server'
-  2: import { auth } from "@/auth"
-  3: import prisma from "@/lib/prisma"
-  4: import { revalidatePath } from "next/cache"
-  5: import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
-  6: import { getActiveSurvey } from "./roadmap-actions"
-  7: /**
-  8:  * Thuật toán duyệt sơ đồ Mindmap để lấy danh sách khóa học đề xuất
-  9:  * Lần theo các 'edges' dựa trên 'answers' của học viên
- 10:  */
- 11: function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goal: string } {
- 12:     const { nodes, edges } = flow
- 13:     const collectedCourseIds = new Set<number>()
- 14:     let currentGoal = ''
- 15:     // 1. Tìm node bắt đầu (thường là node câu hỏi không có đầu vào hoặc node đầu tiên)
- 16:     const startNode = nodes.find((n: any) => n.type === 'questionNode')
- 17:     if (!startNode) return { customPath: [], goal: '' }
- 18:     // Lưu mục tiêu từ câu hỏi đầu tiên
- 19:     currentGoal = startNode.data?.label || ''
- 20:     // 2. Thuật toán duyệt đồ thị (DFS/BFS đơn giản)
- 21:     const traverse = (currentNodeId: string) => {
- 22:         const outEdges = edges.filter((e: any) => e.source === currentNodeId)
- 23:         for (const edge of outEdges) {
- 24:             const targetNode = nodes.find((n: any) => n.id === edge.target)
- 25:             if (!targetNode) continue
- 26:             // Nếu gặp node Đáp án (optionNode)
- 27:             if (targetNode.type === 'optionNode') {
- 28:                 const optionLabel = targetNode.data?.label
- 29:                 if (answers[currentNodeId] === optionLabel) {
- 30:                     traverse(targetNode.id)
- 31:                 }
- 32:             } 
- 33:             // Nếu gặp node Khóa học (courseNode) - Thêm ID vào danh sách
- 34:             else if (targetNode.type === 'courseNode') {
- 35:                 if (targetNode.data?.courseId) {
- 36:                     collectedCourseIds.add(targetNode.data.courseId)
- 37:                 }
- 38:                 traverse(targetNode.id)
- 39:             }
- 40:             // Nếu gặp node Tư vấn (adviceNode) hoặc Câu hỏi tiếp theo (questionNode)
- 41:             else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
- 42:                 traverse(targetNode.id)
- 43:             }
- 44:         }
- 45:     }
- 46:     traverse(startNode.id)
- 47:     return { 
- 48:         customPath: Array.from(collectedCourseIds), 
- 49:         goal: currentGoal 
- 50:     }
- 51: }
- 52: /**
- 53:  * Lưu kết quả khảo sát và tạo lộ trình học tập cá nhân hóa
- 54:  */
- 55: export async function saveSurveyResultAction(answers: Record<string, string>) {
- 56:     const session = await auth()
- 57:     if (!session?.user?.id) {
- 58:         return { success: false, error: "Vui lòng đăng nhập để lưu lộ trình." }
- 59:     }
- 60:     try {
- 61:         const userId = parseInt(session.user.id)
- 62:         // 1. Lấy bài khảo sát ĐANG KÍCH HOẠT từ Database (Động)
- 63:         const flowData = await getActiveSurvey()
- 64:         const flow = flowData as any
- 65:         let customPath: number[] = []
- 66:         let goal = ''
- 67:         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
- 68:             // SỬ DỤNG BỘ MÁY TÍNH TOÁN TỪ SƠ ĐỒ MỚI
- 69:             console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG ĐANG KÍCH HOẠT...')
- 70:             const result = resolvePathFromFlow(flow, answers)
- 71:             customPath = result.customPath
- 72:             goal = result.goal
- 73:         } else {
- 74:             // FALLBACK: DÙNG LOGIC CŨ (Đảm bảo hệ thống luôn chạy)
- 75:             console.log('📦 Đang sử dụng logic lộ trình tĩnh (Fallback)...')
- 76:             customPath = generatePathFromAnswers(answers)
- 77:             const q1AnswerId = answers['q1']
- 78:             const q1Data = (surveyQuestions as any)['q1']
- 79:             const goalOption = q1Data?.options?.find((o: any) => o.id === q1AnswerId)
- 80:             goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
- 81:         }
- 82:         // 2. Xử lý lưu lịch sử khảo sát
- 83:         const user = await prisma.user.findUnique({
- 84:             where: { id: userId },
- 85:             select: { surveyResults: true, customPath: true, goal: true }
- 86:         });
- 87:         const oldResults: any = user?.surveyResults || { history: [] };
- 88:         const newHistory = Array.isArray(oldResults.history) ? [...oldResults.history] : [];
- 89:         if (oldResults.current || user?.customPath) {
- 90:             newHistory.push({
- 91:                 answers: oldResults.current?.answers || oldResults,
- 92:                 customPath: user?.customPath,
- 93:                 goal: user?.goal,
- 94:                 archivedAt: new Date().toISOString()
- 95:             });
- 96:         }
- 97:         const surveyData = {
- 98:             current: {
- 99:                 answers,
-100:                 customPath: customPath,
-101:                 goal: goal,
-102:                 completedAt: new Date().toISOString()
-103:             },
-104:             history: newHistory
-105:         };
-106:         // 3. Cập nhật Database
-107:         await prisma.user.update({
-108:             where: { id: userId },
-109:             data: {
-110:                 surveyResults: surveyData,
-111:                 customPath: customPath,
-112:                 goal: goal
-113:             }
-114:         })
-115:         revalidatePath('/')
-116:         return { success: true, customPath, goal }
-117:     } catch (error: any) {
-118:         console.error("Lỗi khi lưu khảo sát:", error)
-119:         return { success: false, error: "Hệ thống đang bận, vui lòng thử lại sau." }
-120:     }
-121: }
-122: /**
-123:  * Reset lộ trình để làm lại khảo sát
-124:  */
-125: export async function resetSurveyAction() {
-126:     const session = await auth()
-127:     if (!session?.user?.id) return { success: false }
-128:     try {
-129:         await prisma.user.update({
-130:             where: { id: parseInt(session.user.id) },
-131:             data: { customPath: null as any }
-132:         })
-133:         revalidatePath('/')
-134:         return { success: true }
-135:     } catch (error) {
-136:         return { success: false }
-137:     }
-138: }
 ````
 
 ## File: app/admin/layout.tsx
@@ -10902,6 +10453,465 @@ vercel.json
 137:     </Dialog>
 138:   )
 139: }
+````
+
+## File: app/actions/survey-actions.ts
+````typescript
+  1: 'use server'
+  2: import { auth } from "@/auth"
+  3: import prisma from "@/lib/prisma"
+  4: import { revalidatePath } from "next/cache"
+  5: import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
+  6: import { getActiveSurvey } from "./roadmap-actions"
+  7: /**
+  8:  * Thuật toán duyệt sơ đồ Mindmap để lấy danh sách khóa học đề xuất
+  9:  */
+ 10: function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goal: string } {
+ 11:     const { nodes, edges } = flow
+ 12:     const collectedCourseIds = new Set<number>()
+ 13:     let currentGoal = ''
+ 14:     if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goal: '' }
+ 15:     const startNode = nodes.find((n: any) => n.type === 'questionNode')
+ 16:     if (!startNode) return { customPath: [], goal: '' }
+ 17:     currentGoal = startNode.data?.label || ''
+ 18:     const traverse = (currentNodeId: string) => {
+ 19:         const outEdges = edges.filter((e: any) => e.source === currentNodeId)
+ 20:         for (const edge of outEdges) {
+ 21:             const targetNode = nodes.find((n: any) => n.id === edge.target)
+ 22:             if (!targetNode) continue
+ 23:             if (targetNode.type === 'optionNode') {
+ 24:                 const optionLabel = targetNode.data?.label
+ 25:                 // So khớp đáp án người dùng chọn cho câu hỏi nguồn
+ 26:                 if (answers[currentNodeId] === optionLabel) {
+ 27:                     traverse(targetNode.id)
+ 28:                 }
+ 29:             } 
+ 30:             else if (targetNode.type === 'courseNode') {
+ 31:                 if (targetNode.data?.courseId) {
+ 32:                     collectedCourseIds.add(Number(targetNode.data.courseId))
+ 33:                 }
+ 34:                 traverse(targetNode.id)
+ 35:             }
+ 36:             else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
+ 37:                 traverse(targetNode.id)
+ 38:             }
+ 39:         }
+ 40:     }
+ 41:     traverse(startNode.id)
+ 42:     return { 
+ 43:         customPath: Array.from(collectedCourseIds), 
+ 44:         goal: currentGoal 
+ 45:     }
+ 46: }
+ 47: /**
+ 48:  * Lưu kết quả khảo sát và tạo lộ trình học tập cá nhân hóa
+ 49:  */
+ 50: export async function saveSurveyResultAction(answers: Record<string, string>) {
+ 51:     const session = await auth()
+ 52:     if (!session?.user?.id) {
+ 53:         return { success: false, error: "Vui lòng đăng nhập để lưu lộ trình." }
+ 54:     }
+ 55:     try {
+ 56:         const userId = parseInt(session.user.id)
+ 57:         // 1. Lấy bài khảo sát ĐANG KÍCH HOẠT
+ 58:         const flowData = await getActiveSurvey()
+ 59:         const flow = flowData as any
+ 60:         let customPath: number[] = []
+ 61:         let goal = ''
+ 62:         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
+ 63:             console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG...')
+ 64:             const result = resolvePathFromFlow(flow, answers)
+ 65:             customPath = result.customPath
+ 66:             goal = result.goal
+ 67:         } else {
+ 68:             console.log('📦 Đang sử dụng logic lộ trình tĩnh (Fallback)...')
+ 69:             // FALLBACK THÔNG MINH: Nếu UI gửi node_id nhưng logic cũ cần q1, q2
+ 70:             // Ta sẽ cố gắng trích xuất dữ liệu nếu có thể, hoặc dùng logic mặc định
+ 71:             customPath = generatePathFromAnswers(answers)
+ 72:             const q1AnswerId = answers['q1'] || 'unknown'
+ 73:             const q1Data = (surveyQuestions as any)['q1']
+ 74:             const goalOption = q1Data?.options?.find((o: any) => o.id === q1AnswerId)
+ 75:             goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
+ 76:         }
+ 77:         // Đảm bảo customPath không rỗng để RealityMap có thể hiển thị
+ 78:         if (customPath.length === 0) {
+ 79:             customPath = [1] // Mặc định cấp khóa 1 nếu không tính toán được
+ 80:         }
+ 81:         // 2. Lấy dữ liệu cũ để lưu lịch sử
+ 82:         const user = await prisma.user.findUnique({
+ 83:             where: { id: userId },
+ 84:             select: { surveyResults: true, customPath: true, goal: true }
+ 85:         });
+ 86:         const oldResults: any = user?.surveyResults || { history: [] };
+ 87:         const newHistory = Array.isArray(oldResults.history) ? [...oldResults.history] : [];
+ 88:         if (oldResults.current || user?.customPath) {
+ 89:             newHistory.push({
+ 90:                 answers: oldResults.current?.answers || answers,
+ 91:                 customPath: user?.customPath,
+ 92:                 goal: user?.goal,
+ 93:                 archivedAt: new Date().toISOString()
+ 94:             });
+ 95:         }
+ 96:         const surveyData = {
+ 97:             current: {
+ 98:                 answers,
+ 99:                 customPath: customPath,
+100:                 goal: goal,
+101:                 completedAt: new Date().toISOString()
+102:             },
+103:             history: newHistory
+104:         };
+105:         // 3. Cập nhật Database (Dùng Transaction để tăng độ tin cậy)
+106:         await prisma.user.update({
+107:             where: { id: userId },
+108:             data: {
+109:                 surveyResults: surveyData as any,
+110:                 customPath: customPath as any,
+111:                 goal: goal
+112:             }
+113:         })
+114:         revalidatePath('/')
+115:         return { success: true, customPath, goal }
+116:     } catch (error: any) {
+117:         console.error("Lỗi khi lưu khảo sát:", error)
+118:         // Nếu lỗi do Database (Prisma), trả về thông báo chi tiết hơn
+119:         if (error.message?.includes('reach database')) {
+120:             return { success: false, error: "Lỗi kết nối Database. Vui lòng thử lại sau giây lát." }
+121:         }
+122:         return { success: false, error: "Hệ thống đang bận (Error: " + error.message + ")" }
+123:     }
+124: }
+125: /**
+126:  * Reset lộ trình để làm lại khảo sát
+127:  */
+128: export async function resetSurveyAction() {
+129:     const session = await auth()
+130:     if (!session?.user?.id) return { success: false }
+131:     try {
+132:         await prisma.user.update({
+133:             where: { id: parseInt(session.user.id) },
+134:             data: { customPath: null as any }
+135:         })
+136:         revalidatePath('/')
+137:         return { success: true }
+138:     } catch (error) {
+139:         return { success: false }
+140:     }
+141: }
+````
+
+## File: components/home/Zero2HeroSurvey.tsx
+````typescript
+  1: 'use client'
+  2: import React, { useState, useEffect } from 'react'
+  3: import { surveyQuestions } from '@/lib/survey-data'
+  4: import { saveSurveyResultAction } from '@/app/actions/survey-actions'
+  5: import { getActiveSurvey } from '@/app/actions/roadmap-actions'
+  6: import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send } from 'lucide-react'
+  7: // ─── Component Popup Tư Vấn ────────────────────────────────────────────────
+  8: function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
+  9:     return (
+ 10:         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+ 11:             <div className="bg-zinc-900 w-full max-w-xl rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
+ 12:                 <div 
+ 13:                     className="aspect-video bg-black relative flex items-center justify-center group cursor-pointer"
+ 14:                     onClick={() => videoUrl && window.open(videoUrl, '_blank')}
+ 15:                 >
+ 16:                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+ 17:                     <Play className="w-16 h-16 text-yellow-400 fill-current group-hover:scale-110 transition-transform" />
+ 18:                     <p className="absolute bottom-4 left-6 text-white font-black uppercase tracking-widest text-xs">
+ 19:                         {videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}
+ 20:                     </p>
+ 21:                 </div>
+ 22:                 <div className="p-8 space-y-4">
+ 23:                     <h3 className="text-2xl font-black text-white uppercase">Cố vấn định hướng</h3>
+ 24:                     <p className="text-gray-400 text-sm leading-relaxed font-medium">
+ 25:                         Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện. 
+ 26:                         Sau khi xem xong, hãy quay lại và chọn mục tiêu mà bạn cảm thấy tự tin nhất để bắt đầu.
+ 27:                     </p>
+ 28:                     <button 
+ 29:                         onClick={onClose}
+ 30:                         className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-yellow-500 transition-all active:scale-95"
+ 31:                     >
+ 32:                         Tôi đã hiểu - Quay lại chọn
+ 33:                     </button>
+ 34:                 </div>
+ 35:             </div>
+ 36:         </div>
+ 37:     )
+ 38: }
+ 39: export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
+ 40:     // State cho Dynamic Flow
+ 41:     const [flow, setFlow] = useState<any>(null)
+ 42:     const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
+ 43:     const [isLoadingFlow, setIsLoadingFlow] = useState(true)
+ 44:     // State kế thừa từ bản cũ
+ 45:     const [currentStep, setCurrentStep] = useState('q1')
+ 46:     const [history, setHistory] = useState<any[]>([])
+ 47:     const [answers, setAnswers] = useState<Record<string, any>>({})
+ 48:     const [isSubmitting, setIsSubmitting] = useState(false)
+ 49:     const [showSuccess, setShowSuccess] = useState(false)
+ 50:     const [showAdvice, setShowAdvice] = useState<string | null>(null)
+ 51:     // Form inputs state
+ 52:     const [input1, setInput1] = useState('')
+ 53:     const [input2, setInput2] = useState('')
+ 54:     const [videoPerDay, setVideoPerDay] = useState('1')
+ 55:     const [days, setDays] = useState('30')
+ 56:     const [targetVal, setTargetVal] = useState('1000')
+ 57:     // Tải bài khảo sát ĐANG KÍCH HOẠT từ Database
+ 58:     useEffect(() => {
+ 59:         const loadFlow = async () => {
+ 60:             try {
+ 61:                 setIsLoadingFlow(true)
+ 62:                 const data = await getActiveSurvey() as any
+ 63:                 if (data && data.nodes && Array.isArray(data.nodes) && data.nodes.length > 0) {
+ 64:                     setFlow(data)
+ 65:                     const startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+ 66:                     if (startNode) setCurrentNodeId(startNode.id)
+ 67:                 }
+ 68:             } catch (err) {
+ 69:                 console.error("Failed to load flow:", err)
+ 70:             } finally {
+ 71:                 setIsLoadingFlow(false)
+ 72:             }
+ 73:         }
+ 74:         loadFlow()
+ 75:     }, [])
+ 76:     // Lấy dữ liệu câu hỏi hiện tại (Động hoặc Tĩnh)
+ 77:     const getActiveQuestion = () => {
+ 78:         if (flow && currentNodeId && Array.isArray(flow.nodes)) {
+ 79:             const node = flow.nodes.find((n: any) => n.id === currentNodeId)
+ 80:             if (node) {
+ 81:                 const optionEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === currentNodeId) : []
+ 82:                 const options = optionEdges.map((edge: any) => {
+ 83:                     const optNode = flow.nodes.find((n: any) => n.id === edge.target)
+ 84:                     return {
+ 85:                         id: optNode?.id,
+ 86:                         label: optNode?.data?.label,
+ 87:                         edgeId: edge.id
+ 88:                     }
+ 89:                 }).filter((o: any) => o.id)
+ 90:                 return {
+ 91:                     id: node.id,
+ 92:                     question: node.data?.label || 'Câu hỏi không có nội dung',
+ 93:                     type: node.data?.type || 'CHOICE',
+ 94:                     options: options,
+ 95:                     isDynamic: true
+ 96:                 }
+ 97:             }
+ 98:         }
+ 99:         const staticQ = (surveyQuestions as any)[currentStep]
+100:         return { 
+101:             ...staticQ, 
+102:             id: currentStep, 
+103:             isDynamic: false,
+104:             question: staticQ?.question || 'Câu hỏi không tìm thấy',
+105:             options: staticQ?.options || []
+106:         }
+107:     }
+108:     const currentQuestion = getActiveQuestion()
+109:     const handleBack = () => {
+110:         if (history.length > 0) {
+111:             const prev = [...history]
+112:             const last = prev.pop()!
+113:             setHistory(prev)
+114:             if (last.isDynamic) {
+115:                 setCurrentNodeId(last.id)
+116:             } else {
+117:                 setCurrentStep(last.id)
+118:             }
+119:         }
+120:     }
+121:     const handleNext = async (optionId: string, label: string) => {
+122:         const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
+123:         if (currentQuestion.type === 'INPUT_ACCOUNT') {
+124:             newAnswers[`${currentQuestion.id}_name`] = input1
+125:             newAnswers[`${currentQuestion.id}_id`] = input2
+126:             newAnswers[`${currentQuestion.id}_status`] = label
+127:         }
+128:         if (currentQuestion.type === 'INPUT_GOAL') {
+129:             newAnswers['goal_config'] = { videoPerDay, days, targetVal }
+130:         }
+131:         setAnswers(newAnswers)
+132:         if (currentQuestion.isDynamic && flow) {
+133:             const nextEdge = Array.isArray(flow.edges) ? flow.edges.find((e: any) => e.source === optionId) : null
+134:             if (nextEdge) {
+135:                 const nextNode = flow.nodes.find((n: any) => n.id === nextEdge.target)
+136:                 if (nextNode) {
+137:                     if (nextNode.type === 'adviceNode') {
+138:                         setShowAdvice(nextNode.data?.label || '')
+139:                         return
+140:                     }
+141:                     if (nextNode.type === 'questionNode') {
+142:                         setHistory([...history, { id: currentNodeId, isDynamic: true }])
+143:                         setCurrentNodeId(nextNode.id)
+144:                         return
+145:                     }
+146:                     if (nextNode.type === 'courseNode') {
+147:                         const afterCourseEdge = flow.edges.find((e: any) => e.source === nextNode.id)
+148:                         if (afterCourseEdge) {
+149:                             const afterCourseNode = flow.nodes.find((n: any) => n.id === afterCourseEdge.target)
+150:                             if (afterCourseNode && afterCourseNode.type === 'questionNode') {
+151:                                 setHistory([...history, { id: currentNodeId, isDynamic: true }])
+152:                                 setCurrentNodeId(afterCourseNode.id)
+153:                                 return
+154:                             }
+155:                         }
+156:                     }
+157:                 }
+158:             }
+159:             finishSurvey(newAnswers)
+160:         } else {
+161:             const staticQData = (surveyQuestions as any)[currentStep]
+162:             const staticOpt = staticQData?.options?.find((o: any) => o.id === optionId)
+163:             if (staticOpt?.isAdvice) {
+164:                 setShowAdvice('https://youtube.com')
+165:                 return
+166:             }
+167:             if (staticOpt?.nextQuestionId && staticOpt.nextQuestionId !== 'done') {
+168:                 setHistory([...history, { id: currentStep, isDynamic: false }])
+169:                 setCurrentStep(staticOpt.nextQuestionId)
+170:             } else {
+171:                 finishSurvey(newAnswers)
+172:             }
+173:         }
+174:         setInput1('')
+175:         setInput2('')
+176:     }
+177:     const finishSurvey = async (finalAnswers: any) => {
+178:         setIsSubmitting(true)
+179:         try {
+180:             const res = await saveSurveyResultAction(finalAnswers)
+181:             if (res.success) {
+182:                 setShowSuccess(true)
+183:                 // ÉP TẢI LẠI TRANG CHỦ ĐỂ HIỆN LỘ TRÌNH MỚI
+184:                 setTimeout(() => {
+185:                     if (onComplete) {
+186:                         onComplete()
+187:                     } else {
+188:                         window.location.href = '/' // Đây là giải pháp triệt để nhất
+189:                     }
+190:                 }, 2500)
+191:             } else {
+192:                 alert(res.error)
+193:                 setIsSubmitting(false)
+194:             }
+195:         } catch (err) {
+196:             console.error(err)
+197:             setIsSubmitting(false)
+198:         }
+199:     }
+200:     if (isLoadingFlow) return (
+201:         <div className="bg-zinc-950 rounded-[3rem] p-20 flex flex-col items-center justify-center border border-white/10 shadow-2xl">
+202:             <Loader2 className="w-10 h-10 animate-spin text-yellow-400 mb-4" />
+203:             <p className="text-gray-500 font-black uppercase text-[10px] tracking-widest">Đang tải khảo sát...</p>
+204:         </div>
+205:     )
+206:     if (showSuccess) return (
+207:         <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
+208:             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/20">
+209:                 <CheckCircle2 className="w-10 h-10" />
+210:             </div>
+211:             <h2 className="text-3xl font-black uppercase tracking-tight mb-4">Lộ trình đã sẵn sàng!</h2>
+212:             <p className="text-gray-400 text-sm mb-8">AI đã thiết kế xong Bức tranh hiện thực của riêng bạn.</p>
+213:             <Loader2 className="w-6 h-6 animate-spin text-yellow-400 mx-auto" />
+214:         </div>
+215:     )
+216:     return (
+217:         <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
+218:             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px]"></div>
+219:             <div className="relative z-10">
+220:                 <div className="flex items-center justify-between mb-8">
+221:                     <div className="flex items-center gap-3">
+222:                         <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20">
+223:                             <Target className="w-5 h-5" />
+224:                         </div>
+225:                         <div>
+226:                             <h2 className="text-lg font-black uppercase tracking-tight">Zero 2 Hero</h2>
+227:                             <div className="flex gap-1 mt-1">
+228:                                 {Array.from({ length: 4 }).map((_, i) => (
+229:                                     <div key={i} className={`h-1 w-4 rounded-full ${i <= history.length ? 'bg-yellow-400' : 'bg-white/10'}`}></div>
+230:                                 ))}
+231:                             </div>
+232:                         </div>
+233:                     </div>
+234:                     {history.length > 0 && (
+235:                         <button onClick={handleBack} className="p-2 hover:bg-white/5 rounded-full transition-colors text-gray-400"><ArrowLeft className="w-5 h-5" /></button>
+236:                     )}
+237:                 </div>
+238:                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
+239:                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
+240:                     <p className="text-gray-400 text-sm mb-8 font-medium">{'Hãy cung cấp thông tin chính xác để AI thiết kế lộ trình.'}</p>
+241:                     {/* CHOICE TYPE */}
+242:                     {currentQuestion.type === 'CHOICE' && (
+243:                         <div className="grid grid-cols-1 gap-3">
+244:                             {currentQuestion.options?.map((opt: any) => (
+245:                                 <button
+246:                                     key={opt.id}
+247:                                     onClick={() => handleNext(opt.id, opt.label)}
+248:                                     className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]"
+249:                                 >
+250:                                     <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
+251:                                     <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-yellow-400" />
+252:                                 </button>
+253:                             ))}
+254:                         </div>
+255:                     )}
+256:                     {/* INPUT ACCOUNT TYPE */}
+257:                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
+258:                         <div className="space-y-6">
+259:                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+260:                                 <div className="space-y-1.5">
+261:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1">Tên Shop / Kênh / Lĩnh vực</label>
+262:                                     <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500" placeholder="Nhập tên..." />
+263:                                 </div>
+264:                                 <div className="space-y-1.5">
+265:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1">ID TikTok / Link Kênh</label>
+266:                                     <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-purple-500" placeholder="@id_cua_ban" />
+267:                                 </div>
+268:                             </div>
+269:                             <div className="flex gap-3">
+270:                                 {currentQuestion.options?.map((opt: any) => (
+271:                                     <button
+272:                                         key={opt.id}
+273:                                         onClick={() => handleNext(opt.id, opt.label)}
+274:                                         className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' || opt.label?.toLowerCase() === 'tiếp tục' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
+275:                                     >
+276:                                         {opt.label}
+277:                                     </button>
+278:                                 ))}
+279:                             </div>
+280:                         </div>
+281:                     )}
+282:                     {/* INPUT GOAL TYPE */}
+283:                     {currentQuestion.type === 'INPUT_GOAL' && (
+284:                         <div className="space-y-6">
+285:                             <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 space-y-6">
+286:                                 <div className="flex flex-wrap items-center gap-3 text-sm font-bold leading-relaxed">
+287:                                     <span>Tôi sẽ làm</span>
+288:                                     <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-16 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
+289:                                     <span>video/ngày đều đặn trong</span>
+290:                                     <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-16 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
+291:                                     <span>ngày để đạt</span>
+292:                                     <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-24 bg-white/10 border-none rounded-lg px-2 py-1 text-center text-yellow-400 outline-none" />
+293:                                     <span className="text-gray-400 font-medium">Follow / Đơn hàng</span>
+294:                                 </div>
+295:                             </div>
+296:                             <button
+297:                                 disabled={isSubmitting}
+298:                                 onClick={() => handleNext('yes', 'Xác nhận')}
+299:                                 className="w-full bg-black text-yellow-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-zinc-800 transition-all active:scale-95 disabled:opacity-50"
+300:                             >
+301:                                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết
+302:                             </button>
+303:                         </div>
+304:                     )}
+305:                 </div>
+306:             </div>
+307:             {showAdvice && <AdviceModal videoUrl={showAdvice} onClose={() => setShowAdvice(null)} />}
+308:         </div>
+309:     )
+310: }
 ````
 
 ## File: components/home/MessageCard.tsx
@@ -11476,162 +11486,6 @@ vercel.json
 81: }
 ````
 
-## File: lib/notifications.ts
-````typescript
-  1: import { google } from 'googleapis';
-  2: /**
-  3:  * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
-  4:  */
-  5: export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' = 'ACTIVATE') {
-  6:   const token = process.env.TELEGRAM_BOT_TOKEN;
-  7:   // Lấy Chat ID tương ứng với từng loại sự kiện
-  8:   const chatIdMap = {
-  9:     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
- 10:     ACTIVATE: process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID,
- 11:     LESSON: process.env.TELEGRAM_CHAT_ID_LESSON || process.env.TELEGRAM_CHAT_ID,
- 12:   };
- 13:   const chatId = chatIdMap[type];
- 14:   if (!token || !chatId) {
- 15:     console.error(`⚠️ Thiếu cấu hình Telegram cho loại: ${type}`);
- 16:     return;
- 17:   }
- 18:   try {
- 19:     const url = `https://api.telegram.org/bot${token}/sendMessage`;
- 20:     const response = await fetch(url, {
- 21:       method: 'POST',
- 22:       headers: { 'Content-Type': 'application/json' },
- 23:       body: JSON.stringify({
- 24:         chat_id: chatId,
- 25:         text: message,
- 26:         parse_mode: 'HTML',
- 27:       }),
- 28:     });
- 29:     const result = await response.json();
- 30:     if (!result.ok) {
- 31:         console.error(`❌ Telegram API Error (${type}):`, result.description);
- 32:     } else {
- 33:         console.log(`✅ Telegram API Success (${type}): Tin nhắn đã được gửi đến ID ${chatId}`);
- 34:     }
- 35:   } catch (error) {
- 36:     console.error(`❌ Lỗi hệ thống khi gửi Telegram (${type}):`, error);
- 37:   }
- 38: }
- 39: /**
- 40:  * Cấu hình OAuth2 Client cho Gmail
- 41:  */
- 42: function getGmailClient() {
- 43:   const oAuth2Client = new google.auth.OAuth2(
- 44:     process.env.GMAIL_CLIENT_ID,
- 45:     process.env.GMAIL_CLIENT_SECRET,
- 46:     'http://localhost'
- 47:   );
- 48:   oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
- 49:   return google.gmail({ version: 'v1', auth: oAuth2Client });
- 50: }
- 51: /**
- 52:  * Hàm chung để gửi Email qua Gmail API
- 53:  */
- 54: async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string) {
- 55:   const gmail = getGmailClient();
- 56:   const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
- 57:   const fromName = 'Học Viện BRK';
- 58:   const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
- 59:   const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
- 60:   const messageParts = [
- 61:     `From: ${encodedFromName} <${adminEmail}>`,
- 62:     `To: ${to}`,
- 63:     bcc ? `Bcc: ${bcc}` : '',
- 64:     `Content-Type: text/html; charset=utf-8`,
- 65:     `MIME-Version: 1.0`,
- 66:     `Subject: ${encodedSubject}`,
- 67:     ``,
- 68:     htmlBody,
- 69:   ].filter(line => line !== '').join('\n');
- 70:   const encodedMessage = Buffer.from(messageParts)
- 71:     .toString('base64')
- 72:     .replace(/\+/g, '-')
- 73:     .replace(/\//g, '_')
- 74:     .replace(/=+$/, '');
- 75:   try {
- 76:     await gmail.users.messages.send({
- 77:       userId: 'me',
- 78:       requestBody: { raw: encodedMessage },
- 79:     });
- 80:     console.log(`✅ Đã gửi email thành công: ${subject} -> ${to}`);
- 81:   } catch (error) {
- 82:     console.error(`❌ Lỗi gửi Email (${subject}):`, error);
- 83:   }
- 84: }
- 85: /**
- 86:  * Email chào mừng học viên mới
- 87:  */
- 88: export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
- 89:   const subject = `[Học Viện BRK] Chào mừng bạn gia nhập học viện - Mã học tập của bạn là #${studentId}`;
- 90:   const htmlBody = `
- 91:     Chào mừng <b>${studentName}</b> đến với Học Viện BRK,<br><br>
- 92:     Tài khoản của bạn đã được khởi tạo thành công.<br>
- 93:     <b>Mã số học tập của bạn là: <span style="font-size: 18px; color: #7c3aed;">#${studentId}</span></b><br><br>
- 94:     Mã số này rất quan trọng, bạn vui lòng ghi nhớ để sử dụng khi chuyển khoản cam kết hoặc nhận hỗ trợ từ học viện.<br><br>
- 95:     Chúc bạn có những trải nghiệm học tập tuyệt vời!<br><br>
- 96:     Trân trọng,<br>
- 97:     Đội ngũ Học Viện BRK
- 98:   `;
- 99:   await sendGmail(to, subject, htmlBody);
-100: }
-101: /**
-102:  * Email thông báo kích hoạt khóa học (Dùng nội dung từ bảng Course)
-103:  */
-104: export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
-105:   const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
-106:   const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
-107:   const htmlBody = `
-108:     Chào <b>${studentName}</b> (Mã số học tập: <b>#${studentId}</b>),<br><br>
-109:     Chúc mừng bạn! Khóa học <b>${courseName}</b> của bạn đã được <b>kích hoạt thành công</b>.<br><br>
-110:     ${customContent ? `---<br><b>Thông tin bổ sung từ giảng viên:</b><br>${customContent}<br>---<br><br>` : ''}
-111:     Bây giờ bạn có thể đăng nhập để bắt đầu lộ trình học tập.<br><br>
-112:     Trân trọng,<br>
-113:     Đội ngũ Học Viện BRK
-114:   `;
-115:   await sendGmail(to, subject, htmlBody, adminEmail);
-116: }
-117: /**
-118:  * Thông báo khi có người đăng nhập thành công
-119:  */
-120: export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
-121:   try {
-122:     // 1. Tra cứu vị trí từ IP (Sử dụng IP-API miễn phí)
-123:     let location = 'Không xác định';
-124:     let isp = '';
-125:     try {
-126:       const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp`);
-127:       const geoData = await geoRes.json();
-128:       if (geoData.status === 'success') {
-129:         location = `${geoData.city}, ${geoData.regionName}, ${geoData.country}`;
-130:         isp = geoData.isp || '';
-131:       }
-132:     } catch (e) {
-133:       console.error('Lỗi tra cứu GeoIP:', e);
-134:     }
-135:     // 2. Phân tích User Agent đơn giản (Trình duyệt/Hệ điều hành)
-136:     const browser = userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : 'Trình duyệt khác';
-137:     const os = userAgent.includes('Windows') ? 'Windows' : userAgent.includes('Android') ? 'Android' : userAgent.includes('iPhone') ? 'iPhone/iOS' : 'Hệ điều hành khác';
-138:     const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n\n` +
-139:                 `👤 Học viên: <b>${user.name}</b> (#${user.id})\n` +
-140:                 `📧 Email: ${user.email}\n` +
-141:                 `📍 Vị trí: <b>${location}</b>\n` +
-142:                 `🌐 IP: ${ip} (${isp})\n` +
-143:                 `📱 Thiết bị: ${browser} on ${os}\n` +
-144:                 `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
-145:     await sendTelegram(msg, 'REGISTER');
-146:   } catch (error) {
-147:     console.error('Lỗi gửi thông báo đăng nhập:', error);
-148:   }
-149: }
-150: // Giữ lại các hàm cũ để không làm gãy logic hiện tại (nhưng trỏ về hàm mới)
-151: export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
-152: export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
-````
-
 ## File: components/course/CourseCard.tsx
 ````typescript
   1: 'use client'
@@ -11831,6 +11685,162 @@ vercel.json
 195:         </>
 196:     )
 197: }
+````
+
+## File: lib/notifications.ts
+````typescript
+  1: import { google } from 'googleapis';
+  2: /**
+  3:  * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
+  4:  */
+  5: export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' = 'ACTIVATE') {
+  6:   const token = process.env.TELEGRAM_BOT_TOKEN;
+  7:   // Lấy Chat ID tương ứng với từng loại sự kiện
+  8:   const chatIdMap = {
+  9:     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
+ 10:     ACTIVATE: process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID,
+ 11:     LESSON: process.env.TELEGRAM_CHAT_ID_LESSON || process.env.TELEGRAM_CHAT_ID,
+ 12:   };
+ 13:   const chatId = chatIdMap[type];
+ 14:   if (!token || !chatId) {
+ 15:     console.error(`⚠️ Thiếu cấu hình Telegram cho loại: ${type}`);
+ 16:     return;
+ 17:   }
+ 18:   try {
+ 19:     const url = `https://api.telegram.org/bot${token}/sendMessage`;
+ 20:     const response = await fetch(url, {
+ 21:       method: 'POST',
+ 22:       headers: { 'Content-Type': 'application/json' },
+ 23:       body: JSON.stringify({
+ 24:         chat_id: chatId,
+ 25:         text: message,
+ 26:         parse_mode: 'HTML',
+ 27:       }),
+ 28:     });
+ 29:     const result = await response.json();
+ 30:     if (!result.ok) {
+ 31:         console.error(`❌ Telegram API Error (${type}):`, result.description);
+ 32:     } else {
+ 33:         console.log(`✅ Telegram API Success (${type}): Tin nhắn đã được gửi đến ID ${chatId}`);
+ 34:     }
+ 35:   } catch (error) {
+ 36:     console.error(`❌ Lỗi hệ thống khi gửi Telegram (${type}):`, error);
+ 37:   }
+ 38: }
+ 39: /**
+ 40:  * Cấu hình OAuth2 Client cho Gmail
+ 41:  */
+ 42: function getGmailClient() {
+ 43:   const oAuth2Client = new google.auth.OAuth2(
+ 44:     process.env.GMAIL_CLIENT_ID,
+ 45:     process.env.GMAIL_CLIENT_SECRET,
+ 46:     'http://localhost'
+ 47:   );
+ 48:   oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
+ 49:   return google.gmail({ version: 'v1', auth: oAuth2Client });
+ 50: }
+ 51: /**
+ 52:  * Hàm chung để gửi Email qua Gmail API
+ 53:  */
+ 54: async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string) {
+ 55:   const gmail = getGmailClient();
+ 56:   const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
+ 57:   const fromName = 'Học Viện BRK';
+ 58:   const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
+ 59:   const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+ 60:   const messageParts = [
+ 61:     `From: ${encodedFromName} <${adminEmail}>`,
+ 62:     `To: ${to}`,
+ 63:     bcc ? `Bcc: ${bcc}` : '',
+ 64:     `Content-Type: text/html; charset=utf-8`,
+ 65:     `MIME-Version: 1.0`,
+ 66:     `Subject: ${encodedSubject}`,
+ 67:     ``,
+ 68:     htmlBody,
+ 69:   ].filter(line => line !== '').join('\n');
+ 70:   const encodedMessage = Buffer.from(messageParts)
+ 71:     .toString('base64')
+ 72:     .replace(/\+/g, '-')
+ 73:     .replace(/\//g, '_')
+ 74:     .replace(/=+$/, '');
+ 75:   try {
+ 76:     await gmail.users.messages.send({
+ 77:       userId: 'me',
+ 78:       requestBody: { raw: encodedMessage },
+ 79:     });
+ 80:     console.log(`✅ Đã gửi email thành công: ${subject} -> ${to}`);
+ 81:   } catch (error) {
+ 82:     console.error(`❌ Lỗi gửi Email (${subject}):`, error);
+ 83:   }
+ 84: }
+ 85: /**
+ 86:  * Email chào mừng học viên mới
+ 87:  */
+ 88: export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
+ 89:   const subject = `[Học Viện BRK] Chào mừng bạn gia nhập học viện - Mã học tập của bạn là #${studentId}`;
+ 90:   const htmlBody = `
+ 91:     Chào mừng <b>${studentName}</b> đến với Học Viện BRK,<br><br>
+ 92:     Tài khoản của bạn đã được khởi tạo thành công.<br>
+ 93:     <b>Mã số học tập của bạn là: <span style="font-size: 18px; color: #7c3aed;">#${studentId}</span></b><br><br>
+ 94:     Mã số này rất quan trọng, bạn vui lòng ghi nhớ để sử dụng khi chuyển khoản cam kết hoặc nhận hỗ trợ từ học viện.<br><br>
+ 95:     Chúc bạn có những trải nghiệm học tập tuyệt vời!<br><br>
+ 96:     Trân trọng,<br>
+ 97:     Đội ngũ Học Viện BRK
+ 98:   `;
+ 99:   await sendGmail(to, subject, htmlBody);
+100: }
+101: /**
+102:  * Email thông báo kích hoạt khóa học (Dùng nội dung từ bảng Course)
+103:  */
+104: export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
+105:   const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
+106:   const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
+107:   const htmlBody = `
+108:     Chào <b>${studentName}</b> (Mã số học tập: <b>#${studentId}</b>),<br><br>
+109:     Chúc mừng bạn! Khóa học <b>${courseName}</b> của bạn đã được <b>kích hoạt thành công</b>.<br><br>
+110:     ${customContent ? `---<br><b>Thông tin bổ sung từ giảng viên:</b><br>${customContent}<br>---<br><br>` : ''}
+111:     Bây giờ bạn có thể đăng nhập để bắt đầu lộ trình học tập.<br><br>
+112:     Trân trọng,<br>
+113:     Đội ngũ Học Viện BRK
+114:   `;
+115:   await sendGmail(to, subject, htmlBody, adminEmail);
+116: }
+117: /**
+118:  * Thông báo khi có người đăng nhập thành công
+119:  */
+120: export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
+121:   try {
+122:     // 1. Tra cứu vị trí từ IP (Sử dụng IP-API miễn phí)
+123:     let location = 'Không xác định';
+124:     let isp = '';
+125:     try {
+126:       const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,regionName,city,isp`);
+127:       const geoData = await geoRes.json();
+128:       if (geoData.status === 'success') {
+129:         location = `${geoData.city}, ${geoData.regionName}, ${geoData.country}`;
+130:         isp = geoData.isp || '';
+131:       }
+132:     } catch (e) {
+133:       console.error('Lỗi tra cứu GeoIP:', e);
+134:     }
+135:     // 2. Phân tích User Agent đơn giản (Trình duyệt/Hệ điều hành)
+136:     const browser = userAgent.includes('Chrome') ? 'Chrome' : userAgent.includes('Firefox') ? 'Firefox' : userAgent.includes('Safari') ? 'Safari' : 'Trình duyệt khác';
+137:     const os = userAgent.includes('Windows') ? 'Windows' : userAgent.includes('Android') ? 'Android' : userAgent.includes('iPhone') ? 'iPhone/iOS' : 'Hệ điều hành khác';
+138:     const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n\n` +
+139:                 `👤 Học viên: <b>${user.name}</b> (#${user.id})\n` +
+140:                 `📧 Email: ${user.email}\n` +
+141:                 `📍 Vị trí: <b>${location}</b>\n` +
+142:                 `🌐 IP: ${ip} (${isp})\n` +
+143:                 `📱 Thiết bị: ${browser} on ${os}\n` +
+144:                 `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+145:     await sendTelegram(msg, 'REGISTER');
+146:   } catch (error) {
+147:     console.error('Lỗi gửi thông báo đăng nhập:', error);
+148:   }
+149: }
+150: // Giữ lại các hàm cũ để không làm gãy logic hiện tại (nhưng trỏ về hàm mới)
+151: export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
+152: export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
 ````
 
 ## File: prisma/schema.prisma

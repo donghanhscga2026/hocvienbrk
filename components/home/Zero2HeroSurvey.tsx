@@ -2,6 +2,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { surveyQuestions } from '@/lib/survey-data'
 import { saveSurveyResultAction } from '@/app/actions/survey-actions'
 import { getActiveSurvey } from '@/app/actions/roadmap-actions'
@@ -41,12 +42,14 @@ function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => 
 }
 
 export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
+    const router = useRouter()
+    
     // State cho Dynamic Flow
     const [flow, setFlow] = useState<any>(null)
     const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
     const [isLoadingFlow, setIsLoadingFlow] = useState(true)
 
-    // State kế thừa từ bản cũ
+    // [VỊ TRÍ A]: Đổi history từ string[] sang any[]
     const [currentStep, setCurrentStep] = useState('q1')
     const [history, setHistory] = useState<any[]>([])
     const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -61,7 +64,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     const [days, setDays] = useState('30')
     const [targetVal, setTargetVal] = useState('1000')
 
-    // Tải bài khảo sát ĐANG KÍCH HOẠT từ Database
+    // [VỊ TRÍ B]: Tải bài khảo sát và tự động tìm CÂU HỎI GỐC
     useEffect(() => {
         const loadFlow = async () => {
             try {
@@ -69,7 +72,14 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 const data = await getActiveSurvey() as any
                 if (data && data.nodes && Array.isArray(data.nodes) && data.nodes.length > 0) {
                     setFlow(data)
-                    const startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+                    
+                    // Thuật toán tìm đúng Node gốc (Không có dây nào trỏ vào)
+                    const targetIds = new Set(data.edges.map((e: any) => e.target))
+                    let startNode = data.nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
+                    
+                    // Fallback
+                    if (!startNode) startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+                    
                     if (startNode) setCurrentNodeId(startNode.id)
                 }
             } catch (err) {
@@ -81,7 +91,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
         loadFlow()
     }, [])
 
-    // Lấy dữ liệu câu hỏi hiện tại (Động hoặc Tĩnh)
     const getActiveQuestion = () => {
         if (flow && currentNodeId && Array.isArray(flow.nodes)) {
             const node = flow.nodes.find((n: any) => n.id === currentNodeId)
@@ -146,35 +155,47 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
         setAnswers(newAnswers)
 
+        // [VỊ TRÍ C]: BẢN VÁ LOGIC DUYỆT SƠ ĐỒ ĐỘNG ĐỆ QUY
         if (currentQuestion.isDynamic && flow) {
-            const nextEdge = Array.isArray(flow.edges) ? flow.edges.find((e: any) => e.source === optionId) : null
-            if (nextEdge) {
-                const nextNode = flow.nodes.find((n: any) => n.id === nextEdge.target)
-                if (nextNode) {
-                    if (nextNode.type === 'adviceNode') {
-                        setShowAdvice(nextNode.data?.label || '')
-                        return
+            // Hàm tìm node tương tác tiếp theo, tự động đi xuyên qua courseNodes
+            const findNextInteractiveNode = (sourceId: string): any => {
+                const outEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === sourceId) : []
+                for (const edge of outEdges) {
+                    const target = flow.nodes.find((n: any) => n.id === edge.target)
+                    if (!target) continue
+                    
+                    if (target.type === 'questionNode' || target.type === 'adviceNode') {
+                        return target
                     }
-                    if (nextNode.type === 'questionNode') {
-                        setHistory([...history, { id: currentNodeId, isDynamic: true }])
-                        setCurrentNodeId(nextNode.id)
-                        return
-                    }
-                    if (nextNode.type === 'courseNode') {
-                        const afterCourseEdge = flow.edges.find((e: any) => e.source === nextNode.id)
-                        if (afterCourseEdge) {
-                            const afterCourseNode = flow.nodes.find((n: any) => n.id === afterCourseEdge.target)
-                            if (afterCourseNode && afterCourseNode.type === 'questionNode') {
-                                setHistory([...history, { id: currentNodeId, isDynamic: true }])
-                                setCurrentNodeId(afterCourseNode.id)
-                                return
-                            }
-                        }
+                    if (target.type === 'courseNode') {
+                        // Nếu gặp khóa học, đệ quy tìm tiếp phía sau nó có câu hỏi nào không
+                        const next = findNextInteractiveNode(target.id)
+                        if (next) return next
                     }
                 }
+                return null
             }
+
+            // Đối với form Goal, bắt đầu tìm từ chính Node Câu hỏi. Với Choice, tìm từ Node Đáp án.
+            const startSearchId = currentQuestion.type === 'INPUT_GOAL' ? currentNodeId : optionId;
+            const nextNode = findNextInteractiveNode(startSearchId!)
+
+            if (nextNode) {
+                if (nextNode.type === 'adviceNode') {
+                    setShowAdvice(nextNode.data?.label || '')
+                    return
+                }
+                if (nextNode.type === 'questionNode') {
+                    setHistory([...history, { id: currentNodeId, isDynamic: true }])
+                    setCurrentNodeId(nextNode.id)
+                    return
+                }
+            }
+            
+            // Nếu không còn node tương tác nào -> Kết thúc
             finishSurvey(newAnswers)
         } else {
+            // LOGIC TĨNH CŨ (Fallback)
             const staticQData = (surveyQuestions as any)[currentStep]
             const staticOpt = staticQData?.options?.find((o: any) => o.id === optionId)
             if (staticOpt?.isAdvice) {
@@ -199,12 +220,11 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             const res = await saveSurveyResultAction(finalAnswers)
             if (res.success) {
                 setShowSuccess(true)
-                // ÉP TẢI LẠI TRANG CHỦ ĐỂ HIỆN LỘ TRÌNH MỚI
                 setTimeout(() => {
                     if (onComplete) {
                         onComplete()
                     } else {
-                        window.location.href = '/' // Đây là giải pháp triệt để nhất
+                        window.location.href = '/'
                     }
                 }, 2500)
             } else {
@@ -297,7 +317,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                     <button
                                         key={opt.id}
                                         onClick={() => handleNext(opt.id, opt.label)}
-                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' || opt.label?.toLowerCase() === 'tiếp tục' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
+                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' || opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
                                     >
                                         {opt.label}
                                     </button>
