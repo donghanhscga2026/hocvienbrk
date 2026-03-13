@@ -1,24 +1,31 @@
+
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { surveyQuestions } from '@/lib/survey-data'
 import { saveSurveyResultAction } from '@/app/actions/survey-actions'
-import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, HelpCircle, Play, Info, Send } from 'lucide-react'
+import { getActiveSurvey } from '@/app/actions/roadmap-actions'
+import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send } from 'lucide-react'
 
 // ─── Component Popup Tư Vấn ────────────────────────────────────────────────
-function AdviceModal({ type, onClose }: { type: string, onClose: () => void }) {
+function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
     return (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="bg-zinc-900 w-full max-w-xl rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
-                <div className="aspect-video bg-black relative flex items-center justify-center group cursor-pointer">
+                <div 
+                    className="aspect-video bg-black relative flex items-center justify-center group cursor-pointer"
+                    onClick={() => videoUrl && window.open(videoUrl, '_blank')}
+                >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                     <Play className="w-16 h-16 text-yellow-400 fill-current group-hover:scale-110 transition-transform" />
-                    <p className="absolute bottom-4 left-6 text-white font-black uppercase tracking-widest text-xs">Video tư vấn lộ trình BRK</p>
+                    <p className="absolute bottom-4 left-6 text-white font-black uppercase tracking-widest text-xs">
+                        {videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}
+                    </p>
                 </div>
                 <div className="p-8 space-y-4">
                     <h3 className="text-2xl font-black text-white uppercase">Cố vấn định hướng</h3>
                     <p className="text-gray-400 text-sm leading-relaxed font-medium">
-                        Chúng tôi hiểu bạn đang phân vân. Video trên sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện. 
+                        Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện. 
                         Sau khi xem xong, hãy quay lại và chọn mục tiêu mà bạn cảm thấy tự tin nhất để bắt đầu.
                     </p>
                     <button 
@@ -34,70 +41,165 @@ function AdviceModal({ type, onClose }: { type: string, onClose: () => void }) {
 }
 
 export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
-    const [currentStep, setCurrentStep] = useState('q1')
-    const [history, setHistory] = useState<string[]>([])
+    // State cho Dynamic Flow
+    const [flow, setFlow] = useState<any>(null)
+    const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
+    const [isLoadingFlow, setIsLoadingFlow] = useState(true)
+
+    // State kế thừa từ bản cũ
+    const [currentStep, setCurrentStep] = useState('q1') // Chỉ dùng cho Fallback
+    const [history, setHistory] = useState<any[]>([])
     const [answers, setAnswers] = useState<Record<string, any>>({})
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showSuccess, setShowSuccess] = useState(false)
-    const [showAdvice, setShowAdvice] = useState(false)
+    const [showAdvice, setShowAdvice] = useState<string | null>(null)
 
     // Form inputs state
-    const [input1, setInput1] = useState('') // Tên kênh/shop/lĩnh vực
-    const [input2, setInput2] = useState('') // ID TikTok
+    const [input1, setInput1] = useState('')
+    const [input2, setInput2] = useState('')
     const [videoPerDay, setVideoPerDay] = useState('1')
     const [days, setDays] = useState('30')
     const [targetVal, setTargetVal] = useState('1000')
 
-    const question = surveyQuestions[currentStep]
+    // Tải bài khảo sát ĐANG KÍCH HOẠT từ Database
+    useEffect(() => {
+        const loadFlow = async () => {
+            setIsLoadingFlow(true)
+            const data = await getActiveSurvey()
+            if (data && data.nodes && data.nodes.length > 0) {
+                setFlow(data)
+                // Tìm node câu hỏi đầu tiên
+                const startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+                if (startNode) setCurrentNodeId(startNode.id)
+            }
+            setIsLoadingFlow(false)
+        }
+        loadFlow()
+    }, [])
+
+    // Lấy dữ liệu câu hỏi hiện tại (Động hoặc Tĩnh)
+    const getActiveQuestion = () => {
+        if (flow && currentNodeId) {
+            const node = flow.nodes.find((n: any) => n.id === currentNodeId)
+            if (node) {
+                // Tìm các đáp án nối từ node này
+                const optionEdges = flow.edges.filter((e: any) => e.source === currentNodeId)
+                const options = optionEdges.map((edge: any) => {
+                    const optNode = flow.nodes.find((n: any) => n.id === edge.target)
+                    return {
+                        id: optNode?.id,
+                        label: optNode?.data?.label,
+                        edgeId: edge.id
+                    }
+                }).filter((o: any) => o.id)
+
+                return {
+                    id: node.id,
+                    question: node.data?.label,
+                    type: node.data?.type || 'CHOICE',
+                    options: options,
+                    isDynamic: true
+                }
+            }
+        }
+        // Fallback sang dữ liệu tĩnh cũ
+        return { ...surveyQuestions[currentStep], id: currentStep, isDynamic: false }
+    }
+
+    const currentQuestion = getActiveQuestion()
 
     const handleBack = () => {
         if (history.length > 0) {
             const prev = [...history]
             const last = prev.pop()!
             setHistory(prev)
-            setCurrentStep(last)
+            if (last.isDynamic) {
+                setCurrentNodeId(last.id)
+            } else {
+                setCurrentStep(last.id)
+            }
         }
     }
 
-    const handleNext = async (optionId: string, nextId?: string, isAdvice?: boolean) => {
-        if (isAdvice) {
-            setShowAdvice(true)
-            return
-        }
-
-        const newAnswers = { ...answers, [currentStep]: optionId }
+    const handleNext = async (optionId: string, label: string) => {
+        const newAnswers = { ...answers, [currentQuestion.id]: label }
         
-        // Xử lý các Input đặc biệt trước khi đi tiếp
-        if (question.type === 'INPUT_ACCOUNT') {
-            newAnswers[`${currentStep}_name`] = input1
-            newAnswers[`${currentStep}_id`] = input2
-            newAnswers[`${currentStep}_status`] = optionId
+        if (currentQuestion.type === 'INPUT_ACCOUNT') {
+            newAnswers[`${currentQuestion.id}_name`] = input1
+            newAnswers[`${currentQuestion.id}_id`] = input2
+            newAnswers[`${currentQuestion.id}_status`] = label
         }
         
-        if (question.type === 'INPUT_GOAL') {
+        if (currentQuestion.type === 'INPUT_GOAL') {
             newAnswers['goal_config'] = { videoPerDay, days, targetVal }
         }
 
         setAnswers(newAnswers)
 
-        if (nextId && nextId !== 'done') {
-            setHistory([...history, currentStep])
-            setCurrentStep(nextId)
-            // Reset inputs cho bước sau
-            setInput1('')
-            setInput2('')
+        if (currentQuestion.isDynamic) {
+            const nextEdge = flow.edges.find((e: any) => e.source === optionId)
+            if (nextEdge) {
+                const nextNode = flow.nodes.find((n: any) => n.id === nextEdge.target)
+                if (nextNode) {
+                    if (nextNode.type === 'adviceNode') {
+                        setShowAdvice(nextNode.data?.label || '')
+                        return
+                    }
+                    if (nextNode.type === 'questionNode') {
+                        setHistory([...history, { id: currentNodeId, isDynamic: true }])
+                        setCurrentNodeId(nextNode.id)
+                        return
+                    }
+                    if (nextNode.type === 'courseNode') {
+                        const afterCourseEdge = flow.edges.find((e: any) => e.source === nextNode.id)
+                        if (afterCourseEdge) {
+                            const afterCourseNode = flow.nodes.find((n: any) => n.id === afterCourseEdge.target)
+                            if (afterCourseNode && afterCourseNode.type === 'questionNode') {
+                                setHistory([...history, { id: currentNodeId, isDynamic: true }])
+                                setCurrentNodeId(afterCourseNode.id)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            finishSurvey(newAnswers)
         } else {
-            setIsSubmitting(true)
-            const res = await saveSurveyResultAction(newAnswers)
-            if (res.success) {
-                setShowSuccess(true)
-                if (onComplete) setTimeout(onComplete, 3000)
+            const staticOpt = surveyQuestions[currentStep].options.find(o => o.id === optionId)
+            if (staticOpt?.isAdvice) {
+                setShowAdvice('https://youtube.com')
+                return
+            }
+            if (staticOpt?.nextQuestionId && staticOpt.nextQuestionId !== 'done') {
+                setHistory([...history, { id: currentStep, isDynamic: false }])
+                setCurrentStep(staticOpt.nextQuestionId)
             } else {
-                alert(res.error)
-                setIsSubmitting(false)
+                finishSurvey(newAnswers)
             }
         }
+
+        setInput1('')
+        setInput2('')
     }
+
+    const finishSurvey = async (finalAnswers: any) => {
+        setIsSubmitting(true)
+        const res = await saveSurveyResultAction(finalAnswers)
+        if (res.success) {
+            setShowSuccess(true)
+            if (onComplete) setTimeout(onComplete, 3000)
+        } else {
+            alert(res.error)
+            setIsSubmitting(false)
+        }
+    }
+
+    if (isLoadingFlow) return (
+        <div className="bg-zinc-950 rounded-[3rem] p-20 flex flex-col items-center justify-center border border-white/10 shadow-2xl">
+            <Loader2 className="w-10 h-10 animate-spin text-yellow-400 mb-4" />
+            <p className="text-gray-500 font-black uppercase text-[10px] tracking-widest">Đang tải khảo sát...</p>
+        </div>
+    )
 
     if (showSuccess) return (
         <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
@@ -115,7 +217,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px]"></div>
             
             <div className="relative z-10">
-                {/* Header Survey */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20">
@@ -136,16 +237,15 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 </div>
 
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{question.question}</h3>
-                    <p className="text-gray-400 text-sm mb-8 font-medium">{question.subtitle || 'Hãy cung cấp thông tin chính xác để AI thiết kế lộ trình.'}</p>
+                    <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
+                    <p className="text-gray-400 text-sm mb-8 font-medium">{'Hãy cung cấp thông tin chính xác để AI thiết kế lộ trình.'}</p>
 
-                    {/* CHOICE TYPE */}
-                    {question.type === 'CHOICE' && (
+                    {currentQuestion.type === 'CHOICE' && (
                         <div className="grid grid-cols-1 gap-3">
-                            {question.options?.map(opt => (
+                            {currentQuestion.options?.map((opt: any) => (
                                 <button
                                     key={opt.id}
-                                    onClick={() => handleNext(opt.id, opt.nextQuestionId, opt.isAdvice)}
+                                    onClick={() => handleNext(opt.id, opt.label)}
                                     className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]"
                                 >
                                     <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
@@ -155,8 +255,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         </div>
                     )}
 
-                    {/* INPUT ACCOUNT TYPE */}
-                    {question.type === 'INPUT_ACCOUNT' && (
+                    {currentQuestion.type === 'INPUT_ACCOUNT' && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
@@ -169,11 +268,11 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                 </div>
                             </div>
                             <div className="flex gap-3">
-                                {question.options?.map(opt => (
+                                {currentQuestion.options?.map((opt: any) => (
                                     <button
                                         key={opt.id}
-                                        onClick={() => handleNext(opt.id, opt.nextQuestionId)}
-                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
+                                        onClick={() => handleNext(opt.id, opt.label)}
+                                        className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.id === 'yes' || opt.label?.toLowerCase() === 'tiếp tục' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}
                                     >
                                         {opt.label}
                                     </button>
@@ -182,8 +281,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         </div>
                     )}
 
-                    {/* INPUT GOAL TYPE */}
-                    {question.type === 'INPUT_GOAL' && (
+                    {currentQuestion.type === 'INPUT_GOAL' && (
                         <div className="space-y-6">
                             <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10 space-y-6">
                                 <div className="flex flex-wrap items-center gap-3 text-sm font-bold leading-relaxed">
@@ -197,7 +295,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                 </div>
                             </div>
                             <button
-                                onClick={() => handleNext('yes', 'done')}
+                                onClick={() => handleNext('yes', 'Xác nhận')}
                                 className="w-full bg-black text-yellow-400 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-zinc-800 transition-all active:scale-95"
                             >
                                 <Send className="w-4 h-4" /> Xác nhận lộ trình & Cam kết
@@ -207,8 +305,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 </div>
             </div>
 
-            {/* Advice Modal */}
-            {showAdvice && <AdviceModal type={currentStep} onClose={() => setShowAdvice(false)} />}
+            {showAdvice && <AdviceModal videoUrl={showAdvice} onClose={() => setShowAdvice(null)} />}
         </div>
     )
 }
