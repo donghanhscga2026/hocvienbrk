@@ -1,0 +1,38 @@
+{
+  "output": {
+    "filePath": "project-source.md",
+    "style": "markdown",
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "topFilesLength": 20,
+    "showLineNumbers": true
+  },
+  "include": [
+    "app/**/*",
+    "components/**/*",
+    "lib/**/*",
+    "prisma/**/*",
+    "scripts/**/*",
+    "types/**/*",
+    "*.ts",
+    "*.json",
+    "*.md"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    ".git",
+    "public/uploads",
+    "backups",
+    "package-lock.json",
+    "project-source.md",
+    "CODE_HISTORY*.md",
+    "Course.csv",
+    "User.csv",
+    "Enrollment.csv",
+    "Danh sach*.csv"
+  ],
+  "security": {
+    "enableSecurityCheck": true
+  }
+}
