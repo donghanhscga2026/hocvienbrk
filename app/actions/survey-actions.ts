@@ -7,8 +7,9 @@ import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
 import { getActiveSurvey } from "./roadmap-actions"
 
 /**
- * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 3.0)
- * Đảm bảo nhặt đủ ID khóa học kể cả khi chúng nối tiếp nhau
+ * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 4.0 - SIÊU CẤP)
+ * 1. Chấp nhận cả ID và Label của đáp án để so khớp.
+ * 2. Tự động thu thập ID khóa học xuyên qua mọi tầng trung gian.
  */
 function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goal: string } {
     const { nodes, edges } = flow
@@ -32,25 +33,32 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
             const targetNode = nodes.find((n: any) => n.id === edge.target)
             if (!targetNode) continue
 
-            // 1. Nếu là Node Đáp án: So khớp đáp án người dùng chọn
+            // 1. Nếu là Node Đáp án: So khớp cực kỳ linh hoạt
             if (targetNode.type === 'optionNode') {
                 const optionLabel = targetNode.data?.label
+                const optionId = targetNode.id
                 const userAnswer = answers[currentNodeId]
                 
-                if (userAnswer === optionLabel || userAnswer === 'Xác nhận' || userAnswer === 'Tiếp tục') {
+                // So khớp theo: Nội dung chữ, ID node, hoặc các từ khóa xác nhận
+                if (
+                    userAnswer === optionLabel || 
+                    userAnswer === optionId ||
+                    userAnswer === 'Xác nhận' || 
+                    userAnswer === 'Tiếp tục'
+                ) {
                     traverse(targetNode.id)
                 }
             } 
-            // 2. Nếu là Node Khóa học: Nhặt ID và đi tiếp xuyên thấu
+            // 2. Nếu là Node Khóa học: Nhặt ID và đi tiếp
             else if (targetNode.type === 'courseNode') {
-                if (targetNode.data?.courseId) {
-                    collectedCourseIds.add(Number(targetNode.data.courseId))
+                const cid = Number(targetNode.data?.courseId)
+                if (cid) {
+                    collectedCourseIds.add(cid)
                 }
                 traverse(targetNode.id)
             }
             // 3. Nếu là Node Câu hỏi tiếp theo hoặc Node tư vấn
             else if (targetNode.type === 'questionNode' || targetNode.type === 'adviceNode') {
-                // Nếu nối từ một node đã được xác định đi qua (như CourseNode)
                 traverse(targetNode.id)
             }
         }
@@ -81,12 +89,12 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         let goal = ''
 
         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
-            console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG (Recursive Mode)...')
+            console.log('🤖 Đang tính toán lộ trình từ sơ đồ động...')
             const result = resolvePathFromFlow(flow, answers)
             customPath = result.customPath
             goal = result.goal
         } else {
-            console.log('📦 Đang sử dụng logic lộ trình tĩnh (Fallback)...')
+            console.log('📦 Fallback về logic tĩnh...')
             customPath = generatePathFromAnswers(answers)
             const q1AnswerId = answers['q1'] || 'unknown'
             const q1Data = (surveyQuestions as any)['q1']
@@ -94,26 +102,9 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
         }
 
-        // Kiểm tra an toàn: Nếu vẫn rỗng, cấp khóa 1 làm nền tảng
+        // PHÒNG THỦ: Luôn đảm bảo có ít nhất khóa học nền tảng (ID 1)
         if (customPath.length === 0) {
             customPath = [1]
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { surveyResults: true, customPath: true, goal: true }
-        });
-
-        const oldResults: any = user?.surveyResults || { history: [] };
-        const newHistory = Array.isArray(oldResults.history) ? [...oldResults.history] : [];
-        
-        if (oldResults.current || user?.customPath) {
-            newHistory.push({
-                answers: oldResults.current?.answers || answers,
-                customPath: user?.customPath,
-                goal: user?.goal,
-                archivedAt: new Date().toISOString()
-            });
         }
 
         const surveyData = {
@@ -122,10 +113,10 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
                 customPath: customPath,
                 goal: goal,
                 completedAt: new Date().toISOString()
-            },
-            history: newHistory
+            }
         };
 
+        // Cập nhật Database
         await prisma.user.update({
             where: { id: userId },
             data: {
@@ -139,18 +130,14 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         return { success: true, customPath, goal }
 
     } catch (error: any) {
-        console.error("Lỗi khi lưu khảo sát:", error)
-        if (error.message?.includes('reach database')) {
-            return { success: false, error: "Lỗi kết nối Database. Vui lòng thử lại sau giây lát." }
-        }
-        return { success: false, error: "Hệ thống đang bận. Vui lòng thử lại sau." }
+        console.error("Lỗi Server Action:", error.message)
+        return { success: false, error: "Lỗi hệ thống: " + error.message }
     }
 }
 
 export async function resetSurveyAction() {
     const session = await auth()
     if (!session?.user?.id) return { success: false }
-
     try {
         await prisma.user.update({
             where: { id: parseInt(session.user.id) },
