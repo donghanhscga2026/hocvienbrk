@@ -8,7 +8,6 @@ import { saveSurveyResultAction } from '@/app/actions/survey-actions'
 import { getActiveSurvey, getCoursesForBuilder } from '@/app/actions/roadmap-actions'
 import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send, Sparkles, BookOpen } from 'lucide-react'
 
-// ─── Component Popup Tư Vấn ────────────────────────────────────────────────
 function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
     return (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
@@ -37,7 +36,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(true)
 
-    const [currentStep, setCurrentStep] = useState('q1') // Khai báo sớm để use trong scope
+    const [currentStep, setCurrentStep] = useState('q1')
     const [history, setHistory] = useState<any[]>([])
     const [answers, setAnswers] = useState<Record<string, any>>({})
     const [identifiedCourseIds, setIdentifiedCourseIds] = useState<number[]>([])
@@ -58,7 +57,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             try {
                 setIsLoading(true)
                 const [flowData, courses] = await Promise.all([getActiveSurvey(), getCoursesForBuilder()])
-                const data = flowData as any // Ép kiểu để truy cập .nodes
+                const data = flowData as any
                 setAllCourses(courses)
                 
                 if (data && data.nodes && Array.isArray(data.nodes)) {
@@ -68,7 +67,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                     if (!startNode) startNode = data.nodes.find((n: any) => n.type === 'questionNode')
                     if (startNode) {
                         setCurrentNodeId(startNode.id)
-                        // Gọi hàm tìm khóa học ban đầu nếu có
                         findInitialCourses(data, startNode.id)
                     }
                 }
@@ -81,12 +79,10 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
         init()
     }, [])
 
-    // Hàm helper dò tìm khóa học ban đầu (vì findAndAddCourses cần state flow)
     const findInitialCourses = (data: any, sid: string) => {
         if (!data || !data.edges || !data.nodes) return
         const newIds: number[] = []
         const courseNames: string[] = []
-
         const traverse = (currentId: string) => {
             const outEdges = data.edges.filter((e: any) => e.source === currentId)
             for (const edge of outEdges) {
@@ -101,7 +97,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 }
             }
         }
-
         traverse(sid)
         if (newIds.length > 0) {
             setIdentifiedCourseIds(newIds)
@@ -114,7 +109,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
         if (!flow || !flow.edges || !flow.nodes) return
         const newIds: number[] = []
         const courseNames: string[] = []
-
         const traverse = (sid: string) => {
             const outEdges = flow.edges.filter((e: any) => e.source === sid)
             for (const edge of outEdges) {
@@ -129,7 +123,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 }
             }
         }
-
         traverse(sourceId)
         if (newIds.length > 0) {
             setIdentifiedCourseIds(prev => [...prev, ...newIds])
@@ -149,7 +142,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         return { id: optNode?.id, label: optNode?.data?.label, type: optNode?.type }
                     })
                     .filter((o: any) => o.id && o.type === 'optionNode') : []
-
                 return { id: node.id, question: node.data?.label, type: node.data?.type || 'CHOICE', options, isDynamic: true }
             }
         }
@@ -159,23 +151,8 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
     const currentQuestion = getActiveQuestion()
 
-    const handleBack = () => {
-        if (history.length > 0) {
-            const prev = [...history]
-            const last = prev.pop()!
-            setHistory(prev)
-            if (last.isDynamic) {
-                setCurrentNodeId(last.id)
-                setIdentifiedCourseIds(last.courses || [])
-            } else {
-                setCurrentStep(last.id)
-            }
-        }
-    }
-
     const handleNext = async (optionId: string, label: string) => {
         const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
-        
         if (currentQuestion.type === 'INPUT_ACCOUNT') {
             newAnswers[`${currentQuestion.id}_name`] = input1
             newAnswers[`${currentQuestion.id}_id`] = input2
@@ -194,7 +171,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 for (const edge of outEdges) {
                     const target = flow.nodes.find((n: any) => n.id === edge.target)
                     if (!target) continue
-                    if (target.type === 'questionNode' || target.type === 'adviceNode') return target
+                    if (target.type === 'questionNode' || target.type === 'adviceNode' || target.type === 'finishNode') return target
                     if (target.type === 'courseNode' || target.type === 'optionNode') {
                         const next = findNextNode(target.id)
                         if (next) return next
@@ -207,6 +184,11 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             const nextNode = findNextNode(startId!)
 
             if (nextNode) {
+                // Nếu là Đích đến (FinishNode) -> Nộp bài ngay
+                if (nextNode.type === 'finishNode') {
+                    finishSurvey(newAnswers)
+                    return
+                }
                 if (nextNode.type === 'adviceNode') {
                     setShowAdvice(nextNode.data?.label || '')
                     return
@@ -218,7 +200,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 finishSurvey(newAnswers)
             }
         } else {
-            // Fallback logic tĩnh nếu không dùng flow
             finishSurvey(newAnswers)
         }
         setInput1(''); setInput2('')
@@ -259,9 +240,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         const c = allCourses.find(item => item.id === id)
                         return (
                             <div key={`${id}-${idx}`} className="flex items-center gap-3 text-sm font-bold text-gray-200 animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
-                                <div className="w-6 h-6 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-400 text-[10px]">
-                                    {id}
-                                </div>
+                                <div className="w-6 h-6 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-400 text-[10px]">{id}</div>
                                 {c?.name_lop || `Khóa học #${id}`}
                             </div>
                         )
@@ -280,13 +259,10 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                     <Sparkles className="w-3 h-3 fill-current" /> Đã xác định: {lastFoundCourse}
                 </div>
             )}
-
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20">
-                            <Target className="w-5 h-5" />
-                        </div>
+                        <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20"><Target className="w-5 h-5" /></div>
                         <div>
                             <h2 className="text-lg font-black uppercase tracking-tight italic">Zero 2 Hero</h2>
                             <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Live Roadmap Building</p>
@@ -299,11 +275,9 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         </div>
                     )}
                 </div>
-
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
                     <p className="text-gray-400 text-sm mb-8 font-medium italic">Hãy chọn đáp án phản ánh đúng nhất trạng thái của bạn.</p>
-
                     {currentQuestion.type === 'CHOICE' && (
                         <div className="grid grid-cols-1 gap-3">
                             {currentQuestion.options?.map((opt: any) => (
@@ -314,7 +288,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                             ))}
                         </div>
                     )}
-
                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -329,14 +302,11 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                             </div>
                             <div className="flex gap-3">
                                 {currentQuestion.options?.map((opt: any) => (
-                                    <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}>
-                                        {opt.label}
-                                    </button>
+                                    <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}>{opt.label}</button>
                                 ))}
                             </div>
                         </div>
                     )}
-
                     {currentQuestion.type === 'INPUT_GOAL' && (
                         <div className="space-y-6 text-black">
                             <div className="bg-white p-8 rounded-[2rem] border-2 border-yellow-400/20 space-y-6">
@@ -350,9 +320,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                     <span className="text-gray-400 font-bold uppercase">FOLLOW / ĐƠN HÀNG</span>
                                 </div>
                             </div>
-                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết thực hiện
-                            </button>
+                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết thực hiện</button>
                         </div>
                     )}
                 </div>
