@@ -7,9 +7,8 @@ import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
 import { getActiveSurvey } from "./roadmap-actions"
 
 /**
- * [BẢN VÁ LOGIC]: Thuật toán duyệt sơ đồ Mindmap thông minh
- * 1. Tự động xác định Node gốc (Root)
- * 2. Thu thập khóa học xuyên thấu các nhánh
+ * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 3.0)
+ * Đảm bảo nhặt đủ ID khóa học kể cả khi chúng nối tiếp nhau
  */
 function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goal: string } {
     const { nodes, edges } = flow
@@ -18,11 +17,9 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
 
     if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goal: '' }
 
-    // [FIX 1]: Tìm đúng Node gốc (Là câu hỏi không có bất kỳ mũi tên nào trỏ vào)
+    // Tìm Node gốc (Root)
     const targetIds = new Set(edges.map((e: any) => e.target))
     let startNode = nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
-    
-    // Fallback an toàn nếu không tìm thấy node gốc tuyệt đối
     if (!startNode) startNode = nodes.find((n: any) => n.type === 'questionNode')
     if (!startNode) return { customPath: [], goal: '' }
 
@@ -35,21 +32,25 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
             const targetNode = nodes.find((n: any) => n.id === edge.target)
             if (!targetNode) continue
 
+            // 1. Nếu là Node Đáp án: So khớp đáp án người dùng chọn
             if (targetNode.type === 'optionNode') {
                 const optionLabel = targetNode.data?.label
-                // [FIX 3]: So khớp đáp án. Hỗ trợ luôn các nút "Xác nhận" từ Input Form
-                if (answers[currentNodeId] === optionLabel || answers[currentNodeId] === 'Xác nhận' || answers[currentNodeId] === 'Tiếp tục') {
+                const userAnswer = answers[currentNodeId]
+                
+                if (userAnswer === optionLabel || userAnswer === 'Xác nhận' || userAnswer === 'Tiếp tục') {
                     traverse(targetNode.id)
                 }
             } 
+            // 2. Nếu là Node Khóa học: Nhặt ID và đi tiếp xuyên thấu
             else if (targetNode.type === 'courseNode') {
                 if (targetNode.data?.courseId) {
                     collectedCourseIds.add(Number(targetNode.data.courseId))
                 }
-                // [FIX 2]: Thu thập khóa học xong, đi tiếp nếu có câu hỏi hoặc khóa học khác nối sau
                 traverse(targetNode.id)
             }
-            else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
+            // 3. Nếu là Node Câu hỏi tiếp theo hoặc Node tư vấn
+            else if (targetNode.type === 'questionNode' || targetNode.type === 'adviceNode') {
+                // Nếu nối từ một node đã được xác định đi qua (như CourseNode)
                 traverse(targetNode.id)
             }
         }
@@ -73,8 +74,6 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
 
     try {
         const userId = parseInt(session.user.id)
-        
-        // 1. Lấy bài khảo sát ĐANG KÍCH HOẠT từ Database
         const flowData = await getActiveSurvey()
         const flow = flowData as any
         
@@ -82,7 +81,7 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         let goal = ''
 
         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
-            console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG (Bản vá 2.0)...')
+            console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG (Recursive Mode)...')
             const result = resolvePathFromFlow(flow, answers)
             customPath = result.customPath
             goal = result.goal
@@ -95,7 +94,11 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
         }
 
-        // 2. Lưu lịch sử và cập nhật Database
+        // Kiểm tra an toàn: Nếu vẫn rỗng, cấp khóa 1 làm nền tảng
+        if (customPath.length === 0) {
+            customPath = [1]
+        }
+
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { surveyResults: true, customPath: true, goal: true }
@@ -144,9 +147,6 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
     }
 }
 
-/**
- * Reset lộ trình để làm lại khảo sát
- */
 export async function resetSurveyAction() {
     const session = await auth()
     if (!session?.user?.id) return { success: false }
