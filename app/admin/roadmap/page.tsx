@@ -60,7 +60,40 @@ const RoadmapBuilderContent = () => {
     try {
         setIsInitializing(true);
         const list = await getAllSurveys();
-        setSurveys(list || []);
+        
+        // TỰ ĐỘNG KHỞI TẠO BẢN GỐC NẾU CHƯA CÓ BÀI NÀO
+        if (list.length === 0) {
+            console.log('🌱 Đang tự động khởi tạo bài khảo sát bản gốc...');
+            const newNodes: any[] = [];
+            const newEdges: any[] = [];
+            let x = 100, y = 100, spacingX = 400, spacingY = 180;
+            const questions = surveyQuestions as any;
+            
+            Object.keys(questions).forEach((qId, qIndex) => {
+              const q = questions[qId];
+              newNodes.push({ id: qId, type: 'questionNode', position: { x: x + qIndex * spacingX, y }, data: { label: q.question, type: q.type }});
+              if (Array.isArray(q.options)) {
+                q.options.forEach((opt: any, optIndex: number) => {
+                  const optNodeId = `opt_${qId}_${opt.id}`;
+                  newNodes.push({ id: optNodeId, type: 'optionNode', position: { x: x + qIndex * spacingX + (optIndex * 160 - 120), y: y + spacingY }, data: { label: opt.label }});
+                  newEdges.push({ id: `e_${qId}_${optNodeId}`, source: qId, target: optNodeId });
+                  if (opt.nextQuestionId && opt.nextQuestionId !== 'done') {
+                      newEdges.push({ id: `e_${optNodeId}_${opt.nextQuestionId}`, source: optNodeId, target: opt.nextQuestionId });
+                  }
+                });
+              }
+            });
+            
+            const res = await createSurvey('Lộ trình Zero 2 Hero (Bản gốc)');
+            if (res.success && res.survey) {
+                await saveSurveyFlow(res.survey.id, { nodes: newNodes, edges: newEdges });
+                await activateSurvey(res.survey.id);
+                const updatedList = await getAllSurveys();
+                setSurveys(updatedList);
+            }
+        } else {
+            setSurveys(list);
+        }
     } catch (err) {
         console.error(err);
     } finally {
