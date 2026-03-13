@@ -88,7 +88,8 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             console.log('📦 Đang sử dụng logic lộ trình tĩnh (Fallback)...')
             customPath = generatePathFromAnswers(answers)
             const q1AnswerId = answers['q1']
-            const goalOption = surveyQuestions['q1']?.options.find(o => o.id === q1AnswerId)
+            const q1Data = (surveyQuestions as any)['q1']
+            const goalOption = q1Data?.options?.find((o: any) => o.id === q1AnswerId)
             goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
         }
 
