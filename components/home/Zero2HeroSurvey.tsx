@@ -2,7 +2,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { surveyQuestions } from '@/lib/survey-data'
 import { saveSurveyResultAction } from '@/app/actions/survey-actions'
 import { getActiveSurvey } from '@/app/actions/roadmap-actions'
@@ -42,8 +41,6 @@ function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => 
 }
 
 export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
-    const router = useRouter()
-    
     // State cho Dynamic Flow
     const [flow, setFlow] = useState<any>(null)
     const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
@@ -202,13 +199,14 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             const res = await saveSurveyResultAction(finalAnswers)
             if (res.success) {
                 setShowSuccess(true)
+                // ÉP TẢI LẠI TRANG CHỦ ĐỂ HIỆN LỘ TRÌNH MỚI
                 setTimeout(() => {
                     if (onComplete) {
                         onComplete()
                     } else {
-                        router.refresh() // Ép trang chủ tải lại dữ liệu từ Server
+                        window.location.href = '/' // Đây là giải pháp triệt để nhất
                     }
-                }, 3000)
+                }, 2500)
             } else {
                 alert(res.error)
                 setIsSubmitting(false)
