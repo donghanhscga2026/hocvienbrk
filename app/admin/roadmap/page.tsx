@@ -280,7 +280,6 @@ const RoadmapBuilderContent = () => {
           <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onInit={setReactFlowInstance} onDrop={onDrop} onDragOver={onDragOver} onNodeClick={(_, node) => setSelectedNode(node)} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={2} panOnScroll={true} selectionOnDrag={true}>
             <Background color="#E5E7EB" variant={"dots" as any} gap={20} size={1} />
             <Controls className="!bg-white !border-gray-200 !rounded-xl md:!rounded-2xl !shadow-2xl overflow-hidden" />
-            <MiniMap className="hidden md:block !bg-white !rounded-[2rem] !border-2 !border-gray-100 !shadow-2xl" />
           </ReactFlow>
         </div>
 
