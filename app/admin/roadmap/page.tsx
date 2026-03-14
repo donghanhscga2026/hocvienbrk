@@ -262,8 +262,20 @@ const RoadmapBuilderContent = () => {
           {selectedNode && (
             <div className="mt-8 pt-8 border-t-2 border-dashed border-gray-200 space-y-4">
               <div className="text-[10px] font-black uppercase text-black">Thuộc tính</div>
-              <textarea className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none focus:border-yellow-400 text-black" value={selectedNode.data?.label || ''} onChange={(e) => updateNodeData({ label: e.target.value })} rows={4} />
-              {selectedNode.type === 'courseNode' && (
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Câu hỏi chính</label>
+                <textarea className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none focus:border-yellow-400 text-black" value={selectedNode.data?.label || ''} onChange={(e) => updateNodeData({ label: e.target.value })} rows={3} />
+              </div>
+
+              {selectedNode.type === 'questionNode' && (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Mô tả chi tiết (Tùy chọn)</label>
+                  <textarea className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none focus:border-orange-400 text-black" value={selectedNode.data?.description || ''} onChange={(e) => updateNodeData({ description: e.target.value })} rows={2} placeholder="Giúp học viên hiểu rõ câu hỏi hơn..." />
+                </div>
+              )}
+
+              {selectedNode.type === 'questionNode' && (
                 <select className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" value={selectedNode.data?.courseId || ''} onChange={(e) => {
                     const courseId = parseInt(e.target.value);
                     const course = courses.find(c => c.id === courseId);

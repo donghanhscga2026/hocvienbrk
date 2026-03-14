@@ -277,7 +277,9 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 </div>
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
-                    <p className="text-gray-400 text-sm mb-8 font-medium italic">Hãy chọn đáp án phản ánh đúng nhất trạng thái của bạn.</p>
+                    <p className="text-gray-400 text-sm mb-8 font-medium italic">
+                        {currentQuestion.description || 'Hãy chọn đáp án phản ánh đúng nhất trạng thái của bạn.'}
+                    </p>
                     {currentQuestion.type === 'CHOICE' && (
                         <div className="grid grid-cols-1 gap-3">
                             {currentQuestion.options?.map((opt: any) => (
