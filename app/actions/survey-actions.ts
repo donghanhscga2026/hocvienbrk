@@ -7,52 +7,50 @@ import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
 import { getActiveSurvey } from "./roadmap-actions"
 
 /**
- * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 5.0)
- * 1. Tự động xác định Node gốc (Root)
- * 2. Thu thập khóa học xuyên thấu các nhánh
- * 3. [MỚI]: Dừng lại và cập nhật Goal khi gặp FinishNode
+ * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 6.0 - GOAL FOCUS)
+ * Cập nhật Goal dựa trên điểm dừng cuối cùng của học viên
  */
-function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goal: string } {
+function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goalName: string } {
     const { nodes, edges } = flow
     const collectedCourseIds = new Set<number>()
-    let currentGoal = ''
+    let lastPointName = ''
 
-    if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goal: '' }
+    if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goalName: '' }
 
-    // Tìm đúng Node gốc (Câu hỏi không có dây trỏ vào)
     const targetIds = new Set(edges.map((e: any) => e.target))
     let startNode = nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
     if (!startNode) startNode = nodes.find((n: any) => n.type === 'questionNode')
-    if (!startNode) return { customPath: [], goal: '' }
-
-    // Mặc định goal là câu hỏi đầu tiên
-    currentGoal = startNode.data?.label || ''
+    if (!startNode) return { customPath: [], goalName: '' }
 
     const traverse = (currentNodeId: string) => {
+        const node = nodes.find((n: any) => n.id === currentNodeId)
+        if (!node) return
+
+        // Cập nhật điểm dừng cuối cùng dựa trên loại Node
+        if (node.type === 'questionNode' || node.type === 'finishNode') {
+            lastPointName = node.data?.label || lastPointName
+        }
+
         const outEdges = edges.filter((e: any) => e.source === currentNodeId)
-        
         for (const edge of outEdges) {
             const targetNode = nodes.find((n: any) => n.id === edge.target)
             if (!targetNode) continue
 
-            // Nếu gặp Đích đến (FinishNode) -> Chốt Goal và dừng nhánh này
             if (targetNode.type === 'finishNode') {
-                currentGoal = targetNode.data?.label || currentGoal
-                continue // Dừng duyệt tiếp ở nhánh gặp đích
+                lastPointName = targetNode.data?.label || lastPointName
+                continue 
             }
 
             if (targetNode.type === 'optionNode') {
                 const optionLabel = targetNode.data?.label
                 const optionId = targetNode.id
                 const userAnswer = answers[currentNodeId]
-                
                 if (userAnswer === optionLabel || userAnswer === optionId || userAnswer === 'Xác nhận' || userAnswer === 'Tiếp tục') {
                     traverse(targetNode.id)
                 }
             } 
             else if (targetNode.type === 'courseNode') {
-                const cid = Number(targetNode.data?.courseId)
-                if (cid) collectedCourseIds.add(cid)
+                if (targetNode.data?.courseId) collectedCourseIds.add(Number(targetNode.data.courseId))
                 traverse(targetNode.id)
             }
             else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
@@ -64,7 +62,7 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
     traverse(startNode.id)
     return { 
         customPath: Array.from(collectedCourseIds), 
-        goal: currentGoal 
+        goalName: lastPointName 
     }
 }
 
@@ -83,20 +81,22 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         const flow = flowData as any
         
         let customPath: number[] = []
-        let goal = ''
+        let goalTitle = ''
 
         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
-            console.log('🤖 Đang tính toán lộ trình từ Mindmap ĐỘNG (FinishNode support)...')
             const result = resolvePathFromFlow(flow, answers)
             customPath = result.customPath
-            goal = result.goal
+            goalTitle = result.goalName
         } else {
-            console.log('📦 Fallback về logic tĩnh...')
             customPath = generatePathFromAnswers(answers)
-            const q1AnswerId = answers['q1'] || 'unknown'
-            const q1Data = (surveyQuestions as any)['q1']
-            const goalOption = q1Data?.options?.find((o: any) => o.id === q1AnswerId)
-            goal = goalOption ? goalOption.label : 'Hoàn thiện kỹ năng TikTok'
+            goalTitle = 'Hoàn thiện kỹ năng TikTok'
+        }
+
+        // Xử lý thông tin Cam kết mục tiêu (INPUT_GOAL)
+        const config = answers['goal_config'] as any
+        let finalGoal = goalTitle
+        if (config && config.videoPerDay) {
+            finalGoal = `${goalTitle} (Cam kết: ${config.videoPerDay} video/ngày trong ${config.days} ngày để đạt ${config.targetVal} follow)`
         }
 
         if (customPath.length === 0) customPath = [1]
@@ -105,7 +105,7 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             current: {
                 answers,
                 customPath: customPath,
-                goal: goal,
+                goal: finalGoal,
                 completedAt: new Date().toISOString()
             }
         };
@@ -115,16 +115,16 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             data: {
                 surveyResults: surveyData as any,
                 customPath: customPath as any,
-                goal: goal
+                goal: finalGoal
             }
         })
 
         revalidatePath('/')
-        return { success: true, customPath, goal }
+        return { success: true, customPath, goal: finalGoal }
 
     } catch (error: any) {
         console.error("Lỗi Server Action:", error.message)
-        return { success: false, error: "Lỗi hệ thống: " + error.message }
+        return { success: false, error: "Hệ thống đang bận. Vui lòng thử lại sau." }
     }
 }
 

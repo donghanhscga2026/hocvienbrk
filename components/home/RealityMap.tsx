@@ -112,33 +112,24 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
 
                     <div className="relative max-w-4xl mx-auto px-2 md:px-8">
                         <div className="flex flex-col gap-16 md:gap-24">
-                            {/* Chia các chặng thành từng nhóm 3 để tạo hàng */}
                             {Array.from({ length: Math.ceil(stages.length / 3) }).map((_, rowIndex) => {
                                 const rowStages = stages.slice(rowIndex * 3, rowIndex * 3 + 3);
                                 const isReverseRow = rowIndex % 2 !== 0;
 
                                 return (
-                                    <div 
-                                        key={rowIndex} 
-                                        className={`flex relative w-full ${isReverseRow ? 'flex-row-reverse' : 'flex-row'}`}
-                                    >
+                                    <div key={rowIndex} className={`flex relative w-full ${isReverseRow ? 'flex-row-reverse' : 'flex-row'}`}>
                                         {rowStages.map((stage, idxInRow) => {
                                             const isActive = activeStage === stage.id;
-                                            const isUserGoal = stage.name.toLowerCase() === userGoal?.toLowerCase();
-                                            // Xác định nút kết nối
+                                            // Logic so khớp đích đến thông minh
+                                            const isUserGoal = userGoal?.toLowerCase().includes(stage.name.toLowerCase());
                                             const isLastInRow = idxInRow === rowStages.length - 1;
                                             const isNotLastRow = rowIndex < Math.ceil(stages.length / 3) - 1;
                                             
                                             return (
                                                 <div key={stage.id} className="w-1/3 shrink-0 flex flex-col items-center relative z-10">
-                                                    {/* Đường kẻ ngang nối tâm tới nút kế tiếp */}
                                                     {!isLastInRow && (
-                                                        <div 
-                                                            className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-gray-600 -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}
-                                                        ></div>
+                                                        <div className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-gray-600 -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}></div>
                                                     )}
-
-                                                    {/* Đường kẻ dọc đâm thẳng xuống tâm nút hàng dưới */}
                                                     {isLastInRow && isNotLastRow && (
                                                         <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[160px] md:h-[240px] border-l-2 border-dashed border-gray-600 -z-10"></div>
                                                     )}
@@ -155,14 +146,14 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                     >
                                                         <span className="text-xl md:text-3xl font-black">{stage.icon}</span>
                                                         {isUserGoal && (
-                                                            <div className="absolute -top-4 bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter animate-bounce">Đích đến</div>
+                                                            <div className="absolute -top-4 bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter animate-bounce whitespace-nowrap">🎯 Đích của bạn</div>
                                                         )}
                                                         <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isActive ? 'bg-black text-white border-yellow-400' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                                                             {stage.id}
                                                         </div>
                                                     </button>
 
-                                                    <div className="mt-4 text-center">
+                                                    <div className="mt-4 text-center px-1">
                                                         <h4 className={`text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight transition-colors ${isUserGoal ? 'text-emerald-400' : isActive ? 'text-yellow-400' : 'text-zinc-500'}`}>
                                                             {stage.name}
                                                         </h4>
@@ -178,7 +169,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 </div>
             </div>
 
-            {/* 3. MA TRẬN MẢNH GHÉP (COMPACT GRID - 3 COLUMNS ON MOBILE) */}
+            {/* 3. MA TRẬN MẢNH GHÉP */}
             <div className="space-y-6">
                 <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
@@ -192,7 +183,6 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                     {customPath.map((courseId, index) => {
                         const course = allCourses.find(c => c.id === courseId)
                         if (!course) return null
-                        
                         const enrollment = enrollmentsMap[courseId]
                         const isCompleted = enrollment?.status === 'COMPLETED'
                         const isActive = enrollment?.status === 'ACTIVE'
@@ -200,31 +190,12 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         const isHighlighted = highlightedIds.includes(courseId)
 
                         return (
-                            <div 
-                                key={courseId}
-                                onClick={() => setSelectedCourse({ ...course, enrollment })}
-                                className={`group relative aspect-square rounded-[1.5rem] md:rounded-[2.5rem] p-2 sm:p-4 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${
-                                    isHighlighted 
-                                    ? 'border-yellow-400 bg-yellow-50 shadow-xl shadow-yellow-400/20 scale-105 z-10' 
-                                    : 'border-gray-100 bg-white hover:border-gray-300'
-                                }`}
-                                style={{ animationDelay: `${index * 50}ms` }}
-                            >
+                            <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })} className={`group relative aspect-square rounded-[1.5rem] md:rounded-[2.5rem] p-2 sm:p-4 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${isHighlighted ? 'border-yellow-400 bg-yellow-50 shadow-xl shadow-yellow-400/20 scale-105 z-10' : 'border-gray-100 bg-white hover:border-gray-300'}`} style={{ animationDelay: `${index * 50}ms` }}>
                                 <div className="absolute top-2 right-2">
-                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> 
-                                    : isActive ? <Play className="w-3 h-3 text-orange-500 fill-current animate-pulse" />
-                                    : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />
-                                    : <Lock className="w-3 h-3 text-gray-300" />}
+                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : isActive ? <Play className="w-3 h-3 text-orange-500 fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" /> : <Lock className="w-3 h-3 text-gray-300" />}
                                 </div>
-
-                                <span className={`text-xl sm:text-3xl mb-1 transition-transform group-hover:scale-125 ${!isActive && !isCompleted ? 'grayscale opacity-30' : ''}`}>
-                                    {course.icon_emoji || '🧩'}
-                                </span>
-
-                                <h4 className={`text-[8px] sm:text-[10px] font-black uppercase leading-[1.1] tracking-tighter line-clamp-2 px-1 ${!isActive && !isCompleted ? 'text-gray-400' : 'text-black'}`}>
-                                    {course.name_lop}
-                                </h4>
-
+                                <span className={`text-xl sm:text-3xl mb-1 transition-transform group-hover:scale-125 ${!isActive && !isCompleted ? 'grayscale opacity-30' : ''}`}>{course.icon_emoji || '🧩'}</span>
+                                <h4 className={`text-[8px] sm:text-[10px] font-black uppercase leading-[1.1] tracking-tighter line-clamp-2 px-1 ${!isActive && !isCompleted ? 'text-gray-400' : 'text-black'}`}>{course.name_lop}</h4>
                                 {(isActive || isCompleted) && (
                                     <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gray-100">
                                         <div className={`h-full transition-all duration-1000 ${isCompleted ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${isCompleted ? 100 : (enrollment?.completedCount / enrollment?.totalLessons) * 100 || 0}%` }}></div>
@@ -236,14 +207,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 </div>
             </div>
 
-            {/* Course Detail Modal */}
-            {selectedCourse && (
-                <CourseDetailModal 
-                    course={selectedCourse} 
-                    enrollment={selectedCourse.enrollment}
-                    onClose={() => setSelectedCourse(null)} 
-                />
-            )}
+            {selectedCourse && <CourseDetailModal course={selectedCourse} enrollment={selectedCourse.enrollment} onClose={() => setSelectedCourse(null)} />}
         </div>
     )
 }
