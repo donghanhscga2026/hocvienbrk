@@ -275,12 +275,22 @@ const RoadmapBuilderContent = () => {
                 </div>
               )}
 
-              {selectedNode.type === 'questionNode' && (
-                <select className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" value={selectedNode.data?.courseId || ''} onChange={(e) => {
-                    const courseId = parseInt(e.target.value);
-                    const course = courses.find(c => c.id === courseId);
-                    updateNodeData({ courseId, courseName: course?.name_lop });
-                }}><option value="">-- Chọn khóa học --</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}</select>
+              {selectedNode.type === 'courseNode' && (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Chọn khóa học</label>
+                  <select 
+                    className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" 
+                    value={selectedNode.data?.courseId || ''} 
+                    onChange={(e) => {
+                        const courseId = parseInt(e.target.value);
+                        const course = courses.find(c => c.id === courseId);
+                        updateNodeData({ courseId, courseName: course?.name_lop });
+                    }}
+                  >
+                    <option value="">-- Chọn khóa học --</option>
+                    {courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}
+                  </select>
+                </div>
               )}
               <button onClick={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} className="w-full py-4 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-2xl border-2 border-red-100 hover:bg-red-500 hover:text-white transition-all">Xóa khối</button>
             </div>
