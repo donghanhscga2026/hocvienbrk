@@ -26,7 +26,6 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
         const node = nodes.find((n: any) => n.id === currentNodeId)
         if (!node) return
 
-        // Cập nhật điểm dừng cuối cùng dựa trên loại Node
         if (node.type === 'questionNode' || node.type === 'finishNode') {
             lastPointName = node.data?.label || lastPointName
         }
@@ -92,15 +91,14 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             goalTitle = 'Hoàn thiện kỹ năng TikTok'
         }
 
-        // Xử lý thông tin Cam kết mục tiêu (INPUT_GOAL)
         const config = answers['goal_config'] as any
         let finalGoal = goalTitle
         if (config && config.videoPerDay) {
             finalGoal = `${goalTitle} (Cam kết: ${config.videoPerDay} video/ngày trong ${config.days} ngày để đạt ${config.targetVal} follow)`
         }
 
-        if (customPath.length === 0) customPath = [1]
-
+        // ĐÃ GỠ BỎ MẶC ĐỊNH [1] - Nếu rỗng thì lưu rỗng
+        
         const surveyData = {
             current: {
                 answers,

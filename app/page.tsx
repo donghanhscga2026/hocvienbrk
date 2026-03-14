@@ -9,6 +9,7 @@ import RealityMap from "@/components/home/RealityMap";
 import prisma from "@/lib/prisma";
 import { getRandomMessage } from "./actions/message-actions";
 import { resetSurveyAction } from "./actions/survey-actions";
+import { Sparkles } from "lucide-react";
 
 export default async function Home() {
   const session = await auth();
@@ -120,8 +121,29 @@ if (session?.user?.id) {
       {/* Lộ trình Zero 2 Hero */}
       {session?.user && (
         <section className="container mx-auto px-4 py-8">
-          {!customPath || customPath.length === 0 ? (
+          {customPath === null ? (
             <Zero2HeroSurvey />
+          ) : customPath.length === 0 ? (
+            <div className="bg-zinc-950 rounded-[3rem] p-12 text-center border border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/5 rounded-full blur-[100px]"></div>
+                <div className="relative z-10 space-y-6">
+                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-white/10">
+                        <Sparkles className="w-10 h-10 text-yellow-400" />
+                    </div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tight italic">Bạn chưa có lộ trình riêng</h3>
+                    <p className="text-gray-400 text-sm max-w-md mx-auto font-medium italic">
+                        Hãy để AI giúp bạn thiết kế một con đường học tập cá nhân hóa dựa trên mục tiêu thực tế của bạn.
+                    </p>
+                    <form action={async () => {
+                        'use server'
+                        await resetSurveyAction()
+                    }}>
+                        <button className="bg-yellow-400 text-black px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-yellow-500 transition-all active:scale-95 shadow-xl shadow-yellow-400/10">
+                            🚀 Thiết lập lộ trình cá nhân
+                        </button>
+                    </form>
+                </div>
+            </div>
           ) : (
             <RealityMap 
               customPath={customPath}
