@@ -28,7 +28,7 @@ export default async function AdminLayout({
         <div className="min-h-screen flex flex-col bg-gray-50">
             {/* Header Cố định trên cùng */}
             <header className="sticky top-0 z-[100] bg-black text-white p-4 shadow-xl">
-                <div className="flex justify-between items-center max-w-5xl mx-auto">
+                <div className="flex justify-between items-center max-w-[1600px] mx-auto">
                     <h1 className="text-sm font-black tracking-widest text-yellow-400 uppercase">Admin BRK</h1>
                     <Link href="/" className="text-[10px] font-black bg-white/10 px-3 py-1.5 rounded-lg uppercase">Thoát</Link>
                 </div>
@@ -48,7 +48,7 @@ export default async function AdminLayout({
                 ))}
             </nav>
 
-            <div className="flex flex-1 max-w-5xl mx-auto w-full">
+            <div className="flex flex-1 max-w-[1600px] mx-auto w-full">
                 {/* Sidebar Máy tính */}
                 <aside className="hidden md:block w-64 p-6 border-r border-gray-200 bg-white">
                     <nav className="space-y-2 sticky top-24">
