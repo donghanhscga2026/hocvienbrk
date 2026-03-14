@@ -5,14 +5,19 @@ import { Handle, Position } from '@xyflow/react';
 // 1. Node Câu hỏi (Màu cam)
 export const QuestionNode = memo(({ data }: any) => {
   return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-orange-50 border-2 border-orange-500 min-w-[200px]">
-      <div className="flex items-center">
-        <div className="rounded-full w-8 h-8 flex items-center justify-center bg-orange-500 text-white mr-2 text-xs">
+    <div className="px-4 py-2 shadow-md rounded-md bg-orange-50 border-2 border-orange-500 min-w-[220px]">
+      <div className="flex items-start">
+        <div className="rounded-full w-8 h-8 flex items-center justify-center bg-orange-500 text-white mr-2 text-xs shrink-0 mt-1">
           ❓
         </div>
         <div className="ml-2 text-black">
-          <div className="text-[10px] font-bold text-orange-500 uppercase">Câu hỏi</div>
-          <div className="text-sm font-bold">{data.label || 'Chưa có nội dung'}</div>
+          <div className="text-[10px] font-bold text-orange-500 uppercase">Câu hỏi chính</div>
+          <div className="text-sm font-bold leading-tight">{data.label || 'Chưa có nội dung'}</div>
+          {data.description && (
+            <div className="text-[9px] text-gray-500 mt-1 italic leading-tight border-t border-orange-200 pt-1">
+              {data.description}
+            </div>
+          )}
         </div>
       </div>
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-orange-500" />
