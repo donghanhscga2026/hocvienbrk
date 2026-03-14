@@ -164,7 +164,7 @@ const RoadmapBuilderContent = () => {
 
   // VIEW: LIST SURVYES
   if (view === 'LIST') return (
-    <div className="space-y-6 animate-in fade-in duration-500 text-black max-w-6xl mx-auto px-4">
+    <div className="space-y-6 animate-in fade-in duration-500 text-black mx-auto px-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 className="text-2xl font-black uppercase tracking-tighter italic">Quản lý khảo sát</h2>
         <button onClick={handleCreateNew} className="w-full md:w-auto bg-black text-yellow-400 px-6 py-3 rounded-2xl font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-xl">
