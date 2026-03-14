@@ -29,12 +29,18 @@ export const QuestionNode = memo(({ data }: any) => {
 // 2. Node Đáp án (Màu xám)
 export const OptionNode = memo(({ data }: any) => {
   return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-gray-50 border-2 border-gray-400 min-w-[150px]">
+    <div className="px-4 py-2 shadow-md rounded-md bg-gray-50 border-2 border-gray-400 min-w-[150px] relative">
       <div className="flex items-center text-black">
         <div className="text-sm font-medium">{data.label || 'Nhập đáp án...'}</div>
       </div>
-      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400" />
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-gray-400" />
+      
+      {/* Cổng Trên/Dưới: Kết nối với Câu hỏi hoặc Đích đến (Màu xám) */}
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400 border-white border-2" />
+      <Handle type="source" position={Position.Bottom} className="w-3 h-3 bg-gray-400 border-white border-2" />
+      
+      {/* Cổng Trái/Phải: Chuyên dùng để nối ra Khóa học (Màu tím nhạt) */}
+      <Handle type="source" position={Position.Left} id="course-left" className="w-3 h-3 bg-purple-400 border-white border-2" />
+      <Handle type="source" position={Position.Right} id="course-right" className="w-3 h-3 bg-purple-400 border-white border-2" />
     </div>
   );
 });
