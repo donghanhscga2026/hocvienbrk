@@ -155,6 +155,45 @@ const RoadmapBuilderContent = () => {
     setSelectedNode({ ...selectedNode, data: { ...selectedNode.data, ...newData } });
   };
 
+  // LOGIC NẠP DỮ LIỆU TỪ BẢN CŨ
+  const onMigrateFromOldVersion = () => {
+    if (!window.confirm('CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ sơ đồ hiện tại và nạp lại dữ liệu từ file code gốc. Bạn có chắc chắn?')) return;
+    
+    const newNodes: any[] = [];
+    const newEdges: any[] = [];
+    let x = 100, y = 100, spacingX = 450, spacingY = 200;
+
+    const questions = surveyQuestions as any;
+    Object.keys(questions).forEach((qId, qIndex) => {
+      const q = questions[qId];
+      
+      newNodes.push({ 
+        id: qId, 
+        type: 'questionNode', 
+        position: { x: x + qIndex * spacingX, y }, 
+        data: { label: q.question, type: q.type }
+      });
+
+      if (Array.isArray(q.options)) {
+        q.options.forEach((opt: any, optIndex: number) => {
+          const optNodeId = `opt_${qId}_${opt.id}`;
+          newNodes.push({ 
+            id: optNodeId, 
+            type: 'optionNode', 
+            position: { x: x + qIndex * spacingX + (optIndex * 180 - 150), y: y + spacingY }, 
+            data: { label: opt.label }
+          });
+          newEdges.push({ id: `e_${qId}_${optNodeId}`, source: qId, target: optNodeId });
+          if (opt.nextQuestionId && opt.nextQuestionId !== 'done') {
+              newEdges.push({ id: `e_${optNodeId}_${opt.nextQuestionId}`, source: optNodeId, target: opt.nextQuestionId });
+          }
+        });
+      }
+    });
+    setNodes(newNodes);
+    setEdges(newEdges);
+  };
+
   // Tự động mở bảng thuộc tính trên Mobile khi chọn Node
   useEffect(() => {
     if (selectedNode) setShowMobileProps(true);
