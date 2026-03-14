@@ -204,9 +204,17 @@ const RoadmapBuilderContent = () => {
       <div className="bg-black p-3 md:p-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
             <button onClick={() => setView('LIST')} className="p-2 bg-white/10 text-white rounded-xl"><ArrowLeft className="w-4 h-4" /></button>
-            <h2 className="text-white font-black uppercase text-[10px] md:text-sm truncate max-w-[120px] md:max-w-none italic">
-                {surveys.find(s => s.id === currentSurveyId)?.name}
-            </h2>
+            <div className="hidden md:block">
+                <h2 className="text-white font-black uppercase text-sm italic">
+                    {surveys.find(s => s.id === currentSurveyId)?.name}
+                </h2>
+            </div>
+            <button 
+                onClick={onMigrateFromOldVersion} 
+                className="bg-white/10 text-white border border-white/20 px-3 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-white/20 transition-all flex items-center gap-2"
+            >
+                <RefreshCw className="w-3 h-3" /> <span className="hidden sm:inline">Nạp bản cũ</span>
+            </button>
         </div>
         <button onClick={onSave} disabled={isSaving} className="bg-yellow-400 text-black px-5 md:px-8 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[11px] shadow-lg active:scale-95">
           {isSaving ? '...' : <div className="flex items-center gap-2"><Save className="w-3 h-3 md:w-4 md:h-4" /> Lưu</div>}
@@ -272,6 +280,21 @@ const RoadmapBuilderContent = () => {
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Mô tả chi tiết (Tùy chọn)</label>
                   <textarea className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none focus:border-orange-400 text-black" value={selectedNode.data?.description || ''} onChange={(e) => updateNodeData({ description: e.target.value })} rows={2} placeholder="Giúp học viên hiểu rõ câu hỏi hơn..." />
+                </div>
+              )}
+
+              {selectedNode.type === 'questionNode' && (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-orange-500 ml-1 italic">Loại nhập liệu</label>
+                  <select 
+                    className="w-full p-4 text-xs font-bold border-2 border-orange-50 rounded-2xl outline-none focus:border-orange-500 text-black bg-white" 
+                    value={selectedNode.data?.type || 'CHOICE'} 
+                    onChange={(e) => updateNodeData({ type: e.target.value })}
+                  >
+                    <option value="CHOICE">🔘 Các nút Lựa chọn</option>
+                    <option value="INPUT_ACCOUNT">📱 Form Thông tin kênh</option>
+                    <option value="INPUT_GOAL">🏁 Form Cam kết mục tiêu</option>
+                  </select>
                 </div>
               )}
 
