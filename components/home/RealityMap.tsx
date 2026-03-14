@@ -1,9 +1,9 @@
 
 'use client'
 
-import React, { useState, useMemo } from 'react'
-import { Flag, Lock, CheckCircle2, ChevronRight, Play, Info, Sparkles, Trophy, Target, ArrowRight } from 'lucide-react'
-import CourseDetailModal from '../course/CourseDetailModal'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Flag, Lock, CheckCircle2, ChevronRight, Play, Info, Sparkles, Trophy, Target, ArrowRight, X, PlayCircle, BookOpen, RefreshCw, Loader2 } from 'lucide-react'
+import Link from 'next/link'
 
 interface RealityMapProps {
     customPath: number[]
@@ -13,16 +13,62 @@ interface RealityMapProps {
     onReset?: () => Promise<any>
 }
 
+// ─── Component Popup Chi tiết Khóa học ─────────────────────────────────────
+function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrollment: any, onClose: () => void }) {
+    const isActive = enrollment?.status === 'ACTIVE'
+    const isCompleted = enrollment?.status === 'COMPLETED'
+    
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                {/* Ảnh bìa hoặc Header */}
+                <div className="h-32 bg-gradient-to-br from-purple-600 to-indigo-800 relative flex items-center justify-center">
+                    <BookOpen className="w-12 h-12 text-white/20" />
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors text-white">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-8 space-y-6">
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${isActive || isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                {isCompleted ? 'Hoàn thành' : isActive ? 'Đã kích hoạt' : 'Chưa sở hữu'}
+                            </span>
+                        </div>
+                        <h3 className="text-xl font-black text-white uppercase tracking-tight leading-tight">{course.name_lop}</h3>
+                        <p className="text-gray-400 text-sm font-medium line-clamp-3">{course.mo_ta_ngan || 'Khám phá những kiến thức thực chiến cùng Học viện BRK.'}</p>
+                    </div>
+                    
+                    {isActive || isCompleted ? (
+                        <Link 
+                            href={`/courses/${course.id_khoa}/learn`}
+                            className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10"
+                        >
+                            <PlayCircle className="w-5 h-5" /> Vào học ngay
+                        </Link>
+                    ) : (
+                        <Link 
+                            href={`/#khoa-hoc`}
+                            onClick={onClose}
+                            className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 transition-all active:scale-95"
+                        >
+                            Tìm hiểu thêm
+                        </Link>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function RealityMap({ customPath, enrollmentsMap, allCourses, userGoal, onReset }: RealityMapProps) {
     const [activeStage, setActiveStage] = useState<number | null>(null)
     const [selectedCourse, setSelectedCourse] = useState<any>(null)
 
-    // ─── BƯỚC 2.1: ĐỘNG HÓA CHẶNG ĐƯỜNG (STAGES) ──────────────────────────
+    // ─── ĐỘNG HÓA CHẶNG ĐƯỜNG (STAGES) ──────────────────────────
     const stages = useMemo(() => {
         const goal = userGoal?.toLowerCase() || '';
         
-        // Logic phân bổ khóa học vào các chặng (Dựa trên ID khóa học thực tế)
-        // Đây là bộ khung chặng đường phát triển trọn đời
         const allPossibleStages = [
             { id: 1, name: 'Xác định mục tiêu', icon: '🎯', courseIds: [1] },
             { id: 2, name: 'Nền tảng cơ bản', icon: '🧱', courseIds: [2] },
@@ -34,15 +80,12 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             { id: 8, name: 'Giàu toàn diện', icon: '💎', courseIds: [9] }
         ];
 
-        // Lọc chặng dựa trên mục tiêu của người dùng
         if (goal.includes('bán hàng') && !goal.includes('nâng cao')) {
             return allPossibleStages.slice(0, 3);
         }
         if (goal.includes('nhân hiệu')) {
             return allPossibleStages.slice(0, 5);
         }
-        
-        // Mặc định hoặc lộ trình dài hạn
         return allPossibleStages;
     }, [userGoal]);
 
@@ -81,14 +124,14 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 )}
             </div>
 
-            {/* 2. BƯỚC 2.2: UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (ZIG-ZAG) */}
+            {/* 2. UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (ZIG-ZAG) */}
             <div className="bg-zinc-950 rounded-[3rem] p-8 md:p-12 border border-white/5 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#facc1505,transparent_70%)]"></div>
                 
                 <div className="relative z-10 space-y-10">
-                    <div className="flex items-center justify-center gap-3 mb-12">
+                    <div className="flex items-center justify-center gap-3 mb-12 text-white">
                         <Flag className="w-5 h-5 text-yellow-400" />
-                        <h3 className="text-sm font-black uppercase tracking-[0.3em] text-white italic">Hành trình Zero 2 Hero</h3>
+                        <h3 className="text-sm font-black uppercase tracking-[0.3em] italic">Hành trình Zero 2 Hero</h3>
                     </div>
 
                     <div className="flex flex-wrap justify-center relative w-full max-w-4xl mx-auto">
@@ -137,7 +180,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 </div>
             </div>
 
-            {/* 3. BƯỚC 2.3: MA TRẬN MẢNH GHÉP (COMPACT GRID) */}
+            {/* 3. MA TRẬN MẢNH GHÉP (COMPACT GRID) */}
             <div className="space-y-6">
                 <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
