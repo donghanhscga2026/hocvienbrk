@@ -1,6 +1,28 @@
 import { google } from 'googleapis';
 
 /**
+ * Global Notification System for BRK Academy
+ * Dùng để hiển thị các thông báo (toast/bubble) tại vị trí Logo trên UI
+ */
+export const NOTIFICATION_EVENT = 'brk-global-notification';
+
+export interface BRKNotification {
+    message: string;
+    type?: 'info' | 'success' | 'warning' | 'error';
+    duration?: number;
+}
+
+/**
+ * Hàm bắn thông báo hiển thị trên giao diện (Bong bóng tại Logo)
+ */
+export function notify(payload: BRKNotification | string) {
+    if (typeof window === 'undefined') return;
+    const detail = typeof payload === 'string' ? { message: payload } : payload;
+    const event = new CustomEvent(NOTIFICATION_EVENT, { detail });
+    window.dispatchEvent(event);
+}
+
+/**
  * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
  */
 export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' = 'ACTIVATE') {

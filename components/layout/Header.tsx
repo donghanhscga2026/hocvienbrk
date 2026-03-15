@@ -4,21 +4,38 @@ import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
-import { User, Settings, LogOut, ChevronDown } from 'lucide-react'
+import { User, Settings, LogOut, ChevronDown, Sparkles } from 'lucide-react'
+import { NOTIFICATION_EVENT, BRKNotification } from '@/lib/notifications'
 
 export default function Header({ session, userImage }: { session: any, userImage?: string | null }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+    const [notification, setNotification] = useState<BRKNotification | null>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
+        // Lắng nghe thông báo toàn cầu
+        const handleNotification = (event: any) => {
+            const data = event.detail as BRKNotification
+            setNotification(data)
+            
+            // Tự động ẩn sau thời gian quy định (mặc định 4s)
+            const duration = data.duration || 4000
+            setTimeout(() => setNotification(null), duration)
+        }
+
+        window.addEventListener(NOTIFICATION_EVENT, handleNotification)
+        
         function handleClickOutside(event: MouseEvent) {
             if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
                 setIsUserMenuOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        return () => {
+            window.removeEventListener(NOTIFICATION_EVENT, handleNotification)
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
     }, [])
 
     const userInitials = session?.user?.name
@@ -29,17 +46,34 @@ export default function Header({ session, userImage }: { session: any, userImage
         <header className="fixed top-0 z-50 w-full bg-black text-white shadow-xl border-b border-white/5">
             <div className="container mx-auto flex h-16 items-center justify-between px-4 lg:px-8">
                 {/* Logo & Brand */}
-                <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
-                    <Image
-                        src="/logobrk-50px.png"
-                        alt="Học Viện BRK Logo"
-                        width={150}
-                        height={50}
-                        priority
-                        className="object-contain"
-                        style={{ height: '48px', width: 'auto' }}
-                    />
-                </Link>
+                <div className="flex items-center gap-4 shrink-0 relative">
+                    <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
+                        <Image
+                            src="/logobrk-50px.png"
+                            alt="Học Viện BRK Logo"
+                            width={150}
+                            height={50}
+                            priority
+                            className="object-contain"
+                            style={{ height: '48px', width: 'auto' }}
+                        />
+                    </Link>
+
+                    {/* Notification Bubble */}
+                    {notification && (
+                        <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 animate-in slide-in-from-left-2 fade-in duration-300 z-[60]">
+                            <div className="relative bg-yellow-400 text-black px-4 py-2 rounded-2xl shadow-2xl shadow-yellow-400/20 whitespace-nowrap">
+                                {/* Mũi tên trỏ vào logo */}
+                                <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-yellow-400"></div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-3 h-3 animate-pulse" />
+                                    <span className="text-[11px] font-black uppercase tracking-tight italic">{notification.message}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Navigation - Desktop */}
                 <nav className="hidden flex-1 items-center justify-center gap-12 text-[13px] font-black md:flex">
