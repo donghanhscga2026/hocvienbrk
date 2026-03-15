@@ -282,20 +282,36 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                     )}
                 </div>
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
-                    <p className="text-gray-400 text-sm mb-8 font-medium italic">
-                        {currentQuestion.description || 'Hãy chọn đáp án phản ánh đúng nhất trạng thái của bạn.'}
+                    <h3 className="text-base font-black leading-snug mb-2  tracking-tight">{currentQuestion.question}</h3>
+                    <p className="text-gray-400 text-xs mb-8 font-medium italic">
+                        {currentQuestion.description || 'Chọn đáp án đúng nhất hiện tại của bạn'}
                     </p>
                     {currentQuestion.type === 'CHOICE' && (
-                        <div className="grid grid-cols-1 gap-3">
-                            {currentQuestion.options?.map((opt: any) => (
-                                <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]">
-                                    <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
-                                    <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-yellow-400" />
-                                </button>
-                            ))}
-                        </div>
-                    )}
+    <div className="grid grid-cols-1 gap-1"> 
+        {/* Tăng gap từ 3 lên 4 để các nút có khoảng thở */}
+        {currentQuestion.options?.map((opt: any) => (
+            <button 
+                key={opt.id} 
+                onClick={() => handleNext(opt.id, opt.label)} 
+                className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 py-3 px-4 rounded-2xl transition-all duration-300 flex items-center justify-between group active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+            >
+                <div className="flex flex-col gap-1">
+                    {/* text-lg (18px) giúp nội dung nổi bật, leading-relaxed (1.625) cực kỳ thoáng cho tiếng Việt */}
+                    <span className="text-xs font-bold text-gray-200 group-hover:text-white leading-relaxed transition-colors">
+                        {opt.label}
+                    </span>
+                    
+                    {/* Nếu sau này ní muốn thêm mô tả ngắn cho mỗi option thì có thể để ở đây */}
+                </div>
+
+                {/* Icon được cố định kích thước và có hiệu ứng đổi màu khi hover vào cả nút */}
+                <div className="ml-4 p-2 rounded-full bg-white/5 group-hover:bg-yellow-400/10 transition-colors shrink-0">
+                    <ChevronRight className="w-6 h-6 text-gray-600 group-hover:text-yellow-400 transition-transform group-hover:translate-x-1" />
+                </div>
+            </button>
+        ))}
+    </div>
+)}
 
                     {currentQuestion.type === 'FREE_TEXT' && (
                         <div className="space-y-6">
