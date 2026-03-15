@@ -333,6 +333,7 @@ const RoadmapBuilderContent = () => {
                     <option value="CHOICE">🔘 Các nút Lựa chọn</option>
                     <option value="INPUT_ACCOUNT">📱 Form Thông tin kênh</option>
                     <option value="INPUT_GOAL">🏁 Form Cam kết mục tiêu</option>
+                    <option value="FREE_TEXT">📝 Form Tự nhập câu trả lời</option>
                   </select>
                 </div>
               )}

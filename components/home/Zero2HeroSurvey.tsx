@@ -47,6 +47,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
     const [input1, setInput1] = useState('')
     const [input2, setInput2] = useState('')
+    const [freeText, setFreeText] = useState('')
     const [videoPerDay, setVideoPerDay] = useState('1')
     const [days, setDays] = useState('30')
     const [targetVal, setTargetVal] = useState('1000')
@@ -290,6 +291,31 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                             ))}
                         </div>
                     )}
+
+                    {currentQuestion.type === 'FREE_TEXT' && (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Câu trả lời của bạn</label>
+                                <textarea 
+                                    value={freeText} 
+                                    onChange={e => setFreeText(e.target.value)} 
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400 min-h-[120px] transition-all" 
+                                    placeholder="Nhập nội dung trả lời tại đây..." 
+                                />
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    if (!freeText.trim()) return alert('Vui lòng nhập câu trả lời của bạn.');
+                                    handleNext('free_text_submit', freeText);
+                                    setFreeText(''); // Reset cho câu sau
+                                }} 
+                                className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10 flex items-center justify-center gap-2"
+                            >
+                                <Send className="w-3 h-3" /> Tiếp tục khảo sát
+                            </button>
+                        </div>
+                    )}
+
                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
