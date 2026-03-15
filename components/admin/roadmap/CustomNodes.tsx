@@ -6,6 +6,12 @@ import { Handle, Position } from '@xyflow/react';
 export const QuestionNode = memo(({ data }: any) => {
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-orange-50 border-2 border-orange-500 min-w-[220px] relative">
+      {/* Số thứ tự tự động */}
+      {data.orderIndex && (
+        <div className="absolute -top-3 -left-3 w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center text-[10px] font-black border-2 border-white shadow-lg z-50">
+          {data.orderIndex}
+        </div>
+      )}
       <div className="flex items-start text-black">
         <div className="rounded-full w-8 h-8 flex items-center justify-center bg-orange-500 text-white mr-2 text-xs shrink-0 mt-1">❓</div>
         <div className="ml-2">

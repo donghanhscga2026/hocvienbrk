@@ -155,6 +155,45 @@ const RoadmapBuilderContent = () => {
     setSelectedNode({ ...selectedNode, data: { ...selectedNode.data, ...newData } });
   };
 
+  // TÍNH TOÁN THỨ TỰ NODE TỰ ĐỘNG
+  const getOrderedNodes = useCallback(() => {
+    if (nodes.length === 0) return nodes;
+
+    const nodeOrderMap = new Map<string, number>();
+    const visited = new Set<string>();
+    let currentOrder = 1;
+
+    // Tìm các node gốc (không có edge trỏ vào)
+    const targetIds = new Set(edges.map((e: any) => e.target));
+    const rootNodes = nodes.filter((n: any) => n.type === 'questionNode' && !targetIds.has(n.id));
+    
+    const traverse = (nodeId: string) => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+
+      const node = nodes.find((n: any) => n.id === nodeId);
+      if (node && (node.type === 'questionNode' || node.type === 'finishNode')) {
+        nodeOrderMap.set(nodeId, currentOrder++);
+      }
+
+      // Tìm các node tiếp theo thông qua edges và optionNodes/courseNodes
+      const outEdges = edges.filter((e: any) => e.source === nodeId);
+      for (const edge of outEdges) {
+        traverse(edge.target);
+      }
+    };
+
+    rootNodes.forEach(root => traverse(root.id));
+
+    // Cập nhật dữ liệu node với số thứ tự
+    return nodes.map((n: any) => ({
+      ...n,
+      data: { ...n.data, orderIndex: nodeOrderMap.get(n.id) }
+    }));
+  }, [nodes, edges]);
+
+  const nodesWithOrder = getOrderedNodes();
+
   // LOGIC NẠP DỮ LIỆU TỪ BẢN CŨ
   const onMigrateFromOldVersion = () => {
     if (!window.confirm('CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ sơ đồ hiện tại và nạp lại dữ liệu từ file code gốc. Bạn có chắc chắn?')) return;
@@ -362,7 +401,7 @@ const RoadmapBuilderContent = () => {
 
         {/* 3. Canvas Area (Full space) */}
         <div className="flex-1 relative" ref={reactFlowWrapper}>
-          <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onInit={setReactFlowInstance} onDrop={onDrop} onDragOver={onDragOver} onNodeClick={(_, node) => setSelectedNode(node)} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={2} panOnScroll={true} selectionOnDrag={true}>
+          <ReactFlow nodes={nodesWithOrder} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onInit={setReactFlowInstance} onDrop={onDrop} onDragOver={onDragOver} onNodeClick={(_, node) => setSelectedNode(node)} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={2} panOnScroll={true} selectionOnDrag={true}>
             <Background color="#E5E7EB" variant={"dots" as any} gap={20} size={1} />
             <Controls className="!bg-white !border-gray-200 !rounded-xl md:!rounded-2xl !shadow-2xl overflow-hidden" />
           </ReactFlow>
