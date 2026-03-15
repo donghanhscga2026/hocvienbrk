@@ -383,73 +383,71 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         </div>
                     )}
                     {currentQuestion.type === 'INPUT_GOAL' && (
-                        <div className="space-y-6 text-black text-left">
-                            <div className="bg-white p-8 rounded-[3rem] border-2 border-yellow-400/20 space-y-8 shadow-2xl">
-                                {/* PHẦN 1: MỤC TIÊU (Phân nhánh dựa trên lựa chọn trước đó) */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <Target className="w-4 h-4 text-yellow-500" /> 1. Xác định mục tiêu của bạn
+                        <div className="space-y-4 text-black text-left">
+                            <div className="bg-white p-5 md:p-8 rounded-[2.5rem] border-2 border-yellow-400/20 space-y-5 shadow-2xl">
+                                {/* PHẦN 1: MỤC TIÊU */}
+                                <div className="space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                                        <Target className="w-3.5 h-3.5 text-yellow-500" /> 1. Mục tiêu của bạn
                                     </h4>
-                                    
+
                                     {/* TRƯỜNG HỢP: BÁN HÀNG */}
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng')) && (
-                                        <div className="flex flex-wrap items-center gap-3 text-base font-black leading-relaxed">
-                                            <span>TÔI MUỐN KIẾM ĐƯỢC</span>
-                                            <input type="text" value={moneyGoal} onChange={e => setMoneyGoal(e.target.value)} className="min-w-[150px] bg-gray-100 border-none rounded-xl px-4 py-2 text-center text-emerald-600 outline-none" />
-                                            <span className="text-gray-400 font-bold italic">VNĐ / THÁNG</span>
+                                        <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
+                                            <span>TÔI MUỐN KIẾM</span>
+                                            <input type="text" value={moneyGoal} onChange={e => setMoneyGoal(e.target.value)} className="w-28 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-emerald-600 outline-none" />
+                                            <span className="text-gray-400 font-bold italic text-[10px]">VNĐ/THÁNG</span>
                                         </div>
                                     )}
 
                                     {/* TRƯỜNG HỢP: NHÂN HIỆU */}
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('nhân hiệu')) && (
-                                        <div className="flex flex-wrap items-center gap-3 text-base font-black leading-relaxed">
-                                            <span>TÔI MUỐN ĐẠT ĐƯỢC</span>
-                                            <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-24 bg-gray-100 border-none rounded-xl px-4 py-2 text-center text-yellow-600 outline-none" />
-                                            <span className="text-gray-400 font-bold italic">FOLLOW / TƯƠNG TÁC</span>
+                                        <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
+                                            <span>TÔI MUỐN ĐẠT</span>
+                                            <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-20 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
+                                            <span className="text-gray-400 font-bold italic text-[10px]">FOLLOW</span>
                                         </div>
                                     )}
 
-                                    {/* TRƯỜNG HỢP: LAN TỎA GIÁ TRỊ (Mục tiêu = Cam kết hành động) */}
+                                    {/* TRƯỜNG HỢP: LAN TỎA GIÁ TRỊ */}
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('lan tỏa')) && (
-                                        <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 text-blue-700 font-bold text-sm italic">
-                                            🎯 Mục tiêu của bạn là lan tỏa giá trị và cống hiến cho cộng đồng thông qua các hành động cụ thể dưới đây.
+                                        <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-blue-700 font-bold text-[11px] italic leading-snug">
+                                            🎯 Mục tiêu là lan tỏa giá trị cộng đồng thông qua hành động cụ thể.
                                         </div>
                                     )}
                                 </div>
 
                                 {/* PHẦN 2: CAM KẾT HÀNH ĐỘNG */}
-                                <div className="space-y-6 pt-6 border-t border-gray-100">
-                                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> 2. Cam kết thực hiện
+                                <div className="space-y-4 pt-4 border-t border-gray-100">
+                                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 2. Cam kết thực hiện
                                     </h4>
-                                    
-                                    <div className="space-y-6">
-                                        {/* Cam kết Video - Mặc định hiện */}
-                                        <div className="flex flex-wrap items-center gap-3 text-sm font-bold leading-relaxed">
-                                            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">🎬</div>
-                                            <span>LÀM ĐỀU ĐẶN</span>
-                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-center font-black text-red-600" />
-                                            <span>VIDEO / NGÀY TRONG</span>
-                                            <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-center font-black text-red-600" />
+
+                                    <div className="space-y-4">
+                                        {/* Cam kết Video */}
+                                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
+                                            <span className="shrink-0">🎬 LÀM ĐỀU</span>
+                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            <span>VIDEO/NGÀY TRONG</span>
+                                            <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
                                             <span>NGÀY</span>
                                         </div>
 
-                                        {/* Cam kết Livestream - Chỉ hiện nếu có chọn */}
+                                        {/* Cam kết Livestream */}
                                         {Object.values(answers).some(val => String(val).toLowerCase().includes('livestream')) && (
-                                            <div className="flex flex-wrap items-center gap-3 text-sm font-bold leading-relaxed animate-in slide-in-from-left duration-500">
-                                                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">📡</div>
-                                                <span>LÊN SÓNG</span>
-                                                <input type="number" value={livePerDay} onChange={e => setLivePerDay(e.target.value)} className="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-center font-black text-orange-600" />
-                                                <span>PHÚT / NGÀY TRONG</span>
-                                                <input type="number" value={liveDays} onChange={e => setLiveDays(e.target.value)} className="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-center font-black text-orange-600" />
+                                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
+                                                <span className="shrink-0">📡 LÊN SÓNG</span>
+                                                <input type="number" value={livePerDay} onChange={e => setLivePerDay(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
+                                                <span>PHÚT/NGÀY TRONG</span>
+                                                <input type="number" value={liveDays} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
                                                 <span>NGÀY</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-2xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết thực hiện
+                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-3 h-3" />} Xác nhận lộ trình & Cam kết thực hiện
                             </button>
                         </div>
                     )}
