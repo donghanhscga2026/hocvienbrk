@@ -49,7 +49,10 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
                 }
             } 
             else if (targetNode.type === 'courseNode') {
-                if (targetNode.data?.courseId) collectedCourseIds.add(Number(targetNode.data.courseId))
+                const cid = parseInt(targetNode.data?.courseId);
+                if (!isNaN(cid)) {
+                    collectedCourseIds.add(cid);
+                }
                 traverse(targetNode.id)
             }
             else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
@@ -92,36 +95,51 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         }
 
         const config = answers['goal_config'] as any
-        let finalGoal = goalTitle
+        let structuredGoal: any = {
+            title: goalTitle,
+            mainGoal: goalTitle,
+            commitments: []
+        }
+
         if (config && config.videoPerDay) {
-            // 1. Xác định Cờ định hướng
             const isSelling = Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng'))
             const isBranding = Object.values(answers).some(val => String(val).toLowerCase().includes('nhân hiệu'))
             const isSpreading = Object.values(answers).some(val => String(val).toLowerCase().includes('lan tỏa'))
 
-            // 2. Phần Mục tiêu (MỤC TIÊU)
-            let mainGoalStr = ''
-            if (isSelling) mainGoalStr = `Kiếm ${config.moneyGoal} VNĐ/tháng`
-            else if (isBranding) mainGoalStr = `Đạt ${config.targetVal} follow`
-            else if (isSpreading) mainGoalStr = `Lan tỏa giá trị TLGDTG ra toàn cầu`
-            else mainGoalStr = `Mục tiêu: Chinh phục chặng ${goalTitle}`
+            // 1. Xác định QUẢ (Main Goal)
+            if (isSelling) structuredGoal.mainGoal = `${config.moneyGoal} VNĐ/tháng`
+            else if (isBranding) structuredGoal.mainGoal = `${config.targetVal} Follow`
+            else if (isSpreading) structuredGoal.mainGoal = `Lan tỏa TLGDTG ra toàn cầu`
 
-            // 3. Phần Cam kết hành động (CAM KẾT)
-            const videoStr = `Cam kết: Làm ${config.videoPerDay} video/ngày trong ${config.days} ngày`
-            const liveStr = config.isLivestream
-                ? ` và lên Livestream ${config.livePerDay} phút/ngày trong ${config.liveDays} ngày`
-                : ''
+            // 2. Xác định NHÂN (Commitments)
+            // Cam kết 1: Mặc định học tập
+            if (customPath.length > 0) {
+                structuredGoal.commitments.push({
+                    type: 'LEARN',
+                    content: `Hoàn thành lộ trình ${customPath.length} chặng học đã thiết kế`
+                })
+            }
 
-            finalGoal = `${mainGoalStr}. ${videoStr}${liveStr}.`
+            // Cam kết 2: Video
+            structuredGoal.commitments.push({
+                type: 'VIDEO',
+                content: `Đăng ít nhất ${config.videoPerDay} video/ngày trong ${config.days} ngày`
+            })
+
+            // Cam kết 3: Livestream
+            if (config.isLivestream) {
+                structuredGoal.commitments.push({
+                    type: 'LIVE',
+                    content: `Livestream tối thiểu ${config.livePerDay} phút/ngày trong ${config.liveDays} ngày`
+                })
+            }
         }
 
-        // ĐÃ GỠ BỎ MẶC ĐỊNH [1] - Nếu rỗng thì lưu rỗng
-        
         const surveyData = {
             current: {
                 answers,
                 customPath: customPath,
-                goal: finalGoal,
+                goal: structuredGoal,
                 completedAt: new Date().toISOString()
             }
         };
@@ -131,12 +149,12 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             data: {
                 surveyResults: surveyData as any,
                 customPath: customPath as any,
-                goal: finalGoal
+                goal: JSON.stringify(structuredGoal)
             }
         })
 
         revalidatePath('/')
-        return { success: true, customPath, goal: finalGoal }
+        return { success: true, customPath, goal: structuredGoal }
 
     } catch (error: any) {
         console.error("Lỗi Server Action:", error.message)
