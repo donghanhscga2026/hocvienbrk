@@ -1,0 +1,24 @@
+
+/**
+ * Global Notification System for BRK Academy (CLIENT-SIDE ONLY)
+ * Dùng để hiển thị các thông báo bong bóng chat tại Logo.
+ */
+
+export const NOTIFICATION_EVENT = 'brk-global-notification';
+
+export interface BRKNotification {
+    message: string;
+    type?: 'info' | 'success' | 'warning' | 'error';
+    duration?: number;
+}
+
+/**
+ * Hàm bắn thông báo hiển thị trên giao diện (Bong bóng tại Logo)
+ * Tuyệt đối an toàn cho Client Component.
+ */
+export function notify(payload: BRKNotification | string) {
+    if (typeof window === 'undefined') return;
+    const detail = typeof payload === 'string' ? { message: payload } : payload;
+    const event = new CustomEvent(NOTIFICATION_EVENT, { detail });
+    window.dispatchEvent(event);
+}
