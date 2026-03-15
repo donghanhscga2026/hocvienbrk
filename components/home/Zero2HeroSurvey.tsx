@@ -144,7 +144,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                         return { id: optNode?.id, label: optNode?.data?.label, type: optNode?.type }
                     })
                     .filter((o: any) => o.id && o.type === 'optionNode') : []
-                return { id: node.id, question: node.data?.label, type: node.data?.type || 'CHOICE', options, isDynamic: true }
+                return { id: node.id, question: node.data?.label, type: node.data?.type || 'CHOICE', options, isDynamic: true, description: node.data?.description }
             }
         }
         const staticQ = (surveyQuestions as any)[currentStep] || {}
@@ -152,6 +152,25 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     }
 
     const currentQuestion = getActiveQuestion()
+
+    const handleBack = () => {
+        if (history.length > 0) {
+            const prevHistory = [...history]
+            const lastStep = prevHistory.pop()
+            setHistory(prevHistory)
+            
+            if (lastStep.isDynamic) {
+                setCurrentNodeId(lastStep.id)
+                setIdentifiedCourseIds(lastStep.courses || [])
+            } else {
+                setCurrentStep(lastStep.id)
+            }
+            
+            const newAnswers = { ...answers }
+            delete newAnswers[currentQuestion.id]
+            setAnswers(newAnswers)
+        }
+    }
 
     const handleNext = async (optionId: string, label: string) => {
         const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
@@ -195,8 +214,15 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
             const nextNode = findNextNode(startId!)
 
             if (nextNode) {
-                // Nếu là Đích đến (FinishNode) -> Nộp bài ngay
+                // Nếu là Đích đến (FinishNode)
                 if (nextNode.type === 'finishNode') {
+                    // Nếu Đích đến yêu cầu Form Cam kết (INPUT_GOAL)
+                    if (nextNode.data?.type === 'INPUT_GOAL') {
+                        setHistory([...history, { id: currentNodeId, isDynamic: true, courses: [...identifiedCourseIds] }])
+                        setCurrentNodeId(nextNode.id) // Chuyển sang chính Node Đích này để hiện Form
+                        return
+                    }
+                    // Ngược lại nộp bài ngay
                     finishSurvey(newAnswers)
                     return
                 }
@@ -266,52 +292,52 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     return (
         <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
             <div className="relative z-10">
-                <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20"><Target className="w-5 h-5" /></div>
                         <div>
-                            <h2 className="text-lg font-black uppercase tracking-tight italic">Zero 2 Hero</h2>
-                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Live Roadmap Building</p>
+                            <h2 className="text-sg font-black text-yellow-400 uppercase tracking-tight italic">Zero 2 Hero</h2>
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Thiết kế lộ trình</p>
                         </div>
                     </div>
-                    {identifiedCourseIds.length > 0 && (
-                        <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 animate-in zoom-in">
-                            <BookOpen className="w-3 h-3 text-yellow-400" />
-                            <span className="text-[10px] font-black text-yellow-400">{identifiedCourseIds.length}</span>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {history.length > 0 && (
+                            <button 
+                                onClick={handleBack}
+                                className="py-2 px-2
+                             bg-yellow-400 text-black rounded-2xl hover:bg-yellow-500 transition-all active:scale-90 shadow-lg shadow-yellow-400/10 animate-in fade-in zoom-in"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                            </button>
+                        )}
+                        {identifiedCourseIds.length > 0 && (
+                            <div className="flex items-center gap-2 bg-zinc-800 px-4 py-2 rounded-xl border border-white/10 animate-in zoom-in">
+                                <BookOpen className="w-3 h-3 text-yellow-400" />
+                                <span className="text-[10px] font-black text-yellow-400">{identifiedCourseIds.length}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h3 className="text-base font-black leading-snug mb-2  tracking-tight">{currentQuestion.question}</h3>
-                    <p className="text-gray-400 text-xs mb-8 font-medium italic">
-                        {currentQuestion.description || 'Chọn đáp án đúng nhất hiện tại của bạn'}
+                    <h3 className="text-base font-black leading-snug mb-1 tracking-tight">{currentQuestion.question}</h3>
+                    <p className="text-gray-400 text-[10px] mb-6 font-medium italic">
+                        {currentQuestion.description || 'Hãy chọn đáp án đúng nhất bạn muốn!'}
                     </p>
                     {currentQuestion.type === 'CHOICE' && (
-    <div className="grid grid-cols-1 gap-1"> 
-        {/* Tăng gap từ 3 lên 4 để các nút có khoảng thở */}
-        {currentQuestion.options?.map((opt: any) => (
-            <button 
-                key={opt.id} 
-                onClick={() => handleNext(opt.id, opt.label)} 
-                className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/30 py-3 px-4 rounded-2xl transition-all duration-300 flex items-center justify-between group active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
-            >
-                <div className="flex flex-col gap-1">
-                    {/* text-lg (18px) giúp nội dung nổi bật, leading-relaxed (1.625) cực kỳ thoáng cho tiếng Việt */}
-                    <span className="text-xs font-bold text-gray-200 group-hover:text-white leading-relaxed transition-colors">
-                        {opt.label}
-                    </span>
-                    
-                    {/* Nếu sau này ní muốn thêm mô tả ngắn cho mỗi option thì có thể để ở đây */}
-                </div>
-
-                {/* Icon được cố định kích thước và có hiệu ứng đổi màu khi hover vào cả nút */}
-                <div className="ml-4 p-2 rounded-full bg-white/5 group-hover:bg-yellow-400/10 transition-colors shrink-0">
-                    <ChevronRight className="w-6 h-6 text-gray-600 group-hover:text-yellow-400 transition-transform group-hover:translate-x-1" />
-                </div>
-            </button>
-        ))}
-    </div>
-)}
+                        <div className="grid grid-cols-1 gap-2"> 
+                            {currentQuestion.options?.map((opt: any) => (
+                                <button 
+                                    key={opt.id} 
+                                    onClick={() => handleNext(opt.id, opt.label)} 
+                                    className="w-full text-left bg-white hover:bg-gray-100 border border-transparent py-2 px-3 rounded-2xl transition-all duration-300 group active:scale-[0.98] shadow-xl"
+                                >
+                                    <span className="text-xs font-black text-zinc-900 leading-relaxed transition-colors">
+                                        {opt.label}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {currentQuestion.type === 'FREE_TEXT' && (
                         <div className="space-y-6">

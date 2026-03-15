@@ -138,15 +138,22 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                         onClick={() => setActiveStage(isActive ? null : stage.id)}
                                                         className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${
                                                             isUserGoal 
-                                                            ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_50px_rgba(52,211,153,0.5)] scale-110' 
+                                                            ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30' 
                                                             : isActive
-                                                            ? 'border-yellow-400 bg-yellow-400 text-black shadow-[0_0_40px_rgba(250,204,21,0.4)]'
+                                                            ? 'border-yellow-400 bg-yellow-400 text-black shadow-[0_0_40px_rgba(250,204,21,0.4)] z-20'
                                                             : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
                                                         }`}
                                                     >
-                                                        <span className="text-xl md:text-3xl font-black">{stage.icon}</span>
+                                                        {/* Hiệu ứng tỏa sáng động cho Đích đến */}
                                                         {isUserGoal && (
-                                                            <div className="absolute -top-4 bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter animate-bounce whitespace-nowrap">🎯 Đích của bạn</div>
+                                                            <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20"></span>
+                                                        )}
+                                                        
+                                                        <span className="text-xl md:text-3xl font-black relative z-10">{stage.icon}</span>
+                                                        {isUserGoal && (
+                                                            <div className="absolute -top-6 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
+                                                                <Trophy className="w-2.5 h-2.5 inline mr-1" /> Mục tiêu của bạn
+                                                            </div>
                                                         )}
                                                         <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isActive ? 'bg-black text-white border-yellow-400' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                                                             {stage.id}

@@ -377,6 +377,20 @@ const RoadmapBuilderContent = () => {
                 </div>
               )}
 
+              {selectedNode.type === 'finishNode' && (
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-emerald-500 ml-1 italic">Loại hiển thị cuối</label>
+                  <select 
+                    className="w-full p-4 text-xs font-bold border-2 border-emerald-50 rounded-2xl outline-none focus:border-emerald-500 text-black bg-white" 
+                    value={selectedNode.data?.type || 'FINISH'} 
+                    onChange={(e) => updateNodeData({ type: e.target.value })}
+                  >
+                    <option value="FINISH">🏁 Kết thúc mặc định</option>
+                    <option value="INPUT_GOAL">📜 Hiện Form Cam kết mục tiêu</option>
+                  </select>
+                </div>
+              )}
+
               {selectedNode.type === 'courseNode' && (
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Chọn khóa học</label>
