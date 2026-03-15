@@ -388,13 +388,13 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                 {/* PHẦN 1: MỤC TIÊU */}
                                 <div className="space-y-3">
                                     <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <Target className="w-3.5 h-3.5 text-yellow-500" /> 1. Mục tiêu của bạn
+                                        <Target className="w-3.5 h-3.5 text-yellow-500" /> 1. Mục tiêu: (QUẢ) Tôi muốn
                                     </h4>
 
                                     {/* TRƯỜNG HỢP: BÁN HÀNG */}
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng')) && (
                                         <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
-                                            <span>TÔI MUỐN KIẾM</span>
+                                            <span>ĐẠT</span>
                                             <input type="text" value={moneyGoal} onChange={e => setMoneyGoal(e.target.value)} className="w-28 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-emerald-600 outline-none" />
                                             <span className="text-gray-400 font-bold italic text-[10px]">VNĐ/THÁNG</span>
                                         </div>
@@ -418,36 +418,36 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                                 </div>
 
                                 {/* PHẦN 2: CAM KẾT HÀNH ĐỘNG */}
-                                <div className="space-y-4 pt-4 border-t border-gray-100">
+                                <div className="space-y-3 pt-4 border-t border-gray-100">
                                     <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 2. Cam kết thực hiện
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 2. Cam kết (NHÂN) hành động
                                     </h4>
 
                                     <div className="space-y-4">
                                         {/* Cam kết Video */}
                                         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
-                                            <span className="shrink-0">🎬 LÀM ĐỀU</span>
-                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
-                                            <span>VIDEO/NGÀY TRONG</span>
-                                            <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
-                                            <span>NGÀY</span>
+                                            <span className="shrink-0">🎬 Tôi sẽ đăng ít nhất: 
+                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-7 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            Video mỗi ngày</span>
+                                            <span> đều đặn liên tục trong: <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            ngày</span>
                                         </div>
 
                                         {/* Cam kết Livestream */}
                                         {Object.values(answers).some(val => String(val).toLowerCase().includes('livestream')) && (
                                             <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
-                                                <span className="shrink-0">📡 LÊN SÓNG</span>
+                                                <span className="shrink-0">📡 Tôi sẽ livestream tối thiểu: 
                                                 <input type="number" value={livePerDay} onChange={e => setLivePerDay(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
-                                                <span>PHÚT/NGÀY TRONG</span>
-                                                <input type="number" value={liveDays} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
-                                                <span>NGÀY</span>
+                                                phút</span>
+                                                <span> mỗi ngày đều đặn trong:<input type="number" value={liveDays} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
+                                                ngày</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
                             <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-3 h-3" />} Xác nhận lộ trình & Cam kết thực hiện
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-3 h-3" />} Xác nhận & Cam kết
                             </button>
                         </div>
                     )}

@@ -81,23 +81,62 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
     }, [activeStage, stages])
 
     return (
-        <div className="space-y-12 animate-in fade-in duration-700" ref={containerRef}>
-            {/* 1. Header Lộ trình */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
-                <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20">
-                            <Target className="w-4 h-4" />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Mục tiêu hiện tại</span>
+        <div className="space-y-3 animate-in fade-in duration-700" ref={containerRef}>
+            {/* 1. Dashboard Mục tiêu & Cam kết - PHONG CÁCH TỐI GIẢN */}
+            <div className="relative space-y-4">
+                <div className="flex justify-between items-center px-2">
+                    <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-gray-400" />
+                        <span className="text-[12px] font-black uppercase tracking-widest text-gray-400">Mục tiêu & lộ trình</span>
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tight italic leading-none">{userGoal || 'Lộ trình phát triển'}</h2>
+                    {onReset && (
+                        <button onClick={() => { if(confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors border-b border-gray-200">
+                            🔄 Tạo lại lộ trình
+                        </button>
+                    )}
                 </div>
-                {onReset && (
-                    <button onClick={() => { if(confirm('Làm lại khảo sát sẽ xóa lộ trình hiện tại?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors border-b border-transparent hover:border-red-500 pb-1">
-                        🔄 Thiết lập lại mục tiêu
-                    </button>
-                )}
+
+                {(() => {
+                    let goalData: any = null;
+                    if (typeof userGoal === 'object' && userGoal !== null) goalData = userGoal;
+                    else if (typeof userGoal === 'string' && userGoal.startsWith('{')) {
+                        try { goalData = JSON.parse(userGoal); } catch (e) { goalData = null; }
+                    }
+                    const displayTitle = goalData ? goalData.mainGoal : (userGoal || 'Lộ trình phát triển');
+                    const commitments = goalData && Array.isArray(goalData.commitments) ? goalData.commitments : [];
+
+                    return (
+                        <div className="flex flex-col md:flex-row gap-0">
+                            {/* KHỐI MỤC TIÊU (QUẢ) */}
+                            <div className="md:w-1/3 bg-black text-yellow-400 py-1 px-2 rounded-t-[2rem] flex items-center gap-2 border-2 border-black shadow-lg">
+                                <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center text-3xl">🏆</div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[12px] font-black text-white uppercase opacity-86 mb-0.5">(Quả như ý) TÔI MUỐN</div>
+                                    <div className="text-[18px] font-black uppercase tracking-tight truncate leading-none">{displayTitle}</div>
+                                </div>
+                            </div>
+
+                            {/* KHỐI CAM KẾT TỔNG HỢP (NHÂN) */}
+                            <div className="md:w-2/3 bg-white py-3 px-5 rounded-b-[2.5rem] border-2 border-gray-100 flex flex-col justify-center gap-1 shadow-md">
+                                <div className="text-[12px] font-black uppercase text-gray-400 tracking-[0.2em] mb-1">(NHÂN TỐT) Cam kết hành động</div>
+                                <div className="space-y-2">
+                                    {commitments.map((item: any, idx: number) => {
+                                        const icons: any = { LEARN: '📚', VIDEO: '🎬', LIVE: '📡' };
+                                        return (
+                                            <div key={idx} className="flex items-center gap-1 text-[11px] font-bold text-zinc-700 leading-tight">
+                                                <span className="text-sm grayscale-[0.5] group-hover:grayscale-0">{icons[item.type] || '✨'}</span>
+                                                <span>{item.content}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {commitments.length === 0 && (
+                                        <p className="text-[10px] text-gray-400 italic">Đang cập nhật kế hoạch hành động...</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* 2. UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (MOBILE OPTIMIZED) */}
@@ -105,9 +144,9 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#facc1505,transparent_70%)]"></div>
                 
                 <div className="relative z-10">
-                    <div className="flex items-center justify-center gap-3 mb-16 text-white">
+                    <div className="flex items-center justify-center gap-3 mb-6 text-white">
                         <Flag className="w-5 h-5 text-yellow-400" />
-                        <h3 className="text-sm font-black uppercase tracking-[0.3em] italic">Hành trình Zero 2 Hero</h3>
+                        <h3 className="text-sm font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
                     </div>
 
                     <div className="relative max-w-4xl mx-auto px-2 md:px-8">
