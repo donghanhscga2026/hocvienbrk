@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { surveyQuestions } from '@/lib/survey-data'
 import { saveSurveyResultAction } from '@/app/actions/survey-actions'
 import { getActiveSurvey, getCoursesForBuilder } from '@/app/actions/roadmap-actions'
+import { notify } from '@/lib/notifications'
 import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send, Sparkles, BookOpen } from 'lucide-react'
 
 function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
@@ -43,7 +44,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [showSuccess, setShowSuccess] = useState(false)
     const [showAdvice, setShowAdvice] = useState<string | null>(null)
-    const [lastFoundCourse, setLastFoundCourse] = useState<string | null>(null)
 
     const [input1, setInput1] = useState('')
     const [input2, setInput2] = useState('')
@@ -101,8 +101,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
         traverse(sid)
         if (newIds.length > 0) {
             setIdentifiedCourseIds(newIds)
-            setLastFoundCourse(courseNames.join(', '))
-            setTimeout(() => setLastFoundCourse(null), 3000)
+            notify(`Đã xác định: ${courseNames.join(', ')}`)
         }
     }
 
@@ -127,8 +126,7 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
         traverse(sourceId)
         if (newIds.length > 0) {
             setIdentifiedCourseIds(prev => [...prev, ...newIds])
-            setLastFoundCourse(courseNames.join(', '))
-            setTimeout(() => setLastFoundCourse(null), 3000)
+            notify(`Đã xác định: ${courseNames.join(', ')}`)
         }
     }
 
@@ -255,11 +253,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
 
     return (
         <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
-            {lastFoundCourse && (
-                <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-black py-2 px-4 text-center font-black uppercase text-[9px] tracking-widest animate-in slide-in-from-top duration-300 z-50 flex items-center justify-center gap-2">
-                    <Sparkles className="w-3 h-3 fill-current" /> Đã xác định: {lastFoundCourse}
-                </div>
-            )}
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
