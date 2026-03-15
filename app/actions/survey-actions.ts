@@ -94,7 +94,25 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         const config = answers['goal_config'] as any
         let finalGoal = goalTitle
         if (config && config.videoPerDay) {
-            finalGoal = `${goalTitle} (Cam kết: ${config.videoPerDay} video/ngày trong ${config.days} ngày để đạt ${config.targetVal} follow)`
+            // 1. Xác định Cờ định hướng
+            const isSelling = Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng'))
+            const isBranding = Object.values(answers).some(val => String(val).toLowerCase().includes('nhân hiệu'))
+            const isSpreading = Object.values(answers).some(val => String(val).toLowerCase().includes('lan tỏa'))
+
+            // 2. Phần Mục tiêu (MỤC TIÊU)
+            let mainGoalStr = ''
+            if (isSelling) mainGoalStr = `Kiếm ${config.moneyGoal} VNĐ/tháng`
+            else if (isBranding) mainGoalStr = `Đạt ${config.targetVal} follow`
+            else if (isSpreading) mainGoalStr = `Lan tỏa giá trị TLGDTG ra toàn cầu`
+            else mainGoalStr = `Mục tiêu: Chinh phục chặng ${goalTitle}`
+
+            // 3. Phần Cam kết hành động (CAM KẾT)
+            const videoStr = `Cam kết: Làm ${config.videoPerDay} video/ngày trong ${config.days} ngày`
+            const liveStr = config.isLivestream
+                ? ` và lên Livestream ${config.livePerDay} phút/ngày trong ${config.liveDays} ngày`
+                : ''
+
+            finalGoal = `${mainGoalStr}. ${videoStr}${liveStr}.`
         }
 
         // ĐÃ GỠ BỎ MẶC ĐỊNH [1] - Nếu rỗng thì lưu rỗng
