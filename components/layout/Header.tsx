@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import { User, Settings, LogOut, ChevronDown, Sparkles } from 'lucide-react'
-import { NOTIFICATION_EVENT, BRKNotification } from '@/lib/notifications'
+import { NOTIFICATION_EVENT, BRKNotification } from '@/lib/notifications-client'
 
 export default function Header({ session, userImage }: { session: any, userImage?: string | null }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false)

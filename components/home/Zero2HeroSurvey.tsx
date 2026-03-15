@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { surveyQuestions } from '@/lib/survey-data'
 import { saveSurveyResultAction } from '@/app/actions/survey-actions'
 import { getActiveSurvey, getCoursesForBuilder } from '@/app/actions/roadmap-actions'
-import { notify } from '@/lib/notifications'
+import { notify } from '@/lib/notifications-client'
 import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send, Sparkles, BookOpen } from 'lucide-react'
 
 function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
