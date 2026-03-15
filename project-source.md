@@ -1577,6 +1577,128 @@ vercel.json
 34: main()
 `````
 
+## File: scripts/auto-commit-push.ps1
+`````powershell
+ 1: # ================================================================================
+ 2: # Script: auto-commit-push.ps1
+ 3: # Mục đích: Backup code hiện tại, đẩy code mới lên GitHub và cập nhật CODE_HISTORY.md
+ 4: # Cách chạy: powershell -ExecutionPolicy Bypass -File .\scripts\auto-commit-push.ps1
+ 5: # ================================================================================
+ 6: 
+ 7: $ErrorActionPreference = "Stop"
+ 8: 
+ 9: # Màu sắc cho output
+10: function Write-Green { param($msg) Write-Host $msg -ForegroundColor Green }
+11: function Write-Yellow { param($msg) Write-Host $msg -ForegroundColor Yellow }
+12: function Write-Red { param($msg) Write-Host $msg -ForegroundColor Red }
+13: 
+14: Write-Yellow "=== Bat dau auto commit va push ==="
+15: 
+16: # Buoc 1: Kiem tra co thay doi khong
+17: Write-Yellow "Kiem tra thay doi..."
+18: $status = git status --porcelain
+19: if (-not $status) {
+20:     Write-Red "Khong co thay doi nao. Thoat."
+21:     exit 0
+22: }
+23: 
+24: # Buoc 2: Hien thi cac file thay doi
+25: Write-Yellow "Cac file thay doi:"
+26: git status --porcelain
+27: 
+28: # Buoc 3: Tao mo ta commit
+29: $changedFiles = git diff --name-only
+30: Write-Green "Cac file thay doi:"
+31: $changedFiles | ForEach-Object { Write-Host "  - $_" }
+32: 
+33: # Kiem tra neu co cap nhat CODE_HISTORY.md
+34: if ($changedFiles -contains "CODE_HISTORY.md") {
+35:     $commitMsg = "cap nhat CODE_HISTORY.md"
+36: } else {
+37:     # Tao commit message tu ten file
+38:     $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
+39:     if ($fileNames.Length -gt 100) {
+40:         $commitMsg = $fileNames.Substring(0, 97) + "..."
+41:     } else {
+42:         $commitMsg = "cap nhat: $fileNames"
+43:     }
+44: }
+45: 
+46: Write-Green "Commit message: $commitMsg"
+47: 
+48: # Buoc 4: Git add
+49: Write-Yellow "Git add..."
+50: git add -A
+51: 
+52: # Buoc 5: Git commit
+53: Write-Yellow "Git commit..."
+54: git commit -m $commitMsg
+55: 
+56: # Buoc 6: Git push
+57: Write-Yellow "Git push..."
+58: git push origin master
+59: 
+60: Write-Green "=== Hoan thanh! ==="
+61: Write-Green "Da day code len GitHub"
+`````
+
+## File: scripts/auto-commit-push.sh
+`````bash
+ 1: #!/bin/bash
+ 2: # ================================================================================
+ 3: # Script: auto-commit-push.sh
+ 4: # Mục đích: Backup code hiện tại, đẩy code mới lên GitHub và cập nhật CODE_HISTORY.md
+ 5: # Cách chạy: bash scripts/auto-commit-push.sh
+ 6: # ================================================================================
+ 7: set -e
+ 8: # Màu sắc cho output
+ 9: GREEN='\033[0;32m'
+10: YELLOW='\033[1;33m'
+11: RED='\033[0;31m'
+12: NC='\033[0m' # No Color
+13: echo -e "${YELLOW}=== Bắt đầu auto commit và push ===${NC}"
+14: # Bước 1: Kiểm tra có thay đổi không
+15: echo -e "${YELLOW}Kiểm tra thay đổi...${NC}"
+16: if [ -z "$(git status --porcelain)" ]; then
+17:     echo -e "${RED}Không có thay đổi nào. Thoát.${NC}"
+18:     exit 0
+19: fi
+20: # Bước 2: Tạo mô tả thay đổi từ git diff
+21: echo -e "${YELLOW}Tạo mô tả thay đổi...${NC}"
+22: CHANGES=$(git status --porcelain | head -20)
+23: echo "$CHANGES"
+24: # Bước 3: Đọc danh sách file thay đổi
+25: CHANGED_FILES=$(git diff --name-only)
+26: echo -e "${GREEN}Các file thay đổi:${NC}"
+27: echo "$CHANGED_FILES"
+28: # Bước 4: Tạo mô tả commit tự động
+29: if [ -n "$(echo "$CHANGED_FILES" | grep -E "CODE_HISTORY.md")" ]; then
+30:     COMMIT_MSG="cap nhat CODE_HISTORY.md"
+31: else
+32:     # Lấy tên các file thay đổi (không có đường dẫn)
+33:     FILE_NAMES=$(echo "$CHANGED_FILES" | xargs -I {} basename {} | tr '\n' ', ')
+34:     # Cắt bỏ dấu , cuối cùng
+35:     FILE_NAMES=${FILE_NAMES%,}
+36:     COMMIT_MSG="cap nhat: $FILE_NAMES"
+37: fi
+38: # Giới hạn độ dài commit message
+39: if [ ${#COMMIT_MSG} -gt 100 ]; then
+40:     COMMIT_MSG="${COMMIT_MSG:0:97}..."
+41: fi
+42: echo -e "${GREEN}Commit message: $COMMIT_MSG${NC}"
+43: # Bước 5: Git add
+44: echo -e "${YELLOW}Git add...${NC}"
+45: git add -A
+46: # Bước 6: Git commit
+47: echo -e "${YELLOW}Git commit...${NC}"
+48: git commit -m "$COMMIT_MSG"
+49: # Bước 7: Git push
+50: echo -e "${YELLOW}Git push...${NC}"
+51: git push origin master
+52: echo -e "${GREEN}=== Hoàn thành! ===${NC}"
+53: echo -e "${GREEN}Đã đẩy code lên GitHub${NC}"
+`````
+
 ## File: scripts/backup.ps1
 `````powershell
   1: # ============================================================
@@ -3198,6 +3320,98 @@ vercel.json
 81: main()
 82:     .catch((e) => {
 83:         console.error(e)
+84:         process.exit(1)
+85:     })
+86:     .finally(async () => {
+87:         await prisma.$disconnect()
+88:     })
+`````
+
+## File: scripts/seed-messages.ts
+`````typescript
+ 1: import { PrismaClient } from '@prisma/client'
+ 2: const prisma = new PrismaClient()
+ 3: const IMAGE_URLS = [
+ 4:     'https://i.postimg.cc/hQjxMRz0/1.jpg',
+ 5:     'https://i.postimg.cc/hzMT9tjp/10.jpg',
+ 6:     'https://i.postimg.cc/FkRcGXdV/2.jpg',
+ 7:     'https://i.postimg.cc/K3zLQhkn/3.jpg',
+ 8:     'https://i.postimg.cc/8f5WwgJL/4.jpg',
+ 9:     'https://i.postimg.cc/m1DMVWzY/5.jpg',
+10:     'https://i.postimg.cc/DJ5LqwZj/6.jpg',
+11:     'https://i.postimg.cc/BLNHxn6p/7.jpg',
+12:     'https://i.postimg.cc/k6wKxg4c/8.jpg',
+13:     'https://i.postimg.cc/phkzDLTk/9.jpg',
+14: ]
+15: const messages = [
+16:     {
+17:         content: "Tri thức là sức mạnh - Học hôm nay, thành công ngày mai",
+18:         detail: "Học viện BRK mang đến những tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp. Mỗi ngày học tập là một bước tiến trên con đường thành công.\n\n💡 Tri thức không chỉ là kiến thức, mà là khả năng áp dụng để tạo ra giá trị thực tế.",
+19:         imageUrl: IMAGE_URLS[0]
+20:     },
+21:     {
+22:         content: "Kiến tạo giá trị từ gốc - Nền tảng vững chắc cho tương lai",
+23:         detail: "Mỗi chúng ta đều có tiềm năng để trở thành phiên bản tốt hơn của chính mình. Điều quan trọng là bắt đầu từ hôm nay và kiên trì theo đuổi mục tiêu.\n\n🌟 Học viện BRK đồng hành cùng bạn trên hành trình phát triển bản thân và sự nghiệp.",
+24:         imageUrl: IMAGE_URLS[1]
+25:     },
+26:     {
+27:         content: "Thành công không phải đích đến, mà là hành trình không ngừng học hỏi",
+28:         detail: "Trong cuộc sống, việc học tập không bao giờ kết thúc. Mỗi ngày mới là cơ hội để tiếp thu kiến thức mới, kỹ năng mới và trở thành người tốt hơn.\n\n📚 Hãy biến việc học thành thói quen hàng ngày.",
+29:         imageUrl: IMAGE_URLS[2]
+30:     },
+31:     {
+32:         content: "Lan tỏa giá trị - Kiến tạo thịnh vượng bền vững",
+33:         detail: "Thành công thực sự không chỉ đo bằng vật chất, mà còn bằng giá trị mà bạn mang đến cho người khác. Hãy lan tỏa những điều tốt đẹp xung quanh bạn.\n\n🤝 Cùng BRK kiến tạo cộng đồng phát triển.",
+34:         imageUrl: IMAGE_URLS[3]
+35:     },
+36:     {
+37:         content: "Từ gốc đến ngọn - Xây dựng nền tảng vững chắc",
+38:         detail: "Mọi thành công lớn đều bắt đầu từ những bước nhỏ. Hãy kiên nhẫn xây dựng nền tảng từ hôm nay, và bạn sẽ thấy được kết quả trong tương lai.\n\n🏗️ Nền tảng vững = Thành công bền vững.",
+39:         imageUrl: IMAGE_URLS[4]
+40:     },
+41:     {
+42:         content: "Học để thay đổi - Thay đổi để thành công",
+43:         detail: "Tri thức là chìa khóa mở mọi cánh cửa. Hãy không ngừng học hỏi, không ngừng phát triển để nắm bắt cơ hội và tạo ra những thay đổi tích cực trong cuộc sống.\n\n🔑 Học là chìa khóa của mọi thành công.",
+44:         imageUrl: IMAGE_URLS[5]
+45:     },
+46:     {
+47:         content: "Mỗi ngày là một cơ hội để trở nên tốt hơn",
+48:         detail: "Đừng chờ đợi ngày mai để bắt đầu. Hôm nay chính là ngày quan trọng nhất trong cuộc đời bạn. Hãy trân trọng từng khoảnh khắc và không ngừng tiến bộ.\n\n⏰ Hành động ngay hôm nay - Thành công ngày mai.",
+49:         imageUrl: IMAGE_URLS[6]
+50:     },
+51:     {
+52:         content: "Tri thức + Hành động = Thành công",
+53:         detail: "Biết là một chuyện, làm là chuyện khác. Tri thức chỉ có giá trị khi được áp dụng vào thực tế. Hãy kết hợp học với hành để đạt được kết quả mong muốn.\n\n⚡ Học + Hành = Thành công thực sự.",
+54:         imageUrl: IMAGE_URLS[7]
+55:     },
+56:     {
+57:         content: "Học viện BRK - Nơi tri thức được lan tỏa",
+58:         detail: "Học viện BRK là nơi tập hợp những tri thức thực chiến về kinh doanh online, nhân hiệu và AI. Chúng tôi ở đây để đồng hành cùng bạn trên hành trình lan tỏa giá trị.\n\n🌟 Kiến tạo sự thịnh vượng bền vững từ gốc.",
+59:         imageUrl: IMAGE_URLS[8]
+60:     },
+61:     {
+62:         content: "Khởi đầu hôm nay - Thành công tương lai",
+63:         detail: "Không bao giờ là quá muộn để bắt đầu học điều mới. Mỗi bước tiến dù nhỏ cũng là tiến bộ. Hãy bắt đầu hôm nay và theo đuổi ước mơ của bạn.\n\n🚀 Hành trình nghìn dặm bắt đầu từ một bước chân.",
+64:         imageUrl: IMAGE_URLS[9]
+65:     }
+66: ]
+67: async function main() {
+68:     console.log('🚀 Bắt đầu seed messages...')
+69:     for (let i = 0; i < messages.length; i++) {
+70:         const msg = messages[i]
+71:         await prisma.message.upsert({
+72:             where: { id: i + 1 },
+73:             update: msg,
+74:             create: { ...msg, isActive: true }
+75:         })
+76:         console.log(`✅ Đã thêm: ${msg.content.substring(0, 30)}...`)
+77:     }
+78:     console.log('🎉 Hoàn thành seed messages!')
+79: }
+80: main()
+81:     .catch(async (e) => {
+82:         console.error('❌ Lỗi:', e)
+83:         await prisma.$disconnect()
 84:         process.exit(1)
 85:     })
 86:     .finally(async () => {
@@ -9337,128 +9551,6 @@ vercel.json
 38: }
 `````
 
-## File: scripts/auto-commit-push.ps1
-`````powershell
- 1: # ================================================================================
- 2: # Script: auto-commit-push.ps1
- 3: # Mục đích: Backup code hiện tại, đẩy code mới lên GitHub và cập nhật CODE_HISTORY.md
- 4: # Cách chạy: powershell -ExecutionPolicy Bypass -File .\scripts\auto-commit-push.ps1
- 5: # ================================================================================
- 6: 
- 7: $ErrorActionPreference = "Stop"
- 8: 
- 9: # Màu sắc cho output
-10: function Write-Green { param($msg) Write-Host $msg -ForegroundColor Green }
-11: function Write-Yellow { param($msg) Write-Host $msg -ForegroundColor Yellow }
-12: function Write-Red { param($msg) Write-Host $msg -ForegroundColor Red }
-13: 
-14: Write-Yellow "=== Bat dau auto commit va push ==="
-15: 
-16: # Buoc 1: Kiem tra co thay doi khong
-17: Write-Yellow "Kiem tra thay doi..."
-18: $status = git status --porcelain
-19: if (-not $status) {
-20:     Write-Red "Khong co thay doi nao. Thoat."
-21:     exit 0
-22: }
-23: 
-24: # Buoc 2: Hien thi cac file thay doi
-25: Write-Yellow "Cac file thay doi:"
-26: git status --porcelain
-27: 
-28: # Buoc 3: Tao mo ta commit
-29: $changedFiles = git diff --name-only
-30: Write-Green "Cac file thay doi:"
-31: $changedFiles | ForEach-Object { Write-Host "  - $_" }
-32: 
-33: # Kiem tra neu co cap nhat CODE_HISTORY.md
-34: if ($changedFiles -contains "CODE_HISTORY.md") {
-35:     $commitMsg = "cap nhat CODE_HISTORY.md"
-36: } else {
-37:     # Tao commit message tu ten file
-38:     $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
-39:     if ($fileNames.Length -gt 100) {
-40:         $commitMsg = $fileNames.Substring(0, 97) + "..."
-41:     } else {
-42:         $commitMsg = "cap nhat: $fileNames"
-43:     }
-44: }
-45: 
-46: Write-Green "Commit message: $commitMsg"
-47: 
-48: # Buoc 4: Git add
-49: Write-Yellow "Git add..."
-50: git add -A
-51: 
-52: # Buoc 5: Git commit
-53: Write-Yellow "Git commit..."
-54: git commit -m $commitMsg
-55: 
-56: # Buoc 6: Git push
-57: Write-Yellow "Git push..."
-58: git push origin master
-59: 
-60: Write-Green "=== Hoan thanh! ==="
-61: Write-Green "Da day code len GitHub"
-`````
-
-## File: scripts/auto-commit-push.sh
-`````bash
- 1: #!/bin/bash
- 2: # ================================================================================
- 3: # Script: auto-commit-push.sh
- 4: # Mục đích: Backup code hiện tại, đẩy code mới lên GitHub và cập nhật CODE_HISTORY.md
- 5: # Cách chạy: bash scripts/auto-commit-push.sh
- 6: # ================================================================================
- 7: set -e
- 8: # Màu sắc cho output
- 9: GREEN='\033[0;32m'
-10: YELLOW='\033[1;33m'
-11: RED='\033[0;31m'
-12: NC='\033[0m' # No Color
-13: echo -e "${YELLOW}=== Bắt đầu auto commit và push ===${NC}"
-14: # Bước 1: Kiểm tra có thay đổi không
-15: echo -e "${YELLOW}Kiểm tra thay đổi...${NC}"
-16: if [ -z "$(git status --porcelain)" ]; then
-17:     echo -e "${RED}Không có thay đổi nào. Thoát.${NC}"
-18:     exit 0
-19: fi
-20: # Bước 2: Tạo mô tả thay đổi từ git diff
-21: echo -e "${YELLOW}Tạo mô tả thay đổi...${NC}"
-22: CHANGES=$(git status --porcelain | head -20)
-23: echo "$CHANGES"
-24: # Bước 3: Đọc danh sách file thay đổi
-25: CHANGED_FILES=$(git diff --name-only)
-26: echo -e "${GREEN}Các file thay đổi:${NC}"
-27: echo "$CHANGED_FILES"
-28: # Bước 4: Tạo mô tả commit tự động
-29: if [ -n "$(echo "$CHANGED_FILES" | grep -E "CODE_HISTORY.md")" ]; then
-30:     COMMIT_MSG="cap nhat CODE_HISTORY.md"
-31: else
-32:     # Lấy tên các file thay đổi (không có đường dẫn)
-33:     FILE_NAMES=$(echo "$CHANGED_FILES" | xargs -I {} basename {} | tr '\n' ', ')
-34:     # Cắt bỏ dấu , cuối cùng
-35:     FILE_NAMES=${FILE_NAMES%,}
-36:     COMMIT_MSG="cap nhat: $FILE_NAMES"
-37: fi
-38: # Giới hạn độ dài commit message
-39: if [ ${#COMMIT_MSG} -gt 100 ]; then
-40:     COMMIT_MSG="${COMMIT_MSG:0:97}..."
-41: fi
-42: echo -e "${GREEN}Commit message: $COMMIT_MSG${NC}"
-43: # Bước 5: Git add
-44: echo -e "${YELLOW}Git add...${NC}"
-45: git add -A
-46: # Bước 6: Git commit
-47: echo -e "${YELLOW}Git commit...${NC}"
-48: git commit -m "$COMMIT_MSG"
-49: # Bước 7: Git push
-50: echo -e "${YELLOW}Git push...${NC}"
-51: git push origin master
-52: echo -e "${GREEN}=== Hoàn thành! ===${NC}"
-53: echo -e "${GREEN}Đã đẩy code lên GitHub${NC}"
-`````
-
 ## File: scripts/auto-verify-payment.js
 `````javascript
   1: require('dotenv').config()
@@ -10406,98 +10498,6 @@ vercel.json
 85:   .finally(async () => await prisma.$disconnect());
 `````
 
-## File: scripts/seed-messages.ts
-`````typescript
- 1: import { PrismaClient } from '@prisma/client'
- 2: const prisma = new PrismaClient()
- 3: const IMAGE_URLS = [
- 4:     'https://i.postimg.cc/hQjxMRz0/1.jpg',
- 5:     'https://i.postimg.cc/hzMT9tjp/10.jpg',
- 6:     'https://i.postimg.cc/FkRcGXdV/2.jpg',
- 7:     'https://i.postimg.cc/K3zLQhkn/3.jpg',
- 8:     'https://i.postimg.cc/8f5WwgJL/4.jpg',
- 9:     'https://i.postimg.cc/m1DMVWzY/5.jpg',
-10:     'https://i.postimg.cc/DJ5LqwZj/6.jpg',
-11:     'https://i.postimg.cc/BLNHxn6p/7.jpg',
-12:     'https://i.postimg.cc/k6wKxg4c/8.jpg',
-13:     'https://i.postimg.cc/phkzDLTk/9.jpg',
-14: ]
-15: const messages = [
-16:     {
-17:         content: "Tri thức là sức mạnh - Học hôm nay, thành công ngày mai",
-18:         detail: "Học viện BRK mang đến những tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp. Mỗi ngày học tập là một bước tiến trên con đường thành công.\n\n💡 Tri thức không chỉ là kiến thức, mà là khả năng áp dụng để tạo ra giá trị thực tế.",
-19:         imageUrl: IMAGE_URLS[0]
-20:     },
-21:     {
-22:         content: "Kiến tạo giá trị từ gốc - Nền tảng vững chắc cho tương lai",
-23:         detail: "Mỗi chúng ta đều có tiềm năng để trở thành phiên bản tốt hơn của chính mình. Điều quan trọng là bắt đầu từ hôm nay và kiên trì theo đuổi mục tiêu.\n\n🌟 Học viện BRK đồng hành cùng bạn trên hành trình phát triển bản thân và sự nghiệp.",
-24:         imageUrl: IMAGE_URLS[1]
-25:     },
-26:     {
-27:         content: "Thành công không phải đích đến, mà là hành trình không ngừng học hỏi",
-28:         detail: "Trong cuộc sống, việc học tập không bao giờ kết thúc. Mỗi ngày mới là cơ hội để tiếp thu kiến thức mới, kỹ năng mới và trở thành người tốt hơn.\n\n📚 Hãy biến việc học thành thói quen hàng ngày.",
-29:         imageUrl: IMAGE_URLS[2]
-30:     },
-31:     {
-32:         content: "Lan tỏa giá trị - Kiến tạo thịnh vượng bền vững",
-33:         detail: "Thành công thực sự không chỉ đo bằng vật chất, mà còn bằng giá trị mà bạn mang đến cho người khác. Hãy lan tỏa những điều tốt đẹp xung quanh bạn.\n\n🤝 Cùng BRK kiến tạo cộng đồng phát triển.",
-34:         imageUrl: IMAGE_URLS[3]
-35:     },
-36:     {
-37:         content: "Từ gốc đến ngọn - Xây dựng nền tảng vững chắc",
-38:         detail: "Mọi thành công lớn đều bắt đầu từ những bước nhỏ. Hãy kiên nhẫn xây dựng nền tảng từ hôm nay, và bạn sẽ thấy được kết quả trong tương lai.\n\n🏗️ Nền tảng vững = Thành công bền vững.",
-39:         imageUrl: IMAGE_URLS[4]
-40:     },
-41:     {
-42:         content: "Học để thay đổi - Thay đổi để thành công",
-43:         detail: "Tri thức là chìa khóa mở mọi cánh cửa. Hãy không ngừng học hỏi, không ngừng phát triển để nắm bắt cơ hội và tạo ra những thay đổi tích cực trong cuộc sống.\n\n🔑 Học là chìa khóa của mọi thành công.",
-44:         imageUrl: IMAGE_URLS[5]
-45:     },
-46:     {
-47:         content: "Mỗi ngày là một cơ hội để trở nên tốt hơn",
-48:         detail: "Đừng chờ đợi ngày mai để bắt đầu. Hôm nay chính là ngày quan trọng nhất trong cuộc đời bạn. Hãy trân trọng từng khoảnh khắc và không ngừng tiến bộ.\n\n⏰ Hành động ngay hôm nay - Thành công ngày mai.",
-49:         imageUrl: IMAGE_URLS[6]
-50:     },
-51:     {
-52:         content: "Tri thức + Hành động = Thành công",
-53:         detail: "Biết là một chuyện, làm là chuyện khác. Tri thức chỉ có giá trị khi được áp dụng vào thực tế. Hãy kết hợp học với hành để đạt được kết quả mong muốn.\n\n⚡ Học + Hành = Thành công thực sự.",
-54:         imageUrl: IMAGE_URLS[7]
-55:     },
-56:     {
-57:         content: "Học viện BRK - Nơi tri thức được lan tỏa",
-58:         detail: "Học viện BRK là nơi tập hợp những tri thức thực chiến về kinh doanh online, nhân hiệu và AI. Chúng tôi ở đây để đồng hành cùng bạn trên hành trình lan tỏa giá trị.\n\n🌟 Kiến tạo sự thịnh vượng bền vững từ gốc.",
-59:         imageUrl: IMAGE_URLS[8]
-60:     },
-61:     {
-62:         content: "Khởi đầu hôm nay - Thành công tương lai",
-63:         detail: "Không bao giờ là quá muộn để bắt đầu học điều mới. Mỗi bước tiến dù nhỏ cũng là tiến bộ. Hãy bắt đầu hôm nay và theo đuổi ước mơ của bạn.\n\n🚀 Hành trình nghìn dặm bắt đầu từ một bước chân.",
-64:         imageUrl: IMAGE_URLS[9]
-65:     }
-66: ]
-67: async function main() {
-68:     console.log('🚀 Bắt đầu seed messages...')
-69:     for (let i = 0; i < messages.length; i++) {
-70:         const msg = messages[i]
-71:         await prisma.message.upsert({
-72:             where: { id: i + 1 },
-73:             update: msg,
-74:             create: { ...msg, isActive: true }
-75:         })
-76:         console.log(`✅ Đã thêm: ${msg.content.substring(0, 30)}...`)
-77:     }
-78:     console.log('🎉 Hoàn thành seed messages!')
-79: }
-80: main()
-81:     .catch(async (e) => {
-82:         console.error('❌ Lỗi:', e)
-83:         await prisma.$disconnect()
-84:         process.exit(1)
-85:     })
-86:     .finally(async () => {
-87:         await prisma.$disconnect()
-88:     })
-`````
-
 ## File: scripts/setup-gmail-watch.js
 `````javascript
  1: require('dotenv').config()
@@ -11195,6 +11195,29 @@ vercel.json
 67:     }
 68:     redirect('/login')
 69: }
+`````
+
+## File: app/actions/message-actions.ts
+`````typescript
+ 1: 'use server'
+ 2: import prisma from "@/lib/prisma"
+ 3: export async function getRandomMessage() {
+ 4:     const count = await prisma.message.count({ 
+ 5:         where: { isActive: true } 
+ 6:     })
+ 7:     if (count === 0) return null
+ 8:     const random = Math.floor(Math.random() * count)
+ 9:     return await prisma.message.findFirst({
+10:         where: { isActive: true },
+11:         skip: random
+12:     })
+13: }
+14: export async function getAllMessages() {
+15:     return await prisma.message.findMany({
+16:         where: { isActive: true },
+17:         orderBy: { createdAt: 'desc' }
+18:     })
+19: }
 `````
 
 ## File: app/actions/roadmap-actions.ts
@@ -25775,29 +25798,6 @@ vercel.json
 8: }
 `````
 
-## File: app/actions/message-actions.ts
-`````typescript
- 1: 'use server'
- 2: import prisma from "@/lib/prisma"
- 3: export async function getRandomMessage() {
- 4:     const count = await prisma.message.count({ 
- 5:         where: { isActive: true } 
- 6:     })
- 7:     if (count === 0) return null
- 8:     const random = Math.floor(Math.random() * count)
- 9:     return await prisma.message.findFirst({
-10:         where: { isActive: true },
-11:         skip: random
-12:     })
-13: }
-14: export async function getAllMessages() {
-15:     return await prisma.message.findMany({
-16:         where: { isActive: true },
-17:         orderBy: { createdAt: 'desc' }
-18:     })
-19: }
-`````
-
 ## File: lib/prisma.ts
 `````typescript
  1: import { PrismaClient } from "@prisma/client";
@@ -26794,432 +26794,6 @@ vercel.json
 193: }
 `````
 
-## File: app/admin/layout.tsx
-`````typescript
- 1: import { auth } from "@/auth"
- 2: import { Role } from "@prisma/client"
- 3: import { redirect } from "next/navigation"
- 4: import Link from 'next/link'
- 5: export default async function AdminLayout({
- 6:     children,
- 7: }: {
- 8:     children: React.ReactNode
- 9: }) {
-10:     const session = await auth()
-11:     if (!session?.user) redirect("/login")
-12:     if (session.user.role !== Role.ADMIN) {
-13:         return <div className="p-10 text-center text-red-600 font-bold">403 - KHÔNG CÓ QUYỀN TRUY CẬP</div>
-14:     }
-15:     const menuItems = [
-16:         { label: 'Thanh toán', href: '/admin/payments', icon: '💰' },
-17:         { label: 'Thành viên', href: '/admin/students', icon: '👥' },
-18:         { label: 'Khóa học', href: '/admin/courses', icon: '📘' },
-19:         { label: 'Lộ trình', href: '/admin/roadmap', icon: '🗺️' },
-20:         { label: 'Bảng tin', href: '/admin/posts', icon: '📰' },
-21:         { label: 'Số đẹp', href: '/admin/reserved-ids', icon: '💎' },
-22:     ]
-23:     return (
-24:         <div className="min-h-screen flex flex-col bg-gray-50">
-25:             {/* Header Cố định trên cùng */}
-26:             <header className="sticky top-0 z-[100] bg-black text-white p-4 shadow-xl">
-27:                 <div className="flex justify-between items-center max-w-[1600px] mx-auto">
-28:                     <h1 className="text-sm font-black tracking-widest text-yellow-400 uppercase">Admin BRK</h1>
-29:                     <Link href="/" className="text-[10px] font-black bg-white/10 px-3 py-1.5 rounded-lg uppercase">Thoát</Link>
-30:                 </div>
-31:             </header>
-32:             {/* Menu Di động - Hiển thị trên cùng dưới Header, dạng nút bấm rõ ràng */}
-33:             <nav className="sticky top-[52px] z-[90] bg-white border-b border-gray-200 p-2 overflow-x-auto no-scrollbar flex gap-2 md:hidden shadow-sm">
-34:                 {menuItems.map((item) => (
-35:                     <a 
-36:                         key={item.href} 
-37:                         href={item.href}
-38:                         className="flex-none flex items-center gap-1.5 px-4 py-2 bg-gray-100 rounded-xl text-[10px] font-black uppercase text-gray-600 active:bg-black active:text-yellow-400 transition-all"
-39:                     >
-40:                         <span>{item.icon}</span>
-41:                         {item.label}
-42:                     </a>
-43:                 ))}
-44:             </nav>
-45:             <div className="flex flex-1 max-w-[1600px] mx-auto w-full">
-46:                 {/* Sidebar Máy tính */}
-47:                 <aside className="hidden md:block w-64 p-6 border-r border-gray-200 bg-white">
-48:                     <nav className="space-y-2 sticky top-24">
-49:                         {menuItems.map((item) => (
-50:                             <a 
-51:                                 key={item.href}
-52:                                 href={item.href}
-53:                                 className="flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-100 font-bold text-gray-600 text-sm transition-all"
-54:                             >
-55:                                 <span className="text-xl">{item.icon}</span>
-56:                                 {item.label}
-57:                             </a>
-58:                         ))}
-59:                     </nav>
-60:                 </aside>
-61:                 {/* Nội dung chính */}
-62:                 <main className="flex-1 p-4 md:p-8">
-63:                     {children}
-64:                 </main>
-65:             </div>
-66:         </div>
-67:     )
-68: }
-`````
-
-## File: components/course/CourseCard.tsx
-`````typescript
-  1: 'use client'
-  2: import React, { useState } from 'react'
-  3: import Image from 'next/image'
-  4: import PaymentModal from './PaymentModal'
-  5: import UploadProofModal from '@/components/payment/UploadProofModal'
-  6: import { enrollInCourseAction } from '@/app/actions/course-actions'
-  7: interface CourseCardProps {
-  8:     course: any
-  9:     isLoggedIn: boolean
- 10:     enrollment?: {
- 11:         status: string
- 12:         startedAt: Date | null
- 13:         completedCount: number
- 14:         totalLessons: number
- 15:         enrollmentId?: number
- 16:         payment?: {
- 17:             id: number
- 18:             status: string
- 19:             proofImage?: string | null
- 20:         }
- 21:     } | null
- 22:     isCourseOneActive?: boolean
- 23:     userPhone?: string | null
- 24:     userId?: number | null
- 25:     priority?: boolean
- 26:     darkMode?: boolean
- 27: }
- 28: export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false }: CourseCardProps) {
- 29:     const [showPayment, setShowPayment] = useState(false)
- 30:     const [loading, setLoading] = useState(false)
- 31:     // Override phi_coc nếu đã kích hoạt khóa 1
- 32:     const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
- 33:     const isActive = enrollment?.status === 'ACTIVE'
- 34:     const isPending = enrollment?.status === 'PENDING'
- 35:     const handleAction = async (e: React.MouseEvent) => {
- 36:         e.preventDefault()
- 37:         e.stopPropagation()
- 38:         if (!isLoggedIn) {
- 39:             alert('Vui lòng Đăng nhập / Đăng ký tài khoản miễn phí để tiếp tục!')
- 40:             window.location.href = '/login'
- 41:             return
- 42:         }
- 43:         if (isActive) {
- 44:             window.location.href = `/courses/${course.id_khoa}/learn`
- 45:             return
- 46:         }
- 47:         if (effectivePhiCoc === 0) {
- 48:             setLoading(true)
- 49:             try {
- 50:                 const res = await enrollInCourseAction(course.id)
- 51:                 if (res.success) {
- 52:                     window.location.href = `/courses/${course.id_khoa}/learn`
- 53:                 }
- 54:             } catch (err: any) {
- 55:                 alert(err.message)
- 56:             } finally {
- 57:                 setLoading(false)
- 58:             }
- 59:         } else {
- 60:             if (isPending) {
- 61:                 setShowPayment(true)
- 62:             } else {
- 63:                 setLoading(true)
- 64:                 try {
- 65:                     const res = await enrollInCourseAction(course.id)
- 66:                     if (res.success) {
- 67:                         // Sau khi enroll thành công, component sẽ re-render do revalidatePath.
- 68:                         // Chúng ta cần đảm bảo setShowPayment(true) được giữ lại.
- 69:                         // Sử dụng timeout nhỏ để chạy sau chu kỳ re-render của Next.js
- 70:                         setTimeout(() => setShowPayment(true), 100)
- 71:                     }
- 72:                 } catch (err: any) {
- 73:                     alert(err.message)
- 74:                 } finally {
- 75:                     setLoading(false)
- 76:                 }
- 77:             }
- 78:         }
- 79:     }
- 80:     const progressPct = enrollment && enrollment.totalLessons > 0
- 81:         ? Math.round((enrollment.completedCount / enrollment.totalLessons) * 100)
- 82:         : 0
- 83:     return (
- 84:         <>
- 85:             <div className={`group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full ${darkMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-gray-100'}`}>
- 86:                 {/* Ảnh bìa - Đã tối ưu hóa */}
- 87:                 <div className="relative aspect-[16/9] w-full overflow-hidden shrink-0 bg-zinc-800">
- 88:                     <Image
- 89:                         src={course.link_anh_bia || 'https://i.postimg.cc/PJPkm7vB/1.jpg'}
- 90:                         alt={course.name_lop}
- 91:                         fill
- 92:                         priority={priority} // Ưu tiên load các card đầu tiên
- 93:                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
- 94:                         className="object-cover transition-transform duration-500 group-hover:scale-105"
- 95:                     />
- 96:                 </div>
- 97:                 {/* Nội dung - Giữ nguyên 100% */}
- 98:                 <div className="p-5 flex flex-col flex-grow">
- 99:                     {/* Title */}
-100:                     <div className="mb-3 flex items-center gap-2.5">
-101:                         <span className="text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
-102:                         <h3 className={`text-base sm:text-lg font-black leading-tight truncate flex-1 ${darkMode ? 'text-white' : 'text-black'}`}
-103:                             style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-104:                             {course.name_lop}
-105:                         </h3>
-106:                     </div>
-107:                     {/* Badges + Trạng thái + Ngày bắt đầu */}
-108:                     <div className="mb-3 flex flex-wrap items-center gap-2">
-109:                         <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-yellow-400 text-gray-900' : 'bg-red-600 text-white'}`}>
-110:                             {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
-111:                         </span>
-112:                         {isActive && (
-113:                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-sky-400">
-114:                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
-115:                                 Đã kích hoạt
-116:                                 {enrollment?.startedAt && (
-117:                                     <span className="opacity-80 font-normal" suppressHydrationWarning>
-118:                                         · Từ {new Date(enrollment.startedAt).toLocaleDateString('vi-VN')}
-119:                                     </span>
-120:                                 )}
-121:                             </span>
-122:                         )}
-123:                         {isPending && (
-124:                             <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-orange-400">
-125:                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
-126:                                 Chờ thanh toán
-127:                             </span>
-128:                         )}
-129:                     </div>
-130:                     {/* Mô tả */}
-131:                     <div
-132:                         className={`mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words ${darkMode ? 'text-gray-300' : 'text-gray-500'
-133:                             }`}
-134:                         dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }}
-135:                     />
-136:                     {/* Button */}
-137:                     <button
-138:                         onClick={handleAction}
-139:                         disabled={loading}
-140:                         className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
-141:                             ${loading ? 'bg-gray-400 text-white cursor-not-allowed' :
-142:                                 isActive ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-emerald-200' :
-143:                                 isPending ? 'bg-orange-500 text-white hover:bg-orange-600 hover:shadow-orange-200' :
-144:                                     'bg-sky-500 text-white hover:bg-sky-600 hover:shadow-sky-200'}`}
-145:                     >
-146:                         {loading ? (
-147:                             <span className="flex items-center gap-2 relative z-10">
-148:                                 <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-149:                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-150:                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-151:                                 </svg>
-152:                                 Đang kết nối...
-153:                             </span>
-154:                         ) : (
-155:                             <>
-156:                                 {isActive && enrollment && enrollment.totalLessons > 0 && (
-157:                                     <span
-158:                                         className="absolute inset-0 transition-all duration-700"
-159:                                         style={{ width: `${progressPct}%`, background: 'rgba(255,255,255,0.18)' }}
-160:                                         aria-hidden="true"
-161:                                     />
-162:                                 )}
-163:                                 <span className="relative z-10 flex items-center gap-2">
-164:                                     <span>{isActive ? '📖' : isPending ? '💰' : '⚡'}</span>
-165:                                     <span>
-166:                                         {isActive ? 'Vào học tiếp' : isPending ? 'Xem thông tin thanh toán' : effectivePhiCoc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
-167:                                         {isActive && enrollment && enrollment.totalLessons > 0 && (
-168:                                             <span className="ml-1.5 font-normal opacity-90 text-[12px]">
-169:                                                 {enrollment.completedCount}/{enrollment.totalLessons} bài · {progressPct}%
-170:                                             </span>
-171:                                         )}
-172:                                     </span>
-173:                                     <span>{isActive ? '▶' : '🚀'}</span>
-174:                                 </span>
-175:                             </>
-176:                         )}
-177:                     </button>
-178:                     {isPending && !loading && (
-179:                         <p className="mt-3 text-center text-xs font-bold text-orange-600 animate-pulse italic">
-180:                             Đang chờ thanh toán...
-181:                         </p>
-182:                     )}
-183:                 </div>
-184:             </div>
-185:             {showPayment && (
-186:                 <PaymentModal
-187:                     course={course}
-188:                     enrollment={enrollment}
-189:                     isCourseOneActive={isCourseOneActive}
-190:                     userPhone={userPhone}
-191:                     userId={userId}
-192:                     onClose={() => setShowPayment(false)}
-193:                 />
-194:             )}
-195:         </>
-196:     )
-197: }
-`````
-
-## File: next.config.ts
-`````typescript
- 1: import type { NextConfig } from "next";
- 2: const nextConfig: NextConfig = {
- 3:   // Tăng tốc phản hồi HTTP
- 4:   compress: true,
- 5:   // Tối ưu serverless deploy
- 6:   output: "standalone",
- 7:   // Strict mode giúp phát hiện bug React
- 8:   reactStrictMode: true,
- 9:   // Tối ưu import package lớn
-10:   experimental: {
-11:     optimizePackageImports: ["lucide-react"],
-12:   },
-13:   images: {
-14:     // Tắt tối ưu hóa ảnh để sửa lỗi 400 Bad Request và cảnh báo chất lượng
-15:     unoptimized: true,
-16:     // Cấu hình các mức chất lượng được phép
-17:     qualities: [50, 70, 75, 80, 90],
-18:     // Chỉ cho phép domain ảnh thực sự dùng
-19:     remotePatterns: [
-20:       {
-21:         protocol: "https",
-22:         hostname: "**.supabase.co",
-23:       },
-24:       {
-25:         protocol: "https",
-26:         hostname: "images.unsplash.com",
-27:       },
-28:       {
-29:         protocol: "https",
-30:         hostname: "i.imgur.com",
-31:       },
-32:       {
-33:         protocol: "https",
-34:         hostname: "postimg.cc",
-35:       },
-36:       {
-37:         protocol: "https",
-38:         hostname: "**.postimg.cc",
-39:       },
-40:       {
-41:         protocol: "https",
-42:         hostname: "api.vietqr.io",
-43:       },
-44:       {
-45:         protocol: "https",
-46:         hostname: "img.vietqr.io",
-47:       }
-48:     ],
-49:     // Format ảnh hiện đại
-50:     formats: ["image/avif", "image/webp"],
-51:     // Cache ảnh lâu hơn
-52:     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 ngày
-53:   },
-54:   // Tắt source map production để giảm bundle
-55:   productionBrowserSourceMaps: false,
-56:   // Headers bảo mật cơ bản
-57:   async headers() {
-58:     return [
-59:       {
-60:         source: "/(.*)",
-61:         headers: [
-62:           {
-63:             key: "X-Frame-Options",
-64:             value: "SAMEORIGIN",
-65:           },
-66:           {
-67:             key: "X-Content-Type-Options",
-68:             value: "nosniff",
-69:           },
-70:           {
-71:             key: "Referrer-Policy",
-72:             value: "strict-origin-when-cross-origin",
-73:           },
-74:         ],
-75:       },
-76:     ];
-77:   },
-78: };
-79: export default nextConfig;
-`````
-
-## File: package.json
-`````json
- 1: {
- 2:   "name": "brk-academy",
- 3:   "version": "0.1.0",
- 4:   "private": true,
- 5:   "scripts": {
- 6:     "dev": "next dev",
- 7:     "build": "next build",
- 8:     "postinstall": "prisma generate",
- 9:     "start": "next start",
-10:     "lint": "eslint",
-11:     "import-csv": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-csv.ts",
-12:     "process-legacy": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/process-legacy-users.ts",
-13:     "check-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/check-missing-ids.ts",
-14:     "fill-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fill-missing-ids.ts",
-15:     "change-id": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/change-id.ts",
-16:     "add-reserved": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/add-reserved-id.ts",
-17:     "import-reserved": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-reserved-list.ts",
-18:     "make-admin": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/make-admin.ts",
-19:     "seed-courses": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed-courses.ts",
-20:     "seed-enrollments": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed-enrollments.ts",
-21:     "import-v3": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-v3-data.ts",
-22:     "push": "powershell -ExecutionPolicy Bypass -File ./scripts/push.ps1",
-23:     "code-history": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate-code-history.ts",
-24:     "sync-ai": "npx repomix && ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/sync-to-drive.ts"
-25:   },
-26:   "dependencies": {
-27:     "@auth/prisma-adapter": "^2.11.1",
-28:     "@hookform/resolvers": "^5.2.2",
-29:     "@prisma/client": "5.22.0",
-30:     "@supabase/supabase-js": "^2.95.3",
-31:     "@types/bcryptjs": "^2.4.6",
-32:     "@xyflow/react": "^12.10.1",
-33:     "bcryptjs": "^3.0.3",
-34:     "clsx": "^2.1.1",
-35:     "csv-parser": "^3.2.0",
-36:     "csv-writer": "^1.6.0",
-37:     "date-fns": "^4.1.0",
-38:     "dompurify": "^3.3.1",
-39:     "dotenv": "^17.3.1",
-40:     "googleapis": "^171.4.0",
-41:     "lucide-react": "^0.570.0",
-42:     "next": "16.1.6",
-43:     "next-auth": "^5.0.0-beta.30",
-44:     "react": "19.2.3",
-45:     "react-day-picker": "^9.14.0",
-46:     "react-dom": "19.2.3",
-47:     "react-hook-form": "^7.71.1",
-48:     "tailwind-merge": "^3.4.1",
-49:     "zod": "^4.3.6"
-50:   },
-51:   "devDependencies": {
-52:     "@tailwindcss/postcss": "^4",
-53:     "@types/node": "^20",
-54:     "@types/react": "^19",
-55:     "@types/react-dom": "^19",
-56:     "eslint": "^9",
-57:     "eslint-config-next": "16.1.6",
-58:     "prisma": "5.22.0",
-59:     "tailwindcss": "^4",
-60:     "ts-node": "^10.9.2",
-61:     "typescript": "^5"
-62:   },
-63:   "prisma": {
-64:     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
-65:   }
-66: }
-`````
-
 ## File: prisma/schema.prisma
 `````prisma
   1: generator client {
@@ -27506,6 +27080,279 @@ vercel.json
 282: }
 `````
 
+## File: app/admin/layout.tsx
+`````typescript
+ 1: import { auth } from "@/auth"
+ 2: import { Role } from "@prisma/client"
+ 3: import { redirect } from "next/navigation"
+ 4: import Link from 'next/link'
+ 5: export default async function AdminLayout({
+ 6:     children,
+ 7: }: {
+ 8:     children: React.ReactNode
+ 9: }) {
+10:     const session = await auth()
+11:     if (!session?.user) redirect("/login")
+12:     if (session.user.role !== Role.ADMIN) {
+13:         return <div className="p-10 text-center text-red-600 font-bold">403 - KHÔNG CÓ QUYỀN TRUY CẬP</div>
+14:     }
+15:     const menuItems = [
+16:         { label: 'Thanh toán', href: '/admin/payments', icon: '💰' },
+17:         { label: 'Thành viên', href: '/admin/students', icon: '👥' },
+18:         { label: 'Khóa học', href: '/admin/courses', icon: '📘' },
+19:         { label: 'Lộ trình', href: '/admin/roadmap', icon: '🗺️' },
+20:         { label: 'Bảng tin', href: '/admin/posts', icon: '📰' },
+21:         { label: 'Số đẹp', href: '/admin/reserved-ids', icon: '💎' },
+22:     ]
+23:     return (
+24:         <div className="min-h-screen flex flex-col bg-gray-50">
+25:             {/* Header Cố định trên cùng */}
+26:             <header className="sticky top-0 z-[100] bg-black text-white p-4 shadow-xl">
+27:                 <div className="flex justify-between items-center max-w-[1600px] mx-auto">
+28:                     <h1 className="text-sm font-black tracking-widest text-yellow-400 uppercase">Admin BRK</h1>
+29:                     <Link href="/" className="text-[10px] font-black bg-white/10 px-3 py-1.5 rounded-lg uppercase">Thoát</Link>
+30:                 </div>
+31:             </header>
+32:             {/* Menu Di động - Hiển thị trên cùng dưới Header, dạng nút bấm rõ ràng */}
+33:             <nav className="sticky top-[52px] z-[90] bg-white border-b border-gray-200 p-2 overflow-x-auto no-scrollbar flex gap-2 md:hidden shadow-sm">
+34:                 {menuItems.map((item) => (
+35:                     <a 
+36:                         key={item.href} 
+37:                         href={item.href}
+38:                         className="flex-none flex items-center gap-1.5 px-4 py-2 bg-gray-100 rounded-xl text-[10px] font-black uppercase text-gray-600 active:bg-black active:text-yellow-400 transition-all"
+39:                     >
+40:                         <span>{item.icon}</span>
+41:                         {item.label}
+42:                     </a>
+43:                 ))}
+44:             </nav>
+45:             <div className="flex flex-1 max-w-[1600px] mx-auto w-full">
+46:                 {/* Sidebar Máy tính */}
+47:                 <aside className="hidden md:block w-64 p-6 border-r border-gray-200 bg-white">
+48:                     <nav className="space-y-2 sticky top-24">
+49:                         {menuItems.map((item) => (
+50:                             <a 
+51:                                 key={item.href}
+52:                                 href={item.href}
+53:                                 className="flex items-center gap-3 p-3 rounded-2xl hover:bg-gray-100 font-bold text-gray-600 text-sm transition-all"
+54:                             >
+55:                                 <span className="text-xl">{item.icon}</span>
+56:                                 {item.label}
+57:                             </a>
+58:                         ))}
+59:                     </nav>
+60:                 </aside>
+61:                 {/* Nội dung chính */}
+62:                 <main className="flex-1 p-4 md:p-8">
+63:                     {children}
+64:                 </main>
+65:             </div>
+66:         </div>
+67:     )
+68: }
+`````
+
+## File: components/course/CourseCard.tsx
+`````typescript
+  1: 'use client'
+  2: import React, { useState } from 'react'
+  3: import Image from 'next/image'
+  4: import PaymentModal from './PaymentModal'
+  5: import UploadProofModal from '@/components/payment/UploadProofModal'
+  6: import { enrollInCourseAction } from '@/app/actions/course-actions'
+  7: interface CourseCardProps {
+  8:     course: any
+  9:     isLoggedIn: boolean
+ 10:     enrollment?: {
+ 11:         status: string
+ 12:         startedAt: Date | null
+ 13:         completedCount: number
+ 14:         totalLessons: number
+ 15:         enrollmentId?: number
+ 16:         payment?: {
+ 17:             id: number
+ 18:             status: string
+ 19:             proofImage?: string | null
+ 20:         }
+ 21:     } | null
+ 22:     isCourseOneActive?: boolean
+ 23:     userPhone?: string | null
+ 24:     userId?: number | null
+ 25:     priority?: boolean
+ 26:     darkMode?: boolean
+ 27: }
+ 28: export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false }: CourseCardProps) {
+ 29:     const [showPayment, setShowPayment] = useState(false)
+ 30:     const [loading, setLoading] = useState(false)
+ 31:     // Override phi_coc nếu đã kích hoạt khóa 1
+ 32:     const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
+ 33:     const isActive = enrollment?.status === 'ACTIVE'
+ 34:     const isPending = enrollment?.status === 'PENDING'
+ 35:     const handleAction = async (e: React.MouseEvent) => {
+ 36:         e.preventDefault()
+ 37:         e.stopPropagation()
+ 38:         if (!isLoggedIn) {
+ 39:             alert('Vui lòng Đăng nhập / Đăng ký tài khoản miễn phí để tiếp tục!')
+ 40:             window.location.href = '/login'
+ 41:             return
+ 42:         }
+ 43:         if (isActive) {
+ 44:             window.location.href = `/courses/${course.id_khoa}/learn`
+ 45:             return
+ 46:         }
+ 47:         if (effectivePhiCoc === 0) {
+ 48:             setLoading(true)
+ 49:             try {
+ 50:                 const res = await enrollInCourseAction(course.id)
+ 51:                 if (res.success) {
+ 52:                     window.location.href = `/courses/${course.id_khoa}/learn`
+ 53:                 }
+ 54:             } catch (err: any) {
+ 55:                 alert(err.message)
+ 56:             } finally {
+ 57:                 setLoading(false)
+ 58:             }
+ 59:         } else {
+ 60:             if (isPending) {
+ 61:                 setShowPayment(true)
+ 62:             } else {
+ 63:                 setLoading(true)
+ 64:                 try {
+ 65:                     const res = await enrollInCourseAction(course.id)
+ 66:                     if (res.success) {
+ 67:                         // Sau khi enroll thành công, component sẽ re-render do revalidatePath.
+ 68:                         // Chúng ta cần đảm bảo setShowPayment(true) được giữ lại.
+ 69:                         // Sử dụng timeout nhỏ để chạy sau chu kỳ re-render của Next.js
+ 70:                         setTimeout(() => setShowPayment(true), 100)
+ 71:                     }
+ 72:                 } catch (err: any) {
+ 73:                     alert(err.message)
+ 74:                 } finally {
+ 75:                     setLoading(false)
+ 76:                 }
+ 77:             }
+ 78:         }
+ 79:     }
+ 80:     const progressPct = enrollment && enrollment.totalLessons > 0
+ 81:         ? Math.round((enrollment.completedCount / enrollment.totalLessons) * 100)
+ 82:         : 0
+ 83:     return (
+ 84:         <>
+ 85:             <div className={`group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full ${darkMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-gray-100'}`}>
+ 86:                 {/* Ảnh bìa - Đã tối ưu hóa */}
+ 87:                 <div className="relative aspect-[16/9] w-full overflow-hidden shrink-0 bg-zinc-800">
+ 88:                     <Image
+ 89:                         src={course.link_anh_bia || 'https://i.postimg.cc/PJPkm7vB/1.jpg'}
+ 90:                         alt={course.name_lop}
+ 91:                         fill
+ 92:                         priority={priority} // Ưu tiên load các card đầu tiên
+ 93:                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+ 94:                         className="object-cover transition-transform duration-500 group-hover:scale-105"
+ 95:                     />
+ 96:                 </div>
+ 97:                 {/* Nội dung - Giữ nguyên 100% */}
+ 98:                 <div className="p-5 flex flex-col flex-grow">
+ 99:                     {/* Title */}
+100:                     <div className="mb-3 flex items-center gap-2.5">
+101:                         <span className="text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
+102:                         <h3 className={`text-base sm:text-lg font-black leading-tight truncate flex-1 ${darkMode ? 'text-white' : 'text-black'}`}
+103:                             style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+104:                             {course.name_lop}
+105:                         </h3>
+106:                     </div>
+107:                     {/* Badges + Trạng thái + Ngày bắt đầu */}
+108:                     <div className="mb-3 flex flex-wrap items-center gap-2">
+109:                         <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-yellow-400 text-gray-900' : 'bg-red-600 text-white'}`}>
+110:                             {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
+111:                         </span>
+112:                         {isActive && (
+113:                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-sky-400">
+114:                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+115:                                 Đã kích hoạt
+116:                                 {enrollment?.startedAt && (
+117:                                     <span className="opacity-80 font-normal" suppressHydrationWarning>
+118:                                         · Từ {new Date(enrollment.startedAt).toLocaleDateString('vi-VN')}
+119:                                     </span>
+120:                                 )}
+121:                             </span>
+122:                         )}
+123:                         {isPending && (
+124:                             <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-orange-400">
+125:                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+126:                                 Chờ thanh toán
+127:                             </span>
+128:                         )}
+129:                     </div>
+130:                     {/* Mô tả */}
+131:                     <div
+132:                         className={`mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words ${darkMode ? 'text-gray-300' : 'text-gray-500'
+133:                             }`}
+134:                         dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }}
+135:                     />
+136:                     {/* Button */}
+137:                     <button
+138:                         onClick={handleAction}
+139:                         disabled={loading}
+140:                         className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
+141:                             ${loading ? 'bg-gray-400 text-white cursor-not-allowed' :
+142:                                 isActive ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-emerald-200' :
+143:                                 isPending ? 'bg-orange-500 text-white hover:bg-orange-600 hover:shadow-orange-200' :
+144:                                     'bg-sky-500 text-white hover:bg-sky-600 hover:shadow-sky-200'}`}
+145:                     >
+146:                         {loading ? (
+147:                             <span className="flex items-center gap-2 relative z-10">
+148:                                 <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+149:                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+150:                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+151:                                 </svg>
+152:                                 Đang kết nối...
+153:                             </span>
+154:                         ) : (
+155:                             <>
+156:                                 {isActive && enrollment && enrollment.totalLessons > 0 && (
+157:                                     <span
+158:                                         className="absolute inset-0 transition-all duration-700"
+159:                                         style={{ width: `${progressPct}%`, background: 'rgba(255,255,255,0.18)' }}
+160:                                         aria-hidden="true"
+161:                                     />
+162:                                 )}
+163:                                 <span className="relative z-10 flex items-center gap-2">
+164:                                     <span>{isActive ? '📖' : isPending ? '💰' : '⚡'}</span>
+165:                                     <span>
+166:                                         {isActive ? 'Vào học tiếp' : isPending ? 'Xem thông tin thanh toán' : effectivePhiCoc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
+167:                                         {isActive && enrollment && enrollment.totalLessons > 0 && (
+168:                                             <span className="ml-1.5 font-normal opacity-90 text-[12px]">
+169:                                                 {enrollment.completedCount}/{enrollment.totalLessons} bài · {progressPct}%
+170:                                             </span>
+171:                                         )}
+172:                                     </span>
+173:                                     <span>{isActive ? '▶' : '🚀'}</span>
+174:                                 </span>
+175:                             </>
+176:                         )}
+177:                     </button>
+178:                     {isPending && !loading && (
+179:                         <p className="mt-3 text-center text-xs font-bold text-orange-600 animate-pulse italic">
+180:                             Đang chờ thanh toán...
+181:                         </p>
+182:                     )}
+183:                 </div>
+184:             </div>
+185:             {showPayment && (
+186:                 <PaymentModal
+187:                     course={course}
+188:                     enrollment={enrollment}
+189:                     isCourseOneActive={isCourseOneActive}
+190:                     userPhone={userPhone}
+191:                     userId={userId}
+192:                     onClose={() => setShowPayment(false)}
+193:                 />
+194:             )}
+195:         </>
+196:     )
+197: }
+`````
+
 ## File: components/home/MessageCard.tsx
 `````typescript
   1: 'use client'
@@ -27689,6 +27536,159 @@ vercel.json
 179:         </>
 180:     )
 181: }
+`````
+
+## File: next.config.ts
+`````typescript
+ 1: import type { NextConfig } from "next";
+ 2: const nextConfig: NextConfig = {
+ 3:   // Tăng tốc phản hồi HTTP
+ 4:   compress: true,
+ 5:   // Tối ưu serverless deploy
+ 6:   output: "standalone",
+ 7:   // Strict mode giúp phát hiện bug React
+ 8:   reactStrictMode: true,
+ 9:   // Tối ưu import package lớn
+10:   experimental: {
+11:     optimizePackageImports: ["lucide-react"],
+12:   },
+13:   images: {
+14:     // Tắt tối ưu hóa ảnh để sửa lỗi 400 Bad Request và cảnh báo chất lượng
+15:     unoptimized: true,
+16:     // Cấu hình các mức chất lượng được phép
+17:     qualities: [50, 70, 75, 80, 90],
+18:     // Chỉ cho phép domain ảnh thực sự dùng
+19:     remotePatterns: [
+20:       {
+21:         protocol: "https",
+22:         hostname: "**.supabase.co",
+23:       },
+24:       {
+25:         protocol: "https",
+26:         hostname: "images.unsplash.com",
+27:       },
+28:       {
+29:         protocol: "https",
+30:         hostname: "i.imgur.com",
+31:       },
+32:       {
+33:         protocol: "https",
+34:         hostname: "postimg.cc",
+35:       },
+36:       {
+37:         protocol: "https",
+38:         hostname: "**.postimg.cc",
+39:       },
+40:       {
+41:         protocol: "https",
+42:         hostname: "api.vietqr.io",
+43:       },
+44:       {
+45:         protocol: "https",
+46:         hostname: "img.vietqr.io",
+47:       }
+48:     ],
+49:     // Format ảnh hiện đại
+50:     formats: ["image/avif", "image/webp"],
+51:     // Cache ảnh lâu hơn
+52:     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 ngày
+53:   },
+54:   // Tắt source map production để giảm bundle
+55:   productionBrowserSourceMaps: false,
+56:   // Headers bảo mật cơ bản
+57:   async headers() {
+58:     return [
+59:       {
+60:         source: "/(.*)",
+61:         headers: [
+62:           {
+63:             key: "X-Frame-Options",
+64:             value: "SAMEORIGIN",
+65:           },
+66:           {
+67:             key: "X-Content-Type-Options",
+68:             value: "nosniff",
+69:           },
+70:           {
+71:             key: "Referrer-Policy",
+72:             value: "strict-origin-when-cross-origin",
+73:           },
+74:         ],
+75:       },
+76:     ];
+77:   },
+78: };
+79: export default nextConfig;
+`````
+
+## File: package.json
+`````json
+ 1: {
+ 2:   "name": "brk-academy",
+ 3:   "version": "0.1.0",
+ 4:   "private": true,
+ 5:   "scripts": {
+ 6:     "dev": "next dev",
+ 7:     "build": "next build",
+ 8:     "postinstall": "prisma generate",
+ 9:     "start": "next start",
+10:     "lint": "eslint",
+11:     "import-csv": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-csv.ts",
+12:     "process-legacy": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/process-legacy-users.ts",
+13:     "check-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/check-missing-ids.ts",
+14:     "fill-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fill-missing-ids.ts",
+15:     "change-id": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/change-id.ts",
+16:     "add-reserved": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/add-reserved-id.ts",
+17:     "import-reserved": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-reserved-list.ts",
+18:     "make-admin": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/make-admin.ts",
+19:     "seed-courses": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed-courses.ts",
+20:     "seed-enrollments": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/seed-enrollments.ts",
+21:     "import-v3": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/import-v3-data.ts",
+22:     "push": "powershell -ExecutionPolicy Bypass -File ./scripts/push.ps1",
+23:     "code-history": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/generate-code-history.ts",
+24:     "sync-ai": "npx repomix && ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scripts/sync-to-drive.ts"
+25:   },
+26:   "dependencies": {
+27:     "@auth/prisma-adapter": "^2.11.1",
+28:     "@hookform/resolvers": "^5.2.2",
+29:     "@prisma/client": "5.22.0",
+30:     "@supabase/supabase-js": "^2.95.3",
+31:     "@types/bcryptjs": "^2.4.6",
+32:     "@xyflow/react": "^12.10.1",
+33:     "bcryptjs": "^3.0.3",
+34:     "clsx": "^2.1.1",
+35:     "csv-parser": "^3.2.0",
+36:     "csv-writer": "^1.6.0",
+37:     "date-fns": "^4.1.0",
+38:     "dompurify": "^3.3.1",
+39:     "dotenv": "^17.3.1",
+40:     "googleapis": "^171.4.0",
+41:     "lucide-react": "^0.570.0",
+42:     "next": "16.1.6",
+43:     "next-auth": "^5.0.0-beta.30",
+44:     "react": "19.2.3",
+45:     "react-day-picker": "^9.14.0",
+46:     "react-dom": "19.2.3",
+47:     "react-hook-form": "^7.71.1",
+48:     "tailwind-merge": "^3.4.1",
+49:     "zod": "^4.3.6"
+50:   },
+51:   "devDependencies": {
+52:     "@tailwindcss/postcss": "^4",
+53:     "@types/node": "^20",
+54:     "@types/react": "^19",
+55:     "@types/react-dom": "^19",
+56:     "eslint": "^9",
+57:     "eslint-config-next": "16.1.6",
+58:     "prisma": "5.22.0",
+59:     "tailwindcss": "^4",
+60:     "ts-node": "^10.9.2",
+61:     "typescript": "^5"
+62:   },
+63:   "prisma": {
+64:     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+65:   }
+66: }
 `````
 
 ## File: components/course/AssignmentForm.tsx
@@ -28048,6 +28048,298 @@ vercel.json
 353: }
 `````
 
+## File: components/course/VideoPlayer.tsx
+`````typescript
+  1: 'use client'
+  2: import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+  3: import { 
+  4:     RotateCcw, CheckCircle, List, ChevronLeft, ChevronRight, 
+  5:     Play, CheckCircle2, X, FileText, Clock, Loader2, PlayCircle, SkipBack, SkipForward, Maximize2
+  6: } from 'lucide-react'
+  7: import { cn } from "@/lib/utils"
+  8: import { saveVideoProgressAction } from '@/app/actions/course-actions'
+  9: interface VideoPlayerProps {
+ 10:     enrollmentId: number
+ 11:     lessonId: string
+ 12:     videoUrl: string | null
+ 13:     lessonContent: string | null
+ 14:     initialMaxTime: number
+ 15:     onProgress: (maxTime: number, duration: number) => void
+ 16:     onPercentChange: (percent: number) => void
+ 17:     playlistData?: any 
+ 18:     lastVideoIndex?: number 
+ 19: }
+ 20: type PlaylistItem = {
+ 21:     type: 'video' | 'doc'
+ 22:     title: string
+ 23:     url: string
+ 24:     id?: string | null
+ 25: }
+ 26: export default function VideoPlayer({
+ 27:     enrollmentId,
+ 28:     lessonId,
+ 29:     videoUrl,
+ 30:     lessonContent,
+ 31:     initialMaxTime,
+ 32:     onProgress,
+ 33:     onPercentChange,
+ 34:     playlistData,
+ 35:     lastVideoIndex = 0
+ 36: }: VideoPlayerProps) {
+ 37:     const playlist = useMemo(() => {
+ 38:         if (!videoUrl) return []
+ 39:         return videoUrl.split('|').map((item, index) => {
+ 40:             const videoMatch = item.match(/^\[(.*?)\](.*)$/)
+ 41:             if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
+ 42:             const docMatch = item.match(/^\((.*?)\)(.*)$/)
+ 43:             if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
+ 44:             return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
+ 45:         })
+ 46:     }, [videoUrl])
+ 47: const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
+ 48: const [showPlaylist, setShowPlaylist] = useState(false)
+ 49: const [isMounted, setIsMounted] = useState(false)
+ 50: const [isFullscreen, setIsFullscreen] = useState(false) // State cho lớp phủ toàn màn hình
+ 51: // Timer cho tài liệu (30s)
+ 52: const [docTimer, setDocTimer] = useState<number>(0)
+ 53: const [isReading, setIsReading] = useState(false)
+ 54: // Tiến độ chi tiết từng mục: { index: { maxTime, duration } }
+ 55: const [granularProgress, setGranularProgress] = useState<Record<number, {maxTime: number, duration: number}>>(() => {
+ 56:     return playlistData || {}
+ 57: })
+ 58:     const playerRef = useRef<any>(null)
+ 59:     const containerRef = useRef<HTMLDivElement>(null)
+ 60: const saveIntervalRef = useRef<any>(null)
+ 61: const docTimerRef = useRef<any>(null)
+ 62: const currentItem = playlist[currentIndex]
+ 63: useEffect(() => { setIsMounted(true) }, [])
+ 64: // Xử lý phím Esc để thoát full màn hình
+ 65: useEffect(() => {
+ 66:     const handleEsc = (e: KeyboardEvent) => {
+ 67:         if (e.key === 'Escape') setIsFullscreen(false)
+ 68:     }
+ 69:     window.addEventListener('keydown', handleEsc)
+ 70:     return () => window.removeEventListener('keydown', handleEsc)
+ 71: }, [])
+ 72: const toggleFullScreen = () => {
+ 73:     setIsFullscreen(!isFullscreen)
+ 74: }
+ 75:     const calculateAggregateProgress = useCallback((updatedGranular: any) => {
+ 76:         let totalMaxTime = 0
+ 77:         let totalDuration = 0
+ 78:         playlist.forEach((item, idx) => {
+ 79:             const p = updatedGranular[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
+ 80:             totalMaxTime += p.maxTime
+ 81:             totalDuration += p.duration
+ 82:         })
+ 83:         if (totalDuration === 0) return { maxTime: initialMaxTime, duration: 0 }
+ 84:         return { maxTime: totalMaxTime, duration: totalDuration }
+ 85:     }, [playlist, initialMaxTime])
+ 86:     const saveProgress = useCallback(async (index: number, maxTime: number, duration: number) => {
+ 87:         const nextGranular = { ...granularProgress, [index]: { maxTime, duration } }
+ 88:         setGranularProgress(nextGranular)
+ 89:         const aggregate = calculateAggregateProgress(nextGranular)
+ 90:         // [FIX] Sử dụng setTimeout để đẩy các thay đổi state ra khỏi chu kỳ render hiện tại
+ 91:         setTimeout(() => {
+ 92:             onProgress(aggregate.maxTime, aggregate.duration)
+ 93:             if (aggregate.duration > 0) {
+ 94:                 onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
+ 95:             }
+ 96:             // Gọi Server Action an toàn sau render
+ 97:             saveVideoProgressAction({ 
+ 98:                 enrollmentId, 
+ 99:                 lessonId, 
+100:                 maxTime: aggregate.maxTime, 
+101:                 duration: aggregate.duration, 
+102:                 lastIndex: index, 
+103:                 playlistScores: nextGranular 
+104:             }).catch(() => {})
+105:         }, 0)
+106:     }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
+107:     const trackVideoProgress = useCallback(() => {
+108:         if (!playerRef.current || typeof playerRef.current.getCurrentTime !== 'function') return
+109:         const currentTime = playerRef.current.getCurrentTime()
+110:         const duration = playerRef.current.getDuration()
+111:         const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
+112:         if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
+113:     }, [currentIndex, granularProgress, saveProgress])
+114:     useEffect(() => {
+115:         if (currentItem?.type === 'doc') {
+116:             const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 30 }
+117:             if (currentStored.maxTime < 30) {
+118:                 setDocTimer(currentStored.maxTime)
+119:                 setIsReading(true)
+120:                 docTimerRef.current = setInterval(() => {
+121:                     setDocTimer(prev => {
+122:                         const next = prev + 1
+123:                         if (next >= 30) {
+124:                             clearInterval(docTimerRef.current)
+125:                             setIsReading(false)
+126:                             saveProgress(currentIndex, 30, 30)
+127:                             return 30
+128:                         }
+129:                         if (next % 5 === 0) saveProgress(currentIndex, next, 30)
+130:                         return next
+131:                     })
+132:                 }, 1000)
+133:             } else { setDocTimer(30); setIsReading(false); }
+134:         }
+135:         return () => { if (docTimerRef.current) clearInterval(docTimerRef.current) }
+136:     }, [currentIndex, currentItem?.type])
+137:     useEffect(() => {
+138:         if (!isMounted || currentItem?.type !== 'video' || !currentItem?.id) return
+139:         const initPlayer = () => {
+140:             if (playerRef.current) playerRef.current.destroy()
+141:             const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
+142:             // [FIX] Luôn bắt đầu từ mốc đã lưu (nếu đã xong thì đứng ở cuối)
+143:             const startTime = Math.floor(stored.maxTime)
+144:             playerRef.current = new (window as any).YT.Player(`multimedia-player`, {
+145:                 videoId: currentItem.id,
+146:                 playerVars: { 
+147:                     autoplay: 1, 
+148:                     modestbranding: 1, 
+149:                     rel: 0, 
+150:                     start: startTime 
+151:                 },
+152:                 events: {
+153:                     onStateChange: (e: any) => {
+154:                         const YT = (window as any).YT.PlayerState
+155:                         if (e.data === YT.PLAYING) {
+156:                             if (!saveIntervalRef.current) saveIntervalRef.current = setInterval(trackVideoProgress, 5000)
+157:                         } else {
+158:                             if (saveIntervalRef.current) { clearInterval(saveIntervalRef.current); saveIntervalRef.current = null; }
+159:                         }
+160:                         if (e.data === YT.ENDED) {
+161:                             const dur = playerRef.current.getDuration()
+162:                             saveProgress(currentIndex, dur, dur)
+163:                         }
+164:                     }
+165:                 }
+166:             })
+167:         }
+168:         if ((window as any).YT?.Player) initPlayer()
+169:         else {
+170:             const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag)
+171:             ;(window as any).onYouTubeIframeAPIReady = initPlayer
+172:         }
+173:         return () => { if (saveIntervalRef.current) clearInterval(saveIntervalRef.current); if (playerRef.current?.destroy) playerRef.current.destroy() }
+174:     }, [currentIndex, isMounted, currentItem?.type, currentItem?.id])
+175:     const handleNext = () => setCurrentVideoIndex((prev) => (prev + 1) % playlist.length)
+176:     const handlePrev = () => setCurrentVideoIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
+177:     const getEmbedUrl = (url: string) => {
+178:         if (!url.includes('docs.google.com')) return url
+179:         if (url.includes('/pub')) return url
+180:         const cleanUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].replace(/\/+$/, '')
+181:         return `${cleanUrl}/preview`
+182:     }
+183:     if (!isMounted) return <div className="w-full aspect-video bg-black animate-pulse" />
+184:     return (
+185:         <div className={cn(
+186:             "flex flex-col bg-zinc-950 transition-all duration-300",
+187:             isFullscreen ? "fixed inset-0 z-[9999] h-screen w-screen" : "w-full"
+188:         )}>
+189:             <div className={cn(
+190:                 "relative bg-black overflow-hidden shadow-2xl transition-all",
+191:                 isFullscreen ? "flex-1" : "w-full aspect-video"
+192:             )}>
+193:                 {currentItem?.type === 'video' ? (
+194:                     <div id="multimedia-player" className="w-full h-full" />
+195:                 ) : (
+196:                     <div className="w-full h-full bg-white relative flex flex-col">
+197:                         <iframe src={getEmbedUrl(currentItem.url)} className="flex-1 border-0" allow="autoplay" title="Tài liệu" />
+198:                         {isReading && (
+199:                             <div className="absolute top-0 left-0 right-0 h-1 bg-zinc-200 z-10">
+200:                                 <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${(docTimer / 30) * 100}%` }} />
+201:                             </div>
+202:                         )}
+203:                     </div>
+204:                 )}
+205:                 {/* PLAYLIST POPUP */}
+206:                 {showPlaylist && (
+207:                     <div className="absolute inset-0 bg-black/95 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
+208:                         <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
+209:                             <h3 className="text-white font-black text-base flex items-center gap-3">
+210:                                 <List className="w-5 h-5 text-orange-500" /> DANH SÁCH HỌC ({playlist.length})
+211:                             </h3>
+212:                             <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"><X className="w-5 h-5" /></button>
+213:                         </div>
+214:                         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[66vh] custom-scrollbar">
+215:                             {playlist.map((item, idx) => {
+216:                                 const isCurrent = idx === currentIndex
+217:                                 const prog = granularProgress[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
+218:                                 const pct = prog.duration > 0 ? Math.round((prog.maxTime / prog.duration) * 100) : 0
+219:                                 return (
+220:                                     <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false); }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-orange-500/10 border-orange-500 shadow-lg' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}>
+221:                                         <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{item.type === 'video' ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}</div>
+222:                                         <div className="flex-1 text-left min-w-0">
+223:                                             <p className={`text-xs font-bold truncate ${isCurrent ? 'text-white' : 'text-zinc-400'}`}>{item.title}</p>
+224:                                             <div className="flex items-center gap-2 mt-1">
+225:                                                 <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${pct >= 100 ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${pct}%` }} /></div>
+226:                                                 <span className="text-[9px] text-zinc-500 font-bold">{pct}%</span>
+227:                                             </div>
+228:                                         </div>
+229:                                         {pct >= 95 && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+230:                                     </button>
+231:                                 )
+232:                             })}
+233:                         </div>
+234:                     </div>
+235:                 )}
+236:             </div>
+237:             {/* ── 2. EXTERNAL CONTROL BAR ──────────────────────────────── */}
+238:             <div className="bg-zinc-900 border-t border-zinc-800 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
+239:                 {/* Playlist Toggle */}
+240:                 <div className="flex items-center gap-2 shrink-0">
+241:                     <button 
+242:                         onClick={() => setShowPlaylist(!showPlaylist)}
+243:                         className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-700 shadow-sm"
+244:                     >
+245:                         <List className="w-4 h-4 text-orange-500" />
+246:                         <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Lộ trình ({currentIndex + 1}/{playlist.length})</span>
+247:                     </button>
+248:                 </div>
+249:                 {/* Info & Type Icon */}
+250:                 <div className="flex-1 flex flex-col items-center min-w-0 px-1">
+251:                     <div className="flex items-center gap-1.5 max-w-full">
+252:                         {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-zinc-500 shrink-0" /> : <FileText className="w-3 h-3 text-zinc-500 shrink-0" />}
+253:                         <p className="text-[10px] sm:text-[11px] font-black text-orange-400 truncate tracking-tight uppercase">{currentItem?.title}</p>
+254:                     </div>
+255:                     <div className="flex items-center gap-1.5 mt-0.5">
+256:                         {currentItem?.type === 'doc' ? (
+257:                             isReading ? (
+258:                                 <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase"><Clock className="w-2.5 h-2.5 animate-spin" /> {30 - docTimer}s</span>
+259:                             ) : (
+260:                                 <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-emerald-500 font-bold uppercase"><CheckCircle2 className="w-2.5 h-2.5" /> Xong</span>
+261:                             )
+262:                         ) : (
+263:                             <span className="text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Video</span>
+264:                         )}
+265:                     </div>
+266:                 </div>
+267:                 {/* Navigation & Fullscreen Buttons */}
+268:                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+269:                     <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-400 hover:text-white rounded-lg transition-all border border-zinc-700 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
+270:                     <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-400 hover:text-white rounded-lg transition-all border border-zinc-700 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
+271:                     {/* Fullscreen Button - Nổi bật hơn trên mobile */}
+272:                     <button 
+273:                         onClick={toggleFullScreen}
+274:                         className="p-1.5 sm:p-2 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-lg transition-all border border-orange-500/20 active:scale-90 ml-1"
+275:                         title="Xem toàn màn hình"
+276:                     >
+277:                         <Maximize2 className="w-3.5 h-3.5 sm:w-4 h-4" />
+278:                     </button>
+279:                 </div>
+280:             </div>
+281:         </div>
+282:     )
+283: }
+284: function extractVideoId(url: string) {
+285:     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(\&v=))([^#\&\?]*).*/
+286:     const match = url.match(regExp)
+287:     return (match && match[9].length === 11) ? match[9] : null
+288: }
+`````
+
 ## File: lib/notifications.ts
 `````typescript
   1: import { google } from 'googleapis';
@@ -28405,298 +28697,6 @@ vercel.json
 197: }
 `````
 
-## File: components/course/VideoPlayer.tsx
-`````typescript
-  1: 'use client'
-  2: import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-  3: import { 
-  4:     RotateCcw, CheckCircle, List, ChevronLeft, ChevronRight, 
-  5:     Play, CheckCircle2, X, FileText, Clock, Loader2, PlayCircle, SkipBack, SkipForward, Maximize2
-  6: } from 'lucide-react'
-  7: import { cn } from "@/lib/utils"
-  8: import { saveVideoProgressAction } from '@/app/actions/course-actions'
-  9: interface VideoPlayerProps {
- 10:     enrollmentId: number
- 11:     lessonId: string
- 12:     videoUrl: string | null
- 13:     lessonContent: string | null
- 14:     initialMaxTime: number
- 15:     onProgress: (maxTime: number, duration: number) => void
- 16:     onPercentChange: (percent: number) => void
- 17:     playlistData?: any 
- 18:     lastVideoIndex?: number 
- 19: }
- 20: type PlaylistItem = {
- 21:     type: 'video' | 'doc'
- 22:     title: string
- 23:     url: string
- 24:     id?: string | null
- 25: }
- 26: export default function VideoPlayer({
- 27:     enrollmentId,
- 28:     lessonId,
- 29:     videoUrl,
- 30:     lessonContent,
- 31:     initialMaxTime,
- 32:     onProgress,
- 33:     onPercentChange,
- 34:     playlistData,
- 35:     lastVideoIndex = 0
- 36: }: VideoPlayerProps) {
- 37:     const playlist = useMemo(() => {
- 38:         if (!videoUrl) return []
- 39:         return videoUrl.split('|').map((item, index) => {
- 40:             const videoMatch = item.match(/^\[(.*?)\](.*)$/)
- 41:             if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
- 42:             const docMatch = item.match(/^\((.*?)\)(.*)$/)
- 43:             if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
- 44:             return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
- 45:         })
- 46:     }, [videoUrl])
- 47: const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
- 48: const [showPlaylist, setShowPlaylist] = useState(false)
- 49: const [isMounted, setIsMounted] = useState(false)
- 50: const [isFullscreen, setIsFullscreen] = useState(false) // State cho lớp phủ toàn màn hình
- 51: // Timer cho tài liệu (30s)
- 52: const [docTimer, setDocTimer] = useState<number>(0)
- 53: const [isReading, setIsReading] = useState(false)
- 54: // Tiến độ chi tiết từng mục: { index: { maxTime, duration } }
- 55: const [granularProgress, setGranularProgress] = useState<Record<number, {maxTime: number, duration: number}>>(() => {
- 56:     return playlistData || {}
- 57: })
- 58:     const playerRef = useRef<any>(null)
- 59:     const containerRef = useRef<HTMLDivElement>(null)
- 60: const saveIntervalRef = useRef<any>(null)
- 61: const docTimerRef = useRef<any>(null)
- 62: const currentItem = playlist[currentIndex]
- 63: useEffect(() => { setIsMounted(true) }, [])
- 64: // Xử lý phím Esc để thoát full màn hình
- 65: useEffect(() => {
- 66:     const handleEsc = (e: KeyboardEvent) => {
- 67:         if (e.key === 'Escape') setIsFullscreen(false)
- 68:     }
- 69:     window.addEventListener('keydown', handleEsc)
- 70:     return () => window.removeEventListener('keydown', handleEsc)
- 71: }, [])
- 72: const toggleFullScreen = () => {
- 73:     setIsFullscreen(!isFullscreen)
- 74: }
- 75:     const calculateAggregateProgress = useCallback((updatedGranular: any) => {
- 76:         let totalMaxTime = 0
- 77:         let totalDuration = 0
- 78:         playlist.forEach((item, idx) => {
- 79:             const p = updatedGranular[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
- 80:             totalMaxTime += p.maxTime
- 81:             totalDuration += p.duration
- 82:         })
- 83:         if (totalDuration === 0) return { maxTime: initialMaxTime, duration: 0 }
- 84:         return { maxTime: totalMaxTime, duration: totalDuration }
- 85:     }, [playlist, initialMaxTime])
- 86:     const saveProgress = useCallback(async (index: number, maxTime: number, duration: number) => {
- 87:         const nextGranular = { ...granularProgress, [index]: { maxTime, duration } }
- 88:         setGranularProgress(nextGranular)
- 89:         const aggregate = calculateAggregateProgress(nextGranular)
- 90:         // [FIX] Sử dụng setTimeout để đẩy các thay đổi state ra khỏi chu kỳ render hiện tại
- 91:         setTimeout(() => {
- 92:             onProgress(aggregate.maxTime, aggregate.duration)
- 93:             if (aggregate.duration > 0) {
- 94:                 onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
- 95:             }
- 96:             // Gọi Server Action an toàn sau render
- 97:             saveVideoProgressAction({ 
- 98:                 enrollmentId, 
- 99:                 lessonId, 
-100:                 maxTime: aggregate.maxTime, 
-101:                 duration: aggregate.duration, 
-102:                 lastIndex: index, 
-103:                 playlistScores: nextGranular 
-104:             }).catch(() => {})
-105:         }, 0)
-106:     }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
-107:     const trackVideoProgress = useCallback(() => {
-108:         if (!playerRef.current || typeof playerRef.current.getCurrentTime !== 'function') return
-109:         const currentTime = playerRef.current.getCurrentTime()
-110:         const duration = playerRef.current.getDuration()
-111:         const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
-112:         if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
-113:     }, [currentIndex, granularProgress, saveProgress])
-114:     useEffect(() => {
-115:         if (currentItem?.type === 'doc') {
-116:             const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 30 }
-117:             if (currentStored.maxTime < 30) {
-118:                 setDocTimer(currentStored.maxTime)
-119:                 setIsReading(true)
-120:                 docTimerRef.current = setInterval(() => {
-121:                     setDocTimer(prev => {
-122:                         const next = prev + 1
-123:                         if (next >= 30) {
-124:                             clearInterval(docTimerRef.current)
-125:                             setIsReading(false)
-126:                             saveProgress(currentIndex, 30, 30)
-127:                             return 30
-128:                         }
-129:                         if (next % 5 === 0) saveProgress(currentIndex, next, 30)
-130:                         return next
-131:                     })
-132:                 }, 1000)
-133:             } else { setDocTimer(30); setIsReading(false); }
-134:         }
-135:         return () => { if (docTimerRef.current) clearInterval(docTimerRef.current) }
-136:     }, [currentIndex, currentItem?.type])
-137:     useEffect(() => {
-138:         if (!isMounted || currentItem?.type !== 'video' || !currentItem?.id) return
-139:         const initPlayer = () => {
-140:             if (playerRef.current) playerRef.current.destroy()
-141:             const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
-142:             // [FIX] Luôn bắt đầu từ mốc đã lưu (nếu đã xong thì đứng ở cuối)
-143:             const startTime = Math.floor(stored.maxTime)
-144:             playerRef.current = new (window as any).YT.Player(`multimedia-player`, {
-145:                 videoId: currentItem.id,
-146:                 playerVars: { 
-147:                     autoplay: 1, 
-148:                     modestbranding: 1, 
-149:                     rel: 0, 
-150:                     start: startTime 
-151:                 },
-152:                 events: {
-153:                     onStateChange: (e: any) => {
-154:                         const YT = (window as any).YT.PlayerState
-155:                         if (e.data === YT.PLAYING) {
-156:                             if (!saveIntervalRef.current) saveIntervalRef.current = setInterval(trackVideoProgress, 5000)
-157:                         } else {
-158:                             if (saveIntervalRef.current) { clearInterval(saveIntervalRef.current); saveIntervalRef.current = null; }
-159:                         }
-160:                         if (e.data === YT.ENDED) {
-161:                             const dur = playerRef.current.getDuration()
-162:                             saveProgress(currentIndex, dur, dur)
-163:                         }
-164:                     }
-165:                 }
-166:             })
-167:         }
-168:         if ((window as any).YT?.Player) initPlayer()
-169:         else {
-170:             const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag)
-171:             ;(window as any).onYouTubeIframeAPIReady = initPlayer
-172:         }
-173:         return () => { if (saveIntervalRef.current) clearInterval(saveIntervalRef.current); if (playerRef.current?.destroy) playerRef.current.destroy() }
-174:     }, [currentIndex, isMounted, currentItem?.type, currentItem?.id])
-175:     const handleNext = () => setCurrentVideoIndex((prev) => (prev + 1) % playlist.length)
-176:     const handlePrev = () => setCurrentVideoIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
-177:     const getEmbedUrl = (url: string) => {
-178:         if (!url.includes('docs.google.com')) return url
-179:         if (url.includes('/pub')) return url
-180:         const cleanUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].replace(/\/+$/, '')
-181:         return `${cleanUrl}/preview`
-182:     }
-183:     if (!isMounted) return <div className="w-full aspect-video bg-black animate-pulse" />
-184:     return (
-185:         <div className={cn(
-186:             "flex flex-col bg-zinc-950 transition-all duration-300",
-187:             isFullscreen ? "fixed inset-0 z-[9999] h-screen w-screen" : "w-full"
-188:         )}>
-189:             <div className={cn(
-190:                 "relative bg-black overflow-hidden shadow-2xl transition-all",
-191:                 isFullscreen ? "flex-1" : "w-full aspect-video"
-192:             )}>
-193:                 {currentItem?.type === 'video' ? (
-194:                     <div id="multimedia-player" className="w-full h-full" />
-195:                 ) : (
-196:                     <div className="w-full h-full bg-white relative flex flex-col">
-197:                         <iframe src={getEmbedUrl(currentItem.url)} className="flex-1 border-0" allow="autoplay" title="Tài liệu" />
-198:                         {isReading && (
-199:                             <div className="absolute top-0 left-0 right-0 h-1 bg-zinc-200 z-10">
-200:                                 <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${(docTimer / 30) * 100}%` }} />
-201:                             </div>
-202:                         )}
-203:                     </div>
-204:                 )}
-205:                 {/* PLAYLIST POPUP */}
-206:                 {showPlaylist && (
-207:                     <div className="absolute inset-0 bg-black/95 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
-208:                         <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
-209:                             <h3 className="text-white font-black text-base flex items-center gap-3">
-210:                                 <List className="w-5 h-5 text-orange-500" /> DANH SÁCH HỌC ({playlist.length})
-211:                             </h3>
-212:                             <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"><X className="w-5 h-5" /></button>
-213:                         </div>
-214:                         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[66vh] custom-scrollbar">
-215:                             {playlist.map((item, idx) => {
-216:                                 const isCurrent = idx === currentIndex
-217:                                 const prog = granularProgress[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
-218:                                 const pct = prog.duration > 0 ? Math.round((prog.maxTime / prog.duration) * 100) : 0
-219:                                 return (
-220:                                     <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false); }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-orange-500/10 border-orange-500 shadow-lg' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}>
-221:                                         <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>{item.type === 'video' ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}</div>
-222:                                         <div className="flex-1 text-left min-w-0">
-223:                                             <p className={`text-xs font-bold truncate ${isCurrent ? 'text-white' : 'text-zinc-400'}`}>{item.title}</p>
-224:                                             <div className="flex items-center gap-2 mt-1">
-225:                                                 <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${pct >= 100 ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${pct}%` }} /></div>
-226:                                                 <span className="text-[9px] text-zinc-500 font-bold">{pct}%</span>
-227:                                             </div>
-228:                                         </div>
-229:                                         {pct >= 95 && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
-230:                                     </button>
-231:                                 )
-232:                             })}
-233:                         </div>
-234:                     </div>
-235:                 )}
-236:             </div>
-237:             {/* ── 2. EXTERNAL CONTROL BAR ──────────────────────────────── */}
-238:             <div className="bg-zinc-900 border-t border-zinc-800 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
-239:                 {/* Playlist Toggle */}
-240:                 <div className="flex items-center gap-2 shrink-0">
-241:                     <button 
-242:                         onClick={() => setShowPlaylist(!showPlaylist)}
-243:                         className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-700 shadow-sm"
-244:                     >
-245:                         <List className="w-4 h-4 text-orange-500" />
-246:                         <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Lộ trình ({currentIndex + 1}/{playlist.length})</span>
-247:                     </button>
-248:                 </div>
-249:                 {/* Info & Type Icon */}
-250:                 <div className="flex-1 flex flex-col items-center min-w-0 px-1">
-251:                     <div className="flex items-center gap-1.5 max-w-full">
-252:                         {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-zinc-500 shrink-0" /> : <FileText className="w-3 h-3 text-zinc-500 shrink-0" />}
-253:                         <p className="text-[10px] sm:text-[11px] font-black text-orange-400 truncate tracking-tight uppercase">{currentItem?.title}</p>
-254:                     </div>
-255:                     <div className="flex items-center gap-1.5 mt-0.5">
-256:                         {currentItem?.type === 'doc' ? (
-257:                             isReading ? (
-258:                                 <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase"><Clock className="w-2.5 h-2.5 animate-spin" /> {30 - docTimer}s</span>
-259:                             ) : (
-260:                                 <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-emerald-500 font-bold uppercase"><CheckCircle2 className="w-2.5 h-2.5" /> Xong</span>
-261:                             )
-262:                         ) : (
-263:                             <span className="text-[8px] sm:text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Video</span>
-264:                         )}
-265:                     </div>
-266:                 </div>
-267:                 {/* Navigation & Fullscreen Buttons */}
-268:                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-269:                     <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-400 hover:text-white rounded-lg transition-all border border-zinc-700 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
-270:                     <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-400 hover:text-white rounded-lg transition-all border border-zinc-700 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
-271:                     {/* Fullscreen Button - Nổi bật hơn trên mobile */}
-272:                     <button 
-273:                         onClick={toggleFullScreen}
-274:                         className="p-1.5 sm:p-2 bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white rounded-lg transition-all border border-orange-500/20 active:scale-90 ml-1"
-275:                         title="Xem toàn màn hình"
-276:                     >
-277:                         <Maximize2 className="w-3.5 h-3.5 sm:w-4 h-4" />
-278:                     </button>
-279:                 </div>
-280:             </div>
-281:         </div>
-282:     )
-283: }
-284: function extractVideoId(url: string) {
-285:     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(\&v=))([^#\&\?]*).*/
-286:     const match = url.match(regExp)
-287:     return (match && match[9].length === 11) ? match[9] : null
-288: }
-`````
-
 ## File: components/home/Zero2HeroSurvey.tsx
 `````typescript
   1: 'use client'
@@ -28741,275 +28741,299 @@ vercel.json
  40:     const [lastFoundCourse, setLastFoundCourse] = useState<string | null>(null)
  41:     const [input1, setInput1] = useState('')
  42:     const [input2, setInput2] = useState('')
- 43:     const [videoPerDay, setVideoPerDay] = useState('1')
- 44:     const [days, setDays] = useState('30')
- 45:     const [targetVal, setTargetVal] = useState('1000')
- 46:     // Tải bài khảo sát
- 47:     useEffect(() => {
- 48:         const init = async () => {
- 49:             try {
- 50:                 setIsLoading(true)
- 51:                 const [flowData, courses] = await Promise.all([getActiveSurvey(), getCoursesForBuilder()])
- 52:                 const data = flowData as any
- 53:                 setAllCourses(courses)
- 54:                 if (data && data.nodes && Array.isArray(data.nodes)) {
- 55:                     setFlow(data)
- 56:                     const targetIds = new Set(data.edges?.map((e: any) => e.target) || [])
- 57:                     let startNode = data.nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
- 58:                     if (!startNode) startNode = data.nodes.find((n: any) => n.type === 'questionNode')
- 59:                     if (startNode) {
- 60:                         setCurrentNodeId(startNode.id)
- 61:                         findInitialCourses(data, startNode.id)
- 62:                     }
- 63:                 }
- 64:             } catch (err) {
- 65:                 console.error(err)
- 66:             } finally {
- 67:                 setIsLoading(false)
- 68:             }
- 69:         }
- 70:         init()
- 71:     }, [])
- 72:     const findInitialCourses = (data: any, sid: string) => {
- 73:         if (!data || !data.edges || !data.nodes) return
- 74:         const newIds: number[] = []
- 75:         const courseNames: string[] = []
- 76:         const traverse = (currentId: string) => {
- 77:             const outEdges = data.edges.filter((e: any) => e.source === currentId)
- 78:             for (const edge of outEdges) {
- 79:                 const target = data.nodes.find((n: any) => n.id === edge.target)
- 80:                 if (target?.type === 'courseNode' && target.data?.courseId) {
- 81:                     const cid = Number(target.data.courseId)
- 82:                     if (!newIds.includes(cid)) {
- 83:                         newIds.push(cid)
- 84:                         courseNames.push(target.data.courseName || `Khóa #${cid}`)
- 85:                     }
- 86:                     traverse(target.id)
- 87:                 }
- 88:             }
- 89:         }
- 90:         traverse(sid)
- 91:         if (newIds.length > 0) {
- 92:             setIdentifiedCourseIds(newIds)
- 93:             setLastFoundCourse(courseNames.join(', '))
- 94:             setTimeout(() => setLastFoundCourse(null), 3000)
- 95:         }
- 96:     }
- 97:     const findAndAddCourses = (sourceId: string) => {
- 98:         if (!flow || !flow.edges || !flow.nodes) return
- 99:         const newIds: number[] = []
-100:         const courseNames: string[] = []
-101:         const traverse = (sid: string) => {
-102:             const outEdges = flow.edges.filter((e: any) => e.source === sid)
-103:             for (const edge of outEdges) {
-104:                 const target = flow.nodes.find((n: any) => n.id === edge.target)
-105:                 if (target?.type === 'courseNode' && target.data?.courseId) {
-106:                     const cid = Number(target.data.courseId)
-107:                     if (!identifiedCourseIds.includes(cid) && !newIds.includes(cid)) {
-108:                         newIds.push(cid)
-109:                         courseNames.push(target.data.courseName || `Khóa #${cid}`)
-110:                     }
-111:                     traverse(target.id)
-112:                 }
-113:             }
-114:         }
-115:         traverse(sourceId)
-116:         if (newIds.length > 0) {
-117:             setIdentifiedCourseIds(prev => [...prev, ...newIds])
-118:             setLastFoundCourse(courseNames.join(', '))
-119:             setTimeout(() => setLastFoundCourse(null), 3000)
-120:         }
-121:     }
-122:     const getActiveQuestion = () => {
-123:         if (flow && currentNodeId && Array.isArray(flow.nodes)) {
-124:             const node = flow.nodes.find((n: any) => n.id === currentNodeId)
-125:             if (node) {
-126:                 const options = Array.isArray(flow.edges) ? flow.edges
-127:                     .filter((e: any) => e.source === currentNodeId)
-128:                     .map((edge: any) => {
-129:                         const optNode = flow.nodes.find((n: any) => n.id === edge.target)
-130:                         return { id: optNode?.id, label: optNode?.data?.label, type: optNode?.type }
-131:                     })
-132:                     .filter((o: any) => o.id && o.type === 'optionNode') : []
-133:                 return { id: node.id, question: node.data?.label, type: node.data?.type || 'CHOICE', options, isDynamic: true }
-134:             }
-135:         }
-136:         const staticQ = (surveyQuestions as any)[currentStep] || {}
-137:         return { ...staticQ, id: currentStep, isDynamic: false }
-138:     }
-139:     const currentQuestion = getActiveQuestion()
-140:     const handleNext = async (optionId: string, label: string) => {
-141:         const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
-142:         if (currentQuestion.type === 'INPUT_ACCOUNT') {
-143:             newAnswers[`${currentQuestion.id}_name`] = input1
-144:             newAnswers[`${currentQuestion.id}_id`] = input2
-145:             newAnswers[`${currentQuestion.id}_status`] = label
-146:         }
-147:         if (currentQuestion.type === 'INPUT_GOAL') {
-148:             newAnswers['goal_config'] = { videoPerDay, days, targetVal }
-149:         }
-150:         setAnswers(newAnswers)
-151:         if (currentQuestion.isDynamic && flow) {
-152:             findAndAddCourses(optionId)
-153:             const findNextNode = (sid: string): any => {
-154:                 const outEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === sid) : []
-155:                 for (const edge of outEdges) {
-156:                     const target = flow.nodes.find((n: any) => n.id === edge.target)
-157:                     if (!target) continue
-158:                     if (target.type === 'questionNode' || target.type === 'adviceNode' || target.type === 'finishNode') return target
-159:                     if (target.type === 'courseNode' || target.type === 'optionNode') {
-160:                         const next = findNextNode(target.id)
-161:                         if (next) return next
-162:                     }
-163:                 }
-164:                 return null
-165:             }
-166:             const startId = currentQuestion.type === 'INPUT_GOAL' ? currentNodeId : optionId
-167:             const nextNode = findNextNode(startId!)
-168:             if (nextNode) {
-169:                 // Nếu là Đích đến (FinishNode) -> Nộp bài ngay
-170:                 if (nextNode.type === 'finishNode') {
-171:                     finishSurvey(newAnswers)
-172:                     return
-173:                 }
-174:                 if (nextNode.type === 'adviceNode') {
-175:                     setShowAdvice(nextNode.data?.label || '')
-176:                     return
-177:                 }
-178:                 setHistory([...history, { id: currentNodeId, isDynamic: true, courses: [...identifiedCourseIds] }])
-179:                 setCurrentNodeId(nextNode.id)
-180:                 findAndAddCourses(nextNode.id) 
-181:             } else {
-182:                 finishSurvey(newAnswers)
-183:             }
-184:         } else {
-185:             finishSurvey(newAnswers)
-186:         }
-187:         setInput1(''); setInput2('')
-188:     }
-189:     const finishSurvey = async (finalAnswers: any) => {
-190:         setIsSubmitting(true)
-191:         try {
-192:             const res = await saveSurveyResultAction(finalAnswers)
-193:             if (res.success) {
-194:                 setShowSuccess(true)
-195:                 setTimeout(() => {
-196:                     if (onComplete) onComplete()
-197:                     else window.location.href = '/'
-198:                 }, 5000) 
-199:             } else {
-200:                 alert(res.error); setIsSubmitting(false)
-201:             }
-202:         } catch (err) {
-203:             setIsSubmitting(false)
-204:         }
-205:     }
-206:     if (isLoading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-yellow-400" /></div>
-207:     if (showSuccess) return (
-208:         <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
-209:             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/20">
-210:                 <CheckCircle2 className="w-10 h-10" />
-211:             </div>
-212:             <h2 className="text-3xl font-black uppercase mb-4">Lộ trình hoàn tất!</h2>
-213:             <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8 text-left max-w-md mx-auto">
-214:                 <p className="text-[10px] font-black uppercase text-yellow-400 mb-4 tracking-widest flex items-center gap-2">
-215:                     <Sparkles className="w-3 h-3" /> AI đã xác định {identifiedCourseIds.length} chặng học:
-216:                 </p>
-217:                 <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-218:                     {identifiedCourseIds.map((id, idx) => {
-219:                         const c = allCourses.find(item => item.id === id)
-220:                         return (
-221:                             <div key={`${id}-${idx}`} className="flex items-center gap-3 text-sm font-bold text-gray-200 animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
-222:                                 <div className="w-6 h-6 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-400 text-[10px]">{id}</div>
-223:                                 {c?.name_lop || `Khóa học #${id}`}
-224:                             </div>
-225:                         )
-226:                     })}
-227:                 </div>
-228:             </div>
-229:             <p className="text-gray-400 text-xs mb-4 italic">Hệ thống đang lưu dữ liệu và chuyển hướng...</p>
-230:             <Loader2 className="w-6 h-6 animate-spin text-yellow-400 mx-auto" />
-231:         </div>
-232:     )
-233:     return (
-234:         <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
-235:             {lastFoundCourse && (
-236:                 <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-black py-2 px-4 text-center font-black uppercase text-[9px] tracking-widest animate-in slide-in-from-top duration-300 z-50 flex items-center justify-center gap-2">
-237:                     <Sparkles className="w-3 h-3 fill-current" /> Đã xác định: {lastFoundCourse}
-238:                 </div>
-239:             )}
-240:             <div className="relative z-10">
-241:                 <div className="flex items-center justify-between mb-8">
-242:                     <div className="flex items-center gap-3">
-243:                         <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20"><Target className="w-5 h-5" /></div>
-244:                         <div>
-245:                             <h2 className="text-lg font-black uppercase tracking-tight italic">Zero 2 Hero</h2>
-246:                             <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Live Roadmap Building</p>
-247:                         </div>
-248:                     </div>
-249:                     {identifiedCourseIds.length > 0 && (
-250:                         <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 animate-in zoom-in">
-251:                             <BookOpen className="w-3 h-3 text-yellow-400" />
-252:                             <span className="text-[10px] font-black text-yellow-400">{identifiedCourseIds.length}</span>
-253:                         </div>
-254:                     )}
-255:                 </div>
-256:                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-257:                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
-258:                     <p className="text-gray-400 text-sm mb-8 font-medium italic">
-259:                         {currentQuestion.description || 'Hãy chọn đáp án phản ánh đúng nhất trạng thái của bạn.'}
-260:                     </p>
-261:                     {currentQuestion.type === 'CHOICE' && (
-262:                         <div className="grid grid-cols-1 gap-3">
-263:                             {currentQuestion.options?.map((opt: any) => (
-264:                                 <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]">
-265:                                     <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
-266:                                     <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-yellow-400" />
-267:                                 </button>
-268:                             ))}
-269:                         </div>
-270:                     )}
-271:                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
-272:                         <div className="space-y-6">
-273:                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-274:                                 <div className="space-y-1.5">
-275:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Tên Kênh / Lĩnh vực</label>
-276:                                     <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Nhập tên..." />
-277:                                 </div>
-278:                                 <div className="space-y-1.5">
-279:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Link TikTok / Bio</label>
-280:                                     <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="@id_cua_ban" />
-281:                                 </div>
+ 43:     const [freeText, setFreeText] = useState('')
+ 44:     const [videoPerDay, setVideoPerDay] = useState('1')
+ 45:     const [days, setDays] = useState('30')
+ 46:     const [targetVal, setTargetVal] = useState('1000')
+ 47:     // Tải bài khảo sát
+ 48:     useEffect(() => {
+ 49:         const init = async () => {
+ 50:             try {
+ 51:                 setIsLoading(true)
+ 52:                 const [flowData, courses] = await Promise.all([getActiveSurvey(), getCoursesForBuilder()])
+ 53:                 const data = flowData as any
+ 54:                 setAllCourses(courses)
+ 55:                 if (data && data.nodes && Array.isArray(data.nodes)) {
+ 56:                     setFlow(data)
+ 57:                     const targetIds = new Set(data.edges?.map((e: any) => e.target) || [])
+ 58:                     let startNode = data.nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
+ 59:                     if (!startNode) startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+ 60:                     if (startNode) {
+ 61:                         setCurrentNodeId(startNode.id)
+ 62:                         findInitialCourses(data, startNode.id)
+ 63:                     }
+ 64:                 }
+ 65:             } catch (err) {
+ 66:                 console.error(err)
+ 67:             } finally {
+ 68:                 setIsLoading(false)
+ 69:             }
+ 70:         }
+ 71:         init()
+ 72:     }, [])
+ 73:     const findInitialCourses = (data: any, sid: string) => {
+ 74:         if (!data || !data.edges || !data.nodes) return
+ 75:         const newIds: number[] = []
+ 76:         const courseNames: string[] = []
+ 77:         const traverse = (currentId: string) => {
+ 78:             const outEdges = data.edges.filter((e: any) => e.source === currentId)
+ 79:             for (const edge of outEdges) {
+ 80:                 const target = data.nodes.find((n: any) => n.id === edge.target)
+ 81:                 if (target?.type === 'courseNode' && target.data?.courseId) {
+ 82:                     const cid = Number(target.data.courseId)
+ 83:                     if (!newIds.includes(cid)) {
+ 84:                         newIds.push(cid)
+ 85:                         courseNames.push(target.data.courseName || `Khóa #${cid}`)
+ 86:                     }
+ 87:                     traverse(target.id)
+ 88:                 }
+ 89:             }
+ 90:         }
+ 91:         traverse(sid)
+ 92:         if (newIds.length > 0) {
+ 93:             setIdentifiedCourseIds(newIds)
+ 94:             setLastFoundCourse(courseNames.join(', '))
+ 95:             setTimeout(() => setLastFoundCourse(null), 3000)
+ 96:         }
+ 97:     }
+ 98:     const findAndAddCourses = (sourceId: string) => {
+ 99:         if (!flow || !flow.edges || !flow.nodes) return
+100:         const newIds: number[] = []
+101:         const courseNames: string[] = []
+102:         const traverse = (sid: string) => {
+103:             const outEdges = flow.edges.filter((e: any) => e.source === sid)
+104:             for (const edge of outEdges) {
+105:                 const target = flow.nodes.find((n: any) => n.id === edge.target)
+106:                 if (target?.type === 'courseNode' && target.data?.courseId) {
+107:                     const cid = Number(target.data.courseId)
+108:                     if (!identifiedCourseIds.includes(cid) && !newIds.includes(cid)) {
+109:                         newIds.push(cid)
+110:                         courseNames.push(target.data.courseName || `Khóa #${cid}`)
+111:                     }
+112:                     traverse(target.id)
+113:                 }
+114:             }
+115:         }
+116:         traverse(sourceId)
+117:         if (newIds.length > 0) {
+118:             setIdentifiedCourseIds(prev => [...prev, ...newIds])
+119:             setLastFoundCourse(courseNames.join(', '))
+120:             setTimeout(() => setLastFoundCourse(null), 3000)
+121:         }
+122:     }
+123:     const getActiveQuestion = () => {
+124:         if (flow && currentNodeId && Array.isArray(flow.nodes)) {
+125:             const node = flow.nodes.find((n: any) => n.id === currentNodeId)
+126:             if (node) {
+127:                 const options = Array.isArray(flow.edges) ? flow.edges
+128:                     .filter((e: any) => e.source === currentNodeId)
+129:                     .map((edge: any) => {
+130:                         const optNode = flow.nodes.find((n: any) => n.id === edge.target)
+131:                         return { id: optNode?.id, label: optNode?.data?.label, type: optNode?.type }
+132:                     })
+133:                     .filter((o: any) => o.id && o.type === 'optionNode') : []
+134:                 return { id: node.id, question: node.data?.label, type: node.data?.type || 'CHOICE', options, isDynamic: true }
+135:             }
+136:         }
+137:         const staticQ = (surveyQuestions as any)[currentStep] || {}
+138:         return { ...staticQ, id: currentStep, isDynamic: false }
+139:     }
+140:     const currentQuestion = getActiveQuestion()
+141:     const handleNext = async (optionId: string, label: string) => {
+142:         const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
+143:         if (currentQuestion.type === 'INPUT_ACCOUNT') {
+144:             newAnswers[`${currentQuestion.id}_name`] = input1
+145:             newAnswers[`${currentQuestion.id}_id`] = input2
+146:             newAnswers[`${currentQuestion.id}_status`] = label
+147:         }
+148:         if (currentQuestion.type === 'INPUT_GOAL') {
+149:             newAnswers['goal_config'] = { videoPerDay, days, targetVal }
+150:         }
+151:         setAnswers(newAnswers)
+152:         if (currentQuestion.isDynamic && flow) {
+153:             findAndAddCourses(optionId)
+154:             const findNextNode = (sid: string): any => {
+155:                 const outEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === sid) : []
+156:                 for (const edge of outEdges) {
+157:                     const target = flow.nodes.find((n: any) => n.id === edge.target)
+158:                     if (!target) continue
+159:                     if (target.type === 'questionNode' || target.type === 'adviceNode' || target.type === 'finishNode') return target
+160:                     if (target.type === 'courseNode' || target.type === 'optionNode') {
+161:                         const next = findNextNode(target.id)
+162:                         if (next) return next
+163:                     }
+164:                 }
+165:                 return null
+166:             }
+167:             const startId = currentQuestion.type === 'INPUT_GOAL' ? currentNodeId : optionId
+168:             const nextNode = findNextNode(startId!)
+169:             if (nextNode) {
+170:                 // Nếu là Đích đến (FinishNode) -> Nộp bài ngay
+171:                 if (nextNode.type === 'finishNode') {
+172:                     finishSurvey(newAnswers)
+173:                     return
+174:                 }
+175:                 if (nextNode.type === 'adviceNode') {
+176:                     setShowAdvice(nextNode.data?.label || '')
+177:                     return
+178:                 }
+179:                 setHistory([...history, { id: currentNodeId, isDynamic: true, courses: [...identifiedCourseIds] }])
+180:                 setCurrentNodeId(nextNode.id)
+181:                 findAndAddCourses(nextNode.id) 
+182:             } else {
+183:                 finishSurvey(newAnswers)
+184:             }
+185:         } else {
+186:             finishSurvey(newAnswers)
+187:         }
+188:         setInput1(''); setInput2('')
+189:     }
+190:     const finishSurvey = async (finalAnswers: any) => {
+191:         setIsSubmitting(true)
+192:         try {
+193:             const res = await saveSurveyResultAction(finalAnswers)
+194:             if (res.success) {
+195:                 setShowSuccess(true)
+196:                 setTimeout(() => {
+197:                     if (onComplete) onComplete()
+198:                     else window.location.href = '/'
+199:                 }, 5000) 
+200:             } else {
+201:                 alert(res.error); setIsSubmitting(false)
+202:             }
+203:         } catch (err) {
+204:             setIsSubmitting(false)
+205:         }
+206:     }
+207:     if (isLoading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-yellow-400" /></div>
+208:     if (showSuccess) return (
+209:         <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
+210:             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/20">
+211:                 <CheckCircle2 className="w-10 h-10" />
+212:             </div>
+213:             <h2 className="text-3xl font-black uppercase mb-4">Lộ trình hoàn tất!</h2>
+214:             <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8 text-left max-w-md mx-auto">
+215:                 <p className="text-[10px] font-black uppercase text-yellow-400 mb-4 tracking-widest flex items-center gap-2">
+216:                     <Sparkles className="w-3 h-3" /> AI đã xác định {identifiedCourseIds.length} chặng học:
+217:                 </p>
+218:                 <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+219:                     {identifiedCourseIds.map((id, idx) => {
+220:                         const c = allCourses.find(item => item.id === id)
+221:                         return (
+222:                             <div key={`${id}-${idx}`} className="flex items-center gap-3 text-sm font-bold text-gray-200 animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+223:                                 <div className="w-6 h-6 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-400 text-[10px]">{id}</div>
+224:                                 {c?.name_lop || `Khóa học #${id}`}
+225:                             </div>
+226:                         )
+227:                     })}
+228:                 </div>
+229:             </div>
+230:             <p className="text-gray-400 text-xs mb-4 italic">Hệ thống đang lưu dữ liệu và chuyển hướng...</p>
+231:             <Loader2 className="w-6 h-6 animate-spin text-yellow-400 mx-auto" />
+232:         </div>
+233:     )
+234:     return (
+235:         <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
+236:             {lastFoundCourse && (
+237:                 <div className="absolute top-0 left-0 right-0 bg-yellow-400 text-black py-2 px-4 text-center font-black uppercase text-[9px] tracking-widest animate-in slide-in-from-top duration-300 z-50 flex items-center justify-center gap-2">
+238:                     <Sparkles className="w-3 h-3 fill-current" /> Đã xác định: {lastFoundCourse}
+239:                 </div>
+240:             )}
+241:             <div className="relative z-10">
+242:                 <div className="flex items-center justify-between mb-8">
+243:                     <div className="flex items-center gap-3">
+244:                         <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20"><Target className="w-5 h-5" /></div>
+245:                         <div>
+246:                             <h2 className="text-lg font-black uppercase tracking-tight italic">Zero 2 Hero</h2>
+247:                             <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Live Roadmap Building</p>
+248:                         </div>
+249:                     </div>
+250:                     {identifiedCourseIds.length > 0 && (
+251:                         <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-xl border border-white/10 animate-in zoom-in">
+252:                             <BookOpen className="w-3 h-3 text-yellow-400" />
+253:                             <span className="text-[10px] font-black text-yellow-400">{identifiedCourseIds.length}</span>
+254:                         </div>
+255:                     )}
+256:                 </div>
+257:                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
+258:                     <h3 className="text-2xl font-black leading-tight mb-2 uppercase tracking-tight">{currentQuestion.question}</h3>
+259:                     <p className="text-gray-400 text-sm mb-8 font-medium italic">
+260:                         {currentQuestion.description || 'Hãy chọn đáp án phản ánh đúng nhất trạng thái của bạn.'}
+261:                     </p>
+262:                     {currentQuestion.type === 'CHOICE' && (
+263:                         <div className="grid grid-cols-1 gap-3">
+264:                             {currentQuestion.options?.map((opt: any) => (
+265:                                 <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className="w-full text-left bg-white/5 hover:bg-white/10 border border-white/10 p-5 rounded-2xl transition-all flex items-center justify-between group active:scale-[0.98]">
+266:                                     <span className="font-bold text-gray-200 group-hover:text-white">{opt.label}</span>
+267:                                     <ChevronRight className="w-5 h-5 text-gray-600 group-hover:text-yellow-400" />
+268:                                 </button>
+269:                             ))}
+270:                         </div>
+271:                     )}
+272:                     {currentQuestion.type === 'FREE_TEXT' && (
+273:                         <div className="space-y-6">
+274:                             <div className="space-y-2">
+275:                                 <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Câu trả lời của bạn</label>
+276:                                 <textarea 
+277:                                     value={freeText} 
+278:                                     onChange={e => setFreeText(e.target.value)} 
+279:                                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400 min-h-[120px] transition-all" 
+280:                                     placeholder="Nhập nội dung trả lời tại đây..." 
+281:                                 />
 282:                             </div>
-283:                             <div className="flex gap-3">
-284:                                 {currentQuestion.options?.map((opt: any) => (
-285:                                     <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}>{opt.label}</button>
-286:                                 ))}
-287:                             </div>
-288:                         </div>
-289:                     )}
-290:                     {currentQuestion.type === 'INPUT_GOAL' && (
-291:                         <div className="space-y-6 text-black">
-292:                             <div className="bg-white p-8 rounded-[2rem] border-2 border-yellow-400/20 space-y-6">
-293:                                 <div className="flex flex-wrap items-center gap-3 text-sm font-black leading-relaxed">
-294:                                     <span>TÔI CAM KẾT LÀM</span>
-295:                                     <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-16 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
-296:                                     <span>VIDEO/NGÀY TRONG</span>
-297:                                     <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-16 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
-298:                                     <span>NGÀY ĐỂ ĐẠT</span>
-299:                                     <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-24 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
-300:                                     <span className="text-gray-400 font-bold uppercase">FOLLOW / ĐƠN HÀNG</span>
+283:                             <button 
+284:                                 onClick={() => {
+285:                                     if (!freeText.trim()) return alert('Vui lòng nhập câu trả lời của bạn.');
+286:                                     handleNext('free_text_submit', freeText);
+287:                                     setFreeText(''); // Reset cho câu sau
+288:                                 }} 
+289:                                 className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10 flex items-center justify-center gap-2"
+290:                             >
+291:                                 <Send className="w-3 h-3" /> Tiếp tục khảo sát
+292:                             </button>
+293:                         </div>
+294:                     )}
+295:                     {currentQuestion.type === 'INPUT_ACCOUNT' && (
+296:                         <div className="space-y-6">
+297:                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+298:                                 <div className="space-y-1.5">
+299:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Tên Kênh / Lĩnh vực</label>
+300:                                     <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Nhập tên..." />
 301:                                 </div>
-302:                             </div>
-303:                             <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết thực hiện</button>
-304:                         </div>
-305:                     )}
-306:                 </div>
-307:             </div>
-308:             {showAdvice && <AdviceModal videoUrl={showAdvice} onClose={() => setShowAdvice(null)} />}
-309:         </div>
-310:     )
-311: }
+302:                                 <div className="space-y-1.5">
+303:                                     <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Link TikTok / Bio</label>
+304:                                     <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="@id_cua_ban" />
+305:                                 </div>
+306:                             </div>
+307:                             <div className="flex gap-3">
+308:                                 {currentQuestion.options?.map((opt: any) => (
+309:                                     <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}>{opt.label}</button>
+310:                                 ))}
+311:                             </div>
+312:                         </div>
+313:                     )}
+314:                     {currentQuestion.type === 'INPUT_GOAL' && (
+315:                         <div className="space-y-6 text-black">
+316:                             <div className="bg-white p-8 rounded-[2rem] border-2 border-yellow-400/20 space-y-6">
+317:                                 <div className="flex flex-wrap items-center gap-3 text-sm font-black leading-relaxed">
+318:                                     <span>TÔI CAM KẾT LÀM</span>
+319:                                     <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-16 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
+320:                                     <span>VIDEO/NGÀY TRONG</span>
+321:                                     <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-16 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
+322:                                     <span>NGÀY ĐỂ ĐẠT</span>
+323:                                     <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-24 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
+324:                                     <span className="text-gray-400 font-bold uppercase">FOLLOW / ĐƠN HÀNG</span>
+325:                                 </div>
+326:                             </div>
+327:                             <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-4 h-4" />} Xác nhận lộ trình & Cam kết thực hiện</button>
+328:                         </div>
+329:                     )}
+330:                 </div>
+331:             </div>
+332:             {showAdvice && <AdviceModal videoUrl={showAdvice} onClose={() => setShowAdvice(null)} />}
+333:         </div>
+334:     )
+335: }
 `````
 
 ## File: app/actions/survey-actions.ts
@@ -29441,90 +29465,91 @@ vercel.json
 300:                     <option value="CHOICE">🔘 Các nút Lựa chọn</option>
 301:                     <option value="INPUT_ACCOUNT">📱 Form Thông tin kênh</option>
 302:                     <option value="INPUT_GOAL">🏁 Form Cam kết mục tiêu</option>
-303:                   </select>
-304:                 </div>
-305:               )}
-306:               {selectedNode.type === 'courseNode' && (
-307:                 <div className="space-y-1.5">
-308:                   <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Chọn khóa học</label>
-309:                   <select 
-310:                     className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" 
-311:                     value={selectedNode.data?.courseId || ''} 
-312:                     onChange={(e) => {
-313:                         const courseId = parseInt(e.target.value);
-314:                         const course = courses.find(c => c.id === courseId);
-315:                         updateNodeData({ courseId, courseName: course?.name_lop });
-316:                     }}
-317:                   >
-318:                     <option value="">-- Chọn khóa học --</option>
-319:                     {courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}
-320:                   </select>
-321:                 </div>
-322:               )}
-323:               <button onClick={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} className="w-full py-4 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-2xl border-2 border-red-100 hover:bg-red-500 hover:text-white transition-all">Xóa khối</button>
-324:             </div>
-325:           )}
-326:         </aside>
-327:         {/* 3. Canvas Area (Full space) */}
-328:         <div className="flex-1 relative" ref={reactFlowWrapper}>
-329:           <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onInit={setReactFlowInstance} onDrop={onDrop} onDragOver={onDragOver} onNodeClick={(_, node) => setSelectedNode(node)} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={2} panOnScroll={true} selectionOnDrag={true}>
-330:             <Background color="#E5E7EB" variant={"dots" as any} gap={20} size={1} />
-331:             <Controls className="!bg-white !border-gray-200 !rounded-xl md:!rounded-2xl !shadow-2xl overflow-hidden" />
-332:           </ReactFlow>
-333:         </div>
-334:         {/* 4. Mobile Properties Overlay (Bottom Sheet) */}
-335:         {selectedNode && (
-336:             <div className={`md:hidden fixed bottom-0 left-0 right-0 z-[150] transition-transform duration-300 transform ${showMobileProps ? 'translate-y-0' : 'translate-y-[85%]'}`}>
-337:                 <div className="bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.15)] border-t border-gray-100">
-338:                     <button onClick={() => setShowMobileProps(!showMobileProps)} className="w-full py-4 flex flex-col items-center gap-1 border-b border-gray-50">
-339:                         <div className="w-12 h-1.5 bg-gray-200 rounded-full"></div>
-340:                         <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">{showMobileProps ? 'Gạt xuống để ẩn' : 'Gạt lên để sửa'}</span>
-341:                     </button>
-342:                     <div className="p-6 space-y-5 overflow-y-auto max-h-[60vh]">
-343:                         <div className="flex justify-between items-center">
-344:                             <span className="text-xs font-black uppercase text-yellow-600 bg-yellow-50 px-4 py-1.5 rounded-xl border border-yellow-100">{selectedNode.type}</span>
-345:                             <button onClick={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} className="p-3 bg-red-50 text-red-500 rounded-xl"><Trash2 className="w-4 h-4" /></button>
-346:                         </div>
-347:                         <div className="space-y-2">
-348:                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Nội dung hiển thị</label>
-349:                             <textarea className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none focus:border-yellow-400 text-black bg-gray-50" value={selectedNode.data?.label || ''} onChange={(e) => updateNodeData({ label: e.target.value })} rows={3} placeholder="Nhập chữ..." />
-350:                         </div>
-351:                         {selectedNode.type === 'questionNode' && (
-352:                             <div className="space-y-2">
-353:                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Loại nhập liệu</label>
-354:                                 <select className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none text-black bg-gray-50" value={selectedNode.data?.type || 'CHOICE'} onChange={(e) => updateNodeData({ type: e.target.value })}>
-355:                                     <option value="CHOICE">Lựa chọn (Choice)</option>
-356:                                     <option value="INPUT_ACCOUNT">Thông tin kênh (Account)</option>
-357:                                     <option value="INPUT_GOAL">Cam kết mục tiêu (Goal)</option>
-358:                                 </select>
-359:                             </div>
-360:                         )}
-361:                         {selectedNode.type === 'courseNode' && (
-362:                             <div className="space-y-2">
-363:                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Chọn khóa học</label>
-364:                                 <select className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none text-black bg-gray-50" value={selectedNode.data?.courseId || ''} onChange={(e) => {
-365:                                     const courseId = parseInt(e.target.value);
-366:                                     const course = courses.find(c => c.id === courseId);
-367:                                     updateNodeData({ courseId, courseName: course?.name_lop });
-368:                                 }}><option value="">-- Chọn khóa --</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}</select>
-369:                             </div>
-370:                         )}
-371:                         <div className="py-4"></div>
-372:                     </div>
-373:                 </div>
-374:             </div>
-375:         )}
-376:       </div>
-377:     </div>
-378:   );
-379: };
-380: export default function RoadmapBuilder() {
-381:     return (
-382:         <ReactFlowProvider>
-383:             <RoadmapBuilderContent />
-384:         </ReactFlowProvider>
-385:     );
-386: }
+303:                     <option value="FREE_TEXT">📝 Form Tự nhập câu trả lời</option>
+304:                   </select>
+305:                 </div>
+306:               )}
+307:               {selectedNode.type === 'courseNode' && (
+308:                 <div className="space-y-1.5">
+309:                   <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Chọn khóa học</label>
+310:                   <select 
+311:                     className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" 
+312:                     value={selectedNode.data?.courseId || ''} 
+313:                     onChange={(e) => {
+314:                         const courseId = parseInt(e.target.value);
+315:                         const course = courses.find(c => c.id === courseId);
+316:                         updateNodeData({ courseId, courseName: course?.name_lop });
+317:                     }}
+318:                   >
+319:                     <option value="">-- Chọn khóa học --</option>
+320:                     {courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}
+321:                   </select>
+322:                 </div>
+323:               )}
+324:               <button onClick={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} className="w-full py-4 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-2xl border-2 border-red-100 hover:bg-red-500 hover:text-white transition-all">Xóa khối</button>
+325:             </div>
+326:           )}
+327:         </aside>
+328:         {/* 3. Canvas Area (Full space) */}
+329:         <div className="flex-1 relative" ref={reactFlowWrapper}>
+330:           <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onInit={setReactFlowInstance} onDrop={onDrop} onDragOver={onDragOver} onNodeClick={(_, node) => setSelectedNode(node)} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={2} panOnScroll={true} selectionOnDrag={true}>
+331:             <Background color="#E5E7EB" variant={"dots" as any} gap={20} size={1} />
+332:             <Controls className="!bg-white !border-gray-200 !rounded-xl md:!rounded-2xl !shadow-2xl overflow-hidden" />
+333:           </ReactFlow>
+334:         </div>
+335:         {/* 4. Mobile Properties Overlay (Bottom Sheet) */}
+336:         {selectedNode && (
+337:             <div className={`md:hidden fixed bottom-0 left-0 right-0 z-[150] transition-transform duration-300 transform ${showMobileProps ? 'translate-y-0' : 'translate-y-[85%]'}`}>
+338:                 <div className="bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.15)] border-t border-gray-100">
+339:                     <button onClick={() => setShowMobileProps(!showMobileProps)} className="w-full py-4 flex flex-col items-center gap-1 border-b border-gray-50">
+340:                         <div className="w-12 h-1.5 bg-gray-200 rounded-full"></div>
+341:                         <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">{showMobileProps ? 'Gạt xuống để ẩn' : 'Gạt lên để sửa'}</span>
+342:                     </button>
+343:                     <div className="p-6 space-y-5 overflow-y-auto max-h-[60vh]">
+344:                         <div className="flex justify-between items-center">
+345:                             <span className="text-xs font-black uppercase text-yellow-600 bg-yellow-50 px-4 py-1.5 rounded-xl border border-yellow-100">{selectedNode.type}</span>
+346:                             <button onClick={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} className="p-3 bg-red-50 text-red-500 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+347:                         </div>
+348:                         <div className="space-y-2">
+349:                             <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Nội dung hiển thị</label>
+350:                             <textarea className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none focus:border-yellow-400 text-black bg-gray-50" value={selectedNode.data?.label || ''} onChange={(e) => updateNodeData({ label: e.target.value })} rows={3} placeholder="Nhập chữ..." />
+351:                         </div>
+352:                         {selectedNode.type === 'questionNode' && (
+353:                             <div className="space-y-2">
+354:                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Loại nhập liệu</label>
+355:                                 <select className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none text-black bg-gray-50" value={selectedNode.data?.type || 'CHOICE'} onChange={(e) => updateNodeData({ type: e.target.value })}>
+356:                                     <option value="CHOICE">Lựa chọn (Choice)</option>
+357:                                     <option value="INPUT_ACCOUNT">Thông tin kênh (Account)</option>
+358:                                     <option value="INPUT_GOAL">Cam kết mục tiêu (Goal)</option>
+359:                                 </select>
+360:                             </div>
+361:                         )}
+362:                         {selectedNode.type === 'courseNode' && (
+363:                             <div className="space-y-2">
+364:                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Chọn khóa học</label>
+365:                                 <select className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none text-black bg-gray-50" value={selectedNode.data?.courseId || ''} onChange={(e) => {
+366:                                     const courseId = parseInt(e.target.value);
+367:                                     const course = courses.find(c => c.id === courseId);
+368:                                     updateNodeData({ courseId, courseName: course?.name_lop });
+369:                                 }}><option value="">-- Chọn khóa --</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}</select>
+370:                             </div>
+371:                         )}
+372:                         <div className="py-4"></div>
+373:                     </div>
+374:                 </div>
+375:             </div>
+376:         )}
+377:       </div>
+378:     </div>
+379:   );
+380: };
+381: export default function RoadmapBuilder() {
+382:     return (
+383:         <ReactFlowProvider>
+384:             <RoadmapBuilderContent />
+385:         </ReactFlowProvider>
+386:     );
+387: }
 `````
 
 ## File: components/course/CoursePlayer.tsx
