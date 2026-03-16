@@ -14,8 +14,8 @@ import { Sparkles } from "lucide-react";
 export default async function Home() {
   const session = await auth();
 
-  // Parallel: lấy user + courses + message cùng lúc
-  const [courses, userRecord, message] = await Promise.all([
+  // Parallel: lấy user + courses + roadmap + points cùng lúc
+  const [courses, userRecord, roadmapPoints, message] = await Promise.all([
     (prisma as any).course.findMany({
       where: { status: true },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
@@ -23,9 +23,15 @@ export default async function Home() {
     session?.user?.id
       ? (prisma as any).user.findUnique({
         where: { id: parseInt(session.user.id) },
-        select: { name: true, id: true, image: true, phone: true, customPath: true, goal: true }
+        select: { 
+          name: true, id: true, image: true, phone: true,
+          roadmap: true // Lấy bảng UserRoadmap mới
+        }
       })
       : Promise.resolve(null),
+    (prisma as any).roadmapPoint.findMany({
+      orderBy: { pointId: 'asc' }
+    }),
     getRandomMessage()
   ]);
 
@@ -33,8 +39,12 @@ export default async function Home() {
   const userId = userRecord?.id ?? null;
   const userImage = userRecord?.image ?? session?.user?.image ?? null;
   const userPhone = userRecord?.phone ?? null;
-  const customPath = userRecord?.customPath as number[] | null;
-  const userGoal = userRecord?.goal ?? null;
+  
+  // Dữ liệu từ bảng Roadmap mới
+  const userRoadmap = userRecord?.roadmap;
+  const customPath = userRoadmap?.customPath as number[] | null;
+  const userGoal = userRoadmap?.goal ?? null;
+  const targetPointId = userRoadmap?.targetPointId ?? 1;
 
   // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
   let myCourseIds = new Set<number>();
@@ -150,6 +160,8 @@ if (session?.user?.id) {
               enrollmentsMap={enrollmentsMap}
               allCourses={courses}
               userGoal={userGoal || 'Hoàn thiện kỹ năng'}
+              targetPointId={targetPointId}
+              roadmapPoints={roadmapPoints}
               onReset={resetSurveyAction}
             />
           )}

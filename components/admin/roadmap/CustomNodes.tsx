@@ -47,11 +47,16 @@ export const OptionNode = memo(({ data }: any) => {
 export const CourseNode = memo(({ data }: any) => {
   return (
     <div className="px-4 py-2 shadow-md rounded-md bg-purple-50 border-2 border-purple-600 min-w-[200px] relative">
-      <div className="flex items-center text-black">
-        <div className="rounded-full w-8 h-8 flex items-center justify-center bg-purple-600 text-white mr-2 text-xs shrink-0">🎓</div>
+      {data.pointId && (
+        <div className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black border-2 border-white shadow-lg z-50">
+          P{data.pointId}
+        </div>
+      )}
+      <div className="flex items-start text-black">
+        <div className="rounded-full w-8 h-8 flex items-center justify-center bg-purple-600 text-white mr-2 text-xs shrink-0 mt-1">🎓</div>
         <div className="ml-2">
-          <div className="text-[10px] font-bold text-purple-600 uppercase">Khóa học cấp ra</div>
-          <div className="text-sm font-bold">{data.courseName || 'Chọn khóa học...'}</div>
+          <div className="text-[10px] font-bold text-purple-600 uppercase italic">Khóa học cấp ra</div>
+          <div className="text-sm font-bold leading-tight">{data.courseName || 'Chọn khóa học...'}</div>
         </div>
       </div>
       <Handle type="target" position={Position.Top} id="t" className="w-2.5 h-2.5 bg-purple-600 border-white border-2" />
