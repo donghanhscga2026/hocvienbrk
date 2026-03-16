@@ -42,9 +42,10 @@ export default async function Home() {
   
   // Dữ liệu từ bảng Roadmap mới
   const userRoadmap = userRecord?.roadmap;
-  const customPath = userRoadmap?.customPath as number[] | null;
+  const customPath = (userRoadmap?.customPath as number[] | null) ?? null; // Đảm bảo luôn là null nếu không có
   const userGoal = userRoadmap?.goal ?? null;
   const targetPointId = userRoadmap?.targetPointId ?? 1;
+  const safeRoadmapPoints = roadmapPoints || []; // Đảm bảo là mảng
 
   // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
   let myCourseIds = new Set<number>();
@@ -161,7 +162,7 @@ if (session?.user?.id) {
               allCourses={courses}
               userGoal={userGoal || 'Hoàn thiện kỹ năng'}
               targetPointId={targetPointId}
-              roadmapPoints={roadmapPoints}
+              roadmapPoints={safeRoadmapPoints}
               onReset={resetSurveyAction}
             />
           )}
