@@ -10,17 +10,18 @@ import { getActiveSurvey } from "./roadmap-actions"
  * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 6.0 - GOAL FOCUS)
  * Cập nhật Goal dựa trên điểm dừng cuối cùng của học viên
  */
-function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goalName: string } {
+function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goalName: string, targetPointId: number } {
     const { nodes, edges } = flow
     const collectedCourseIds = new Set<number>()
     let lastPointName = ''
+    let maxPointId = 1 // Mặc định là nút số 1
 
-    if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goalName: '' }
+    if (!Array.isArray(nodes) || !Array.isArray(edges)) return { customPath: [], goalName: '', targetPointId: 1 }
 
     const targetIds = new Set(edges.map((e: any) => e.target))
     let startNode = nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
     if (!startNode) startNode = nodes.find((n: any) => n.type === 'questionNode')
-    if (!startNode) return { customPath: [], goalName: '' }
+    if (!startNode) return { customPath: [], goalName: '', targetPointId: 1 }
 
     const traverse = (currentNodeId: string) => {
         const node = nodes.find((n: any) => n.id === currentNodeId)
@@ -53,6 +54,13 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
                 if (!isNaN(cid)) {
                     collectedCourseIds.add(cid);
                 }
+                
+                // Nhặt pointId lớn nhất đi qua
+                const pid = parseInt(targetNode.data?.pointId);
+                if (!isNaN(pid) && pid > maxPointId) {
+                    maxPointId = pid;
+                }
+
                 traverse(targetNode.id)
             }
             else if (targetNode.type === 'adviceNode' || targetNode.type === 'questionNode') {
@@ -64,7 +72,8 @@ function resolvePathFromFlow(flow: any, answers: Record<string, string>): { cust
     traverse(startNode.id)
     return { 
         customPath: Array.from(collectedCourseIds), 
-        goalName: lastPointName 
+        goalName: lastPointName,
+        targetPointId: maxPointId
     }
 }
 
@@ -84,14 +93,17 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
         
         let customPath: number[] = []
         let goalTitle = ''
+        let targetPointId = 1
 
         if (flow && flow.nodes && Array.isArray(flow.nodes) && flow.nodes.length > 0) {
             const result = resolvePathFromFlow(flow, answers)
             customPath = result.customPath
             goalTitle = result.goalName
+            targetPointId = result.targetPointId
         } else {
             customPath = generatePathFromAnswers(answers)
             goalTitle = 'Hoàn thiện kỹ năng TikTok'
+            targetPointId = 1
         }
 
         const config = answers['goal_config'] as any
@@ -144,12 +156,21 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             }
         };
 
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
+        // Lưu vào bảng UserRoadmap (Tách biệt khỏi bảng User)
+        await prisma.userRoadmap.upsert({
+            where: { userId },
+            update: {
                 surveyResults: surveyData as any,
                 customPath: customPath as any,
-                goal: JSON.stringify(structuredGoal)
+                goal: structuredGoal as any,
+                targetPointId: targetPointId
+            },
+            create: {
+                userId,
+                surveyResults: surveyData as any,
+                customPath: customPath as any,
+                goal: structuredGoal as any,
+                targetPointId: targetPointId
             }
         })
 
@@ -166,9 +187,8 @@ export async function resetSurveyAction() {
     const session = await auth()
     if (!session?.user?.id) return { success: false }
     try {
-        await prisma.user.update({
-            where: { id: parseInt(session.user.id) },
-            data: { customPath: null as any }
+        await prisma.userRoadmap.deleteMany({
+            where: { userId: parseInt(session.user.id) }
         })
         revalidatePath('/')
         return { success: true }

@@ -392,20 +392,37 @@ const RoadmapBuilderContent = () => {
               )}
 
               {selectedNode.type === 'courseNode' && (
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Chọn khóa học</label>
-                  <select 
-                    className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" 
-                    value={selectedNode.data?.courseId || ''} 
-                    onChange={(e) => {
-                        const courseId = parseInt(e.target.value);
-                        const course = courses.find(c => c.id === courseId);
-                        updateNodeData({ courseId, courseName: course?.name_lop });
-                    }}
-                  >
-                    <option value="">-- Chọn khóa học --</option>
-                    {courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}
-                  </select>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Chọn khóa học</label>
+                    <select 
+                      className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none text-black bg-white" 
+                      value={selectedNode.data?.courseId || ''} 
+                      onChange={(e) => {
+                          const courseId = parseInt(e.target.value);
+                          const course = courses.find(c => c.id === courseId);
+                          updateNodeData({ courseId, courseName: course?.name_lop });
+                      }}
+                    >
+                      <option value="">-- Chọn khóa học --</option>
+                      {courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase text-purple-600 ml-1 italic">Gắn vào Nút Timeline (1-9)</label>
+                    <select 
+                      className="w-full p-4 text-xs font-bold border-2 border-purple-50 rounded-2xl outline-none focus:border-purple-500 text-black bg-white" 
+                      value={selectedNode.data?.pointId || ''} 
+                      onChange={(e) => updateNodeData({ pointId: e.target.value ? parseInt(e.target.value) : null })}
+                    >
+                      <option value="">-- Không gắn nút --</option>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                        <option key={num} value={num}>Nút số {num}</option>
+                      ))}
+                    </select>
+                    <p className="text-[8px] text-gray-400 px-1 italic">Học viên đi qua khối này sẽ được chốt đích đến tại Nút này.</p>
+                  </div>
                 </div>
               )}
               <button onClick={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} className="w-full py-4 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-2xl border-2 border-red-100 hover:bg-red-500 hover:text-white transition-all">Xóa khối</button>
@@ -449,13 +466,28 @@ const RoadmapBuilderContent = () => {
                             </div>
                         )}
                         {selectedNode.type === 'courseNode' && (
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Chọn khóa học</label>
-                                <select className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none text-black bg-gray-50" value={selectedNode.data?.courseId || ''} onChange={(e) => {
-                                    const courseId = parseInt(e.target.value);
-                                    const course = courses.find(c => c.id === courseId);
-                                    updateNodeData({ courseId, courseName: course?.name_lop });
-                                }}><option value="">-- Chọn khóa --</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}</select>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Chọn khóa học</label>
+                                    <select className="w-full p-4 text-sm font-bold border-2 border-gray-100 rounded-[1.5rem] outline-none text-black bg-gray-50" value={selectedNode.data?.courseId || ''} onChange={(e) => {
+                                        const courseId = parseInt(e.target.value);
+                                        const course = courses.find(c => c.id === courseId);
+                                        updateNodeData({ courseId, courseName: course?.name_lop });
+                                    }}><option value="">-- Chọn khóa --</option>{courses.map(c => <option key={c.id} value={c.id}>{c.name_lop}</option>)}</select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-purple-600 uppercase ml-1">Gắn vào Nút Timeline (1-9)</label>
+                                    <select 
+                                        className="w-full p-4 text-sm font-bold border-2 border-purple-100 rounded-[1.5rem] outline-none text-black bg-purple-50" 
+                                        value={selectedNode.data?.pointId || ''} 
+                                        onChange={(e) => updateNodeData({ pointId: e.target.value ? parseInt(e.target.value) : null })}
+                                    >
+                                        <option value="">-- Không gắn nút --</option>
+                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                                            <option key={num} value={num}>Nút số {num}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         )}
                         <div className="py-4"></div>

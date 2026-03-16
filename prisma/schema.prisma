@@ -29,14 +29,34 @@ model User {
   referrer      User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
   referrals     User[]       @relation("ReferrerToReferee")
   
-  // Zero 2 Hero Data
-  goal          String?      // Mục tiêu học tập
-  surveyResults Json?        // Kết quả khảo sát đầu vào
-  customPath    Json?        // Lộ trình cá nhân hóa (danh sách ID khóa học)
+  // Zero 2 Hero Data - Tách sang bảng UserRoadmap
+  roadmap       UserRoadmap?
 
   @@index([email])
   @@index([phone])
   @@index([referrerId])
+}
+
+model UserRoadmap {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetPointId   Int      @default(1) // Điểm đích trên Timeline (1-9)
+  customPath      Json?    // Danh sách ID khóa học lộ trình
+  goal            Json?    // Mục tiêu & Cam kết (JSON structuredGoal)
+  surveyResults   Json?    // Kết quả khảo sát thô và lịch sử
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model RoadmapPoint {
+  id        Int      @id @default(autoincrement())
+  pointId   Int      @unique // ID từ 1 đến 9
+  name      String   // Tên chặng đường
+  courseIds String   // Chuỗi ID khóa học tương đương, cách nhau dấu phẩy (vd: "1,2,3")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Post {

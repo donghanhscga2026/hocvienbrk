@@ -9,9 +9,16 @@ interface RealityMapProps {
     customPath: number[]
     enrollmentsMap: Record<number, any>
     allCourses: any[]
-    userGoal: string
+    userGoal: string | any
+    targetPointId?: number
+    roadmapPoints?: any[]
     onReset?: () => Promise<any>
 }
+
+// ─── Icons mapping for stages ──────────────────────────────────────────
+const STAGE_ICONS: Record<number, string> = {
+    1: '🎯', 2: '🧱', 3: '🛒', 4: '🌟', 5: '🦸', 6: '🎓', 7: '🌐', 8: '💎', 9: '🚀'
+};
 
 // ─── Component Popup Chi tiết Khóa học ─────────────────────────────────────
 function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrollment: any, onClose: () => void }) {
@@ -52,15 +59,24 @@ function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrol
     )
 }
 
-export default function RealityMap({ customPath, enrollmentsMap, allCourses, userGoal, onReset }: RealityMapProps) {
+export default function RealityMap({ customPath, enrollmentsMap, allCourses, userGoal, targetPointId = 1, roadmapPoints = [], onReset }: RealityMapProps) {
     const [activeStage, setActiveStage] = useState<number | null>(null)
     const [selectedCourse, setSelectedCourse] = useState<any>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
     // ─── ĐỘNG HÓA CHẶNG ĐƯỜNG (STAGES) ──────────────────────────
     const stages = useMemo(() => {
-        const goal = userGoal?.toLowerCase() || '';
-        const allPossibleStages = [
+        if (roadmapPoints && roadmapPoints.length > 0) {
+            return roadmapPoints.map(p => ({
+                id: p.pointId,
+                name: p.name,
+                icon: STAGE_ICONS[p.pointId] || '✨',
+                courseIds: p.courseIds ? p.courseIds.split(',').map((id: string) => parseInt(id.trim())) : []
+            }));
+        }
+        
+        // Fallback cũ nếu không có dữ liệu từ DB
+        return [
             { id: 1, name: 'Xác định mục tiêu', icon: '🎯', courseIds: [1] },
             { id: 2, name: 'Nền tảng cơ bản', icon: '🧱', courseIds: [2] },
             { id: 3, name: 'Bán hàng đơn giản', icon: '🛒', courseIds: [4, 5] },
@@ -70,10 +86,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             { id: 7, name: 'Xây dựng cộng đồng', icon: '🌐', courseIds: [8] },
             { id: 8, name: 'Giàu toàn diện', icon: '💎', courseIds: [9] }
         ];
-        if (goal.includes('bán hàng') && !goal.includes('nâng cao')) return allPossibleStages.slice(0, 3);
-        if (goal.includes('nhân hiệu')) return allPossibleStages.slice(0, 5);
-        return allPossibleStages;
-    }, [userGoal]);
+    }, [roadmapPoints]);
 
     const highlightedIds = useMemo(() => {
         if (!activeStage) return []
@@ -159,8 +172,8 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                     <div key={rowIndex} className={`flex relative w-full ${isReverseRow ? 'flex-row-reverse' : 'flex-row'}`}>
                                         {rowStages.map((stage, idxInRow) => {
                                             const isActive = activeStage === stage.id;
-                                            // Logic so khớp đích đến thông minh
-                                            const isUserGoal = userGoal?.toLowerCase().includes(stage.name.toLowerCase());
+                                            // Logic so khớp đích đến thông minh bằng targetPointId
+                                            const isUserGoal = stage.id === targetPointId;
                                             const isLastInRow = idxInRow === rowStages.length - 1;
                                             const isNotLastRow = rowIndex < Math.ceil(stages.length / 3) - 1;
                                             
