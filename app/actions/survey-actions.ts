@@ -212,9 +212,9 @@ export async function resetSurveyAction() {
                 where: { userId },
                 data: {
                     targetPointId: 1,
-                    customPath: null,
-                    goal: null,
-                    surveyResults: null,
+                    customPath: null as any,
+                    goal: null as any,
+                    surveyResults: null as any,
                     history: newHistory as any
                 }
             })
