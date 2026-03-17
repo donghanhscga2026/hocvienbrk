@@ -44,7 +44,8 @@ model UserRoadmap {
   targetPointId   Int      @default(1) // Điểm đích trên Timeline (1-9)
   customPath      Json?    // Danh sách ID khóa học lộ trình
   goal            Json?    // Mục tiêu & Cam kết (JSON structuredGoal)
-  surveyResults   Json?    // Kết quả khảo sát thô và lịch sử
+  surveyResults   Json?    // Kết quả khảo sát thô hiện tại
+  history         Json?    // Mảng chứa các bản ghi cũ [ {targetPointId, customPath, goal, surveyResults, timestamp} ]
   updatedAt       DateTime @updatedAt
 
   @@index([userId])

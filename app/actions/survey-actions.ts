@@ -187,12 +187,43 @@ export async function resetSurveyAction() {
     const session = await auth()
     if (!session?.user?.id) return { success: false }
     try {
-        await prisma.userRoadmap.deleteMany({
-            where: { userId: parseInt(session.user.id) }
+        const userId = parseInt(session.user.id)
+        
+        // 1. Lấy dữ liệu hiện tại trước khi reset
+        const currentRoadmap = await prisma.userRoadmap.findUnique({
+            where: { userId }
         })
+
+        if (currentRoadmap) {
+            // 2. Chuẩn bị bản lưu lịch sử
+            const snapshot = {
+                targetPointId: currentRoadmap.targetPointId,
+                customPath: currentRoadmap.customPath,
+                goal: currentRoadmap.goal,
+                surveyResults: currentRoadmap.surveyResults,
+                archivedAt: new Date().toISOString()
+            }
+
+            // 3. Đưa vào mảng history và reset dữ liệu chính
+            const oldHistory = Array.isArray(currentRoadmap.history) ? currentRoadmap.history : []
+            const newHistory = [...oldHistory, snapshot]
+
+            await prisma.userRoadmap.update({
+                where: { userId },
+                data: {
+                    targetPointId: 1,
+                    customPath: null,
+                    goal: null,
+                    surveyResults: null,
+                    history: newHistory as any
+                }
+            })
+        }
+
         revalidatePath('/')
         return { success: true }
     } catch (error) {
+        console.error("Lỗi reset survey:", error)
         return { success: false }
     }
 }
