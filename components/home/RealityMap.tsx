@@ -59,9 +59,42 @@ function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrol
     )
 }
 
+// ─── Component Popup Xác nhận Nâng cấp Lộ trình ──────────────────────────
+function UpgradeRoadmapModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: () => void }) {
+    const [isReseting, setIsReseting] = useState(false)
+    
+    return (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl p-8 space-y-6 text-center">
+                <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto">
+                    <Sparkles className="w-8 h-8 text-yellow-400" />
+                </div>
+                <div className="space-y-2">
+                    <h3 className="text-xl font-black text-white uppercase italic">Nâng cấp lộ trình?</h3>
+                    <p className="text-gray-400 text-xs font-medium leading-relaxed">Chặng đường này đang bị khóa. Bạn có muốn thực hiện lại khảo sát để thiết lập lộ trình xa hơn không?</p>
+                </div>
+                <div className="space-y-3">
+                    <button 
+                        disabled={isReseting}
+                        onClick={async () => {
+                            setIsReseting(true)
+                            await onConfirm()
+                        }} 
+                        className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-yellow-500 transition-all flex items-center justify-center gap-2"
+                    >
+                        {isReseting ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sẵn sàng nâng cấp'}
+                    </button>
+                    <button onClick={onClose} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all">Để sau</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function RealityMap({ customPath, enrollmentsMap, allCourses, userGoal, targetPointId = 1, roadmapPoints = [], onReset }: RealityMapProps) {
     const [activeStage, setActiveStage] = useState<number | null>(null)
     const [selectedCourse, setSelectedCourse] = useState<any>(null)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
 
     // ─── ĐỘNG HÓA CHẶNG ĐƯỜNG (STAGES) ──────────────────────────
@@ -174,6 +207,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                             const isActive = activeStage === stage.id;
                                             // Logic so khớp đích đến thông minh bằng targetPointId
                                             const isUserGoal = stage.id === targetPointId;
+                                            const isLocked = stage.id > targetPointId; // Khóa các nút sau đích đến
                                             const isLastInRow = idxInRow === rowStages.length - 1;
                                             const isNotLastRow = rowIndex < Math.ceil(stages.length / 3) - 1;
                                             
@@ -187,12 +221,17 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                     )}
 
                                                     <button
-                                                        onClick={() => setActiveStage(isActive ? null : stage.id)}
+                                                        onClick={() => {
+                                                            if (isLocked) setShowUpgradeModal(true)
+                                                            else setActiveStage(isActive ? null : stage.id)
+                                                        }}
                                                         className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${
                                                             isUserGoal 
                                                             ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30' 
                                                             : isActive
                                                             ? 'border-yellow-400 bg-yellow-400 text-black shadow-[0_0_40px_rgba(250,204,21,0.4)] z-20'
+                                                            : isLocked
+                                                            ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
                                                             : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
                                                         }`}
                                                     >
@@ -201,19 +240,26 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20"></span>
                                                         )}
                                                         
-                                                        <span className="text-xl md:text-3xl font-black relative z-10">{stage.icon}</span>
+                                                        <span className={`text-xl md:text-3xl font-black relative z-10 ${isLocked ? 'grayscale' : ''}`}>{stage.icon}</span>
                                                         {isUserGoal && (
                                                             <div className="absolute -top-6 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
                                                                 <Trophy className="w-2.5 h-2.5 inline mr-1" /> Mục tiêu của bạn
                                                             </div>
                                                         )}
-                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isActive ? 'bg-black text-white border-yellow-400' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+
+                                                        {isLocked && (
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
+                                                                <Lock className="w-4 h-4 text-zinc-500" />
+                                                            </div>
+                                                        )}
+
+                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isActive ? 'bg-black text-white border-yellow-400' : isLocked ? 'bg-zinc-800 text-zinc-600 border-zinc-700' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                                                             {stage.id}
                                                         </div>
                                                     </button>
 
                                                     <div className="mt-4 text-center px-1">
-                                                        <h4 className={`text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight transition-colors ${isUserGoal ? 'text-emerald-400' : isActive ? 'text-yellow-400' : 'text-zinc-500'}`}>
+                                                        <h4 className={`text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight transition-colors ${isUserGoal ? 'text-emerald-400' : isActive ? 'text-yellow-400' : isLocked ? 'text-zinc-700' : 'text-zinc-500'}`}>
                                                             {stage.name}
                                                         </h4>
                                                     </div>
@@ -267,6 +313,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             </div>
 
             {selectedCourse && <CourseDetailModal course={selectedCourse} enrollment={selectedCourse.enrollment} onClose={() => setSelectedCourse(null)} />}
+            {showUpgradeModal && <UpgradeRoadmapModal onClose={() => setShowUpgradeModal(false)} onConfirm={onReset!} />}
         </div>
     )
 }
