@@ -24,7 +24,7 @@ const STAGE_ICONS: Record<number, string> = {
 function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrollment: any, onClose: () => void }) {
     const isActive = enrollment?.status === 'ACTIVE'
     const isCompleted = enrollment?.status === 'COMPLETED'
-    
+
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={onClose}>
             <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
@@ -62,7 +62,7 @@ function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrol
 // ─── Component Popup Xác nhận Nâng cấp Lộ trình ──────────────────────────
 function UpgradeRoadmapModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: () => void }) {
     const [isReseting, setIsReseting] = useState(false)
-    
+
     return (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl p-8 space-y-6 text-center">
@@ -74,12 +74,12 @@ function UpgradeRoadmapModal({ onClose, onConfirm }: { onClose: () => void, onCo
                     <p className="text-gray-400 text-xs font-medium leading-relaxed">Chặng đường này đang bị khóa. Bạn có muốn thực hiện lại khảo sát để thiết lập lộ trình xa hơn không?</p>
                 </div>
                 <div className="space-y-3">
-                    <button 
+                    <button
                         disabled={isReseting}
                         onClick={async () => {
                             setIsReseting(true)
                             await onConfirm()
-                        }} 
+                        }}
                         className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-yellow-500 transition-all flex items-center justify-center gap-2"
                     >
                         {isReseting ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sẵn sàng nâng cấp'}
@@ -107,7 +107,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 courseIds: p.courseIds ? p.courseIds.split(',').map((id: string) => parseInt(id.trim())) : []
             }));
         }
-        
+
         // Fallback cũ nếu không có dữ liệu từ DB
         return [
             { id: 1, name: 'Xác định mục tiêu', icon: '🎯', courseIds: [1] },
@@ -136,7 +136,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         <span className="text-[12px] font-black uppercase tracking-widest text-gray-400">Mục tiêu & lộ trình</span>
                     </div>
                     {onReset && (
-                        <button onClick={() => { if(confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors border-b border-gray-200">
+                        <button onClick={() => { if (confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors border-b border-gray-200">
                             🔄 Tạo lại lộ trình
                         </button>
                     )}
@@ -186,16 +186,17 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             </div>
 
             {/* 2. UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (MOBILE OPTIMIZED) */}
-            <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-12 border border-white/5 shadow-2xl relative overflow-hidden">
+            <div className="bg-zinc-950 rounded-[3rem] py-3 px-3 md:p-12 border border-white/5 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#facc1505,transparent_70%)]"></div>
-                
+
                 <div className="relative z-10">
-                    <div className="flex items-center justify-center gap-3 mb-6 text-white">
+                    <div className="flex items-center justify-center gap-3 mb-10 text-white">
                         <Flag className="w-5 h-5 text-yellow-400" />
-                        <h3 className="text-sm font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
                     </div>
 
                     <div className="relative max-w-4xl mx-auto px-2 md:px-8">
+                        {/* Thay đổi gap-16 và md:gap-24 ở đây để chỉnh khoảng cách hàng */}
                         <div className="flex flex-col gap-16 md:gap-24">
                             {Array.from({ length: Math.ceil(stages.length / 3) }).map((_, rowIndex) => {
                                 const rowStages = stages.slice(rowIndex * 3, rowIndex * 3 + 3);
@@ -210,40 +211,39 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                             const isLocked = stage.id > targetPointId; // Khóa các nút sau đích đến
                                             const isLastInRow = idxInRow === rowStages.length - 1;
                                             const isNotLastRow = rowIndex < Math.ceil(stages.length / 3) - 1;
-                                            
+
                                             return (
                                                 <div key={stage.id} className="w-1/3 shrink-0 flex flex-col items-center relative z-10">
                                                     {!isLastInRow && (
                                                         <div className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-gray-600 -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}></div>
                                                     )}
                                                     {isLastInRow && isNotLastRow && (
-                                                        <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[160px] md:h-[240px] border-l-2 border-dashed border-gray-600 -z-10"></div>
+                                                        /* Chỉnh h-[160px] và md:h-[240px] ở đây để khớp với gap ở trên */
+                                                        <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[120px] md:h-[180px] border-l-2 border-dashed border-gray-600 -z-10"></div>
                                                     )}
-
                                                     <button
                                                         onClick={() => {
                                                             if (isLocked) setShowUpgradeModal(true)
                                                             else setActiveStage(isActive ? null : stage.id)
                                                         }}
-                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${
-                                                            isUserGoal 
-                                                            ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30' 
+                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${isUserGoal
+                                                            ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30'
                                                             : isActive
-                                                            ? 'border-yellow-400 bg-yellow-400 text-black shadow-[0_0_40px_rgba(250,204,21,0.4)] z-20'
-                                                            : isLocked
-                                                            ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
-                                                            : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
-                                                        }`}
+                                                                ? 'border-yellow-400 bg-yellow-400 text-black shadow-[0_0_40px_rgba(250,204,21,0.4)] z-20'
+                                                                : isLocked
+                                                                    ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
+                                                                    : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
+                                                            }`}
                                                     >
                                                         {/* Hiệu ứng tỏa sáng động cho Đích đến */}
                                                         {isUserGoal && (
                                                             <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20"></span>
                                                         )}
-                                                        
+
                                                         <span className={`text-xl md:text-3xl font-black relative z-10 ${isLocked ? 'grayscale' : ''}`}>{stage.icon}</span>
                                                         {isUserGoal && (
-                                                            <div className="absolute -top-6 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
-                                                                <Trophy className="w-2.5 h-2.5 inline mr-1" /> Mục tiêu của bạn
+                                                            <div className="absolute -top-6 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
+                                                                <Trophy className="w-2.5 h-2.5 inline mr-1" /> Điểm đến của bạn
                                                             </div>
                                                         )}
 
