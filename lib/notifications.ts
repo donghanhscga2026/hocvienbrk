@@ -58,14 +58,14 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
     const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
     const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
     const messageParts = [
-        `From: ${encodedFromName} <${adminEmail}>`,
-        `To: ${to}`,
-        bcc ? `Bcc: ${bcc}` : '',
-        `Content-Type: text/html; charset=utf-8`,
-        `MIME-Version: 1.0`,
-        `Subject: ${encodedSubject}`,
-        ``,
-        htmlBody,
+      `From: ${encodedFromName} <${adminEmail}>`,
+      `To: ${to}`,
+      bcc ? `Bcc: ${bcc}` : '',
+      `Content-Type: text/html; charset=utf-8`,
+      `MIME-Version: 1.0`,
+      `Subject: ${encodedSubject}`,
+      ``,
+      htmlBody,
     ].filter(line => line !== '').join('\n');
     const encodedMessage = Buffer.from(messageParts).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encodedMessage } });
@@ -88,7 +88,7 @@ export async function sendActivationEmail(to: string, studentName: string, stude
 
 export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
   const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})`;
-  await sendTelegram(msg, 'REGISTER');
+  await sendTelegram(msg, 'LESSON');
 }
 
 export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
