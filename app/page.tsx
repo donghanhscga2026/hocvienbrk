@@ -116,6 +116,18 @@ if (session?.user?.id) {
   const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
   const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
 
+  // Gom nhóm khóa học theo category cho phần "Tất cả khóa học"
+  const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
+    const category = course.category || "Khác";
+    const existingGroup = acc.find(g => g.category === category);
+    if (existingGroup) {
+      existingGroup.courses.push(course);
+    } else {
+      acc.push({ category, courses: [course] });
+    }
+    return acc;
+  }, []);
+
   // Kiểm tra user có kích hoạt khóa 1 (86 ngày) không
   const isCourseOneActive = enrollmentsMap[1]?.status === 'ACTIVE';
 
@@ -194,10 +206,10 @@ if (session?.user?.id) {
             )}
 
             {/* Các khóa học khác */}
-            {otherCourses.length > 0 && (
+            {groupedOtherCourses.length > 0 && (
               <CourseSection 
                 title="Tất cả khóa học"
-                courses={otherCourses}
+                groupedCourses={groupedOtherCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
                 isCourseOneActive={isCourseOneActive}
@@ -210,7 +222,7 @@ if (session?.user?.id) {
         ) : (
           <CourseSection 
             title="Danh Sách Khóa Học"
-            courses={courses}
+            groupedCourses={groupedOtherCourses}
             session={null}
             enrollmentsMap={{}}
             isCourseOneActive={false}
