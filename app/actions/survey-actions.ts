@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { generatePathFromAnswers, surveyQuestions } from "@/lib/survey-data"
 import { getActiveSurvey } from "./roadmap-actions"
+import { sendSurveyNotification } from "@/lib/notifications"
 
 /**
  * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 6.0 - GOAL FOCUS)
@@ -173,6 +174,29 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
                 targetPointId: targetPointId
             }
         })
+
+        // Gửi thông báo Telegram (Không đợi để tránh block UI)
+        try {
+            const [user, roadmapPoint, courses] = await Promise.all([
+                prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+                prisma.roadmapPoint.findUnique({ where: { pointId: targetPointId } }),
+                prisma.course.findMany({ 
+                    where: { id: { in: customPath } }, 
+                    select: { name_lop: true } 
+                })
+            ])
+
+            sendSurveyNotification({
+                studentName: user?.name || session.user.name || 'Học viên',
+                studentId: userId,
+                goal: structuredGoal.mainGoal,
+                targetPointName: roadmapPoint?.name || String(targetPointId),
+                courses: courses.map(c => c.name_lop),
+                answers: answers
+            }).catch(e => console.error("Lỗi gửi Tele Survey:", e))
+        } catch (teleErr) {
+            console.error("Lỗi chuẩn bị data Tele:", teleErr)
+        }
 
         revalidatePath('/')
         return { success: true, customPath, goal: structuredGoal }
