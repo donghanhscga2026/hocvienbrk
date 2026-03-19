@@ -126,6 +126,35 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
         return stages.find(s => s.id === activeStage)?.courseIds || []
     }, [activeStage, stages])
 
+    // ─── TÍNH TOÁN TIẾN ĐỘ TỪNG CHẶNG ────────────────────────────
+    const stageProgress = useMemo(() => {
+        return stages.map(stage => {
+            let total = 0;
+            let completed = 0;
+            
+            stage.courseIds.forEach((cid: number) => {
+                const enr = enrollmentsMap[cid];
+                if (enr) {
+                    total += enr.totalLessons || 0;
+                    completed += enr.completedCount || 0;
+                }
+            });
+
+            return {
+                id: stage.id,
+                percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+                isCompleted: total > 0 && completed >= total && total === total // Đảm bảo có bài học
+            };
+        });
+    }, [stages, enrollmentsMap]);
+
+    // Xác định Chặng Hiện Tại (Chặng đầu tiên chưa xong)
+    const currentStageId = useMemo(() => {
+        const firstIncomplete = stageProgress.find(p => p.percentage < 100);
+        if (firstIncomplete) return firstIncomplete.id;
+        return stages[stages.length - 1]?.id || 1; // Nếu xong hết thì là chặng cuối
+    }, [stageProgress, stages]);
+
     return (
         <div className="space-y-3 animate-in fade-in duration-700" ref={containerRef}>
             {/* 1. Dashboard Mục tiêu & Cam kết - PHONG CÁCH TỐI GIẢN */}
@@ -208,9 +237,14 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                             const isActive = activeStage === stage.id;
                                             // Logic so khớp đích đến thông minh bằng targetPointId
                                             const isUserGoal = stage.id === targetPointId;
+                                            const isCurrentPos = stage.id === currentStageId; // Vị trí hiện tại
                                             const isLocked = stage.id > targetPointId; // Khóa các nút sau đích đến
                                             const isLastInRow = idxInRow === rowStages.length - 1;
                                             const isNotLastRow = rowIndex < Math.ceil(stages.length / 3) - 1;
+
+                                            // Lấy % tiến độ của chặng này
+                                            const progress = stageProgress.find(p => p.id === stage.id)?.percentage || 0;
+                                            const isCompleted = progress >= 100;
 
                                             return (
                                                 <div key={stage.id} className="w-1/3 shrink-0 flex flex-col items-center relative z-10">
@@ -218,7 +252,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                         <div className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-gray-600 -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}></div>
                                                     )}
                                                     {isLastInRow && isNotLastRow && (
-                                                        /* Chỉnh h-[160px] và md:h-[240px] ở đây để khớp với gap ở trên */
+                                                        /* Chỉnh h-[120px] và md:h-[180px] ở đây để khớp với gap ở trên */
                                                         <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[120px] md:h-[180px] border-l-2 border-dashed border-gray-600 -z-10"></div>
                                                     )}
                                                     <button
@@ -226,24 +260,56 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             if (isLocked) setShowUpgradeModal(true)
                                                             else setActiveStage(isActive ? null : stage.id)
                                                         }}
-                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${isUserGoal
+                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${
+                                                            isUserGoal
                                                             ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30'
-                                                            : isActive
-                                                                ? 'border-yellow-400 bg-yellow-400 text-black shadow-[0_0_40px_rgba(250,204,21,0.4)] z-20'
+                                                            : isCurrentPos
+                                                                ? 'border-yellow-400 bg-zinc-900 text-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.3)] z-20'
                                                                 : isLocked
                                                                     ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
-                                                                    : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
-                                                            }`}
+                                                                    : isCompleted
+                                                                        ? 'border-emerald-500/50 bg-zinc-900 text-emerald-400'
+                                                                        : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
+                                                        }`}
                                                     >
+                                                        {/* VÒNG TRÒN TIẾN ĐỘ (%) */}
+                                                        {!isLocked && (
+                                                            <svg className="absolute inset-[-6px] md:inset-[-8px] w-[calc(100%+12px)] h-[calc(100%+12px)] md:w-[calc(100%+16px)] md:h-[calc(100%+16px)] -rotate-90 z-0">
+                                                                <circle
+                                                                    cx="50%" cy="50%" r="46%"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="3"
+                                                                    strokeDasharray="283"
+                                                                    strokeDashoffset={283 - (283 * progress) / 100}
+                                                                    className={`transition-all duration-1000 ${isCompleted ? 'text-emerald-500' : isCurrentPos ? 'text-yellow-400' : 'text-zinc-700'}`}
+                                                                />
+                                                            </svg>
+                                                        )}
+
+                                                        {/* Hiệu ứng Pulsing cho Vị trí hiện tại */}
+                                                        {isCurrentPos && !isLocked && (
+                                                            <span className="absolute inset-0 rounded-full bg-yellow-400 animate-ping opacity-20"></span>
+                                                        )}
+
                                                         {/* Hiệu ứng tỏa sáng động cho Đích đến */}
                                                         {isUserGoal && (
                                                             <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20"></span>
                                                         )}
 
                                                         <span className={`text-xl md:text-3xl font-black relative z-10 ${isLocked ? 'grayscale' : ''}`}>{stage.icon}</span>
+                                                        
+                                                        {/* Badge: Điểm đích */}
                                                         {isUserGoal && (
-                                                            <div className="absolute -top-6 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
+                                                            <div className="absolute -top-10 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
                                                                 <Trophy className="w-2.5 h-2.5 inline mr-1" /> Điểm đến của bạn
+                                                            </div>
+                                                        )}
+
+                                                        {/* Badge: Vị trí hiện tại */}
+                                                        {isCurrentPos && !isUserGoal && (
+                                                            <div className="absolute -top-10 bg-white text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
+                                                                <ArrowRight className="w-2.5 h-2.5 inline mr-1 rotate-90" /> Bạn đang ở đây
                                                             </div>
                                                         )}
 
@@ -253,7 +319,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             </div>
                                                         )}
 
-                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isActive ? 'bg-black text-white border-yellow-400' : isLocked ? 'bg-zinc-800 text-zinc-600 border-zinc-700' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isCurrentPos ? 'bg-yellow-400 text-black border-zinc-900' : isLocked ? 'bg-zinc-800 text-zinc-600 border-zinc-700' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                                                             {stage.id}
                                                         </div>
                                                     </button>
