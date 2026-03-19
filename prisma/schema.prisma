@@ -167,6 +167,7 @@ model Course {
   link_qrcode   String?
   file_email    String?
   noidung_email String?
+  category      String       @default("Khác")
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   type          CourseType   @default(NORMAL)
