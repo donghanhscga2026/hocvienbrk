@@ -182,7 +182,7 @@ export default function AssignmentForm({
 
     // Realtime scoring
     // Rule: Nếu không có link video YouTube -> mặc định 2đ video
-    const hasYouTubeVideo = !!videoUrl && /youtu\.be\/|youtube\.com\/|v=/.test(videoUrl)
+    const hasYouTubeVideo = !!videoUrl && /youtu\.be\/|youtube\.com\/|v=|live\//.test(videoUrl)
     const displayPercent = hasYouTubeVideo ? videoPercent : 100
 
     const vidScore = useMemo(() => {

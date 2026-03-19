@@ -311,7 +311,14 @@ const toggleFullScreen = () => {
 }
 
 function extractVideoId(url: string) {
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(\&v=))([^#\&\?]*).*/
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(live\/)|(\&v=))([^#\&\?]*).*/
     const match = url.match(regExp)
-    return (match && match[9].length === 11) ? match[9] : null
+    // Nếu dùng regex trên, ID nằm ở group cuối cùng. 
+    // Với việc thêm (live\/), ID sẽ dịch chuyển tùy theo số lượng group.
+    // Cách an toàn nhất là lấy group cuối cùng có nội dung
+    if (match && match.length > 0) {
+        const id = match[match.length - 1]
+        return (id && id.length === 11) ? id : null
+    }
+    return null
 }

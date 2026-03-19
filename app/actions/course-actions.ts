@@ -306,7 +306,7 @@ export async function submitAssignmentAction({
 
         // 3. Tính toán các đầu điểm
         const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
-        const isYouTube = /youtu\.be\/|youtube\.com\/|v=/.test(rawUrl)
+        const isYouTube = /youtu\.be\/|youtube\.com\/|v=|live\//.test(rawUrl)
 
         let videoScore = 0
         if (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) {
