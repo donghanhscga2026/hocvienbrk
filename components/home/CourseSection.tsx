@@ -166,6 +166,38 @@ export default function CourseSection({
     darkMode = false,
     accentColor = 'bg-blue-600'
 }: CourseSectionProps) {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const [countdown, setCountdown] = useState(10)
+    const timerRef = useRef<NodeJS.Timeout | null>(null)
+    const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+    const resetTimer = useCallback(() => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        
+        if (isExpanded) {
+            setCountdown(10)
+            intervalRef.current = setInterval(() => {
+                setCountdown(prev => (prev > 0 ? prev - 1 : 0))
+            }, 1000)
+            timerRef.current = setTimeout(() => {
+                setIsExpanded(false)
+            }, 10000)
+        }
+    }, [isExpanded])
+
+    useEffect(() => {
+        if (isExpanded) resetTimer()
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current)
+            if (intervalRef.current) clearInterval(intervalRef.current)
+        }
+    }, [isExpanded, resetTimer])
+
+    const handleActivity = () => {
+        if (isExpanded) resetTimer()
+    }
+
     // Nếu có groupedCourses thì hiển thị theo nhóm
     if (groupedCourses && groupedCourses.length > 0) {
         return (
@@ -196,16 +228,36 @@ export default function CourseSection({
         )
     }
 
-    // Hiển thị dạng phẳng như cũ cho "Khóa học của tôi"
-    const visibleCourses = courses || []
+    // Hiển thị dạng phẳng có thu gọn cho "Khóa học của tôi"
+    const visibleCourses = isExpanded ? (courses || []) : (courses || []).slice(0, 3)
+    const hasMore = (courses || []).length > 3
 
     return (
-        <div className={`mb-12 rounded-3xl transition-all duration-500 ${darkMode ? '-mx-4 px-4 py-10 bg-zinc-950 shadow-2xl shadow-black/50' : ''}`}>
+        <div 
+            onMouseMove={handleActivity}
+            onTouchStart={handleActivity}
+            className={`mb-12 rounded-[2.5rem] transition-all duration-500 relative ${
+                darkMode ? '-mx-4 px-4 py-10 bg-zinc-950 shadow-2xl shadow-black/50 border border-white/5' : 'bg-white p-6 md:p-10 border border-gray-100 shadow-xl'
+            } ${isExpanded ? 'ring-2 ring-yellow-400 z-30' : ''}`}
+        >
+            {/* Thông báo đếm ngược nổi */}
+            {isExpanded && (
+                <div className="absolute top-6 right-6 z-50 animate-in fade-in zoom-in duration-300">
+                    <div className="bg-black text-yellow-400 px-4 py-2 rounded-full border border-yellow-400/30 shadow-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                        <Clock className="w-3 h-3 animate-pulse" />
+                        <span>Đóng sau {countdown}s</span>
+                    </div>
+                </div>
+            )}
+
             <div className="mb-8 text-center">
                 <h2 className={`text-2xl font-black uppercase tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                     {title}
                 </h2>
                 <div className={`mx-auto mt-2 h-1 w-12 rounded-full ${accentColor}`}></div>
+                {title === 'Khóa học của tôi' && (
+                    <p className="mt-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Đang được sắp xếp theo lộ trình riêng của bạn</p>
+                )}
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -224,6 +276,25 @@ export default function CourseSection({
                     </div>
                 ))}
             </div>
+
+            {hasMore && (
+                <div className="mt-10 flex justify-center">
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className={`group flex items-center gap-2 px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
+                            isExpanded 
+                            ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' 
+                            : 'bg-yellow-400 text-black hover:bg-yellow-500 shadow-yellow-400/20'
+                        }`}
+                    >
+                        {isExpanded ? (
+                            <> Thu gọn lộ trình <ChevronUp className="w-4 h-4" /> </>
+                        ) : (
+                            <> Xem toàn bộ lộ trình ({ (courses?.length || 0) - 3} khóa khác) <ChevronDown className="w-4 h-4 animate-bounce group-hover:animate-none" /> </>
+                        )}
+                    </button>
+                </div>
+            )}
         </div>
     )
 }

@@ -113,7 +113,26 @@ if (session?.user?.id) {
 
 
 
-  const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
+  // 1. Lọc lấy các khóa học đã đăng ký
+  const myEnrolledCourses = courses.filter((c: any) => myCourseIds.has(c.id));
+  
+  // 2. Sắp xếp theo lộ trình (customPath)
+  // Nếu khóa học nằm trong lộ trình, nó sẽ được đưa lên đầu theo đúng thứ tự mảng customPath
+  const myCourses = [...myEnrolledCourses].sort((a, b) => {
+    if (!customPath) return 0;
+    const indexA = customPath.indexOf(a.id);
+    const indexB = customPath.indexOf(b.id);
+    
+    // Nếu cả 2 đều trong lộ trình -> so sánh vị trí
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    // Nếu chỉ A trong lộ trình -> A lên trước
+    if (indexA !== -1) return -1;
+    // Nếu chỉ B trong lộ trình -> B lên trước
+    if (indexB !== -1) return 1;
+    // Cả 2 không trong lộ trình -> giữ nguyên
+    return 0;
+  });
+
   const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
 
   // Gom nhóm khóa học theo category cho phần "Tất cả khóa học"
