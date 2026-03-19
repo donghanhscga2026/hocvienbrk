@@ -91,5 +91,61 @@ export async function sendLoginNotification(user: any, ip: string, userAgent: st
   await sendTelegram(msg, 'LESSON');
 }
 
+export async function sendSurveyNotification(data: {
+  studentName: string,
+  studentId: number,
+  goal: string,
+  targetPointName: string,
+  courses: string[],
+  answers: Record<string, any>
+}) {
+  const coursesList = data.courses.length > 0 
+    ? data.courses.map((c, i) => `${i + 1}. ${c}`).join('\n')
+    : 'Chưa xác định';
+
+  // 1. Phân loại các câu trả lời
+  const inputs: string[] = [];
+  const selections: string[] = [];
+
+  Object.entries(data.answers).forEach(([key, value]) => {
+    if (key === 'goal_config') return;
+
+    // Nhận diện các input văn bản (tên kênh, link, free text)
+    if (key.endsWith('_name') || key.endsWith('_id') || key.endsWith('_url') || key === 'free_text_submit') {
+      const label = key.endsWith('_name') ? 'Kênh' : key.endsWith('_id') ? 'Link/ID' : 'Nhập liệu';
+      inputs.push(`<b>${label}:</b> ${value}`);
+    } else if (typeof value === 'string' && value !== 'Xác nhận' && value !== 'Tiếp tục') {
+      selections.push(`• ${value}`);
+    }
+  });
+
+  // 2. Xử lý thông tin chi tiết từ cấu hình mục tiêu (goal_config)
+  const config = data.answers['goal_config'];
+  let configDetails = '';
+  if (config) {
+    configDetails = `📝 <b>CHI TIẾT CAM KẾT:</b>\n` +
+      `• Đăng bài: ${config.videoPerDay} video/ngày trong ${config.days} ngày\n`;
+    
+    if (config.isLivestream) {
+      configDetails += `• Livestream: ${config.livePerDay} phút/ngày trong ${config.liveDays} ngày\n`;
+    }
+    
+    if (config.moneyGoal) configDetails += `• Mục tiêu tài chính: ${config.moneyGoal} VNĐ\n`;
+    if (config.targetVal) configDetails += `• Mục tiêu Follow: ${config.targetVal}\n`;
+  }
+
+  const msg = `🎯 <b>HỌC VIÊN HOÀN THÀNH KHẢO SÁT</b>\n\n` +
+    `👤 Học viên: <b>${data.studentName}</b> (#${data.studentId})\n` +
+    `🏁 Đích đến: <b>Nút ${data.targetPointName}</b>\n` +
+    `🏆 Mục tiêu: <b>${data.goal}</b>\n\n` +
+    (inputs.length > 0 ? `<b>⌨️ THÔNG TIN NHẬP:</b>\n${inputs.join('\n')}\n\n` : '') +
+    `<b>📊 LỰA CHỌN KHẢO SÁT:</b>\n${selections.join('\n')}\n\n` +
+    `${configDetails}\n` +
+    `<b>📚 LỘ TRÌNH KHÓA HỌC:</b>\n${coursesList}\n\n` +
+    `#Survey #Roadmap #HocVienBRK`;
+
+  await sendTelegram(msg, 'ACTIVATE');
+}
+
 export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
 export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
