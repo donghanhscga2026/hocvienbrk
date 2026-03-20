@@ -131,7 +131,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
         return stages.map(stage => {
             let total = 0;
             let completed = 0;
-            
+
             stage.courseIds.forEach((cid: number) => {
                 const enr = enrollmentsMap[cid];
                 if (enr) {
@@ -154,6 +154,30 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
         if (firstIncomplete) return firstIncomplete.id;
         return stages[stages.length - 1]?.id || 1; // Nếu xong hết thì là chặng cuối
     }, [stageProgress, stages]);
+
+    // ─── SẮP XẾP MẢNH GHÉP THEO LỘ TRÌNH ────────────────────────────
+    // Tác dụng: Đảm bảo các mảnh ghép trong Matrix luôn hiển thị theo thứ tự học tập (Chặng 1 -> 9)
+    const sortedCustomPath = useMemo(() => {
+        // Tạo bản đồ tra cứu: CourseId -> StageId thấp nhất mà khóa đó thuộc về
+        const courseToStageMap: Record<number, number> = {};
+        stages.forEach(s => {
+            s.courseIds.forEach((cid: number) => {
+                if (courseToStageMap[cid] === undefined) {
+                    courseToStageMap[cid] = s.id;
+                }
+            });
+        });
+
+        return [...customPath].sort((a, b) => {
+            const stageA = courseToStageMap[a] ?? 999;
+            const stageB = courseToStageMap[b] ?? 999;
+            
+            if (stageA !== stageB) return stageA - stageB;
+            
+            // Nếu cùng một chặng, giữ nguyên thứ tự gốc từ khảo sát (customPath)
+            return customPath.indexOf(a) - customPath.indexOf(b);
+        });
+    }, [customPath, stages]);
 
     return (
         <div className="space-y-3 animate-in fade-in duration-700" ref={containerRef}>
@@ -226,7 +250,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
 
                     <div className="relative max-w-4xl mx-auto px-2 md:px-8">
                         {/* Thay đổi gap-16 và md:gap-24 ở đây để chỉnh khoảng cách hàng */}
-                        <div className="flex flex-col gap-16 md:gap-24">
+                        <div className="flex flex-col gap-10 md:gap-16">
                             {Array.from({ length: Math.ceil(stages.length / 3) }).map((_, rowIndex) => {
                                 const rowStages = stages.slice(rowIndex * 3, rowIndex * 3 + 3);
                                 const isReverseRow = rowIndex % 2 !== 0;
@@ -260,8 +284,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             if (isLocked) setShowUpgradeModal(true)
                                                             else setActiveStage(isActive ? null : stage.id)
                                                         }}
-                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${
-                                                            isUserGoal
+                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${isUserGoal
                                                             ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30'
                                                             : isCurrentPos
                                                                 ? 'border-yellow-400 bg-zinc-900 text-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.3)] z-20'
@@ -270,7 +293,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                                     : isCompleted
                                                                         ? 'border-emerald-500/50 bg-zinc-900 text-emerald-400'
                                                                         : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {/* VÒNG TRÒN TIẾN ĐỘ (%) */}
                                                         {!isLocked && (
@@ -298,17 +321,17 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                         )}
 
                                                         <span className={`text-xl md:text-3xl font-black relative z-10 ${isLocked ? 'grayscale' : ''}`}>{stage.icon}</span>
-                                                        
+
                                                         {/* Badge: Điểm đích */}
                                                         {isUserGoal && (
-                                                            <div className="absolute -top-10 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
+                                                            <div className="absolute -top-6 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
                                                                 <Trophy className="w-2.5 h-2.5 inline mr-1" /> Điểm đến của bạn
                                                             </div>
                                                         )}
 
                                                         {/* Badge: Vị trí hiện tại */}
                                                         {isCurrentPos && !isUserGoal && (
-                                                            <div className="absolute -top-10 bg-white text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
+                                                            <div className="absolute -top-8 bg-white text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
                                                                 <ArrowRight className="w-2.5 h-2.5 inline mr-1 rotate-90" /> Bạn đang ở đây
                                                             </div>
                                                         )}
@@ -341,17 +364,19 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             </div>
 
             {/* 3. MA TRẬN MẢNH GHÉP */}
-            <div className="space-y-6">
+            <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-yellow-500" />
-                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 italic">Bức tranh hiện thực</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Bức tranh hiện thực</h3>
                     </div>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{customPath.length} mảnh ghép chặng đầu</span>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{customPath.length} mảnh ghép chặng đầu</span>
                 </div>
 
-                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3 md:gap-4">
-                    {customPath.map((courseId, index) => {
+                {/* Sửa tính năng: Thu hẹp gap từ 3/4 xuống 1.5/2 để các mảnh ghép nằm sát nhau hơn theo yêu cầu */}
+                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-1.5 md:gap-2">
+                    {/* Sửa tính năng: Sử dụng sortedCustomPath để đảm bảo các mảnh ghép hiển thị đúng thứ tự chặng học (Lộ trình) */}
+                    {sortedCustomPath.map((courseId, index) => {
                         const course = allCourses.find(c => c.id === courseId)
                         if (!course) return null
                         const enrollment = enrollmentsMap[courseId]
@@ -360,18 +385,30 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         const isPending = enrollment?.status === 'PENDING'
                         const isHighlighted = highlightedIds.includes(courseId)
 
+                        // Tính toán % tiến độ để tô màu nền xanh
+                        const progressPercent = isCompleted ? 100 : (enrollment?.completedCount / enrollment?.totalLessons) * 100 || 0
+
                         return (
-                            <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })} className={`group relative aspect-square rounded-[1.5rem] md:rounded-[2.5rem] p-2 sm:p-4 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${isHighlighted ? 'border-yellow-400 bg-yellow-50 shadow-xl shadow-yellow-400/20 scale-105 z-10' : 'border-gray-100 bg-white hover:border-gray-300'}`} style={{ animationDelay: `${index * 50}ms` }}>
-                                <div className="absolute top-2 right-2">
+                            <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })}
+                                // Sửa tính năng: Gỡ bỏ emoji, thay bằng màu nền xanh phủ dần theo tỷ lệ % hoàn thành khóa học để tối ưu giao diện
+                                className={`group relative aspect-[22/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/20 scale-105 z-10' : 'border-gray-100 bg-white hover:border-gray-300'}`} style={{ animationDelay: `${index * 50}ms` }}>
+
+                                {/* Lớp màu xanh hiển thị tiến độ học tập (phủ từ trái sang) */}
+                                {(isActive || isCompleted) && (
+                                    <div
+                                        className="absolute inset-0 bg-blue-500/15 transition-all duration-1000 origin-left z-0"
+                                        style={{ width: `${progressPercent}%` }}
+                                    />
+                                )}
+
+                                <div className="absolute top-2 right-2 z-20">
                                     {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : isActive ? <Play className="w-3 h-3 text-orange-500 fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" /> : <Lock className="w-3 h-3 text-gray-300" />}
                                 </div>
-                                <span className={`text-xl sm:text-3xl mb-1 transition-transform group-hover:scale-125 ${!isActive && !isCompleted ? 'grayscale opacity-30' : ''}`}>{course.icon_emoji || '🧩'}</span>
-                                <h4 className={`text-[8px] sm:text-[10px] font-black uppercase leading-[1.1] tracking-tighter line-clamp-2 px-1 ${!isActive && !isCompleted ? 'text-gray-400' : 'text-black'}`}>{course.name_lop}</h4>
-                                {(isActive || isCompleted) && (
-                                    <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gray-100">
-                                        <div className={`h-full transition-all duration-1000 ${isCompleted ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{ width: `${isCompleted ? 100 : (enrollment?.completedCount / enrollment?.totalLessons) * 100 || 0}%` }}></div>
-                                    </div>
-                                )}
+
+                                <h4 className={`text-[10px] sm:text-[8px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${!isActive && !isCompleted ? 'text-gray-400' : 'text-black'}`}>
+                                    {/* Sửa tính năng: Căn lề trái cho tên khóa học và thêm lề trái (pl-4) để lùi vào 1 chút theo yêu cầu */}
+                                    {course.name_lop}
+                                </h4>
                             </div>
                         )
                     })}
