@@ -65,8 +65,21 @@ function CourseCategoryGroup({
         if (isExpanded) resetTimer()
     }
 
-    const visibleCourses = isExpanded ? courses : courses.slice(0, 1)
-    const hasMore = courses.length > 1
+    // Tính toán số lượng khóa học hiển thị khi thu gọn dựa trên thiết bị
+    const [displayCount, setDisplayCount] = useState(1)
+    
+    useEffect(() => {
+        const updateCount = () => {
+            // Trên Desktop (>= 768px) hiện 3 khóa, trên Mobile hiện 1 khóa
+            setDisplayCount(window.innerWidth >= 768 ? 3 : 1)
+        }
+        updateCount()
+        window.addEventListener('resize', updateCount)
+        return () => window.removeEventListener('resize', updateCount)
+    }, [])
+
+    const visibleCourses = isExpanded ? courses : courses.slice(0, displayCount)
+    const hasMore = courses.length > displayCount
 
     return (
         <div 
@@ -228,9 +241,22 @@ export default function CourseSection({
         )
     }
 
+    // Tính toán số lượng khóa học hiển thị khi thu gọn dựa trên thiết bị cho nhóm "Khóa học của tôi"
+    const [displayCount, setDisplayCount] = useState(3)
+    
+    useEffect(() => {
+        const updateCount = () => {
+            // Trên Desktop (>= 768px) hiện 3 khóa, trên Mobile hiện 1 khóa
+            setDisplayCount(window.innerWidth >= 768 ? 3 : 1)
+        }
+        updateCount()
+        window.addEventListener('resize', updateCount)
+        return () => window.removeEventListener('resize', updateCount)
+    }, [])
+
     // Hiển thị dạng phẳng có thu gọn cho "Khóa học của tôi"
-    const visibleCourses = isExpanded ? (courses || []) : (courses || []).slice(0, 3)
-    const hasMore = (courses || []).length > 3
+    const visibleCourses = isExpanded ? (courses || []) : (courses || []).slice(0, displayCount)
+    const hasMore = (courses || []).length > displayCount
 
     return (
         <div 

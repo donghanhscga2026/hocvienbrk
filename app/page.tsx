@@ -98,7 +98,10 @@ if (session?.user?.id) {
   });
 
   enrollments.forEach((e: any) => {
-    myCourseIds.add(e.courseId);
+    // Chỉ thêm vào danh sách "Khóa học của tôi" nếu đã kích hoạt hoặc hoàn thành
+    if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
+      myCourseIds.add(e.courseId);
+    }
 
     enrollmentsMap[e.courseId] = {
       status: e.status,
