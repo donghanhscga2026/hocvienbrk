@@ -33,12 +33,14 @@ $changedFiles | ForEach-Object { Write-Host "  - $_" }
 # Kiem tra neu co cap nhat CODE_HISTORY.md
 if ($changedFiles -contains "CODE_HISTORY.md") {
     $commitMsg = "cap nhat CODE_HISTORY.md"
-} else {
+}
+else {
     # Tao commit message tu ten file
     $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
     if ($fileNames.Length -gt 100) {
         $commitMsg = $fileNames.Substring(0, 97) + "..."
-    } else {
+    }
+    else {
         $commitMsg = "cap nhat: $fileNames"
     }
 }
@@ -56,6 +58,9 @@ git commit -m $commitMsg
 # Buoc 6: Git push
 Write-Yellow "Git push..."
 git push origin master
-
-Write-Green "=== Hoan thanh! ==="
-Write-Green "Da day code len GitHub"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "!!! LOI: Khong the push code. Hay chay 'git pull' truoc !!!" -ForegroundColor Red
+}
+else {
+    Write-Host "=== Da day code len GitHub thanh cong! ===" -ForegroundColor Green
+}
