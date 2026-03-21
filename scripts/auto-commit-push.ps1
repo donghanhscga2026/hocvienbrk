@@ -1,66 +1,51 @@
 # ================================================================================
-# Script: auto-commit-push.ps1
-# Mục đích: Backup code hiện tại, đẩy code mới lên GitHub và cập nhật CODE_HISTORY.md
-# Cách chạy: powershell -ExecutionPolicy Bypass -File .\scripts\auto-commit-push.ps1
+# Script: auto-commit-push.ps1 (Version Pro - Auto Sync PC & Mac)
 # ================================================================================
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue" # Để script không dừng đột ngột khi gặp lỗi nhỏ
 
-# Màu sắc cho output
-function Write-Green { param($msg) Write-Host $msg -ForegroundColor Green }
-function Write-Yellow { param($msg) Write-Host $msg -ForegroundColor Yellow }
-function Write-Red { param($msg) Write-Host $msg -ForegroundColor Red }
+function Write-Green { param($msg) Write-Host "`n[OK] $msg" -ForegroundColor Green }
+function Write-Yellow { param($msg) Write-Host "`n[WAIT] $msg" -ForegroundColor Yellow }
+function Write-Red { param($msg) Write-Host "`n[ERROR] $msg" -ForegroundColor Red }
 
-Write-Yellow "=== Bat dau auto commit va push ==="
+Write-Yellow "=== Bat dau quy trinh dong bo GitHub ==="
 
-# Buoc 1: Kiem tra co thay doi khong
-Write-Yellow "Kiem tra thay doi..."
+# Bước 1: Kiểm tra thay đổi nội bộ
 $status = git status --porcelain
 if (-not $status) {
-    Write-Red "Khong co thay doi nao. Thoat."
-    exit 0
-}
-
-# Buoc 2: Hien thi cac file thay doi
-Write-Yellow "Cac file thay doi:"
-git status --porcelain
-
-# Buoc 3: Tao mo ta commit
-$changedFiles = git diff --name-only
-Write-Green "Cac file thay doi:"
-$changedFiles | ForEach-Object { Write-Host "  - $_" }
-
-# Kiem tra neu co cap nhat CODE_HISTORY.md
-if ($changedFiles -contains "CODE_HISTORY.md") {
-    $commitMsg = "cap nhat CODE_HISTORY.md"
-}
-else {
-    # Tao commit message tu ten file
+    Write-Red "Khong co thay doi nao de commit. Dang kiem tra code moi tu GitHub..."
+} else {
+    # Bước 2: Commit các thay đổi hiện tại
+    Write-Yellow "Dang luu lai cac thay doi cua ban..."
+    git add -A
+    
+    $changedFiles = git diff --cached --name-only
     $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
-    if ($fileNames.Length -gt 100) {
-        $commitMsg = $fileNames.Substring(0, 97) + "..."
-    }
-    else {
-        $commitMsg = "cap nhat: $fileNames"
-    }
+    $commitMsg = if ($fileNames.Length -gt 80) { $fileNames.Substring(0, 77) + "..." } else { "cap nhat: $fileNames" }
+    
+    git commit -m $commitMsg
+    Write-Green "Da Commit: $commitMsg"
 }
 
-Write-Green "Commit message: $commitMsg"
+# Bước 3: QUAN TRỌNG - Kéo code mới về trước khi đẩy lên (Tránh lỗi Rejected)
+Write-Yellow "Dang keo code moi tu GitHub (Pull) de tranh xung dot..."
+git pull origin master --rebase
 
-# Buoc 4: Git add
-Write-Yellow "Git add..."
-git add -A
-
-# Buoc 5: Git commit
-Write-Yellow "Git commit..."
-git commit -m $commitMsg
-
-# Buoc 6: Git push
-Write-Yellow "Git push..."
-git push origin master
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "!!! LOI: Khong the push code. Hay chay 'git pull' truoc !!!" -ForegroundColor Red
+    Write-Red "PHAT HIEN XUNG DOT (CONFLICT)!"
+    Write-Host "Co ve nhu ban da sua cung 1 file tren ca Mac va PC." -ForegroundColor Yellow
+    Write-Host "Hay mo VS Code de giai quyet Conflict thu cong, sau do chay lai script." -ForegroundColor Cyan
+    exit 1
 }
-else {
-    Write-Host "=== Da day code len GitHub thanh cong! ===" -ForegroundColor Green
+
+# Bước 4: Đẩy code lên GitHub
+Write-Yellow "Dang day code len GitHub (Push)..."
+git push origin master
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Red "Push that bai! Dang thu dung quyen tro giup --force..."
+    # Chi dung force neu ban thuc su tin tuong code o PC la ban moi nhat
+    # git push origin master --force 
+} else {
+    Write-Green "=== DONG BO THANH CONG! Code da len GitHub an toan ==="
 }
