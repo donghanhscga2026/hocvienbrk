@@ -22,6 +22,8 @@ export default async function AdminLayout({
         { label: 'Lộ trình', href: '/admin/roadmap', icon: '🗺️' },
         { label: 'Bảng tin', href: '/admin/posts', icon: '📰' },
         { label: 'Số đẹp', href: '/admin/reserved-ids', icon: '💎' },
+        { label: 'Chiến dịch Email', href: '/admin/campaigns', icon: '📧' },
+        { label: 'Email Pool', href: '/admin/email-senders', icon: '📮' },
     ]
 
     return (

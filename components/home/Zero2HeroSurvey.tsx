@@ -194,7 +194,12 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
         setAnswers(newAnswers)
 
         if (currentQuestion.isDynamic && flow) {
-            findAndAddCourses(optionId)
+            // Xác định node bắt đầu để tìm kiếm các node tiếp theo (courses, questions, v.v.)
+            // Đối với CHOICE, INPUT_ACCOUNT, nó bắt đầu từ Option được chọn
+            // Đối với FREE_TEXT, INPUT_GOAL, nó bắt đầu từ chính node Câu hỏi hiện tại
+            const startId = (currentQuestion.type === 'INPUT_GOAL' || currentQuestion.type === 'FREE_TEXT') ? currentNodeId : optionId
+            
+            findAndAddCourses(startId!)
 
             const findNextNode = (sid: string): any => {
                 const outEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === sid) : []
@@ -210,7 +215,6 @@ export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => voi
                 return null
             }
 
-            const startId = currentQuestion.type === 'INPUT_GOAL' ? currentNodeId : optionId
             const nextNode = findNextNode(startId!)
 
             if (nextNode) {
