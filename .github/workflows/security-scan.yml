@@ -1,0 +1,13 @@
+name: Security Scan
+on: [push]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Scan for Malicious Files
+        run: |
+          if [ -f "project-source.md" ]; then
+            echo "PHÁT HIỆN FILE ĐỘC HẠI! BLOCKING PUSH..."
+            exit 1
+          fi

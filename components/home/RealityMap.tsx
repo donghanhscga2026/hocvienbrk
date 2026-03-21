@@ -245,7 +245,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 <div className="relative z-10">
                     <div className="flex items-center justify-center gap-3 mb-10 text-white">
                         <Flag className="w-5 h-5 text-yellow-400" />
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
+                        <h3 className="text-[12px] font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
                     </div>
 
                     <div className="relative max-w-4xl mx-auto px-2 md:px-8">
@@ -285,14 +285,10 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             else setActiveStage(isActive ? null : stage.id)
                                                         }}
                                                         className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${isUserGoal
-                                                            ? 'border-emerald-400 bg-emerald-500 text-white shadow-[0_0_60px_rgba(52,211,153,0.6)] scale-110 z-30'
-                                                            : isCurrentPos
-                                                                ? 'border-yellow-400 bg-zinc-900 text-yellow-400 shadow-[0_0_40px_rgba(250,204,21,0.3)] z-20'
-                                                                : isLocked
-                                                                    ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
-                                                                    : isCompleted
-                                                                        ? 'border-emerald-500/50 bg-zinc-900 text-emerald-400'
-                                                                        : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600'
+                                                            ? 'border-white bg-yellow-400 text-white shadow-[0_0_60px_rgba(37,99,235,0.4)] scale-110 z-30'
+                                                            : isLocked
+                                                                ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
+                                                                : 'border-white bg-zinc-600 text-white shadow-[0_0_20px_rgba(0,0,0,0.3)]'
                                                             }`}
                                                     >
                                                         {/* VÒNG TRÒN TIẾN ĐỘ (%) */}
@@ -305,7 +301,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                                     strokeWidth="3"
                                                                     strokeDasharray="283"
                                                                     strokeDashoffset={283 - (283 * progress) / 100}
-                                                                    className={`transition-all duration-1000 ${isCompleted ? 'text-emerald-500' : isCurrentPos ? 'text-yellow-400' : 'text-zinc-700'}`}
+                                                                    className={`transition-all duration-1000 text-green-600`}
                                                                 />
                                                             </svg>
                                                         )}
@@ -370,7 +366,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         <Sparkles className="w-4 h-4 text-yellow-500" />
                         <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Bức tranh hiện thực</h3>
                     </div>
-                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{customPath.length} mảnh ghép chặng đầu</span>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{customPath.length} mảnh ghép cần học</span>
                 </div>
 
                 {/* Sửa tính năng: Thu hẹp gap từ 3/4 xuống 1.5/2 để các mảnh ghép nằm sát nhau hơn theo yêu cầu */}
@@ -390,23 +386,23 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
 
                         return (
                             <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })}
-                                // Sửa tính năng: Gỡ bỏ emoji, thay bằng màu nền xanh phủ dần theo tỷ lệ % hoàn thành khóa học để tối ưu giao diện
-                                className={`group relative aspect-[22/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/20 scale-105 z-10' : 'border-gray-100 bg-white hover:border-gray-300'}`} style={{ animationDelay: `${index * 50}ms` }}>
+                                // Sửa tính năng: Khóa được chọn không đổi nền, chỉ lóe viền vàng (border-yellow-400) theo yêu cầu
+                                className={`group relative aspect-[21/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-4 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-600' : 'bg-zinc-900'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/40 scale-105 z-10' : 'border-black'}`} style={{ animationDelay: `${index * 50}ms` }}>
 
-                                {/* Lớp màu xanh hiển thị tiến độ học tập (phủ từ trái sang) */}
+                                {/* Lớp màu xanh lá hiển thị tiến độ học tập (phủ từ trái sang) */}
                                 {(isActive || isCompleted) && (
                                     <div
-                                        className="absolute inset-0 bg-blue-500/15 transition-all duration-1000 origin-left z-0"
+                                        className="absolute inset-0 bg-green-600/30 transition-all duration-1000 origin-left z-0"
                                         style={{ width: `${progressPercent}%` }}
                                     />
                                 )}
 
                                 <div className="absolute top-2 right-2 z-20">
-                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : isActive ? <Play className="w-3 h-3 text-orange-500 fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" /> : <Lock className="w-3 h-3 text-gray-300" />}
+                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : isActive ? <Play className="w-3 h-3 text-red-500 fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" /> : <Lock className="w-3 h-3 text-zinc-400" />}
                                 </div>
 
-                                <h4 className={`text-[10px] sm:text-[8px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${!isActive && !isCompleted ? 'text-gray-400' : 'text-black'}`}>
-                                    {/* Sửa tính năng: Căn lề trái cho tên khóa học và thêm lề trái (pl-4) để lùi vào 1 chút theo yêu cầu */}
+                                <h4 className={`text-[12px] sm:text-[10px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${isActive || isCompleted ? 'text-white' : 'text-zinc-500'}`}>
+                                    {/* Sửa tính năng: Chữ trắng chỉ dành cho khóa đã mở, chữ xám cho khóa chưa kích hoạt kể cả khi được chọn */}
                                     {course.name_lop}
                                 </h4>
                             </div>

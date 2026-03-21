@@ -145,7 +145,7 @@ function CourseCategoryGroup({
                         {isExpanded ? (
                             <> Thu gọn <ChevronUp className="w-3.5 h-3.5" /> </>
                         ) : (
-                            <> Xem thêm {courses.length - 1} khóa <ChevronDown className="w-3.5 h-3.5 animate-bounce group-hover:animate-none" /> </>
+                            <> Xem thêm {courses.length - displayCount} khóa <ChevronDown className="w-3.5 h-3.5 animate-bounce group-hover:animate-none" /> </>
                         )}
                     </button>
                 </div>
@@ -316,7 +316,7 @@ export default function CourseSection({
                         {isExpanded ? (
                             <> Thu gọn lộ trình <ChevronUp className="w-4 h-4" /> </>
                         ) : (
-                            <> Xem toàn bộ lộ trình ({ (courses?.length || 0) - 3} khóa khác) <ChevronDown className="w-4 h-4 animate-bounce group-hover:animate-none" /> </>
+                            <> Xem toàn bộ lộ trình ({ (courses?.length || 0) - displayCount} khóa khác) <ChevronDown className="w-4 h-4 animate-bounce group-hover:animate-none" /> </>
                         )}
                     </button>
                 </div>
