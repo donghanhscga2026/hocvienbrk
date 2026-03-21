@@ -31,10 +31,89 @@ model User {
   
   // Zero 2 Hero Data - Tách sang bảng UserRoadmap
   roadmap       UserRoadmap?
+  emailCampaigns EmailCampaign[] @relation("UserToEmailCampaign")
 
   @@index([email])
   @@index([phone])
   @@index([referrerId])
+}
+
+model EmailSender {
+  id            Int      @id @default(autoincrement())
+  label         String                    // Tên gợi nhớ (VD: "Vệ tinh 01")
+  email         String   @unique
+  isMain        Boolean  @default(false)  // Email chính hocvienbrk@gmail.com
+  clientId      String                    // GMAIL_CLIENT_ID (Lưu chung hoặc riêng tùy chọn, ở đây cho phép lưu riêng nếu cần)
+  clientSecret  String?                   // Mã hóa AES-256
+  refreshToken  String   @db.Text         // Mã hóa AES-256
+  dailyLimit    Int      @default(480)    // Giới hạn gửi /ngày (an toàn dưới 500)
+  sentToday     Int      @default(0)      // Đếm số đã gửi hôm nay
+  lastResetAt   DateTime @default(now())  // Ngày reset sentToday
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  campaigns     EmailCampaignSender[]
+}
+
+model EmailCampaign {
+  id                Int            @id @default(autoincrement())
+  title             String
+  status            CampaignStatus @default(DRAFT)
+  notificationType  String         // NEW_LESSON | ZOOM_SESSION | NEW_POST | ANNOUNCEMENT | CUSTOM
+  linkedEntityId    String?        // ID bài học / bài đăng liên quan
+  recipientSource   String         // DB_ALL | DB_ACTIVE | DB_COURSE | CSV
+  recipientFilter   Json?          // { courseId } nếu lọc theo khóa
+  recipientCsvData  String?        @db.Text
+  subject           String
+  htmlContent       String         @db.Text
+  totalRecipients   Int            @default(0)
+  sentCount         Int            @default(0)
+  failedCount       Int            @default(0)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  createdBy         Int
+  creator           User           @relation("UserToEmailCampaign", fields: [createdBy], references: [id])
+  senders           EmailCampaignSender[]
+  logs              EmailCampaignLog[]
+}
+
+model EmailCampaignSender {
+  id          Int           @id @default(autoincrement())
+  campaignId  Int
+  senderId    Int
+  assignedCount Int         @default(0) // Số email được phân công cho sender này
+  sentCount   Int           @default(0)
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sender      EmailSender   @relation(fields: [senderId], references: [id])
+}
+
+model EmailCampaignLog {
+  id          Int      @id @default(autoincrement())
+  campaignId  Int
+  senderId    Int?     // Gửi từ email nào
+  toEmail     String
+  status      String   // SENT | FAILED | SKIPPED | BOUNCED
+  errorCode   String?  // VD: "5.1.1 user unknown", "550 mailbox full"
+  errorType   String?  // HARD_BOUNCE | SOFT_BOUNCE | INVALID | TIMEOUT
+  sentAt      DateTime @default(now())
+  campaign    EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model EmailBlacklist {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  reason      String   // HARD_BOUNCE | UNSUBSCRIBED | MANUAL
+  campaignId  Int?     // Campaign phát hiện ra (nếu có)
+  createdAt   DateTime @default(now())
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 model UserRoadmap {
