@@ -1,159 +1,115 @@
 # ============================================================
-#  backup.ps1 - HocVien-BRK Project Backup Script
+#  backup.ps1 - HocVien-BRK Project Backup Script (Git-Sync Version)
 #  Usage: .\scripts\backup.ps1
-#  Creates a timestamped ZIP of all important source files.
+#  Creates a timestamped ZIP of all Git-tracked files + sensitive configs.
 # ============================================================
 
-$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path # Ensure $ProjectRoot is a string
+$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
 $BackupDir = "$ProjectRoot\backups"
 $ZipName = "backup_$Timestamp.zip"
 $ZipPath = "$BackupDir\$ZipName"
 $TempBackupDir = Join-Path ([System.IO.Path]::GetTempPath()) "BRK_Backup_Temp_$Timestamp"
 
-# --- Files & folders to include (relative to project root) ---
-$IncludePaths = @(
-    # App source
-    "app",
-    "components",
-    "lib",
-    "types",
-    "public",
-
-    # Auth & config
-    "auth.ts",
-    "auth.config.ts",
-    "middleware.ts",
-    ".env",
-    ".env.local",
-
-    # DB / Prisma
-    "prisma",
-
-    # Scripts
-    "scripts",
-
-    # Project config
-    "package.json",
-    "next.config.ts",
-    "tsconfig.json",
-    "tsconfig.seed.json",
-    "postcss.config.mjs",
-    "eslint.config.mjs",
-    "docker-compose.yml",
-
-    # Docs
-    "README.md",
-    "DESIGN_SYSTEM.md"
-)
-
-# --- Paths/patterns to EXCLUDE even if inside an included folder ---
-$ExcludePatterns = @(
-    "*.log",
-    "*.tsbuildinfo",
-    ".next",
-    "node_modules",
-    ".git",
-    "backups"
-)
-
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "  BRK Project Backup" -ForegroundColor Cyan
+Write-Host "  BRK Project Backup (Git-Sync)" -ForegroundColor Cyan
 Write-Host "  Time   : $Timestamp" -ForegroundColor Cyan
 Write-Host "  Output : $ZipPath" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Create backups directory if it doesn't exist
+# 1. Create backups directory if it doesn't exist
 if (-not (Test-Path $BackupDir)) {
     New-Item -ItemType Directory -Path $BackupDir | Out-Null
     Write-Host "[+] Created backups/ folder" -ForegroundColor Green
 }
 
-# Create temporary directory for staging files
-if (Test-Path $TempBackupDir) {
-    Remove-Item -Path $TempBackupDir -Recurse -Force | Out-Null
-}
-New-Item -ItemType Directory -Path $TempBackupDir | Out-Null
-Write-Host "[+] Created temporary staging folder: $TempBackupDir" -ForegroundColor Green
-
-# Collect all files to backup
+# 2. Collect files to backup
+Write-Host "[*] Identifying files to backup..." -ForegroundColor Gray
 $FilesToBackup = @()
 
-foreach ($rel in $IncludePaths) {
-    $full = Join-Path $ProjectRoot $rel
-
-    if (Test-Path $full -PathType Leaf) {
-        # It's a single file
-        $FilesToBackup += $full
-    }
-    elseif (Test-Path $full -PathType Container) {
-        # It's a folder — collect all files recursively, applying exclusions
-        $all = Get-ChildItem -Path $full -File -Recurse
-
-        foreach ($file in $all) {
-            $skip = $false
-            foreach ($pattern in $ExcludePatterns) {
-                # Check if any part of the full path matches the pattern
-                if ($file.FullName -like "*\$pattern\*" -or $file.Name -like $pattern) {
-                    $skip = $true; break
-                }
-            }
-            if (-not $skip) { $FilesToBackup += $file.FullName }
+# --- A. Get all files tracked by Git ---
+if (Test-Path (Join-Path $ProjectRoot ".git")) {
+    Push-Location $ProjectRoot
+    try {
+        # Sử dụng -c core.quotepath=false để Git không bao ngoặc kép và mã hóa ký tự tiếng Việt
+        $GitFiles = git -c core.quotepath=false ls-files
+        foreach ($file in $GitFiles) {
+            # Chuyển dấu gạch chéo xuôi (/) của Git thành gạch chéo ngược (\) của Windows
+            $cleanFile = $file -replace '/', '\'
+            $FilesToBackup += Join-Path $ProjectRoot $cleanFile
         }
+        Write-Host "[+] Found $($GitFiles.Count) files tracked by Git." -ForegroundColor Green
     }
-    else {
-        Write-Host "[!] Not found, skipping: $rel" -ForegroundColor Yellow
+    catch {
+        Write-Host "[!] Git command failed. Falling back to manual mode." -ForegroundColor Yellow
+    }
+    Pop-Location
+} else {
+    Write-Host "[!] Not a Git repository. Backup might be incomplete." -ForegroundColor Yellow
+}
+
+# --- B. Add sensitive/local files NOT in Git (often ignored) ---
+$ManualIncludes = @(
+    ".env",
+    ".env.local",
+    ".env.production",
+    "prisma/dev.db" # Nếu bạn dùng SQLite cục bộ
+)
+
+foreach ($rel in $ManualIncludes) {
+    $full = Join-Path $ProjectRoot $rel
+    if (Test-Path $full -PathType Leaf) {
+        if ($FilesToBackup -notcontains $full) {
+            $FilesToBackup += $full
+            Write-Host "[+] Added local file: $rel" -ForegroundColor Gray
+        }
     }
 }
 
 if ($FilesToBackup.Count -eq 0) {
-    Write-Host "[ERROR] No files found to backup." -ForegroundColor Red
-    # Clean up temp directory before exiting
-    if (Test-Path $TempBackupDir) {
-        Remove-Item -Path $TempBackupDir -Recurse -Force | Out-Null
-    }
+    Write-Host "[ERROR] No files found to backup. Ensure you have committed files or check Git status." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "[*] Collecting $($FilesToBackup.Count) files..." -ForegroundColor Gray
+# 3. Create temporary staging directory
+if (Test-Path $TempBackupDir) {
+    Remove-Item -Path $TempBackupDir -Recurse -Force | Out-Null
+}
+New-Item -ItemType Directory -Path $TempBackupDir | Out-Null
 
-# Copy files to the temporary directory, maintaining relative structure
+# 4. Copy files to staging (maintaining structure)
+Write-Host "[*] Staging $($FilesToBackup.Count) files..." -ForegroundColor Gray
 foreach ($filePath in $FilesToBackup) {
     # Get relative path from ProjectRoot
     $relativePath = $filePath.Substring($ProjectRoot.Length).TrimStart('\', '/')
     $destinationPath = Join-Path $TempBackupDir $relativePath
 
-    # Ensure the destination directory exists in the temp structure
     $destinationDir = Split-Path -Parent $destinationPath
     if (-not (Test-Path $destinationDir)) {
         New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
     }
 
-    # Copy the file
-    Copy-Item -Path $filePath -Destination $destinationPath -Force
+    if (Test-Path $filePath -PathType Leaf) {
+        Copy-Item -Path $filePath -Destination $destinationPath -Force
+    }
 }
 
-Write-Host "[*] Staged files to temporary directory. Creating ZIP archive..." -ForegroundColor Gray
-
-# Create ZIP using Compress-Archive
+# 5. Create ZIP archive
+Write-Host "[*] Creating ZIP archive..." -ForegroundColor Gray
 try {
     Compress-Archive -Path "$TempBackupDir\*" -DestinationPath $ZipPath -Force
 }
 catch {
     Write-Host "[ERROR] Failed to create ZIP archive: $($_.Exception.Message)" -ForegroundColor Red
-    # Clean up temp directory before exiting
-    if (Test-Path $TempBackupDir) {
-        Remove-Item -Path $TempBackupDir -Recurse -Force | Out-Null
-    }
+    if (Test-Path $TempBackupDir) { Remove-Item -Path $TempBackupDir -Recurse -Force }
     exit 1
 }
 
-# Clean up the temporary directory
+# 6. Cleanup temp folder
 if (Test-Path $TempBackupDir) {
     Remove-Item -Path $TempBackupDir -Recurse -Force | Out-Null
-    Write-Host "[+] Cleaned up temporary staging folder." -ForegroundColor Green
 }
 
 $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
@@ -167,12 +123,12 @@ Write-Host "  Files: $($FilesToBackup.Count)" -ForegroundColor Green
 Write-Host "======================================" -ForegroundColor Green
 Write-Host ""
 
-# Keep only the 5 most recent backups to save disk space
+# 7. Rotation: Keep only the 5 most recent backups
 $OldBackups = Get-ChildItem -Path $BackupDir -Filter "backup_*.zip" |
-Sort-Object LastWriteTime -Descending |
-Select-Object -Skip 5
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip 5
 
 if ($OldBackups.Count -gt 0) {
-    Write-Host "[*] Removing $($OldBackups.Count) old backup(s)..." -ForegroundColor Gray
+    Write-Host "[*] Removing $($OldBackups.Count) old backup(s) to save space..." -ForegroundColor Gray
     $OldBackups | Remove-Item -Force
 }
