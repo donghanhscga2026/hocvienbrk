@@ -171,9 +171,9 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
         return [...customPath].sort((a, b) => {
             const stageA = courseToStageMap[a] ?? 999;
             const stageB = courseToStageMap[b] ?? 999;
-            
+
             if (stageA !== stageB) return stageA - stageB;
-            
+
             // Nếu cùng một chặng, giữ nguyên thứ tự gốc từ khảo sát (customPath)
             return customPath.indexOf(a) - customPath.indexOf(b);
         });
@@ -284,11 +284,11 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             if (isLocked) setShowUpgradeModal(true)
                                                             else setActiveStage(isActive ? null : stage.id)
                                                         }}
-                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-4 transition-all duration-500 relative group active:scale-90 ${isUserGoal
-                                                            ? 'border-white bg-yellow-400 text-white shadow-[0_0_60px_rgba(37,99,235,0.4)] scale-110 z-30'
+                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-2 transition-all duration-500 relative group active:scale-90 ${isUserGoal
+                                                            ? 'border-red-600 bg-yellow-400 text-white shadow-[0_0_60px_rgba(37,99,235,0.4)] scale-110 z-30'
                                                             : isLocked
                                                                 ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
-                                                                : 'border-white bg-zinc-600 text-white shadow-[0_0_20px_rgba(0,0,0,0.3)]'
+                                                                : 'border-white/40 bg-zinc-600 text-white shadow-[0_0_20px_rgba(0,0,0,0.3)]'
                                                             }`}
                                                     >
                                                         {/* VÒNG TRÒN TIẾN ĐỘ (%) */}
@@ -327,7 +327,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
 
                                                         {/* Badge: Vị trí hiện tại */}
                                                         {isCurrentPos && !isUserGoal && (
-                                                            <div className="absolute -top-8 bg-white text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
+                                                            <div className="absolute -top-8 bg-white text-black text-[10px] font-black px-2 py-1 rounded-full  tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
                                                                 <ArrowRight className="w-2.5 h-2.5 inline mr-1 rotate-90" /> Bạn đang ở đây
                                                             </div>
                                                         )}
@@ -387,12 +387,12 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         return (
                             <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })}
                                 // Sửa tính năng: Khóa được chọn không đổi nền, chỉ lóe viền vàng (border-yellow-400) theo yêu cầu
-                                className={`group relative aspect-[21/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-4 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-600' : 'bg-zinc-900'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/40 scale-105 z-10' : 'border-black'}`} style={{ animationDelay: `${index * 50}ms` }}>
+                                className={`group relative aspect-[23/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-700' : 'bg-zinc-300'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/50 scale-105 z-10' : 'border-black'}`} style={{ animationDelay: `${index * 50}ms` }}>
 
                                 {/* Lớp màu xanh lá hiển thị tiến độ học tập (phủ từ trái sang) */}
                                 {(isActive || isCompleted) && (
                                     <div
-                                        className="absolute inset-0 bg-green-600/30 transition-all duration-1000 origin-left z-0"
+                                        className="absolute inset-0 bg-green-500/50 transition-all duration-1000 origin-left z-0"
                                         style={{ width: `${progressPercent}%` }}
                                     />
                                 )}
