@@ -1,0 +1,121 @@
+import prisma from "../lib/prisma";
+
+function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  let p = phone.replace(/\s/g, '').replace(/^0/, '84');
+  if (!p.startsWith('+')) p = '+' + p;
+  return p;
+}
+
+async function previewCleanup() {
+  console.log("=".repeat(70));
+  console.log("PREVIEW: DỮ LIỆU TRÙNG LẶP - CHƯA XÓA GÌ");
+  console.log("=".repeat(70) + "\n");
+
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, phone: true, name: true },
+    orderBy: { id: 'asc' }
+  });
+
+  // Tìm email trùng
+  const emailMap: Record<string, typeof users> = {};
+  for (const user of users) {
+    const normalized = user.email?.toLowerCase() || '';
+    if (!emailMap[normalized]) emailMap[normalized] = [];
+    emailMap[normalized].push(user);
+  }
+  const duplicateEmails = Object.entries(emailMap).filter(([_, u]) => u.length > 1);
+
+  // Tìm phone trùng (normalized)
+  const phoneMap: Record<string, typeof users> = {};
+  for (const user of users) {
+    if (!user.phone) continue;
+    const normalized = normalizePhone(user.phone);
+    if (!phoneMap[normalized]) phoneMap[normalized] = [];
+    phoneMap[normalized].push(user);
+  }
+  const duplicatePhones = Object.entries(phoneMap).filter(([_, u]) => u.length > 1);
+
+  // Users có phone chưa chuẩn hóa
+  const unnormalizedPhones = users.filter(u => u.phone && !u.phone.startsWith('+'));
+
+  console.log("📧 EMAIL TRÙNG LẶP:");
+  console.log("-".repeat(50));
+  
+  if (duplicateEmails.length === 0) {
+    console.log("  ✅ Không có email trùng\n");
+  } else {
+    for (const [email, userList] of duplicateEmails) {
+      const sorted = userList.sort((a, b) => b.id - a.id);
+      console.log(`\n  📧 ${email}`);
+      console.log(`     Sẽ GIỮ: ID ${sorted[0].id} - ${sorted[0].name} (Mới nhất)`);
+      sorted.slice(1).forEach(u => {
+        console.log(`     Sẽ XÓA: ID ${u.id} - ${u.name} | ${u.phone || 'không có phone'}`);
+      });
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log("\n📱 PHONE TRÙNG LẶP (+84 vs 0xxx):");
+  console.log("-".repeat(50));
+  
+  if (duplicatePhones.length === 0) {
+    console.log("  ✅ Không có phone trùng\n");
+  } else {
+    for (const [normalizedPhone, userList] of duplicatePhones) {
+      const sorted = userList.sort((a, b) => b.id - a.id);
+      console.log(`\n  📱 ${normalizedPhone}`);
+      console.log(`     Sẽ GIỮ: ID ${sorted[0].id} - ${sorted[0].name} (${sorted[0].phone})`);
+      sorted.slice(1).forEach(u => {
+        console.log(`     Sẽ XÓA: ID ${u.id} - ${u.name} (${u.phone})`);
+      });
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log("\n📋 PHONE CHƯA CHUẨN HÓA (sẽ cập nhật):");
+  console.log("-".repeat(50));
+  
+  if (unnormalizedPhones.length === 0) {
+    console.log("  ✅ Tất cả phone đã chuẩn hóa\n");
+  } else {
+    unnormalizedPhones.slice(0, 10).forEach(u => {
+      console.log(`  ID ${u.id}: ${u.phone} → ${normalizePhone(u.phone)}`);
+    });
+    if (unnormalizedPhones.length > 10) {
+      console.log(`  ... và ${unnormalizedPhones.length - 10} users khác`);
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log("\n📊 TỔNG HỢP:");
+  console.log("=".repeat(70));
+  
+  const toDelete = new Set<number>();
+  const toNormalize: { id: number; old: string; new: string }[] = [];
+
+  for (const [_, userList] of duplicateEmails) {
+    userList.slice(1).forEach(u => toDelete.add(u.id));
+  }
+  for (const [_, userList] of duplicatePhones) {
+    userList.slice(1).forEach(u => toDelete.add(u.id));
+  }
+  unnormalizedPhones.forEach(u => {
+    if (u.phone) {
+      toNormalize.push({ id: u.id, old: u.phone, new: normalizePhone(u.phone) });
+    }
+  });
+
+  console.log(`  - Users sẽ XÓA: ${toDelete.size}`);
+  if (toDelete.size > 0) {
+    console.log(`    IDs: ${Array.from(toDelete).sort((a, b) => a - b).join(', ')}`);
+  }
+  console.log(`  - Phones sẽ chuẩn hóa: ${toNormalize.length}`);
+  console.log(`  - Enrollments của users bị xóa: Sẽ xóa theo`);
+
+  console.log("\n" + "=".repeat(70));
+
+  await prisma.$disconnect();
+}
+
+previewCleanup().catch(console.error);

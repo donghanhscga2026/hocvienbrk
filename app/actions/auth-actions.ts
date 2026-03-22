@@ -6,10 +6,38 @@ import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { redirect } from "next/navigation"
 
+function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  let p = phone.replace(/\s/g, '').replace(/^0/, '84');
+  if (!p.startsWith('+')) p = '+' + p;
+  return p;
+}
+
+function getAllPhoneVariants(fullPhone: string): string[] {
+  const normalized = normalizePhone(fullPhone);
+  const variants = [normalized];
+  
+  if (normalized.startsWith('+84')) {
+    variants.push('0' + normalized.slice(3));
+    variants.push(normalized.slice(1));
+  } else if (normalized.startsWith('+')) {
+    const withoutPlus = normalized.slice(1);
+    variants.push(withoutPlus);
+    if (withoutPlus.startsWith('84')) {
+      variants.push('0' + withoutPlus.slice(2));
+    }
+  } else {
+    variants.push('+' + normalized);
+  }
+  
+  return [...new Set(variants)];
+}
+
 const registerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
-    phone: z.string().min(10, "Phone number must be at least 10 characters"),
+    countryCode: z.string(),
+    phone: z.string().min(7, "Số điện thoại phải có ít nhất 7 số").max(15, "Số điện thoại tối đa 15 số"),
     password: z.string().min(6, "Password must be at least 6 characters"),
 })
 
@@ -25,21 +53,37 @@ export async function registerUser(prevState: any, formData: FormData) {
         }
     }
 
-    const { name, email, phone, password } = validatedFields.data
+    const { name, email, countryCode, phone, password } = validatedFields.data
+    
+    const cleanPhone = phone.replace(/\s/g, '').replace(/^0/, '');
+    const fullPhone = `${countryCode}${cleanPhone}`;
+    
+    const phoneVariants = getAllPhoneVariants(fullPhone);
+    const normalizedEmail = email.toLowerCase().trim();
 
-    // Check if user exists
     const existingUser = await prisma.user.findFirst({
         where: {
             OR: [
-                { email },
-                { phone }
+                { email: { equals: normalizedEmail, mode: 'insensitive' } },
+                { phone: { in: phoneVariants } }
             ]
         }
     })
 
     if (existingUser) {
+        const issues: string[] = [];
+        
+        if (existingUser.email.toLowerCase() === normalizedEmail) {
+            issues.push("email");
+        }
+        
+        if (phoneVariants.includes(existingUser.phone || '')) {
+            issues.push("số điện thoại");
+        }
+        
         return {
-            message: "User already exists with this email or phone number",
+            message: `Tài khoản đã tồn tại với ${issues.join(' và ')}. Vui lòng kiểm tra lại hoặc đăng nhập.`,
+            errors: {},
         }
     }
 
@@ -52,19 +96,17 @@ export async function registerUser(prevState: any, formData: FormData) {
 
         const user = await prisma.user.create({
             data: {
-                id: newId, // Sử dụng ID đã tính toán (tránh số đẹp)
+                id: newId,
                 name,
-                email,
-                phone,
+                email: normalizedEmail,
+                phone: fullPhone,
                 password: hashedPassword,
                 role: Role.STUDENT,
             },
         })
 
-        // 1. Gửi Email chào mừng cho học viên
         await sendWelcomeEmail(email, name, user.id)
 
-        // 2. Gửi thông báo Telegram cho Admin (Group REGISTER)
         const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
                          `👤 Họ tên: <b>${user.name}</b>\n` +

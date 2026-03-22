@@ -1,0 +1,142 @@
+import prisma from "../lib/prisma";
+
+function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  let p = phone.replace(/\s/g, '').replace(/^0/, '84');
+  if (!p.startsWith('+')) p = '+' + p;
+  return p;
+}
+
+async function cleanupDuplicates() {
+  console.log("=".repeat(60));
+  console.log("CLEANUP DỮ LIỆU TRÙNG LẶP");
+  console.log("=".repeat(60) + "\n");
+
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, phone: true, name: true }
+  });
+
+  // Tìm email trùng
+  const emailMap: Record<string, typeof users> = {};
+  for (const user of users) {
+    const normalized = user.email?.toLowerCase() || '';
+    if (!emailMap[normalized]) emailMap[normalized] = [];
+    emailMap[normalized].push(user);
+  }
+
+  const duplicateEmails = Object.entries(emailMap).filter(([_, u]) => u.length > 1);
+  
+  // Tìm phone trùng (normalized)
+  const phoneMap: Record<string, typeof users> = {};
+  for (const user of users) {
+    if (!user.phone) continue;
+    const normalized = normalizePhone(user.phone);
+    if (!phoneMap[normalized]) phoneMap[normalized] = [];
+    phoneMap[normalized].push(user);
+  }
+
+  const duplicatePhones = Object.entries(phoneMap).filter(([_, u]) => u.length > 1);
+
+  console.log(`📧 Email trùng: ${duplicateEmails.length} nhóm`);
+  console.log(`📱 Phone trùng: ${duplicatePhones.length} nhóm\n`);
+
+  let deletedCount = 0;
+  let updatedCount = 0;
+
+  // Xử lý email trùng
+  console.log("-".repeat(50));
+  console.log("\n📧 XỬ LÝ EMAIL TRÙNG:");
+  
+  for (const [email, userList] of duplicateEmails) {
+    console.log(`\n  ${email}:`);
+    
+    // Giữ lại user mới nhất (ID lớn nhất), xóa các user cũ hơn
+    const sorted = userList.sort((a, b) => b.id - a.id);
+    const keep = sorted[0];
+    const toDelete = sorted.slice(1);
+    
+    console.log(`    Giữ lại: ID ${keep.id} (${keep.name})`);
+    
+    for (const user of toDelete) {
+      console.log(`    Xóa: ID ${user.id} (${user.name})`);
+      
+      // Xóa enrollments trước (nếu có)
+      await prisma.enrollment.deleteMany({ where: { userId: user.id } });
+      
+      // Xóa user
+      await prisma.user.delete({ where: { id: user.id } });
+      deletedCount++;
+    }
+  }
+
+  // Xử lý phone trùng (sau khi đã xử lý email)
+  console.log("\n" + "-".repeat(50));
+  console.log("\n📱 XỬ LÝ PHONE TRÙNG:");
+  
+  // Refresh users list sau khi xóa
+  const refreshedUsers = await prisma.user.findMany({
+    select: { id: true, email: true, phone: true, name: true }
+  });
+
+  const refreshedPhoneMap: Record<string, typeof refreshedUsers> = {};
+  for (const user of refreshedUsers) {
+    if (!user.phone) continue;
+    const normalized = normalizePhone(user.phone);
+    if (!refreshedPhoneMap[normalized]) refreshedPhoneMap[normalized] = [];
+    refreshedPhoneMap[normalized].push(user);
+  }
+
+  const remainingPhoneDupes = Object.entries(refreshedPhoneMap).filter(([_, u]) => u.length > 1);
+
+  for (const [normalizedPhone, userList] of remainingPhoneDupes) {
+    console.log(`\n  ${normalizedPhone}:`);
+    
+    // Giữ lại user mới nhất, xóa các user cũ hơn
+    const sorted = userList.sort((a, b) => b.id - a.id);
+    const keep = sorted[0];
+    const toDelete = sorted.slice(1);
+    
+    console.log(`    Giữ lại: ID ${keep.id} (${keep.name}) - ${keep.phone}`);
+    
+    for (const user of toDelete) {
+      console.log(`    Xóa: ID ${user.id} (${user.name}) - ${user.phone}`);
+      
+      await prisma.enrollment.deleteMany({ where: { userId: user.id } });
+      await prisma.user.delete({ where: { id: user.id } });
+      deletedCount++;
+    }
+  }
+
+  // Chuẩn hóa phone cho tất cả users còn lại
+  console.log("\n" + "-".repeat(50));
+  console.log("\n🔧 CHUẨN HÓA PHONE CHO TẤT CẢ USERS:");
+  
+  const allUsers = await prisma.user.findMany({
+    where: { phone: { not: null } },
+    select: { id: true, phone: true }
+  });
+
+  let normalizedCount = 0;
+  for (const user of allUsers) {
+    if (user.phone && !user.phone.startsWith('+')) {
+      const normalized = normalizePhone(user.phone);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { phone: normalized }
+      });
+      normalizedCount++;
+    }
+  }
+
+  console.log(`  Đã chuẩn hóa: ${normalizedCount} users`);
+
+  console.log("\n" + "=".repeat(60));
+  console.log("\n✅ HOÀN TẤT CLEANUP:");
+  console.log(`   - Users đã xóa: ${deletedCount}`);
+  console.log(`   - Phones đã chuẩn hóa: ${normalizedCount}`);
+  console.log("=".repeat(60));
+
+  await prisma.$disconnect();
+}
+
+cleanupDuplicates().catch(console.error);

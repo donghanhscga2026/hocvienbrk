@@ -7,6 +7,35 @@ import { useRouter } from "next/navigation"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import { registerUser } from "../actions/auth-actions"
 
+const COUNTRY_CODES = [
+    { code: "+84", country: "Vietnam 🇻🇳" },
+    { code: "+1", country: "USA/Canada 🇺🇸" },
+    { code: "+44", country: "UK 🇬🇧" },
+    { code: "+61", country: "Australia 🇦🇺" },
+    { code: "+65", country: "Singapore 🇸🇬" },
+    { code: "+66", country: "Thailand 🇹🇭" },
+    { code: "+855", country: "Cambodia 🇰🇭" },
+    { code: "+856", country: "Laos 🇱🇦" },
+    { code: "+60", country: "Malaysia 🇲🇾" },
+    { code: "+62", country: "Indonesia 🇮🇩" },
+    { code: "+63", country: "Philippines 🇵🇭" },
+    { code: "+81", country: "Japan 🇯🇵" },
+    { code: "+82", country: "Korea 🇰🇷" },
+    { code: "+86", country: "China 🇨🇳" },
+    { code: "+33", country: "France 🇫🇷" },
+    { code: "+49", country: "Germany 🇩🇪" },
+    { code: "+39", country: "Italy 🇮🇹" },
+    { code: "+34", country: "Spain 🇪🇸" },
+    { code: "+7", country: "Russia 🇷🇺" },
+    { code: "+971", country: "UAE 🇦🇪" },
+    { code: "+66", country: "Thailand 🇹🇭" },
+    { code: "+855", country: "Cambodia 🇰🇭" },
+    { code: "+856", country: "Laos 🇱🇦" },
+    { code: "+60", country: "Malaysia 🇲🇾" },
+    { code: "+62", country: "Indonesia 🇮🇩" },
+    { code: "+63", country: "Philippines 🇵🇭" },
+]
+
 export default function RegisterPage() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -14,14 +43,17 @@ export default function RegisterPage() {
     const [showPassword, setShowPassword] = useState(false)
     const router = useRouter()
 
-    const { register, handleSubmit, formState: { errors } } = useForm({
+    const { register, handleSubmit, watch, formState: { errors } } = useForm({
         defaultValues: {
             name: "",
             email: "",
+            countryCode: "+84",
             phone: "",
             password: ""
         }
     })
+
+    const countryCode = watch("countryCode")
 
     async function onSubmit(data: any) {
         setIsLoading(true)
@@ -32,17 +64,9 @@ export default function RegisterPage() {
             const formData = new FormData()
             formData.append("name", data.name)
             formData.append("email", data.email)
+            formData.append("countryCode", data.countryCode)
             formData.append("phone", data.phone)
             formData.append("password", data.password)
-
-            // We call the server action directly here, but managing state manually 
-            // since we aren't using useFormState (React 19 feature, but next-auth guidelines often use client side wrappers)
-            // Actually, since this is a client component, we can just await the action.
-            // But `registerUser` redirects on success, so we might need to catch that?
-            // Wait, `registerUser` calls `redirect`. Next.js redirects throw an error in try/catch blocks unless handled specificially.
-            // But typically server actions with redirect are safe to call if we don't catch the redirect error.
-            // However, since we are in a client event handler, we need to be careful.
-            // Let's wrapping it.
 
             const result = await registerUser(null, formData)
 
@@ -54,15 +78,9 @@ export default function RegisterPage() {
                     setError(result.message)
                 }
             }
-            // If it redirects, the code below won't execute effectively (or at least the page changes)
 
         } catch (err: any) {
-            // Next.js NEXT_REDIRECT error check
-            //   if (err.message === "NEXT_REDIRECT") throw err
-            // Actually for client components calling server actions, the redirect happens automatically. 
-            // But if we use `try/catch`, we might catch the redirect error.
-            // Best practice: Check if error is digest NEXT_REDIRECT
-            // but usually server actions are robust.
+            // Next.js redirect error
         } finally {
             setIsLoading(false)
         }
@@ -127,11 +145,28 @@ export default function RegisterPage() {
                             <label className="block text-sm font-medium text-gray-700">
                                 Phone Number
                             </label>
-                            <input
-                                {...register("phone", { required: "Phone is required" })}
-                                type="tel"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                            />
+                            <div className="flex gap-2">
+                                <select
+                                    {...register("countryCode")}
+                                    className="w-36 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 text-sm"
+                                >
+                                    {COUNTRY_CODES.map((c) => (
+                                        <option key={c.code} value={c.code}>
+                                            {c.country}
+                                        </option>
+                                    ))}
+                                </select>
+                                <input
+                                    {...register("phone", { 
+                                        required: "Phone is required",
+                                        minLength: { value: 7, message: "Ít nhất 7 số" },
+                                        maxLength: { value: 15, message: "Tối đa 15 số" }
+                                    })}
+                                    type="tel"
+                                    placeholder={countryCode === "+84" ? "0912 345 678" : "Enter phone number"}
+                                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                />
+                            </div>
                             {errors.phone && (
                                 <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>
                             )}
