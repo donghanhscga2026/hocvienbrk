@@ -1,0 +1,102 @@
+import prisma from "../lib/prisma";
+import { getOAuth2Client } from "../lib/google-auth";
+import { decrypt } from "../lib/email-encryptor";
+import { google } from "googleapis";
+
+function decodeQuotedPrintable(str: string): string {
+  return str
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/gi, (_, p1) => String.fromCharCode(parseInt(p1, 16)));
+}
+
+async function debugBounceEmails() {
+  console.log("=".repeat(60));
+  console.log("DEBUG: XEM CHI TIẾT NỘI DUNG BOUNCE EMAILS");
+  console.log("=".repeat(60) + "\n");
+
+  const sender = await prisma.emailSender.findFirst({
+    where: { isActive: true, email: 'scgacademy05@gmail.com' },
+    select: { email: true, refreshToken: true }
+  });
+
+  if (!sender) {
+    console.log("Không tìm thấy sender");
+    return;
+  }
+
+  const oauth2Client = getOAuth2Client();
+  oauth2Client.setCredentials({ refresh_token: decrypt(sender.refreshToken) });
+
+  const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+  const response = await gmail.users.messages.list({
+    userId: sender.email,
+    q: 'from:mailer-daemon newer_than:30d',
+    maxResults: 3
+  });
+
+  const messages = response.data.messages || [];
+  console.log(`Tìm thấy ${messages.length} bounce emails\n`);
+
+  for (const msg of messages.slice(0, 2)) {
+    const message = await gmail.users.messages.get({
+      userId: sender.email,
+      id: msg.id!,
+      format: 'full'
+    });
+
+    const headers = message.data.payload?.headers || [];
+    const subject = headers.find((h: any) => h.name?.toLowerCase() === 'subject')?.value;
+    const from = headers.find((h: any) => h.name?.toLowerCase() === 'from')?.value;
+
+    console.log(`📧 Subject: ${subject}`);
+    console.log(`📤 From: ${from}`);
+    console.log("-".repeat(50));
+
+    const extractText = (p: any): string => {
+      let text = "";
+      if (p.body?.data) {
+        try {
+          const base64 = p.body.data.replace(/-/g, '+').replace(/_/g, '/');
+          const rawText = Buffer.from(base64, 'base64').toString('utf-8');
+          text += decodeQuotedPrintable(rawText) + " ";
+        } catch {}
+      }
+      if (p.parts) {
+        for (const part of p.parts) {
+          text += extractText(part) + " ";
+        }
+      }
+      return text;
+    };
+
+    const content = extractText(message.data.payload);
+    console.log(`📝 Nội dung (500 ký tự đầu):`);
+    console.log(content.substring(0, 500));
+    console.log("\n" + "=".repeat(60));
+
+    const allEmails = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+    console.log(`\n📧 Tất cả emails tìm thấy: ${allEmails.length}`);
+    [...new Set(allEmails)].forEach(e => console.log(`  - ${e}`));
+    console.log("");
+  }
+
+  // Lấy tất cả sent emails từ campaign logs
+  console.log("-".repeat(50));
+  console.log("\n📊 KIỂM TRA: Emails trong sent logs:");
+  
+  const sentLogs = await prisma.emailCampaignLog.findMany({
+    where: { status: "SENT" },
+    select: { toEmail: true },
+    take: 50
+  });
+
+  console.log(`\nMẫu 50 emails đã gửi:`);
+  sentLogs.forEach((log, i) => {
+    console.log(`  ${i + 1}. ${log.toEmail}`);
+  });
+
+  await prisma.$disconnect();
+}
+
+debugBounceEmails().catch(console.error);

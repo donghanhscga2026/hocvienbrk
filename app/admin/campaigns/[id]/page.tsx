@@ -6,13 +6,19 @@ import { Button } from "@/components/ui/button";
 
 export default function CampaignDetailPage() {
   const params = useParams();
-  const id = params?.id as string; // Lấy ID trực tiếp từ URL
+  const id = params?.id as string;
   
   const router = useRouter();
   const [campaign, setCampaign] = useState<any>(null);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logsBySender, setLogsBySender] = useState<Record<number, any[]>>({});
+  const [senders, setSenders] = useState<any[]>([]);
+  const [senderStats, setSenderStats] = useState<any[]>([]);
+  const [logsNoSender, setLogsNoSender] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<any>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   
@@ -46,10 +52,44 @@ export default function CampaignDetailPage() {
       const res = await fetch(`/api/admin/campaigns/${id}/logs`);
       if (res.ok) {
         const data = await res.json();
-        setLogs(data);
+        setLogsBySender(data.logsBySender || {});
+        setSenders(data.senders || []);
+        setSenderStats(data.senderStats || []);
+        setLogsNoSender(data.logsNoSender || []);
+        setSummary(data.summary || null);
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const scanBounces = async () => {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const res = await fetch(`/api/admin/campaigns/bounce-scan`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScanResult(data);
+        await fetchCampaign();
+        await fetchLogs();
+        
+        const totalBounced = (data.hardBounced || 0) + (data.softBounced || 0);
+        const details = data.senderDetails?.map((s: any) => 
+          `${s.email}: 🔴${s.hardBounced} 🟡${s.softBounced}`
+        ).join('\n') || '';
+        
+        alert(`Đã quét xong!\n🔴 HARD BOUNCE: ${data.hardBounced}\n🟡 SOFT BOUNCE: ${data.softBounced}\n\nChi tiết:\n${details}`);
+      } else {
+        alert("Lỗi khi quét bounce");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Lỗi mạng khi quét bounce");
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -117,6 +157,27 @@ export default function CampaignDetailPage() {
 
   const pauseSending = () => {
     stopRequest.current = true;
+  };
+
+  const restartCampaign = async () => {
+    if (!confirm("Bạn có muốn gửi lại toàn bộ chiến dịch này không? Toàn bộ nhật ký cũ sẽ bị xóa và tiến độ sẽ quay về 0.")) return;
+    
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/admin/campaigns/${id}/restart`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        await fetchCampaign();
+        await fetchLogs();
+      } else {
+        alert("Lỗi khi đặt lại chiến dịch");
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const abortCampaign = async () => {
@@ -199,33 +260,59 @@ export default function CampaignDetailPage() {
           </div>
         )}
 
-        <div className="flex gap-4">
-          {campaign.status !== "COMPLETED" && (
-            <>
-              {!running ? (
-                <Button 
-                  onClick={startSending}
-                  className="flex-1 h-16 rounded-2xl bg-yellow-400 text-black hover:bg-yellow-500 font-black uppercase text-sm shadow-xl shadow-yellow-400/20 transition-all active:scale-95"
-                >
-                  ▶️ {campaign.sentCount > 0 ? "Tiếp tục gửi" : "Bắt đầu gửi ngay"}
-                </Button>
-              ) : (
-                <Button 
-                  onClick={pauseSending}
-                  className="flex-1 h-16 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-black uppercase text-sm shadow-xl shadow-red-600/20 transition-all active:scale-95"
-                >
-                  ⏸️ Tạm dừng gửi
-                </Button>
-              )}
-              {campaign.status !== "FAILED" && !running && (
-                <Button 
-                  onClick={abortCampaign}
-                  className="h-16 px-4 rounded-2xl bg-gray-100 text-red-600 font-black uppercase text-[10px] border-2 border-red-100 transition-all active:scale-95"
-                >
-                  🛑 Dừng hẳn
-                </Button>
-              )}
-            </>
+        <div className="flex flex-wrap gap-4">
+          {/* Nút chính: Bắt đầu / Tiếp tục / Tạm dừng */}
+          {campaign.status !== "COMPLETED" ? (
+            !running ? (
+              <Button 
+                onClick={startSending}
+                className="flex-1 h-16 rounded-2xl bg-yellow-400 text-black hover:bg-yellow-500 font-black uppercase text-sm shadow-xl shadow-yellow-400/20 transition-all active:scale-95"
+              >
+                ▶️ {campaign.sentCount > 0 ? "Tiếp tục gửi" : "Bắt đầu gửi ngay"}
+              </Button>
+            ) : (
+              <Button 
+                onClick={pauseSending}
+                className="flex-1 h-16 rounded-2xl bg-red-600 text-white hover:bg-red-700 font-black uppercase text-sm shadow-xl shadow-red-600/20 transition-all active:scale-95"
+              >
+                ⏸️ Tạm dừng gửi
+              </Button>
+            )
+          ) : (
+            <div className="flex-1 h-16 rounded-2xl bg-green-50 text-green-700 border-2 border-green-100 flex items-center justify-center font-black uppercase text-xs">
+              ✅ Chiến dịch đã hoàn thành
+            </div>
+          )}
+
+          {/* Nút Reset / Gửi lại từ đầu: Hiện khi đã có tiến độ và không đang chạy */}
+          {campaign.sentCount > 0 && !running && (
+            <Button 
+              onClick={restartCampaign}
+              className="h-16 px-8 rounded-2xl bg-blue-50 text-blue-600 hover:bg-blue-100 font-black uppercase text-[10px] border-2 border-blue-100 transition-all active:scale-95"
+            >
+              🔄 Gửi lại từ đầu
+            </Button>
+          )}
+
+          {/* Nút Dừng hẳn */}
+          {campaign.status !== "COMPLETED" && campaign.status !== "FAILED" && !running && (
+            <Button 
+              onClick={abortCampaign}
+              className="h-16 px-6 rounded-2xl bg-gray-100 text-red-600 font-black uppercase text-[10px] border-2 border-red-100 transition-all active:scale-95"
+            >
+              🛑 Dừng hẳn
+            </Button>
+          )}
+
+          {/* Nút Quét Bounce - Hiện khi không đang gửi */}
+          {!running && campaign.sentCount > 0 && (
+            <Button 
+              onClick={scanBounces}
+              disabled={scanning}
+              className="h-16 px-8 rounded-2xl bg-black text-white hover:bg-gray-800 font-black uppercase text-[10px] transition-all active:scale-95 disabled:opacity-50"
+            >
+              {scanning ? "⌛ Đang quét..." : "🧹 Quét Bounce & Làm sạch"}
+            </Button>
           )}
           
           <Button 
@@ -238,50 +325,143 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Nhật ký hoạt động (100 mới nhất)</h3>
-          <Button onClick={fetchLogs} variant="ghost" className="text-[8px] font-black uppercase">Làm mới</Button>
+      <div className="space-y-4">
+        <div className="bg-gray-50 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-4">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Nhật ký hoạt động</h3>
+          
+          {summary && (
+            <div className="flex gap-3 text-[9px]">
+              <span className="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 font-black">
+                ✅ Gửi: {summary.sent}
+              </span>
+              <span className="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-black">
+                🔴 Lỗi: {summary.bounced}
+              </span>
+              <span className="px-3 py-1.5 rounded-lg bg-yellow-100 text-yellow-700 font-black">
+                ⚠️ Khác: {summary.failed}
+              </span>
+            </div>
+          )}
+          
+          <Button onClick={fetchLogs} variant="ghost" className="text-[8px] font-black uppercase">🔄 Làm mới</Button>
         </div>
-        <div className="overflow-x-auto max-h-[400px]">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50/30 border-b border-gray-100">
-                <th className="px-6 py-3 text-[8px] font-black uppercase text-gray-400">Email nhận</th>
-                <th className="px-6 py-3 text-[8px] font-black uppercase text-gray-400">Trạng thái</th>
-                <th className="px-6 py-3 text-[8px] font-black uppercase text-gray-400">Chi tiết/Lỗi</th>
-                <th className="px-6 py-3 text-[8px] font-black uppercase text-gray-400">Thời gian</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {logs.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-gray-400 font-bold uppercase text-[10px]">Chưa có hoạt động nào</td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="text-[10px] hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-3 font-bold">{log.toEmail}</td>
-                    <td className="px-6 py-3">
-                      <span className={`px-2 py-0.5 rounded-lg font-black uppercase text-[8px] ${
-                        log.status === "SENT" ? "bg-green-100 text-green-700" :
-                        log.status === "FAILED" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
-                      }`}>
-                        {log.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-gray-400 max-w-[200px] truncate">
-                      {log.errorCode || "-"}
-                    </td>
-                    <td className="px-6 py-3 text-gray-400">
-                      {new Date(log.sentAt).toLocaleTimeString('vi-VN')}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        {senderStats.length === 0 ? (
+          <div className="bg-white rounded-2xl p-10 text-center text-gray-400 font-bold uppercase text-xs">
+            Chưa có hoạt động nào
+          </div>
+        ) : (
+          senderStats.map((sender) => {
+            const logs = logsBySender[sender.id] || [];
+            return (
+              <div key={sender.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-black text-xs">
+                      {sender.id}
+                    </span>
+                    <div>
+                      <p className="font-black text-sm text-gray-800">{sender.email}</p>
+                      <p className="text-[9px] text-gray-400">{sender.label}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 text-[9px]">
+                    <span className="px-2 py-1 rounded bg-green-100 text-green-700 font-bold">
+                      ✅ {sender.sent}
+                    </span>
+                    <span className="px-2 py-1 rounded bg-red-100 text-red-700 font-bold">
+                      🔴 {sender.bounced}
+                    </span>
+                    <span className="px-2 py-1 rounded bg-gray-100 text-gray-600 font-bold">
+                      Tổng: {sender.total}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="overflow-x-auto max-h-[300px]">
+                  <table className="w-full text-left">
+                    <thead className="sticky top-0 bg-gray-50/80 backdrop-blur-sm z-10">
+                      <tr className="border-b border-gray-100">
+                        <th className="px-4 py-2 text-[7px] font-black uppercase text-gray-400 w-10">#</th>
+                        <th className="px-4 py-2 text-[7px] font-black uppercase text-gray-400">Email nhận</th>
+                        <th className="px-4 py-2 text-[7px] font-black uppercase text-gray-400 w-20">Trạng thái</th>
+                        <th className="px-4 py-2 text-[7px] font-black uppercase text-gray-400 w-20">Loại</th>
+                        <th className="px-4 py-2 text-[7px] font-black uppercase text-gray-400 w-24">Thời gian</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {logs.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-gray-300 text-[9px] font-bold uppercase">
+                            Chưa gửi email nào
+                          </td>
+                        </tr>
+                      ) : (
+                        logs.map((log: any, idx: number) => (
+                          <tr key={log.id} className="text-[9px] hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-2 text-gray-300">{idx + 1}</td>
+                            <td className="px-4 py-2 font-bold text-gray-700">{log.toEmail}</td>
+                            <td className="px-4 py-2">
+                              <span className={`px-2 py-0.5 rounded font-black uppercase text-[7px] ${
+                                log.status === "SENT" ? "bg-green-100 text-green-700" :
+                                log.status === "BOUNCED" ? "bg-red-100 text-red-700" :
+                                log.status === "FAILED" ? "bg-red-100 text-red-700" : 
+                                log.status === "SKIPPED" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-700"
+                              }`}>
+                                {log.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2">
+                              {log.errorType && (
+                                <span className={`px-2 py-0.5 rounded text-[7px] font-black ${
+                                  log.errorType === "HARD_BOUNCE" ? "bg-red-100 text-red-600" :
+                                  log.errorType === "SOFT_BOUNCE" ? "bg-yellow-100 text-yellow-600" : "bg-gray-100 text-gray-600"
+                                }`}>
+                                  {log.errorType === "HARD_BOUNCE" ? "🔴" : 
+                                   log.errorType === "SOFT_BOUNCE" ? "🟡" : log.errorType}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-gray-400">
+                              {new Date(log.sentAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })
+        )}
+        
+        {logsNoSender.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-100">
+              <p className="font-black text-sm text-gray-500">📧 Không xác định vệ tinh ({logsNoSender.length} emails)</p>
+            </div>
+            <div className="overflow-x-auto max-h-[200px]">
+              <table className="w-full text-left">
+                <tbody className="divide-y divide-gray-50">
+                  {logsNoSender.slice(0, 20).map((log: any, idx: number) => (
+                    <tr key={log.id} className="text-[9px]">
+                      <td className="px-4 py-2 text-gray-300 w-10">{idx + 1}</td>
+                      <td className="px-4 py-2 font-bold text-gray-600">{log.toEmail}</td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 rounded font-black uppercase text-[7px] ${
+                          log.status === "SENT" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        }`}>
+                          {log.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

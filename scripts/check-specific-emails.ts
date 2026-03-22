@@ -1,0 +1,75 @@
+import prisma from "../lib/prisma";
+
+async function checkSpecificEmails() {
+  console.log("=".repeat(60));
+  console.log("KIỂM TRA CÁC EMAIL BOUNCE CỤ THỂ");
+  console.log("=".repeat(60) + "\n");
+
+  const bounceEmails = [
+    "bonghoanhohamhoc@gmail.com",
+    "noemail454@gmail.com",
+    "noemail441@gmail.com",
+  ];
+
+  for (const email of bounceEmails) {
+    console.log(`\n📧 ${email}`);
+    console.log("-".repeat(40));
+
+    // Kiểm tra trong User
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true, email: true, emailVerified: true }
+    });
+    console.log(`  User: ${user ? `ID ${user.id}, Verified: ${user.emailVerified}` : 'Không có'}`);
+
+    // Kiểm tra trong CampaignLog - tất cả thời gian
+    const logs = await prisma.emailCampaignLog.findMany({
+      where: { toEmail: { equals: email, mode: 'insensitive' } },
+      select: { id: true, campaignId: true, status: true, sentAt: true, errorType: true },
+      orderBy: { sentAt: 'desc' }
+    });
+    console.log(`  Campaign Logs: ${logs.length} bản ghi`);
+    logs.forEach(log => {
+      console.log(`    - Campaign ${log.campaignId}: ${log.status} (${log.sentAt.toLocaleDateString()}) - ${log.errorType || 'N/A'}`);
+    });
+
+    // Kiểm tra trong Blacklist
+    const blacklist = await prisma.emailBlacklist.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+    console.log(`  Blacklist: ${blacklist ? blacklist.reason : 'Không có'}`);
+  }
+
+  // Kiểm tra tất cả SENT logs trong 60 ngày
+  console.log("\n" + "=".repeat(60));
+  console.log("TẤT CẢ SENT LOGS TRONG 60 NGÀY:");
+  
+  const allSentLogs = await prisma.emailCampaignLog.findMany({
+    where: {
+      status: "SENT",
+      sentAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }
+    },
+    select: { toEmail: true, sentAt: true }
+  });
+
+  console.log(`\nTổng SENT logs (60 ngày): ${allSentLogs.length}`);
+  
+  const sentSet = new Set(allSentLogs.map(l => l.toEmail.toLowerCase()));
+  
+  // Kiểm tra xem bounce emails có trong sentSet không
+  let found = 0;
+  for (const email of bounceEmails) {
+    if (sentSet.has(email.toLowerCase())) {
+      found++;
+      console.log(`  ✅ ${email} - CÓ trong sent logs`);
+    } else {
+      console.log(`  ❌ ${email} - KHÔNG có trong sent logs`);
+    }
+  }
+
+  console.log(`\nTìm thấy: ${found}/${bounceEmails.length}`);
+
+  await prisma.$disconnect();
+}
+
+checkSpecificEmails().catch(console.error);
