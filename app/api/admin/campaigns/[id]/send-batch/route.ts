@@ -127,7 +127,7 @@ export async function POST(
               <a href="https://giautoandien.io.vn" style="text-decoration: none;">
                 <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="HỌC VIỆN BRK" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
               </a>
-              <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">THE NEW GENERATION</div>
+              <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">NGÂN HÀNG PHƯỚC BÁU</div>
             </div>
             <div style="padding: 40px 30px; background-color: #ffffff;">
               <div style="font-size: 16px; color: #333333;">
