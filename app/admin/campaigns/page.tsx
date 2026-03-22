@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,6 +39,23 @@ export default function CampaignsPage() {
       if (res.ok) fetchCampaigns();
     } catch (error) {
       alert("Lỗi khi xóa chiến dịch");
+    }
+  };
+
+  const restartCampaign = async (id: number) => {
+    if (!confirm("Bạn có muốn gửi lại toàn bộ chiến dịch này không? Toàn bộ nhật ký cũ sẽ bị xóa và tiến độ sẽ quay về 0.")) return;
+    
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/restart`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        router.push(`/admin/campaigns/${id}`);
+      } else {
+        alert("Lỗi khi đặt lại chiến dịch");
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -115,6 +134,24 @@ export default function CampaignsPage() {
                           {cp.status === "DRAFT" ? "Soạn" : "Xem"}
                         </Button>
                       </Link>
+                      <Link href={`/admin/campaigns/new?editId=${cp.id}`}>
+                        <Button className="bg-gray-100 text-gray-900 hover:bg-gray-200 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all">
+                          Chỉnh sửa
+                        </Button>
+                      </Link>
+                      <Link href={`/admin/campaigns/new?cloneId=${cp.id}`}>
+                        <Button className="bg-blue-50 text-blue-600 hover:bg-blue-100 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all">
+                          Nhân bản
+                        </Button>
+                      </Link>
+                      {(cp.status === "COMPLETED" || cp.status === "FAILED") && (
+                        <Button 
+                          onClick={() => restartCampaign(cp.id)}
+                          className="bg-green-50 text-green-600 hover:bg-green-100 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all"
+                        >
+                          Gửi lại
+                        </Button>
+                      )}
                       <Button 
                         onClick={() => deleteCampaign(cp.id)}
                         className="bg-red-50 text-red-600 hover:bg-red-100 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all"

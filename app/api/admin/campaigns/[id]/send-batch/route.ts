@@ -87,29 +87,48 @@ export async function POST(
         }
 
         // --- CÁ NHÂN HÓA ---
-        // Tiêu đề
-        let subject = spinContent(campaign.subject);
+        // GHI CHÚ: Subject và Content cần được xử lý spin và replace trước khi gửi qua Gmail API
+        let subject = spinContent(campaign.subject || "").trim();
         subject = subject.replace(/\[Tên\]/g, recipient.name || "Học viên");
         subject = subject.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
 
         // Nội dung HTML
-        let html = spinContent(campaign.htmlContent);
-        html = html.replace(/\[Tên\]/g, recipient.name || "bạn");
-        html = html.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
+        let rawHtml = spinContent(campaign.htmlContent || "").trim();
+        rawHtml = rawHtml.replace(/\[Tên\]/g, recipient.name || "bạn");
+        rawHtml = rawHtml.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
         
-        // Thêm Footer Unsubscribe
-        const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}`;
-        html += `
-          <br><br>
-          <hr style="border:none;border-top:1px solid #eee">
-          <p style="font-size:10px;color:#999;text-align:center">
-            Bạn nhận email này vì là học viên Học Viện BRK. 
-            <a href="${unsubscribeUrl}" style="color:#666">Hủy đăng ký nhận email</a>
-          </p>
+        // Tự động chuyển xuống dòng nếu người dùng không dùng thẻ HTML
+        if (!rawHtml.includes('<p>') && !rawHtml.includes('<br')) {
+          rawHtml = rawHtml.replace(/\n/g, '<br/>');
+        }
+
+        // --- WRAP TRONG TEMPLATE CHUYÊN NGHIỆP ---
+        const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}`;
+        
+        const finalHtml = `
+          <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
+            <div style="background-color: #000000; padding: 30px; text-align: center;">
+              <a href="https://giautoandien.io.vn" style="text-decoration: none;">
+                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="HỌC VIỆN BRK" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
+              </a>
+              <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">THE NEW GENERATION</div>
+            </div>
+            <div style="padding: 40px 30px; background-color: #ffffff;">
+              <div style="font-size: 16px; color: #333333;">
+                ${rawHtml}
+              </div>
+            </div>
+            <div style="padding: 30px; background-color: #f9f9f9; border-top: 1px solid #eeeeee; text-align: center;">
+              <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
+                Bạn nhận được thông báo này vì là thành viên của <b>Học Viện BRK</b>.<br>
+                Nếu không muốn nhận những email này, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">Hủy đăng ký tại đây</a>.
+              </p>
+            </div>
+          </div>
         `;
         
         // Gửi qua Gmail API
-        await sendGmailFromSender(sender, recipient.email, subject, html);
+        await sendGmailFromSender(sender, recipient.email, subject, finalHtml);
 
         // Lưu Log Thành công
         await prisma.emailCampaignLog.create({

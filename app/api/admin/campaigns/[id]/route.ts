@@ -56,10 +56,20 @@ export async function PATCH(
   }
 
   try {
-    const { status } = await req.json();
+    const data = await req.json();
     const updated = await prisma.emailCampaign.update({
       where: { id },
-      data: { status }
+      data: {
+        title: data.title,
+        notificationType: data.notificationType,
+        recipientSource: data.recipientSource,
+        recipientFilter: data.recipientFilter,
+        recipientCsvData: data.recipientCsvData,
+        subject: data.subject,
+        htmlContent: data.htmlContent,
+        status: data.status || "DRAFT", // Mặc định về Draft nếu sửa nội dung quan trọng
+        totalRecipients: data.totalRecipients || 0,
+      }
     });
     return NextResponse.json(updated);
   } catch (error: any) {
