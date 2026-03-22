@@ -91,6 +91,11 @@ export async function sendLoginNotification(user: any, ip: string, userAgent: st
   await sendTelegram(msg, 'LESSON');
 }
 
+export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }) {
+  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
+  await sendTelegram(msg, 'LESSON');
+}
+
 export async function sendSurveyNotification(data: {
   studentName: string,
   studentId: number,
@@ -149,3 +154,4 @@ export async function sendSurveyNotification(data: {
 
 export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
 export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
+export { sendGmail };
