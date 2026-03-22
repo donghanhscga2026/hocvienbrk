@@ -1,0 +1,37 @@
+import { auth } from "@/auth";
+import { NextResponse } from "next/server";
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
+
+    if (!file) {
+      return new NextResponse("No file uploaded", { status: 400 });
+    }
+
+    // Kiểm tra kích thước ảnh (Giới hạn 1MB cho ổn định)
+    if (file.size > 1024 * 1024) {
+      return new NextResponse("Kích thước ảnh quá lớn (vui lòng chọn ảnh < 1MB)", { status: 400 });
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    
+    // Trả về Data URL để trình soạn thảo hiển thị preview 
+    // và Email Runner sẽ tự chuyển sang CID khi gửi.
+    const base64Image = buffer.toString('base64');
+    const dataUrl = `data:${file.type};base64,${base64Image}`;
+
+    return NextResponse.json({ url: dataUrl });
+
+  } catch (error: any) {
+    console.error("Upload error:", error);
+    return new NextResponse(error.message, { status: 500 });
+  }
+}
