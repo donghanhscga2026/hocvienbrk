@@ -9,25 +9,26 @@ datasource db {
 }
 
 model User {
-  id            Int          @id @default(autoincrement())
-  name          String?
-  email         String       @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  phone         String?      @unique
-  role          Role         @default(STUDENT)
-  referrerId    Int?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  accounts      Account[]
-  enrollments   Enrollment[]
-  sessions      Session[]
-  lessonComments LessonComment[] @relation("UserToLessonComment")
-  posts         Post[]          @relation("UserToPost")
-  postComments  PostComment[]   @relation("UserToPostComment")
-  referrer      User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
-  referrals     User[]       @relation("ReferrerToReferee")
+  id              Int          @id @default(autoincrement())
+  name            String?
+  email           String       @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+  passwordChanged  Boolean      @default(false)  // TRUE sau khi đổi mật khẩu từ mặc định
+  phone           String?      @unique
+  role            Role         @default(STUDENT)
+  referrerId      Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  accounts        Account[]
+  enrollments      Enrollment[]
+  sessions        Session[]
+  lessonComments   LessonComment[] @relation("UserToLessonComment")
+  posts           Post[]          @relation("UserToPost")
+  postComments    PostComment[]   @relation("UserToPostComment")
+  referrer        User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
+  referrals       User[]       @relation("ReferrerToReferee")
   
   // Zero 2 Hero Data - Tách sang bảng UserRoadmap
   roadmap       UserRoadmap?
@@ -203,6 +204,17 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
 }
 
 model SystemConfig {

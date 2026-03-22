@@ -8,9 +8,18 @@ import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MẬT KHẨU MẶC ĐỊNH - CẤU HÌNH
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"; // Brk#3773
+
+export async function isDefaultPassword(password: string): Promise<boolean> {
+  // So sánh với hash của "Brk#3773"
+  return bcrypt.compare("Brk#3773", password);
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig,
-    // Sử dụng 'as any' để giải quyết xung đột Type hệ thống
     adapter: PrismaAdapter(prisma) as any, 
     session: { strategy: "jwt" },
     providers: [
@@ -35,7 +44,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const isNumeric = /^\d+$/.test(identifier);
                 const isEmail = identifier.includes("@");
 
-                // Tìm kiếm người dùng 1 lần duy nhất
                 const user = await prisma.user.findFirst({
                     where: {
                         OR: [
@@ -50,12 +58,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 const passwordsMatch = await bcrypt.compare(password, user.password);
                 if (passwordsMatch) {
+                    // Kiểm tra nếu dùng mật khẩu mặc định
+                    const isDefault = await isDefaultPassword(user.password);
+                    const userAny = user as any;
+                    
                     return {
                         id: user.id.toString(),
                         name: user.name,
                         email: user.email,
                         role: user.role,
                         image: user.image,
+                        needsPasswordChange: isDefault && !userAny.passwordChanged,
                     };
                 }
                 return null;
@@ -64,13 +77,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ],
     callbacks: {
         async jwt({ token, user, trigger, session }) {
-            // Sử dụng trường 'sub' làm định danh chuẩn của JWT
             if (user) {
                 token.sub = user.id;
                 token.role = (user as any).role;
+                token.needsPasswordChange = (user as any).needsPasswordChange;
             }
 
-            // Cập nhật khi có tín hiệu update chủ động
             if (trigger === "update" && session?.role) {
                 token.role = session.role;
             }
@@ -78,10 +90,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return token;
         },
         async session({ session, token }) {
-            // Map từ 'sub' của token ngược lại 'id' của session cho đồng bộ UI
             if (token.sub && session.user) {
                 session.user.id = token.sub;
                 session.user.role = token.role as Role;
+                (session.user as any).needsPasswordChange = token.needsPasswordChange as boolean;
             }
             return session;
         }
@@ -107,7 +119,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     console.log(`📡 Đang gửi thông báo đăng nhập cho #${user.id} từ IP: ${ip}`);
                     const { sendLoginNotification } = await import("@/lib/notifications");
                     
-                    // BẮT BUỘC dùng await trên Vercel để tránh function bị đóng sớm
                     await sendLoginNotification(user, ip, userAgent);
                     console.log(`✅ Đã xử lý xong thông báo đăng nhập.`);
                 } catch (error: any) {
