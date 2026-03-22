@@ -17,17 +17,24 @@ export async function GET(req: Request) {
 
     if (source === "DB_ALL") {
       users = await prisma.user.findMany({
-        select: { id: true, email: true, name: true, role: true },
+        where: {
+          emailVerified: { not: null },
+          email: { contains: "@" }
+        },
+        select: { id: true, email: true, name: true, role: true, emailVerified: true },
         orderBy: { createdAt: "desc" }
       });
     } else if (source === "DB_ACTIVE" && courseId) {
       const enrollments = await prisma.enrollment.findMany({
         where: { 
           courseId: parseInt(courseId),
-          status: "ACTIVE"
+          status: "ACTIVE",
+          user: { emailVerified: { not: null } }
         },
         include: {
-          user: { select: { id: true, email: true, name: true, role: true } }
+          user: { 
+            select: { id: true, email: true, name: true, role: true, emailVerified: true }
+          }
         }
       });
       users = enrollments.map(e => e.user);

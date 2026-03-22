@@ -11,6 +11,15 @@ export interface Recipient {
 }
 
 /**
+ * Giải mã Quoted-Printable (Cần thiết cho email Gmail)
+ */
+function decodeQuotedPrintable(str: string): string {
+  return str
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/gi, (_, p1) => String.fromCharCode(parseInt(p1, 16)));
+}
+
+/**
  * Gửi 1 email duy nhất từ 1 sender cụ thể 
  */ 
 export async function sendGmailFromSender( 
@@ -105,7 +114,6 @@ export async function sendGmailFromSender(
   }); 
 }
 
-
 /**
  * Lấy danh sách người nhận dựa trên cấu hình Campaign
  */
@@ -123,6 +131,10 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
 
   if (campaign.recipientSource === "DB_ALL") {
     const users = await prisma.user.findMany({
+      where: {
+        emailVerified: { not: null },
+        email: { contains: "@" }
+      },
       select: { email: true, name: true, id: true },
     });
     return users.map(u => ({ email: u.email, name: u.name || "", userId: u.id }));
@@ -137,7 +149,8 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
     const enrollments = await prisma.enrollment.findMany({
       where: {
         courseId: courseId,
-        status: "ACTIVE"
+        status: "ACTIVE",
+        user: { emailVerified: { not: null } }
       },
       include: {
         user: { select: { email: true, name: true, id: true } }
@@ -152,4 +165,462 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
   }
 
   return [];
+}
+
+type EmailSenderRecord = {
+  id: number;
+  email: string;
+  refreshToken: string;
+  clientId: string | null;
+  clientSecret: string | null;
+  isActive: boolean;
+};
+
+type BounceType = 'HARD_BOUNCE' | 'SOFT_BOUNCE';
+
+interface BouncePattern {
+  pattern: RegExp;
+  type: BounceType;
+  reason: string;
+}
+
+const FAKE_EMAIL_PATTERNS = [
+  /^noemail\d+@/i,
+  /^test\d+@/i,
+  /^fake\d+@/i,
+  /^mailinator\.com$/i,
+];
+
+function isLikelyFakeEmail(email: string): { isFake: boolean; reason?: string } {
+  const lowerEmail = email.toLowerCase();
+  
+  for (const pattern of FAKE_EMAIL_PATTERNS) {
+    if (pattern.test(lowerEmail)) {
+      return { isFake: true, reason: 'Email có dạng test/fake (noemail, test, fake)' };
+    }
+  }
+  
+  return { isFake: false };
+}
+
+const BOUNCE_PATTERNS: BouncePattern[] = [
+  // HARD BOUNCE - Địa chỉ không tồn tại
+  { pattern: /user unknown|user not found|no such user|invalid recipient|recipient rejected/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /does not exist|doesn't exist|not exist/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /550 5\.1\.1|5\.1\.1 bounce|address not found/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /mailbox.*not found|not listed in directory/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /bad-mailbox|bad destination|unrouteable address/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /invalid email|invalid address/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ email không hợp lệ' },
+  
+  // SOFT BOUNCE - Tạm thời, thử lại sau
+  { pattern: /mailbox full|quota exceeded|storage full|user over quota/i, type: 'SOFT_BOUNCE', reason: 'Hộp thư đầy' },
+  { pattern: /temporary failure|temporary error|try again later|retry timeout/i, type: 'SOFT_BOUNCE', reason: 'Lỗi tạm thời' },
+  { pattern: /service unavailable|server too busy|deferred|delay/i, type: 'SOFT_BOUNCE', reason: 'Server bận, thử lại sau' },
+  { pattern: /rate limit|too many requests|excessive recipients/i, type: 'SOFT_BOUNCE', reason: 'Vượt giới hạn gửi' },
+  { pattern: /greylisted|grey list|please try again/i, type: 'SOFT_BOUNCE', reason: 'Bị greylist, thử lại sau' },
+  { pattern: /dns failure|dns error|nameserver|domain not found/i, type: 'SOFT_BOUNCE', reason: 'Lỗi DNS tạm thời' },
+  { pattern: /authentication required|authorization failed/i, type: 'SOFT_BOUNCE', reason: 'Lỗi xác thực' },
+];
+
+function detectBounceType(content: string, subject: string): BounceType | null {
+  const text = `${subject} ${content}`.toLowerCase();
+  
+  for (const bp of BOUNCE_PATTERNS) {
+    if (bp.pattern.test(text)) {
+      return bp.type;
+    }
+  }
+  
+  // Default: nếu là bounce notification thì coi là HARD
+  if (/bounced|undeliverable|delivery failed|mailer-daemon/i.test(subject)) {
+    return 'HARD_BOUNCE';
+  }
+  
+  return null;
+}
+
+function getBounceReason(content: string, subject: string): string {
+  const text = `${subject} ${content}`.toLowerCase();
+  
+  for (const bp of BOUNCE_PATTERNS) {
+    if (bp.pattern.test(text)) {
+      return bp.reason;
+    }
+  }
+  
+  return 'Lỗi không xác định';
+}
+
+async function scanSenderForBounces(
+  sender: EmailSenderRecord,
+  sentSet: Set<string>,
+  processedEmails: Set<string>,
+  scanDays: number = 30
+): Promise<{ 
+  scanned: number; 
+  hardBounced: number; 
+  softBounced: number; 
+  error: string | null; 
+  foundEmails: { email: string; type: BounceType; reason: string }[];
+}> {
+  const result = { 
+    scanned: 0, 
+    hardBounced: 0, 
+    softBounced: 0, 
+    error: null as string | null, 
+    foundEmails: [] as { email: string; type: BounceType; reason: string }[]
+  };
+
+  console.log(`\n[BOUNCE-SCAN] ===== Bắt đầu quét vệ tinh: ${sender.email} =====`);
+
+  try {
+    const oauth2Client = getOAuth2Client();
+    
+    const clientId = sender.clientId || process.env.GMAIL_CLIENT_ID;
+    const clientSecret = sender.clientSecret || process.env.GMAIL_CLIENT_SECRET;
+    
+    if (!clientId || !clientSecret) {
+      result.error = 'Missing OAuth credentials';
+      console.log(`[BOUNCE-SCAN] ❌ ${sender.email}: Thiếu OAuth credentials`);
+      return result;
+    }
+    
+    oauth2Client.setCredentials({
+      refresh_token: decrypt(sender.refreshToken)
+    });
+
+    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+    const searchQueries = [
+      `from:mailer-daemon newer_than:${scanDays}d`,
+      `subject:bounced newer_than:${scanDays}d`,
+      `subject:delivery failed newer_than:${scanDays}d`,
+      `subject:undeliverable newer_than:${scanDays}d`,
+      `subject:"mail delivery failed" newer_than:${scanDays}d`,
+      `from:postmaster newer_than:${scanDays}d`,
+      `subject:failure newer_than:${scanDays}d`,
+      `subject:"returned mail" newer_than:${scanDays}d`,
+    ];
+
+    const allMessageIds = new Set<string>();
+
+    for (const query of searchQueries) {
+      try {
+        const response = await gmail.users.messages.list({
+          userId: sender.email,
+          q: query,
+          maxResults: 300
+        });
+        
+        const messages = response.data.messages || [];
+        messages.forEach(m => m.id && allMessageIds.add(m.id));
+        
+        console.log(`[BOUNCE-SCAN]   Query "${query}": ${messages.length} emails`);
+      } catch (err: any) {
+        console.log(`[BOUNCE-SCAN]   Query lỗi: ${err.message}`);
+      }
+    }
+
+    console.log(`[BOUNCE-SCAN]   Tổng bounce emails tìm thấy: ${allMessageIds.size}`);
+    result.scanned = allMessageIds.size;
+
+    const messageList = Array.from(allMessageIds);
+    let processedCount = 0;
+
+    for (const msgId of messageList) {
+      try {
+        const message = await gmail.users.messages.get({
+          userId: sender.email,
+          id: msgId,
+          format: 'full'
+        });
+
+        const payload = message.data.payload;
+        const headers = payload?.headers || [];
+        const subjectHeader = headers.find((h: any) => h.name?.toLowerCase() === 'subject');
+        const subject = subjectHeader?.value || 'No Subject';
+
+        const extractText = (p: any): string => {
+          let text = "";
+          if (p.body?.data) {
+            try {
+              const base64 = p.body.data.replace(/-/g, '+').replace(/_/g, '/');
+              const rawText = Buffer.from(base64, 'base64').toString('utf-8');
+              text += decodeQuotedPrintable(rawText) + " ";
+            } catch {}
+          }
+          if (p.parts) {
+            for (const part of p.parts) {
+              text += extractText(part) + " ";
+            }
+          }
+          return text;
+        };
+
+        const content = extractText(payload);
+        const bounceType = detectBounceType(content, subject);
+        
+        if (!bounceType) continue;
+
+        const reason = getBounceReason(content, subject);
+        const allEmails = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+        
+        const uniqueEmails = [...new Set(allEmails.map(e => e.toLowerCase().trim()))];
+
+        processedCount++;
+        if (processedCount % 20 === 0) {
+          console.log(`[BOUNCE-SCAN]   Đã xử lý ${processedCount}/${messageList.length} emails...`);
+        }
+
+        for (const email of uniqueEmails) {
+          const lowerEmail = email.toLowerCase().trim();
+
+          // Bỏ qua email của chính vệ tinh và các email hệ thống
+          if (lowerEmail.includes(sender.email) || 
+              lowerEmail.includes('mailer-daemon') ||
+              lowerEmail.includes('postmaster') ||
+              lowerEmail.includes('noreply') ||
+              lowerEmail.includes('no-reply') ||
+              lowerEmail.includes('@googlemail.com')) {
+            continue;
+          }
+
+          if (sentSet.has(lowerEmail) && !processedEmails.has(lowerEmail)) {
+            processedEmails.add(lowerEmail);
+
+            console.log(`[BOUNCE-SCAN]   ✅ ${bounceType === 'HARD_BOUNCE' ? '🔴' : '🟡'} ${lowerEmail} - ${reason}`);
+
+            // Cập nhật log
+            await prisma.emailCampaignLog.updateMany({
+              where: { toEmail: { equals: lowerEmail, mode: 'insensitive' }, status: "SENT" },
+              data: {
+                status: "BOUNCED",
+                errorType: bounceType,
+                errorCode: `${reason} (Quét vệ tinh: ${sender.email})`
+              }
+            });
+
+            // Chỉ hard bounce mới đánh dấu emailVerified = null
+            if (bounceType === 'HARD_BOUNCE') {
+              await prisma.user.updateMany({
+                where: { email: { equals: lowerEmail, mode: 'insensitive' } },
+                data: { emailVerified: null }
+              });
+            }
+
+            // Thêm vào blacklist
+            const existing = await prisma.emailBlacklist.findUnique({ where: { email: lowerEmail } });
+            if (!existing) {
+              await prisma.emailBlacklist.create({ 
+                data: { 
+                  email: lowerEmail, 
+                  reason: bounceType 
+                } 
+              });
+            } else if (bounceType === 'HARD_BOUNCE') {
+              // Update reason nếu là HARD_BOUNCE
+              await prisma.emailBlacklist.update({
+                where: { email: lowerEmail },
+                data: { reason: 'HARD_BOUNCE' }
+              });
+            }
+
+            result.foundEmails.push({ email: lowerEmail, type: bounceType, reason });
+            
+            if (bounceType === 'HARD_BOUNCE') {
+              result.hardBounced++;
+            } else {
+              result.softBounced++;
+            }
+          }
+        }
+      } catch (err: any) {
+        console.log(`[BOUNCE-SCAN]   Lỗi đọc message ${msgId}: ${err.message}`);
+      }
+    }
+
+    console.log(`[BOUNCE-SCAN] ✓ Hoàn thành ${sender.email}:`);
+    console.log(`[BOUNCE-SCAN]   - Tổng bounce emails: ${result.scanned}`);
+    console.log(`[BOUNCE-SCAN]   - HARD BOUNCE: ${result.hardBounced}`);
+    console.log(`[BOUNCE-SCAN]   - SOFT BOUNCE: ${result.softBounced}`);
+
+  } catch (err: any) {
+    console.error(`[BOUNCE-SCAN] ❌ Lỗi quét vệ tinh ${sender.email}:`, err.message);
+    result.error = err.message;
+  }
+
+  return result;
+}
+
+async function detectFakeEmails(
+  sentSet: Set<string>,
+  processedEmails: Set<string>
+): Promise<{ detected: number; emails: { email: string; reason: string }[] }> {
+  const result = { detected: 0, emails: [] as { email: string; reason: string }[] };
+
+  console.log(`\n[FAKE-EMAIL] ===== Phát hiện email ảo =====`);
+
+  // Lấy tất cả SENT logs
+  const sentLogs = await prisma.emailCampaignLog.findMany({
+    where: { status: "SENT" },
+    select: { toEmail: true }
+  });
+
+  // Đếm số lần xuất hiện của mỗi email
+  const emailCounts: Record<string, number> = {};
+  for (const log of sentLogs) {
+    const email = log.toEmail.toLowerCase();
+    emailCounts[email] = (emailCounts[email] || 0) + 1;
+  }
+
+  // Kiểm tra từng email trong sentSet
+  for (const email of sentSet) {
+    if (processedEmails.has(email)) continue; // Đã xử lý rồi
+
+    const fakeCheck = isLikelyFakeEmail(email);
+    if (fakeCheck.isFake) {
+      processedEmails.add(email);
+
+      console.log(`[FAKE-EMAIL]   🚫 ${email} - ${fakeCheck.reason}`);
+
+      // Cập nhật log
+      await prisma.emailCampaignLog.updateMany({
+        where: { toEmail: { equals: email, mode: 'insensitive' }, status: "SENT" },
+        data: {
+          status: "BOUNCED",
+          errorType: "HARD_BOUNCE",
+          errorCode: `Email ảo: ${fakeCheck.reason}`
+        }
+      });
+
+      // Đánh dấu user
+      await prisma.user.updateMany({
+        where: { email: { equals: email, mode: 'insensitive' } },
+        data: { emailVerified: null }
+      });
+
+      // Thêm vào blacklist
+      const existing = await prisma.emailBlacklist.findUnique({ where: { email: email } });
+      if (!existing) {
+        await prisma.emailBlacklist.create({ 
+          data: { 
+            email: email, 
+            reason: "HARD_BOUNCE" 
+          } 
+        });
+      }
+
+      result.emails.push({ email, reason: fakeCheck.reason || 'Unknown' });
+      result.detected++;
+    }
+  }
+
+  console.log(`[FAKE-EMAIL] ===== Phát hiện ${result.detected} email ảo =====`);
+
+  return result;
+}
+
+export async function processBounceEmails(scanDays: number = 3) {
+  console.log('\n[BOUNCE-SCAN] ============================================');
+  console.log(`[BOUNCE-SCAN] BẮT ĐẦU QUÉT BOUNCE - ${scanDays} NGÀY - TẤT CẢ VỆ TINH`);
+  console.log('[BOUNCE-SCAN] ============================================\n');
+
+  const recentSentLogs = await prisma.emailCampaignLog.findMany({
+    where: {
+      status: "SENT",
+      sentAt: { gte: new Date(Date.now() - scanDays * 24 * 60 * 60 * 1000) }
+    },
+    select: { toEmail: true }
+  });
+
+  const sentSet = new Set(recentSentLogs.map(l => l.toEmail.toLowerCase().trim()));
+  const processedEmails = new Set<string>();
+
+  console.log(`[BOUNCE-SCAN] Tổng emails đã gửi trong ${scanDays} ngày: ${sentSet.size}`);
+
+  const allSenders = await prisma.emailSender.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      email: true,
+      refreshToken: true,
+      clientId: true,
+      clientSecret: true,
+      isActive: true
+    }
+  });
+
+  console.log(`[BOUNCE-SCAN] Tổng vệ tinh hoạt động: ${allSenders.length}\n`);
+
+  const stats = {
+    totalSenders: allSenders.length,
+    totalSentEmails: sentSet.size,
+    scanned: 0,
+    hardBounced: 0,
+    softBounced: 0,
+    fakeEmails: 0,
+    errors: 0,
+    scanDays,
+    senderDetails: [] as { 
+      email: string; 
+      scanned: number; 
+      hardBounced: number;
+      softBounced: number;
+      error: string | null;
+      foundEmails: { email: string; type: BounceType; reason: string }[];
+    }[]
+  };
+
+  for (const sender of allSenders) {
+    const senderResult = await scanSenderForBounces(sender, sentSet, processedEmails, scanDays);
+
+    stats.senderDetails.push({
+      email: sender.email,
+      scanned: senderResult.scanned,
+      hardBounced: senderResult.hardBounced,
+      softBounced: senderResult.softBounced,
+      error: senderResult.error,
+      foundEmails: senderResult.foundEmails
+    });
+
+    stats.scanned += senderResult.scanned;
+    stats.hardBounced += senderResult.hardBounced;
+    stats.softBounced += senderResult.softBounced;
+    if (senderResult.error) stats.errors++;
+  }
+
+  // Phát hiện email ảo dựa trên pattern
+  console.log('\n[BOUNCE-SCAN] Đang phát hiện email ảo...');
+  const fakeEmailResult = await detectFakeEmails(sentSet, processedEmails);
+  stats.fakeEmails = fakeEmailResult.detected;
+  stats.hardBounced += fakeEmailResult.detected;
+
+  console.log('\n[BOUNCE-SCAN] ============================================');
+  console.log('[BOUNCE-SCAN] KẾT QUẢ QUÉT BOUNCE');
+  console.log('[BOUNCE-SCAN] ============================================');
+  console.log(`[BOUNCE-SCAN] Thời gian quét: ${scanDays} ngày`);
+  console.log(`[BOUNCE-SCAN] Tổng vệ tinh: ${stats.totalSenders}`);
+  console.log(`[BOUNCE-SCAN] Tổng emails đã gửi: ${stats.totalSentEmails}`);
+  console.log(`[BOUNCE-SCAN] Tổng bounce emails tìm thấy: ${stats.scanned}`);
+  console.log(`[BOUNCE-SCAN] 🔴 HARD BOUNCE: ${stats.hardBounced} (bao gồm ${stats.fakeEmails} email ảo)`);
+  console.log(`[BOUNCE-SCAN] 🟡 SOFT BOUNCE: ${stats.softBounced}`);
+  console.log(`[BOUNCE-SCAN] 🚫 Email ảo phát hiện: ${stats.fakeEmails}`);
+  console.log(`[BOUNCE-SCAN] Số vệ tinh lỗi: ${stats.errors}`);
+  
+  if (stats.errors > 0) {
+    console.log('[BOUNCE-SCAN] VỆ TINH CÓ LỖI:');
+    stats.senderDetails.filter(s => s.error).forEach(s => {
+      console.log(`[BOUNCE-SCAN]   - ${s.email}: ${s.error}`);
+    });
+  }
+  
+  console.log('\n[BOUNCE-SCAN] CHI TIẾT TỪNG VỆ TINH:');
+  stats.senderDetails.forEach(s => {
+    const status = s.error ? '❌ LỖI' : '✓ OK';
+    console.log(`[BOUNCE-SCAN]   ${status} ${s.email}:`);
+    console.log(`[BOUNCE-SCAN]      Tổng: ${s.scanned} | 🔴: ${s.hardBounced} | 🟡: ${s.softBounced}`);
+  });
+  console.log('[BOUNCE-SCAN] ============================================\n');
+
+  return stats;
 }

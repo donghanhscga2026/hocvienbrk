@@ -68,6 +68,22 @@ export async function POST(
       const sender = activeSenders[i % activeSenders.length];
 
       try {
+        // --- KIỂM TRA ĐỊA CHỈ EMAIL ---
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!recipient.email || !emailRegex.test(recipient.email)) {
+          await prisma.emailCampaignLog.create({
+            data: {
+              campaignId,
+              toEmail: recipient.email || "N/A",
+              status: "FAILED",
+              errorType: "INVALID_FORMAT",
+              errorCode: "Định dạng email không hợp lệ",
+            }
+          });
+          results.failed++;
+          continue;
+        }
+
         // Kiểm tra Blacklist
         const isBlacklisted = await prisma.emailBlacklist.findUnique({
           where: { email: recipient.email }
