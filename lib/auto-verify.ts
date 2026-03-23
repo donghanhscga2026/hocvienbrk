@@ -58,6 +58,7 @@ export async function processPaymentEmails() {
   const messages = response.data.messages || [];
   if (messages.length === 0) return { processed: 0, matched: 0 };
 
+  // [OPTIMIZE] Chỉ query DB khi có email mới - tránh tải thừa
   let matchedCount = 0;
   const pendingEnrollments = await prisma.enrollment.findMany({
     where: { status: 'PENDING' },
