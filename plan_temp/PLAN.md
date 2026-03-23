@@ -1,5 +1,15 @@
 # KẾ HOẠCH TỐI ƯU HIỆU SUẤT & UX
 
+## QUY TẮC KIM CƯƠNG (TUÂN THỦ NGHIÊM NGHI)
+
+1. **KHÔNG VIẾT LẠI TOÀN BỘ FILE** - Chỉ edit đúng phần cần tối ưu
+2. **LUÔN LƯU BACKUP TRƯỚC KHI SỬA** - File gốc vào plan_temp
+3. **SO SÁNH CODE CŨ VỚI MỚI** - Trước khi xác nhận hoàn thành
+4. **TEST VÀ XÁC NHẬN** - Mỗi bước xong phải chờ user xác nhận mới làm tiếp
+5. **TUÂN THỦ NGUYÊN TẮC** - Không làm mất tính năng đang hoạt động
+
+---
+
 ## Tổng quan
 Dự án này tối ưu hiệu suất và trải nghiệm người dùng cho HocVien-BRK. Được thực hiện theo nguyên tắc Kim Cương: ưu tiên tác động lớn + dễ làm trước.
 
@@ -12,7 +22,7 @@ Bước 1: Course Player (page.tsx + VideoPlayer)          [Dễ]
 Bước 2: ImageViewer - Fix pan/zoom lag                    [Dễ]
 Bước 3: Next.js Image Optimization                       [Dễ, impact lớn]
 Bước 4: Home Page - Fix waterfall                        [Dễ]
-Bước 5: Admin Students - Server-side pagination         [Trung bình]
+Bước 5: Admin Students - Server-side pagination         [Trung bình] ⚠️ ĐANG SỬA
 Bước 6: Roadmap Builder - Tách API                        [Trung bình]
 Bước 7: Community Board - Add limit                      [Dễ]
 Bước 8: Email Settings - Server fetch                    [Dễ]
@@ -174,10 +184,10 @@ Bước 10: Campaign - Virtual Scrolling + Progress API      [Phức tạp]
 | Bước | Trạng thái | Ghi chú |
 |------|------------|---------|
 | 1 | ✅ Hoàn thành | Course Player - Xóa dynamic, parse playlist server-side |
-| 2 | ⏳ Chờ xác nhận | ImageViewer |
-| 3 | ⏳ Chờ xác nhận | Next.js Image |
-| 4 | ⏳ Chờ xác nhận | Home Page |
-| 5 | ⏳ Chờ xác nhận | Admin Students |
+| 2 | ✅ Hoàn thành | ImageViewer - Fix pan/zoom lag, dùng useRef + DOM direct |
+| 3 | ✅ Hoàn thành | Next.js Image - Bật tối ưu, xóa unoptimized |
+| 4 | ✅ Hoàn thành | Home Page - Fix waterfall, enrollments vào Promise.all |
+| 5 | ⚠️ Cần test | Admin Students - Server pagination (cần user xác nhận) |
 | 6 | ⏳ Chờ xác nhận | Roadmap Builder |
 | 7 | ⏳ Chờ xác nhận | Community Board |
 | 8 | ⏳ Chờ xác nhận | Email Settings |
@@ -188,4 +198,5 @@ Bước 10: Campaign - Virtual Scrolling + Progress API      [Phức tạp]
 
 ## NGÀY CẬP NHẬT
 - Created: 2026-03-24
-- Bước 1 hoàn thành: 2026-03-24
+- Bước 1-4 hoàn thành: 2026-03-24
+- Bước 5 cần test: 2026-03-24

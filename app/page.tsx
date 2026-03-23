@@ -14,8 +14,8 @@ import { Sparkles } from "lucide-react";
 export default async function Home() {
   const session = await auth();
 
-  // Parallel: lấy user + courses + roadmap + points cùng lúc
-  const [courses, userRecord, roadmapPoints, message] = await Promise.all([
+  // [OPTIMIZE] Parallel: lấy tất cả dữ liệu cùng lúc (bao gồm enrollments)
+  const [courses, userRecord, roadmapPoints, message, enrollments] = await Promise.all([
     (prisma as any).course.findMany({
       where: { status: true },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
@@ -32,7 +32,40 @@ export default async function Home() {
     (prisma as any).roadmapPoint.findMany({
       orderBy: { pointId: 'asc' }
     }),
-    getRandomMessage()
+    getRandomMessage(),
+    // [OPTIMIZE] Đưa enrollment vào Promise.all để chạy song song
+    session?.user?.id
+      ? (prisma as any).enrollment.findMany({
+        where: { userId: parseInt(session.user.id) },
+        select: {
+          id: true,
+          courseId: true,
+          status: true,
+          startedAt: true,
+          payment: {
+            select: {
+              id: true,
+              status: true,
+              proofImage: true
+            }
+          },
+          course: {
+            select: {
+              _count: {
+                select: { lessons: true }
+              }
+            }
+          },
+          _count: {
+            select: {
+              lessonProgress: {
+                where: { status: 'COMPLETED' }
+              }
+            }
+          }
+        }
+      })
+      : Promise.resolve([])
   ]);
 
   const userName = userRecord?.name ?? null;
@@ -50,54 +83,21 @@ export default async function Home() {
   // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
   let myCourseIds = new Set<number>();
 
-let enrollmentsMap: Record<number, { 
-  status: string; 
-  startedAt: Date | null; 
-  completedCount: number; 
-  totalLessons: number;
-  enrollmentId?: number;
-  payment?: {
-    id: number;
-    status: string;
-    proofImage?: string | null;
-  };
-}> = {};
+  let enrollmentsMap: Record<number, { 
+    status: string; 
+    startedAt: Date | null; 
+    completedCount: number; 
+    totalLessons: number;
+    enrollmentId?: number;
+    payment?: {
+      id: number;
+      status: string;
+      proofImage?: string | null;
+    };
+  }> = {};
 
-if (session?.user?.id) {
-  const userId = parseInt(session.user.id);
-
-  const enrollments = await (prisma as any).enrollment.findMany({
-    where: { userId },
-    select: {
-      id: true,
-      courseId: true,
-      status: true,
-      startedAt: true,
-      payment: {
-        select: {
-          id: true,
-          status: true,
-          proofImage: true
-        }
-      },
-      course: {
-        select: {
-          _count: {
-            select: { lessons: true }
-          }
-        }
-      },
-      _count: {
-        select: {
-          lessonProgress: {
-            where: { status: 'COMPLETED' }
-          }
-        }
-      }
-    }
-  });
-
-  enrollments.forEach((e: any) => {
+  // [OPTIMIZE] enrollments đã lấy sẵn từ Promise.all, không cần query lại
+  (enrollments as any[]).forEach((e: any) => {
     // Chỉ thêm vào danh sách "Khóa học của tôi" nếu đã kích hoạt hoặc hoàn thành
     if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
       myCourseIds.add(e.courseId);
@@ -112,7 +112,6 @@ if (session?.user?.id) {
       payment: e.payment
     };
   });
-}
 
 
 

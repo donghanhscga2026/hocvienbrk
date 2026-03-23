@@ -11,36 +11,50 @@ interface CommunityBoardProps {
     isAdmin: boolean
 }
 
+const POSTS_LIMIT = 10 // [OPTIMIZE] Giới hạn số posts ban đầu
+
 export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
     const [posts, setPosts] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
     
-    // Quản lý trang (mỗi trang 5 bài)
+    // [OPTIMIZE] Server-side pagination
     const [currentPage, setCurrentPage] = useState(0)
-    const postsPerPage = 5
+    const [totalPages, setTotalPages] = useState(0)
+    const [total, setTotal] = useState(0)
 
-    const fetchPosts = async () => {
+    const fetchPosts = async (page: number = 0) => {
         setLoading(true)
-        const res = await getPostsAction()
+        
+        const res = await getPostsAction(page, POSTS_LIMIT)
+        
         if (res.success) {
             setPosts(res.posts || [])
+            setTotal(res.total || 0)
+            setTotalPages(res.totalPages || 0)
+            setCurrentPage(page)
         }
+        
         setLoading(false)
     }
 
     useEffect(() => {
-        fetchPosts()
+        fetchPosts(0)
     }, [])
 
-    const totalPages = Math.ceil(posts.length / postsPerPage)
-    const startIndex = currentPage * postsPerPage
-    const currentVisiblePosts = posts.slice(startIndex, startIndex + postsPerPage)
+    const startItem = currentPage * POSTS_LIMIT + 1
+    const endItem = Math.min((currentPage + 1) * POSTS_LIMIT, total)
+    
+    // Server-side pagination, no client slicing needed
     const hasNextPage = currentPage < totalPages - 1
     const hasPrevPage = currentPage > 0
 
-    const nextGroup = () => { if (hasNextPage) setCurrentPage(prev => prev + 1) }
-    const prevGroup = () => { if (hasPrevPage) setCurrentPage(prev => prev - 1) }
+    const nextGroup = () => { 
+        if (hasNextPage) fetchPosts(currentPage + 1) 
+    }
+    const prevGroup = () => { 
+        if (hasPrevPage) fetchPosts(currentPage - 1) 
+    }
 
     return (
         <div className="space-y-6">
@@ -49,7 +63,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                     <Newspaper className="w-6 h-6 text-purple-600" />
                     <div>
                         <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight leading-none">Bảng tin</h2>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1}</p>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1} ({total} bài)</p>
                     </div>
                 </div>
                 
@@ -109,7 +123,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                             </div>
                         )}
 
-                        {currentVisiblePosts.map((post) => (
+                        {posts.map((post: any) => (
                             <div key={post.id} className="flex-none w-[85%] sm:w-[350px] snap-center">
                                 <PostCard 
                                     post={post} 
@@ -127,7 +141,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                                 >
                                     <ArrowRightCircle className="w-8 h-8" />
                                 </button>
-                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Tiếp tục ({posts.length - (startIndex + postsPerPage)})</span>
+                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Tiếp tục</span>
                             </div>
                         )}
                     </div>

@@ -4,16 +4,39 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
 /**
- * Lấy danh sách tất cả các bài khảo sát
+ * Lấy danh sách tất cả các bài khảo sát (CHỈ lấy id, name, isActive - KHÔNG lấy flow)
+ * [OPTIMIZE] Tránh tải cả MB dữ liệu JSON flow khi chỉ cần list tên
  */
 export async function getAllSurveys() {
     try {
         return await prisma.survey.findMany({
+            select: {
+                id: true,
+                name: true,
+                isActive: true,
+                createdAt: true
+            },
             orderBy: { createdAt: 'desc' }
         })
     } catch (error) {
         console.error('Error fetching surveys:', error)
         return []
+    }
+}
+
+/**
+ * Lấy flow của một bài khảo sát (CHỈ gọi khi cần thiết kế sơ đồ)
+ * [OPTIMIZE] Tách riêng để tránh tải flow khi chỉ cần list
+ */
+export async function getSurveyFlow(id: number) {
+    try {
+        return await prisma.survey.findUnique({
+            where: { id },
+            select: { flow: true, name: true }
+        })
+    } catch (error) {
+        console.error('Error fetching survey flow:', error)
+        return null
     }
 }
 

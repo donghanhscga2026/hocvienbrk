@@ -6,19 +6,28 @@ import { revalidatePath } from "next/cache"
 import { Role } from "@prisma/client"
 
 /**
- * Lấy danh sách bài viết
+ * Lấy danh sách bài viết (CÓ PHÂN TRANG)
+ * [OPTIMIZE] Thêm take/skip để tránh tải toàn bộ posts
  */
-export async function getPostsAction() {
+export async function getPostsAction(page: number = 0, limit: number = 10) {
     try {
-        const posts = await prisma.post.findMany({
-            where: { published: true },
-            include: {
-                author: { select: { name: true, image: true } },
-                _count: { select: { comments: true } }
-            },
-            orderBy: [{ pin: 'desc' }, { createdAt: 'desc' }]
-        })
-        return { success: true, posts }
+        const skip = page * limit
+        
+        const [posts, total] = await Promise.all([
+            prisma.post.findMany({
+                where: { published: true },
+                include: {
+                    author: { select: { name: true, image: true } },
+                    _count: { select: { comments: true } }
+                },
+                orderBy: [{ pin: 'desc' }, { createdAt: 'desc' }],
+                take: limit,
+                skip: skip
+            }),
+            prisma.post.count({ where: { published: true } })
+        ])
+        
+        return { success: true, posts, total, page, totalPages: Math.ceil(total / limit) }
     } catch (error: any) {
         return { success: false, error: error.message }
     }
