@@ -46,6 +46,20 @@ export default function CampaignDetailPage() {
     }
   };
 
+  const fetchProgress = async () => {
+    if (!id) return;
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/progress`);
+      if (res.ok) {
+        const data = await res.json();
+        setCampaign(prev => prev ? { ...prev, sentCount: data.sentCount, failedCount: data.failedCount, status: data.status } : null);
+        setProgress((data.sentCount / (data.totalRecipients || 1)) * 100);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchLogs = async () => {
     if (!id) return;
     try {
@@ -103,7 +117,7 @@ export default function CampaignDetailPage() {
   useEffect(() => {
     let interval: any;
     if (running && id) {
-      interval = setInterval(fetchLogs, 10000);
+      interval = setInterval(fetchProgress, 5000);
     }
     return () => clearInterval(interval);
   }, [id, running]);

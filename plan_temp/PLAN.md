@@ -192,7 +192,10 @@ Bước 10: Campaign - Virtual Scrolling + Progress API      [Phức tạp]
 | 7 | ✅ Hoàn thành | Community Board - Thêm limit, pagination |
 | 8 | ✅ Hoàn thành | Email Settings - Server fetch, không flash |
 | 9 | ✅ Hoàn thành | Auto-verify - Fix DB query order |
-| 10 | ⏭️ Bỏ qua | Campaign - Không có polling trong code hiện tại |
+| 10 | ✅ Hoàn thành | Campaign - Tách API /progress, polling 5s thay vì 10s gọi full logs |
+| 11 | ✅ Hoàn thành | id-helper.ts - Fix N+1 query |
+| 12 | ✅ Hoàn thành | CourseLearnPage - Query tối ưu |
+| 13 | ✅ Hoàn thành | Link Prefetch - Thêm prefetch={false} |
 
 ---
 

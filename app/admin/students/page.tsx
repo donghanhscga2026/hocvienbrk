@@ -188,6 +188,7 @@ export default function AdminStudentsPage() {
                 <Link
                   key={student.id}
                   href={`/admin/students/${student.id}`}
+                  prefetch={false}
                   className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
                 >
                   <div className="flex items-start gap-3">
