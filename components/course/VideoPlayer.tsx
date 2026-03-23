@@ -18,6 +18,7 @@ interface VideoPlayerProps {
     onPercentChange: (percent: number) => void
     playlistData?: any 
     lastVideoIndex?: number 
+    serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client
 }
 
 type PlaylistItem = {
@@ -25,6 +26,17 @@ type PlaylistItem = {
     title: string
     url: string
     id?: string | null
+}
+
+function extractVideoId(url: string): string | null {
+    if (!url) return null
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(live\/)|(\&v=))([^#\&\?]*).*/
+    const match = url.match(regExp)
+    if (match && match.length > 0) {
+        const id = match[match.length - 1]
+        return (id && id.length === 11) ? id : null
+    }
+    return null
 }
 
 export default function VideoPlayer({
@@ -36,9 +48,12 @@ export default function VideoPlayer({
     onProgress,
     onPercentChange,
     playlistData,
-    lastVideoIndex = 0
+    lastVideoIndex = 0,
+    serverPlaylist // [OPTIMIZE] Ưu tiên playlist từ Server, chỉ parse client nếu không có
 }: VideoPlayerProps) {
+    // [OPTIMIZE] Ưu tiên playlist từ Server, fallback sang parse từ videoUrl (backward compatible)
     const playlist = useMemo(() => {
+        if (serverPlaylist) return serverPlaylist // [OPTIMIZE] Server đã parse sẵn
         if (!videoUrl) return []
         return videoUrl.split('|').map((item, index) => {
             const videoMatch = item.match(/^\[(.*?)\](.*)$/)
@@ -47,7 +62,7 @@ export default function VideoPlayer({
             if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
             return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
         })
-    }, [videoUrl])
+    }, [videoUrl, serverPlaylist])
 const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
 const [showPlaylist, setShowPlaylist] = useState(false)
 const [isMounted, setIsMounted] = useState(false)
@@ -310,15 +325,3 @@ const toggleFullScreen = () => {
     )
 }
 
-function extractVideoId(url: string) {
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(live\/)|(\&v=))([^#\&\?]*).*/
-    const match = url.match(regExp)
-    // Nếu dùng regex trên, ID nằm ở group cuối cùng. 
-    // Với việc thêm (live\/), ID sẽ dịch chuyển tùy theo số lượng group.
-    // Cách an toàn nhất là lấy group cuối cùng có nội dung
-    if (match && match.length > 0) {
-        const id = match[match.length - 1]
-        return (id && id.length === 11) ? id : null
-    }
-    return null
-}

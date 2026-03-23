@@ -3,7 +3,34 @@ import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
 
-export const dynamic = "force-dynamic"; //test thử xem lỗi gì - dùng xong xóa
+type PlaylistItem = {
+  type: 'video' | 'doc'
+  title: string
+  url: string
+  id?: string | null
+}
+
+function extractVideoId(url: string) {
+  if (!url) return null
+  const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(live\/)|(\&v=))([^#\&\?]*).*/
+  const match = url.match(regExp)
+  if (match && match.length > 0) {
+    const id = match[match.length - 1]
+    return (id && id.length === 11) ? id : null
+  }
+  return null
+}
+
+function parsePlaylist(videoUrl: string | null): PlaylistItem[] {
+  if (!videoUrl) return []
+  return videoUrl.split('|').map((item, index) => {
+    const videoMatch = item.match(/^\[(.*?)\](.*)$/)
+    if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
+    const docMatch = item.match(/^\((.*?)\)(.*)$/)
+    if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
+    return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
+  })
+}
 
 export default async function CourseLearnPage({
   params,
@@ -79,10 +106,15 @@ export default async function CourseLearnPage({
     redirect(`/courses/${id}`)
   }
 
+  const lessonsWithPlaylist = enrollment.course.lessons.map((lesson: any) => ({
+    ...lesson,
+    playlist: parsePlaylist(lesson.videoUrl)
+  }))
+
   return (
     <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
       <CoursePlayer
-        course={enrollment.course}
+        course={{ ...enrollment.course, lessons: lessonsWithPlaylist }}
         enrollment={enrollment}
         session={session}
       />
