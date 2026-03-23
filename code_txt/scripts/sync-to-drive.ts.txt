@@ -1,0 +1,87 @@
+================================================================================
+FILE: scripts\sync-to-drive.ts
+================================================================================
+
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { google } from 'googleapis';
+require('dotenv').config();
+
+const FOLDER_ID = '1XudNfFRNBM3t3Ty0uSuG2MVELTE7J2Dm';
+const FILE_NAME = 'project-source.md';
+const FILE_PATH = path.join(process.cwd(), FILE_NAME);
+
+async function getDriveClient() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'http://localhost'
+  );
+
+  oAuth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+  });
+
+  return google.drive({ version: 'v3', auth: oAuth2Client });
+}
+
+async function syncToDrive() {
+  console.log('🚀 Đang chuẩn bị đồng bộ lên Google Drive...');
+
+  if (!fs.existsSync(FILE_PATH)) {
+    console.error(`❌ Không tìm thấy file ${FILE_NAME}. Hãy chạy 'npx repomix' trước.`);
+    return;
+  }
+
+  try {
+    const drive = await getDriveClient();
+
+    // 1. Tìm xem file đã tồn tại trong thư mục chưa
+    const response = await drive.files.list({
+      q: `name = '${FILE_NAME}' and '${FOLDER_ID}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive',
+    });
+
+    const existingFile = response.data.files?.[0];
+
+    const media = {
+      mimeType: 'text/markdown',
+      body: fs.createReadStream(FILE_PATH),
+    };
+
+    if (existingFile && existingFile.id) {
+      // 2. Cập nhật file cũ
+      console.log(`📝 Đang cập nhật file hiện tại (ID: ${existingFile.id})...`);
+      await drive.files.update({
+        fileId: existingFile.id as string,
+        media: media,
+      });
+      console.log('✅ Cập nhật thành công!');
+    } else {
+      // 3. Tạo file mới
+      console.log('🆕 Đang tạo file mới trên Drive...');
+      await drive.files.create({
+        requestBody: {
+          name: FILE_NAME,
+          parents: [FOLDER_ID],
+        },
+        media: media,
+      } as any);
+      console.log('✅ Tải lên file mới thành công!');
+    }
+  } catch (error: any) {
+    console.error('❌ Lỗi khi đồng bộ lên Drive:', error.message);
+    if (error.message.includes('invalid_grant')) {
+      console.error('💡 Gợi ý: Refresh token có thể đã hết hạn hoặc sai.');
+    }
+  }
+}
+
+syncToDrive();
+
+
+================================================================================
+END OF FILE: scripts\sync-to-drive.ts
+================================================================================

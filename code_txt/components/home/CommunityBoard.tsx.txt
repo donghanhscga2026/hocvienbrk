@@ -1,0 +1,155 @@
+================================================================================
+FILE: components\home\CommunityBoard.tsx
+================================================================================
+
+'use client'
+
+import React, { useState, useEffect, useRef } from 'react'
+import { getPostsAction } from '@/app/actions/post-actions'
+import PostCard from './PostCard'
+import PostDetailModal from './PostDetailModal'
+import { Newspaper, Loader2, PlusCircle, ChevronLeft, ChevronRight, ArrowRightCircle, ArrowLeftCircle } from 'lucide-react'
+import Link from 'next/link'
+
+interface CommunityBoardProps {
+    isAdmin: boolean
+}
+
+export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
+    const [posts, setPosts] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+    
+    // Quản lý trang (mỗi trang 5 bài)
+    const [currentPage, setCurrentPage] = useState(0)
+    const postsPerPage = 5
+
+    const fetchPosts = async () => {
+        setLoading(true)
+        const res = await getPostsAction()
+        if (res.success) {
+            setPosts(res.posts || [])
+        }
+        setLoading(false)
+    }
+
+    useEffect(() => {
+        fetchPosts()
+    }, [])
+
+    const totalPages = Math.ceil(posts.length / postsPerPage)
+    const startIndex = currentPage * postsPerPage
+    const currentVisiblePosts = posts.slice(startIndex, startIndex + postsPerPage)
+    const hasNextPage = currentPage < totalPages - 1
+    const hasPrevPage = currentPage > 0
+
+    const nextGroup = () => { if (hasNextPage) setCurrentPage(prev => prev + 1) }
+    const prevGroup = () => { if (hasPrevPage) setCurrentPage(prev => prev - 1) }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-2">
+                    <Newspaper className="w-6 h-6 text-purple-600" />
+                    <div>
+                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight leading-none">Bảng tin</h2>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1}</p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    {/* Nút điều hướng */}
+                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+                        <button 
+                            onClick={prevGroup}
+                            disabled={!hasPrevPage}
+                            className="p-1.5 rounded-lg hover:bg-white disabled:opacity-20 transition-all active:scale-90"
+                        >
+                            <ChevronLeft className="w-4 h-4 text-gray-900" />
+                        </button>
+                        <button 
+                            onClick={nextGroup}
+                            disabled={!hasNextPage}
+                            className="p-1.5 rounded-lg hover:bg-white disabled:opacity-20 transition-all active:scale-90"
+                        >
+                            <ChevronRight className="w-4 h-4 text-gray-900" />
+                        </button>
+                    </div>
+
+                    {isAdmin && (
+                        <Link 
+                            href="/admin/posts" 
+                            className="bg-black text-yellow-400 p-2 rounded-xl hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
+                        >
+                            <PlusCircle className="w-5 h-5" />
+                        </Link>
+                    )}
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="py-12 flex flex-col items-center justify-center text-gray-400 gap-2">
+                    <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">Đang cập nhật tin mới...</p>
+                </div>
+            ) : posts.length === 0 ? (
+                <div className="py-12 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 text-gray-400 mx-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest">Hộp thư đang trống</p>
+                </div>
+            ) : (
+                <div className="relative group">
+                    {/* Danh sách vuốt ngang */}
+                    <div className="flex gap-4 overflow-x-auto pb-6 px-2 no-scrollbar scroll-smooth snap-x snap-mandatory">
+                        {/* Nút Quay lại ở đầu trang nếu không phải trang đầu */}
+                        {hasPrevPage && (
+                            <div className="flex-none w-[120px] snap-center flex flex-col items-center justify-center gap-3">
+                                <button 
+                                    onClick={prevGroup}
+                                    className="w-16 h-16 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:bg-black hover:text-yellow-400 transition-all shadow-lg active:scale-90"
+                                >
+                                    <ArrowLeftCircle className="w-8 h-8" />
+                                </button>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Quay lại</span>
+                            </div>
+                        )}
+
+                        {currentVisiblePosts.map((post) => (
+                            <div key={post.id} className="flex-none w-[85%] sm:w-[350px] snap-center">
+                                <PostCard 
+                                    post={post} 
+                                    onClick={(p) => setSelectedPostId(p.id)} 
+                                />
+                            </div>
+                        ))}
+
+                        {/* Nút Xem thêm ở cuối trang nếu còn bài */}
+                        {hasNextPage && (
+                            <div className="flex-none w-[150px] snap-center flex flex-col items-center justify-center gap-3">
+                                <button 
+                                    onClick={nextGroup}
+                                    className="w-16 h-16 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-600 hover:text-white transition-all shadow-lg active:scale-90"
+                                >
+                                    <ArrowRightCircle className="w-8 h-8" />
+                                </button>
+                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Tiếp tục ({posts.length - (startIndex + postsPerPage)})</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Chi tiết */}
+            {selectedPostId && (
+                <PostDetailModal 
+                    postId={selectedPostId} 
+                    onClose={() => setSelectedPostId(null)} 
+                />
+            )}
+        </div>
+    )
+}
+
+
+================================================================================
+END OF FILE: components\home\CommunityBoard.tsx
+================================================================================

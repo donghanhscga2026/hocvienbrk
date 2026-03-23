@@ -91,7 +91,7 @@ export default function EmailSettingsClient() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-black text-white shadow-lg sticky top-0 z-50">
-        <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
+        <div className="flex items-center justify-between p-3 max-w-lg mx-auto">
           <div className="flex items-center gap-3">
             <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
               <ArrowLeft className="h-4 w-4" />
@@ -124,7 +124,7 @@ export default function EmailSettingsClient() {
       {/* Content */}
       <div className="max-w-lg mx-auto p-4 space-y-4">
         {toast && (
-          <div className={`mb-4 flex items-center gap-3 p-4 rounded-xl ${
+          <div className={`mb-4 flex items-center gap-1 p-4 rounded-xl ${
             toast.type === 'success' 
               ? 'bg-green-50 border border-green-200 text-green-700' 
               : 'bg-red-50 border border-red-200 text-red-700'
@@ -134,7 +134,7 @@ export default function EmailSettingsClient() {
         )}
 
         {/* Batch Settings */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-2">
           <h2 className="font-bold text-gray-900 mb-4">📤 Batch & Pause</h2>
           
           <div className="space-y-4">
@@ -191,7 +191,7 @@ export default function EmailSettingsClient() {
         </div>
 
         {/* Delay Settings */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-2">
           <h2 className="font-bold text-gray-900 mb-4">⏱️ Delay giữa emails</h2>
           
           <div className="flex items-center gap-2">

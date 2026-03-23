@@ -1,0 +1,132 @@
+================================================================================
+FILE: scripts\seed-enrollments.ts
+================================================================================
+
+
+import fs from 'fs'
+import csv from 'csv-parser'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+interface RegRow {
+    time_stamp: string
+    id_hocvien: string
+    name_hocvien: string
+    id_lop: string
+    id_khoa: string
+    phi_coc: string
+    trang_thai: string
+}
+
+async function main() {
+    const results: RegRow[] = []
+    const csvFilePath = 'LS_DangKy.csv'
+
+    if (!fs.existsSync(csvFilePath)) {
+        console.error(`Error: File '${csvFilePath}' not found.`)
+        process.exit(1)
+    }
+
+    console.log('Reading LS_DangKy.csv...')
+    await new Promise((resolve, reject) => {
+        fs.createReadStream(csvFilePath)
+            .pipe(csv())
+            .on('data', (data: RegRow) => results.push(data))
+            .on('end', resolve)
+            .on('error', reject)
+    })
+
+    console.log(`Loaded ${results.length} registration history entries.`)
+
+    // Lấy mapping Course để tránh query nhiều
+    const allCourses = await (prisma as any).course.findMany();
+
+    let successCount = 0
+    let skipCount = 0
+    let errorCount = 0
+
+    for (const row of results) {
+        const studentId = parseInt(row.id_hocvien)
+        if (isNaN(studentId)) {
+            skipCount++
+            continue
+        }
+
+        // SMART MAPPING FOR LEGACY CODES
+        let targetIdKhoa = row.id_khoa;
+        if (targetIdKhoa === '1kF') targetIdKhoa = 'LS03';
+        if (targetIdKhoa === 'AF386') targetIdKhoa = 'AF01';
+        if (targetIdKhoa === 'VRD') targetIdKhoa = 'AF01'; // Giả định theo id_lop=AF, sẽ kiểm tra lại với bác
+
+        // Tìm khóa học phù hợp theo id_khoa mới
+        let course = allCourses.find((c: any) => c.id_khoa === targetIdKhoa);
+
+        // Trường hợp AI trùng lặp, cần tìm khớp chính xác
+        if (targetIdKhoa === 'AI') {
+            // Thử tìm theo name chứa trong row (nếu có logic bổ sung)
+            // Ở đây lấy bản ghi đầu tiên khớp AI
+            course = allCourses.find((c: any) => c.id_khoa.startsWith('AI'));
+        }
+
+        if (!course && row.id_lop) {
+            // Thử tìm theo id_lop trong CSV khớp với id_khoa trong DB
+            course = allCourses.find((c: any) => c.id_khoa === row.id_lop);
+        }
+
+        if (!course) {
+            // console.log(`⚠️ Không tìm thấy khóa học cho: Lop=${row.id_lop}, Khoa=${row.id_khoa}`)
+            skipCount++
+            continue
+        }
+
+        try {
+            // Kiểm tra User có tồn tại không
+            const user = await prisma.user.findUnique({ where: { id: studentId } })
+            if (!user) {
+                skipCount++
+                continue
+            }
+
+            await (prisma as any).enrollment.upsert({
+                where: {
+                    userId_courseId: {
+                        userId: studentId,
+                        courseId: course.id
+                    }
+                },
+                update: {
+                    status: 'ACTIVE' // Mặc định là đã kích hoạt theo yêu cầu
+                },
+                create: {
+                    userId: studentId,
+                    courseId: course.id,
+                    status: 'ACTIVE'
+                }
+            })
+            successCount++
+        } catch (error) {
+            errorCount++
+            // console.error(`❌ Lỗi khi nạp Enrollment cho User ${studentId}:`, error)
+        }
+    }
+
+    console.log(`--- KẾT QUẢ ĐỒNG BỘ ---`)
+    console.log(`✅ Thành công: ${successCount}`)
+    console.log(`⏭️ Bỏ qua (không khớp/lỗi): ${skipCount}`)
+    console.log(`❌ Lỗi hệ thống: ${errorCount}`)
+}
+
+main()
+    .catch(e => {
+        console.error(e)
+        process.exit(1)
+    })
+    .finally(async () => {
+        await prisma.$disconnect()
+    })
+
+
+================================================================================
+END OF FILE: scripts\seed-enrollments.ts
+================================================================================

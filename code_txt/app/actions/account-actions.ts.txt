@@ -1,0 +1,92 @@
+================================================================================
+FILE: app\actions\account-actions.ts
+================================================================================
+
+'use server'
+
+import { auth } from "@/auth"
+import prisma from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
+
+export async function getUserWithAccounts() {
+    const session = await auth()
+    if (!session?.user?.id) return null
+
+    const userId = parseInt(session.user.id as string)
+    
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+            accounts: {
+                select: {
+                    provider: true,
+                    providerAccountId: true,
+                }
+            }
+        }
+    })
+
+    return user
+}
+
+export async function updateUserProfile(data: {
+    name?: string
+    phone?: string
+    image?: string
+}) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, message: "Unauthorized" }
+
+    const userId = parseInt(session.user.id as string)
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: data.name,
+                phone: data.phone,
+                image: data.image,
+            }
+        })
+
+        revalidatePath('/account-settings')
+        return { success: true, message: "Cập nhật thành công" }
+    } catch (error) {
+        console.error("Update profile error:", error)
+        return { success: false, message: "Cập nhật thất bại" }
+    }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, message: "Unauthorized" }
+
+    const userId = parseInt(session.user.id as string)
+    const bcrypt = await import('bcryptjs')
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId }
+    })
+
+    if (!user?.password) {
+        return { success: false, message: "Tài khoản này không sử dụng mật khẩu" }
+    }
+
+    const passwordsMatch = await bcrypt.compare(currentPassword, user.password)
+    if (!passwordsMatch) {
+        return { success: false, message: "Mật khẩu hiện tại không đúng" }
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+    await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword }
+    })
+
+    return { success: true, message: "Đổi mật khẩu thành công" }
+}
+
+
+================================================================================
+END OF FILE: app\actions\account-actions.ts
+================================================================================

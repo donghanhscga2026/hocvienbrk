@@ -1,0 +1,76 @@
+================================================================================
+FILE: scripts\auto-commit-push.sh
+================================================================================
+
+#!/bin/bash
+
+# ================================================================================
+# Script: auto-commit-push.sh
+# Mục đích: Backup code hiện tại, đẩy code mới lên GitHub và cập nhật CODE_HISTORY.md
+# Cách chạy: bash scripts/auto-commit-push.sh
+# ================================================================================
+
+set -e
+
+# Màu sắc cho output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}=== Bắt đầu auto commit và push ===${NC}"
+
+# Bước 1: Kiểm tra có thay đổi không
+echo -e "${YELLOW}Kiểm tra thay đổi...${NC}"
+if [ -z "$(git status --porcelain)" ]; then
+    echo -e "${RED}Không có thay đổi nào. Thoát.${NC}"
+    exit 0
+fi
+
+# Bước 2: Tạo mô tả thay đổi từ git diff
+echo -e "${YELLOW}Tạo mô tả thay đổi...${NC}"
+CHANGES=$(git status --porcelain | head -20)
+echo "$CHANGES"
+
+# Bước 3: Đọc danh sách file thay đổi
+CHANGED_FILES=$(git diff --name-only)
+echo -e "${GREEN}Các file thay đổi:${NC}"
+echo "$CHANGED_FILES"
+
+# Bước 4: Tạo mô tả commit tự động
+if [ -n "$(echo "$CHANGED_FILES" | grep -E "CODE_HISTORY.md")" ]; then
+    COMMIT_MSG="cap nhat CODE_HISTORY.md"
+else
+    # Lấy tên các file thay đổi (không có đường dẫn)
+    FILE_NAMES=$(echo "$CHANGED_FILES" | xargs -I {} basename {} | tr '\n' ', ')
+    # Cắt bỏ dấu , cuối cùng
+    FILE_NAMES=${FILE_NAMES%,}
+    COMMIT_MSG="cap nhat: $FILE_NAMES"
+fi
+
+# Giới hạn độ dài commit message
+if [ ${#COMMIT_MSG} -gt 100 ]; then
+    COMMIT_MSG="${COMMIT_MSG:0:97}..."
+fi
+
+echo -e "${GREEN}Commit message: $COMMIT_MSG${NC}"
+
+# Bước 5: Git add
+echo -e "${YELLOW}Git add...${NC}"
+git add -A
+
+# Bước 6: Git commit
+echo -e "${YELLOW}Git commit...${NC}"
+git commit -m "$COMMIT_MSG"
+
+# Bước 7: Git push
+echo -e "${YELLOW}Git push...${NC}"
+git push origin master
+
+echo -e "${GREEN}=== Hoàn thành! ===${NC}"
+echo -e "${GREEN}Đã đẩy code lên GitHub${NC}"
+
+
+================================================================================
+END OF FILE: scripts\auto-commit-push.sh
+================================================================================

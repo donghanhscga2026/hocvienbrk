@@ -1,0 +1,28 @@
+================================================================================
+FILE: app\api\webhooks\gmail\route.ts
+================================================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { processPaymentEmails } from '@/lib/auto-verify';
+
+export async function POST(req: NextRequest) {
+  try {
+    // Nhận thông báo từ Google Pub/Sub
+    console.log('📩 Nhận được thông báo Push từ Gmail!');
+
+    // Gọi trực tiếp logic xử lý thanh toán
+    const result = await processPaymentEmails();
+    
+    console.log(`✅ Kết quả Webhook: Đã quét ${result?.processed} email, khớp ${result?.matched} giao dịch.`);
+
+    return NextResponse.json({ status: 'ok', ...result }, { status: 200 });
+  } catch (error: any) {
+    console.error('⚠️ Webhook Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+
+================================================================================
+END OF FILE: app\api\webhooks\gmail\route.ts
+================================================================================

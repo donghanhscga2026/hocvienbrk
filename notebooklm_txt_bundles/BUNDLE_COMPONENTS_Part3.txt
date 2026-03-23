@@ -1,0 +1,1616 @@
+
+
+================================================================================
+FILE GỐC: components/home/RealityMap.tsx
+================================================================================
+
+
+'use client'
+
+import React, { useState, useMemo, useEffect, useRef } from 'react'
+import { Flag, Lock, CheckCircle2, ChevronRight, Play, Info, Sparkles, Trophy, Target, ArrowRight, X, PlayCircle, BookOpen, RefreshCw, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+
+interface RealityMapProps {
+    customPath: number[]
+    enrollmentsMap: Record<number, any>
+    allCourses: any[]
+    userGoal: string | any
+    targetPointId?: number
+    roadmapPoints?: any[]
+    onReset?: () => Promise<any>
+}
+
+// ─── Icons mapping for stages ──────────────────────────────────────────
+const STAGE_ICONS: Record<number, string> = {
+    1: '🎯', 2: '🧱', 3: '🛒', 4: '🌟', 5: '🦸', 6: '🎓', 7: '🌐', 8: '💎', 9: '🚀'
+};
+
+// ─── Component Popup Chi tiết Khóa học ─────────────────────────────────────
+function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrollment: any, onClose: () => void }) {
+    const isActive = enrollment?.status === 'ACTIVE'
+    const isCompleted = enrollment?.status === 'COMPLETED'
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                <div className="h-32 bg-gradient-to-br from-purple-600 to-indigo-800 relative flex items-center justify-center">
+                    <BookOpen className="w-12 h-12 text-white/20" />
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors text-white">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-8 space-y-6">
+                    <div className="space-y-2 text-white">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${isActive || isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                                {isCompleted ? 'Hoàn thành' : isActive ? 'Đã kích hoạt' : 'Chưa sở hữu'}
+                            </span>
+                        </div>
+                        <h3 className="text-xl font-black uppercase tracking-tight leading-tight">{course.name_lop}</h3>
+                        <p className="text-gray-400 text-sm font-medium line-clamp-3">{course.mo_ta_ngan || 'Khám phá những kiến thức thực chiến cùng Học viện BRK.'}</p>
+                    </div>
+                    {isActive || isCompleted ? (
+                        <Link href={`/courses/${course.id_khoa}/learn`} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10">
+                            <PlayCircle className="w-5 h-5" /> Vào học ngay
+                        </Link>
+                    ) : (
+                        <Link href={`/#khoa-hoc`} onClick={onClose} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 transition-all active:scale-95">
+                            Tìm hiểu thêm
+                        </Link>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Component Popup Xác nhận Nâng cấp Lộ trình ──────────────────────────
+function UpgradeRoadmapModal({ onClose, onConfirm }: { onClose: () => void, onConfirm: () => void }) {
+    const [isReseting, setIsReseting] = useState(false)
+
+    return (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl p-8 space-y-6 text-center">
+                <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto">
+                    <Sparkles className="w-8 h-8 text-yellow-400" />
+                </div>
+                <div className="space-y-2">
+                    <h3 className="text-xl font-black text-white uppercase italic">Nâng cấp lộ trình?</h3>
+                    <p className="text-gray-400 text-xs font-medium leading-relaxed">Chặng đường này đang bị khóa. Bạn có muốn thực hiện lại khảo sát để thiết lập lộ trình xa hơn không?</p>
+                </div>
+                <div className="space-y-3">
+                    <button
+                        disabled={isReseting}
+                        onClick={async () => {
+                            setIsReseting(true)
+                            await onConfirm()
+                        }}
+                        className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-yellow-500 transition-all flex items-center justify-center gap-2"
+                    >
+                        {isReseting ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sẵn sàng nâng cấp'}
+                    </button>
+                    <button onClick={onClose} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all">Để sau</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default function RealityMap({ customPath, enrollmentsMap, allCourses, userGoal, targetPointId = 1, roadmapPoints = [], onReset }: RealityMapProps) {
+    const [activeStage, setActiveStage] = useState<number | null>(null)
+    const [selectedCourse, setSelectedCourse] = useState<any>(null)
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    // ─── ĐỘNG HÓA CHẶNG ĐƯỜNG (STAGES) ──────────────────────────
+    const stages = useMemo(() => {
+        if (roadmapPoints && roadmapPoints.length > 0) {
+            return roadmapPoints.map(p => ({
+                id: p.pointId,
+                name: p.name,
+                icon: STAGE_ICONS[p.pointId] || '✨',
+                courseIds: p.courseIds ? p.courseIds.split(',').map((id: string) => parseInt(id.trim())) : []
+            }));
+        }
+
+        // Fallback cũ nếu không có dữ liệu từ DB
+        return [
+            { id: 1, name: 'Xác định mục tiêu', icon: '🎯', courseIds: [1] },
+            { id: 2, name: 'Nền tảng cơ bản', icon: '🧱', courseIds: [2] },
+            { id: 3, name: 'Bán hàng đơn giản', icon: '🛒', courseIds: [4, 5] },
+            { id: 4, name: 'Bán trải nghiệm', icon: '🌟', courseIds: [3] },
+            { id: 5, name: 'Nhân hiệu chuyên gia', icon: '🦸', courseIds: [6] },
+            { id: 6, name: 'Nhà đào tạo', icon: '🎓', courseIds: [7] },
+            { id: 7, name: 'Xây dựng cộng đồng', icon: '🌐', courseIds: [8] },
+            { id: 8, name: 'Giàu toàn diện', icon: '💎', courseIds: [9] }
+        ];
+    }, [roadmapPoints]);
+
+    const highlightedIds = useMemo(() => {
+        if (!activeStage) return []
+        return stages.find(s => s.id === activeStage)?.courseIds || []
+    }, [activeStage, stages])
+
+    // ─── TÍNH TOÁN TIẾN ĐỘ TỪNG CHẶNG ────────────────────────────
+    const stageProgress = useMemo(() => {
+        return stages.map(stage => {
+            let total = 0;
+            let completed = 0;
+
+            stage.courseIds.forEach((cid: number) => {
+                const enr = enrollmentsMap[cid];
+                if (enr) {
+                    total += enr.totalLessons || 0;
+                    completed += enr.completedCount || 0;
+                }
+            });
+
+            return {
+                id: stage.id,
+                percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+                isCompleted: total > 0 && completed >= total && total === total // Đảm bảo có bài học
+            };
+        });
+    }, [stages, enrollmentsMap]);
+
+    // Xác định Chặng Hiện Tại (Chặng đầu tiên chưa xong)
+    const currentStageId = useMemo(() => {
+        const firstIncomplete = stageProgress.find(p => p.percentage < 100);
+        if (firstIncomplete) return firstIncomplete.id;
+        return stages[stages.length - 1]?.id || 1; // Nếu xong hết thì là chặng cuối
+    }, [stageProgress, stages]);
+
+    // ─── SẮP XẾP MẢNH GHÉP THEO LỘ TRÌNH ────────────────────────────
+    // Tác dụng: Đảm bảo các mảnh ghép trong Matrix luôn hiển thị theo thứ tự học tập (Chặng 1 -> 9)
+    const sortedCustomPath = useMemo(() => {
+        // Tạo bản đồ tra cứu: CourseId -> StageId thấp nhất mà khóa đó thuộc về
+        const courseToStageMap: Record<number, number> = {};
+        stages.forEach(s => {
+            s.courseIds.forEach((cid: number) => {
+                if (courseToStageMap[cid] === undefined) {
+                    courseToStageMap[cid] = s.id;
+                }
+            });
+        });
+
+        return [...customPath].sort((a, b) => {
+            const stageA = courseToStageMap[a] ?? 999;
+            const stageB = courseToStageMap[b] ?? 999;
+
+            if (stageA !== stageB) return stageA - stageB;
+
+            // Nếu cùng một chặng, giữ nguyên thứ tự gốc từ khảo sát (customPath)
+            return customPath.indexOf(a) - customPath.indexOf(b);
+        });
+    }, [customPath, stages]);
+
+    return (
+        <div className="space-y-3 animate-in fade-in duration-700" ref={containerRef}>
+            {/* 1. Dashboard Mục tiêu & Cam kết - PHONG CÁCH TỐI GIẢN */}
+            <div className="relative space-y-4">
+                <div className="flex justify-between items-center px-2">
+                    <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-gray-400" />
+                        <span className="text-[12px] font-black uppercase tracking-widest text-gray-400">Mục tiêu & lộ trình</span>
+                    </div>
+                    {onReset && (
+                        <button onClick={() => { if (confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors border-b border-gray-200">
+                            🔄 Tạo lại lộ trình
+                        </button>
+                    )}
+                </div>
+
+                {(() => {
+                    let goalData: any = null;
+                    if (typeof userGoal === 'object' && userGoal !== null) goalData = userGoal;
+                    else if (typeof userGoal === 'string' && userGoal.startsWith('{')) {
+                        try { goalData = JSON.parse(userGoal); } catch (e) { goalData = null; }
+                    }
+                    const displayTitle = goalData ? goalData.mainGoal : (userGoal || 'Lộ trình phát triển');
+                    const commitments = goalData && Array.isArray(goalData.commitments) ? goalData.commitments : [];
+
+                    return (
+                        <div className="flex flex-col md:flex-row gap-0">
+                            {/* KHỐI MỤC TIÊU (QUẢ) */}
+                            <div className="md:w-1/3 bg-black text-yellow-400 py-1 px-2 rounded-t-[2rem] flex items-center gap-2 border-2 border-black shadow-lg">
+                                <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center text-3xl">🏆</div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[12px] font-black text-white uppercase opacity-86 mb-0.5">(Quả như ý) TÔI MUỐN</div>
+                                    <div className="text-[18px] font-black uppercase tracking-tight truncate leading-none">{displayTitle}</div>
+                                </div>
+                            </div>
+
+                            {/* KHỐI CAM KẾT TỔNG HỢP (NHÂN) */}
+                            <div className="md:w-2/3 bg-white py-3 px-5 rounded-b-[2.5rem] border-2 border-gray-100 flex flex-col justify-center gap-1 shadow-md">
+                                <div className="text-[12px] font-black uppercase text-gray-400 tracking-[0.2em] mb-1">(NHÂN TỐT) Cam kết hành động</div>
+                                <div className="space-y-2">
+                                    {commitments.map((item: any, idx: number) => {
+                                        const icons: any = { LEARN: '📚', VIDEO: '🎬', LIVE: '📡' };
+                                        return (
+                                            <div key={idx} className="flex items-center gap-1 text-[11px] font-bold text-zinc-700 leading-tight">
+                                                <span className="text-sm grayscale-[0.5] group-hover:grayscale-0">{icons[item.type] || '✨'}</span>
+                                                <span>{item.content}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {commitments.length === 0 && (
+                                        <p className="text-[10px] text-gray-400 italic">Đang cập nhật kế hoạch hành động...</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+
+            {/* 2. UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (MOBILE OPTIMIZED) */}
+            <div className="bg-zinc-950 rounded-[3rem] py-3 px-3 md:p-12 border border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#facc1505,transparent_70%)]"></div>
+
+                <div className="relative z-10">
+                    <div className="flex items-center justify-center gap-3 mb-10 text-white">
+                        <Flag className="w-5 h-5 text-yellow-400" />
+                        <h3 className="text-[12px] font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
+                    </div>
+
+                    <div className="relative max-w-4xl mx-auto px-2 md:px-8">
+                        {/* Thay đổi gap-16 và md:gap-24 ở đây để chỉnh khoảng cách hàng */}
+                        <div className="flex flex-col gap-10 md:gap-16">
+                            {Array.from({ length: Math.ceil(stages.length / 3) }).map((_, rowIndex) => {
+                                const rowStages = stages.slice(rowIndex * 3, rowIndex * 3 + 3);
+                                const isReverseRow = rowIndex % 2 !== 0;
+
+                                return (
+                                    <div key={rowIndex} className={`flex relative w-full ${isReverseRow ? 'flex-row-reverse' : 'flex-row'}`}>
+                                        {rowStages.map((stage, idxInRow) => {
+                                            const isActive = activeStage === stage.id;
+                                            // Logic so khớp đích đến thông minh bằng targetPointId
+                                            const isUserGoal = stage.id === targetPointId;
+                                            const isCurrentPos = stage.id === currentStageId; // Vị trí hiện tại
+                                            const isLocked = stage.id > targetPointId; // Khóa các nút sau đích đến
+                                            const isLastInRow = idxInRow === rowStages.length - 1;
+                                            const isNotLastRow = rowIndex < Math.ceil(stages.length / 3) - 1;
+
+                                            // Lấy % tiến độ của chặng này
+                                            const progress = stageProgress.find(p => p.id === stage.id)?.percentage || 0;
+                                            const isCompleted = progress >= 100;
+
+                                            return (
+                                                <div key={stage.id} className="w-1/3 shrink-0 flex flex-col items-center relative z-10">
+                                                    {!isLastInRow && (
+                                                        <div className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-gray-600 -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}></div>
+                                                    )}
+                                                    {isLastInRow && isNotLastRow && (
+                                                        /* Chỉnh h-[120px] và md:h-[180px] ở đây để khớp với gap ở trên */
+                                                        <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[120px] md:h-[180px] border-l-2 border-dashed border-gray-600 -z-10"></div>
+                                                    )}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isLocked) setShowUpgradeModal(true)
+                                                            else setActiveStage(isActive ? null : stage.id)
+                                                        }}
+                                                        className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-2 transition-all duration-500 relative group active:scale-90 ${isUserGoal
+                                                            ? 'border-red-600 bg-yellow-400 text-white shadow-[0_0_60px_rgba(37,99,235,0.4)] scale-110 z-30'
+                                                            : isLocked
+                                                                ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
+                                                                : 'border-white/40 bg-zinc-600 text-white shadow-[0_0_20px_rgba(0,0,0,0.3)]'
+                                                            }`}
+                                                    >
+                                                        {/* VÒNG TRÒN TIẾN ĐỘ (%) */}
+                                                        {!isLocked && (
+                                                            <svg className="absolute inset-[-6px] md:inset-[-8px] w-[calc(100%+12px)] h-[calc(100%+12px)] md:w-[calc(100%+16px)] md:h-[calc(100%+16px)] -rotate-90 z-0">
+                                                                <circle
+                                                                    cx="50%" cy="50%" r="46%"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="3"
+                                                                    strokeDasharray="283"
+                                                                    strokeDashoffset={283 - (283 * progress) / 100}
+                                                                    className={`transition-all duration-1000 text-green-600`}
+                                                                />
+                                                            </svg>
+                                                        )}
+
+                                                        {/* Hiệu ứng Pulsing cho Vị trí hiện tại */}
+                                                        {isCurrentPos && !isLocked && (
+                                                            <span className="absolute inset-0 rounded-full bg-yellow-400 animate-ping opacity-20"></span>
+                                                        )}
+
+                                                        {/* Hiệu ứng tỏa sáng động cho Đích đến */}
+                                                        {isUserGoal && (
+                                                            <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20"></span>
+                                                        )}
+
+                                                        <span className={`text-xl md:text-3xl font-black relative z-10 ${isLocked ? 'grayscale' : ''}`}>{stage.icon}</span>
+
+                                                        {/* Badge: Điểm đích */}
+                                                        {isUserGoal && (
+                                                            <div className="absolute -top-6 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
+                                                                <Trophy className="w-2.5 h-2.5 inline mr-1" /> Điểm đến của bạn
+                                                            </div>
+                                                        )}
+
+                                                        {/* Badge: Vị trí hiện tại */}
+                                                        {isCurrentPos && !isUserGoal && (
+                                                            <div className="absolute -top-8 bg-white text-black text-[10px] font-black px-2 py-1 rounded-full  tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
+                                                                <ArrowRight className="w-2.5 h-2.5 inline mr-1 rotate-90" /> Bạn đang ở đây
+                                                            </div>
+                                                        )}
+
+                                                        {isLocked && (
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
+                                                                <Lock className="w-4 h-4 text-zinc-500" />
+                                                            </div>
+                                                        )}
+
+                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isCurrentPos ? 'bg-yellow-400 text-black border-zinc-900' : isLocked ? 'bg-zinc-800 text-zinc-600 border-zinc-700' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                                                            {stage.id}
+                                                        </div>
+                                                    </button>
+
+                                                    <div className="mt-4 text-center px-1">
+                                                        <h4 className={`text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight transition-colors ${isUserGoal ? 'text-emerald-400' : isActive ? 'text-yellow-400' : isLocked ? 'text-zinc-700' : 'text-zinc-500'}`}>
+                                                            {stage.name}
+                                                        </h4>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 3. MA TRẬN MẢNH GHÉP */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-yellow-500" />
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Bức tranh hiện thực</h3>
+                    </div>
+                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{customPath.length} mảnh ghép cần học</span>
+                </div>
+
+                {/* Sửa tính năng: Thu hẹp gap từ 3/4 xuống 1.5/2 để các mảnh ghép nằm sát nhau hơn theo yêu cầu */}
+                <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-1.5 md:gap-2">
+                    {/* Sửa tính năng: Sử dụng sortedCustomPath để đảm bảo các mảnh ghép hiển thị đúng thứ tự chặng học (Lộ trình) */}
+                    {sortedCustomPath.map((courseId, index) => {
+                        const course = allCourses.find(c => c.id === courseId)
+                        if (!course) return null
+                        const enrollment = enrollmentsMap[courseId]
+                        const isCompleted = enrollment?.status === 'COMPLETED'
+                        const isActive = enrollment?.status === 'ACTIVE'
+                        const isPending = enrollment?.status === 'PENDING'
+                        const isHighlighted = highlightedIds.includes(courseId)
+
+                        // Tính toán % tiến độ để tô màu nền xanh
+                        const progressPercent = isCompleted ? 100 : (enrollment?.completedCount / enrollment?.totalLessons) * 100 || 0
+
+                        return (
+                            <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })}
+                                // Sửa tính năng: Khóa được chọn không đổi nền, chỉ lóe viền vàng (border-yellow-400) theo yêu cầu
+                                className={`group relative aspect-[23/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-700' : 'bg-zinc-300'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/50 scale-105 z-10' : 'border-black'}`} style={{ animationDelay: `${index * 50}ms` }}>
+
+                                {/* Lớp màu xanh lá hiển thị tiến độ học tập (phủ từ trái sang) */}
+                                {(isActive || isCompleted) && (
+                                    <div
+                                        className="absolute inset-0 bg-green-500/50 transition-all duration-1000 origin-left z-0"
+                                        style={{ width: `${progressPercent}%` }}
+                                    />
+                                )}
+
+                                <div className="absolute top-2 right-2 z-20">
+                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : isActive ? <Play className="w-3 h-3 text-red-500 fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" /> : <Lock className="w-3 h-3 text-zinc-400" />}
+                                </div>
+
+                                <h4 className={`text-[12px] sm:text-[10px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${isActive || isCompleted ? 'text-white' : 'text-zinc-500'}`}>
+                                    {/* Sửa tính năng: Chữ trắng chỉ dành cho khóa đã mở, chữ xám cho khóa chưa kích hoạt kể cả khi được chọn */}
+                                    {course.name_lop}
+                                </h4>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+
+            {selectedCourse && <CourseDetailModal course={selectedCourse} enrollment={selectedCourse.enrollment} onClose={() => setSelectedCourse(null)} />}
+            {showUpgradeModal && <UpgradeRoadmapModal onClose={() => setShowUpgradeModal(false)} onConfirm={onReset!} />}
+        </div>
+    )
+}
+
+
+================================================================================
+KẾT THÚC FILE: components/home/RealityMap.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/home/Zero2HeroSurvey.tsx
+================================================================================
+
+
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { surveyQuestions } from '@/lib/survey-data'
+import { saveSurveyResultAction } from '@/app/actions/survey-actions'
+import { getActiveSurvey, getCoursesForBuilder } from '@/app/actions/roadmap-actions'
+import { notify } from '@/lib/notifications-client'
+import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send, Sparkles, BookOpen } from 'lucide-react'
+
+function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
+    return (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-zinc-900 w-full max-w-xl rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
+                <div className="aspect-video bg-black relative flex items-center justify-center group cursor-pointer" onClick={() => videoUrl && window.open(videoUrl, '_blank')}>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <Play className="w-16 h-16 text-yellow-400 fill-current group-hover:scale-110 transition-transform" />
+                    <p className="absolute bottom-4 left-6 text-white font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}</p>
+                </div>
+                <div className="p-8 space-y-4">
+                    <h3 className="text-2xl font-black text-white uppercase">Cố vấn định hướng</h3>
+                    <p className="text-gray-400 text-sm leading-relaxed font-medium">Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện.</p>
+                    <button onClick={onClose} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-yellow-500 transition-all active:scale-95">Tôi đã hiểu - Quay lại chọn</button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default function Zero2HeroSurvey({ onComplete }: { onComplete?: () => void }) {
+    const router = useRouter()
+    
+    // States
+    const [flow, setFlow] = useState<any>(null)
+    const [allCourses, setAllCourses] = useState<any[]>([])
+    const [currentNodeId, setCurrentNodeId] = useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+
+    const [currentStep, setCurrentStep] = useState('q1')
+    const [history, setHistory] = useState<any[]>([])
+    const [answers, setAnswers] = useState<Record<string, any>>({})
+    const [identifiedCourseIds, setIdentifiedCourseIds] = useState<number[]>([])
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [showSuccess, setShowSuccess] = useState(false)
+    const [showAdvice, setShowAdvice] = useState<string | null>(null)
+
+    const [input1, setInput1] = useState('')
+    const [input2, setInput2] = useState('')
+    const [freeText, setFreeText] = useState('')
+    const [moneyGoal, setMoneyGoal] = useState('3.000.000')
+    const [videoPerDay, setVideoPerDay] = useState('1')
+    const [days, setDays] = useState('30')
+    const [livePerDay, setLivePerDay] = useState('60')
+    const [liveDays, setLiveDays] = useState('30')
+    const [targetVal, setTargetVal] = useState('1000')
+
+    // Tải bài khảo sát
+    useEffect(() => {
+        const init = async () => {
+            try {
+                setIsLoading(true)
+                const [flowData, courses] = await Promise.all([getActiveSurvey(), getCoursesForBuilder()])
+                const data = flowData as any
+                setAllCourses(courses)
+                
+                if (data && data.nodes && Array.isArray(data.nodes)) {
+                    setFlow(data)
+                    const targetIds = new Set(data.edges?.map((e: any) => e.target) || [])
+                    let startNode = data.nodes.find((n: any) => n.type === 'questionNode' && !targetIds.has(n.id))
+                    if (!startNode) startNode = data.nodes.find((n: any) => n.type === 'questionNode')
+                    if (startNode) {
+                        setCurrentNodeId(startNode.id)
+                        findInitialCourses(data, startNode.id)
+                    }
+                }
+            } catch (err) {
+                console.error(err)
+            } finally {
+                setIsLoading(false)
+            }
+        }
+        init()
+    }, [])
+
+    const findInitialCourses = (data: any, sid: string) => {
+        if (!data || !data.edges || !data.nodes) return
+        const newIds: number[] = []
+        const courseNames: string[] = []
+        const traverse = (currentId: string) => {
+            const outEdges = data.edges.filter((e: any) => e.source === currentId)
+            for (const edge of outEdges) {
+                const target = data.nodes.find((n: any) => n.id === edge.target)
+                if (target?.type === 'courseNode' && target.data?.courseId) {
+                    const cid = Number(target.data.courseId)
+                    if (!newIds.includes(cid)) {
+                        newIds.push(cid)
+                        courseNames.push(target.data.courseName || `Khóa #${cid}`)
+                    }
+                    traverse(target.id)
+                }
+            }
+        }
+        traverse(sid)
+        if (newIds.length > 0) {
+            setIdentifiedCourseIds(newIds)
+            notify(`Đã xác định: ${courseNames.join(', ')}`)
+        }
+    }
+
+    const findAndAddCourses = (sourceId: string) => {
+        if (!flow || !flow.edges || !flow.nodes) return
+        const newIds: number[] = []
+        const courseNames: string[] = []
+        const traverse = (sid: string) => {
+            const outEdges = flow.edges.filter((e: any) => e.source === sid)
+            for (const edge of outEdges) {
+                const target = flow.nodes.find((n: any) => n.id === edge.target)
+                if (target?.type === 'courseNode' && target.data?.courseId) {
+                    const cid = Number(target.data.courseId)
+                    if (!identifiedCourseIds.includes(cid) && !newIds.includes(cid)) {
+                        newIds.push(cid)
+                        courseNames.push(target.data.courseName || `Khóa #${cid}`)
+                    }
+                    traverse(target.id)
+                }
+            }
+        }
+        traverse(sourceId)
+        if (newIds.length > 0) {
+            setIdentifiedCourseIds(prev => [...prev, ...newIds])
+            notify(`Đã xác định: ${courseNames.join(', ')}`)
+        }
+    }
+
+    const getActiveQuestion = () => {
+        if (flow && currentNodeId && Array.isArray(flow.nodes)) {
+            const node = flow.nodes.find((n: any) => n.id === currentNodeId)
+            if (node) {
+                const options = Array.isArray(flow.edges) ? flow.edges
+                    .filter((e: any) => e.source === currentNodeId)
+                    .map((edge: any) => {
+                        const optNode = flow.nodes.find((n: any) => n.id === edge.target)
+                        return { id: optNode?.id, label: optNode?.data?.label, type: optNode?.type }
+                    })
+                    .filter((o: any) => o.id && o.type === 'optionNode') : []
+                return { id: node.id, question: node.data?.label, type: node.data?.type || 'CHOICE', options, isDynamic: true, description: node.data?.description }
+            }
+        }
+        const staticQ = (surveyQuestions as any)[currentStep] || {}
+        return { ...staticQ, id: currentStep, isDynamic: false }
+    }
+
+    const currentQuestion = getActiveQuestion()
+
+    const handleBack = () => {
+        if (history.length > 0) {
+            const prevHistory = [...history]
+            const lastStep = prevHistory.pop()
+            setHistory(prevHistory)
+            
+            if (lastStep.isDynamic) {
+                setCurrentNodeId(lastStep.id)
+                setIdentifiedCourseIds(lastStep.courses || [])
+            } else {
+                setCurrentStep(lastStep.id)
+            }
+            
+            const newAnswers = { ...answers }
+            delete newAnswers[currentQuestion.id]
+            setAnswers(newAnswers)
+        }
+    }
+
+    const handleNext = async (optionId: string, label: string) => {
+        const newAnswers: Record<string, any> = { ...answers, [currentQuestion.id]: label }
+        if (currentQuestion.type === 'INPUT_ACCOUNT') {
+            newAnswers[`${currentQuestion.id}_name`] = input1
+            newAnswers[`${currentQuestion.id}_id`] = input2
+            newAnswers[`${currentQuestion.id}_status`] = label
+        }
+        if (currentQuestion.type === 'INPUT_GOAL') {
+            newAnswers['goal_config'] = { 
+                videoPerDay, 
+                days, 
+                targetVal, 
+                moneyGoal, 
+                livePerDay, 
+                liveDays,
+                isSelling: Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng')),
+                isLivestream: Object.values(answers).some(val => String(val).toLowerCase().includes('livestream'))
+            }
+        }
+        setAnswers(newAnswers)
+
+        if (currentQuestion.isDynamic && flow) {
+            // Xác định node bắt đầu để tìm kiếm các node tiếp theo (courses, questions, v.v.)
+            // Đối với CHOICE, INPUT_ACCOUNT, nó bắt đầu từ Option được chọn
+            // Đối với FREE_TEXT, INPUT_GOAL, nó bắt đầu từ chính node Câu hỏi hiện tại
+            const startId = (currentQuestion.type === 'INPUT_GOAL' || currentQuestion.type === 'FREE_TEXT') ? currentNodeId : optionId
+            
+            findAndAddCourses(startId!)
+
+            const findNextNode = (sid: string): any => {
+                const outEdges = Array.isArray(flow.edges) ? flow.edges.filter((e: any) => e.source === sid) : []
+                for (const edge of outEdges) {
+                    const target = flow.nodes.find((n: any) => n.id === edge.target)
+                    if (!target) continue
+                    if (target.type === 'questionNode' || target.type === 'adviceNode' || target.type === 'finishNode') return target
+                    if (target.type === 'courseNode' || target.type === 'optionNode') {
+                        const next = findNextNode(target.id)
+                        if (next) return next
+                    }
+                }
+                return null
+            }
+
+            const nextNode = findNextNode(startId!)
+
+            if (nextNode) {
+                // Nếu là Đích đến (FinishNode)
+                if (nextNode.type === 'finishNode') {
+                    // Nếu Đích đến yêu cầu Form Cam kết (INPUT_GOAL)
+                    if (nextNode.data?.type === 'INPUT_GOAL') {
+                        setHistory([...history, { id: currentNodeId, isDynamic: true, courses: [...identifiedCourseIds] }])
+                        setCurrentNodeId(nextNode.id) // Chuyển sang chính Node Đích này để hiện Form
+                        return
+                    }
+                    // Ngược lại nộp bài ngay
+                    finishSurvey(newAnswers)
+                    return
+                }
+                if (nextNode.type === 'adviceNode') {
+                    setShowAdvice(nextNode.data?.label || '')
+                    return
+                }
+                setHistory([...history, { id: currentNodeId, isDynamic: true, courses: [...identifiedCourseIds] }])
+                setCurrentNodeId(nextNode.id)
+                findAndAddCourses(nextNode.id) 
+            } else {
+                finishSurvey(newAnswers)
+            }
+        } else {
+            finishSurvey(newAnswers)
+        }
+        setInput1(''); setInput2('')
+    }
+
+    const finishSurvey = async (finalAnswers: any) => {
+        setIsSubmitting(true)
+        try {
+            const res = await saveSurveyResultAction(finalAnswers)
+            if (res.success) {
+                setShowSuccess(true)
+                setTimeout(() => {
+                    if (onComplete) onComplete()
+                    else window.location.href = '/'
+                }, 5000) 
+            } else {
+                alert(res.error); setIsSubmitting(false)
+            }
+        } catch (err) {
+            setIsSubmitting(false)
+        }
+    }
+
+    if (isLoading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-yellow-400" /></div>
+
+    if (showSuccess) return (
+        <div className="bg-zinc-950 rounded-[2.5rem] p-10 text-center text-white border border-white/10 shadow-2xl animate-in zoom-in-95">
+            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/20">
+                <CheckCircle2 className="w-10 h-10" />
+            </div>
+            <h2 className="text-3xl font-black uppercase mb-4">Lộ trình hoàn tất!</h2>
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8 text-left max-w-md mx-auto">
+                <p className="text-[10px] font-black uppercase text-yellow-400 mb-4 tracking-widest flex items-center gap-2">
+                    <Sparkles className="w-3 h-3" /> AI đã xác định {identifiedCourseIds.length} chặng học:
+                </p>
+                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {identifiedCourseIds.map((id, idx) => {
+                        const c = allCourses.find(item => item.id === id)
+                        return (
+                            <div key={`${id}-${idx}`} className="flex items-center gap-3 text-sm font-bold text-gray-200 animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+                                <div className="w-6 h-6 rounded-lg bg-yellow-400/10 flex items-center justify-center text-yellow-400 text-[10px]">{id}</div>
+                                {c?.name_lop || `Khóa học #${id}`}
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+            <p className="text-gray-400 text-xs mb-4 italic">Hệ thống đang lưu dữ liệu và chuyển hướng...</p>
+            <Loader2 className="w-6 h-6 animate-spin text-yellow-400 mx-auto" />
+        </div>
+    )
+
+    return (
+        <div className="bg-zinc-950 rounded-[3rem] p-6 md:p-10 text-white border border-white/10 shadow-2xl relative overflow-hidden">
+            <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20"><Target className="w-5 h-5" /></div>
+                        <div>
+                            <h2 className="text-sg font-black text-yellow-400 uppercase tracking-tight italic">Zero 2 Hero</h2>
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Thiết kế lộ trình</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {history.length > 0 && (
+                            <button 
+                                onClick={handleBack}
+                                className="py-2 px-2
+                             bg-yellow-400 text-black rounded-2xl hover:bg-yellow-500 transition-all active:scale-90 shadow-lg shadow-yellow-400/10 animate-in fade-in zoom-in"
+                            >
+                                <ArrowLeft className="w-5 h-5" />
+                            </button>
+                        )}
+                        {identifiedCourseIds.length > 0 && (
+                            <div className="flex items-center gap-2 bg-zinc-800 px-4 py-2 rounded-xl border border-white/10 animate-in zoom-in">
+                                <BookOpen className="w-3 h-3 text-yellow-400" />
+                                <span className="text-[10px] font-black text-yellow-400">{identifiedCourseIds.length}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="animate-in slide-in-from-right-4 fade-in duration-300">
+                    <h3 className="text-base font-black leading-snug mb-1 tracking-tight">{currentQuestion.question}</h3>
+                    <p className="text-gray-400 text-[10px] mb-6 font-medium italic">
+                        {currentQuestion.description || 'Hãy chọn đáp án đúng nhất bạn muốn!'}
+                    </p>
+                    {currentQuestion.type === 'CHOICE' && (
+                        <div className="grid grid-cols-1 gap-2"> 
+                            {currentQuestion.options?.map((opt: any) => (
+                                <button 
+                                    key={opt.id} 
+                                    onClick={() => handleNext(opt.id, opt.label)} 
+                                    className="w-full text-left bg-white hover:bg-gray-100 border border-transparent py-2 px-3 rounded-2xl transition-all duration-300 group active:scale-[0.98] shadow-xl"
+                                >
+                                    <span className="text-xs font-black text-zinc-900 leading-relaxed transition-colors">
+                                        {opt.label}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {currentQuestion.type === 'FREE_TEXT' && (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Câu trả lời của bạn</label>
+                                <textarea 
+                                    value={freeText} 
+                                    onChange={e => setFreeText(e.target.value)} 
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400 min-h-[120px] transition-all" 
+                                    placeholder="Nhập nội dung trả lời tại đây..." 
+                                />
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    if (!freeText.trim()) return alert('Vui lòng nhập câu trả lời của bạn.');
+                                    handleNext('free_text_submit', freeText);
+                                    setFreeText(''); // Reset cho câu sau
+                                }} 
+                                className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10 flex items-center justify-center gap-2"
+                            >
+                                <Send className="w-3 h-3" /> Tiếp tục khảo sát
+                            </button>
+                        </div>
+                    )}
+
+                    {currentQuestion.type === 'INPUT_ACCOUNT' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Tên Kênh / Lĩnh vực</label>
+                                    <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Nhập tên..." />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Link TikTok / Bio</label>
+                                    <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="@id_cua_ban" />
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                {currentQuestion.options?.map((opt: any) => (
+                                    <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-white/5 text-white border border-white/10 hover:bg-white/10'}`}>{opt.label}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {currentQuestion.type === 'INPUT_GOAL' && (
+                        <div className="space-y-4 text-black text-left">
+                            <div className="bg-white p-5 md:p-8 rounded-[2.5rem] border-2 border-yellow-400/20 space-y-5 shadow-2xl">
+                                {/* PHẦN 1: MỤC TIÊU */}
+                                <div className="space-y-3">
+                                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                                        <Target className="w-3.5 h-3.5 text-yellow-500" /> 1. Mục tiêu: (QUẢ) Tôi muốn
+                                    </h4>
+
+                                    {/* TRƯỜNG HỢP: BÁN HÀNG */}
+                                    {Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng')) && (
+                                        <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
+                                            <span>ĐẠT</span>
+                                            <input type="text" value={moneyGoal} onChange={e => setMoneyGoal(e.target.value)} className="w-28 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-emerald-600 outline-none" />
+                                            <span className="text-gray-400 font-bold italic text-[10px]">VNĐ/THÁNG</span>
+                                        </div>
+                                    )}
+
+                                    {/* TRƯỜNG HỢP: NHÂN HIỆU */}
+                                    {Object.values(answers).some(val => String(val).toLowerCase().includes('nhân hiệu')) && (
+                                        <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
+                                            <span>TÔI MUỐN ĐẠT</span>
+                                            <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-20 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
+                                            <span className="text-gray-400 font-bold italic text-[10px]">FOLLOW</span>
+                                        </div>
+                                    )}
+
+                                    {/* TRƯỜNG HỢP: LAN TỎA GIÁ TRỊ */}
+                                    {Object.values(answers).some(val => String(val).toLowerCase().includes('lan tỏa')) && (
+                                        <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-blue-700 font-bold text-[11px] italic leading-snug">
+                                            🎯 Mục tiêu là lan tỏa giá trị cộng đồng thông qua hành động cụ thể.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* PHẦN 2: CAM KẾT HÀNH ĐỘNG */}
+                                <div className="space-y-3 pt-4 border-t border-gray-100">
+                                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 2. Cam kết (NHÂN) hành động
+                                    </h4>
+
+                                    <div className="space-y-4">
+                                        {/* Cam kết Video */}
+                                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
+                                            <span className="shrink-0">🎬 Tôi sẽ đăng ít nhất: 
+                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-7 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            Video mỗi ngày</span>
+                                            <span> đều đặn liên tục trong: <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            ngày</span>
+                                        </div>
+
+                                        {/* Cam kết Livestream */}
+                                        {Object.values(answers).some(val => String(val).toLowerCase().includes('livestream')) && (
+                                            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
+                                                <span className="shrink-0">📡 Tôi sẽ livestream tối thiểu: 
+                                                <input type="number" value={livePerDay} onChange={e => setLivePerDay(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
+                                                phút</span>
+                                                <span> mỗi ngày đều đặn trong:<input type="number" value={liveDays} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
+                                                ngày</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-3 h-3" />} Xác nhận & Cam kết
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+            {showAdvice && <AdviceModal videoUrl={showAdvice} onClose={() => setShowAdvice(null)} />}
+        </div>
+    )
+}
+
+
+================================================================================
+KẾT THÚC FILE: components/home/Zero2HeroSurvey.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ImageViewer.tsx
+================================================================================
+
+"use client"
+
+import { useEffect, useRef, useState } from "react"
+
+export default function ImageViewer() {
+  const [src, setSrc] = useState<string | null>(null)
+  const [scale, setScale] = useState(1)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const dragging = useRef(false)
+  const lastPos = useRef({ x: 0, y: 0 })
+  const imgRef = useRef<HTMLImageElement | null>(null)
+
+  // Click ảnh trong prose
+  useEffect(() => {
+    const handleClick = (e: any) => {
+      const img = e.target.closest(".prose img")
+      if (!img) return
+      setSrc(img.src)
+      setScale(1)
+      setPosition({ x: 0, y: 0 })
+    }
+
+    document.addEventListener("click", handleClick)
+    return () => document.removeEventListener("click", handleClick)
+  }, [])
+
+  // ESC đóng
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSrc(null)
+    }
+
+    if (src) document.addEventListener("keydown", handleKey)
+    return () => document.removeEventListener("keydown", handleKey)
+  }, [src])
+
+  if (!src) return null
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    setScale((prev) =>
+      e.deltaY < 0 ? Math.min(prev + 0.15, 6) : Math.max(prev - 0.15, 1)
+    )
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1) return
+    dragging.current = true
+    lastPos.current = { x: e.clientX, y: e.clientY }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragging.current) return
+    const dx = e.clientX - lastPos.current.x
+    const dy = e.clientY - lastPos.current.y
+
+    setPosition((prev) => ({
+      x: prev.x + dx,
+      y: prev.y + dy,
+    }))
+
+    lastPos.current = { x: e.clientX, y: e.clientY }
+  }
+
+  const handleMouseUp = () => {
+    dragging.current = false
+  }
+
+  const handleDoubleClick = () => {
+    if (scale === 1) {
+      setScale(2)
+    } else {
+      setScale(1)
+      setPosition({ x: 0, y: 0 })
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[999] bg-black/95 flex items-center justify-center"
+      onClick={() => setSrc(null)}
+    >
+      <div
+        className="relative w-full h-full flex items-center justify-center overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+        onWheel={handleWheel}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <img
+          ref={imgRef}
+          src={src}
+          alt=""
+          draggable={false}
+          className="select-none max-w-[90vw] max-h-[90vh] object-contain"
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            transition: dragging.current ? "none" : "transform 0.2s ease",
+            cursor: scale > 1 ? "grab" : "zoom-in",
+          }}
+          onMouseDown={handleMouseDown}
+          onDoubleClick={handleDoubleClick}
+        />
+
+        <div className="absolute top-5 right-5 flex gap-2">
+          <button
+            onClick={() => setScale((s) => Math.min(s + 0.3, 6))}
+            className="bg-white text-black px-3 py-1 rounded shadow"
+          >
+            +
+          </button>
+          <button
+            onClick={() => {
+              setScale(1)
+              setPosition({ x: 0, y: 0 })
+            }}
+            className="bg-white text-black px-3 py-1 rounded shadow"
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => setSrc(null)}
+            className="bg-white text-black px-3 py-1 rounded shadow"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+================================================================================
+KẾT THÚC FILE: components/ImageViewer.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/layout/Header.tsx
+================================================================================
+
+'use client'
+
+import React, { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { signOut } from 'next-auth/react'
+import { User, Settings, LogOut, ChevronDown, Sparkles } from 'lucide-react'
+import { NOTIFICATION_EVENT, BRKNotification } from '@/lib/notifications-client'
+
+export default function Header({ session, userImage }: { session: any, userImage?: string | null }) {
+    const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+    const [notification, setNotification] = useState<BRKNotification | null>(null)
+    const userMenuRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        // Lắng nghe thông báo toàn cầu
+        const handleNotification = (event: any) => {
+            const data = event.detail as BRKNotification
+            setNotification(data)
+            
+            // Tự động ẩn sau thời gian quy định (mặc định 4s)
+            const duration = data.duration || 4000
+            setTimeout(() => setNotification(null), duration)
+        }
+
+        window.addEventListener(NOTIFICATION_EVENT, handleNotification)
+        
+        function handleClickOutside(event: MouseEvent) {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setIsUserMenuOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            window.removeEventListener(NOTIFICATION_EVENT, handleNotification)
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [])
+
+    const userInitials = session?.user?.name
+        ? session.user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+        : '?'
+
+    return (
+        <header className="fixed top-0 z-50 w-full bg-black text-white shadow-xl border-b border-white/5">
+            <div className="container mx-auto flex h-16 items-center justify-between px-4 lg:px-8">
+                {/* Logo & Brand */}
+                <div className="flex items-center gap-4 shrink-0 relative">
+                    <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
+                        <Image
+                            src="/logobrk-50px.png"
+                            alt="Học Viện BRK Logo"
+                            width={150}
+                            height={50}
+                            priority
+                            className="object-contain"
+                            style={{ height: '48px', width: 'auto' }}
+                        />
+                    </Link>
+
+                    {/* Notification Bubble */}
+                    {notification && (
+                        <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 animate-in slide-in-from-left-2 fade-in duration-300 z-[60]">
+                            <div className="relative bg-yellow-400 text-black px-4 py-2 rounded-2xl shadow-2xl shadow-yellow-400/20 whitespace-nowrap">
+                                {/* Mũi tên trỏ vào logo */}
+                                <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-yellow-400"></div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-3 h-3 animate-pulse" />
+                                    <span className="text-[11px] font-black uppercase tracking-tight italic">{notification.message}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Navigation - Desktop */}
+                <nav className="hidden flex-1 items-center justify-center gap-12 text-[13px] font-black md:flex">
+                    <Link href="/" className="transition-all hover:text-yellow-400 hover:scale-105 tracking-widest">TRANG CHỦ</Link>
+                    <Link href="#khoa-hoc" className="transition-all hover:text-yellow-400 hover:scale-105 tracking-widest">KHÓA HỌC</Link>
+                    <Link href="#" className="transition-all hover:text-yellow-400 hover:scale-105 tracking-widest">GIỚI THIỆU</Link>
+                </nav>
+
+                {/* Actions & Hamburger */}
+                <div className="flex items-center gap-2 sm:gap-6">
+                    {session ? (
+                        <div className="relative" ref={userMenuRef}>
+                            <button
+                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                                className="flex items-center gap-1.5 rounded-full bg-zinc-800 px-2 py-1.5 transition-all hover:bg-zinc-700"
+                            >
+                                {userImage || session?.user?.image ? (
+                                    <img
+                                        src={userImage || session?.user?.image}
+                                        alt="Avatar"
+                                        className="h-7 w-7 rounded-full object-cover border-2 border-yellow-400"
+                                    />
+                                ) : (
+                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-yellow-400 text-xs font-black text-black">
+                                        {userInitials}
+                                    </div>
+                                )}
+                                <ChevronDown className={`h-3 w-3 text-zinc-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {/* User Dropdown Menu */}
+                            {isUserMenuOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-zinc-700 bg-zinc-900 py-2 shadow-xl animate-in fade-in slide-in-from-top-2">
+                                    <div className="border-b border-zinc-800 px-4 py-2 mb-1">
+                                        <p className="text-xs font-bold text-white truncate">{session.user?.name}</p>
+                                        <p className="text-[10px] text-zinc-500 truncate">{session.user?.email}</p>
+                                    </div>
+                                    {session.user?.role === 'ADMIN' && (
+                                        <Link
+                                            href="/admin"
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-400 hover:bg-zinc-800 transition-colors font-bold"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                            Quản trị hệ thống
+                                        </Link>
+                                    )}
+                                    <Link
+                                        href="/account-settings"
+                                        onClick={() => setIsUserMenuOpen(false)}
+                                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                                    >
+                                        <Settings className="h-4 w-4" />
+                                        Cài đặt tài khoản
+                                    </Link>
+                                    <button
+                                        onClick={() => signOut()}
+                                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-zinc-800 transition-colors"
+                                    >
+                                        <LogOut className="h-4 w-4" />
+                                        Đăng xuất
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <Link
+                            href="/login"
+                            className="hidden sm:inline-block rounded-full bg-white px-6 py-2 text-xs font-black text-black shadow-md transition-all hover:bg-yellow-400 hover:scale-105"
+                        >
+                            ĐĂNG NHẬP
+                        </Link>
+                    )}
+
+                    {/* Hamburger Button */}
+                    <button
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white transition-all hover:bg-white/10 md:hidden"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="h-6 w-6">
+                            {isMenuOpen ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                            )}
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* Mobile Menu Dropdown */}
+            {isMenuOpen && (
+                <div className="animate-in slide-in-from-top-4 absolute left-0 top-16 w-full border-b border-white/5 bg-black px-4 py-8 shadow-2xl md:hidden">
+                    <nav className="flex flex-col gap-6 text-center text-sm font-black">
+                        <Link href="/" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">TRANG CHỦ</Link>
+                        <Link href="#khoa-hoc" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">KHÓA HỌC</Link>
+                        <Link href="#" onClick={() => setIsMenuOpen(false)} className="py-2 hover:text-yellow-400 hover:scale-105 transition-all">GIỚI THIỆU</Link>
+                        {!session ? (
+                            <Link href="/login" onClick={() => setIsMenuOpen(false)} className="mt-4 rounded-xl bg-white py-4 text-black shadow-lg">ĐĂNG NHẬP</Link>
+                        ) : (
+                            <button
+                                onClick={() => signOut()}
+                                className="mt-4 rounded-xl bg-red-600 py-4 text-white shadow-lg"
+                            >
+                                ĐĂNG XUẤT
+                            </button>
+                        )}
+                    </nav>
+                </div>
+            )}
+        </header>
+    )
+}
+
+
+================================================================================
+KẾT THÚC FILE: components/layout/Header.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/payment/UploadProofModal.tsx
+================================================================================
+
+'use client'
+
+import { useState, useRef } from 'react'
+import { updatePaymentProof } from '@/app/actions/payment-actions'
+
+interface UploadProofModalProps {
+    enrollmentId: number
+    onClose: () => void
+    onSuccess: () => void
+}
+
+export default function UploadProofModal({ enrollmentId, onClose, onSuccess }: UploadProofModalProps) {
+    const [uploading, setUploading] = useState(false)
+    const [preview, setPreview] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onload = () => setPreview(reader.result as string)
+            reader.readAsDataURL(file)
+        }
+    }
+
+    const handleUpload = async () => {
+        const file = fileInputRef.current?.files?.[0]
+        if (!file) return
+
+        setUploading(true)
+
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const response = await fetch('/api/upload/payment', {
+                method: 'POST',
+                body: formData
+            })
+
+            if (!response.ok) {
+                throw new Error('Upload failed')
+            }
+
+            const { url } = await response.json()
+
+            const result = await updatePaymentProof(enrollmentId, url)
+
+            if (result.success) {
+                onSuccess()
+                onClose()
+            } else {
+                alert('Cập nhật thất bại: ' + result.error)
+            }
+        } catch (error) {
+            console.error('Upload error:', error)
+            alert('Upload thất bại. Vui lòng thử lại.')
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4">Upload biên lai chuyển khoản</h3>
+                
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Chọn ảnh biên lai
+                    </label>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="w-full border rounded-lg p-2"
+                    />
+                </div>
+
+                {preview && (
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-2">Preview:</p>
+                        <div className="relative w-full h-48 border rounded-lg overflow-hidden">
+                            <img src={preview} alt="Preview" className="object-contain w-full h-full" />
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex gap-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-2 border rounded-lg font-medium hover:bg-gray-50"
+                    >
+                        Hủy
+                    </button>
+                    <button
+                        onClick={handleUpload}
+                        disabled={!preview || uploading}
+                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+                    >
+                        {uploading ? 'Đang tải...' : 'Xác nhận'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+
+================================================================================
+KẾT THÚC FILE: components/payment/UploadProofModal.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ui/button.tsx
+================================================================================
+
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface ButtonProps
+    extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
+    size?: 'default' | 'sm' | 'lg' | 'icon'
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+    ({ className, variant = 'default', size = 'default', ...props }, ref) => {
+        const variants = {
+            default: "bg-primary text-primary-foreground hover:bg-primary/90",
+            destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+            outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+            secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+            ghost: "hover:bg-accent hover:text-accent-foreground",
+            link: "text-primary underline-offset-4 hover:underline",
+        }
+        const sizes = {
+            default: "h-10 px-4 py-2",
+            sm: "h-9 rounded-md px-3",
+            lg: "h-11 rounded-md px-8",
+            icon: "h-10 w-10",
+        }
+
+        return (
+            <button
+                className={cn(
+                    "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                    variants[variant],
+                    sizes[size],
+                    className
+                )}
+                ref={ref}
+                {...props}
+            />
+        )
+    }
+)
+Button.displayName = "Button"
+
+export { Button }
+
+
+================================================================================
+KẾT THÚC FILE: components/ui/button.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ui/checkbox.tsx
+================================================================================
+
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface CheckboxProps
+    extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+    onCheckedChange?: (checked: boolean) => void
+}
+
+const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
+    ({ className, onCheckedChange, checked, ...props }, ref) => {
+        return (
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => onCheckedChange?.(e.target.checked)}
+                className={cn(
+                    "h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer",
+                    className
+                )}
+                ref={ref}
+                {...props}
+            />
+        )
+    }
+)
+Checkbox.displayName = "Checkbox"
+
+export { Checkbox }
+
+
+================================================================================
+KẾT THÚC FILE: components/ui/checkbox.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ui/dialog.tsx
+================================================================================
+
+
+'use client'
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+import { X } from "lucide-react"
+
+interface DialogProps {
+    open?: boolean
+    children: React.ReactNode
+}
+
+export function Dialog({ open, children }: DialogProps) {
+    if (!open) return null
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+            {children}
+        </div>
+    )
+}
+
+export function DialogContent({ className, children }: { className?: string, children: React.ReactNode }) {
+    return (
+        <div className={cn("bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full p-6 relative shadow-2xl animate-in zoom-in-95 duration-200", className)}>
+            {children}
+        </div>
+    )
+}
+
+export function DialogHeader({ className, children }: { className?: string, children: React.ReactNode }) {
+    return <div className={cn("space-y-1.5 text-center sm:text-left", className)}>{children}</div>
+}
+
+export function DialogTitle({ className, children }: { className?: string, children: React.ReactNode }) {
+    return <h2 className={cn("text-lg font-semibold leading-none tracking-tight", className)}>{children}</h2>
+}
+
+export function DialogDescription({ className, children }: { className?: string, children: React.ReactNode }) {
+    return <p className={cn("text-sm text-zinc-400", className)}>{children}</p>
+}
+
+export function DialogFooter({ className, children }: { className?: string, children: React.ReactNode }) {
+    return <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}>{children}</div>
+}
+
+
+================================================================================
+KẾT THÚC FILE: components/ui/dialog.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ui/input.tsx
+================================================================================
+
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface InputProps
+    extends React.InputHTMLAttributes<HTMLInputElement> { }
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+    ({ className, type, ...props }, ref) => {
+        return (
+            <input
+                type={type}
+                className={cn(
+                    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    className
+                )}
+                ref={ref}
+                {...props}
+            />
+        )
+    }
+)
+Input.displayName = "Input"
+
+export { Input }
+
+
+================================================================================
+KẾT THÚC FILE: components/ui/input.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ui/label.tsx
+================================================================================
+
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+const Label = React.forwardRef<HTMLLabelElement, React.LabelHTMLAttributes<HTMLLabelElement>>(
+    ({ className, ...props }, ref) => (
+        <label
+            ref={ref}
+            className={cn(
+                "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+                className
+            )}
+            {...props}
+        />
+    )
+)
+Label.displayName = "Label"
+
+export { Label }
+
+
+================================================================================
+KẾT THÚC FILE: components/ui/label.tsx
+================================================================================
+
+
+================================================================================
+FILE GỐC: components/ui/textarea.tsx
+================================================================================
+
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface TextareaProps
+    extends React.TextareaHTMLAttributes<HTMLTextAreaElement> { }
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+    ({ className, ...props }, ref) => {
+        return (
+            <textarea
+                className={cn(
+                    "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                    className
+                )}
+                ref={ref}
+                {...props}
+            />
+        )
+    }
+)
+Textarea.displayName = "Textarea"
+
+export { Textarea }
+
+
+================================================================================
+KẾT THÚC FILE: components/ui/textarea.tsx
+================================================================================

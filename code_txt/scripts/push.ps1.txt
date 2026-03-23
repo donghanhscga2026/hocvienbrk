@@ -1,0 +1,120 @@
+================================================================================
+FILE: scripts\push.ps1
+================================================================================
+
+# ============================================================
+#  push.ps1 - Backup + Push len GitHub
+#  Usage: .\scripts\push.ps1 "Noi dung ghi chu"
+# ============================================================
+
+param (
+    [string]$Message = "Cap nhat he thong BRK Academy"
+)
+
+$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
+
+# ── BUOC 1: BACKUP ──────────────────────────────────────────
+$Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
+$BackupDir = "$ProjectRoot\backups"
+$ZipName = "backup_$Timestamp.zip"
+$ZipPath = "$BackupDir\$ZipName"
+$TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "BRK_Backup_$Timestamp"
+
+Write-Host ""
+Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "  [1/2] BACKUP DU AN" -ForegroundColor Cyan
+Write-Host "  Time   : $Timestamp" -ForegroundColor Cyan
+Write-Host "  Output : $ZipPath" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+
+$IncludePaths = @(
+    "app", "components", "lib", "types", "public",
+    "auth.ts", "auth.config.ts", "middleware.ts", ".env", ".env.local",
+    "prisma", "scripts",
+    "package.json", "next.config.ts", "tsconfig.json", "tsconfig.seed.json",
+    "postcss.config.mjs", "eslint.config.mjs", "docker-compose.yml",
+    "README.md", "DESIGN_SYSTEM.md"
+)
+$ExcludePatterns = @("*.log", "*.tsbuildinfo", ".next", "node_modules", ".git", "backups")
+
+if (-not (Test-Path $BackupDir)) { New-Item -ItemType Directory -Path $BackupDir | Out-Null }
+if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
+New-Item -ItemType Directory -Path $TempDir | Out-Null
+
+$FilesToBackup = @()
+foreach ($rel in $IncludePaths) {
+    $full = Join-Path $ProjectRoot $rel
+    if (Test-Path $full -PathType Leaf) {
+        $FilesToBackup += $full
+    }
+    elseif (Test-Path $full -PathType Container) {
+        foreach ($file in (Get-ChildItem -Path $full -File -Recurse)) {
+            $skip = $false
+            foreach ($p in $ExcludePatterns) {
+                if ($file.FullName -like "*\$p\*" -or $file.Name -like $p) { $skip = $true; break }
+            }
+            if (-not $skip) { $FilesToBackup += $file.FullName }
+        }
+    }
+}
+
+foreach ($filePath in $FilesToBackup) {
+    $rel = $filePath.Substring($ProjectRoot.Length).TrimStart('\', '/')
+    $dest = Join-Path $TempDir $rel
+    $dir = Split-Path -Parent $dest
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    Copy-Item -Path $filePath -Destination $dest -Force
+}
+
+try {
+    Compress-Archive -Path "$TempDir\*" -DestinationPath $ZipPath -Force
+    $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
+    Write-Host "[OK] Backup xong: $ZipName ($sizeMB MB, $($FilesToBackup.Count) files)" -ForegroundColor Green
+}
+catch {
+    Write-Host "[LOI] Khong the tao ZIP: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Xoa temp va giu toi da 5 ban backup gan nhat
+if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
+$old = Get-ChildItem -Path $BackupDir -Filter "backup_*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -Skip 5
+if ($old.Count -gt 0) {
+    Write-Host "[*] Xoa $($old.Count) backup cu..." -ForegroundColor Gray
+    $old | Remove-Item -Force
+}
+
+# ── BUOC 2: PUSH LEN GITHUB ─────────────────────────────────
+Write-Host ""
+Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "  [2/2] DAY CODE LEN GITHUB" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+
+Write-Host "> Dang gom cac thay doi..." -ForegroundColor Yellow
+git add .
+
+$status = git status --porcelain
+if ($status) {
+    Write-Host "> Commit: '$Message'" -ForegroundColor Yellow
+    git commit -m $Message
+}
+else {
+    Write-Host "> Khong co thay doi moi de commit." -ForegroundColor Gray
+}
+
+Write-Host "> Dang day len nhanh master..." -ForegroundColor Yellow
+git push origin master
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host ""
+    Write-Host "======================================" -ForegroundColor Green
+    Write-Host "  HOAN THANH! Backup + Push thanh cong" -ForegroundColor Green
+    Write-Host "======================================" -ForegroundColor Green
+}
+else {
+    Write-Host "[LOI] Push that bai! Kiem tra ket noi hoac xung dot code." -ForegroundColor Red
+}
+
+
+================================================================================
+END OF FILE: scripts\push.ps1
+================================================================================

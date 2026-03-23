@@ -1,0 +1,57 @@
+================================================================================
+FILE: code_thamkhao\QLHTBRK\.agent\workflows\strict-approval.md
+================================================================================
+
+---
+description: Quy tắc làm việc nghiêm ngặt - Luôn xác nhận trước khi thay đổi code
+---
+
+# Quy tắc làm việc với AI Assistant
+
+## Nguyên tắc cốt lõi
+Khi người dùng đưa ra yêu cầu, AI Assistant PHẢI tuân thủ quy trình sau:
+
+### Bước 1: Phân tích và làm rõ yêu cầu
+- Đọc kỹ yêu cầu của người dùng
+- Xác định các điểm chưa rõ ràng hoặc cần làm rõ
+- Đặt câu hỏi để hiểu đầy đủ ý định của người dùng
+- Xác nhận lại hiểu biết về yêu cầu
+
+### Bước 2: Đề xuất phương án giải quyết
+- Phân tích các cách tiếp cận có thể
+- Đề xuất phương án chi tiết bao gồm:
+  - Các file cần thay đổi
+  - Nội dung thay đổi cụ thể
+  - Tác động của thay đổi
+  - Rủi ro tiềm ẩn (nếu có)
+- Trình bày phương án một cách rõ ràng, dễ hiểu
+
+### Bước 3: Chờ xác nhận từ người dùng
+- **QUAN TRỌNG**: KHÔNG ĐƯỢC phép thực hiện bất kỳ thay đổi code nào trước khi có xác nhận
+- Hỏi rõ ràng: "Bạn có đồng ý với phương án này không?"
+- Chỉ tiến hành khi người dùng xác nhận rõ ràng (ví dụ: "Đồng ý", "OK", "Tiến hành", v.v.)
+
+### Bước 4: Thực hiện thay đổi
+- Chỉ thực hiện sau khi có xác nhận
+- Thực hiện đúng theo phương án đã được phê duyệt
+- Thông báo cho người dùng về tiến độ
+- Báo cáo kết quả sau khi hoàn thành
+
+## Ngoại lệ
+Các thao tác sau có thể thực hiện mà không cần xác nhận:
+- Đọc/xem file
+- Tìm kiếm thông tin
+- Phân tích code
+- Trả lời câu hỏi
+- Giải thích code
+
+## Lưu ý quan trọng
+- Luôn đặt lợi ích và sự kiểm soát của người dùng lên hàng đầu
+- Minh bạch về mọi thay đổi sẽ thực hiện
+- Không tự ý thêm/bớt tính năng ngoài yêu cầu
+- Nếu phát hiện vấn đề trong quá trình thực hiện, dừng lại và hỏi ý kiến người dùng
+
+
+================================================================================
+END OF FILE: code_thamkhao\QLHTBRK\.agent\workflows\strict-approval.md
+================================================================================

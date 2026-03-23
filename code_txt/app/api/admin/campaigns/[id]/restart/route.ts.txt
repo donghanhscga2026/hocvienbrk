@@ -1,0 +1,48 @@
+================================================================================
+FILE: app\api\admin\campaigns\[id]\restart\route.ts
+================================================================================
+
+import { auth } from "@/auth";
+import prisma from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  const { id: idStr } = await params;
+  const id = parseInt(idStr);
+
+  if (session?.user?.role !== "ADMIN") {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  try {
+    // 1. Xóa toàn bộ nhật ký cũ của chiến dịch này
+    await prisma.emailCampaignLog.deleteMany({
+      where: { campaignId: id }
+    });
+
+    // 2. Đặt lại các thông số về 0 và trạng thái về ACTIVE
+    const updated = await prisma.emailCampaign.update({
+      where: { id },
+      data: {
+        status: "ACTIVE",
+        sentCount: 0,
+        failedCount: 0,
+        startedAt: null,
+        completedAt: null,
+      }
+    });
+
+    return NextResponse.json(updated);
+  } catch (error: any) {
+    return new NextResponse(error.message, { status: 500 });
+  }
+}
+
+
+================================================================================
+END OF FILE: app\api\admin\campaigns\[id]\restart\route.ts
+================================================================================

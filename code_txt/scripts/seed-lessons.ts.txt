@@ -1,0 +1,106 @@
+================================================================================
+FILE: scripts\seed-lessons.ts
+================================================================================
+
+
+import { PrismaClient } from '@prisma/client'
+const prisma = new PrismaClient()
+
+async function main() {
+    console.log('--- SEEDING LESSONS ---')
+
+    // 1. Khóa Tiếp thị liên kết (AF06) - 21 ngày
+    const af06 = await (prisma as any).course.findUnique({ where: { id_khoa: 'AF06' } })
+    if (af06) {
+        console.log(`Found AF06 with ID: ${af06.id}`)
+        for (let i = 1; i <= 21; i++) {
+            await (prisma as any).lesson.upsert({
+                where: { courseId_order: { courseId: af06.id, order: i } },
+                update: {},
+                create: {
+                    id: `AF06_L${i}`,
+                    courseId: af06.id,
+                    order: i,
+                    title: `Bài ${i}: Nội dung thực chiến ngày ${i}`,
+                    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+                    content: `Nội dung hướng dẫn chi tiết cho ngày thứ ${i} của lộ trình Affiliate.`
+                }
+            })
+        }
+    }
+
+    // 2. Khóa Nhân hiệu từ gốc (NH06) - 21 ngày
+    const nh06 = await (prisma as any).course.findUnique({ where: { id_khoa: 'NH06' } })
+    if (nh06) {
+        for (let i = 1; i <= 21; i++) {
+            await (prisma as any).lesson.upsert({
+                where: { courseId_order: { courseId: nh06.id, order: i } },
+                update: {},
+                create: {
+                    id: `NH06_L${i}`,
+                    courseId: nh06.id,
+                    order: i,
+                    title: `Bài ${i}: Xây dựng nhân hiệu ngày ${i}`,
+                    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                    content: `Bước thứ ${i} trong hành trình xây dựng nhân hiệu từ gốc.`
+                }
+            })
+        }
+    }
+
+    // 3. Khóa Thử thách độc lập
+    let challengeCourse = await (prisma as any).course.findUnique({ where: { id_khoa: 'CHALLENGE_DAILY' } })
+
+    if (!challengeCourse) {
+        console.log('Creating CHALLENGE_DAILY course...')
+        challengeCourse = await (prisma as any).course.create({
+            data: {
+                id_khoa: 'CHALLENGE_DAILY',
+                name_lop: 'Thử thách rèn luyện hàng ngày',
+                name_khoa: 'BRK Discipline',
+                type: 'CHALLENGE',
+                phi_coc: 0,
+                status: true,
+                mo_ta_ngan: 'Chương trình rèn luyện kỷ luật 7-90 ngày tùy chọn.',
+                mo_ta_dai: 'Tham gia thử thách để rèn luyện thói quen nộp bài tâm đắc ngộ và thực hành mỗi ngày.'
+            }
+        })
+    } else {
+        await (prisma as any).course.update({
+            where: { id: challengeCourse.id },
+            data: { type: 'CHALLENGE' }
+        })
+    }
+
+    // Seed cho Challenge Course (Giả sử tối đa 90 ngày)
+    for (let i = 1; i <= 90; i++) {
+        await (prisma as any).lesson.upsert({
+            where: { courseId_order: { courseId: challengeCourse.id, order: i } },
+            update: { isDailyChallenge: true },
+            create: {
+                id: `CHALLENGE_D${i}`,
+                courseId: challengeCourse.id,
+                order: i,
+                title: `Ngày ${i}: Rèn luyện kỷ luật`,
+                isDailyChallenge: true,
+                content: `Ngày thứ ${i} trong chuỗi thử thách rèn luyện. Tập trung vào Tâm đắc ngộ và Thực hành mới.`
+            }
+        })
+    }
+
+    console.log('✅ Seeding completed.')
+}
+
+main()
+    .catch((e) => {
+        console.error(e)
+        process.exit(1)
+    })
+    .finally(async () => {
+        await prisma.$disconnect()
+    })
+
+
+================================================================================
+END OF FILE: scripts\seed-lessons.ts
+================================================================================
