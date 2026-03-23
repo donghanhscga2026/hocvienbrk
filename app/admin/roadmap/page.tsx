@@ -19,7 +19,7 @@ import { QuestionNode, OptionNode, CourseNode, AdviceNode, FinishNode } from '@/
 import { 
   getAllSurveys, createSurvey, 
   saveSurveyFlow, activateSurvey, deleteSurvey, 
-  getCoursesForBuilder 
+  getCoursesForBuilder, getSurveyFlow
 } from '@/app/actions/roadmap-actions';
 import { surveyQuestions } from '@/lib/survey-data';
 import Link from 'next/link'
@@ -90,13 +90,26 @@ const RoadmapBuilderContent = () => {
     if (res.success) loadSurveys();
   };
 
-  const handleEdit = (survey: any) => {
+  // [OPTIMIZE] Chỉ tải flow khi bấm "Thiết kế sơ đồ" - tránh tải cả MB dữ liệu khi chỉ cần list
+  const handleEdit = async (survey: any) => {
     setCurrentSurveyId(survey.id);
-    const flow = survey.flow as any;
-    setNodes(Array.isArray(flow?.nodes) ? flow.nodes : []);
-    setEdges(Array.isArray(flow?.edges) ? flow.edges : []);
     setView('EDITOR');
     setSelectedNode(null);
+    setIsInitializing(true);
+    
+    try {
+      // [OPTIMIZE] Gọi API riêng để lấy flow - chỉ khi cần thiết kế
+      const flowData = await getSurveyFlow(survey.id);
+      const flow = flowData?.flow as any;
+      setNodes(Array.isArray(flow?.nodes) ? flow.nodes : []);
+      setEdges(Array.isArray(flow?.edges) ? flow.edges : []);
+    } catch (err) {
+      console.error('Error loading flow:', err);
+      setNodes([]);
+      setEdges([]);
+    } finally {
+      setIsInitializing(false);
+    }
   };
 
   const handleActivate = async (id: number) => {

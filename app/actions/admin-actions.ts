@@ -89,7 +89,14 @@ export async function getReservedIds() {
     })
 }
 
-export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS') {
+export async function getStudentsAction(
+    query?: string, 
+    role?: Role | 'ALL' | 'COURSE_86_DAYS',
+    page: number = 0,
+    limit: number = 20,
+    sortBy: 'createdAt' | 'id' = 'createdAt',
+    sortOrder: 'asc' | 'desc' = 'desc'
+) {
     await checkAdmin()
 
     try {
@@ -112,7 +119,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
                 if (!isNaN(id)) {
                     where.id = id;
                 } else {
-                    return { success: true, students: [] };
+                    return { success: true, students: [], total: 0, page: 0, totalPages: 0, roleCounts: {} };
                 }
             } 
             // 2. Nếu là số thuần túy
@@ -160,22 +167,48 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
             }
         }
 
-        const students = await prisma.user.findMany({
-            where,
-            include: {
-                enrollments: {
-                    include: {
-                        course: { select: { name_lop: true } },
-                        _count: {
-                            select: { lessonProgress: { where: { status: 'COMPLETED' } } }
+        // [OPTIMIZE] Thêm take/skip để phân trang
+        const skip = page * limit;
+        
+        const [students, total] = await Promise.all([
+            prisma.user.findMany({
+                where,
+                include: {
+                    enrollments: {
+                        include: {
+                            course: { select: { name_lop: true } },
+                            _count: {
+                                select: { lessonProgress: { where: { status: 'COMPLETED' } } }
+                            }
                         }
                     }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        })
+                },
+                orderBy: { [sortBy]: sortOrder },
+                take: limit,
+                skip: skip
+            }),
+            prisma.user.count({ where })
+        ])
 
-        return { success: true, students }
+        // [NEW] Lấy role counts riêng (chỉ khi page 0 và không có search)
+        let roleCounts: Record<string, number> = {}
+        if (page === 0 && !query) {
+            const allUsers = await prisma.user.findMany({
+                select: { role: true, enrollments: { select: { courseId: true } } }
+            })
+            roleCounts = {
+                ALL: allUsers.length,
+                STUDENT: allUsers.filter((u: any) => u.role === 'STUDENT').length,
+                ADMIN: allUsers.filter((u: any) => u.role === 'ADMIN').length,
+                INSTRUCTOR: allUsers.filter((u: any) => u.role === 'INSTRUCTOR').length,
+                AFFILIATE: allUsers.filter((u: any) => u.role === 'AFFILIATE').length,
+                COURSE_86_DAYS: allUsers.filter((u: any) => u.enrollments?.some((e: any) => e.courseId === 1)).length,
+            }
+        }
+
+        const totalPages = Math.ceil(total / limit)
+        
+        return { success: true, students, total, page, totalPages, roleCounts }
     } catch (error: any) {
         console.error("Get Students Error:", error)
         return { success: false, error: error.message }

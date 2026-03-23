@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    // Tắt tối ưu hóa ảnh để sửa lỗi 400 Bad Request và cảnh báo chất lượng
+    // [OPTIMIZE] Tạm thời tắt tối ưu ảnh để tránh lỗi 400 - có thể bật lại sau khi config đầy đủ domain
     unoptimized: true,
 
     // Cấu hình các mức chất lượng được phép
@@ -39,6 +39,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "postimg.cc",
+      },
+      {
+        protocol: "https",
+        hostname: "i.postimg.cc",
       },
       {
         protocol: "https",
