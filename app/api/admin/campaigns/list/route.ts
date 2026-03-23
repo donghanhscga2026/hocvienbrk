@@ -11,7 +11,18 @@ export async function GET() {
 
   try {
     const campaigns = await prisma.emailCampaign.findMany({
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        totalRecipients: true,
+        sentCount: true,
+        failedCount: true,
+        createdAt: true,
+        notificationType: true, // Thêm trường này vì UI đang sử dụng
+      },
       orderBy: { createdAt: "desc" },
+      take: 50,
     });
 
     return NextResponse.json(campaigns);
