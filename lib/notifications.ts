@@ -155,3 +155,92 @@ export async function sendSurveyNotification(data: {
 export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
 export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
 export { sendGmail };
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * EMAIL CAMPAIGN TELEGRAM NOTIFICATIONS
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+type EmailCampaignEventType = 'START' | 'PAUSE' | 'RESUME' | 'COMPLETE' | 'ERROR';
+
+interface CampaignNotificationData {
+  event: EmailCampaignEventType;
+  campaignTitle: string;
+  total: number;
+  sent: number;
+  success: number;
+  failed: number;
+  pauseMinutes?: number;
+  resumeTime?: string;
+  error?: string;
+}
+
+export async function sendEmailCampaignNotification(data: CampaignNotificationData): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID_EMAIL_CAMPAIGN;
+
+  if (!token || !chatId) {
+    console.log("[EmailCampaign] Telegram: Missing bot token or chat ID");
+    return;
+  }
+
+  let message = "";
+  const { event, campaignTitle, total, sent, success, failed, pauseMinutes, resumeTime, error } = data;
+
+  switch (event) {
+    case 'START':
+      message = `📤 <b>BẮT ĐẦU CAMPAIGN</b>\n\n` +
+        `📋 Chiến dịch: <b>${campaignTitle}</b>\n` +
+        `📧 Tổng: <b>${total}</b> emails\n` +
+        `⏱️ Dự kiến: ~${Math.ceil(total / 30)} phút`;
+      break;
+
+    case 'PAUSE':
+      message = `⏸️ <b>PAUSE - ${sent}/${total}</b>\n\n` +
+        `📋 Chiến dịch: ${campaignTitle}\n` +
+        `⏳ Pause: <b>${pauseMinutes} phút</b>\n` +
+        `▶️ Tiếp tục: <b>${resumeTime}</b>\n\n` +
+        `📊 Đã gửi: ${sent} | ✅ Thành công: ${success} | ❌ Thất bại: ${failed}`;
+      break;
+
+    case 'RESUME':
+      message = `▶️ <b>TIẾP TỤC GỬI</b>\n\n` +
+        `📋 Chiến dịch: ${campaignTitle}\n` +
+        `📧 Đã: <b>${sent}/${total}</b>\n` +
+        `✅ Thành công: ${success} | ❌ Thất bại: ${failed}`;
+      break;
+
+    case 'COMPLETE':
+      const rate = total > 0 ? ((success / total) * 100).toFixed(1) : 0;
+      message = `✅ <b>HOÀN THÀNH</b>\n\n` +
+        `📋 Chiến dịch: <b>${campaignTitle}</b>\n` +
+        `📧 Tổng: ${total}\n` +
+        `✅ Thành công: <b>${success}</b>\n` +
+        `❌ Thất bại: ${failed}\n\n` +
+        `📈 Tỷ lệ thành công: <b>${rate}%</b>`;
+      break;
+
+    case 'ERROR':
+      message = `⚠️ <b>LỖI CAMPAIGN</b>\n\n` +
+        `📋 Chiến dịch: ${campaignTitle}\n` +
+        `📧 Đã gửi: ${sent}/${total}\n` +
+        `❌ Lỗi: <b>${error}</b>`;
+      break;
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+      }),
+    });
+  } catch (err) {
+    console.error("[EmailCampaign] Telegram error:", err);
+  }
+}

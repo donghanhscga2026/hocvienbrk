@@ -2,157 +2,250 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { getStudentsAction } from '@/app/actions/admin-actions'
-import { Search, User, Mail, Phone, Calendar, BookOpen, CheckCircle, Loader2, Info, ArrowUpDown } from 'lucide-react'
+import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy } from 'lucide-react'
+
+const roleConfig: Record<string, { label: string; icon: any; color: string; bgColor: string; textColor: string }> = {
+  ALL: { label: 'Tất cả', icon: Users, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
+  STUDENT: { label: 'Học viên', icon: GraduationCap, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
+  ADMIN: { label: 'Quản trị', icon: Shield, color: 'text-red-600', bgColor: 'bg-red-100', textColor: 'text-red-700' },
+  INSTRUCTOR: { label: 'Giảng viên', icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
+  AFFILIATE: { label: 'Đối tác', icon: Handshake, color: 'text-green-600', bgColor: 'bg-green-100', textColor: 'text-green-700' },
+  COURSE_86_DAYS: { label: 'Coach 1:1', icon: Trophy, color: 'text-purple-600', bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
+}
+
+const roleCardColors: Record<string, string> = {
+  ADMIN: 'bg-red-100',
+  COURSE_86_DAYS: 'bg-gray-100',
+  INSTRUCTOR: 'bg-blue-100',
+  AFFILIATE: 'bg-green-100',
+  STUDENT: 'bg-gray-100',
+}
+
+const roleTextColors: Record<string, string> = {
+  ADMIN: 'text-red-600',
+  COURSE_86_DAYS: 'bg-purple-100',
+  INSTRUCTOR: 'text-blue-600',
+  AFFILIATE: 'text-green-600',
+  STUDENT: 'text-gray-900',
+}
 
 export default function AdminStudentsPage() {
-    const [students, setStudents] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-    const [searchQuery, setSearchQuery] = useState('')
-    const [selectedRole, setSelectedRole] = useState<string>('STUDENT') 
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [allStudents, setAllStudents] = useState<any[]>([])
+  const [filteredStudents, setFilteredStudents] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedRole, setSelectedRole] = useState<string>('ALL') 
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-    const fetchStudents = async (query?: string, role?: string) => {
-        setLoading(true)
-        const res = await getStudentsAction(query, (role || selectedRole) as any)
-        if (res.success) {
-            let data = res.students || []
-            // Sắp xếp dữ liệu theo thời gian tạo (createdAt)
-            data.sort((a: any, b: any) => {
-                const timeA = new Date(a.createdAt).getTime()
-                const timeB = new Date(b.createdAt).getTime()
-                return sortOrder === 'asc' ? timeA - timeB : timeB - timeA
-            })
-            setStudents(data)
-        }
-        setLoading(false)
+  const fetchStudents = async () => {
+    setLoading(true)
+    const res = await getStudentsAction('', 'ALL')
+    if (res.success) {
+      setAllStudents(res.students || [])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchStudents()
+  }, [])
+
+  useEffect(() => {
+    let result = allStudents
+
+    if (selectedRole !== 'ALL') {
+      if (selectedRole === 'COURSE_86_DAYS') {
+        result = result.filter(s => s.enrollments?.some((e: any) => e.courseId === 1))
+      } else {
+        result = result.filter(s => s.role === selectedRole)
+      }
     }
 
-    useEffect(() => {
-        fetchStudents(searchQuery, selectedRole)
-    }, [sortOrder, selectedRole])
-
-    const toggleSort = () => {
-        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(s => 
+        s.name?.toLowerCase().includes(query) ||
+        s.email?.toLowerCase().includes(query) ||
+        s.phone?.toLowerCase().includes(query) ||
+        s.id.toString().includes(query)
+      )
     }
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault()
-        fetchStudents(searchQuery, selectedRole)
-    }
+    result.sort((a: any, b: any) => {
+      const timeA = new Date(a.createdAt).getTime()
+      const timeB = new Date(b.createdAt).getTime()
+      return sortOrder === 'asc' ? timeA - timeB : timeB - timeA
+    })
 
-    return (
-        <div className="space-y-6 pb-20">
-            <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 leading-tight">Quản lý</h1>
-                        <p className="text-gray-500 text-xs font-medium">Thành viên & tiến độ</p>
+    setFilteredStudents(result)
+  }, [allStudents, selectedRole, searchQuery, sortOrder])
+
+  const toggleSort = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+  }
+
+  const roleCounts: Record<string, number> = {
+    ALL: allStudents.length,
+    STUDENT: allStudents.filter(s => s.role === 'STUDENT').length,
+    ADMIN: allStudents.filter(s => s.role === 'ADMIN').length,
+    INSTRUCTOR: allStudents.filter(s => s.role === 'INSTRUCTOR').length,
+    AFFILIATE: allStudents.filter(s => s.role === 'AFFILIATE').length,
+    COURSE_86_DAYS: allStudents.filter(s => 
+      s.enrollments && s.enrollments.some((e: any) => e.courseId === 1)
+    ).length,
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* HEADER */}
+      <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-3">
+            <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-xs font-medium">Quay ra</span>
+            </Link>
+            <h1 className="text-lg font-bold text-yellow-400">Thành Viên</h1>
+          </div>
+          <div className="text-xs font-medium text-white/60">
+            {filteredStudents.length} / {allStudents.length}
+          </div>
+        </div>
+      </header>
+
+      {/* TOOLBAR STICKY */}
+      <div className="sticky top-16 z-40 bg-white border-b shadow-sm">
+        <div className="p-4 space-y-3">
+          {/* Role Filter */}
+          <div className="flex gap-2">
+            {Object.entries(roleConfig).map(([key, config]) => {
+              const Icon = config.icon
+              const isSelected = selectedRole === key
+              const count = roleCounts[key]
+              return (
+                <button
+                  key={key}
+                  onClick={() => setSelectedRole(key)}
+                  className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl transition-all border-2 ${
+                    isSelected 
+                      ? `${config.bgColor} ${config.textColor} shadow-lg ring-2 ring-yellow-400 ring-offset-1 border-yellow-400` 
+                      : `${config.bgColor} ${config.textColor} border-transparent hover:shadow-md`
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-[9px] font-black uppercase tracking-tight leading-tight">{config.label}</span>
+                  <span className="text-[10px] font-bold">{count}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Search + Sort */}
+          <div className="flex gap-2">
+            <form onSubmit={handleSearch} className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm Tên, SĐT, Email..."
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </form>
+            <button
+              onClick={toggleSort}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                sortOrder === 'desc' 
+                  ? 'bg-black text-yellow-400' 
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              <span>{sortOrder === 'desc' ? 'Mới' : 'Cũ'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENT - SCROLLABLE */}
+      <div className="flex-1 p-4 pb-8">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-3 border-purple-600 border-t-transparent"></div>
+            <p className="mt-4 text-gray-500 text-sm">Đang tải...</p>
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Users className="w-8 h-8 text-gray-300" />
+            </div>
+            <p className="text-gray-500 font-medium">Không có thành viên</p>
+            <p className="text-gray-400 text-sm mt-1">Danh sách trống</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredStudents.map((student) => {
+              const isCoach = student.enrollments?.some((e: any) => e.courseId === 1)
+              const displayRole = isCoach ? 'COURSE_86_DAYS' : student.role
+              const bgColor = roleCardColors[displayRole] || 'bg-gray-100'
+              const textColor = roleTextColors[displayRole] || 'text-gray-900'
+              
+              return (
+                <Link
+                  key={student.id}
+                  href={`/admin/students/${student.id}`}
+                  className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Avatar with ID */}
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      {student.image ? (
+                        <div className={`w-12 h-12 rounded-xl overflow-hidden ${bgColor}`}>
+                          <Image
+                            src={student.image}
+                            alt={student.name || 'Avatar'}
+                            width={48}
+                            height={48}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bgColor}`}>
+                          <User className={`w-6 h-6 ${textColor}`} />
+                        </div>
+                      )}
+                      <span className="text-[10px] font-black text-gray-400">#{student.id}</span>
                     </div>
 
-                    <select 
-                        value={selectedRole}
-                        onChange={(e) => setSelectedRole(e.target.value)}
-                        className="bg-black text-yellow-400 border-none rounded-xl px-3 py-2 text-[10px] font-black uppercase tracking-tighter focus:ring-2 focus:ring-yellow-500 outline-none shadow-lg cursor-pointer"
-                    >
-                        <option value="ALL">Tất cả</option>
-                        <option value="STUDENT">Học viên</option>
-                        <option value="ADMIN">Quản trị</option>
-                        <option value="INSTRUCTOR">Giảng viên</option>
-                        <option value="AFFILIATE">Đối tác</option>
-                        <option value="COURSE_86_DAYS">Coach 1:1</option>
-                    </select>
-                </div>
-
-                <form onSubmit={handleSearch} className="relative w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Tìm Tên, SĐT hoặc #ID..."
-                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm text-sm"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </form>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="w-full">
-                    <table className="w-full text-left border-collapse table-fixed">
-                        <thead>
-                            <tr className="bg-gray-50 border-b border-gray-200">
-                                <th className="px-2 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center w-14 border-r border-gray-100">ID</th>
-                                <th className="px-3 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest relative">
-                                    <div className="flex items-center">
-                                        <span>Thông tin cơ bản</span>
-                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                                            <div className="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-[9px] font-black border border-orange-200 shadow-sm">
-                                                {students.length}
-                                            </div>
-                                            <button 
-                                                onClick={toggleSort}
-                                                className="flex items-center gap-1 hover:text-gray-900 transition-colors bg-gray-100 p-1 rounded-lg border border-gray-200"
-                                                title={sortOrder === 'desc' ? 'Mới nhất lên đầu' : 'Cũ nhất lên đầu'}
-                                            >
-                                                <ArrowUpDown className={`w-3.5 h-3.5 ${sortOrder === 'desc' ? 'text-gray-900' : 'text-purple-600'}`} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={2} className="px-6 py-12 text-center text-gray-500">
-                                        <Loader2 className="w-6 h-6 animate-spin text-purple-500 mx-auto mb-2" />
-                                        <p className="text-[10px] font-black uppercase">Đang tải...</p>
-                                    </td>
-                                </tr>
-                            ) : students.length === 0 ? (
-                                <tr>
-                                    <td colSpan={2} className="px-6 py-12 text-center text-gray-400 text-[10px] font-black uppercase">
-                                        Trống
-                                    </td>
-                                </tr>
-                            ) : (
-                                    students.map((student) => {
-                                        const hasCourseOne = student.enrollments.some((e: any) => e.courseId === 1)
-                                        
-                                        return (
-                                            <tr key={student.id} className="hover:bg-orange-50/30 transition-colors">
-                                                <td className="px-2 py-4 text-center align-top space-y-3">
-                                                    <div className="text-[10px] font-black font-mono text-gray-900 bg-gray-100 px-1 py-0.5 rounded border border-gray-200">
-                                                        #{student.id}
-                                                    </div>
-                                                    <Link 
-                                                        href={`/admin/students/${student.id}`} 
-                                                        className="inline-flex items-center justify-center w-8 h-8 bg-black text-yellow-400 rounded-full hover:bg-zinc-800 active:scale-90 transition-all shadow-md"
-                                                    >
-                                                        <Info className="w-4 h-4" />
-                                                    </Link>
-                                                </td>
-                                                <td className="px-3 py-4 space-y-1 overflow-hidden">
-                                                    <div className={`font-black text-sm truncate leading-tight capitalize tracking-tight ${hasCourseOne ? 'text-purple-600' : 'text-orange-600'}`}>
-                                                        {student.name ? student.name.toLowerCase() : 'N/A'}
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium truncate">
-                                                        <Mail className="w-3 h-3 text-gray-300 shrink-0" />
-                                                        {student.email}
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold truncate">
-                                                        <Phone className="w-3 h-3 text-gray-300 shrink-0" />
-                                                        {student.phone || '---'}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    )
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-bold text-base truncate ${isCoach ? 'text-purple-600' : textColor}`}>
+                        {student.name || 'Chưa có tên'}
+                      </h3>
+                      
+                      <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500">
+                        <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="truncate">{student.email}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
+                        <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span>{student.phone || 'Chưa có SĐT'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

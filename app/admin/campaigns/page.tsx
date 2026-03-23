@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ArrowLeft, Plus, Mail, Radio, Settings } from "lucide-react";
 
 export default function CampaignsPage() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function CampaignsPage() {
   const fetchCampaigns = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/campaigns/list"); // Tôi sẽ tạo route này vì fetch trực tiếp từ API sướng hơn
+      const res = await fetch("/api/admin/campaigns/list");
       if (res.ok) {
         const data = await res.json();
         setCampaigns(data);
@@ -30,7 +31,7 @@ export default function CampaignsPage() {
   }, []);
 
   const deleteCampaign = async (id: number) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa chiến dịch này? Toàn bộ nhật ký gửi cũng sẽ bị xóa.")) return;
+    if (!confirm("Bạn có chắc chắn muốn xóa chiến dịch này?")) return;
     
     try {
       const res = await fetch(`/api/admin/campaigns/${id}`, {
@@ -43,7 +44,7 @@ export default function CampaignsPage() {
   };
 
   const restartCampaign = async (id: number) => {
-    if (!confirm("Bạn có muốn gửi lại toàn bộ chiến dịch này không? Toàn bộ nhật ký cũ sẽ bị xóa và tiến độ sẽ quay về 0.")) return;
+    if (!confirm("Bạn có muốn gửi lại chiến dịch này không?")) return;
     
     try {
       const res = await fetch(`/api/admin/campaigns/${id}/restart`, {
@@ -60,111 +61,93 @@ export default function CampaignsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center bg-black text-white p-6 rounded-3xl shadow-xl">
-        <div>
-          <h1 className="text-2xl font-black uppercase tracking-tighter">Email Campaigns</h1>
-          <p className="text-white/60 text-xs font-bold uppercase mt-1">Quản lý các đợt gửi thông báo</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+        <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
+          <div className="flex items-center gap-3">
+            <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-xs font-medium">Quay ra</span>
+            </Link>
+            <h1 className="text-lg font-bold text-yellow-400">Email MKT</h1>
+          </div>
+          <Link href="/admin/campaigns/new">
+            <Button className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-sm rounded-lg px-3 py-2">
+              + Tạo Mới
+            </Button>
+          </Link>
         </div>
-        <Link href="/admin/campaigns/new">
-          <Button className="bg-yellow-400 hover:bg-yellow-500 text-black font-black uppercase text-xs rounded-xl px-6 py-6 shadow-lg shadow-yellow-400/20 transition-all active:scale-95">
-            + Tạo Chiến Dịch Mới
-          </Button>
-        </Link>
-      </div>
+        {/* Sub Navigation */}
+        <div className="flex gap-1 px-4 pb-3 overflow-x-auto">
+          <Link href="/admin/campaigns" className="px-3 py-1.5 rounded-full text-xs font-bold bg-orange-500 text-white">
+            📋 Danh Sách
+          </Link>
+          <Link href="/admin/email-senders" className="px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white/70 hover:bg-white/20">
+            📡 Tài Khoản
+          </Link>
+          <Link href="/admin/email-settings" className="px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white/70 hover:bg-white/20">
+            ⚙️ Cấu Hình
+          </Link>
+        </div>
+      </header>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-gray-50/50 border-b border-gray-100">
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-400">Tên / Loại</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-400">Trạng Thái</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-400">Tiến Độ</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-400">Ngày Tạo</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase text-gray-400">Thao Tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {loading ? (
-              <tr><td colSpan={5} className="px-6 py-12 text-center font-black uppercase text-[10px] text-gray-400">Đang tải...</td></tr>
-            ) : campaigns.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-bold uppercase text-xs">
-                  Chưa có chiến dịch nào được tạo.
-                </td>
-              </tr>
-            ) : (
-              campaigns.map((cp) => (
-                <tr key={cp.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="font-black text-gray-900 text-sm">{cp.title}</div>
-                    <div className="text-gray-400 text-[10px] font-bold uppercase">{cp.notificationType}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-block px-2 py-1 rounded-lg text-[10px] font-black uppercase ${
-                      cp.status === "COMPLETED" ? "bg-green-100 text-green-700" :
-                      cp.status === "RUNNING" ? "bg-blue-100 text-blue-700" :
-                      cp.status === "DRAFT" ? "bg-gray-100 text-gray-500" :
-                      cp.status === "FAILED" ? "bg-red-100 text-red-700" :
-                      "bg-yellow-100 text-yellow-700"
-                    }`}>
-                      {cp.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-1">
-                      <div className="text-[10px] font-black text-gray-500">
-                        {cp.sentCount}/{cp.totalRecipients}
-                      </div>
-                      <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-black" 
-                          style={{ width: `${(cp.sentCount / (cp.totalRecipients || 1)) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[10px] font-bold text-gray-400">
-                    {new Date(cp.createdAt).toLocaleDateString('vi-VN')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <Link href={`/admin/campaigns/${cp.id}`}>
-                        <Button variant="outline" className="text-[8px] font-black uppercase border-2 rounded-lg h-7 px-3 active:scale-95 transition-all">
-                          {cp.status === "DRAFT" ? "Soạn" : "Xem"}
-                        </Button>
-                      </Link>
-                      <Link href={`/admin/campaigns/new?editId=${cp.id}`}>
-                        <Button className="bg-gray-100 text-gray-900 hover:bg-gray-200 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all">
-                          Chỉnh sửa
-                        </Button>
-                      </Link>
-                      <Link href={`/admin/campaigns/new?cloneId=${cp.id}`}>
-                        <Button className="bg-blue-50 text-blue-600 hover:bg-blue-100 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all">
-                          Nhân bản
-                        </Button>
-                      </Link>
-                      {(cp.status === "COMPLETED" || cp.status === "FAILED") && (
-                        <Button 
-                          onClick={() => restartCampaign(cp.id)}
-                          className="bg-green-50 text-green-600 hover:bg-green-100 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all"
-                        >
-                          Gửi lại
-                        </Button>
-                      )}
-                      <Button 
-                        onClick={() => deleteCampaign(cp.id)}
-                        className="bg-red-50 text-red-600 hover:bg-red-100 text-[8px] font-black uppercase rounded-lg h-7 px-3 active:scale-95 transition-all"
-                      >
-                        Xóa
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* Content */}
+      <div className="max-w-lg mx-auto p-4 space-y-3">
+        {loading ? (
+          <div className="text-center py-12 text-gray-400 font-medium">Đang tải...</div>
+        ) : campaigns.length === 0 ? (
+          <div className="text-center py-12 text-gray-400 font-medium">
+            Chưa có chiến dịch nào.
+          </div>
+        ) : (
+          campaigns.map((cp) => (
+            <div key={cp.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="font-bold text-gray-900">{cp.title}</h3>
+                  <span className="text-xs text-gray-400 uppercase">{cp.notificationType}</span>
+                </div>
+                <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                  cp.status === "COMPLETED" ? "bg-green-100 text-green-700" :
+                  cp.status === "RUNNING" ? "bg-blue-100 text-blue-700" :
+                  cp.status === "DRAFT" ? "bg-gray-100 text-gray-500" :
+                  cp.status === "FAILED" ? "bg-red-100 text-red-700" :
+                  "bg-yellow-100 text-yellow-700"
+                }`}>
+                  {cp.status}
+                </span>
+              </div>
+              
+              <div className="mb-3">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Tiến độ</span>
+                  <span>{cp.sentCount}/{cp.totalRecipients}</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-orange-500" 
+                    style={{ width: `${(cp.sentCount / (cp.totalRecipients || 1)) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Link href={`/admin/campaigns/${cp.id}`} className="flex-1">
+                  <Button className="w-full bg-black text-white text-sm font-bold rounded-lg py-2">
+                    {cp.status === "DRAFT" ? "Soạn" : "Xem"}
+                  </Button>
+                </Link>
+                <Button 
+                  onClick={() => deleteCampaign(cp.id)}
+                  className="bg-red-50 text-red-600 text-sm font-bold px-3 py-2 rounded-lg"
+                >
+                  Xóa
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
