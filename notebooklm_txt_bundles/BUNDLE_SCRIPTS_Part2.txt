@@ -1,0 +1,2210 @@
+
+
+================================================================================
+FILE GỐC: scripts/import-v3-data.ts
+================================================================================
+
+import fs from 'fs'
+import csv from 'csv-parser'
+import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+
+const prisma = new PrismaClient()
+
+async function readCsv(filePath: string): Promise<any[]> {
+    const results: any[] = []
+    return new Promise((resolve, reject) => {
+        fs.createReadStream(filePath)
+            .pipe(csv())
+            .on('data', (data) => results.push(data))
+            .on('end', () => resolve(results))
+            .on('error', reject)
+    })
+}
+
+async function main() {
+    console.log('🚀 Bắt đầu quy trình nạp dữ liệu chuẩn hóa (V3 - Nâng cấp)...')
+
+    try {
+        const users = await readCsv('User.csv')
+        const courses = await readCsv('Course.csv')
+        const enrollments = await readCsv('Enrollment.csv')
+
+        // 1. DỌN DẸP DATABASE
+        console.log('🗑️  Đang làm sạch Database...')
+        await (prisma as any).enrollment.deleteMany()
+        await (prisma as any).account.deleteMany()
+        await (prisma as any).session.deleteMany()
+        await (prisma as any).course.deleteMany()
+        await (prisma as any).user.deleteMany()
+        console.log('✅ Đã làm sạch dữ liệu cũ.')
+
+        // 2. NẠP KHÓA HỌC
+        console.log('📚 Đang nạp danh sách Khóa học...')
+        for (const row of courses) {
+            await (prisma as any).course.create({
+                data: {
+                    id: parseInt(row.id),
+                    id_khoa: row.id_khoa,
+                    name_lop: row.name_lop,
+                    name_khoa: row.name_khoa,
+                    date_join: row.date_join,
+                    status: row.status.toUpperCase() === 'TRUE',
+                    mo_ta_ngan: row.mo_ta_ngan,
+                    mo_ta_dai: row.mo_ta_dai,
+                    link_anh_bia: row.link_anh_bia_khoa,
+                    link_zalo: row.link_zalo,
+                    phi_coc: parseInt(row.phi_coc) || 0,
+                    stk: row.stk,
+                    name_stk: row.name_stk,
+                    bank_stk: row.bank_stk,
+                    noidung_stk: row.noidung_stk,
+                    link_qrcode: row.link_qrcode,
+                    file_email: row.file_email,
+                    noidung_email: row.noidung_email,
+                }
+            })
+        }
+        console.log(`✅ Đã nạp ${courses.length} khóa học.`)
+
+        // 3. NẠP NGƯỜI DÙNG (Phase 1: Không có Referrer)
+        console.log('👤 Đang nạp danh sách Học viên (Kèm mã hóa mật khẩu)...')
+        const userCount = users.length;
+        for (let i = 0; i < users.length; i++) {
+            const u = users[i];
+            try {
+                // Mã hóa mật khẩu nếu có
+                let passwordHash = null;
+                if (u.password && u.password.trim() !== '') {
+                    passwordHash = await bcrypt.hash(u.password.trim(), 10);
+                }
+
+                // Chuẩn hóa dữ liệu trước khi nạp
+                const data: any = {
+                    id: parseInt(u.id),
+                    name: u.name || null,
+                    email: u.email.trim(),
+                    phone: u.phone && u.phone.trim() !== '' ? u.phone.trim() : null,
+                    role: u.role || 'STUDENT',
+                    password: passwordHash,
+                };
+
+                // Xử lý ngày tháng
+                if (u.createdAt) {
+                    const parts = u.createdAt.split(' ');
+                    const dateParts = parts[0].split('/');
+                    if (dateParts.length === 3) {
+                        const d = parseInt(dateParts[0]);
+                        const m = parseInt(dateParts[1]) - 1;
+                        const y = parseInt(dateParts[2]);
+
+                        if (parts[1]) {
+                            const t = parts[1].split(':');
+                            data.createdAt = new Date(y, m, d,
+                                parseInt(t[0] || '0'),
+                                parseInt(t[1] || '0'),
+                                parseInt(t[2] || '0'));
+                        } else {
+                            data.createdAt = new Date(y, m, d);
+                        }
+                    } else {
+                        data.createdAt = new Date(u.createdAt);
+                    }
+                }
+
+                await (prisma as any).user.create({ data });
+                if ((i + 1) % 100 === 0) console.log(`... Đã nạp ${i + 1}/${userCount} học viên.`);
+            } catch (err: any) {
+                console.error(`❌ Lỗi tại User ID ${u.id} (${u.email}):`, err);
+                throw err;
+            }
+        }
+
+        // 4. CẬP NHẬT REFERRER (Phase 2)
+        console.log('🔗 Đang nối quan hệ Người giới thiệu...')
+        for (const u of users) {
+            // Sửa logic: Cho phép id 0 làm người giới thiệu
+            if (u.referrerId && u.referrerId.trim() !== '') {
+                await (prisma as any).user.update({
+                    where: { id: parseInt(u.id) },
+                    data: { referrerId: parseInt(u.referrerId) }
+                }).catch(() => { });
+            }
+        }
+
+        // 5. NẠP ĐĂNG KÍ KHÓA HỌC
+        console.log('📋 Đang nạp danh sách Đăng ký (Enrollments)...')
+        const enrCount = enrollments.length;
+        for (let i = 0; i < enrollments.length; i++) {
+            const e = enrollments[i];
+            try {
+                const data: any = {
+                    userId: parseInt(e.userId),
+                    courseId: parseInt(e.courseId),
+                    status: e.status || 'ACTIVE',
+                    phi_coc: parseInt(e.phi_coc) || 0,
+                    link_anh_coc: e.link_anh_coc || null,
+                };
+
+                // Xử lý ngày bắt đầu (startedAt) nếu có
+                if (e.startedAt && e.startedAt.trim() !== '') {
+                    data.startedAt = new Date(e.startedAt);
+                }
+
+                if (e.createdAt) {
+                    const parts = e.createdAt.split(' ');
+                    const dateParts = parts[0].split('/');
+                    if (dateParts.length === 3) {
+                        const d = parseInt(dateParts[0]);
+                        const m = parseInt(dateParts[1]) - 1;
+                        const y = parseInt(dateParts[2]);
+                        if (parts[1]) {
+                            const t = parts[1].split(':');
+                            data.createdAt = new Date(y, m, d, parseInt(t[0] || '0'), parseInt(t[1] || '0'), parseInt(t[2] || '0'));
+                        } else {
+                            data.createdAt = new Date(y, m, d);
+                        }
+                    } else {
+                        data.createdAt = new Date(e.createdAt);
+                    }
+                }
+
+                await (prisma as any).enrollment.create({ data });
+                if ((i + 1) % 100 === 0) console.log(`... Đã nạp ${i + 1}/${enrCount} lượt đăng ký.`);
+            } catch (err: any) {
+                console.error(`❌ Lỗi tại Enrollment dòng ${i + 2} (User: ${e.userId}, Course: ${e.courseId}):`, err.message);
+                // Nếu là lỗi trùng lặp (P2002), ta có thể bỏ qua
+                if (!err.message.includes('P2002')) throw err;
+            }
+        }
+        console.log(`✅ Đã hoàn tất nạp lượt đăng ký.`)
+
+        // 6. RESET SEQUENCES (PostgreSQL)
+        console.log('🔄 Đang đồng bộ lại bộ đếm ID (Sequence)...')
+        await (prisma as any).$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"User"', 'id'), (SELECT MAX(id) FROM "User"));`)
+        await (prisma as any).$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"Course"', 'id'), (SELECT MAX(id) FROM "Course"));`)
+        await (prisma as any).$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"Enrollment"', 'id'), (SELECT MAX(id) FROM "Enrollment"));`)
+        console.log('🎯 HOÀN TẤT NẠP DỮ LIỆU CHUẨN HÓA V3!')
+
+    } catch (error) {
+        console.error('❌ LỖI TRONG QUÁ TRÌNH NẠP:', error)
+    } finally {
+        await prisma.$disconnect()
+    }
+}
+
+main()
+
+
+================================================================================
+KẾT THÚC FILE: scripts/import-v3-data.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/make-admin.ts
+================================================================================
+
+
+import { PrismaClient, Role } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+async function main() {
+    const args = process.argv.slice(2)
+    const email = args[0] || 'cuongchupanh001@gmail.com' // Email mặc định hoặc lấy từ tham số dòng lệnh
+
+    console.log(`Checking email: ${email}...`)
+
+    try {
+        const user = await prisma.user.findUnique({ where: { email } })
+
+        if (!user) {
+            console.error(`❌ User with email '${email}' not found.`)
+            return
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { email },
+            data: { role: Role.ADMIN },
+        })
+        console.log(`✅ Success! Updated user ${updatedUser.email} (ID: ${updatedUser.id}) to ADMIN role.`)
+    } catch (e) {
+        console.error('Error updating user:', e)
+    } finally {
+        await prisma.$disconnect()
+    }
+}
+
+main()
+
+
+================================================================================
+KẾT THÚC FILE: scripts/make-admin.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/migrate-to-flow.ts
+================================================================================
+
+
+import { surveyQuestions } from '../lib/survey-data';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+const ROADMAP_FLOW_KEY = 'ZERO_TO_HERO_FLOW';
+
+async function migrate() {
+  console.log('🚀 Bắt đầu chuyển đổi dữ liệu khảo sát cũ sang sơ đồ Mindmap...');
+
+  const nodes: any[] = [];
+  const edges: any[] = [];
+  
+  let x = 100;
+  let y = 100;
+  const spacingX = 300;
+  const spacingY = 150;
+
+  // Duyệt qua các câu hỏi cũ
+  Object.keys(surveyQuestions).forEach((qId, qIndex) => {
+    const q = (surveyQuestions as any)[qId];
+    
+    // 1. Tạo Node Câu hỏi
+    const questionNodeId = qId;
+    nodes.push({
+      id: questionNodeId,
+      type: 'questionNode',
+      position: { x: x + qIndex * spacingX, y: y },
+      data: { label: q.question, type: q.type }
+    });
+
+    // 2. Tạo các Node Đáp án và nối dây
+    if (q.options) {
+      q.options.forEach((opt: any, optIndex: number) => {
+        const optionNodeId = `opt_${qId}_${opt.id}`;
+        
+        // Node Đáp án
+        nodes.push({
+          id: optionNodeId,
+          type: 'optionNode',
+          position: { x: x + qIndex * spacingX + (optIndex * 100 - 50), y: y + spacingY },
+          data: { label: opt.label }
+        });
+
+        // Dây nối: Câu hỏi -> Đáp án
+        edges.push({
+          id: `e_${questionNodeId}_${optionNodeId}`,
+          source: questionNodeId,
+          target: optionNodeId
+        });
+
+        // Nếu có rẽ nhánh tiếp theo (nextQuestionId)
+        if (opt.nextQuestionId && opt.nextQuestionId !== 'done') {
+            // Dây nối: Đáp án -> Câu hỏi tiếp theo
+            edges.push({
+              id: `e_${optionNodeId}_${opt.nextQuestionId}`,
+              source: optionNodeId,
+              target: opt.nextQuestionId
+            });
+        }
+        
+        // Nếu là tư vấn (isAdvice)
+        if (opt.isAdvice) {
+            const adviceNodeId = `advice_${qId}_${opt.id}`;
+            nodes.push({
+                id: adviceNodeId,
+                type: 'adviceNode',
+                position: { x: x + qIndex * spacingX, y: y + spacingY * 2 },
+                data: { label: 'https://youtube.com' }
+            });
+            edges.push({
+                id: `e_${optionNodeId}_${adviceNodeId}`,
+                source: optionNodeId,
+                target: adviceNodeId
+            });
+        }
+      });
+    }
+  });
+
+  // Lưu vào Database
+  const flow = { nodes, edges };
+  await prisma.systemConfig.upsert({
+    where: { key: ROADMAP_FLOW_KEY },
+    update: { value: flow },
+    create: {
+      key: ROADMAP_FLOW_KEY,
+      value: flow
+    }
+  });
+
+  console.log('✅ Đã chuyển đổi thành công! Hãy vào trang Admin > Lộ trình để kiểm tra.');
+}
+
+migrate()
+  .catch(e => console.error(e))
+  .finally(async () => await prisma.$disconnect());
+
+
+================================================================================
+KẾT THÚC FILE: scripts/migrate-to-flow.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/preview-cleanup.ts
+================================================================================
+
+import prisma from "../lib/prisma";
+
+function normalizePhone(phone: string): string {
+  if (!phone) return '';
+  let p = phone.replace(/\s/g, '').replace(/^0/, '84');
+  if (!p.startsWith('+')) p = '+' + p;
+  return p;
+}
+
+async function previewCleanup() {
+  console.log("=".repeat(70));
+  console.log("PREVIEW: DỮ LIỆU TRÙNG LẶP - CHƯA XÓA GÌ");
+  console.log("=".repeat(70) + "\n");
+
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true, phone: true, name: true },
+    orderBy: { id: 'asc' }
+  });
+
+  // Tìm email trùng
+  const emailMap: Record<string, typeof users> = {};
+  for (const user of users) {
+    const normalized = user.email?.toLowerCase() || '';
+    if (!emailMap[normalized]) emailMap[normalized] = [];
+    emailMap[normalized].push(user);
+  }
+  const duplicateEmails = Object.entries(emailMap).filter(([_, u]) => u.length > 1);
+
+  // Tìm phone trùng (normalized)
+  const phoneMap: Record<string, typeof users> = {};
+  for (const user of users) {
+    if (!user.phone) continue;
+    const normalized = normalizePhone(user.phone);
+    if (!phoneMap[normalized]) phoneMap[normalized] = [];
+    phoneMap[normalized].push(user);
+  }
+  const duplicatePhones = Object.entries(phoneMap).filter(([_, u]) => u.length > 1);
+
+  // Users có phone chưa chuẩn hóa
+  const unnormalizedPhones = users.filter(u => u.phone && !u.phone.startsWith('+'));
+
+  console.log("📧 EMAIL TRÙNG LẶP:");
+  console.log("-".repeat(50));
+  
+  if (duplicateEmails.length === 0) {
+    console.log("  ✅ Không có email trùng\n");
+  } else {
+    for (const [email, userList] of duplicateEmails) {
+      const sorted = userList.sort((a, b) => b.id - a.id);
+      console.log(`\n  📧 ${email}`);
+      console.log(`     Sẽ GIỮ: ID ${sorted[0].id} - ${sorted[0].name} (Mới nhất)`);
+      sorted.slice(1).forEach(u => {
+        console.log(`     Sẽ XÓA: ID ${u.id} - ${u.name} | ${u.phone || 'không có phone'}`);
+      });
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log("\n📱 PHONE TRÙNG LẶP (+84 vs 0xxx):");
+  console.log("-".repeat(50));
+  
+  if (duplicatePhones.length === 0) {
+    console.log("  ✅ Không có phone trùng\n");
+  } else {
+    for (const [normalizedPhone, userList] of duplicatePhones) {
+      const sorted = userList.sort((a, b) => b.id - a.id);
+      console.log(`\n  📱 ${normalizedPhone}`);
+      console.log(`     Sẽ GIỮ: ID ${sorted[0].id} - ${sorted[0].name} (${sorted[0].phone})`);
+      sorted.slice(1).forEach(u => {
+        console.log(`     Sẽ XÓA: ID ${u.id} - ${u.name} (${u.phone})`);
+      });
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log("\n📋 PHONE CHƯA CHUẨN HÓA (sẽ cập nhật):");
+  console.log("-".repeat(50));
+  
+  if (unnormalizedPhones.length === 0) {
+    console.log("  ✅ Tất cả phone đã chuẩn hóa\n");
+  } else {
+    unnormalizedPhones.slice(0, 10).forEach(u => {
+      console.log(`  ID ${u.id}: ${u.phone} → ${normalizePhone(u.phone)}`);
+    });
+    if (unnormalizedPhones.length > 10) {
+      console.log(`  ... và ${unnormalizedPhones.length - 10} users khác`);
+    }
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log("\n📊 TỔNG HỢP:");
+  console.log("=".repeat(70));
+  
+  const toDelete = new Set<number>();
+  const toNormalize: { id: number; old: string; new: string }[] = [];
+
+  for (const [_, userList] of duplicateEmails) {
+    userList.slice(1).forEach(u => toDelete.add(u.id));
+  }
+  for (const [_, userList] of duplicatePhones) {
+    userList.slice(1).forEach(u => toDelete.add(u.id));
+  }
+  unnormalizedPhones.forEach(u => {
+    if (u.phone) {
+      toNormalize.push({ id: u.id, old: u.phone, new: normalizePhone(u.phone) });
+    }
+  });
+
+  console.log(`  - Users sẽ XÓA: ${toDelete.size}`);
+  if (toDelete.size > 0) {
+    console.log(`    IDs: ${Array.from(toDelete).sort((a, b) => a - b).join(', ')}`);
+  }
+  console.log(`  - Phones sẽ chuẩn hóa: ${toNormalize.length}`);
+  console.log(`  - Enrollments của users bị xóa: Sẽ xóa theo`);
+
+  console.log("\n" + "=".repeat(70));
+
+  await prisma.$disconnect();
+}
+
+previewCleanup().catch(console.error);
+
+
+================================================================================
+KẾT THÚC FILE: scripts/preview-cleanup.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/process-legacy-users.ts
+================================================================================
+
+
+import fs from 'fs'
+import csv from 'csv-parser'
+import { createObjectCsvWriter } from 'csv-writer'
+import path from 'path'
+
+// Format ngày tháng từ DD/MM/YYYY H:mm:ss sang ISO
+function parseDate(dateStr: string): string {
+    if (!dateStr) return new Date().toISOString()
+    try {
+        // Giả sử định dạng DD/MM/YYYY H:mm:ss (ví dụ: 06/08/2023 6:08:37)
+        // Hoặc DD/MM/YYYY (ví dụ: 27/01/2025)
+        const [datePart, timePart] = dateStr.trim().split(' ')
+        const [day, month, year] = datePart.split('/').map(Number)
+
+        // Validate date
+        if (!day || !month || !year) return new Date().toISOString()
+
+        let hour = 0, minute = 0, second = 0
+        if (timePart) {
+            [hour, minute, second] = timePart.split(':').map(Number)
+        }
+
+        // Lưu ý: Month trong JS bắt đầu từ 0
+        return new Date(year, month - 1, day, hour || 0, minute || 0, second || 0).toISOString()
+    } catch (e) {
+        console.warn(`Invalid date: ${dateStr}. Using current time.`)
+        return new Date().toISOString()
+    }
+}
+
+async function main() {
+    const inputFilePath = 'User old - User.csv'
+    const outputFilePath = 'processed-users.preview.csv'
+
+    if (!fs.existsSync(inputFilePath)) {
+        console.error(`File not found: ${inputFilePath}`)
+        process.exit(1)
+    }
+
+    const rawRows: any[] = []
+
+    // Map: NameNormalized -> UserID[]
+    // Dùng để tra cứu referrer nếu referrerId là tên
+    const nameMap = new Map<string, string[]>()
+
+    console.log('📖 Reading CSV data...')
+
+    await new Promise((resolve, reject) => {
+        fs.createReadStream(inputFilePath)
+            .pipe(csv())
+            .on('data', (data) => {
+                rawRows.push(data)
+
+                // Build Name Map
+                const name = data.name ? data.name.trim() : ''
+                if (name) {
+                    const normalized = name.toLowerCase()
+                    if (!nameMap.has(normalized)) {
+                        nameMap.set(normalized, [])
+                    }
+                    nameMap.get(normalized)?.push(data.id)
+                }
+            })
+            .on('end', resolve)
+            .on('error', reject)
+    })
+
+    console.log(`📊 Loaded ${rawRows.length} rows. Processing...`)
+
+    const processedData: any[] = []
+    let resolvedCount = 0
+    let ambiguousCount = 0
+    let notFoundCount = 0
+
+    for (const row of rawRows) {
+        const id = row.id
+
+        // 1. Xử lý Email
+        let email = row.email ? row.email.trim() : ''
+        if (!email) {
+            email = `noemail${id}@gmail.com`
+        }
+
+        // 2. Xử lý Phone
+        let phone = row.phone ? row.phone.trim() : ''
+        if (!phone) {
+            const idSuffix = id.toString().padStart(3, '0')
+            phone = `000000${idSuffix}` // Fake phone logic
+        }
+
+        // 3. Xử lý Password
+        let password = row.password ? row.password.trim() : ''
+        if (!password) {
+            password = 'Brk@3773'
+        }
+
+        // 4. Xử lý Role
+        let role = row.role ? row.role.trim() : ''
+        if (!role) {
+            role = 'STUDENT'
+        }
+
+        // 5. Xử lý Referrer
+        let referrerId = row.referrerId ? row.referrerId.trim() : null
+
+        // Nếu referrerId là tên (không phải số)
+        if (referrerId && isNaN(parseInt(referrerId))) {
+            const referrerNameNormalized = referrerId.toLowerCase()
+            const foundIds = nameMap.get(referrerNameNormalized)
+
+            if (foundIds && foundIds.length === 1) {
+                // Tìm thấy chính xác 1 người -> RESOLVED
+                referrerId = foundIds[0]
+                resolvedCount++
+                // console.log(`   ✅ Resolved referrer "${row.referrerId}" -> ID: ${referrerId}`)
+            } else if (foundIds && foundIds.length > 1) {
+                // Tìm thấy nhiều người trùng tên -> AMBIGUOUS
+                // console.warn(`   ⚠️  Ambiguous referrer "${row.referrerId}" for User ${id}. Matches IDs: ${foundIds.join(', ')}. Leaving NULL.`)
+                ambiguousCount++
+                referrerId = null
+            } else {
+                // Không tìm thấy -> NOT FOUND
+                // console.warn(`   ❌ Referrer "${row.referrerId}" not found for User ${id}. Leaving NULL.`)
+                notFoundCount++
+                referrerId = null
+            }
+        } else if (referrerId && !isNaN(parseInt(referrerId))) {
+            // Là số -> Giữ nguyên (Check tồn tại sẽ ở bước import)
+        } else {
+            referrerId = null
+        }
+
+        // 6. Xử lý CreatedAt
+        const createdAt = parseDate(row.createdAt)
+
+        processedData.push({
+            id: id,
+            name: row.name,
+            email: email,
+            phone: phone,
+            password: password,
+            role: role,
+            referrerId: referrerId,
+            createdAt: createdAt
+        })
+    }
+
+    console.log(`\n--- Summary ---`)
+    console.log(`Toal Users: ${processedData.length}`)
+    console.log(`Referrers Resolved (Name->ID): ${resolvedCount}`)
+    console.log(`Referrers Ambiguous (Skipped):   ${ambiguousCount}`)
+    console.log(`Referrers Not Found (Skipped):   ${notFoundCount}`)
+
+    // Ghi ra file CSV mới
+    const csvWriter = createObjectCsvWriter({
+        path: outputFilePath,
+        header: [
+            { id: 'id', title: 'id' },
+            { id: 'name', title: 'name' },
+            { id: 'email', title: 'email' },
+            { id: 'phone', title: 'phone' },
+            { id: 'password', title: 'password' },
+            { id: 'role', title: 'role' },
+            { id: 'referrerId', title: 'referrerId' },
+            { id: 'createdAt', title: 'createdAt' },
+        ]
+    })
+
+    await csvWriter.writeRecords(processedData)
+    console.log(`\n✅ Saved to: ${outputFilePath}`)
+}
+
+main()
+
+
+================================================================================
+KẾT THÚC FILE: scripts/process-legacy-users.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/push.ps1
+================================================================================
+
+# ============================================================
+#  push.ps1 - Backup + Push len GitHub
+#  Usage: .\scripts\push.ps1 "Noi dung ghi chu"
+# ============================================================
+
+param (
+    [string]$Message = "Cap nhat he thong BRK Academy"
+)
+
+$ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
+
+# ── BUOC 1: BACKUP ──────────────────────────────────────────
+$Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
+$BackupDir = "$ProjectRoot\backups"
+$ZipName = "backup_$Timestamp.zip"
+$ZipPath = "$BackupDir\$ZipName"
+$TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "BRK_Backup_$Timestamp"
+
+Write-Host ""
+Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "  [1/2] BACKUP DU AN" -ForegroundColor Cyan
+Write-Host "  Time   : $Timestamp" -ForegroundColor Cyan
+Write-Host "  Output : $ZipPath" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+
+$IncludePaths = @(
+    "app", "components", "lib", "types", "public",
+    "auth.ts", "auth.config.ts", "middleware.ts", ".env", ".env.local",
+    "prisma", "scripts",
+    "package.json", "next.config.ts", "tsconfig.json", "tsconfig.seed.json",
+    "postcss.config.mjs", "eslint.config.mjs", "docker-compose.yml",
+    "README.md", "DESIGN_SYSTEM.md"
+)
+$ExcludePatterns = @("*.log", "*.tsbuildinfo", ".next", "node_modules", ".git", "backups")
+
+if (-not (Test-Path $BackupDir)) { New-Item -ItemType Directory -Path $BackupDir | Out-Null }
+if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
+New-Item -ItemType Directory -Path $TempDir | Out-Null
+
+$FilesToBackup = @()
+foreach ($rel in $IncludePaths) {
+    $full = Join-Path $ProjectRoot $rel
+    if (Test-Path $full -PathType Leaf) {
+        $FilesToBackup += $full
+    }
+    elseif (Test-Path $full -PathType Container) {
+        foreach ($file in (Get-ChildItem -Path $full -File -Recurse)) {
+            $skip = $false
+            foreach ($p in $ExcludePatterns) {
+                if ($file.FullName -like "*\$p\*" -or $file.Name -like $p) { $skip = $true; break }
+            }
+            if (-not $skip) { $FilesToBackup += $file.FullName }
+        }
+    }
+}
+
+foreach ($filePath in $FilesToBackup) {
+    $rel = $filePath.Substring($ProjectRoot.Length).TrimStart('\', '/')
+    $dest = Join-Path $TempDir $rel
+    $dir = Split-Path -Parent $dest
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    Copy-Item -Path $filePath -Destination $dest -Force
+}
+
+try {
+    Compress-Archive -Path "$TempDir\*" -DestinationPath $ZipPath -Force
+    $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
+    Write-Host "[OK] Backup xong: $ZipName ($sizeMB MB, $($FilesToBackup.Count) files)" -ForegroundColor Green
+}
+catch {
+    Write-Host "[LOI] Khong the tao ZIP: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Xoa temp va giu toi da 5 ban backup gan nhat
+if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
+$old = Get-ChildItem -Path $BackupDir -Filter "backup_*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -Skip 5
+if ($old.Count -gt 0) {
+    Write-Host "[*] Xoa $($old.Count) backup cu..." -ForegroundColor Gray
+    $old | Remove-Item -Force
+}
+
+# ── BUOC 2: PUSH LEN GITHUB ─────────────────────────────────
+Write-Host ""
+Write-Host "======================================" -ForegroundColor Cyan
+Write-Host "  [2/2] DAY CODE LEN GITHUB" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
+
+Write-Host "> Dang gom cac thay doi..." -ForegroundColor Yellow
+git add .
+
+$status = git status --porcelain
+if ($status) {
+    Write-Host "> Commit: '$Message'" -ForegroundColor Yellow
+    git commit -m $Message
+}
+else {
+    Write-Host "> Khong co thay doi moi de commit." -ForegroundColor Gray
+}
+
+Write-Host "> Dang day len nhanh master..." -ForegroundColor Yellow
+git push origin master
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host ""
+    Write-Host "======================================" -ForegroundColor Green
+    Write-Host "  HOAN THANH! Backup + Push thanh cong" -ForegroundColor Green
+    Write-Host "======================================" -ForegroundColor Green
+}
+else {
+    Write-Host "[LOI] Push that bai! Kiem tra ket noi hoac xung dot code." -ForegroundColor Red
+}
+
+
+================================================================================
+KẾT THÚC FILE: scripts/push.ps1
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/seed-courses.ts
+================================================================================
+
+
+import fs from 'fs'
+import csv from 'csv-parser'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+interface CourseRow {
+    id_lop: string
+    name_lop: string
+    id_khoa: string
+    name_khoa: string
+    date_join: string
+    status: string
+    mo_ta_dai: string
+    link_zalo: string
+    phi_coc: string
+    stk: string
+    name_stk: string
+    bank_stk: string
+    noidung_stk: string
+    link_qrcode: string
+    file_email: string
+    noidung_email: string
+    link_anh_bia_khoa: string
+    mo_ta_ngan: string
+}
+
+async function main() {
+    const results: CourseRow[] = []
+    const csvFilePath = 'KhoaHoc.csv'
+
+    if (!fs.existsSync(csvFilePath)) {
+        console.error(`Error: File '${csvFilePath}' not found.`)
+        process.exit(1)
+    }
+
+    console.log('Reading KhoaHoc.csv...')
+    await new Promise((resolve, reject) => {
+        fs.createReadStream(csvFilePath)
+            .pipe(csv())
+            .on('data', (data: CourseRow) => results.push(data))
+            .on('end', resolve)
+            .on('error', reject)
+    })
+
+    console.log(`Loaded ${results.length} course entries.`)
+
+    let successCount = 0
+    for (const row of results) {
+        if (!row.id_khoa) continue;
+
+        // Xử lý trùng id_khoa bằng cách tạo unique ID kết hợp tên lớp nếu cần
+        // Đặc biệt cho trường hợp AI
+        const uniqueKey = row.id_khoa === 'AI' ? `${row.id_khoa}_${row.name_lop.substring(0, 10)}` : row.id_khoa;
+
+        try {
+            await (prisma as any).course.upsert({
+                where: { id_khoa: uniqueKey },
+                update: {
+                    name_lop: row.name_lop,
+                    name_khoa: row.name_khoa,
+                    date_join: row.date_join,
+                    status: row.status.toUpperCase() === 'TRUE',
+                    mo_ta_ngan: row.mo_ta_ngan,
+                    mo_ta_dai: row.mo_ta_dai,
+                    link_anh_bia: row.link_anh_bia_khoa,
+                    link_zalo: row.link_zalo,
+                    phi_coc: parseInt(row.phi_coc) || 0,
+                    stk: row.stk,
+                    name_stk: row.name_stk,
+                    bank_stk: row.bank_stk,
+                    noidung_stk: row.noidung_stk,
+                    link_qrcode: row.link_qrcode,
+                    file_email: row.file_email,
+                    noidung_email: row.noidung_email,
+                },
+                create: {
+                    id_khoa: uniqueKey,
+                    name_lop: row.name_lop,
+                    name_khoa: row.name_khoa,
+                    date_join: row.date_join,
+                    status: row.status.toUpperCase() === 'TRUE',
+                    mo_ta_ngan: row.mo_ta_ngan,
+                    mo_ta_dai: row.mo_ta_dai,
+                    link_anh_bia: row.link_anh_bia_khoa,
+                    link_zalo: row.link_zalo,
+                    phi_coc: parseInt(row.phi_coc) || 0,
+                    stk: row.stk,
+                    name_stk: row.name_stk,
+                    bank_stk: row.bank_stk,
+                    noidung_stk: row.noidung_stk,
+                    link_qrcode: row.link_qrcode,
+                    file_email: row.file_email,
+                    noidung_email: row.noidung_email,
+                }
+            })
+            successCount++
+        } catch (error) {
+            console.error(`❌ Failed to seed course ${row.id_khoa}:`, error)
+        }
+    }
+
+    console.log(`✅ Seeded ${successCount} courses successfully.`)
+}
+
+main()
+    .catch(e => {
+        console.error(e)
+        process.exit(1)
+    })
+    .finally(async () => {
+        await prisma.$disconnect()
+    })
+
+
+================================================================================
+KẾT THÚC FILE: scripts/seed-courses.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/seed-enrollments.ts
+================================================================================
+
+
+import fs from 'fs'
+import csv from 'csv-parser'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+interface RegRow {
+    time_stamp: string
+    id_hocvien: string
+    name_hocvien: string
+    id_lop: string
+    id_khoa: string
+    phi_coc: string
+    trang_thai: string
+}
+
+async function main() {
+    const results: RegRow[] = []
+    const csvFilePath = 'LS_DangKy.csv'
+
+    if (!fs.existsSync(csvFilePath)) {
+        console.error(`Error: File '${csvFilePath}' not found.`)
+        process.exit(1)
+    }
+
+    console.log('Reading LS_DangKy.csv...')
+    await new Promise((resolve, reject) => {
+        fs.createReadStream(csvFilePath)
+            .pipe(csv())
+            .on('data', (data: RegRow) => results.push(data))
+            .on('end', resolve)
+            .on('error', reject)
+    })
+
+    console.log(`Loaded ${results.length} registration history entries.`)
+
+    // Lấy mapping Course để tránh query nhiều
+    const allCourses = await (prisma as any).course.findMany();
+
+    let successCount = 0
+    let skipCount = 0
+    let errorCount = 0
+
+    for (const row of results) {
+        const studentId = parseInt(row.id_hocvien)
+        if (isNaN(studentId)) {
+            skipCount++
+            continue
+        }
+
+        // SMART MAPPING FOR LEGACY CODES
+        let targetIdKhoa = row.id_khoa;
+        if (targetIdKhoa === '1kF') targetIdKhoa = 'LS03';
+        if (targetIdKhoa === 'AF386') targetIdKhoa = 'AF01';
+        if (targetIdKhoa === 'VRD') targetIdKhoa = 'AF01'; // Giả định theo id_lop=AF, sẽ kiểm tra lại với bác
+
+        // Tìm khóa học phù hợp theo id_khoa mới
+        let course = allCourses.find((c: any) => c.id_khoa === targetIdKhoa);
+
+        // Trường hợp AI trùng lặp, cần tìm khớp chính xác
+        if (targetIdKhoa === 'AI') {
+            // Thử tìm theo name chứa trong row (nếu có logic bổ sung)
+            // Ở đây lấy bản ghi đầu tiên khớp AI
+            course = allCourses.find((c: any) => c.id_khoa.startsWith('AI'));
+        }
+
+        if (!course && row.id_lop) {
+            // Thử tìm theo id_lop trong CSV khớp với id_khoa trong DB
+            course = allCourses.find((c: any) => c.id_khoa === row.id_lop);
+        }
+
+        if (!course) {
+            // console.log(`⚠️ Không tìm thấy khóa học cho: Lop=${row.id_lop}, Khoa=${row.id_khoa}`)
+            skipCount++
+            continue
+        }
+
+        try {
+            // Kiểm tra User có tồn tại không
+            const user = await prisma.user.findUnique({ where: { id: studentId } })
+            if (!user) {
+                skipCount++
+                continue
+            }
+
+            await (prisma as any).enrollment.upsert({
+                where: {
+                    userId_courseId: {
+                        userId: studentId,
+                        courseId: course.id
+                    }
+                },
+                update: {
+                    status: 'ACTIVE' // Mặc định là đã kích hoạt theo yêu cầu
+                },
+                create: {
+                    userId: studentId,
+                    courseId: course.id,
+                    status: 'ACTIVE'
+                }
+            })
+            successCount++
+        } catch (error) {
+            errorCount++
+            // console.error(`❌ Lỗi khi nạp Enrollment cho User ${studentId}:`, error)
+        }
+    }
+
+    console.log(`--- KẾT QUẢ ĐỒNG BỘ ---`)
+    console.log(`✅ Thành công: ${successCount}`)
+    console.log(`⏭️ Bỏ qua (không khớp/lỗi): ${skipCount}`)
+    console.log(`❌ Lỗi hệ thống: ${errorCount}`)
+}
+
+main()
+    .catch(e => {
+        console.error(e)
+        process.exit(1)
+    })
+    .finally(async () => {
+        await prisma.$disconnect()
+    })
+
+
+================================================================================
+KẾT THÚC FILE: scripts/seed-enrollments.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/seed-lessons.ts
+================================================================================
+
+
+import { PrismaClient } from '@prisma/client'
+const prisma = new PrismaClient()
+
+async function main() {
+    console.log('--- SEEDING LESSONS ---')
+
+    // 1. Khóa Tiếp thị liên kết (AF06) - 21 ngày
+    const af06 = await (prisma as any).course.findUnique({ where: { id_khoa: 'AF06' } })
+    if (af06) {
+        console.log(`Found AF06 with ID: ${af06.id}`)
+        for (let i = 1; i <= 21; i++) {
+            await (prisma as any).lesson.upsert({
+                where: { courseId_order: { courseId: af06.id, order: i } },
+                update: {},
+                create: {
+                    id: `AF06_L${i}`,
+                    courseId: af06.id,
+                    order: i,
+                    title: `Bài ${i}: Nội dung thực chiến ngày ${i}`,
+                    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', // Placeholder
+                    content: `Nội dung hướng dẫn chi tiết cho ngày thứ ${i} của lộ trình Affiliate.`
+                }
+            })
+        }
+    }
+
+    // 2. Khóa Nhân hiệu từ gốc (NH06) - 21 ngày
+    const nh06 = await (prisma as any).course.findUnique({ where: { id_khoa: 'NH06' } })
+    if (nh06) {
+        for (let i = 1; i <= 21; i++) {
+            await (prisma as any).lesson.upsert({
+                where: { courseId_order: { courseId: nh06.id, order: i } },
+                update: {},
+                create: {
+                    id: `NH06_L${i}`,
+                    courseId: nh06.id,
+                    order: i,
+                    title: `Bài ${i}: Xây dựng nhân hiệu ngày ${i}`,
+                    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                    content: `Bước thứ ${i} trong hành trình xây dựng nhân hiệu từ gốc.`
+                }
+            })
+        }
+    }
+
+    // 3. Khóa Thử thách độc lập
+    let challengeCourse = await (prisma as any).course.findUnique({ where: { id_khoa: 'CHALLENGE_DAILY' } })
+
+    if (!challengeCourse) {
+        console.log('Creating CHALLENGE_DAILY course...')
+        challengeCourse = await (prisma as any).course.create({
+            data: {
+                id_khoa: 'CHALLENGE_DAILY',
+                name_lop: 'Thử thách rèn luyện hàng ngày',
+                name_khoa: 'BRK Discipline',
+                type: 'CHALLENGE',
+                phi_coc: 0,
+                status: true,
+                mo_ta_ngan: 'Chương trình rèn luyện kỷ luật 7-90 ngày tùy chọn.',
+                mo_ta_dai: 'Tham gia thử thách để rèn luyện thói quen nộp bài tâm đắc ngộ và thực hành mỗi ngày.'
+            }
+        })
+    } else {
+        await (prisma as any).course.update({
+            where: { id: challengeCourse.id },
+            data: { type: 'CHALLENGE' }
+        })
+    }
+
+    // Seed cho Challenge Course (Giả sử tối đa 90 ngày)
+    for (let i = 1; i <= 90; i++) {
+        await (prisma as any).lesson.upsert({
+            where: { courseId_order: { courseId: challengeCourse.id, order: i } },
+            update: { isDailyChallenge: true },
+            create: {
+                id: `CHALLENGE_D${i}`,
+                courseId: challengeCourse.id,
+                order: i,
+                title: `Ngày ${i}: Rèn luyện kỷ luật`,
+                isDailyChallenge: true,
+                content: `Ngày thứ ${i} trong chuỗi thử thách rèn luyện. Tập trung vào Tâm đắc ngộ và Thực hành mới.`
+            }
+        })
+    }
+
+    console.log('✅ Seeding completed.')
+}
+
+main()
+    .catch((e) => {
+        console.error(e)
+        process.exit(1)
+    })
+    .finally(async () => {
+        await prisma.$disconnect()
+    })
+
+
+================================================================================
+KẾT THÚC FILE: scripts/seed-lessons.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/seed-messages.ts
+================================================================================
+
+
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+const IMAGE_URLS = [
+    'https://i.postimg.cc/hQjxMRz0/1.jpg',
+    'https://i.postimg.cc/hzMT9tjp/10.jpg',
+    'https://i.postimg.cc/FkRcGXdV/2.jpg',
+    'https://i.postimg.cc/K3zLQhkn/3.jpg',
+    'https://i.postimg.cc/8f5WwgJL/4.jpg',
+    'https://i.postimg.cc/m1DMVWzY/5.jpg',
+    'https://i.postimg.cc/DJ5LqwZj/6.jpg',
+    'https://i.postimg.cc/BLNHxn6p/7.jpg',
+    'https://i.postimg.cc/k6wKxg4c/8.jpg',
+    'https://i.postimg.cc/phkzDLTk/9.jpg',
+]
+
+const messages = [
+    {
+        content: "Tri thức là sức mạnh - Học hôm nay, thành công ngày mai",
+        detail: "Học viện BRK mang đến những tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp. Mỗi ngày học tập là một bước tiến trên con đường thành công.\n\n💡 Tri thức không chỉ là kiến thức, mà là khả năng áp dụng để tạo ra giá trị thực tế.",
+        imageUrl: IMAGE_URLS[0]
+    },
+    {
+        content: "Kiến tạo giá trị từ gốc - Nền tảng vững chắc cho tương lai",
+        detail: "Mỗi chúng ta đều có tiềm năng để trở thành phiên bản tốt hơn của chính mình. Điều quan trọng là bắt đầu từ hôm nay và kiên trì theo đuổi mục tiêu.\n\n🌟 Học viện BRK đồng hành cùng bạn trên hành trình phát triển bản thân và sự nghiệp.",
+        imageUrl: IMAGE_URLS[1]
+    },
+    {
+        content: "Thành công không phải đích đến, mà là hành trình không ngừng học hỏi",
+        detail: "Trong cuộc sống, việc học tập không bao giờ kết thúc. Mỗi ngày mới là cơ hội để tiếp thu kiến thức mới, kỹ năng mới và trở thành người tốt hơn.\n\n📚 Hãy biến việc học thành thói quen hàng ngày.",
+        imageUrl: IMAGE_URLS[2]
+    },
+    {
+        content: "Lan tỏa giá trị - Kiến tạo thịnh vượng bền vững",
+        detail: "Thành công thực sự không chỉ đo bằng vật chất, mà còn bằng giá trị mà bạn mang đến cho người khác. Hãy lan tỏa những điều tốt đẹp xung quanh bạn.\n\n🤝 Cùng BRK kiến tạo cộng đồng phát triển.",
+        imageUrl: IMAGE_URLS[3]
+    },
+    {
+        content: "Từ gốc đến ngọn - Xây dựng nền tảng vững chắc",
+        detail: "Mọi thành công lớn đều bắt đầu từ những bước nhỏ. Hãy kiên nhẫn xây dựng nền tảng từ hôm nay, và bạn sẽ thấy được kết quả trong tương lai.\n\n🏗️ Nền tảng vững = Thành công bền vững.",
+        imageUrl: IMAGE_URLS[4]
+    },
+    {
+        content: "Học để thay đổi - Thay đổi để thành công",
+        detail: "Tri thức là chìa khóa mở mọi cánh cửa. Hãy không ngừng học hỏi, không ngừng phát triển để nắm bắt cơ hội và tạo ra những thay đổi tích cực trong cuộc sống.\n\n🔑 Học là chìa khóa của mọi thành công.",
+        imageUrl: IMAGE_URLS[5]
+    },
+    {
+        content: "Mỗi ngày là một cơ hội để trở nên tốt hơn",
+        detail: "Đừng chờ đợi ngày mai để bắt đầu. Hôm nay chính là ngày quan trọng nhất trong cuộc đời bạn. Hãy trân trọng từng khoảnh khắc và không ngừng tiến bộ.\n\n⏰ Hành động ngay hôm nay - Thành công ngày mai.",
+        imageUrl: IMAGE_URLS[6]
+    },
+    {
+        content: "Tri thức + Hành động = Thành công",
+        detail: "Biết là một chuyện, làm là chuyện khác. Tri thức chỉ có giá trị khi được áp dụng vào thực tế. Hãy kết hợp học với hành để đạt được kết quả mong muốn.\n\n⚡ Học + Hành = Thành công thực sự.",
+        imageUrl: IMAGE_URLS[7]
+    },
+    {
+        content: "Học viện BRK - Nơi tri thức được lan tỏa",
+        detail: "Học viện BRK là nơi tập hợp những tri thức thực chiến về kinh doanh online, nhân hiệu và AI. Chúng tôi ở đây để đồng hành cùng bạn trên hành trình lan tỏa giá trị.\n\n🌟 Kiến tạo sự thịnh vượng bền vững từ gốc.",
+        imageUrl: IMAGE_URLS[8]
+    },
+    {
+        content: "Khởi đầu hôm nay - Thành công tương lai",
+        detail: "Không bao giờ là quá muộn để bắt đầu học điều mới. Mỗi bước tiến dù nhỏ cũng là tiến bộ. Hãy bắt đầu hôm nay và theo đuổi ước mơ của bạn.\n\n🚀 Hành trình nghìn dặm bắt đầu từ một bước chân.",
+        imageUrl: IMAGE_URLS[9]
+    }
+]
+
+async function main() {
+    console.log('🚀 Bắt đầu seed messages...')
+
+    for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i]
+        await prisma.message.upsert({
+            where: { id: i + 1 },
+            update: msg,
+            create: { ...msg, isActive: true }
+        })
+        console.log(`✅ Đã thêm: ${msg.content.substring(0, 30)}...`)
+    }
+
+    console.log('🎉 Hoàn thành seed messages!')
+}
+
+main()
+    .catch(async (e) => {
+        console.error('❌ Lỗi:', e)
+        await prisma.$disconnect()
+        process.exit(1)
+    })
+    .finally(async () => {
+        await prisma.$disconnect()
+    })
+
+
+================================================================================
+KẾT THÚC FILE: scripts/seed-messages.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/seed-sample-lessons.ts
+================================================================================
+
+/**
+ * Script: seed-sample-lessons.ts
+ * Chèn 7 bài học mẫu cho các khóa học chưa có bài nào
+ * Chạy: npx ts-node -r tsconfig-paths/register scripts/seed-sample-lessons.ts
+ */
+
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+const DEFAULT_VIDEO_URL = 'https://www.youtube.com/watch?v=ASlj2zjgatc'
+
+const LESSON_TITLES = [
+    'Bài 1: Giới thiệu khóa học & Tổng quan',
+    'Bài 2: Nền tảng tư duy cốt lõi',
+    'Bài 3: Kỹ năng thiết yếu – Phần 1',
+    'Bài 4: Kỹ năng thiết yếu – Phần 2',
+    'Bài 5: Thực chiến & Ứng dụng thực tế',
+    'Bài 6: Nâng cao & Bứt phá giới hạn',
+    'Bài 7: Tổng kết & Bước tiếp theo',
+]
+
+async function main() {
+    // Lấy tất cả khóa học (trừ CHALLENGE_DAILY)
+    const courses = await (prisma as any).course.findMany({
+        where: { id_khoa: { not: 'CHALLENGE_DAILY' } },
+        include: { lessons: { select: { id: true } } }
+    })
+
+    let seededCount = 0
+
+    for (const course of courses) {
+        if (course.lessons.length > 0) {
+            console.log(`⏭  ${course.id_khoa} – đã có ${course.lessons.length} bài, bỏ qua.`)
+            continue
+        }
+
+        console.log(`✅ ${course.id_khoa} – đang tạo 7 bài học mẫu...`)
+
+        await (prisma as any).lesson.createMany({
+            data: LESSON_TITLES.map((title, index) => ({
+                courseId: course.id,
+                title,
+                order: index + 1,
+                videoUrl: DEFAULT_VIDEO_URL,
+                content: `Nội dung bài ${index + 1} – ${course.name_lop}. Hãy xem video hướng dẫn và hoàn thành bài tập thực hành.`,
+            }))
+        })
+
+        seededCount++
+    }
+
+    console.log(`\n🎉 Hoàn thành! Đã thêm 7 bài vào ${seededCount} khóa học.`)
+}
+
+main()
+    .catch(console.error)
+    .finally(() => prisma.$disconnect())
+
+
+================================================================================
+KẾT THÚC FILE: scripts/seed-sample-lessons.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/sync-to-drive.ts
+================================================================================
+
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { google } from 'googleapis';
+require('dotenv').config();
+
+const FOLDER_ID = '1XudNfFRNBM3t3Ty0uSuG2MVELTE7J2Dm';
+const FILE_NAME = 'project-source.md';
+const FILE_PATH = path.join(process.cwd(), FILE_NAME);
+
+async function getDriveClient() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'http://localhost'
+  );
+
+  oAuth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+  });
+
+  return google.drive({ version: 'v3', auth: oAuth2Client });
+}
+
+async function syncToDrive() {
+  console.log('🚀 Đang chuẩn bị đồng bộ lên Google Drive...');
+
+  if (!fs.existsSync(FILE_PATH)) {
+    console.error(`❌ Không tìm thấy file ${FILE_NAME}. Hãy chạy 'npx repomix' trước.`);
+    return;
+  }
+
+  try {
+    const drive = await getDriveClient();
+
+    // 1. Tìm xem file đã tồn tại trong thư mục chưa
+    const response = await drive.files.list({
+      q: `name = '${FILE_NAME}' and '${FOLDER_ID}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive',
+    });
+
+    const existingFile = response.data.files?.[0];
+
+    const media = {
+      mimeType: 'text/markdown',
+      body: fs.createReadStream(FILE_PATH),
+    };
+
+    if (existingFile && existingFile.id) {
+      // 2. Cập nhật file cũ
+      console.log(`📝 Đang cập nhật file hiện tại (ID: ${existingFile.id})...`);
+      await drive.files.update({
+        fileId: existingFile.id as string,
+        media: media,
+      });
+      console.log('✅ Cập nhật thành công!');
+    } else {
+      // 3. Tạo file mới
+      console.log('🆕 Đang tạo file mới trên Drive...');
+      await drive.files.create({
+        requestBody: {
+          name: FILE_NAME,
+          parents: [FOLDER_ID],
+        },
+        media: media,
+      } as any);
+      console.log('✅ Tải lên file mới thành công!');
+    }
+  } catch (error: any) {
+    console.error('❌ Lỗi khi đồng bộ lên Drive:', error.message);
+    if (error.message.includes('invalid_grant')) {
+      console.error('💡 Gợi ý: Refresh token có thể đã hết hạn hoặc sai.');
+    }
+  }
+}
+
+syncToDrive();
+
+
+================================================================================
+KẾT THÚC FILE: scripts/sync-to-drive.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-bounce-scan.ts
+================================================================================
+
+import prisma from "../lib/prisma";
+import { getOAuth2Client } from "../lib/google-auth";
+import { decrypt } from "../lib/email-encryptor";
+import { google } from "googleapis";
+
+async function testBounceScan() {
+  console.log("=".repeat(60));
+  console.log("TEST BOUNCE SCAN - KIỂM TRA VỆ TINH VÀ QUYỀN TRUY CẬP");
+  console.log("=".repeat(60) + "\n");
+
+  // 1. Lấy danh sách tất cả vệ tinh
+  console.log("📋 DANH SÁCH VỆ TINH TRONG DATABASE:\n");
+  const allSenders = await prisma.emailSender.findMany({
+    select: {
+      id: true,
+      email: true,
+      label: true,
+      isMain: true,
+      isActive: true,
+      dailyLimit: true,
+      sentToday: true,
+      refreshToken: true,
+      clientId: true,
+      clientSecret: true,
+    },
+    orderBy: { isMain: 'desc' }
+  });
+
+  if (allSenders.length === 0) {
+    console.log("❌ Không có vệ tinh nào trong database!");
+    return;
+  }
+
+  allSenders.forEach((s, i) => {
+    console.log(`  ${i + 1}. ${s.email} ${s.isMain ? '(CHÍNH)' : ''}`);
+    console.log(`     - Label: ${s.label}`);
+    console.log(`     - Active: ${s.isActive ? '✅' : '❌'}`);
+    console.log(`     - Hôm nay đã gửi: ${s.sentToday}/${s.dailyLimit}`);
+    console.log("");
+  });
+
+  console.log("-".repeat(60));
+  console.log("\n🔍 KIỂM TRA QUYỀN TRUY CẬP TỪNG VỆ TINH:\n");
+
+  const results: {
+    email: string;
+    accessible: boolean;
+    error?: string;
+    bounceEmails?: number;
+    sampleSubjects?: string[];
+  }[] = [];
+
+  for (const sender of allSenders) {
+    const result: typeof results[0] = { email: sender.email, accessible: false };
+    
+    try {
+      console.log(`  🔄 Testing: ${sender.email}`);
+      
+      const oauth2Client = getOAuth2Client();
+      const clientId = sender.clientId || process.env.GMAIL_CLIENT_ID;
+      const clientSecret = sender.clientSecret || process.env.GMAIL_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        result.error = "Missing OAuth credentials";
+        console.log(`     ❌ ${result.error}`);
+        results.push(result);
+        continue;
+      }
+
+      oauth2Client.setCredentials({
+        refresh_token: decrypt(sender.refreshToken)
+      });
+
+      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+      // Test 1: Lấy profile
+      try {
+        await gmail.users.getProfile({ userId: sender.email });
+        result.accessible = true;
+        console.log(`     ✅ Có thể truy cập inbox`);
+      } catch (profileErr: any) {
+        result.error = `Không truy cập được: ${profileErr.message}`;
+        console.log(`     ❌ ${result.error}`);
+        results.push(result);
+        continue;
+      }
+
+      // Test 2: Tìm bounce emails với nhiều query
+      const searchQueries = [
+        'from:mailer-daemon newer_than:15d',
+        'subject:bounced newer_than:15d',
+        'subject:delivery failed newer_than:15d',
+        'subject:undeliverable newer_than:15d',
+      ];
+
+      let totalBounceEmails = 0;
+      const allSubjects: string[] = [];
+      const allMessageIds = new Set<string>();
+
+      for (const query of searchQueries) {
+        try {
+          const response = await gmail.users.messages.list({
+            userId: sender.email,
+            q: query,
+            maxResults: 100
+          });
+          
+          const messages = response.data.messages || [];
+          messages.forEach(m => m.id && allMessageIds.add(m.id));
+          totalBounceEmails += messages.length;
+
+          // Lấy subject từ vài message đầu
+          if (messages.length > 0 && allSubjects.length < 10) {
+            for (const msg of messages.slice(0, 3)) {
+              try {
+                const msgDetail = await gmail.users.messages.get({
+                  userId: sender.email,
+                  id: msg.id!,
+                  format: 'metadata',
+                  metadataHeaders: ['Subject', 'From']
+                });
+                const subject = msgDetail.data.payload?.headers?.find(
+                  (h: any) => h.name?.toLowerCase() === 'subject'
+                )?.value;
+                if (subject && !allSubjects.includes(subject)) {
+                  allSubjects.push(subject);
+                }
+              } catch {}
+            }
+          }
+        } catch (queryErr: any) {
+          console.log(`     ⚠️ Query lỗi: ${queryErr.message}`);
+        }
+      }
+
+      result.bounceEmails = allMessageIds.size;
+      result.sampleSubjects = allSubjects;
+
+      console.log(`     📧 Tìm thấy: ${allMessageIds.size} bounce emails`);
+      if (allSubjects.length > 0) {
+        console.log(`     📋 Subjects mẫu:`);
+        allSubjects.slice(0, 5).forEach(s => console.log(`        - ${s}`));
+      }
+      console.log("");
+
+    } catch (err: any) {
+      result.error = err.message;
+      console.log(`     ❌ Lỗi: ${err.message}\n`);
+    }
+
+    results.push(result);
+  }
+
+  // Tổng hợp
+  console.log("-".repeat(60));
+  console.log("\n📊 TỔNG HỢP:\n");
+  
+  const accessible = results.filter(r => r.accessible);
+  const notAccessible = results.filter(r => !r.accessible);
+  const totalBounces = results.reduce((sum, r) => sum + (r.bounceEmails || 0), 0);
+
+  console.log(`  Tổng vệ tinh: ${results.length}`);
+  console.log(`  ✅ Có thể truy cập: ${accessible.length}`);
+  console.log(`  ❌ Không thể truy cập: ${notAccessible.length}`);
+  console.log(`  📧 Tổng bounce emails tìm thấy: ${totalBounces}`);
+
+  if (notAccessible.length > 0) {
+    console.log("\n⚠️  VỆ TINH CẦN CẤP QUYỀN:");
+    notAccessible.forEach(r => {
+      console.log(`  - ${r.email}: ${r.error}`);
+    });
+  }
+
+  console.log("\n" + "=".repeat(60));
+  
+  await prisma.$disconnect();
+}
+
+testBounceScan().catch(console.error);
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-bounce-scan.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-encoding-bug.ts
+================================================================================
+
+import { Buffer } from "buffer";
+
+function testEncoding() {
+  const fromName = 'Học Viện BRK';
+  const subject = '🎥 Bài học mới vừa được cập nhật!';
+
+  const encodeHeader = (str: string) => {
+    if (!str) return "";
+    const cleanStr = str.replace(/[\r\n]/g, " ").trim();
+    
+    // Sử dụng Array.from để tách chuỗi an toàn, không làm vỡ các ký tự Emoji (surrogate pairs)
+    const chars = Array.from(cleanStr);
+    const CHUNK_SIZE = 15; // 15 ký tự (khoảng 15-60 bytes), sau khi base64 sẽ luôn an toàn dưới 75 ký tự của RFC 2047
+    const chunks = [];
+    
+    for (let i = 0; i < chars.length; i += CHUNK_SIZE) {
+      const chunkStr = chars.slice(i, i + CHUNK_SIZE).join('');
+      const base64 = Buffer.from(chunkStr, "utf-8").toString("base64");
+      chunks.push(`=?utf-8?B?${base64}?=`);
+    }
+    
+    // Các khối encoded-word phải được nối với nhau bằng dấu CRLF và Space (hoặc chỉ Space nếu trên cùng một dòng)
+    return chunks.join("\r\n ");
+  };
+
+  console.log("FROM NAME ENCODED:");
+  console.log(encodeHeader(fromName));
+
+  console.log("SUBJECT ENCODED:");
+  console.log(encodeHeader(subject));
+
+  // Build raw MIME message theo chuẩn RFC 2822
+  const messageParts = [
+    `Content-Type: text/html; charset=utf-8`,
+    `MIME-Version: 1.0`,
+    `Content-Transfer-Encoding: base64`,
+    `From: ${encodeHeader(fromName)} <sender@test.com>`,
+    `To: to@test.com`,
+    `Subject: ${encodeHeader(subject)}`,
+    `Date: ${new Date().toUTCString()}`,
+    ``,
+    Buffer.from("Nội dung HTML", 'utf-8').toString("base64"),
+  ];
+
+  const rawMessage = messageParts.join('\r\n');
+  console.log("RAW MESSAGE:\n", rawMessage);
+
+  const encodedMessage = Buffer.from(rawMessage, 'utf-8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+    
+  console.log("FINAL GMAIL PAYLOAD:\n", encodedMessage);
+}
+
+testEncoding();
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-encoding-bug.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-fake-email-detection.ts
+================================================================================
+
+import prisma from "../lib/prisma";
+
+const FAKE_EMAIL_PATTERNS = [
+  /^noemail\d+@/i,
+  /^test\d+@/i,
+  /^fake\d+@/i,
+];
+
+async function testFakeEmailDetection() {
+  console.log("=".repeat(60));
+  console.log("TEST: PHÁT HIỆN EMAIL ẢO");
+  console.log("=".repeat(60) + "\n");
+
+  const sentLogs = await prisma.emailCampaignLog.findMany({
+    where: { status: "SENT" },
+    select: { toEmail: true }
+  });
+
+  const sentSet = new Set(sentLogs.map(l => l.toEmail.toLowerCase()));
+  console.log(`Tổng SENT emails: ${sentSet.size}`);
+
+  let fakeCount = 0;
+  const fakeEmails: string[] = [];
+
+  for (const email of sentSet) {
+    for (const pattern of FAKE_EMAIL_PATTERNS) {
+      if (pattern.test(email)) {
+        fakeCount++;
+        fakeEmails.push(email);
+        break;
+      }
+    }
+  }
+
+  console.log(`\n📊 Email ảo phát hiện được: ${fakeCount}`);
+  
+  if (fakeEmails.length > 0) {
+    console.log("\nDanh sách (mẫu 20):");
+    fakeEmails.slice(0, 20).forEach((e, i) => {
+      console.log(`  ${i + 1}. ${e}`);
+    });
+    
+    // Kiểm tra xem đã trong blacklist chưa
+    let inBlacklist = 0;
+    for (const email of fakeEmails.slice(0, 10)) {
+      const bl = await prisma.emailBlacklist.findUnique({ where: { email } });
+      if (bl) inBlacklist++;
+    }
+    console.log(`\nTrong blacklist (10 mẫu đầu): ${inBlacklist}/10`);
+  }
+
+  await prisma.$disconnect();
+}
+
+testFakeEmailDetection().catch(console.error);
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-fake-email-detection.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-gmail.ts
+================================================================================
+
+require('dotenv').config()
+const { google } = require('googleapis')
+const { PrismaClient } = require('@prisma/client')
+
+const prisma = new PrismaClient()
+
+async function getGmailClient() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'http://localhost'
+  )
+
+  oAuth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN
+  })
+
+  return google.gmail({ version: 'v1', auth: oAuth2Client })
+}
+
+async function testGmail() {
+  console.log('🔍 Debug: Kiểm tra kết nối Gmail...')
+  console.log('Email:', process.env.GMAIL_EMAIL)
+
+  if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_REFRESH_TOKEN) {
+    console.log('⚠️  Chưa cấu hình Gmail credentials')
+    return
+  }
+
+  try {
+    const gmail = await getGmailClient()
+    
+    // Lấy 20 email gần nhất
+    const response = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 20
+    })
+
+    const messages = response.data.messages || []
+    console.log(`📧 Tổng số email: ${messages.length}`)
+
+    if (messages.length === 0) {
+      console.log('Không có email nào')
+      return
+    }
+
+    // Lấy chi tiết từng email
+    for (const msg of messages.slice(0, 10)) {
+      const message = await gmail.users.messages.get({
+        userId: 'me',
+        id: msg.id
+      })
+
+      const headers = message.data.payload?.headers || []
+      const subject = headers.find((h: any) => h.name === 'Subject')?.value || ''
+      const from = headers.find((h: any) => h.name === 'From')?.value || ''
+      const date = headers.find((h: any) => h.name === 'Date')?.value || ''
+      const snippet = message.data.snippet || ''
+
+      console.log(`\n--- Email #${msg.id} ---`)
+      console.log(`From: ${from}`)
+      console.log(`Subject: ${subject}`)
+      console.log(`Date: ${date}`)
+      console.log(`Snippet: ${snippet.substring(0, 100)}...`)
+    }
+
+  } catch (error: any) {
+    console.error('❌ Lỗi:', error.message)
+  }
+}
+
+testGmail()
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-gmail.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-new-bounce-logic.ts
+================================================================================
+
+import prisma from "../lib/prisma";
+import { getOAuth2Client } from "../lib/google-auth";
+import { decrypt } from "../lib/email-encryptor";
+import { google } from "googleapis";
+
+function decodeQuotedPrintable(str: string): string {
+  return str
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/gi, (_, p1) => String.fromCharCode(parseInt(p1, 16)));
+}
+
+type BounceType = 'HARD_BOUNCE' | 'SOFT_BOUNCE';
+
+interface BouncePattern {
+  pattern: RegExp;
+  type: BounceType;
+  reason: string;
+}
+
+const BOUNCE_PATTERNS: BouncePattern[] = [
+  { pattern: /user unknown|user not found|no such user|invalid recipient|recipient rejected/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /does not exist|doesn't exist|not exist/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /550 5\.1\.1|5\.1\.1 bounce|address not found/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /mailbox.*not found|not listed in directory/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /bad-mailbox|bad destination|unrouteable address/i, type: 'HARD_BOUNCE', reason: 'Địa chỉ không tồn tại' },
+  { pattern: /mailbox full|quota exceeded|storage full|user over quota/i, type: 'SOFT_BOUNCE', reason: 'Hộp thư đầy' },
+  { pattern: /temporary failure|temporary error|try again later|retry timeout/i, type: 'SOFT_BOUNCE', reason: 'Lỗi tạm thời' },
+  { pattern: /service unavailable|server too busy|deferred|delay/i, type: 'SOFT_BOUNCE', reason: 'Server bận, thử lại sau' },
+  { pattern: /rate limit|too many requests|excessive recipients/i, type: 'SOFT_BOUNCE', reason: 'Vượt giới hạn gửi' },
+  { pattern: /greylisted|grey list|please try again/i, type: 'SOFT_BOUNCE', reason: 'Bị greylist, thử lại sau' },
+  { pattern: /dns failure|dns error|nameserver|domain not found/i, type: 'SOFT_BOUNCE', reason: 'Lỗi DNS tạm thời' },
+];
+
+function detectBounceType(content: string, subject: string): BounceType | null {
+  const text = `${subject} ${content}`.toLowerCase();
+  for (const bp of BOUNCE_PATTERNS) {
+    if (bp.pattern.test(text)) return bp.type;
+  }
+  if (/bounced|undeliverable|delivery failed|mailer-daemon/i.test(subject)) {
+    return 'HARD_BOUNCE';
+  }
+  return null;
+}
+
+function getBounceReason(content: string, subject: string): string {
+  const text = `${subject} ${content}`.toLowerCase();
+  for (const bp of BOUNCE_PATTERNS) {
+    if (bp.pattern.test(text)) return bp.reason;
+  }
+  return 'Lỗi không xác định';
+}
+
+async function testNewBounceLogic() {
+  console.log("=".repeat(60));
+  console.log("TEST BOUNCE SCAN VỚI LOẠI BOUNCE MỚI");
+  console.log("=".repeat(60) + "\n");
+
+  const allSenders = await prisma.emailSender.findMany({
+    where: { isActive: true },
+    select: {
+      email: true,
+      refreshToken: true,
+      clientId: true,
+      clientSecret: true,
+    },
+    orderBy: { email: 'asc' }
+  });
+
+  const recentSentLogs = await prisma.emailCampaignLog.findMany({
+    where: {
+      status: "SENT",
+      sentAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    },
+    select: { toEmail: true }
+  });
+
+  const sentSet = new Set(recentSentLogs.map(l => l.toEmail.toLowerCase().trim()));
+  console.log(`📤 Emails đã gửi (30 ngày): ${sentSet.size}\n`);
+
+  const totalResults = {
+    scanned: 0,
+    hardBounced: 0,
+    softBounced: 0,
+    noMatch: 0,
+  };
+
+  for (const sender of allSenders) {
+    console.log(`\n📬 ${sender.email}`);
+    console.log("-".repeat(50));
+
+    try {
+      const oauth2Client = getOAuth2Client();
+      oauth2Client.setCredentials({ refresh_token: decrypt(sender.refreshToken) });
+
+      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+      const response = await gmail.users.messages.list({
+        userId: sender.email,
+        q: 'from:mailer-daemon OR subject:bounced OR subject:delivery failed OR subject:undeliverable newer_than:30d',
+        maxResults: 300
+      });
+
+      const messages = response.data.messages || [];
+      console.log(`  Tổng bounce emails: ${messages.length}`);
+
+      let senderHard = 0, senderSoft = 0, senderNoMatch = 0;
+      const foundBounces: { email: string; type: BounceType; reason: string }[] = [];
+
+      for (const msg of messages) {
+        const message = await gmail.users.messages.get({
+          userId: sender.email,
+          id: msg.id!,
+          format: 'full'
+        });
+
+        const payload = message.data.payload;
+        const headers = payload?.headers || [];
+        const subject = headers.find((h: any) => h.name?.toLowerCase() === 'subject')?.value || 'No Subject';
+        const bounceType = detectBounceType('', subject);
+
+        if (!bounceType) {
+          senderNoMatch++;
+          continue;
+        }
+
+        const extractText = (p: any): string => {
+          let text = "";
+          if (p.body?.data) {
+            try {
+              const base64 = p.body.data.replace(/-/g, '+').replace(/_/g, '/');
+              const rawText = Buffer.from(base64, 'base64').toString('utf-8');
+              text += decodeQuotedPrintable(rawText) + " ";
+            } catch {}
+          }
+          if (p.parts) {
+            for (const part of p.parts) {
+              text += extractText(part) + " ";
+            }
+          }
+          return text;
+        };
+
+        const content = extractText(payload);
+        const reason = getBounceReason(content, subject);
+        const allEmails = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+        const uniqueEmails = [...new Set(allEmails.map(e => e.toLowerCase().trim()))];
+
+        for (const email of uniqueEmails) {
+          if (email.includes(sender.email) || email.includes('mailer-daemon') || 
+              email.includes('postmaster') || email.includes('@googlemail.com')) continue;
+
+          if (sentSet.has(email)) {
+            foundBounces.push({ email, type: bounceType, reason });
+            
+            if (bounceType === 'HARD_BOUNCE') senderHard++;
+            else senderSoft++;
+          }
+        }
+      }
+
+      console.log(`  🔴 HARD BOUNCE: ${senderHard}`);
+      console.log(`  🟡 SOFT BOUNCE: ${senderSoft}`);
+      console.log(`  ⚪ Không xác định: ${senderNoMatch}`);
+
+      if (foundBounces.length > 0) {
+        console.log(`\n  📋 Chi tiết bounces:`);
+        foundBounces.slice(0, 10).forEach((b, i) => {
+          console.log(`     ${i + 1}. ${b.email}`);
+          console.log(`        ${b.type === 'HARD_BOUNCE' ? '🔴' : '🟡'} ${b.reason}`);
+        });
+        if (foundBounces.length > 10) {
+          console.log(`     ... và ${foundBounces.length - 10} bounces khác`);
+        }
+      }
+
+      totalResults.scanned += messages.length;
+      totalResults.hardBounced += senderHard;
+      totalResults.softBounced += senderSoft;
+      totalResults.noMatch += senderNoMatch;
+
+    } catch (err: any) {
+      console.log(`  ❌ Lỗi: ${err.message}`);
+    }
+  }
+
+  console.log("\n" + "=".repeat(60));
+  console.log("📊 TỔNG HỢP:");
+  console.log("=".repeat(60));
+  console.log(`  Tổng bounce emails: ${totalResults.scanned}`);
+  console.log(`  🔴 HARD BOUNCE: ${totalResults.hardBounced}`);
+  console.log(`  🟡 SOFT BOUNCE: ${totalResults.softBounced}`);
+  console.log(`  ⚪ Không xác định: ${totalResults.noMatch}`);
+  console.log("=".repeat(60));
+
+  await prisma.$disconnect();
+}
+
+testNewBounceLogic().catch(console.error);
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-new-bounce-logic.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-new-format.ts
+================================================================================
+
+
+import { parseFullTransferEmail } from '../lib/email-parser';
+
+const mockEmailContent = `
+Sacombank thông báo giao dịch:
+Tài khoản: 0123456789
+Phát sinh: +386,868 VND
+Thời gian: 05/03/2026 14:30
+Nội dung: SDT 123456 HV 8286 COC LS03
+Số dư cuối: 10,000,000 VND
+`;
+
+console.log('🚀 Đang test logic bóc tách email với format mới...');
+console.log('--- Nội dung giả lập ---');
+console.log(mockEmailContent);
+
+const result = parseFullTransferEmail(mockEmailContent);
+
+console.log('\n--- Kết quả bóc tách ---');
+console.log(`Số điện thoại (6 số cuối): ${result.phone}`);
+console.log(`Mã học viên (UserID): ${result.userId}`);
+console.log(`Mã khóa học: ${result.courseCode}`);
+console.log(`Số tiền: ${result.amount.toLocaleString()} VND`);
+
+if (result.userId === 8286 && result.courseCode === 'LS03' && result.amount === 386868) {
+    console.log('\n✅ TEST THÀNH CÔNG: Logic nhận diện hoàn hảo!');
+} else {
+    console.log('\n❌ TEST THẤT BẠI: Cần kiểm tra lại Regex.');
+}
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-new-format.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-sacombank.ts
+================================================================================
+
+require('dotenv').config()
+const { google } = require('googleapis')
+
+async function getGmailClient() {
+  const oAuth2Client = new google.auth.OAuth2(
+    process.env.GMAIL_CLIENT_ID,
+    process.env.GMAIL_CLIENT_SECRET,
+    'http://localhost'
+  )
+
+  oAuth2Client.setCredentials({
+    refresh_token: process.env.GMAIL_REFRESH_TOKEN
+  })
+
+  return google.gmail({ version: 'v1', auth: oAuth2Client })
+}
+
+async function getSacombankEmails() {
+  console.log('🔍 Tìm email Sacombank...')
+
+  const gmail = await getGmailClient()
+
+  // Tìm email Sacombank - dùng search rộng hơn
+  const response = await gmail.users.messages.list({
+    userId: 'me',
+    q: 'sacombank thong bao',
+    maxResults: 10
+  })
+
+  const messages = response.data.messages || []
+  console.log(`📧 Tìm thấy ${messages.length} email Sacombank`)
+
+  for (const msg of messages) {
+    const message = await gmail.users.messages.get({
+      userId: 'me',
+      id: msg.id,
+      format: 'full'
+    })
+
+    const headers = message.data.payload?.headers || []
+    const subject = headers.find((h: any) => h.name === 'Subject')?.value || ''
+    const from = headers.find((h: any) => h.name === 'From')?.value || ''
+    const date = headers.find((h: any) => h.name === 'Date')?.value || ''
+
+    // Lấy body
+    let body = ''
+    if (message.data.payload?.body?.data) {
+      body = Buffer.from(message.data.payload.body.data, 'base64').toString('utf-8')
+    } else if (message.data.payload?.parts) {
+      for (const part of message.data.payload.parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString('utf-8')
+          break
+        }
+      }
+    }
+
+    console.log(`\n=== Email: ${subject} ===`)
+    console.log(`From: ${from}`)
+    console.log(`Date: ${date}`)
+    console.log(`\n--- Nội dung email (text) ---`)
+    console.log(body.substring(0, 2000))
+  }
+}
+
+getSacombankEmails().catch(console.error)
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-sacombank.ts
+================================================================================
+
+
+================================================================================
+FILE GỐC: scripts/test-vietqr.ts
+================================================================================
+
+require('dotenv').config()
+
+async function testVietQR() {
+  console.log('🧪 Test VietQR API...')
+  
+  const requestBody = {
+    accountNo: "1039789789",
+    accountName: "NGUYEN VAN A",
+    acqId: "970403",
+    amount: 500000,
+    addInfo: "SDT0389758138MHV123COCNH",
+    template: "compact",
+    format: "text"
+  }
+
+  console.log('Request:', JSON.stringify(requestBody, null, 2))
+
+  try {
+    const response = await fetch('https://api.vietqr.io/v2/generate', {
+      method: 'POST',
+      headers: {
+        'x-client-id': process.env.VIETQR_CLIENT_ID || '',
+        'x-api-key': process.env.VIETQR_API_KEY || '',
+        'Content-Type': 'application/json'
+      } as any,
+      body: JSON.stringify(requestBody)
+    })
+
+    const data = await response.json()
+    console.log('Response:', JSON.stringify(data, null, 2))
+    
+    if (data.code === '00') {
+      console.log('✅ QR Generated successfully!')
+      console.log('QR Data URL:', data.data?.qrDataURL?.substring(0, 100) + '...')
+    } else {
+      console.log('❌ Error:', data.desc)
+    }
+  } catch (error: any) {
+    console.error('❌ Request failed:', error.message)
+  }
+}
+
+testVietQR()
+
+
+================================================================================
+KẾT THÚC FILE: scripts/test-vietqr.ts
+================================================================================

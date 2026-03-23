@@ -1,0 +1,184 @@
+================================================================================
+FILE: scripts\analyze-bounce-emails.ts
+================================================================================
+
+import prisma from "../lib/prisma";
+import { getOAuth2Client } from "../lib/google-auth";
+import { decrypt } from "../lib/email-encryptor";
+import { google } from "googleapis";
+
+function decodeQuotedPrintable(str: string): string {
+  return str
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/gi, (_, p1) => String.fromCharCode(parseInt(p1, 16)));
+}
+
+async function analyzeBounceEmails() {
+  console.log("=".repeat(60));
+  console.log("PHÂN TÍCH CHI TIẾT BOUNCE EMAILS");
+  console.log("=".repeat(60) + "\n");
+
+  const allSenders = await prisma.emailSender.findMany({
+    where: { isActive: true },
+    select: {
+      email: true,
+      refreshToken: true,
+      clientId: true,
+      clientSecret: true,
+    },
+    orderBy: { email: 'asc' }
+  });
+
+  // Lấy tất cả emails đã gửi trong 15 ngày
+  const recentSentLogs = await prisma.emailCampaignLog.findMany({
+    where: {
+      status: "SENT",
+      sentAt: { gte: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) }
+    },
+    select: { toEmail: true, sentAt: true }
+  });
+
+  const sentEmails = new Set(recentSentLogs.map(l => l.toEmail.toLowerCase().trim()));
+  console.log(`📤 Tổng emails đã gửi trong 15 ngày: ${sentEmails.size}\n`);
+
+  const allFoundEmails: { email: string; bounceFrom: string; subject: string }[] = [];
+
+  for (const sender of allSenders) {
+    console.log(`\n📬 ${sender.email}`);
+    console.log("-".repeat(50));
+
+    try {
+      const oauth2Client = getOAuth2Client();
+      oauth2Client.setCredentials({
+        refresh_token: decrypt(sender.refreshToken)
+      });
+
+      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+
+      // Lấy tất cả bounce emails
+      const response = await gmail.users.messages.list({
+        userId: sender.email,
+        q: 'from:mailer-daemon OR subject:bounced OR subject:delivery failed OR subject:undeliverable newer_than:15d',
+        maxResults: 200
+      });
+
+      const messages = response.data.messages || [];
+      console.log(`  Tìm thấy ${messages.length} bounce emails`);
+
+      let matchCount = 0;
+      let totalEmailsFound = 0;
+
+      for (const msg of messages.slice(0, 5)) { // Chỉ phân tích 5 email đầu
+        try {
+          const message = await gmail.users.messages.get({
+            userId: sender.email,
+            id: msg.id!,
+            format: 'full'
+          });
+
+          const payload = message.data.payload;
+          const headers = payload?.headers || [];
+          
+          const subject = headers.find((h: any) => h.name?.toLowerCase() === 'subject')?.value || 'No Subject';
+          const from = headers.find((h: any) => h.name?.toLowerCase() === 'from')?.value || 'No From';
+
+          const extractText = (p: any): string => {
+            let text = "";
+            if (p.body?.data) {
+              try {
+                const base64 = p.body.data.replace(/-/g, '+').replace(/_/g, '/');
+                const rawText = Buffer.from(base64, 'base64').toString('utf-8');
+                text += decodeQuotedPrintable(rawText) + " ";
+              } catch {}
+            }
+            if (p.parts) {
+              for (const part of p.parts) {
+                text += extractText(part) + " ";
+              }
+            }
+            return text;
+          };
+
+          const content = extractText(payload);
+          const allEmails = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+          totalEmailsFound += allEmails.length;
+
+          // Kiểm tra xem có email nào trùng với danh sách đã gửi
+          const matchingEmails = allEmails.filter(e => sentEmails.has(e.toLowerCase().trim()));
+          
+          console.log(`\n  📧 Subject: "${subject}"`);
+          console.log(`     From: ${from}`);
+          console.log(`     Emails tìm thấy trong nội dung: ${allEmails.length}`);
+          console.log(`     Emails TRÙNG với danh sách đã gửi: ${matchingEmails.length}`);
+          
+          if (matchingEmails.length > 0) {
+            matchCount++;
+            matchingEmails.forEach(e => {
+              console.log(`       ✅ ${e}`);
+              allFoundEmails.push({ email: e, bounceFrom: sender.email, subject });
+            });
+          } else {
+            // Hiển thị vài email đầu tiên để debug
+            console.log(`     📋 Emails mẫu: ${allEmails.slice(0, 5).join(', ')}${allEmails.length > 5 ? '...' : ''}`);
+          }
+
+        } catch (err: any) {
+          console.log(`  ❌ Lỗi đọc message: ${err.message}`);
+        }
+      }
+
+      console.log(`\n  📊 Tổng kết vệ tinh ${sender.email}:`);
+      console.log(`     - Tổng bounce emails: ${messages.length}`);
+      console.log(`     - Emails trùng với sent list: ${matchCount}`);
+
+    } catch (err: any) {
+      console.log(`  ❌ Lỗi: ${err.message}`);
+    }
+  }
+
+  console.log("\n" + "=".repeat(60));
+  console.log("📊 TỔNG HỢP TẤT CẢ BOUNCES TÌM ĐƯỢC:");
+  console.log("=".repeat(60));
+  
+  console.log(`\nTổng emails bounce phát hiện được: ${allFoundEmails.length}`);
+  
+  if (allFoundEmails.length > 0) {
+    console.log("\nDanh sách chi tiết:");
+    allFoundEmails.forEach((item, i) => {
+      console.log(`  ${i + 1}. ${item.email}`);
+      console.log(`     Từ vệ tinh: ${item.bounceFrom}`);
+      console.log(`     Subject: ${item.subject}`);
+    });
+  }
+
+  // Kiểm tra xem có email nào trong sentEmails mà chưa có trong bounce
+  console.log("\n" + "-".repeat(60));
+  console.log("🔍 KIỂM TRA: Emails đã gửi nhưng CHƯA phát hiện bounce");
+  console.log("-".repeat(60));
+  
+  const detectedBounces = new Set(allFoundEmails.map(e => e.email.toLowerCase()));
+  const sentArray = Array.from(sentEmails);
+  
+  console.log(`Tổng đã gửi: ${sentArray.length}`);
+  console.log(`Đã phát hiện bounce: ${detectedBounces.size}`);
+  console.log(`Chưa phát hiện: ${sentArray.length - detectedBounces.size}`);
+  
+  if (sentArray.length > detectedBounces.size) {
+    const notDetected = sentArray.filter(e => !detectedBounces.has(e.toLowerCase()));
+    console.log("\n📋 Emails đã gửi nhưng chưa phát hiện bounce (mẫu 20):");
+    notDetected.slice(0, 20).forEach((e, i) => {
+      console.log(`  ${i + 1}. ${e}`);
+    });
+  }
+
+  console.log("\n" + "=".repeat(60));
+  
+  await prisma.$disconnect();
+}
+
+analyzeBounceEmails().catch(console.error);
+
+
+================================================================================
+END OF FILE: scripts\analyze-bounce-emails.ts
+================================================================================

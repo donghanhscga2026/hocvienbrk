@@ -1,0 +1,137 @@
+================================================================================
+FILE: scripts\check-bounce-emails.ts
+================================================================================
+
+import prisma from "../lib/prisma";
+
+async function checkBounceEmails() {
+  console.log("=".repeat(60));
+  console.log("KIỂM TRA EMAILS TRONG BOUNCE CÓ TRONG DATABASE KHÔNG");
+  console.log("=".repeat(60) + "\n");
+
+  // Danh sách emails từ bounce test trước đó
+  const bounceEmails = [
+    "bonghoanhohamhoc@gmail.com",
+    "noemail454@gmail.com",
+    "tranhviet19789@gmail.com",
+    "caothutn3_472@gmail.com",
+    "qthoanguyen_597@gmail.com",
+    "huong.cnm@gmail.com",
+    "noemail441@gmail.com",
+    "noemail420@gmail.com",
+    "chaomungcongai_576@gmail.com",
+    "thuhuong1973@gmail.com",
+    "quacongnghehay007@gmail.com",
+    "noemail403@gmail.com",
+    "noemail391@gmail.com",
+    "noemail434@gmail.com",
+    "vuongquyen230695@gmail.com",
+    "lemyhanhs69.001_52@gmail.com",
+    "toanphanthi095@gmail.com",
+    "nhungmt2512@gmail.com.vn",
+    "htuoi203_347@gmail.com",
+    "noemail399@gmail.com",
+    "transen097996_29@gmail.com",
+    "noemail173@gmail.com",
+    "nguyenthiphuong230393@gmail.com",
+    "Trucquynhdvcg@gmail.com",
+    "noemail444@gmail.com",
+  ];
+
+  console.log(`Kiểm tra ${bounceEmails.length} emails từ bounce...\n`);
+
+  // 1. Kiểm tra trong User table
+  console.log("📊 TRONG BẢNG USER:");
+  for (const email of bounceEmails) {
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true, email: true, emailVerified: true }
+    });
+    
+    if (user) {
+      console.log(`  ✅ ${email}`);
+      console.log(`     - User ID: ${user.id}`);
+      console.log(`     - Email Verified: ${user.emailVerified}`);
+    }
+  }
+
+  // 2. Kiểm tra trong EmailCampaignLog
+  console.log("\n📊 TRONG BẢNG EmailCampaignLog:");
+  for (const email of bounceEmails) {
+    const logs = await prisma.emailCampaignLog.findMany({
+      where: { toEmail: { equals: email, mode: 'insensitive' } },
+      select: { 
+        id: true, 
+        campaignId: true, 
+        status: true, 
+        sentAt: true 
+      },
+      orderBy: { sentAt: 'desc' },
+      take: 3
+    });
+    
+    if (logs.length > 0) {
+      console.log(`  ✅ ${email} - ${logs.length} logs`);
+      logs.forEach(log => {
+        console.log(`     - Campaign ${log.campaignId}: ${log.status} (${log.sentAt.toLocaleDateString()})`);
+      });
+    }
+  }
+
+  // 3. Kiểm tra trong EmailBlacklist
+  console.log("\n📊 TRONG BẢNG EmailBlacklist:");
+  const blacklisted = await prisma.emailBlacklist.findMany({
+    where: {
+      email: { in: bounceEmails.map(e => e.toLowerCase()) }
+    },
+    select: { email: true, reason: true, createdAt: true }
+  });
+  
+  if (blacklisted.length > 0) {
+    console.log(`  Tìm thấy ${blacklisted.length} emails trong blacklist:`);
+    blacklisted.forEach(b => {
+      console.log(`  - ${b.email} (${b.reason})`);
+    });
+  } else {
+    console.log("  Không có emails nào trong blacklist");
+  }
+
+  // 4. Tổng kết các trạng thái
+  console.log("\n" + "-".repeat(60));
+  console.log("📊 TỔNG KẾT:");
+  
+  let inUsers = 0, inLogs = 0, inBlacklist = 0;
+  
+  for (const email of bounceEmails) {
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } }
+    });
+    if (user) inUsers++;
+    
+    const logs = await prisma.emailCampaignLog.findFirst({
+      where: { toEmail: { equals: email, mode: 'insensitive' } }
+    });
+    if (logs) inLogs++;
+    
+    const blacklist = await prisma.emailBlacklist.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } }
+    });
+    if (blacklist) inBlacklist++;
+  }
+  
+  console.log(`  - Emails trong User table: ${inUsers}/${bounceEmails.length}`);
+  console.log(`  - Emails trong CampaignLog: ${inLogs}/${bounceEmails.length}`);
+  console.log(`  - Emails trong Blacklist: ${inBlacklist}/${bounceEmails.length}`);
+  console.log(`  - Emails KHÔNG có trong database: ${bounceEmails.length - inUsers}/${bounceEmails.length}`);
+  
+  console.log("\n" + "=".repeat(60));
+  
+  await prisma.$disconnect();
+}
+
+checkBounceEmails().catch(console.error);
+
+
+================================================================================
+END OF FILE: scripts\check-bounce-emails.ts
+================================================================================

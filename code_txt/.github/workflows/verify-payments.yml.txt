@@ -1,0 +1,26 @@
+================================================================================
+FILE: .github\workflows\verify-payments.yml
+================================================================================
+
+name: Auto Verify Payments
+
+on:
+  schedule:
+    # Chạy mỗi 15 phút (Tần suất tối ưu cho GitHub Free)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Cho phép bấm chạy thủ công từ GitHub UI
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Payment Verification API
+        run: |
+          curl -X GET "https://giautoandien.io.vn/api/cron/gmail-watch" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json"
+
+
+================================================================================
+END OF FILE: .github\workflows\verify-payments.yml
+================================================================================

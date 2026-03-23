@@ -1,0 +1,90 @@
+================================================================================
+FILE: app\globals.css
+================================================================================
+
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@keyframes glow {
+
+  0%,
+  100% {
+    text-shadow: 0 0 10px #facc15, 0 0 20px #facc15, 2px 2px 0px #854d0e;
+  }
+
+  50% {
+    text-shadow: 0 0 20px #fde047, 0 0 35px #fde047, 2px 2px 0px #854d0e;
+  }
+}
+
+.text-glow-3d {
+  animation: glow 3s ease-in-out infinite;
+  color: #facc15;
+  letter-spacing: 0.1em;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-be-vietnam-pro), ui-sans-serif, system-ui, sans-serif;
+}
+/* ============================= */
+/* GOOGLE DOCS CONTENT FIX */
+/* ============================= */
+
+/* Ảnh responsive + zoom UX */
+.prose img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 1em auto;
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
+  user-select: none;
+}
+
+.prose img:hover {
+  transform: scale(1.02);
+}
+
+/* Table không tràn ngang */
+.prose table {
+  width: 100% !important;
+  display: block;
+  overflow-x: auto;
+}
+
+/* Reset container Google Docs nhưng KHÔNG phá layout */
+.prose div {
+  max-width: 100% !important;
+}
+
+/* Chuẩn hóa khoảng cách văn bản */
+.prose p {
+  margin-top: 0.6em !important;
+  margin-bottom: 0.6em !important;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  margin-top: 1.4em !important;
+  margin-bottom: 0.7em !important;
+}
+
+
+================================================================================
+END OF FILE: app\globals.css
+================================================================================

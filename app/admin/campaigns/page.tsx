@@ -81,7 +81,7 @@ export default function CampaignsPage() {
         {/* Sub Navigation */}
         <div className="flex gap-1 px-4 pb-3 overflow-x-auto">
           <Link href="/admin/campaigns" className="px-3 py-1.5 rounded-full text-xs font-bold bg-orange-500 text-white">
-            📋 Danh Sách
+            📋 Chiến dịch
           </Link>
           <Link href="/admin/email-senders" className="px-3 py-1.5 rounded-full text-xs font-bold bg-white/10 text-white/70 hover:bg-white/20">
             📡 Tài Khoản

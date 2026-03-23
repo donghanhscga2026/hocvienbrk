@@ -1,0 +1,91 @@
+================================================================================
+FILE: scripts\export-modules.ts
+================================================================================
+
+
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const OUTPUT_DIR = 'source_md';
+const TEMP_CONFIG = 'repomix.temp.json';
+
+if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR);
+} else {
+    const files = fs.readdirSync(OUTPUT_DIR);
+    for (const file of files) fs.unlinkSync(path.join(OUTPUT_DIR, file));
+}
+
+const modules = [
+    { 
+        name: 'overview.md', 
+        include: ["package.json", "next.config.ts", "tsconfig.json", "vercel.json"], 
+        desc: 'Cấu hình hệ thống & Deploy' 
+    },
+    { 
+        name: 'frontend-ui.md', 
+        include: ["components/**/*", "app/**/page.tsx", "app/**/layout.tsx", "app/**/*.tsx"], 
+        desc: 'Giao diện & Cấu trúc trang (Pages + Components)' 
+    },
+    { 
+        name: 'backend-logic.md', 
+        include: ["app/actions/**/*", "app/api/**/*"], 
+        desc: 'Xử lý phía Server (Actions & API)' 
+    },
+    { 
+        name: 'database-infra.md', 
+        include: ["prisma/schema.prisma", "prisma/seed.ts", "types/**/*"], 
+        desc: 'Cấu trúc Database & Định nghĩa kiểu dữ liệu' 
+    },
+    { 
+        name: 'core-system.md', 
+        include: ["lib/**/*", "auth.ts", "auth.config.ts", "middleware.ts"], 
+        desc: 'Hệ thống lõi, Bảo mật & Helpers' 
+    },
+    { 
+        name: 'scripts.md', 
+        include: ["scripts/**/*"], 
+        desc: 'Toàn bộ Scripts tự động hóa' 
+    }
+];
+
+async function runExport() {
+    console.log('🚀 Đang đóng gói tri thức TOÀN DIỆN (Bản đảm bảo không sót code)...');
+
+    for (const mod of modules) {
+        console.log(`📦 Đang xuất Module: ${mod.desc}`);
+        const config = {
+            output: { 
+                filePath: path.join(OUTPUT_DIR, mod.name), 
+                style: "markdown", 
+                removeComments: true, 
+                removeEmptyLines: true, 
+                showLineNumbers: false 
+            },
+            include: mod.include,
+            exclude: [
+                "node_modules", ".next", ".git", "public", "source_md", 
+                "backups", "plan_temp", "*.md", "*.png", "*.jpg", "*.csv", 
+                "package-lock.json", "repomix.temp.json"
+            ]
+        };
+
+        fs.writeFileSync(TEMP_CONFIG, JSON.stringify(config, null, 2));
+        try {
+            execSync(`npx repomix --config ${TEMP_CONFIG}`, { stdio: 'inherit' });
+        } catch (error) {
+            console.error(`❌ Lỗi tại module ${mod.name}`);
+        }
+    }
+
+    if (fs.existsSync(TEMP_CONFIG)) fs.unlinkSync(TEMP_CONFIG);
+    console.log('\n✅ HOÀN TẤT! Toàn bộ mã nguồn quan trọng đã được đóng gói an toàn trong /source_md');
+}
+
+runExport();
+
+
+================================================================================
+END OF FILE: scripts\export-modules.ts
+================================================================================
