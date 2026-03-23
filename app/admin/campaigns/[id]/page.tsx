@@ -52,7 +52,7 @@ export default function CampaignDetailPage() {
       const res = await fetch(`/api/admin/campaigns/${id}/progress`);
       if (res.ok) {
         const data = await res.json();
-        setCampaign(prev => prev ? { ...prev, sentCount: data.sentCount, failedCount: data.failedCount, status: data.status } : null);
+        setCampaign((prev: typeof campaign) => prev ? { ...prev, sentCount: data.sentCount, failedCount: data.failedCount, status: data.status } : null);
         setProgress((data.sentCount / (data.totalRecipients || 1)) * 100);
       }
     } catch (err) {
