@@ -16,6 +16,7 @@ export async function GET() {
 
     return NextResponse.json(senders);
   } catch (error: any) {
-    return new NextResponse(error.message, { status: 500 });
+    console.error("[Senders List] Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -3,11 +3,240 @@ import { getOAuth2Client } from "@/lib/google-auth";
 import { decrypt } from "@/lib/email-encryptor";
 import { spinContent } from "@/lib/email-spin";
 import { google } from "googleapis";
+import { getEmailConfig, randomBetween, getEffectiveDailyLimit } from "@/lib/email-config";
+import { sendEmailCampaignNotification } from "@/lib/notifications";
 
 export interface Recipient {
   email: string;
   name?: string;
   userId?: number;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * RANDOM MESSAGE FOOTER - Lấy ngẫu nhiên từ bảng Message để chèn vào email
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+let cachedMessages: { content: string }[] | null = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000;
+
+export async function getRandomMessageFooter(): Promise<string> {
+  const now = Date.now();
+
+  if (!cachedMessages || now - lastCacheTime > CACHE_TTL) {
+    const messages = await prisma.message.findMany({
+      where: { isActive: true },
+      select: { content: true },
+    });
+    cachedMessages = messages;
+    lastCacheTime = now;
+  }
+
+  if (cachedMessages.length === 0) {
+    return "";
+  }
+
+  const randomIndex = Math.floor(Math.random() * cachedMessages.length);
+  const rawContent = cachedMessages[randomIndex].content;
+  const content = spinContent(rawContent);
+
+  return `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+    <p style="color: #6b7280; font-size: 12px; font-style: italic; margin: 0;">
+      — ${content}
+    </p>
+  </div>`;
+}
+
+export function injectFooter(html: string, footer: string): string {
+  const bodyCloseIndex = html.lastIndexOf('</body>');
+  if (bodyCloseIndex !== -1) {
+    return html.slice(0, bodyCloseIndex) + footer + html.slice(bodyCloseIndex);
+  }
+  return html + footer;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * SMART SENDER SELECTION - Chọn satellite với cooldown thông minh
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+export async function getAvailableSender(campaignId?: number): Promise<{
+  id: number;
+  email: string;
+  refreshToken: string;
+  clientId: string | null;
+  clientSecret: string | null;
+  isActive: boolean;
+  dailyLimit: number;
+  sentToday: number;
+  staggerDelayMin: number;
+  staggerDelayMax: number;
+  maxPerBatch: number;
+  cooldownUntil: Date | null;
+  createdAt: Date;
+} | null> {
+  const now = new Date();
+
+  const availableSenders = await prisma.emailSender.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { cooldownUntil: null },
+        { cooldownUntil: { lt: now } }
+      ]
+    },
+    orderBy: [
+      { cooldownUntil: 'asc' },
+      { sentToday: 'asc' }
+    ],
+  });
+
+  if (availableSenders.length === 0) {
+    return null;
+  }
+
+  const sendersWithQuota = availableSenders.filter(sender => {
+    const effectiveLimit = getEffectiveDailyLimit({
+      createdAt: sender.createdAt,
+      dailyLimit: sender.dailyLimit,
+      warmupPhase: sender.warmupPhase
+    });
+    return sender.sentToday < effectiveLimit;
+  });
+
+  if (sendersWithQuota.length === 0) {
+    return null;
+  }
+
+  const weights = sendersWithQuota.map(sender => {
+    const effectiveLimit = getEffectiveDailyLimit({
+      createdAt: sender.createdAt,
+      dailyLimit: sender.dailyLimit,
+      warmupPhase: sender.warmupPhase
+    });
+    return effectiveLimit - sender.sentToday;
+  });
+
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  let random = Math.random() * totalWeight;
+
+  for (let i = 0; i < sendersWithQuota.length; i++) {
+    random -= weights[i];
+    if (random <= 0) {
+      return sendersWithQuota[i] as any;
+    }
+  }
+
+  return sendersWithQuota[0] as any;
+}
+
+export async function updateSenderCooldown(senderId: number, minutes: number): Promise<void> {
+  const cooldownUntil = new Date(Date.now() + minutes * 60 * 1000);
+
+  await prisma.emailSender.update({
+    where: { id: senderId },
+    data: {
+      cooldownUntil,
+      lastUsedAt: new Date()
+    }
+  });
+}
+
+export async function incrementSenderSentCount(senderId: number): Promise<void> {
+  await prisma.emailSender.update({
+    where: { id: senderId },
+    data: {
+      sentToday: { increment: 1 }
+    }
+  });
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * BATCH CONTROL - Kiểm tra và xử lý pause/cooldown
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+export interface BatchStatus {
+  shouldPause: boolean;
+  emailsInBatch: number;
+  nextPauseAt: number;
+  pauseDuration: number;
+  nextResumeTime: string;
+}
+
+export async function checkBatchStatus(
+  senderId: number,
+  emailsSentSinceLastPause: number
+): Promise<BatchStatus> {
+  const sender = await prisma.emailSender.findUnique({
+    where: { id: senderId },
+    select: {
+      maxPerBatch: true,
+      staggerDelayMin: true,
+      staggerDelayMax: true,
+      pauseDurationMin: true,
+      pauseDurationMax: true,
+    }
+  });
+
+  const config = await getEmailConfig();
+
+  const maxPerBatch = sender?.maxPerBatch || 15;
+  const staggerDelayMin = sender?.staggerDelayMin || config.pauseDurationMin;
+  const staggerDelayMax = sender?.staggerDelayMax || config.pauseDurationMax;
+
+  const nextPauseAt = maxPerBatch;
+  const shouldPause = emailsSentSinceLastPause >= nextPauseAt;
+
+  const pauseDuration = randomBetween(
+    staggerDelayMin || config.pauseDurationMin,
+    staggerDelayMax || config.pauseDurationMax
+  );
+
+  const nextResumeTime = new Date(Date.now() + pauseDuration * 60 * 1000)
+    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  return {
+    shouldPause,
+    emailsInBatch: emailsSentSinceLastPause,
+    nextPauseAt,
+    pauseDuration,
+    nextResumeTime
+  };
+}
+
+export async function performCooldown(
+  campaignTitle: string,
+  senderId: number,
+  totalSent: number,
+  totalEmails: number,
+  successCount: number,
+  failCount: number,
+  pauseMinutes: number
+): Promise<void> {
+  await updateSenderCooldown(senderId, pauseMinutes);
+
+  const resumeTime = new Date(Date.now() + pauseMinutes * 60 * 1000)
+    .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  await sendEmailCampaignNotification({
+    event: 'PAUSE',
+    campaignTitle,
+    total: totalEmails,
+    sent: totalSent,
+    success: successCount,
+    failed: failCount,
+    pauseMinutes,
+    resumeTime
+  });
+
+  console.log(`[EmailCampaign] ⏸️ Pause ${pauseMinutes} phút. Tiếp tục lúc ${resumeTime}`);
+
+  await new Promise(resolve => setTimeout(resolve, pauseMinutes * 60 * 1000));
 }
 
 /**

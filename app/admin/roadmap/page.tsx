@@ -22,6 +22,7 @@ import {
   getCoursesForBuilder 
 } from '@/app/actions/roadmap-actions';
 import { surveyQuestions } from '@/lib/survey-data';
+import Link from 'next/link'
 import { Loader2, ArrowLeft, Plus, CheckCircle, Trash2, Edit3, Settings, Save, RefreshCw, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 // Định nghĩa các loại Node tùy chỉnh
@@ -242,14 +243,26 @@ const RoadmapBuilderContent = () => {
 
   // VIEW: LIST SURVYES
   if (view === 'LIST') return (
-    <div className="space-y-6 animate-in fade-in duration-500 text-black mx-auto px-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-2xl font-black uppercase tracking-tighter italic">Quản lý khảo sát</h2>
-        <button onClick={handleCreateNew} className="w-full md:w-auto bg-black text-yellow-400 px-6 py-3 rounded-2xl font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-xl">
-          <Plus className="w-4 h-4" /> Tạo bài mới
-        </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+        <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
+          <div className="flex items-center gap-3">
+            <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-xs font-medium">Quay ra</span>
+            </Link>
+            <h1 className="text-lg font-bold text-yellow-400">Lộ Trình</h1>
+          </div>
+        </div>
+      </header>
+      <div className="space-y-6 animate-in fade-in duration-500 text-black mx-auto px-4 py-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <h2 className="text-xl font-black uppercase tracking-tight">Quản lý khảo sát</h2>
+          <button onClick={handleCreateNew} className="w-full md:w-auto bg-black text-yellow-400 px-4 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg">
+            <Plus className="w-3 h-3" /> Tạo mới
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {surveys.map((survey) => (
           <div key={survey.id} className={`bg-white rounded-[2.5rem] p-6 border-2 transition-all ${survey.isActive ? 'border-green-500 shadow-xl' : 'border-gray-100'}`}>
             <div className="flex justify-between items-start mb-4">
@@ -271,6 +284,7 @@ const RoadmapBuilderContent = () => {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -113,7 +113,7 @@ export default function Header({ session, userImage }: { session: any, userImage
                                     </div>
                                     {session.user?.role === 'ADMIN' && (
                                         <Link
-                                            href="/admin/students"
+                                            href="/admin"
                                             onClick={() => setIsUserMenuOpen(false)}
                                             className="flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-400 hover:bg-zinc-800 transition-colors font-bold"
                                         >

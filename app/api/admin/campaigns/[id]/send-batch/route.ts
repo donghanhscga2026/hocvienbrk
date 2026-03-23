@@ -1,8 +1,22 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { resolveRecipients, sendGmailFromSender } from "@/lib/email-campaign-runner";
+import { 
+  resolveRecipients, 
+  sendGmailFromSender, 
+  getRandomMessageFooter, 
+  injectFooter,
+  getAvailableSender,
+  updateSenderCooldown,
+  incrementSenderSentCount,
+  checkBatchStatus,
+  performCooldown
+} from "@/lib/email-campaign-runner";
 import { spinContent } from "@/lib/email-spin";
+import { getEmailConfig, randomBetween } from "@/lib/email-config";
+import { sendEmailCampaignNotification } from "@/lib/notifications";
 import { NextResponse } from "next/server";
+
+let campaignStats: Map<number, { total: number; sent: number; success: number; failed: number; emailsInBatch: number }> = new Map();
 
 export async function POST(
   req: Request,
@@ -18,6 +32,7 @@ export async function POST(
 
   try {
     const { offset = 0, batchSize = 20 } = await req.json();
+    const config = await getEmailConfig();
 
     const campaign = await prisma.emailCampaign.findUnique({
       where: { id: campaignId },
@@ -32,7 +47,6 @@ export async function POST(
       return new NextResponse("Campaign not found", { status: 404 });
     }
 
-    // Lấy toàn bộ người nhận
     const allRecipients = await resolveRecipients(campaignId);
     const recipientsBatch = allRecipients.slice(offset, offset + batchSize);
 
@@ -40,35 +54,56 @@ export async function POST(
       return NextResponse.json({ success: true, finished: true });
     }
 
-    // Lấy danh sách Senders còn Quota
-    const activeSenders = await prisma.emailSender.findMany({
-      where: {
-        isActive: true,
-        sentToday: { lt: prisma.emailSender.fields.dailyLimit }
+    if (!campaignStats.has(campaignId)) {
+      campaignStats.set(campaignId, { total: allRecipients.length, sent: 0, success: 0, failed: 0, emailsInBatch: 0 });
+      
+      if (config.enableTelegramAlert) {
+        await sendEmailCampaignNotification({
+          event: 'START',
+          campaignTitle: campaign.title,
+          total: allRecipients.length,
+          sent: 0,
+          success: 0,
+          failed: 0
+        });
       }
-    });
-
-    if (activeSenders.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        error: "Không còn email sender nào đủ quota trong ngày hôm nay." 
-      }, { status: 400 });
     }
+
+    const stats = campaignStats.get(campaignId)!;
 
     const results = {
       sent: 0,
       failed: 0,
     };
 
-    // Gửi từng email trong batch
     for (let i = 0; i < recipientsBatch.length; i++) {
       const recipient = recipientsBatch[i];
-      
-      // Chọn sender theo Round-Robin đơn giản
-      const sender = activeSenders[i % activeSenders.length];
+
+      const sender = await getAvailableSender(campaignId);
+
+      if (!sender) {
+        console.log("[EmailCampaign] Không có sender khả dụng (hết quota hoặc đang cooldown)");
+        
+        if (config.enableTelegramAlert) {
+          await sendEmailCampaignNotification({
+            event: 'ERROR',
+            campaignTitle: campaign.title,
+            total: allRecipients.length,
+            sent: stats.sent,
+            success: stats.success,
+            failed: stats.failed,
+            error: 'Không có sender khả dụng'
+          });
+        }
+
+        return NextResponse.json({ 
+          success: false, 
+          error: "Tất cả email sender đã hết quota hoặc đang trong thời gian chờ.",
+          needsCooldown: true
+        }, { status: 429 });
+      }
 
       try {
-        // --- KIỂM TRA ĐỊA CHỈ EMAIL ---
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!recipient.email || !emailRegex.test(recipient.email)) {
           await prisma.emailCampaignLog.create({
@@ -81,10 +116,10 @@ export async function POST(
             }
           });
           results.failed++;
+          stats.failed++;
           continue;
         }
 
-        // Kiểm tra Blacklist
         const isBlacklisted = await prisma.emailBlacklist.findUnique({
           where: { email: recipient.email }
         });
@@ -98,27 +133,28 @@ export async function POST(
               errorType: "BLACKLISTED",
             }
           });
-          results.sent++; // Tính là đã xử lý
+          stats.sent++;
+          results.sent++;
           continue;
         }
 
-        // --- CÁ NHÂN HÓA ---
-        // GHI CHÚ: Subject và Content cần được xử lý spin và replace trước khi gửi qua Gmail API
         let subject = spinContent(campaign.subject || "").trim();
         subject = subject.replace(/\[Tên\]/g, recipient.name || "Học viên");
         subject = subject.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
 
-        // Nội dung HTML
         let rawHtml = spinContent(campaign.htmlContent || "").trim();
         rawHtml = rawHtml.replace(/\[Tên\]/g, recipient.name || "bạn");
         rawHtml = rawHtml.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
         
-        // Tự động chuyển xuống dòng nếu người dùng không dùng thẻ HTML
         if (!rawHtml.includes('<p>') && !rawHtml.includes('<br')) {
           rawHtml = rawHtml.replace(/\n/g, '<br/>');
         }
 
-        // --- WRAP TRONG TEMPLATE CHUYÊN NGHIỆP ---
+        if (config.enableRandomMessageFooter) {
+          const footer = await getRandomMessageFooter();
+          rawHtml = injectFooter(rawHtml, footer);
+        }
+
         const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}`;
         
         const finalHtml = `
@@ -143,10 +179,8 @@ export async function POST(
           </div>
         `;
         
-        // Gửi qua Gmail API
         await sendGmailFromSender(sender, recipient.email, subject, finalHtml);
 
-        // Lưu Log Thành công
         await prisma.emailCampaignLog.create({
           data: {
             campaignId,
@@ -156,22 +190,49 @@ export async function POST(
           }
         });
 
-        // Cập nhật Quota của sender
-        await prisma.emailSender.update({
-          where: { id: sender.id },
-          data: { sentToday: { increment: 1 } }
-        });
-
+        await incrementSenderSentCount(sender.id);
+        stats.sent++;
+        stats.success++;
+        stats.emailsInBatch++;
         results.sent++;
-        
-        // Delay 1000ms (1 giây) giữa mỗi email để Gmail không block
-        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const batchStatus = await checkBatchStatus(sender.id, stats.emailsInBatch);
+
+        if (batchStatus.shouldPause) {
+          console.log(`[EmailCampaign] Đã gửi ${stats.emailsInBatch} emails. Bắt đầu pause ${batchStatus.pauseDuration} phút.`);
+          
+          stats.emailsInBatch = 0;
+
+          await performCooldown(
+            campaign.title,
+            sender.id,
+            stats.sent,
+            allRecipients.length,
+            stats.success,
+            stats.failed,
+            batchStatus.pauseDuration
+          );
+
+          if (config.enableTelegramAlert) {
+            await sendEmailCampaignNotification({
+              event: 'RESUME',
+              campaignTitle: campaign.title,
+              total: allRecipients.length,
+              sent: stats.sent,
+              success: stats.success,
+              failed: stats.failed
+            });
+          }
+        } else {
+          const delay = randomBetween(config.interEmailDelayMin, config.interEmailDelayMax);
+          await new Promise(resolve => setTimeout(resolve, delay * 1000));
+        }
 
       } catch (error: any) {
         console.error(`Gửi email thất bại tới ${recipient.email}:`, error);
         results.failed++;
+        stats.failed++;
 
-        // Lưu Log Thất bại
         await prisma.emailCampaignLog.create({
           data: {
             campaignId,
@@ -184,7 +245,6 @@ export async function POST(
       }
     }
 
-    // Cập nhật tiến độ Campaign
     await prisma.emailCampaign.update({
       where: { id: campaignId },
       data: {
@@ -196,12 +256,32 @@ export async function POST(
       }
     });
 
+    if (offset + recipientsBatch.length >= allRecipients.length) {
+      campaignStats.delete(campaignId);
+
+      if (config.enableTelegramAlert) {
+        await sendEmailCampaignNotification({
+          event: 'COMPLETE',
+          campaignTitle: campaign.title,
+          total: allRecipients.length,
+          sent: allRecipients.length,
+          success: stats.success,
+          failed: stats.failed
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       sentInBatch: results.sent,
       failedInBatch: results.failed,
       nextOffset: offset + batchSize,
-      finished: offset + recipientsBatch.length >= allRecipients.length
+      finished: offset + recipientsBatch.length >= allRecipients.length,
+      stats: {
+        totalSent: stats.sent,
+        totalSuccess: stats.success,
+        totalFailed: stats.failed
+      }
     });
 
   } catch (error: any) {

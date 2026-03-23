@@ -1,4 +1,6 @@
 
+import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 import { deleteReservedIdAction, getReservedIds } from "@/app/actions/admin-actions"
 import { AddReservedIdForm } from "./add-form"
 import { ChangeUserIdForm } from "./change-id-form"
@@ -7,13 +9,26 @@ export default async function ReservedIdsPage() {
     const reservedIds = await getReservedIds()
 
     return (
-        <div className="space-y-8">
-            <div>
-                <h2 className="text-2xl font-bold mb-4 text-gray-800">💎 Cấp số đẹp cho Học viên</h2>
-                <ChangeUserIdForm />
-            </div>
+        <div className="min-h-screen bg-gray-50">
+            <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+                <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
+                    <div className="flex items-center gap-3">
+                        <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
+                            <ArrowLeft className="h-4 w-4" />
+                            <span className="text-xs font-medium">Quay ra</span>
+                        </Link>
+                        <h1 className="text-lg font-bold text-yellow-400">💎 Số Đẹp</h1>
+                    </div>
+                </div>
+            </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="p-4 max-w-4xl mx-auto space-y-8">
+                <div>
+                    <h2 className="text-xl font-bold mb-4 text-gray-800">Cấp số đẹp cho Học viên</h2>
+                    <ChangeUserIdForm />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Cột Trái: Danh sách */}
                 <div>
                     <h3 className="text-xl font-bold mb-4 text-gray-800">Danh sách ID Đã giữ ({reservedIds.length})</h3>
@@ -56,6 +71,7 @@ export default async function ReservedIdsPage() {
                     <h3 className="text-xl font-bold mb-4 text-gray-800">Giữ thêm số mới</h3>
                     <AddReservedIdForm />
                 </div>
+            </div>
             </div>
         </div>
     )

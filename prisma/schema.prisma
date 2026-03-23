@@ -40,19 +40,28 @@ model User {
 }
 
 model EmailSender {
-  id            Int      @id @default(autoincrement())
-  label         String                    // Tên gợi nhớ (VD: "Vệ tinh 01")
-  email         String   @unique
-  isMain        Boolean  @default(false)  // Email chính hocvienbrk@gmail.com
-  clientId      String                    // GMAIL_CLIENT_ID (Lưu chung hoặc riêng tùy chọn, ở đây cho phép lưu riêng nếu cần)
-  clientSecret  String?                   // Mã hóa AES-256
-  refreshToken  String   @db.Text         // Mã hóa AES-256
-  dailyLimit    Int      @default(480)    // Giới hạn gửi /ngày (an toàn dưới 500)
-  sentToday     Int      @default(0)      // Đếm số đã gửi hôm nay
-  lastResetAt   DateTime @default(now())  // Ngày reset sentToday
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  campaigns     EmailCampaignSender[]
+  id              Int      @id @default(autoincrement())
+  label           String                    // Tên gợi nhớ (VD: "Vệ tinh 01")
+  email           String   @unique
+  isMain          Boolean  @default(false)  // Email chính hocvienbrk@gmail.com
+  clientId        String                    // GMAIL_CLIENT_ID (Lưu chung hoặc riêng tùy chọn, ở đây cho phép lưu riêng nếu cần)
+  clientSecret    String?                   // Mã hóa AES-256
+  refreshToken    String   @db.Text         // Mã hóa AES-256
+  dailyLimit      Int      @default(480)    // Giới hạn gửi /ngày (an toàn dưới 500)
+  sentToday       Int      @default(0)      // Đếm số đã gửi hôm nay
+  lastResetAt     DateTime @default(now())  // Ngày reset sentToday
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  // Email Delivery Optimization fields
+  staggerDelayMin    Int       @default(5)    // Phút chờ riêng (stagger) - tối thiểu
+  staggerDelayMax    Int       @default(15)   // Phút chờ riêng - tối đa  
+  maxPerBatch        Int       @default(20)   // Số mail mỗi lần trước khi stagger (tăng từ 15 lên 20)
+  pauseDurationMin   Int       @default(10)   // Phút pause tối thiểu giữa các batch (giảm từ 15 xuống 10)
+  pauseDurationMax   Int       @default(30)    // Phút pause tối đa giữa các batch
+  warmupPhase        Int       @default(0)    // 0=ready, 1-4=warmup weeks (sẽ auto tính theo createdAt)
+  lastUsedAt         DateTime?               // Thời gian gửi email cuối cùng
+  cooldownUntil      DateTime?               // Thời gian được phép gửi tiếp (sau khi cooldown)
+  campaigns          EmailCampaignSender[]
 }
 
 model EmailCampaign {

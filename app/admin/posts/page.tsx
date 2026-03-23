@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getPostsAction, createPostAction } from '@/app/actions/post-actions'
-import { Plus, Newspaper, Save, Loader2, Image as ImageIcon, X, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { getPostsAction, createPostAction } from '@/app/actions/post-actions'
+import { Plus, Newspaper, Save, Loader2, Image as ImageIcon, X, Trash2, ArrowLeft } from 'lucide-react'
 
 export default function AdminPostsPage() {
     const [posts, setPosts] = useState<any[]>([])
@@ -44,21 +44,33 @@ export default function AdminPostsPage() {
     }
 
     return (
-        <div className="space-y-6 pb-20">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 leading-tight">Bảng tin</h1>
-                    <p className="text-gray-500 text-xs font-medium">Quản lý bài viết cộng đồng</p>
+        <div className="min-h-screen bg-gray-50">
+            <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+                <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
+                    <div className="flex items-center gap-3">
+                        <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
+                            <ArrowLeft className="h-4 w-4" />
+                            <span className="text-xs font-medium">Quay ra</span>
+                        </Link>
+                        <h1 className="text-lg font-bold text-yellow-400">Bảng Tin</h1>
+                    </div>
+                    <button 
+                        onClick={() => setShowCreate(!showCreate)}
+                        className="bg-yellow-400 text-black p-2 rounded-xl"
+                    >
+                        {showCreate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
                 </div>
-                <button 
-                    onClick={() => setShowCreate(!showCreate)}
-                    className="bg-black text-yellow-400 p-2.5 rounded-2xl shadow-lg active:scale-95 transition-all"
-                >
-                    {showCreate ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                </button>
-            </div>
+            </header>
 
-            {/* Form Đăng bài mới */}
+            <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
+                <div className="flex items-center justify-between mt-4">
+                    <div>
+                        <p className="text-gray-600 text-sm">Quản lý bài viết cộng đồng</p>
+                    </div>
+                </div>
+
+                {/* Form Đăng bài mới */}
             {showCreate && (
                 <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-purple-100 animate-in slide-in-from-top-4 duration-300">
                     <h2 className="text-lg font-black text-gray-900 mb-4 uppercase tracking-tight flex items-center gap-2">
@@ -156,6 +168,7 @@ export default function AdminPostsPage() {
                         </tbody>
                     </table>
                 </div>
+            </div>
             </div>
         </div>
     )

@@ -1,18 +1,14 @@
 import { auth } from "@/auth"
-import { Role } from "@prisma/client"
 import { redirect } from "next/navigation"
+import EmailSettingsClient from "./EmailSettingsClient"
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function EmailSettingsPage() {
   const session = await auth()
 
   if (!session?.user) redirect("/login")
-  if (session.user.role !== Role.ADMIN) {
+  if ((session.user as any).role !== "ADMIN") {
     return <div className="p-10 text-center text-red-600 font-bold">403 - KHÔNG CÓ QUYỀN TRUY CẬP</div>
   }
 
-  return <>{children}</>
+  return <EmailSettingsClient />
 }

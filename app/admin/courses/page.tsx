@@ -22,18 +22,30 @@ export default function AdminCoursesPage() {
     }, [])
 
     return (
-        <div className="space-y-6 pb-20">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 leading-tight">Khóa học</h1>
-                    <p className="text-gray-500 text-xs font-medium">Quản lý nội dung & học phí</p>
+        <div className="min-h-screen bg-gray-50">
+            <header className="bg-black text-white shadow-lg sticky top-0 z-50">
+                <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
+                    <div className="flex items-center gap-3">
+                        <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
+                            <ArrowLeft className="h-4 w-4" />
+                            <span className="text-xs font-medium">Quay ra</span>
+                        </Link>
+                        <h1 className="text-lg font-bold text-yellow-400">Khóa Học</h1>
+                    </div>
+                    <button className="bg-yellow-400 text-black p-2 rounded-xl">
+                        <Plus className="w-4 h-4" />
+                    </button>
                 </div>
-                <button className="bg-black text-yellow-400 p-2.5 rounded-2xl shadow-lg active:scale-95 transition-all">
-                    <Plus className="w-5 h-5" />
-                </button>
-            </div>
+            </header>
 
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
+                <div className="flex items-center justify-between mt-4">
+                    <div>
+                        <p className="text-gray-600 text-sm">Quản lý nội dung & học phí</p>
+                    </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                 <div className="w-full">
                     <table className="w-full text-left border-collapse table-fixed">
                         <thead>
@@ -98,6 +110,7 @@ export default function AdminCoursesPage() {
                         </tbody>
                     </table>
                 </div>
+            </div>
             </div>
         </div>
     )
