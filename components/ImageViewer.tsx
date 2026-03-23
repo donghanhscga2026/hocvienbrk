@@ -9,6 +9,7 @@ export default function ImageViewer() {
   const dragging = useRef(false)
   const lastPos = useRef({ x: 0, y: 0 })
   const imgRef = useRef<HTMLImageElement | null>(null)
+  const positionRef = useRef({ x: 0, y: 0 }) // [OPTIMIZE] Dùng ref cho tọa độ để tránh re-render
 
   // Click ảnh trong prose
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function ImageViewer() {
       setSrc(img.src)
       setScale(1)
       setPosition({ x: 0, y: 0 })
+      positionRef.current = { x: 0, y: 0 }
     }
 
     document.addEventListener("click", handleClick)
@@ -49,20 +51,30 @@ export default function ImageViewer() {
     lastPos.current = { x: e.clientX, y: e.clientY }
   }
 
+  // [OPTIMIZE] Can thiệp DOM trực tiếp, không re-render
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!dragging.current) return
     const dx = e.clientX - lastPos.current.x
     const dy = e.clientY - lastPos.current.y
 
-    setPosition((prev) => ({
-      x: prev.x + dx,
-      y: prev.y + dy,
-    }))
+    // Cập nhật ref và DOM trực tiếp
+    positionRef.current = {
+      x: positionRef.current.x + dx,
+      y: positionRef.current.y + dy,
+    }
+
+    if (imgRef.current) {
+      imgRef.current.style.transform = `translate(${positionRef.current.x}px, ${positionRef.current.y}px) scale(${scale})`
+    }
 
     lastPos.current = { x: e.clientX, y: e.clientY }
   }
 
+  // [OPTIMIZE] Chỉ cập nhật state khi kết thúc drag
   const handleMouseUp = () => {
+    if (dragging.current) {
+      setPosition({ ...positionRef.current })
+    }
     dragging.current = false
   }
 
@@ -72,6 +84,7 @@ export default function ImageViewer() {
     } else {
       setScale(1)
       setPosition({ x: 0, y: 0 })
+      positionRef.current = { x: 0, y: 0 }
     }
   }
 
@@ -114,6 +127,10 @@ export default function ImageViewer() {
             onClick={() => {
               setScale(1)
               setPosition({ x: 0, y: 0 })
+              positionRef.current = { x: 0, y: 0 }
+              if (imgRef.current) {
+                imgRef.current.style.transform = "translate(0px, 0px) scale(1)"
+              }
             }}
             className="bg-white text-black px-3 py-1 rounded shadow"
           >

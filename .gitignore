@@ -45,3 +45,13 @@ nul
 
 # Local backups
 /backups/
+
+# Temp folders and bundles
+/plan_temp/
+/notebooklm_txt_bundles/
+/code_txt/
+
+# Documentation and history (MD files)
+*.md
+!README.md # Giữ lại README.md nếu bạn muốn, nếu không thì bỏ dòng này
+

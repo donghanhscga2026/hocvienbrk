@@ -8,7 +8,7 @@ function Write-Green { param($msg) Write-Host "`n[OK] $msg" -ForegroundColor Gre
 function Write-Yellow { param($msg) Write-Host "`n[WAIT] $msg" -ForegroundColor Yellow }
 function Write-Red { param($msg) Write-Host "`n[ERROR] $msg" -ForegroundColor Red }
 
-Write-Yellow "=== Bat dau quy trinh dong bo GitHub ==="
+Write-Yellow "=== Bat dau quy trinh dong bo GitHub (Da loai bo file tam & .md) ==="
 
 # Bước 1: Kiểm tra thay đổi nội bộ
 $status = git status --porcelain
@@ -16,7 +16,7 @@ if (-not $status) {
     Write-Red "Khong co thay doi nao de commit. Dang kiem tra code moi tu GitHub..."
 } else {
     # Bước 2: Commit các thay đổi hiện tại
-    Write-Yellow "Dang luu lai cac thay doi cua ban..."
+    Write-Yellow "Dang luu lai cac thay doi cua ban (Bo qua /backups/, /plan_temp/, /code_txt/, *.md)..."
     git add -A
     
     $changedFiles = git diff --cached --name-only
