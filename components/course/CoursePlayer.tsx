@@ -275,6 +275,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 initialMaxTime={currentProgress?.maxTime || 0}
                                 playlistData={currentProgress?.scores?.playlist}
                                 lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
+                                serverPlaylist={currentLesson?.playlist} // [OPTIMIZE] Truyền playlist đã parse từ Server
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                             />
