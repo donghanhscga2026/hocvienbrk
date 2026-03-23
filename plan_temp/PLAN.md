@@ -4,7 +4,7 @@
 
 1. **KHÔNG VIẾT LẠI TOÀN BỘ FILE** - Chỉ edit đúng phần cần tối ưu
 2. **LUÔN LƯU BACKUP TRƯỚC KHI SỬA** - File gốc vào plan_temp
-3. **SO SÁNH CODE CŨ VỚI MỚI** - Trước khi xác nhận hoàn thành
+3. **SO SÁNH CODE CŨ VỚI MỚI** - Trước khi xác nhận hoàn thành phải so sánh với backup
 4. **TEST VÀ XÁC NHẬN** - Mỗi bước xong phải chờ user xác nhận mới làm tiếp
 5. **TUÂN THỦ NGUYÊN TẮC** - Không làm mất tính năng đang hoạt động
 
@@ -185,18 +185,17 @@ Bước 10: Campaign - Virtual Scrolling + Progress API      [Phức tạp]
 |------|------------|---------|
 | 1 | ✅ Hoàn thành | Course Player - Xóa dynamic, parse playlist server-side |
 | 2 | ✅ Hoàn thành | ImageViewer - Fix pan/zoom lag, dùng useRef + DOM direct |
-| 3 | ✅ Hoàn thành | Next.js Image - Bật tối ưu, xóa unoptimized |
+| 3 | ⚠️ Tạm hoãn | Next.js Image - unoptimized do lỗi domain config |
 | 4 | ✅ Hoàn thành | Home Page - Fix waterfall, enrollments vào Promise.all |
-| 5 | ⚠️ Cần test | Admin Students - Server pagination (cần user xác nhận) |
-| 6 | ⏳ Chờ xác nhận | Roadmap Builder |
-| 7 | ⏳ Chờ xác nhận | Community Board |
-| 8 | ⏳ Chờ xác nhận | Email Settings |
-| 9 | ⏳ Chờ xác nhận | Auto-verify |
-| 10 | ⏳ Chờ xác nhận | Campaign |
+| 5 | ⚠️ Cần test | Admin Students - Server pagination (đã test, chờ user xác nhận) |
+| 6 | ✅ Hoàn thành | Roadmap Builder - Tách API, không tải flow khi list |
+| 7 | ✅ Hoàn thành | Community Board - Thêm limit, pagination |
+| 8 | ✅ Hoàn thành | Email Settings - Server fetch, không flash |
+| 9 | ✅ Hoàn thành | Auto-verify - Fix DB query order |
+| 10 | ⏭️ Bỏ qua | Campaign - Không có polling trong code hiện tại |
 
 ---
 
 ## NGÀY CẬP NHẬT
 - Created: 2026-03-24
-- Bước 1-4 hoàn thành: 2026-03-24
-- Bước 5 cần test: 2026-03-24
+- Hoàn thành 9 bước: 2026-03-24

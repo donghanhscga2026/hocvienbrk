@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { ArrowLeft, RefreshCw, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+import { getEmailConfig } from "@/lib/email-config"
+
 interface EmailConfig {
   emailsBeforePauseMin: number
   emailsBeforePauseMax: number
@@ -17,12 +19,16 @@ interface EmailConfig {
   enableRandomMessageFooter: boolean
 }
 
-export default function EmailSettingsClient() {
+interface EmailSettingsClientProps {
+  initialConfig?: EmailConfig
+}
+
+export default function EmailSettingsClient({ initialConfig }: EmailSettingsClientProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
-  const [config, setConfig] = useState<EmailConfig>({
+  const [config, setConfig] = useState<EmailConfig>(initialConfig || {
     emailsBeforePauseMin: 30,
     emailsBeforePauseMax: 50,
     pauseDurationMin: 10,
@@ -34,8 +40,14 @@ export default function EmailSettingsClient() {
     enableRandomMessageFooter: false
   })
 
+  // [OPTIMIZE] Nếu có initialConfig từ Server thì không cần fetch lại
   useEffect(() => {
-    fetchData()
+    if (initialConfig) {
+      setConfig(initialConfig)
+      setIsLoading(false)
+    } else {
+      fetchData()
+    }
   }, [])
 
   async function fetchData() {

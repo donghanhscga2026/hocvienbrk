@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import EmailSettingsClient from "./EmailSettingsClient"
+import { getEmailConfig } from "@/lib/email-config"
 
 export default async function EmailSettingsPage() {
   const session = await auth()
@@ -10,5 +11,8 @@ export default async function EmailSettingsPage() {
     return <div className="p-10 text-center text-red-600 font-bold">403 - KHÔNG CÓ QUYỀN TRUY CẬP</div>
   }
 
-  return <EmailSettingsClient />
+  // [OPTIMIZE] Fetch config trên Server, không cần useEffect ở client
+  const emailConfig = await getEmailConfig()
+
+  return <EmailSettingsClient initialConfig={emailConfig} />
 }
