@@ -87,7 +87,7 @@ export default function CampaignList({ initialCampaigns }: CampaignListProps) {
           </div>
 
           <div className="flex gap-2">
-            <Link href={`/admin/campaigns/${cp.id}`} className="flex-1">
+            <Link href={`/admin/campaigns/${cp.id}`} prefetch={false} className="flex-1">
               <Button className="w-full bg-black text-white text-sm font-bold rounded-lg py-2">
                 {cp.status === "DRAFT" ? "Soạn" : "Xem"}
               </Button>

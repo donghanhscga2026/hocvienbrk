@@ -16,9 +16,6 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    // [OPTIMIZE] Tạm thời tắt tối ưu ảnh để tránh lỗi 400 - có thể bật lại sau khi config đầy đủ domain
-    unoptimized: true,
-
     // Cấu hình các mức chất lượng được phép
     qualities: [50, 70, 75, 80, 90],
 

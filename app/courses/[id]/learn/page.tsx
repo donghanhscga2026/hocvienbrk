@@ -43,7 +43,7 @@ export default async function CourseLearnPage({
 
   const userId = Number(session.user.id)
 
-  // 🔥 BƯỚC 1: lấy course trước
+  // Lấy course trước (để kiểm tra tồn tại)
   const course = await prisma.course.findUnique({
     where: { id_khoa: id },
     select: { id: true },
@@ -51,7 +51,7 @@ export default async function CourseLearnPage({
 
   if (!course) redirect(`/courses/${id}`)
 
-  // 🔥 BƯỚC 2: lấy enrollment bằng courseId
+  // Lấy enrollment bằng courseId (giữ nguyên query gốc)
   const enrollment = await prisma.enrollment.findUnique({
     where: {
       userId_courseId: {

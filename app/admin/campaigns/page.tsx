@@ -32,7 +32,7 @@ export default async function CampaignsPage() {
             </Link>
             <h1 className="text-lg font-bold text-yellow-400">Email MKT</h1>
           </div>
-          <Link href="/admin/campaigns/new">
+          <Link href="/admin/campaigns/new" prefetch={false}>
             <Button className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold text-sm rounded-lg px-3 py-2">
               + Tạo Mới
             </Button>
