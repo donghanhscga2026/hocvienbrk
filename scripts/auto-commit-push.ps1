@@ -11,20 +11,29 @@ function Write-Red { param($msg) Write-Host "`n[ERROR] $msg" -ForegroundColor Re
 Write-Yellow "=== Bat dau quy trinh dong bo GitHub (Da loai bo file tam & .md) ==="
 
 # Bước 1: Kiểm tra thay đổi nội bộ
+# Kiểm tra xem có file nào thay đổi mà không thuộc danh sách bỏ qua không
 $status = git status --porcelain
+
 if (-not $status) {
     Write-Red "Khong co thay doi nao de commit. Dang kiem tra code moi tu GitHub..."
 } else {
     # Bước 2: Commit các thay đổi hiện tại
-    Write-Yellow "Dang luu lai cac thay doi cua ban (Bo qua /backups/, /plan_temp/, /code_txt/, *.md)..."
-    git add -A
+    Write-Yellow "Dang luu lai cac thay doi cua ban (Tu dong bo qua file tam theo .gitignore)..."
+    
+    # Sử dụng git add . để tuân thủ chặt chẽ .gitignore
+    # Nếu muốn chắc chắn hơn, ta có thể dùng git add (git ls-files -m -o --exclude-standard)
+    git add .
     
     $changedFiles = git diff --cached --name-only
-    $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
-    $commitMsg = if ($fileNames.Length -gt 80) { $fileNames.Substring(0, 77) + "..." } else { "cap nhat: $fileNames" }
-    
-    git commit -m $commitMsg
-    Write-Green "Da Commit: $commitMsg"
+    if (-not $changedFiles) {
+        Write-Yellow "Tat ca thay doi deu thuoc danh sach bo qua (.gitignore). Khong co gi de commit."
+    } else {
+        $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
+        $commitMsg = if ($fileNames.Length -gt 80) { $fileNames.Substring(0, 77) + "..." } else { "cap nhat: $fileNames" }
+        
+        git commit -m $commitMsg
+        Write-Green "Da Commit: $commitMsg"
+    }
 }
 
 # Bước 3: QUAN TRỌNG - Kéo code mới về trước khi đẩy lên (Tránh lỗi Rejected)
