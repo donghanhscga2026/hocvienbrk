@@ -82,6 +82,17 @@ const [granularProgress, setGranularProgress] = useState<Record<number, {maxTime
 const saveIntervalRef = useRef<any>(null)
 const docTimerRef = useRef<any>(null)
 const currentItem = playlist[currentIndex]
+    
+    if (!currentItem) {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+                <div className="text-center p-8">
+                    <FileText className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+                    <p className="text-zinc-400 font-bold">Chưa có nội dung bài học</p>
+                </div>
+            </div>
+        )
+    }
 
 useEffect(() => { setIsMounted(true) }, [])
 
