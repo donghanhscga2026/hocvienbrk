@@ -16,8 +16,10 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    // Cấu hình các mức chất lượng được phép
-    qualities: [50, 70, 75, 80, 90],
+    // Tắt Image Optimization để tránh lỗi private IP với i.postimg.cc
+    unoptimized: true,
+    // Các mức quality được phép
+    qualities: [50, 60, 70, 75, 80, 85, 90],
 
     // Chỉ cho phép domain ảnh thực sự dùng
     remotePatterns: [
@@ -55,11 +57,6 @@ const nextConfig: NextConfig = {
       }
     ],
 
-    // Format ảnh hiện đại
-    formats: ["image/avif", "image/webp"],
-
-    // Cache ảnh lâu hơn
-    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 ngày
   },
 
   // Tắt source map production để giảm bundle
