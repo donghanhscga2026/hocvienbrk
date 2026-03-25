@@ -77,6 +77,7 @@ export default async function CourseLearnPage({
               title: true,
               order: true,
               videoUrl: true,
+              content: true,
               isDailyChallenge: true,
             },
             orderBy: { order: "asc" },
