@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Settings, Radio, Bell } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Settings, Radio, Bell, Youtube } from 'lucide-react'
 
 const menuItems = [
   { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard },
@@ -10,6 +10,7 @@ const menuItems = [
   { label: 'Số Đẹp', href: '/admin/reserved-ids', icon: Gem },
   { label: 'Thành Viên', href: '/admin/students', icon: Users },
   { label: 'Khóa Học', href: '/admin/courses', icon: BookOpen },
+  { label: 'YouTube', href: '/admin/youtube-tools', icon: Youtube },
   { label: 'Cài Đặt', href: '/admin/settings', icon: Settings },
   { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map },
   { label: 'Chiến Dịch Email', href: '/admin/campaigns', icon: Mail },

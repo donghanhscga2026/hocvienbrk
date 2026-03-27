@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, Settings, ArrowLeft } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, Settings, ArrowLeft, Youtube } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const menuItems = [
@@ -10,6 +10,7 @@ const menuItems = [
   { label: 'Số Đẹp', href: '/admin/reserved-ids', icon: Gem, color: 'bg-purple-500' },
   { label: 'Thành Viên', href: '/admin/students', icon: Users, color: 'bg-cyan-500' },
   { label: 'Khóa Học', href: '/admin/courses', icon: BookOpen, color: 'bg-orange-500' },
+  { label: 'YouTube', href: '/admin/youtube-tools', icon: Youtube, color: 'bg-red-600' },
   { label: 'Cài Đặt', href: '/admin/settings', icon: Settings, color: 'bg-gray-500' },
   { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map, color: 'bg-teal-500' },
   { label: 'Email MKT', href: '/admin/campaigns', icon: Mail, color: 'bg-red-500' },
