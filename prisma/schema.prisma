@@ -402,3 +402,15 @@ model Payment {
   updatedAt       DateTime       @updatedAt
   enrollment      Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
 }
+
+model YouTubeToken {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @unique
+  channelId    String?
+  channelTitle String?
+  accessToken  String    @db.Text
+  refreshToken String    @db.Text
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
