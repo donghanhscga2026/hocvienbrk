@@ -4,6 +4,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Flag, Lock, CheckCircle2, ChevronRight, Play, Info, Sparkles, Trophy, Target, ArrowRight, X, PlayCircle, BookOpen, RefreshCw, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { enrollInCourseAction } from '@/app/actions/course-actions'
 
 interface RealityMapProps {
     customPath: number[]
@@ -95,7 +96,36 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
     const [activeStage, setActiveStage] = useState<number | null>(null)
     const [selectedCourse, setSelectedCourse] = useState<any>(null)
     const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+    const [enrollingCourseId, setEnrollingCourseId] = useState<number | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+
+    const handleCourseClick = async (course: any, enrollment: any) => {
+        const isActive = enrollment?.status === 'ACTIVE'
+        const isCompleted = enrollment?.status === 'COMPLETED'
+        const isPending = enrollment?.status === 'PENDING'
+
+        if (isActive || isCompleted) {
+            window.location.href = `/courses/${course.id_khoa}/learn`
+        } else if (isPending) {
+            setSelectedCourse({ ...course, enrollment })
+        } else {
+            setEnrollingCourseId(course.id)
+            try {
+                const res = await enrollInCourseAction(course.id)
+                if (res.success) {
+                    if (res.status === 'ACTIVE') {
+                        window.location.href = `/courses/${course.id_khoa}/learn`
+                    } else if (res.status === 'PENDING') {
+                        window.location.href = `/?paymentCourseId=${course.id}#khoa-hoc`
+                    }
+                }
+            } catch (err: any) {
+                alert(err.message || 'Có lỗi xảy ra khi đăng ký khóa học.')
+            } finally {
+                setEnrollingCourseId(null)
+            }
+        }
+    }
 
     // ─── ĐỘNG HÓA CHẶNG ĐƯỜNG (STAGES) ──────────────────────────
     const stages = useMemo(() => {
@@ -385,9 +415,17 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         const progressPercent = isCompleted ? 100 : (enrollment?.completedCount / enrollment?.totalLessons) * 100 || 0
 
                         return (
-                            <div key={courseId} onClick={() => setSelectedCourse({ ...course, enrollment })}
-                                // Sửa tính năng: Khóa được chọn không đổi nền, chỉ lóe viền vàng (border-yellow-400) theo yêu cầu
-                                className={`group relative aspect-[23/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-700' : 'bg-zinc-300'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/50 scale-105 z-10' : 'border-black'}`} style={{ animationDelay: `${index * 50}ms` }}>
+                            <div 
+                                key={courseId} 
+                                onClick={() => handleCourseClick(course, enrollment)}
+                                className={`group relative aspect-[23/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-700' : 'bg-zinc-300'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/50 scale-105 z-10' : 'border-black'}`} 
+                                style={{ animationDelay: `${index * 50}ms` }}
+                            >
+                                {enrollingCourseId === courseId && (
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-30">
+                                        <Loader2 className="w-6 h-6 animate-spin text-white" />
+                                    </div>
+                                )}
 
                                 {/* Lớp màu xanh lá hiển thị tiến độ học tập (phủ từ trái sang) */}
                                 {(isActive || isCompleted) && (

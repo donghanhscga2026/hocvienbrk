@@ -9,17 +9,27 @@ import Link from 'next/link'
 function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
     const [file, setFile] = useState<any>(null)
     const [mode, setMode] = useState<'upsert' | 'skip'>('upsert')
+    const [sourceType, setSourceType] = useState<'file' | 'sheet'>('file')
+    const [sheetUrl, setSheetUrl] = useState('')
     const [importing, setImporting] = useState(false)
     const [result, setResult] = useState<any>(null)
 
     const handleImport = async () => {
-        if (!file) return
+        if (sourceType === 'file' && !file) return
+        if (sourceType === 'sheet' && !sheetUrl) return
+        
         setImporting(true)
         setResult(null)
         
         const formData = new FormData()
-        formData.append('file', file)
         formData.append('mode', mode)
+        formData.append('sourceType', sourceType)
+        
+        if (sourceType === 'file') {
+            formData.append('file', file)
+        } else {
+            formData.append('sheetUrl', sheetUrl)
+        }
 
         try {
             const res = await fetch(`/api/courses/${courseId}/lessons/import`, {
@@ -51,14 +61,41 @@ function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId: strin
                     </a>
                     
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File CSV</label>
-                        <input 
-                            type="file" 
-                            accept=".csv"
-                            onChange={(e) => setFile(e.target.files?.[0] || null)}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700"
-                        />
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nguồn dữ liệu</label>
+                        <div className="flex gap-3">
+                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${sourceType === 'file' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
+                                <input type="radio" name="source" value="file" checked={sourceType === 'file'} onChange={() => setSourceType('file')} className="hidden" />
+                                <span className={`text-xs font-bold ${sourceType === 'file' ? 'text-purple-700' : 'text-gray-500'}`}>File CSV</span>
+                            </label>
+                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${sourceType === 'sheet' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
+                                <input type="radio" name="source" value="sheet" checked={sourceType === 'sheet'} onChange={() => setSourceType('sheet')} className="hidden" />
+                                <span className={`text-xs font-bold ${sourceType === 'sheet' ? 'text-purple-700' : 'text-gray-500'}`}>Google Sheets</span>
+                            </label>
+                        </div>
                     </div>
+
+                    {sourceType === 'file' ? (
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File CSV</label>
+                            <input 
+                                type="file" 
+                                accept=".csv"
+                                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700"
+                            />
+                        </div>
+                    ) : (
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link Google Sheets (Public)</label>
+                            <input 
+                                type="text" 
+                                value={sheetUrl}
+                                onChange={(e) => setSheetUrl(e.target.value)}
+                                placeholder="https://docs.google.com/spreadsheets/d/..."
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                            />
+                        </div>
+                    )}
 
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Khi bài học đã tồn tại</label>
@@ -82,7 +119,7 @@ function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId: strin
 
                     <button 
                         onClick={handleImport}
-                        disabled={!file || importing}
+                        disabled={(sourceType === 'file' && !file) || (sourceType === 'sheet' && !sheetUrl) || importing}
                         className="w-full bg-green-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {importing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
