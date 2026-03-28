@@ -14,6 +14,7 @@ const menuItems = [
   { label: 'Cài Đặt', href: '/admin/settings', icon: Settings },
   { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map },
   { label: 'Chiến Dịch Email', href: '/admin/campaigns', icon: Mail },
+  { label: 'Nhân Mạch', href: '/admin/genealogy', icon: Users },
   { label: 'Trang Chủ', href: '/', icon: ArrowLeft },
 ]
 

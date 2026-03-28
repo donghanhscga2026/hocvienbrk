@@ -30,6 +30,10 @@ model User {
   referrer        User?        @relation("ReferrerToReferee", fields: [referrerId], references: [id])
   referrals       User[]       @relation("ReferrerToReferee")
   
+  // Closure Table relations
+  closureAsAncestor   UserClosure[] @relation("ClosureAncestor")
+  closureAsDescendant UserClosure[] @relation("ClosureDescendant")
+  
   // Zero 2 Hero Data - Tách sang bảng UserRoadmap
   roadmap       UserRoadmap?
   emailCampaigns EmailCampaign[] @relation("UserToEmailCampaign")
@@ -38,6 +42,26 @@ model User {
   @@index([phone])
   @@index([referrerId])
 }
+
+// Closure Table cho Genealogy Tree - Tối ưu truy vấn descendants
+// Lưu tất cả cặp ancestor-descendant để query O(1) thay vì đệ quy
+model UserClosure {
+    ancestorId   Int @map("ancestor_id")
+    descendantId Int @map("descendant_id")
+    depth        Int @default(0)
+
+    ancestor   User @relation("ClosureAncestor", fields: [ancestorId], references: [id])
+    descendant User @relation("ClosureDescendant", fields: [descendantId], references: [id])
+
+    @@id([ancestorId, descendantId])
+    @@index([ancestorId])
+    @@index([descendantId])
+    @@index([depth])
+    @@map("user_closure")
+}
+
+// Them relations vao User model
+// ... (tiep theo trong User model)
 
 model EmailSender {
   id              Int      @id @default(autoincrement())
