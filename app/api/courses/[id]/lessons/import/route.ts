@@ -24,12 +24,29 @@ export async function POST(
     const formData = await req.formData();
     const file = formData.get('file') as File;
     const mode = formData.get('mode') as string || 'upsert';
+    const sourceType = formData.get('sourceType') as string || 'file';
+    const sheetUrl = formData.get('sheetUrl') as string;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    let text: string;
+
+    if (sourceType === 'sheet' && sheetUrl) {
+      const sheetIdMatch = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!sheetIdMatch) {
+        return NextResponse.json({ error: 'Invalid Google Sheets URL' }, { status: 400 });
+      }
+      
+      const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetIdMatch[1]}/export?format=csv`;
+      const sheetRes = await fetch(exportUrl);
+      if (!sheetRes.ok) {
+        return NextResponse.json({ error: 'Cannot fetch Google Sheet. Make sure the sheet is publicly shared.' }, { status: 400 });
+      }
+      text = await sheetRes.text();
+    } else {
+      if (!file) {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      }
+      text = await file.text();
     }
-
-    let text = await file.text();
     // Remove BOM if present
     if (text.charCodeAt(0) === 0xFEFF) {
       text = text.slice(1);

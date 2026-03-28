@@ -1,11 +1,7 @@
 import { auth } from "@/auth";
 import Header from "@/components/layout/Header";
-import CourseCard from "@/components/course/CourseCard";
-import CourseSection from "@/components/home/CourseSection";
 import MessageCard from "@/components/home/MessageCard";
-import CommunityBoard from "@/components/home/CommunityBoard";
-import Zero2HeroSurvey from "@/components/home/Zero2HeroSurvey";
-import RealityMap from "@/components/home/RealityMap";
+import HomeClient from "@/components/home/HomeClient";
 import prisma from "@/lib/prisma";
 import { getRandomMessage } from "./actions/message-actions";
 import { resetSurveyAction } from "./actions/survey-actions";
@@ -118,7 +114,14 @@ export default async function Home() {
   // 1. Lọc lấy các khóa học đã đăng ký
   const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
 
-  const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id));
+  // Lọc khóa học chưa đăng ký và ưu tiên PENDING lên đầu
+  const otherCourses = courses
+    .filter((c: any) => !myCourseIds.has(c.id))
+    .sort((a: any, b: any) => {
+      const aPending = enrollmentsMap[a.id]?.status === 'PENDING' ? 0 : 1
+      const bPending = enrollmentsMap[b.id]?.status === 'PENDING' ? 0 : 1
+      return aPending - bPending
+    })
 
   // Gom nhóm khóa học theo category cho phần "Tất cả khóa học"
   const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
@@ -145,97 +148,22 @@ export default async function Home() {
         <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
       </div>
 
-      {/* Lộ trình Zero 2 Hero */}
-      {session?.user && (
-        <section className="container mx-auto px-4 py-8">
-          {customPath === null ? (
-            <Zero2HeroSurvey />
-          ) : customPath.length === 0 ? (
-            <div className="bg-zinc-950 rounded-[3rem] p-12 text-center border border-white/5 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/5 rounded-full blur-[100px]"></div>
-                <div className="relative z-10 space-y-6">
-                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-white/10">
-                        <Sparkles className="w-10 h-10 text-yellow-400" />
-                    </div>
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tight italic">Bạn chưa có lộ trình riêng</h3>
-                    <p className="text-gray-400 text-sm max-w-md mx-auto font-medium italic">
-                        Hãy để AI giúp bạn thiết kế một con đường học tập cá nhân hóa dựa trên mục tiêu thực tế của bạn.
-                    </p>
-                    <form action={async () => {
-                        'use server'
-                        await resetSurveyAction()
-                    }}>
-                        <button className="bg-yellow-400 text-black px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-yellow-500 transition-all active:scale-95 shadow-xl shadow-yellow-400/10">
-                            🚀 Thiết lập lộ trình cá nhân
-                        </button>
-                    </form>
-                </div>
-            </div>
-          ) : (
-            <RealityMap 
-              customPath={customPath}
-              enrollmentsMap={enrollmentsMap}
-              allCourses={courses}
-              userGoal={userGoal || 'Hoàn thiện kỹ năng'}
-              targetPointId={targetPointId}
-              roadmapPoints={safeRoadmapPoints}
-              onReset={resetSurveyAction}
-            />
-          )}
-        </section>
-      )}
-
-      {/* Community Board Module */}
-      <section className="container mx-auto px-4 py-8">
-        <CommunityBoard isAdmin={session?.user?.role === 'ADMIN'} />
-      </section>
-
-      {/* Course List Section */}
-      <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
-        {session?.user ? (
-          <>
-            {/* Khóa học của tôi */}
-            {myCourses.length > 0 && (
-              <CourseSection 
-                title="Khóa học của tôi"
-                courses={myCourses}
-                session={session}
-                enrollmentsMap={enrollmentsMap}
-                isCourseOneActive={isCourseOneActive}
-                userPhone={userPhone}
-                userId={userId}
-                darkMode={true}
-                accentColor="bg-emerald-500"
-              />
-            )}
-
-            {/* Các khóa học khác */}
-            {groupedOtherCourses.length > 0 && (
-              <CourseSection 
-                title="Tất cả khóa học"
-                groupedCourses={groupedOtherCourses}
-                session={session}
-                enrollmentsMap={enrollmentsMap}
-                isCourseOneActive={isCourseOneActive}
-                userPhone={userPhone}
-                userId={userId}
-                accentColor="bg-blue-600"
-              />
-            )}
-          </>
-        ) : (
-          <CourseSection 
-            title="Danh Sách Khóa Học"
-            groupedCourses={groupedOtherCourses}
-            session={null}
-            enrollmentsMap={{}}
-            isCourseOneActive={false}
-            userPhone={null}
-            userId={null}
-            accentColor="bg-blue-600"
-          />
-        )}
-      </section>
+      {/* Lộ trình Zero 2 Hero & Course Sections - Client Component */}
+      <HomeClient 
+        courses={courses}
+        myCourses={myCourses}
+        groupedOtherCourses={groupedOtherCourses}
+        session={session}
+        enrollmentsMap={enrollmentsMap}
+        isCourseOneActive={isCourseOneActive}
+        userPhone={userPhone}
+        userId={userId}
+        customPath={customPath}
+        userGoal={userGoal}
+        targetPointId={targetPointId}
+        roadmapPoints={safeRoadmapPoints}
+        resetSurveyAction={resetSurveyAction}
+      />
 
       {/* Footer (Optional simple) */}
       <footer className="bg-gray-100 py-12 text-center text-gray-500 text-sm">
