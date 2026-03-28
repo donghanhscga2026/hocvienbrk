@@ -3,17 +3,18 @@ import prisma from '@/lib/prisma'
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = parseInt(params.id)
+        const { id } = await params
+        const userId = parseInt(id)
         
-        if (isNaN(id)) {
+        if (isNaN(userId)) {
             return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
         }
         
         const user = await prisma.user.findUnique({
-            where: { id },
+            where: { id: userId },
             select: { id: true, name: true }
         })
         
