@@ -14,6 +14,7 @@ const menuItems = [
   { label: 'Cài Đặt', href: '/admin/settings', icon: Settings, color: 'bg-gray-500' },
   { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map, color: 'bg-teal-500' },
   { label: 'Email MKT', href: '/admin/campaigns', icon: Mail, color: 'bg-red-500' },
+  { label: 'Nhân Mạch', href: '/admin/genealogy', icon: Users, color: 'bg-indigo-500' },
   { label: 'Trang Chủ', href: '/', icon: ArrowLeft, color: 'bg-yellow-500' },
 ]
 

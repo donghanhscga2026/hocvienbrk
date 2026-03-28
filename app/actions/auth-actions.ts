@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { redirect } from "next/navigation"
+import { revalidateTag } from "next/cache"
+import { addUserToClosure } from "@/lib/closure-helpers"
 
 function normalizePhone(phone: string): string {
   if (!phone) return '';
@@ -39,6 +41,7 @@ const registerSchema = z.object({
     countryCode: z.string(),
     phone: z.string().min(7, "Số điện thoại phải có ít nhất 7 số").max(15, "Số điện thoại tối đa 15 số"),
     password: z.string().min(6, "Password must be at least 6 characters"),
+    referrerId: z.string().optional(),
 })
 
 export async function registerUser(prevState: any, formData: FormData) {
@@ -53,7 +56,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         }
     }
 
-    const { name, email, countryCode, phone, password } = validatedFields.data
+    const { name, email, countryCode, phone, password, referrerId } = validatedFields.data
     
     const cleanPhone = phone.replace(/\s/g, '').replace(/^0/, '');
     const fullPhone = `${countryCode}${cleanPhone}`;
@@ -93,7 +96,11 @@ export async function registerUser(prevState: any, formData: FormData) {
         const { getNextAvailableId } = await import("@/lib/id-helper")
         const { sendTelegram, sendWelcomeEmail } = await import("@/lib/notifications")
         const newId = await getNextAvailableId()
+        
+        // Parse referrerId
+        const refId = referrerId ? parseInt(referrerId) : null
 
+        // Tao user
         const user = await prisma.user.create({
             data: {
                 id: newId,
@@ -102,16 +109,24 @@ export async function registerUser(prevState: any, formData: FormData) {
                 phone: fullPhone,
                 password: hashedPassword,
                 role: Role.STUDENT,
+                referrerId: refId && !isNaN(refId) ? refId : null,
             },
         })
+        
+        // Them closure rows cho genealogy
+        await addUserToClosure(user.id, user.referrerId)
+        
+        // Revalidate genealogy cache
+        revalidateTag('genealogy')
 
         await sendWelcomeEmail(email, name, user.id)
 
+        const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}` : ''
         const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
                          `👤 Họ tên: <b>${user.name}</b>\n` +
                          `📧 Email: ${user.email}\n` +
-                         `📞 SĐT: ${user.phone}\n` +
+                         `📞 SĐT: ${user.phone}${referrerInfo}\n` +
                          `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
         await sendTelegram(msgAdmin, 'REGISTER');
 

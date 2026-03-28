@@ -1,9 +1,9 @@
 'use client'
 
 import { useForm } from "react-hook-form"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import { registerUser } from "../actions/auth-actions"
 
@@ -41,7 +41,24 @@ export default function RegisterPage() {
     const [error, setError] = useState<string | null>(null)
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null)
     const [showPassword, setShowPassword] = useState(false)
+    const [referrerName, setReferrerName] = useState<string | null>(null)
     const router = useRouter()
+    const searchParams = useSearchParams()
+
+    // Doc referrer tu URL (VD: /register?ref=150)
+    const referrerId = searchParams.get('ref')
+
+    // Lay thong tin referrer khi co
+    useEffect(() => {
+        if (referrerId) {
+            fetch(`/api/user/${referrerId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.name) setReferrerName(data.name)
+                })
+                .catch(() => {})
+        }
+    }, [referrerId])
 
     const { register, handleSubmit, watch, formState: { errors } } = useForm({
         defaultValues: {
@@ -49,7 +66,8 @@ export default function RegisterPage() {
             email: "",
             countryCode: "+84",
             phone: "",
-            password: ""
+            password: "",
+            referrerId: referrerId || ""
         }
     })
 
@@ -96,8 +114,22 @@ export default function RegisterPage() {
                     </p>
                 </div>
 
+                {/* Referrer info - hien thi neu co */}
+                {referrerId && (
+                    <div className="rounded-lg bg-emerald-50 p-3 border border-emerald-200">
+                        <p className="text-xs text-emerald-700 font-medium">
+                            🎁 Được giới thiệu bởi
+                        </p>
+                        <p className="text-sm text-emerald-900 font-bold">
+                            {referrerName ? `#${referrerId} - ${referrerName}` : `User #${referrerId}`}
+                        </p>
+                    </div>
+                )}
+
                 <div className="space-y-4">
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                        {/* Hidden field for referrerId */}
+                        <input type="hidden" {...register("referrerId")} />
                         {error && (
                             <div className="rounded-md bg-red-50 p-3 text-sm text-red-500">
                                 {error}
