@@ -1,7 +1,7 @@
 'use client'
 
 import { useForm } from "react-hook-form"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff } from "lucide-react"
@@ -28,15 +28,9 @@ const COUNTRY_CODES = [
     { code: "+34", country: "Spain 🇪🇸" },
     { code: "+7", country: "Russia 🇷🇺" },
     { code: "+971", country: "UAE 🇦🇪" },
-    { code: "+66", country: "Thailand 🇹🇭" },
-    { code: "+855", country: "Cambodia 🇰🇭" },
-    { code: "+856", country: "Laos 🇱🇦" },
-    { code: "+60", country: "Malaysia 🇲🇾" },
-    { code: "+62", country: "Indonesia 🇮🇩" },
-    { code: "+63", country: "Philippines 🇵🇭" },
 ]
 
-export default function RegisterPage() {
+function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null)
@@ -45,10 +39,8 @@ export default function RegisterPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    // Doc referrer tu URL (VD: /register?ref=150)
     const referrerId = searchParams.get('ref')
 
-    // Lay thong tin referrer khi co
     useEffect(() => {
         if (referrerId) {
             fetch(`/api/user/${referrerId}`)
@@ -98,161 +90,172 @@ export default function RegisterPage() {
             }
 
         } catch (err: any) {
-            // Next.js redirect error
         } finally {
             setIsLoading(false)
         }
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-            <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg">
-                <div className="text-center">
-                    <h2 className="text-3xl font-bold tracking-tight text-gray-900">Create an account</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Join BRK Academy today
-                    </p>
-                </div>
-
-                {/* Referrer info - hien thi neu co */}
-                {referrerId && (
-                    <div className="rounded-lg bg-emerald-50 p-3 border border-emerald-200">
-                        <p className="text-xs text-emerald-700 font-medium">
-                            🎁 Được giới thiệu bởi
-                        </p>
-                        <p className="text-sm text-emerald-900 font-bold">
-                            {referrerName ? `#${referrerId} - ${referrerName}` : `User #${referrerId}`}
-                        </p>
-                    </div>
-                )}
-
-                <div className="space-y-4">
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                        {/* Hidden field for referrerId */}
-                        <input type="hidden" {...register("referrerId")} />
-                        {error && (
-                            <div className="rounded-md bg-red-50 p-3 text-sm text-red-500">
-                                {error}
-                            </div>
-                        )}
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Full Name
-                            </label>
-                            <input
-                                {...register("name", { required: "Name is required" })}
-                                type="text"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                            />
-                            {errors.name && (
-                                <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>
-                            )}
-                            {fieldErrors?.name && (
-                                <p className="mt-1 text-xs text-red-500">{fieldErrors.name[0]}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Email
-                            </label>
-                            <input
-                                {...register("email", {
-                                    required: "Email is required",
-                                    pattern: { value: /^\S+@\S+$/i, message: "Invalid email" }
-                                })}
-                                type="email"
-                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                            />
-                            {errors.email && (
-                                <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
-                            )}
-                            {fieldErrors?.email && (
-                                <p className="mt-1 text-xs text-red-500">{fieldErrors.email[0]}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Phone Number
-                            </label>
-                            <div className="flex gap-2">
-                                <select
-                                    {...register("countryCode")}
-                                    className="w-36 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 text-sm"
-                                >
-                                    {COUNTRY_CODES.map((c) => (
-                                        <option key={c.code} value={c.code}>
-                                            {c.country}
-                                        </option>
-                                    ))}
-                                </select>
-                                <input
-                                    {...register("phone", { 
-                                        required: "Phone is required",
-                                        minLength: { value: 7, message: "Ít nhất 7 số" },
-                                        maxLength: { value: 15, message: "Tối đa 15 số" }
-                                    })}
-                                    type="tel"
-                                    placeholder={countryCode === "+84" ? "0912 345 678" : "Enter phone number"}
-                                    className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                                />
-                            </div>
-                            {errors.phone && (
-                                <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>
-                            )}
-                            {fieldErrors?.phone && (
-                                <p className="mt-1 text-xs text-red-500">{fieldErrors.phone[0]}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Password
-                            </label>
-                            <div className="relative">
-                                <input
-                                    {...register("password", {
-                                        required: "Password is required",
-                                        minLength: { value: 6, message: "Min 6 characters" }
-                                    })}
-                                    type={showPassword ? "text" : "password"}
-                                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </button>
-                            </div>
-                            {errors.password && (
-                                <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
-                            )}
-                            {fieldErrors?.password && (
-                                <p className="mt-1 text-xs text-red-500">{fieldErrors.password[0]}</p>
-                            )}
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                        >
-                            {isLoading ? <Loader2 className="animate-spin" /> : "Sign up"}
-                        </button>
-                    </form>
-
-                    <p className="text-center text-sm text-gray-600">
-                        Already have an account?{" "}
-                        <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-                            Sign in
-                        </Link>
-                    </p>
-                </div>
+        <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg">
+            <div className="text-center">
+                <h2 className="text-3xl font-bold tracking-tight text-gray-900">Create an account</h2>
+                <p className="mt-2 text-sm text-gray-600">
+                    Join BRK Academy today
+                </p>
             </div>
+
+            {referrerId && (
+                <div className="rounded-lg bg-emerald-50 p-3 border border-emerald-200">
+                    <p className="text-xs text-emerald-700 font-medium">
+                        🎁 Được giới thiệu bởi
+                    </p>
+                    <p className="text-sm text-emerald-900 font-bold">
+                        {referrerName ? `#${referrerId} - ${referrerName}` : `User #${referrerId}`}
+                    </p>
+                </div>
+            )}
+
+            <div className="space-y-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <input type="hidden" {...register("referrerId")} />
+                    {error && (
+                        <div className="rounded-md bg-red-50 p-3 text-sm text-red-500">
+                            {error}
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Full Name
+                        </label>
+                        <input
+                            {...register("name", { required: "Name is required" })}
+                            type="text"
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                        />
+                        {errors.name && (
+                            <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>
+                        )}
+                        {fieldErrors?.name && (
+                            <p className="mt-1 text-xs text-red-500">{fieldErrors.name[0]}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Email
+                        </label>
+                        <input
+                            {...register("email", {
+                                required: "Email is required",
+                                pattern: { value: /^\S+@\S+$/i, message: "Invalid email" }
+                            })}
+                            type="email"
+                            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                        />
+                        {errors.email && (
+                            <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
+                        )}
+                        {fieldErrors?.email && (
+                            <p className="mt-1 text-xs text-red-500">{fieldErrors.email[0]}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Phone Number
+                        </label>
+                        <div className="flex gap-2">
+                            <select
+                                {...register("countryCode")}
+                                className="w-36 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 text-sm"
+                            >
+                                {COUNTRY_CODES.map((c) => (
+                                    <option key={c.code} value={c.code}>
+                                        {c.country}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                {...register("phone", { 
+                                    required: "Phone is required",
+                                    minLength: { value: 7, message: "Ít nhất 7 số" },
+                                    maxLength: { value: 15, message: "Tối đa 15 số" }
+                                })}
+                                type="tel"
+                                placeholder={countryCode === "+84" ? "0912 345 678" : "Enter phone number"}
+                                className="flex-1 rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                            />
+                        </div>
+                        {errors.phone && (
+                            <p className="mt-1 text-xs text-red-500">{errors.phone.message}</p>
+                        )}
+                        {fieldErrors?.phone && (
+                            <p className="mt-1 text-xs text-red-500">{fieldErrors.phone[0]}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                            Password
+                        </label>
+                        <div className="relative">
+                            <input
+                                {...register("password", {
+                                    required: "Password is required",
+                                    minLength: { value: 6, message: "Min 6 characters" }
+                                })}
+                                type={showPassword ? "text" : "password"}
+                                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 pr-10 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
+                        </div>
+                        {errors.password && (
+                            <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
+                        )}
+                        {fieldErrors?.password && (
+                            <p className="mt-1 text-xs text-red-500">{fieldErrors.password[0]}</p>
+                        )}
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+                    >
+                        {isLoading ? <Loader2 className="animate-spin" /> : "Sign up"}
+                    </button>
+                </form>
+
+                <p className="text-center text-sm text-gray-600">
+                    Already have an account?{" "}
+                    <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+                        Sign in
+                    </Link>
+                </p>
+            </div>
+        </div>
+    )
+}
+
+export default function RegisterPage() {
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+            <Suspense fallback={
+                <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-8 shadow-lg">
+                    <div className="flex justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                    </div>
+                </div>
+            }>
+                <RegisterForm />
+            </Suspense>
         </div>
     )
 }
