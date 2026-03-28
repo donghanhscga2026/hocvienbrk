@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { redirect } from "next/navigation"
-import { revalidateTag } from "next/cache"
+import { revalidatePath } from "next/cache"
 import { addUserToClosure } from "@/lib/closure-helpers"
 
 function normalizePhone(phone: string): string {
@@ -117,7 +117,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         await addUserToClosure(user.id, user.referrerId)
         
         // Revalidate genealogy cache
-        revalidateTag('genealogy')
+        revalidatePath('/admin/genealogy')
 
         await sendWelcomeEmail(email, name, user.id)
 
