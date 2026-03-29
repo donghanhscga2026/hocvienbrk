@@ -36,11 +36,16 @@ function getAllPhoneVariants(fullPhone: string): string[] {
 }
 
 const registerSchema = z.object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Invalid email address"),
+    name: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
+    email: z.string().email("Địa chỉ email không hợp lệ"),
     countryCode: z.string(),
-    phone: z.string().min(7, "Số điện thoại phải có ít nhất 7 số").max(15, "Số điện thoại tối đa 15 số"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    phone: z.string().min(9, "Số điện thoại phải có ít nhất 9 số").max(15, "Số điện thoại tối đa 15 số"),
+    password: z.string()
+        .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+        .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất một chữ hoa")
+        .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất một chữ thường")
+        .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất một chữ số")
+        .regex(/[!@#$%^&*(),.?":{}|<>]/, "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"),
     referrerId: z.string().optional(),
 })
 
@@ -94,11 +99,12 @@ export async function registerUser(prevState: any, formData: FormData) {
 
     try {
         const { getNextAvailableId } = await import("@/lib/id-helper")
-        const { sendTelegram, sendWelcomeEmail } = await import("@/lib/notifications")
+        const { sendTelegram, sendVerificationEmail } = await import("@/lib/notifications")
         const newId = await getNextAvailableId()
         
         // Parse referrerId
-        const refId = referrerId ? parseInt(referrerId) : null
+        const parsedRef = parseInt(referrerId || "0")
+        const refId = isNaN(parsedRef) ? 0 : parsedRef
 
         // Tao user
         const user = await prisma.user.create({
@@ -109,8 +115,18 @@ export async function registerUser(prevState: any, formData: FormData) {
                 phone: fullPhone,
                 password: hashedPassword,
                 role: Role.STUDENT,
-                referrerId: refId && !isNaN(refId) ? refId : null,
+                referrerId: refId,
             },
+        })
+
+        // Tao verification token (24h)
+        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        await prisma.verificationToken.create({
+            data: {
+                identifier: normalizedEmail,
+                token: token,
+                expires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+            }
         })
         
         // Them closure rows cho genealogy
@@ -119,10 +135,11 @@ export async function registerUser(prevState: any, formData: FormData) {
         // Revalidate genealogy cache
         revalidatePath('/admin/genealogy')
 
-        await sendWelcomeEmail(email, name, user.id)
+        // Gui email xac minh
+        await sendVerificationEmail(normalizedEmail, name, token)
 
         const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}` : ''
-        const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ</b>\n\n` +
+        const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
                          `👤 Họ tên: <b>${user.name}</b>\n` +
                          `📧 Email: ${user.email}\n` +
@@ -130,12 +147,15 @@ export async function registerUser(prevState: any, formData: FormData) {
                          `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
         await sendTelegram(msgAdmin, 'REGISTER');
 
+        return {
+            message: "Đăng ký thành công! Vui lòng kiểm tra Email để xác minh tài khoản trước khi đăng nhập.",
+            success: true
+        }
+
     } catch (error) {
         console.error("Failed to create user:", error)
         return {
-            message: "Database Error: Failed to create user. Please try again.",
+            message: "Lỗi hệ thống: Không thể tạo tài khoản. Vui lòng thử lại.",
         }
     }
-
-    redirect('/login')
 }

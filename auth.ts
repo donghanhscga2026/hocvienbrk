@@ -56,6 +56,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 if (!user || !user.password) return null;
 
+                // CHẶN ĐĂNG NHẬP NẾU CHƯA XÁC MINH EMAIL (Chỉ áp dụng cho tài khoản mới từ ngày 29/03/2026)
+                const featureDate = new Date("2026-03-29T00:00:00Z");
+                const isLegacy = user.createdAt <= featureDate;
+                
+                if (!user.emailVerified) {
+                    if (!isLegacy) {
+                        // Tài khoản mới: Chặn tuyệt đối
+                        throw new Error("Vui lòng xác minh email trước khi đăng nhập.");
+                    } else {
+                        // Tài khoản cũ: Kiểm tra xem đã được gửi mã chưa
+                        const existingToken = await prisma.verificationToken.findFirst({
+                            where: { identifier: user.email }
+                        });
+
+                        if (existingToken) {
+                            if (existingToken.expires > new Date()) {
+                                // Đã gửi mã và mã còn hạn: Buộc phải xác minh mới được vào tiếp
+                                throw new Error("Tài khoản của bạn cần được xác minh. Vui lòng kiểm tra email đã gửi.");
+                            } else {
+                                // Mã hết hạn: Xóa mã cũ để lần đăng nhập này đóng vai trò "Gửi lại mã mới"
+                                await prisma.verificationToken.delete({
+                                    where: { 
+                                        identifier_token: { 
+                                            identifier: existingToken.identifier, 
+                                            token: existingToken.token 
+                                        } 
+                                    }
+                                });
+                            }
+                        }
+                        // Nếu chưa có mã hoặc mã vừa bị xóa (do hết hạn), cho phép đăng nhập để kích hoạt gửi mã mới ở sự kiện signIn
+                    }
+                }
+
                 const passwordsMatch = await bcrypt.compare(password, user.password);
                 if (passwordsMatch) {
                     // Kiểm tra nếu dùng mật khẩu mặc định
@@ -69,6 +103,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         role: user.role,
                         image: user.image,
                         needsPasswordChange: isDefault && !userAny.passwordChanged,
+                        isUnverifiedLegacy: !user.emailVerified && isLegacy, // Gắn cờ để gửi mail ở event signIn
                     };
                 }
                 return null;
@@ -81,6 +116,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.sub = user.id;
                 token.role = (user as any).role;
                 token.needsPasswordChange = (user as any).needsPasswordChange;
+                token.isUnverifiedLegacy = (user as any).isUnverifiedLegacy;
             }
 
             if (trigger === "update" && session?.role) {
@@ -94,6 +130,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.id = token.sub;
                 session.user.role = token.role as Role;
                 (session.user as any).needsPasswordChange = token.needsPasswordChange as boolean;
+                (session.user as any).isUnverifiedLegacy = token.isUnverifiedLegacy as boolean;
             }
             return session;
         }
@@ -117,9 +154,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const userAgent = headerList.get('user-agent') || 'Unknown';
 
                     console.log(`📡 Đang gửi thông báo đăng nhập cho #${user.id} từ IP: ${ip}`);
-                    const { sendLoginNotification } = await import("@/lib/notifications");
+                    const { sendLoginNotification, sendVerificationEmail } = await import("@/lib/notifications");
                     
                     await sendLoginNotification(user, ip, userAgent);
+
+                    // GỬI THÔNG BÁO XÁC MINH CHO HỌC VIÊN CŨ CHƯA XÁC MINH
+                    if ((user as any).isUnverifiedLegacy) {
+                        console.log(`📧 Gửi nhắc nhở xác minh cho học viên cũ: ${user.email}`);
+                        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        
+                        await prisma.verificationToken.upsert({
+                            where: { 
+                                identifier_token: { 
+                                    identifier: user.email!, 
+                                    token: token 
+                                } 
+                            },
+                            update: { token, expires: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+                            create: {
+                                identifier: user.email!,
+                                token: token,
+                                expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+                            }
+                        });
+
+                        await sendVerificationEmail(user.email!, user.name!, token);
+                    }
+
                     console.log(`✅ Đã xử lý xong thông báo đăng nhập.`);
                 } catch (error: any) {
                     console.error("❌ Lỗi trong sự kiện signIn:", error.message);
