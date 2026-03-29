@@ -25,6 +25,9 @@ export interface GenealogyNode {
     f1aCount: number
     f1bCount: number
     f1cCount: number
+    groupATotalSub: number
+    groupBTotalSub: number
+    groupCTotalSub: number
     groupA: any[]
     groupB: any[]
     children: GenealogyNode[]
@@ -148,6 +151,8 @@ async function buildStandardTree(
 
     // 5. Phân nhóm F1
     let groupA: any[] = [], groupB: any[] = [], groupC: any[] = []
+    let groupATotalSub = 0, groupBTotalSub = 0, groupCTotalSub = 0
+
     for (const f1 of f1Data) {
         const closures = closureByAncestor.get(f1.autoId) || []
         const hasF2 = closures.some(c => c.depth === 1)
@@ -155,9 +160,16 @@ async function buildStandardTree(
         const f2s = closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
         const fData = { id: f1.user.id, name: f1.user.name, totalSubCount: closures.length, children: f2s }
 
-        if (!hasF2) groupA.push(fData)
-        else if (!hasF3) groupB.push(fData)
-        else groupC.push(fData)
+        if (!hasF2) {
+            groupA.push(fData)
+            groupATotalSub += closures.length
+        } else if (!hasF3) {
+            groupB.push(fData)
+            groupBTotalSub += closures.length
+        } else {
+            groupC.push(fData)
+            groupCTotalSub += closures.length
+        }
     }
 
     // 6. Build Children (Group C)
@@ -166,6 +178,7 @@ async function buildStandardTree(
         const f1Closures = closureByAncestor.get(f1Record.autoId) || []
         const grandF1s = f1Closures.filter(c => c.depth === 1)
         let gA: any[] = [], gB: any[] = [], gC: any[] = []
+        let gATotal = 0, gBTotal = 0, gCTotal = 0
 
         for (const gf1 of grandF1s) {
             const gf1Closures = closureByAncestor.get(gf1.autoId) || []
@@ -174,18 +187,29 @@ async function buildStandardTree(
             const gf2s = gf1Closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
             const gfData = { id: gf1.userId, name: gf1.name, totalSubCount: gf1Closures.length, children: gf2s }
 
-            if (!gHasF2) gA.push(gfData)
-            else if (!gHasF3) gB.push(gfData)
-            else gC.push(gfData)
+            if (!gHasF2) {
+                gA.push(gfData)
+                gATotal += gf1Closures.length
+            } else if (!gHasF3) {
+                gB.push(gfData)
+                gBTotal += gf1Closures.length
+            } else {
+                gC.push(gfData)
+                gCTotal += gf1Closures.length
+            }
         }
 
         return {
             id: f1Info.id, name: f1Info.name, referrerId: null,
-            totalSubCount: f1Closures.length, f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
+            totalSubCount: f1Closures.length, 
+            f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
+            groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
             groupA: gA, groupB: gB,
             children: gC.map(cf => ({
                 id: cf.id, name: cf.name, referrerId: null, totalSubCount: cf.totalSubCount,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0, groupA: [], groupB: [], children: []
+                f1aCount: 0, f1bCount: 0, f1cCount: 0, 
+                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                groupA: [], groupB: [], children: []
             }))
         }
     })
@@ -196,6 +220,9 @@ async function buildStandardTree(
         f1aCount: groupA.length,
         f1bCount: groupB.length,
         f1cCount: groupC.length,
+        groupATotalSub,
+        groupBTotalSub,
+        groupCTotalSub,
         groupA,
         groupB,
         children,
@@ -234,16 +261,21 @@ export async function getSystemTreeAction(systemId: number) {
     const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
     try {
-        let rootUserId: number
-        if (isAdmin) {
-            const root = await getSystemRootUser(systemId)
-            if (!root) return { success: false, error: "Không tìm thấy root" }
-            rootUserId = root.id
-        } else {
-            const systemInfo = await getUserSystemInfo(userId)
-            if (!systemInfo || systemInfo.onSystem !== systemId) return { success: false, error: "Bạn không thuộc hệ thống này" }
-            rootUserId = userId
+        let rootUserId = userId // Mặc định lấy chính mình làm gốc
+        
+        const systemInfo = await getUserSystemInfo(userId)
+        // Nếu không thuộc hệ thống này
+        if (!systemInfo || systemInfo.onSystem !== systemId) {
+            if (isAdmin) {
+                // Nếu là Admin, cho phép xem từ Gốc cao nhất của hệ thống
+                const root = await getSystemRootUser(systemId)
+                if (!root) return { success: false, error: "Không tìm thấy root" }
+                rootUserId = root.id
+            } else {
+                return { success: false, error: "Bạn không thuộc hệ thống này" }
+            }
         }
+        
         const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId)
         return { success: true, tree }
     } catch (error: any) { return { success: false, error: error.message } }
