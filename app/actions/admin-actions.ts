@@ -101,8 +101,9 @@ async function buildStandardTree(
 
     if (f1Data.length === 0) {
         return {
-            id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId,
+            id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
             totalSubCount: 1, f1aCount: 0, f1bCount: 0, f1cCount: 0,
+            groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
             groupA: [], groupB: [], children: [], isRoot: true
         }
     }
