@@ -1,0 +1,4 @@
+app/admin/genealogy/page.tsx(27,30): error TS2304: Cannot find name 'NodeData'.
+app/admin/genealogy/page.tsx(179,55): error TS2554: Expected 1 arguments, but got 2.
+app/admin/genealogy/page.tsx(236,56): error TS2554: Expected 0-1 arguments, but got 2.
+app/admin/genealogy/page.tsx(263,53): error TS2554: Expected 0-1 arguments, but got 2.

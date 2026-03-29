@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Home, User, ChevronRight, X, Network, Zap, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Home, User, ChevronRight, X, Zap, ChevronDown, Search } from 'lucide-react'
 import {
   ReactFlow,
   Node,
@@ -19,59 +19,50 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, GenealogyNode } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, GenealogyNode } from '@/app/actions/admin-actions'
 
-// --- Types ---
-interface NodeData extends Record<string, unknown> {
-  id: number
-  name: string | null
-  totalSubCount: number
-  f1aCount: number
-  f1bCount: number
-  f1cCount: number
-  groupA: any[]
-  groupB: any[]
-  onToggleExpand?: (id: number) => void
-  onOpenGroup?: (type: 'A' | 'B', data: any[]) => void
-}
-
-// --- Components ---
+// ... (các loại type giữ nguyên)
 
 const GenealogyCard = (props: NodeProps) => {
-  const data = props.data as NodeData
+  const data = props.data as unknown as GenealogyNode & { 
+    isRoot?: boolean;
+    onToggleExpand?: (id: number) => void;
+    onOpenGroup?: (type: 'A' | 'B', data: any[]) => void;
+  }
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
+  const isActuallyRoot = data.isRoot
   
   return (
-    <div className={`bg-white border-2 border-slate-200 rounded-2xl p-0 min-w-[200px] shadow-xl hover:shadow-indigo-100 transition-all overflow-visible ${hasChildren ? 'cursor-pointer' : 'cursor-default'}`}>
-      <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-2 !h-2" />
+    <div className={`bg-white border-2 border-slate-200 rounded-2xl p-0 min-w-[160px] shadow-xl hover:shadow-indigo-180 transition-all overflow-visible ${hasChildren ? 'cursor-pointer' : 'cursor-default'}`}>
+      {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-2 !h-2" />}
       <div className="p-4 flex flex-col gap-2">
         <div className="flex justify-between items-center text-slate-900 font-black text-[12px]">
           <span>#{data.id}</span>
           <span>TS: {data.totalSubCount || 0}</span>
         </div>
-        <div className="text-slate-800 font-bold text-[13px] truncate py-1.5 text-center border-y border-slate-50 uppercase tracking-tighter">
+        <div className="text-slate-800 font-bold text-[13px] text-center border-y border-slate-50 uppercase tracking-tighter line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
           {data.name || 'Học viên'}
         </div>
         <div className="flex justify-between items-center mt-1 relative h-10 px-0">
           <button 
             onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA); }}
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -ml-2 ${data.f1aCount > 0 ? 'bg-emerald-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-100 text-slate-300 cursor-default pointer-events-none'}`}
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -ml-2 ${data.f1aCount > 0 ? 'bg-emerald-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
           >
             {data.f1aCount}
           </button>
           <div className="relative">
             <button 
               onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onToggleExpand?.(data.id); }}
-              className={`w-11 h-11 rounded-full flex items-center justify-center gap-0.5 text-[11px] font-black border-4 border-white shadow-md transition-transform ${data.f1cCount > 0 ? 'bg-rose-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-100 text-slate-300 cursor-default pointer-events-none'}`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center gap-0.5 text-[11px] font-black border-4 border-white shadow-md transition-transform ${data.f1cCount > 0 ? 'bg-rose-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
             >
               <User className="w-4 h-4" />
               <span>{data.f1cCount}</span>
             </button>
-            <Handle type="source" position={Position.Bottom} className={`${data.f1cCount > 0 ? '!bg-rose-500' : '!bg-slate-300'} !w-3 !h-3 !border-2 !border-white !-bottom-1`} />
           </div>
+          <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !-bottom-1" />
           <button 
             onClick={(e) => { e.stopPropagation(); if (data.f1bCount > 0) data.onOpenGroup?.('B', data.groupB); }}
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -mr-2 ${data.f1bCount > 0 ? 'bg-sky-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-100 text-slate-300 cursor-default pointer-events-none'}`}
+            className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -mr-2 ${data.f1bCount > 0 ? 'bg-sky-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
           >
             {data.f1bCount}
           </button>
@@ -97,6 +88,7 @@ function GenealogyFlow() {
   const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B' } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
+  const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
 
   // Hàm ghép cây thông minh
   const mergeSubtree = useCallback((root: GenealogyNode, subtree: GenealogyNode): GenealogyNode => {
@@ -114,7 +106,7 @@ function GenealogyFlow() {
     if (isParentVisibleAndExpanded && tree.children && tree.children.length > 0) {
       for (let i = 0; i < tree.children.length; i++) {
         const child = tree.children[i]
-        const childX = px + (i - (tree.children.length - 1) / 2) * 350
+        const childX = px + (i - (tree.children.length - 1) / 2) * 200
         const childY = py + 300
         const subIsExpanded = focusMap.get(tree.id) === child.id
         const pos = getNodePosition(child, targetId, childX, childY, focusMap, subIsExpanded)
@@ -150,16 +142,15 @@ function GenealogyFlow() {
     })
 
     // 2. Kiểm tra xem có cần vẽ các con của Node này không
-    // Điều kiện: Node hiện tại là Gốc HOẶC Node hiện tại là node đang được Focus bởi cha nó
     const isRoot = parent.id === fullTree?.id;
     const isFocusNode = isParentVisibleAndExpanded;
 
     if (isFocusNode && parent.children && parent.children.length > 0) {
       parent.children.forEach((child, index) => {
-        const childX = px + (index - (parent.children.length - 1) / 2) * 350
+        const childX = px + (index - (parent.children.length - 1) / 2) * 200
         const childY = py + 300
         
-        // Xác định xem đứa con này có được mở rộng tiếp không (để vẽ cháu của nó)
+        // Chỉ hiển thị F2 khi có F3 (subIsExpanded)
         const subIsExpanded = currentFocusMap.get(parent.id) === child.id
         
         // Đệ quy vẽ con
@@ -187,7 +178,12 @@ function GenealogyFlow() {
     lastExpandedIdRef.current = id
     
     try {
-      const result = await getGenealogyChildrenAction(id, 3)
+      let result;
+      if (selectedSystem === null) {
+        result = await getGenealogyChildrenAction(id)
+      } else {
+        result = await getSystemChildrenAction(id, selectedSystem)
+      }
       console.log(`[API] Fetch children for #${id} result:`, result.success ? 'Success' : 'Failed');
       
       if (result.success && result.tree && fullTree) {
@@ -228,19 +224,56 @@ function GenealogyFlow() {
       console.error("[Fatal] Error in handleToggleExpand:", e);
     }
     setLoading(false);
-  }, [fullTree, mergeSubtree])
+  }, [fullTree, mergeSubtree, selectedSystem])
+
+  // Handle chon he thong (TCA/KTC)
+  const handleSystemChange = useCallback(async (systemId: number | null) => {
+    setSelectedSystem(systemId)
+    setLoading(true)
+    setError(null)
+    setActiveFocusMap(new Map())
+    lastExpandedIdRef.current = null
+
+    try {
+      if (systemId === null) {
+        // Mac dinh: lay toan bo tree
+        const result = await getGenealogyTreeAction(0)
+        if (result.success && result.tree) {
+          setFullTree(result.tree)
+        } else {
+          setError(result.error || 'Lỗi tải dữ liệu')
+        }
+      } else {
+        // He thong TCA/KTC
+        const result = await getSystemTreeAction(systemId)
+        if (result.success && result.tree) {
+          setFullTree(result.tree)
+        } else {
+          setError(result.error || 'Bạn không thuộc hệ thống này')
+        }
+      }
+    } catch (e) {
+      setError('Lỗi khi tải dữ liệu')
+    }
+    setLoading(false)
+  }, [])
 
   // Khởi tạo
   const initTree = useCallback(async (rootId: number = 0) => {
     setLoading(true); setError(null); setActiveFocusMap(new Map()); lastExpandedIdRef.current = null
-    const result = await getGenealogyTreeAction(rootId, 1)
+    
+    let result;
+    if (selectedSystem === null) {
+      result = await getGenealogyTreeAction(rootId)
+    } else {
+      result = await getSystemTreeAction(selectedSystem)
+    }
+    
     if (result.success && result.tree) {
       setFullTree(result.tree)
     } else setError(result.error || 'Lỗi tải dữ liệu')
     setLoading(false)
-  }, [])
-
-  useEffect(() => { initTree(0) }, [])
+  }, [selectedSystem])
 
   // Render Effect
   useEffect(() => {
@@ -259,9 +292,9 @@ function GenealogyFlow() {
           console.log(`[DEBUG useEffect] getNodePosition result:`, pos);
           
           if (pos) {
-            console.log(`[DEBUG useEffect] Calling setCenter to (${pos.x + 100}, ${pos.y + 150}) with zoom 1.2`);
+            console.log(`[DEBUG useEffect] Calling setCenter to (${pos.x + 180}, ${pos.y + 180}) with zoom 1.2`);
             const zoom = 1.2
-            setCenter(pos.x + 100, pos.y + 150, { zoom, duration: 600 })
+            setCenter(pos.x + 180, pos.y + 180, { zoom, duration: 600 })
           } else {
             console.log(`[DEBUG useEffect] pos is null, falling back to fitView`);
             fitView({ padding: 0.2, duration: 800 })
@@ -270,21 +303,75 @@ function GenealogyFlow() {
           console.log(`[DEBUG useEffect] No lastExpandedId, calling fitView`);
           fitView({ padding: 0.2, duration: 800 })
         }
-      }, 150)
+      }, 180)
     }
-  }, [fullTree, activeFocusMap, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition])
+  }, [fullTree, activeFocusMap, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, selectedSystem])
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden font-sans text-slate-900">
+      {/* HEADER - V6.6: Nho hon, co legend tren header */}
       <header className="bg-slate-900 text-white shadow-sm flex-shrink-0 z-20 border-b border-white/10">
-        <div className="flex items-center justify-between p-4 w-full">
-          <div className="flex items-center gap-5">
-            <Link href="/admin" className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all"><ArrowLeft className="h-5 w-5" /></Link>
-            <h1 className="text-xl font-black uppercase tracking-tight italic text-white">Nhân Mạch Pro <span className="text-rose-500 not-italic ml-2">V6.5 Stable</span></h1>
+        <div className="flex items-center justify-between px-4 py-2 w-full">
+          {/* Left: Back + Title */}
+          <div className="flex items-center gap-4">
+            <Link href="/admin" className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all"><ArrowLeft className="h-4 w-4" /></Link>
+            <h1 className="text-lg font-black uppercase tracking-tight text-white">NHÂN MẠCH</h1>
           </div>
-          <button onClick={() => initTree(0)} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-white text-slate-900 text-xs font-black shadow-lg hover:bg-rose-50 transition-all"><Home className="h-4 w-4 text-rose-600" /> RESET</button>
+
+          {/* Center: Legend */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+              <span className="text-[10px] font-bold text-slate-300">Chỉ F1</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-sky-500"></div>
+              <span className="text-[10px] font-bold text-slate-300">Có F2</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+              <span className="text-[10px] font-bold text-slate-300">Có F3</span>
+            </div>
+          </div>
+
+          {/* Right: placeholder for alignment */}
+          <div></div>
+        </div>
+
+        {/* System Selector */}
+        <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-t border-white/5">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Hệ thống:</span>
+            <div className="relative">
+              <select
+                value={selectedSystem ?? ''}
+                onChange={(e) => handleSystemChange(e.target.value === '' ? null : Number(e.target.value))}
+                className="appearance-none bg-slate-700 text-white text-[10px] font-bold px-4 py-1.5 pr-8 rounded-lg border-none outline-none cursor-pointer hover:bg-slate-600 transition-all"
+              >
+                <option value="">Học viên</option>
+                <option value="1">TCA</option>
+                <option value="2">KTC</option>
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all">
+              <Search className="h-4 w-4" />
+            </button>
+            <button onClick={() => initTree(0)} className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black shadow-lg hover:bg-emerald-600 transition-all">
+              <Home className="h-3 w-3" /> XEM
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-500 text-white px-4 py-2 text-xs font-bold">
+          {error}
+        </div>
+      )}
 
       <div className="flex-1 relative w-full h-full">
         {loading && nodes.length === 0 ? (
@@ -301,57 +388,43 @@ function GenealogyFlow() {
                 <span className="text-[10px] font-black uppercase text-slate-600 tracking-tighter">Updating Tree...</span>
               </div>
             )}
-            <div className="absolute bottom-8 left-8 z-10 bg-white border border-slate-200 rounded-[32px] p-6 shadow-2xl min-w-[240px]">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Quy ước tương tác</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4"><div className="w-4 h-4 rounded-full bg-emerald-500"></div><div><div className="text-xs font-black uppercase">Nhóm A (Xanh lá)</div><div className="text-[9px] text-slate-400 font-bold uppercase">Click xem danh sách F1 trống</div></div></div>
-                <div className="flex items-center gap-4"><div className="w-4 h-4 rounded-full bg-sky-500"></div><div><div className="text-xs font-black uppercase">Nhóm B (Xanh dương)</div><div className="text-[9px] text-slate-400 font-bold uppercase">Click xem F1 có F2 (có xem trước)</div></div></div>
-                <div className="flex items-center gap-4"><div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center text-white"><User className="w-2 h-2" /></div><div><div className="text-xs font-black uppercase text-rose-600">Nhóm C (Đỏ)</div><div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Mở rộng node và thu gọn nhánh khác</div></div></div>
-              </div>
-            </div>
           </div>
         )}
       </div>
 
       {modalData && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[180] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl max-h-[80vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-8 border-b border-slate-180 flex items-center justify-between">
               <div><h2 className="text-2xl font-black tracking-tight">{modalData.title}</h2><p className="text-sm text-slate-400 font-bold uppercase mt-1 tracking-widest">Gồm {modalData.users.length} thành viên</p></div>
-              <button onClick={() => { setModalData(null); setExpandedF2Id(null); }} className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-colors"><X className="w-6 h-6 text-slate-400" /></button>
+              <button onClick={() => { setModalData(null); setExpandedF2Id(null); }} className="p-3 bg-slate-50 hover:bg-slate-180 rounded-2xl transition-colors"><X className="w-6 h-6 text-slate-400" /></button>
             </div>
-            <div className="flex-1 flex overflow-hidden">
-              <div className="w-1/2 border-r border-slate-100 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
-                <div className="grid grid-cols-1 gap-2">
-                  {modalData.users.map(u => (
-                    <div key={u.id} className="mb-1">
-                      <div 
-                        onClick={() => { if (modalData.type === 'B') setExpandedF2Id(expandedF2Id === u.id ? null : u.id); }}
-                        className={`flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all border-2 ${expandedF2Id === u.id ? 'border-indigo-500 bg-indigo-50' : 'border-transparent hover:bg-white hover:shadow-sm'}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-black text-xs">#{u.id}</div>
-                          <div><div className="text-sm font-black text-slate-900">{u.name || 'Học viên'}</div><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-emerald-600">TS: {u.totalSubCount}</div></div>
-                        </div>
-                        {modalData.type === 'B' && <ChevronDown className={`w-5 h-5 text-slate-300 transition-transform ${expandedF2Id === u.id ? 'rotate-180 text-sky-500' : ''}`} />}
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
+              <div className="grid grid-cols-1 gap-2">
+                {modalData.users.map(u => (
+                  <div key={u.id} className="mb-1">
+                    <div 
+                      onClick={() => { if (modalData.type === 'B') setExpandedF2Id(expandedF2Id === u.id ? null : u.id); }}
+                      className={`flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all border-2 ${expandedF2Id === u.id ? 'border-indigo-500 bg-indigo-50' : 'border-transparent hover:bg-white hover:shadow-sm'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-180 text-slate-500 flex items-center justify-center font-black text-xs">#{u.id}</div>
+                        <div><div className="text-sm font-black text-slate-900">{u.name || 'Học viên'}</div><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-emerald-600">TS: {u.totalSubCount}</div></div>
                       </div>
-                      {expandedF2Id === u.id && modalData.type === 'B' && (
-                        <div className="p-2 pl-14 space-y-1 animate-in slide-in-from-top-2">
-                          {u.children?.map((f2: any) => (
-                            <div key={f2.id} className="p-3 bg-white border border-sky-100 rounded-2xl flex items-center justify-between shadow-sm">
-                              <span className="text-[10px] font-black text-sky-600">#{f2.id}</span>
-                              <span className="text-xs font-bold text-slate-600">{f2.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {modalData.type === 'B' && <ChevronDown className={`w-5 h-5 text-slate-300 transition-transform ${expandedF2Id === u.id ? 'rotate-180 text-sky-500' : ''}`} />}
                     </div>
-                  ))}
-                </div>
-              </div>
-              <div className="w-1/2 bg-slate-50/50 p-6 flex flex-col items-center justify-center text-center opacity-40">
-                <Network className="w-16 h-16 text-slate-300 mb-4" />
-                <p className="text-xs font-bold text-slate-400 px-10 leading-relaxed uppercase tracking-widest italic">Hệ thống đang mở rộng tiêu điểm để bạn quan sát sâu nhất có thể</p>
+                    {expandedF2Id === u.id && modalData.type === 'B' && (
+                      <div className="p-2 pl-14 space-y-1 animate-in slide-in-from-top-2">
+                        {u.children?.map((f2: any) => (
+                          <div key={f2.id} className="p-3 bg-white border border-sky-180 rounded-2xl flex items-center justify-between shadow-sm">
+                            <span className="text-[10px] font-black text-sky-600">#{f2.id}</span>
+                            <span className="text-xs font-bold text-slate-600">{f2.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

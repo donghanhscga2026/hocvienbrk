@@ -4,7 +4,6 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
-import { unstable_cache } from "next/cache"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -15,7 +14,7 @@ async function checkAdmin() {
 }
 
 // ==========================================
-// GENEALOGY TREE - V7.2 (CACHE + LAZY LOAD)
+// GENEALOGY TREE - UNIFIED VERSION (V8.0)
 // ==========================================
 
 export interface GenealogyNode {
@@ -29,262 +28,151 @@ export interface GenealogyNode {
     groupA: any[]
     groupB: any[]
     children: GenealogyNode[]
+    isRoot?: boolean
 }
 
-// Cache key generator
-function getCacheKey(userId: number, depth: number): string {
-    return `genealogy-${userId}-${depth}`
+// Helper: Lay thong tin System cua user
+async function getUserSystemInfo(userId: number): Promise<{ onSystem: number | null; refSysId: number; autoId: number } | null> {
+    const system = await prisma.system.findUnique({ where: { userId } })
+    if (!system) return null
+    return { onSystem: system.onSystem, refSysId: system.refSysId, autoId: system.autoId }
 }
 
-// Cached tree builder - tu dong cache trong 30s
-// TEMP DISABLED FOR TESTING: const getCachedGenealogyTree = unstable_cache(...)
-const getCachedGenealogyTree = buildGenealogyTreeInternal
+// Helper: Lay root cua he thong
+async function getSystemRootUser(systemId: number): Promise<{ id: number; name: string | null } | null> {
+    const rootSystem = await prisma.system.findFirst({
+        where: { onSystem: systemId, refSysId: 0 },
+        orderBy: { userId: 'asc' }
+    })
+    if (!rootSystem) return null
+    const user = await prisma.user.findUnique({
+        where: { id: rootSystem.userId },
+        select: { id: true, name: true }
+    })
+    return user
+}
 
-// Core tree builder - chi query database
-async function buildGenealogyTreeInternal(userId: number, maxDepth: number): Promise<GenealogyNode | null> {
-    // Lay user va F1s song song
-    const [rootUser, rootF1s] = await Promise.all([
-        prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, name: true, referrerId: true }
-        }),
-        prisma.user.findMany({
-            where: { referrerId: userId },
+// Hàm xây dựng cây chuẩn dùng chung cho cả Học viên và Hệ thống
+async function buildStandardTree(
+    rootId: number, 
+    type: 'USER' | 'SYSTEM',
+    systemId?: number
+): Promise<GenealogyNode | null> {
+    const isSystem = type === 'SYSTEM'
+    
+    // 1. Lấy thông tin Root
+    const rootUser = await prisma.user.findUnique({
+        where: { id: rootId },
+        select: { id: true, name: true, referrerId: true }
+    })
+    if (!rootUser) return null
+
+    let rootAutoId = rootId
+    if (isSystem) {
+        const rootSys = await prisma.system.findUnique({ where: { userId: rootId, onSystem: systemId } })
+        if (!rootSys) return null
+        rootAutoId = rootSys.autoId
+    }
+
+    // 2. Lấy F1s trực tiếp
+    let f1Data: any[] = []
+    if (isSystem) {
+        f1Data = await prisma.system.findMany({
+            where: { 
+                refSysId: rootId, 
+                onSystem: systemId,
+                userId: { not: rootId }
+            },
+            include: { user: { select: { id: true, name: true } } }
+        })
+    } else {
+        const users = await prisma.user.findMany({
+            where: { 
+                referrerId: rootId,
+                id: { not: rootId }
+            },
             select: { id: true, name: true }
+        })
+        f1Data = users.map(u => ({ ...u, autoId: u.id, user: u }))
+    }
+
+    if (f1Data.length === 0) {
+        return {
+            id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId,
+            totalSubCount: 1, f1aCount: 0, f1bCount: 0, f1cCount: 0,
+            groupA: [], groupB: [], children: [], isRoot: true
+        }
+    }
+
+    const f1AutoIds = f1Data.map(f => f.autoId)
+
+    // 3. Lấy Closures (Lấy descendants của F1s để tìm F2s)
+    const closureModel = isSystem ? prisma.systemClosure : prisma.userClosure
+    const whereBase = isSystem ? { systemId } : {}
+
+    const allDescOfF1s = await (closureModel as any).findMany({
+        where: { ...whereBase, ancestorId: { in: f1AutoIds }, depth: { gte: 1 } },
+        select: { descendantId: true }
+    })
+    const f2AutoIds = [...new Set(allDescOfF1s.map((c: any) => c.descendantId))]
+
+    const [allClosures, totalCount] = await Promise.all([
+        (closureModel as any).findMany({
+            where: {
+                ...whereBase,
+                OR: [
+                    { ancestorId: { in: [rootAutoId, ...f1AutoIds, ...f2AutoIds] } },
+                    { descendantId: { in: f1AutoIds } }
+                ],
+                depth: { gte: 0 }
+            },
+            include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true } } } } : { select: { id: true, name: true } } }
+        }),
+        (closureModel as any).count({
+            where: { ...whereBase, ancestorId: rootAutoId }
         })
     ])
 
-    if (!rootUser) return null
-
-    if (rootF1s.length === 0) {
-        return {
-            id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId,
-            totalSubCount: 0, f1aCount: 0, f1bCount: 0, f1cCount: 0,
-            groupA: [], groupB: [], children: []
-        }
-    }
-
-    const f1Ids = rootF1s.map(f => f.id)
-
-    // Lay tat ca closures lien quan: user, F1s, va F2s (de biet F2 co F3)
-    // Lay tat ca descendants cua rootF1s de tim F2s
-    const allDescendantsOfF1s = await prisma.userClosure.findMany({
-        where: {
-            ancestorId: { in: f1Ids },
-            depth: { gte: 1, lte: 3 }
-        },
-        select: { descendantId: true }
-    })
-    const f2Ids = [...new Set(allDescendantsOfF1s.map(c => c.descendantId))]
-
-    // Lay tat ca closures can thiet trong 1 query
-    const allClosures = await prisma.userClosure.findMany({
-        where: {
-            OR: [
-                { ancestorId: { in: [userId, ...f1Ids, ...f2Ids] } },
-                { descendantId: { in: f1Ids } }
-            ],
-            depth: { gt: 0, lte: 4 }
-        },
-        include: {
-            descendant: { select: { id: true, name: true } }
-        }
-    })
-
-    // Build map trong memory
-    const closureByAncestor = new Map<number, { depth: number; descendantId: number; name: string | null }[]>()
-    for (const c of allClosures) {
-        if (!closureByAncestor.has(c.ancestorId)) {
-            closureByAncestor.set(c.ancestorId, [])
-        }
-        closureByAncestor.get(c.ancestorId)!.push({
-            depth: c.depth,
-            descendantId: c.descendantId,
-            name: c.descendant.name
-        })
-    }
-
-    // Build root node
-    const rootClosures = closureByAncestor.get(userId) || []
-    let groupA: any[] = [], groupB: any[] = [], groupC: any[] = []
-
-    for (const f1 of rootF1s) {
-        const f1Closures = closureByAncestor.get(f1.id) || []
-        const hasF2 = f1Closures.some(c => c.depth === 1)
-        const hasF3 = f1Closures.some(c => c.depth === 2)
-        const f2s = f1Closures
-            .filter(c => c.depth === 1)
-            .map(c => ({ id: c.descendantId, name: c.name }))
-
-        const fData = {
-            id: f1.id,
-            name: f1.name,
-            totalSubCount: f1Closures.length + 1,
-            children: f2s
-        }
-
-        if (!hasF2) groupA.push(fData)
-        else if (!hasF3) groupB.push(fData)
-        else groupC.push(fData)
-    }
-
-    // Build children nếu co
-    const children: GenealogyNode[] = groupC.map(f1 => {
-        const f1Closures = closureByAncestor.get(f1.id) || []
-        const grandF1s = f1Closures.filter(c => c.depth === 1)
-        let gA: any[] = [], gB: any[] = [], gC: any[] = []
-
-        for (const gf1 of grandF1s) {
-            const gf1Closures = closureByAncestor.get(gf1.descendantId) || []
-            const gHasF2 = gf1Closures.some(c => c.depth === 1)
-            const gHasF3 = gf1Closures.some(c => c.depth === 2)
-            const gf2s = gf1Closures.filter(c => c.depth === 1).map(c => ({
-                id: c.descendantId, name: c.name
-            }))
-
-            const gfData = {
-                id: gf1.descendantId,
-                name: gf1.name,
-                totalSubCount: gf1Closures.length + 1,
-                children: gf2s
-            }
-
-            if (!gHasF2) gA.push(gfData)
-            else if (!gHasF3) gB.push(gfData)
-            else gC.push(gfData)
-        }
-
-        return {
-            id: f1.id,
-            name: f1.name,
-            referrerId: null,
-            totalSubCount: f1Closures.length,
-            f1aCount: gA.length,
-            f1bCount: gB.length,
-            f1cCount: gC.length,
-            groupA: gA,
-            groupB: gB,
-            children: gC.map(cf => ({
-                id: cf.id, name: cf.name, referrerId: null,
-                totalSubCount: cf.totalSubCount,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                groupA: [], groupB: [], children: []
-            }))
-        }
-    })
-
-    return {
-        id: rootUser.id,
-        name: rootUser.name,
-        referrerId: rootUser.referrerId,
-        totalSubCount: rootClosures.length,
-        f1aCount: groupA.length,
-        f1bCount: groupB.length,
-        f1cCount: groupC.length,
-        groupA,
-        groupB,
-        children
-    }
-}
-
-// Lazy load children cho 1 node cu the
-async function getLazyChildrenNode(nodeId: number): Promise<GenealogyNode | null> {
-    const nodeUser = await prisma.user.findUnique({
-        where: { id: nodeId },
-        select: { id: true, name: true, referrerId: true }
-    })
-    if (!nodeUser) return null
-
-    const f1s = await prisma.user.findMany({
-        where: { referrerId: nodeId },
-        select: { id: true, name: true }
-    })
-
-    if (f1s.length === 0) {
-        return {
-            id: nodeUser.id, name: nodeUser.name, referrerId: nodeUser.referrerId,
-            totalSubCount: 0, f1aCount: 0, f1bCount: 0, f1cCount: 0,
-            groupA: [], groupB: [], children: []
-        }
-    }
-
-    const f1Ids = f1s.map(f => f.id)
-
-    // Lay F2s (descendants depth=1 cua F1s) de biet F2 co F3
-    const allDescendantsOfF1s = await prisma.userClosure.findMany({
-        where: { ancestorId: { in: f1Ids }, depth: { gte: 1, lte: 3 } },
-        select: { descendantId: true }
-    })
-    const f2Ids = [...new Set(allDescendantsOfF1s.map(c => c.descendantId))]
-
-    // Lay tat ca closures can thiet (depth <= 4 de biet F3)
-    const closures = await prisma.userClosure.findMany({
-        where: {
-            OR: [
-                { ancestorId: { in: [nodeId, ...f1Ids, ...f2Ids] } },
-                { descendantId: { in: f1Ids } }
-            ],
-            depth: { gt: 0, lte: 4 }
-        },
-        include: { descendant: { select: { id: true, name: true } } }
-    })
-
+    // 4. Build map
     const closureByAncestor = new Map<number, any[]>()
-    for (const c of closures) {
-        if (!closureByAncestor.has(c.ancestorId)) {
-            closureByAncestor.set(c.ancestorId, [])
-        }
+    for (const c of allClosures) {
+        if (!closureByAncestor.has(c.ancestorId)) closureByAncestor.set(c.ancestorId, [])
+        const desc = isSystem ? c.descendant.user : c.descendant
         closureByAncestor.get(c.ancestorId)!.push({
             depth: c.depth,
-            descendantId: c.descendantId,
-            name: c.descendant.name
+            userId: desc.id,
+            name: desc.name,
+            autoId: isSystem ? c.descendantId : desc.id
         })
     }
 
+    // 5. Phân nhóm F1
     let groupA: any[] = [], groupB: any[] = [], groupC: any[] = []
-
-    for (const f1 of f1s) {
-        const f1Closures = closureByAncestor.get(f1.id) || []
-        const hasF2 = f1Closures.some(c => c.depth === 1)
-        const hasF3 = f1Closures.some(c => c.depth === 2)
-        const f2s = f1Closures.filter(c => c.depth === 1).map(c => ({
-            id: c.descendantId, name: c.name
-        }))
-
-        const fData = {
-            id: f1.id,
-            name: f1.name,
-            totalSubCount: f1Closures.length + 1,
-            children: f2s
-        }
+    for (const f1 of f1Data) {
+        const closures = closureByAncestor.get(f1.autoId) || []
+        const hasF2 = closures.some(c => c.depth === 1)
+        const hasF3 = closures.some(c => c.depth === 2)
+        const f2s = closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
+        const fData = { id: f1.user.id, name: f1.user.name, totalSubCount: closures.length, children: f2s }
 
         if (!hasF2) groupA.push(fData)
         else if (!hasF3) groupB.push(fData)
         else groupC.push(fData)
     }
 
-    const nodeClosures = closureByAncestor.get(nodeId) || []
-
-    // Build children voi day du group A/B/C
-    const children: GenealogyNode[] = groupC.map(f1 => {
-        const f1Closures = closureByAncestor.get(f1.id) || []
+    // 6. Build Children (Group C)
+    const children: GenealogyNode[] = groupC.map(f1Info => {
+        const f1Record = f1Data.find(f => f.user.id === f1Info.id)
+        const f1Closures = closureByAncestor.get(f1Record.autoId) || []
         const grandF1s = f1Closures.filter(c => c.depth === 1)
         let gA: any[] = [], gB: any[] = [], gC: any[] = []
 
         for (const gf1 of grandF1s) {
-            const gf1Closures = closureByAncestor.get(gf1.descendantId) || []
+            const gf1Closures = closureByAncestor.get(gf1.autoId) || []
             const gHasF2 = gf1Closures.some(c => c.depth === 1)
             const gHasF3 = gf1Closures.some(c => c.depth === 2)
-            const gf2s = gf1Closures.filter(c => c.depth === 1).map(c => ({
-                id: c.descendantId, name: c.name
-            }))
-
-            const gfData = {
-                id: gf1.descendantId,
-                name: gf1.name,
-                totalSubCount: gf1Closures.length + 1,
-                children: gf2s
-            }
+            const gf2s = gf1Closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
+            const gfData = { id: gf1.userId, name: gf1.name, totalSubCount: gf1Closures.length, children: gf2s }
 
             if (!gHasF2) gA.push(gfData)
             else if (!gHasF3) gB.push(gfData)
@@ -292,43 +180,35 @@ async function getLazyChildrenNode(nodeId: number): Promise<GenealogyNode | null
         }
 
         return {
-            id: f1.id,
-            name: f1.name,
-            referrerId: null,
-            totalSubCount: f1Closures.length,
-            f1aCount: gA.length,
-            f1bCount: gB.length,
-            f1cCount: gC.length,
-            groupA: gA,
-            groupB: gB,
+            id: f1Info.id, name: f1Info.name, referrerId: null,
+            totalSubCount: f1Closures.length, f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
+            groupA: gA, groupB: gB,
             children: gC.map(cf => ({
-                id: cf.id, name: cf.name, referrerId: null,
-                totalSubCount: cf.totalSubCount,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                groupA: [], groupB: [], children: []
+                id: cf.id, name: cf.name, referrerId: null, totalSubCount: cf.totalSubCount,
+                f1aCount: 0, f1bCount: 0, f1cCount: 0, groupA: [], groupB: [], children: []
             }))
         }
     })
 
     return {
-        id: nodeUser.id,
-        name: nodeUser.name,
-        referrerId: nodeUser.referrerId,
-        totalSubCount: nodeClosures.length,
+        id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
+        totalSubCount: totalCount,
         f1aCount: groupA.length,
         f1bCount: groupB.length,
         f1cCount: groupC.length,
         groupA,
         groupB,
-        children
+        children,
+        isRoot: true
     }
-}
+    }
 
-export async function getGenealogyTreeAction(rootId: number = 0, depth: number = 1) {
-    const session = await auth()
-    if (!session?.user?.id) throw new Error("Unauthorized")
-    const userId = parseInt(session.user.id)
-    const isAdmin = session.user.role === Role.ADMIN
+
+// --- Public Actions ---
+
+export async function getGenealogyTreeAction(rootId: number = 0) {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+    const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
     try {
         let actualRootId = rootId
         if (rootId === 0) {
@@ -337,23 +217,53 @@ export async function getGenealogyTreeAction(rootId: number = 0, depth: number =
                 actualRootId = firstUser?.id || userId
             } else actualRootId = userId
         }
-        // Su dung cached version - cache 30s
-        const tree = await getCachedGenealogyTree(actualRootId, depth)
+        const tree = await buildStandardTree(actualRootId, 'USER')
         return { success: true, tree }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function getGenealogyChildrenAction(parentId: number, depth: number = 3) {
-    const session = await auth()
-    if (!session?.user?.id) throw new Error("Unauthorized")
+export async function getGenealogyChildrenAction(parentId: number) {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     try {
-        // Lazy load children - khong dung cache vi la tuong tac moi
-        const tree = await getLazyChildrenNode(parentId)
+        const tree = await buildStandardTree(parentId, 'USER')
+        return { success: true, tree: tree ? { ...tree, isRoot: false } : null }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function getSystemTreeAction(systemId: number) {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+    const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
+    try {
+        let rootUserId: number
+        if (isAdmin) {
+            const root = await getSystemRootUser(systemId)
+            if (!root) return { success: false, error: "Không tìm thấy root" }
+            rootUserId = root.id
+        } else {
+            const systemInfo = await getUserSystemInfo(userId)
+            if (!systemInfo || systemInfo.onSystem !== systemId) return { success: false, error: "Bạn không thuộc hệ thống này" }
+            rootUserId = userId
+        }
+        const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId)
         return { success: true, tree }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-// ... các hàm quản trị học viên giữ nguyên (getStudentsAction, roleCounts, etc.)
+export async function getSystemChildrenAction(parentId: number, systemId: number) {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+    try {
+        const tree = await buildStandardTree(parentId, 'SYSTEM', systemId)
+        return { success: true, tree: tree ? { ...tree, isRoot: false } : null }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function getUserSystemsAction() {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+    const userId = parseInt(session.user.id)
+    const systems = await prisma.system.findMany({ where: { userId }, select: { onSystem: true } })
+    return { success: true, systems: systems.map((s: { onSystem: number }) => s.onSystem) }
+}
+
 export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc') {
     await checkAdmin()
     try {

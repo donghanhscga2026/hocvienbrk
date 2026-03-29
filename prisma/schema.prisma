@@ -34,6 +34,9 @@ model User {
   closureAsAncestor   UserClosure[] @relation("ClosureAncestor")
   closureAsDescendant UserClosure[] @relation("ClosureDescendant")
   
+  // System relations (TCA/KTC)
+  system System?
+  
   // Zero 2 Hero Data - Tách sang bảng UserRoadmap
   roadmap       UserRoadmap?
   emailCampaigns EmailCampaign[] @relation("UserToEmailCampaign")
@@ -437,4 +440,46 @@ model YouTubeToken {
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+// ==========================================
+// SYSTEM FEATURE - He thong TCA/KTC
+// ==========================================
+
+// Thong tin he thong cua user (TCA=1, KTC=2)
+model System {
+  autoId    Int       @id @default(autoincrement())  // ID tu dong cho phep refSysId
+  userId    Int       @unique  // Lien ket voi User.id
+  onSystem  Int       // 1=TCA, 2=KTC
+  refSysId  Int       @default(0)  // UserID cua F1 trong he thong (0 = root)
+  createdAt DateTime  @default(now())
+  
+  user       User           @relation(fields: [userId], references: [id])
+  upline     System?        @relation("SystemUpline", fields: [refSysId], references: [userId])
+  referrals  System[]       @relation("SystemUpline")
+  closuresAsAncestor   SystemClosure[] @relation("SystemClosureAncestor")
+  closuresAsDescendant SystemClosure[] @relation("SystemClosureDescendant")
+  
+  @@index([userId])
+  @@index([onSystem])
+  @@index([refSysId])
+  @@map("system")
+}
+
+// Closure Table cho System Tree - toi uu query theo he thong
+model SystemClosure {
+  ancestorId   Int
+  descendantId Int
+  depth        Int     @default(0)
+  systemId     Int     // 1=TCA, 2=KTC
+  
+  ancestor   System @relation("SystemClosureAncestor", fields: [ancestorId], references: [autoId])
+  descendant System @relation("SystemClosureDescendant", fields: [descendantId], references: [autoId])
+  
+  @@id([ancestorId, descendantId, systemId])
+  @@index([ancestorId])
+  @@index([descendantId])
+  @@index([systemId])
+  @@index([depth])
+  @@map("system_closure")
 }
