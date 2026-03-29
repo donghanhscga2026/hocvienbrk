@@ -27,7 +27,7 @@ const GenealogyCard = (props: NodeProps) => {
   const data = props.data as unknown as GenealogyNode & { 
     isRoot?: boolean;
     onToggleExpand?: (id: number) => void;
-    onOpenGroup?: (type: 'A' | 'B', data: any[]) => void;
+    onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
   }
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
@@ -45,7 +45,7 @@ const GenealogyCard = (props: NodeProps) => {
         </div>
         <div className="flex justify-between items-center mt-1 relative h-10 px-0">
           <button 
-            onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA); }}
+            onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA, data.groupATotalSub); }}
             className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -ml-2 ${data.f1aCount > 0 ? 'bg-emerald-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
           >
             {data.f1aCount}
@@ -61,7 +61,7 @@ const GenealogyCard = (props: NodeProps) => {
           </div>
           <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !-bottom-1" />
           <button 
-            onClick={(e) => { e.stopPropagation(); if (data.f1bCount > 0) data.onOpenGroup?.('B', data.groupB); }}
+            onClick={(e) => { e.stopPropagation(); if (data.f1bCount > 0) data.onOpenGroup?.('B', data.groupB, data.groupBTotalSub); }}
             className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -mr-2 ${data.f1bCount > 0 ? 'bg-sky-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
           >
             {data.f1bCount}
@@ -85,7 +85,7 @@ function GenealogyFlow() {
   
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
   const [activeFocusMap, setActiveFocusMap] = useState<Map<number, number>>(new Map()) // parentId -> activeChildId
-  const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B' } | null>(null)
+  const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B', totalSub: number } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
@@ -137,7 +137,7 @@ function GenealogyFlow() {
       data: { 
         ...parent,
         onToggleExpand: actions.onToggleExpand,
-        onOpenGroup: (type: 'A' | 'B', data: any[]) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type })
+        onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub })
       },
     })
 
@@ -396,7 +396,12 @@ function GenealogyFlow() {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[180] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl max-h-[80vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b border-slate-180 flex items-center justify-between">
-              <div><h2 className="text-2xl font-black tracking-tight">{modalData.title}</h2><p className="text-sm text-slate-400 font-bold uppercase mt-1 tracking-widest">Gồm {modalData.users.length} thành viên</p></div>
+              <div>
+                <h2 className="text-2xl font-black tracking-tight">{modalData.title}</h2>
+                <p className="text-sm text-slate-400 font-bold uppercase mt-1 tracking-widest">
+                  Gồm {modalData.users.length} F1 (Tổng: {modalData.totalSub} thành viên)
+                </p>
+              </div>
               <button onClick={() => { setModalData(null); setExpandedF2Id(null); }} className="p-3 bg-slate-50 hover:bg-slate-180 rounded-2xl transition-colors"><X className="w-6 h-6 text-slate-400" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">

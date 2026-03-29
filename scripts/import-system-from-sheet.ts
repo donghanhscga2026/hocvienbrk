@@ -54,15 +54,19 @@ async function importSystemFromSheet(sheetUrl: string, systemId: number) {
     const rows = await parseCSV(csvText)
     console.log(`📊 Đã parse ${rows.length} dòng dữ liệu`)
     
-    // Xóa closure cũ của system này
-    console.log('🗑️ Xóa closure cũ...')
-    await prisma.systemClosure.deleteMany({ where: { systemId } })
+    // Xóa dữ liệu cũ (dùng raw query để bypass FK)
+    console.log('🗑️ Xóa dữ liệu cũ...')
+    await prisma.$executeRaw`DELETE FROM system_closure WHERE "systemId" = ${systemId}`
+    await prisma.$executeRaw`DELETE FROM system WHERE "onSystem" = ${systemId}`
     
-    // Map userId -> autoId sau khi insert
-    const userIdToAutoId = new Map<number, number>()
+    // Sort rows by userId to ensure parent is inserted before child
+    rows.sort((a, b) => parseInt(a.UserID) - parseInt(b.UserID))
     
-    // Insert System records (upsert)
+    // Insert System records với refSysId = 0 trước
     console.log('💾 Đang insert System records...')
+    const userIdToAutoId = new Map<number, number>()
+    const userIdToRefSysId = new Map<number, number>()
+    
     for (const row of rows) {
         const userId = parseInt(row.UserID)
         const onSystem = parseInt(row.OnSystem)
@@ -73,60 +77,41 @@ async function importSystemFromSheet(sheetUrl: string, systemId: number) {
             continue
         }
         
-        const system = await prisma.system.upsert({
-            where: { userId },
-            update: { onSystem, refSysId },
-            create: { userId, onSystem, refSysId }
+        userIdToRefSysId.set(userId, refSysId)
+        
+        const system = await prisma.system.create({
+            data: { userId, onSystem, refSysId: 0 }
         })
         
         userIdToAutoId.set(userId, system.autoId)
     }
     console.log(`✅ Đã insert ${userIdToAutoId.size} System records`)
     
-    // Tạo closures
-    console.log('🔗 Đang tạo closures...')
-    let closureCount = 0
-    
-    for (const row of rows) {
-        const userId = parseInt(row.UserID)
-        const refSysId = parseInt(row.RefSysID)
-        const autoId = userIdToAutoId.get(userId)
-        
-        if (!autoId) continue
-        
-        // Closure cho chính mình (depth = 0)
-        await prisma.systemClosure.create({
-            data: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
-        }).catch(() => {})
-        closureCount++
-        
-        // Nếu có upline, copy closures từ upline
-        if (refSysId > 0) {
-            const uplineAutoId = userIdToAutoId.get(refSysId)
-            if (uplineAutoId) {
-                const uplineClosures = await prisma.systemClosure.findMany({
-                    where: { ancestorId: uplineAutoId, systemId }
-                })
-                
-                for (const closure of uplineClosures) {
-                    await prisma.systemClosure.create({
-                        data: {
-                            ancestorId: closure.ancestorId,
-                            descendantId: autoId,
-                            depth: closure.depth + 1,
-                            systemId
-                        }
-                    }).catch(() => {})
-                    closureCount++
-                }
+    // Update refSysId sau khi tất cả đã được insert (dùng raw query để bypass FK)
+    // refSysId trong DB tham chiếu đến userId của upline
+    console.log('💾 Đang update refSysId...')
+    let updateSuccess = false
+    try {
+        for (const [userId, refSysId] of userIdToRefSysId) {
+            if (refSysId > 0) {
+                const autoId = userIdToAutoId.get(userId)
+                await prisma.$executeRaw`UPDATE "system" SET "refSysId" = ${refSysId} WHERE "autoId" = ${autoId}`
             }
         }
+        console.log('✅ Đã update refSysId')
+        updateSuccess = true
+    } catch (e) {
+        console.log('❌ Update refSysId thất bại!')
     }
     
-    console.log(`✅ Đã tạo ${closureCount} closures`)
-    console.log('🎉 Import hoàn tất!')
+    if (!updateSuccess) {
+        console.log('❌ Dừng lại do update thất bại. Không tạo closures.')
+        return { systemCount: 0, closureCount: 0 }
+    }
     
-    return { systemCount: userIdToAutoId.size, closureCount }
+    console.log('🎉 Import hoàn tất! Vui lòng chạy scripts/generate-system-closures.ts để tạo closures.')
+    
+    return { systemCount: userIdToAutoId.size, closureCount: 0 }
 }
 
 // Main
