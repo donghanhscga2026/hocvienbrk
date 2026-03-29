@@ -80,6 +80,26 @@ export async function sendWelcomeEmail(to: string, studentName: string, studentI
   await sendGmail(to, subject, htmlBody);
 }
 
+export async function sendVerificationEmail(to: string, studentName: string, token: string) {
+  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://hocvienbrk.com'}/api/auth/verify?token=${token}`;
+  const subject = `[Học Viện BRK] Xác minh tài khoản của bạn`;
+  const htmlBody = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; rounded: 8px;">
+      <h2 style="color: #4f46e5; text-align: center;">Xác minh Email</h2>
+      <p>Chào <b>${studentName}</b>,</p>
+      <p>Cảm ơn bạn đã đăng ký gia nhập Học Viện BRK. Để hoàn tất quá trình đăng ký và kích hoạt tài khoản, vui lòng nhấn vào nút bên dưới:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verifyUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Kích hoạt tài khoản</a>
+      </div>
+      <p style="font-size: 12px; color: #6b7280;">Nếu nút trên không hoạt động, bạn có thể sao chép và dán liên kết này vào trình duyệt:</p>
+      <p style="font-size: 12px; color: #4f46e5; word-break: break-all;">${verifyUrl}</p>
+      <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+      <p style="font-size: 12px; color: #9ca3af; text-align: center;">Đây là email tự động, vui lòng không trả lời email này.</p>
+    </div>
+  `;
+  await sendGmail(to, subject, htmlBody);
+}
+
 export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
   const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
   const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
