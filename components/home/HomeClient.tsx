@@ -83,9 +83,9 @@ export default function HomeClient({
 
   return (
     <>
-      {customPath !== null && (
+      {session?.user && (
         <section className="container mx-auto px-4 py-8">
-          {customPath.length === 0 ? (
+          {!customPath || customPath.length === 0 ? (
             <Zero2HeroSurvey />
           ) : (
             <RealityMap 

@@ -290,6 +290,105 @@ export async function getSystemChildrenAction(parentId: number, systemId: number
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
+// SỬA 2026-03-30: Thêm tính năng tìm kiếm Nhân mạch theo ID (FIX: tối ưu query)
+// Tìm đường đi từ root đến target node và trả về path - chỉ hiện path đơn giản
+export async function searchGenealogyByIdAction(targetId: number, systemId?: number) {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+    const isSystem = systemId !== undefined
+    try {
+        // 1. Kiểm tra user/system tồn tại
+        let targetAutoId: number | null = null
+        
+        if (isSystem) {
+            const system = await prisma.system.findFirst({ 
+                where: { userId: targetId, onSystem: systemId } 
+            })
+            if (!system) return { success: false, error: `Không tìm thấy mã #${targetId} trong hệ thống này` }
+            targetAutoId = system.autoId
+        } else {
+            const user = await prisma.user.findUnique({ where: { id: targetId } })
+            if (!user) return { success: false, error: `Không tìm thấy mã #${targetId}` }
+        }
+
+        // 2. Query closure để lấy path từ root đến target - depth DESC (root → target)
+        const ancestors = isSystem
+            ? await prisma.systemClosure.findMany({
+                where: { systemId, descendantId: targetAutoId! },
+                orderBy: { depth: 'desc' },
+                include: { 
+                    ancestor: { 
+                        include: { 
+                            user: { select: { id: true, name: true } },
+                        }
+                    } 
+                }
+              })
+            : await prisma.userClosure.findMany({
+                where: { descendantId: targetId },
+                orderBy: { depth: 'desc' },
+                include: { ancestor: { select: { id: true, name: true, referrerId: true } } }
+              })
+
+        if (!ancestors || ancestors.length === 0) {
+            return { success: false, error: `Không tìm thấy đường dẫn cho mã #${targetId}` }
+        }
+
+        // 3. Build path nodes đơn giản
+        const pathNodes: GenealogyNode[] = []
+        
+        for (let i = 0; i < ancestors.length; i++) {
+            const anc = ancestors[i] as any
+            const nodeId = isSystem ? anc.ancestor.userId : anc.ancestorId
+            const name = isSystem ? anc.ancestor.user?.name : anc.ancestor.name
+            const depth = anc.depth
+
+            // Build children - chỉ có 1 child trên path (node tiếp theo)
+            const children: GenealogyNode[] = []
+            if (i < ancestors.length - 1) {
+                const nextAnc = ancestors[i + 1] as any
+                const nextId = isSystem ? nextAnc.ancestor.userId : nextAnc.ancestorId
+                const nextName = isSystem ? nextAnc.ancestor.user?.name : nextAnc.ancestor.name
+                children.push({
+                    id: nextId,
+                    name: nextName || 'HV',
+                    referrerId: null,
+                    totalSubCount: 0,
+                    f1aCount: 0, f1bCount: 0, f1cCount: 0,
+                    groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                    groupA: [], groupB: [], children: []
+                })
+            }
+
+            pathNodes.push({
+                id: nodeId,
+                name: name || 'HV',
+                referrerId: null,
+                totalSubCount: 1,
+                f1aCount: 0,
+                f1bCount: 0,
+                f1cCount: 0,
+                groupATotalSub: 0,
+                groupBTotalSub: 0,
+                groupCTotalSub: 0,
+                groupA: [],
+                groupB: [],
+                children,
+                isRoot: depth === 0
+            })
+        }
+
+        return { 
+            success: true, 
+            path: pathNodes,
+            targetNode: pathNodes[pathNodes.length - 1],
+            targetId 
+        }
+    } catch (error: any) { 
+        console.error('[Search Error]', error)
+        return { success: false, error: error.message || 'Lỗi khi tìm kiếm' } 
+    }
+}
+
 export async function getUserSystemsAction() {
     const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     const userId = parseInt(session.user.id)
