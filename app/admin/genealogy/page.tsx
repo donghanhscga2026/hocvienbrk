@@ -221,12 +221,11 @@ function GenealogyFlow() {
   const handleToggleExpand = useCallback(async (id: number) => {
     console.log(`[Action] Trigger Toggle Expand for Node #${id}`);
     setLoading(true)
-    console.log(`[DEBUG] Setting lastExpandedIdRef to ${id}`);
     lastExpandedIdRef.current = id
 
     try {
       let result;
-      if (selectedSystem === null) {
+      if (selectedSystem === null || selectedSystem === 0) {
         result = await getGenealogyChildrenAction(id)
       } else {
         result = await getSystemChildrenAction(id, selectedSystem)
@@ -234,13 +233,14 @@ function GenealogyFlow() {
       console.log(`[API] Fetch children for #${id} result:`, result.success ? 'Success' : 'Failed');
 
       if (result.success && result.tree && fullTree) {
-        // 1. Cập nhật dữ liệu cây (ghép nhánh mới vào)
+        console.log(`[Tree] FullTree root:`, fullTree.id);
+        
         setFullTree(prev => {
           const updatedTree = mergeSubtree(prev!, result.tree!);
+          console.log(`[Tree] Merged, root children count:`, updatedTree.children?.length);
           return { ...updatedTree };
         });
 
-        // 2. Tìm cha của node vừa click để cập nhật Focus Map
         const findParentId = (node: GenealogyNode, targetId: number): number | null => {
           if (node.children?.some(c => c.id === targetId)) return node.id;
           for (const c of (node.children || [])) {
@@ -266,6 +266,8 @@ function GenealogyFlow() {
             return next;
           });
         }
+      } else {
+        console.log(`[API] Failed or no tree: fullTree=`, !!fullTree);
       }
     } catch (e) {
       console.error("[Fatal] Error in handleToggleExpand:", e);
@@ -345,13 +347,34 @@ function GenealogyFlow() {
     setSearchError(null)
     setIsSearchMode(true)
     setLoading(true)
-    setSearchResult(null) // Clear trước
+    setSearchResult(null)
 
     try {
       // Chỉ truyền systemId khi chọn TCA(1) hoặc KTC(2), không truyền cho Học viên(0)
       const systemIdForSearch = selectedSystem === 0 ? undefined : (selectedSystem ?? undefined)
       console.log('[SEARCH] Searching for ID:', id, 'systemId:', systemIdForSearch)
 
+      // Nếu tìm trong hệ thống Học viên (0), load luôn cây con của node đó
+      if (selectedSystem === 0 || selectedSystem === null) {
+        const childrenResult = await getGenealogyChildrenAction(id)
+        console.log('[SEARCH] Fetch children result:', childrenResult.success ? 'Success' : 'Failed')
+        
+        if (childrenResult.success && childrenResult.tree) {
+          // Load cây gốc trước
+          const treeResult = await getGenealogyTreeAction(0)
+          if (treeResult.success && treeResult.tree) {
+            // Ghép cây con vào cây gốc
+            const subtreeWithId = { ...childrenResult.tree, isRoot: false } as GenealogyNode
+            setFullTree(prev => {
+              if (!prev) return subtreeWithId
+              // Merge cây con vào vị trí của node id
+              return mergeSubtree(prev, subtreeWithId)
+            })
+          }
+        }
+      }
+
+      // Sau đó tìm kiếm như bình thường
       const result = await searchGenealogyByIdAction(id, systemIdForSearch)
       console.log('[SEARCH] Result:', JSON.stringify(result))
 
@@ -362,7 +385,19 @@ function GenealogyFlow() {
           targetId: result.targetId
         })
         console.log('[SEARCH] searchResult set with', result.path.length, 'nodes')
-        setSearchError(null)
+        
+        // SỬA: Focus vào node target bằng cách expand path
+        const targetId = result.targetId
+        setActiveFocusMap(prev => {
+          const next = new Map(prev)
+          // Tìm parent của target và set focus
+          for (let i = 0; i < result.path.length - 1; i++) {
+            next.set(result.path[i].id, result.path[i + 1].id)
+          }
+          return next
+        })
+        
+        setError(null)
       } else {
         console.log('[SEARCH] Not found:', result.error)
         setSearchError(result.error || `Không tìm thấy mã #${id}`)
@@ -376,7 +411,7 @@ function GenealogyFlow() {
       setSearchResult(null)
     }
     setLoading(false)
-  }, [searchInput, selectedSystem])
+  }, [searchInput, selectedSystem, mergeSubtree])
 
   // SỬA 2026-03-30: Handler xóa tìm kiếm, quay về tree gốc
   const handleClearSearch = useCallback(() => {

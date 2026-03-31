@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import Image from 'next/image'
+import React, { useState } from 'react'
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { Lightbulb } from 'lucide-react'
 
 // Tối ưu 1: Dynamic Import cho Dialog giúp giảm dung lượng file bundle ban đầu (Initial JS)
@@ -69,15 +69,15 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                     <div className="flex flex-col items-center shrink-0">
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
                             <span
-                                className="uppercase text-white drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.5rem, 6vw, 4rem)' }}
+                                className="uppercase drop-shadow-xl"
+                                style={{ fontSize: 'clamp(0.5rem, 6vw, 4rem)', color: '#ffffff' }}
                             >
                                 HỌC VIỆN BRK
                             </span>
 
                             <span
-                                className="text-glow-3d uppercase drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.5rem, 5vw, 3rem)' }}
+                                className="uppercase drop-shadow-xl"
+                                style={{ fontSize: 'clamp(0.5rem, 5vw, 3rem)', color: '#fbbf24', textShadow: '0 0 15px #fbbf2480, 0 0 30px #fbbf2450' }}
                             >
                                 NGÂN HÀNG PHƯỚC BÁU
                             </span>
@@ -90,8 +90,8 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 }}
                             >
                                 <span
-                                    className="block font-semibold text-white whitespace-nowrap"
-                                    style={{ fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)' }}
+                                    className="block font-semibold whitespace-nowrap"
+                                    style={{ fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', color: '#ffffff' }}
                                 >
                                     {session?.user
                                         ? `Mến chào ${userName || 'Học viên'} - Mã học tập ${userId}`
@@ -112,10 +112,11 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                         {/* Container nội dung thông điệp - Tự động điều chỉnh theo nội dung */}
                         <div className="flex items-center justify-center gap-[8px] max-w-[95%] md:max-w-[85%] w-full">
                             <p
-                                className="text-yellow-400 font-medium italic leading-tight drop-shadow-lg whitespace-pre-line overflow-visible"
+                                className="font-medium italic leading-tight drop-shadow-lg whitespace-pre-line overflow-visible"
                                 style={{
                                     /* Font size đơn giản: tự động điều chỉnh theo độ dài nội dung */
                                     fontSize: `clamp(0.7rem, 2.5vw, 2rem)`,
+                                    color: '#fbbf24'
                                 }}
                             >
                                 &ldquo;{displayMessage.content}&rdquo;
@@ -123,15 +124,16 @@ export default function MessageCard({ message, session, userName, userId }: Mess
 
                             {/* Icon bóng đèn - Thu nhỏ scale khi chữ nhỏ đi để giữ sự cân đối */}
                             <div
-                                className="shrink-0 rounded-full bg-yellow-400 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity shadow-lg"
+                                className="shrink-0 rounded-full flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity shadow-lg"
                                 style={{
                                     width: 'clamp(1.4rem, 3.2vw, 2.6rem)',
-                                    height: 'clamp(1.4rem, 3.2vw, 2.6rem)'
+                                    height: 'clamp(1.4rem, 3.2vw, 2.6rem)',
+                                    backgroundColor: '#fbbf24'
                                 }}
                             >
                                 <Lightbulb
-                                    className="text-black animate-pulse"
-                                    style={{ width: '55%', height: '55%' }}
+                                    className="animate-pulse"
+                                    style={{ width: '55%', height: '55%', color: '#000' }}
                                 />
                             </div>
                         </div>

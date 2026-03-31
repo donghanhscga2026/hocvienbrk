@@ -11,6 +11,34 @@
   --text-color: #171717;
 }
 
+/* Base theme classes - áp dụng trước khi JS chạy (chống flash màu) */
+.text-brk-primary { color: #f59e0b !important; text-shadow: 0 0 10px rgba(245,158,11,0.25), 0 0 20px rgba(245,158,11,0.25) !important; }
+.text-brk-secondary { color: #0ea5e9 !important; text-shadow: 0 0 10px rgba(14,165,233,0.25), 0 0 20px rgba(14,165,233,0.25) !important; }
+.text-brk-text { color: #171717 !important; }
+.text-brk-bg { color: #ffffff !important; }
+.bg-brk-primary { background-color: #f59e0b !important; }
+.bg-brk-bg { background-color: #ffffff !important; }
+.bg-brk-header { background-color: #000000 !important; }
+.text-brk-header { color: #000000 !important; }
+
+.text-brk-primary-75 { color: rgba(245, 158, 11, 0.75) !important; }
+.text-brk-primary-50 { color: rgba(245, 158, 11, 0.5) !important; }
+.text-brk-primary-25 { color: rgba(245, 158, 11, 0.25) !important; }
+.text-brk-primary-light { color: #fbbf24 !important; }
+.text-brk-primary-dark { color: #d97706 !important; }
+.text-brk-secondary-75 { color: rgba(14, 165, 233, 0.75) !important; }
+.text-brk-secondary-50 { color: rgba(14, 165, 233, 0.5) !important; }
+.text-brk-secondary-25 { color: rgba(14, 165, 233, 0.25) !important; }
+.text-brk-secondary-light { color: #38bdf8 !important; }
+.text-brk-secondary-dark { color: #0284c7 !important; }
+.text-brk-text-75 { color: rgba(23, 23, 23, 0.75) !important; }
+.text-brk-text-50 { color: rgba(23, 23, 23, 0.5) !important; }
+.text-brk-text-25 { color: rgba(23, 23, 23, 0.25) !important; }
+.text-brk-text-light { color: #404040 !important; }
+.text-brk-text-dark { color: #000000 !important; }
+.bg-brk-primary-light { background-color: #fbbf24 !important; }
+.bg-brk-primary-dark { background-color: #d97706 !important; }
+
 /* Theme High-End Business */
 [data-theme="highend"] {
   --primary-color: #D4AF37;
