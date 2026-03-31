@@ -484,3 +484,37 @@ model SystemClosure {
   @@index([depth])
   @@map("system_closure")
 }
+
+// ==========================================
+// THEME SYSTEM - 2026-03-30
+// ==========================================
+
+model Theme {
+  id            String   @id
+  name          String
+  description   String?
+  colors        Json
+  typography    Json
+  layout        Json
+  animations    Json?
+  effects       Json?
+  isLocked      Boolean  @default(false)
+  isActive      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  siteSettings  SiteSettings?
+
+  @@index([id])
+}
+
+model SiteSettings {
+  id          String   @id @default("global")
+  themeId     String   @default("classic")
+  language    String   @default("vi")
+  updatedAt   DateTime @updatedAt
+  
+  theme       Theme    @relation(fields: [themeId], references: [id])
+
+  @@unique([themeId])
+}
