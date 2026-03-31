@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Palette, Globe } from "lucide-react"
 
 export default function SettingsPage() {
   return (
@@ -17,10 +17,32 @@ export default function SettingsPage() {
       </header>
 
       <div className="p-4 max-w-lg mx-auto">
-        <div className="space-y-6 mt-4">
-          <div className="bg-white rounded-2xl border border-gray-100 p-6">
-            <h2 className="text-lg font-bold mb-4">Cài Đặt Chung</h2>
-            <p className="text-gray-500">Trang cài đặt đang được phát triển...</p>
+        <div className="space-y-4 mt-4">
+          <Link
+            href="/admin/settings/theme"
+            className="block bg-white rounded-2xl border border-gray-100 p-6 hover:border-amber-300 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <Palette className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Giao diện</h2>
+                <p className="text-sm text-gray-500">Tùy chỉnh theme, màu sắc, phông chữ</p>
+              </div>
+            </div>
+          </Link>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 opacity-60">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                <Globe className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Ngôn ngữ</h2>
+                <p className="text-sm text-gray-500">Sắp ra mắt...</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
