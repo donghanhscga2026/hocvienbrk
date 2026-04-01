@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { onEmailVerified } from "@/lib/affiliate/points-manager";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -22,13 +23,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/login?error=Mã xác minh đã hết hạn hoặc không tồn tại", request.url));
     }
 
-    // 2. Cập nhật trạng thái emailVerified cho User
+    // 2. Tìm user trước khi cập nhật
+    const user = await prisma.user.findUnique({
+      where: { email: verificationToken.identifier },
+      select: { id: true }
+    });
+
+    // 3. Cập nhật trạng thái emailVerified cho User
     await prisma.user.update({
       where: { email: verificationToken.identifier },
       data: { emailVerified: new Date() }
     });
 
-    // 3. Xóa token sau khi đã sử dụng
+    // 4. Xóa token sau khi đã sử dụng
     await prisma.verificationToken.delete({
       where: {
         identifier_token: {
@@ -38,7 +45,12 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // 4. Chuyển hướng về trang đăng nhập với thông báo thành công
+    // 5. Cộng điểm affiliate cho người giới thiệu (nếu có)
+    if (user) {
+      await onEmailVerified(user.id);
+    }
+
+    // 6. Chuyển hướng về trang đăng nhập với thông báo thành công
     return NextResponse.redirect(new URL("/login?success=Xác minh email thành công! Bây giờ bạn có thể đăng nhập.", request.url));
 
   } catch (error) {

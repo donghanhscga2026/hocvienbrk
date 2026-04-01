@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, Settings, ArrowLeft, Youtube } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, Settings, ArrowLeft, Youtube, DollarSign } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const menuItems = [
+  { label: 'Affiliate', href: '/admin/affiliate', icon: DollarSign, color: 'bg-emerald-500' },
   { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard, color: 'bg-green-500' },
   { label: 'Bảng Tin', href: '/admin/posts', icon: FileText, color: 'bg-blue-500' },
   { label: 'Số Đẹp', href: '/admin/reserved-ids', icon: Gem, color: 'bg-purple-500' },
