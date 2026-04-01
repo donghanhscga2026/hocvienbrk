@@ -42,9 +42,25 @@ model User {
   roadmap       UserRoadmap?
   emailCampaigns EmailCampaign[] @relation("UserToEmailCampaign")
 
+  // Affiliate System fields
+  affiliateCode    String?   @unique  // Mã CTV duy nhất (VD: "BRK123456")
+  bankAccount     String?   // Số tài khoản
+  bankName        String?   // Tên ngân hàng (VD: "VietinBank")
+  bankHolder      String?   // Tên chủ tài khoản
+  idCardNumber    String?   // CMND/CCCD
+  
+  // Affiliate Relations
+  affiliateLinks      AffiliateLink[]
+  registrationPointsAsReferrer  RegistrationPoint[] @relation("ReferrerRegistration")
+  registrationPointsAsReferee  RegistrationPoint[] @relation("RefereeRegistration")
+  commissions          AffiliateCommission[]
+  wallet               AffiliateWallet?
+  affiliatePayouts     AffiliatePayout[]
+
   @@index([email])
   @@index([phone])
   @@index([referrerId])
+  @@index([affiliateCode])
 }
 
 // Closure Table cho Genealogy Tree - Tối ưu truy vấn descendants
@@ -402,6 +418,78 @@ enum CourseType {
   CHALLENGE
 }
 
+// ==========================================
+// AFFILIATE SYSTEM ENUMS
+// ==========================================
+
+enum AffiliateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ConversionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum CommissionStatus {
+  PENDING
+  AVAILABLE
+  WITHDRAWN
+  CANCELLED
+}
+
+enum PointStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum TransactionType {
+  COMMISSION
+  WITHDRAWAL
+  REFUND
+  ADJUSTMENT
+  POINT_EARNED
+  POINT_REDEEMED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  FREE
+  PAID
+  POINT_REDEMPTION
+  SYSTEM_GRANT
+}
+
+enum ProductType {
+  COURSE
+  POINT_REDEMPTION
+}
+
+enum SystemType {
+  TCA
+  KTC
+}
+
 enum PaymentStatus {
   PENDING
   VERIFIED
@@ -506,6 +594,239 @@ model Theme {
   siteSettings  SiteSettings?
 
   @@index([id])
+}
+
+// ==========================================
+// AFFILIATE SYSTEM MODELS - Phase 1
+// ==========================================
+
+// Chiến dịch Affiliate (Campaign)
+model AffiliateCampaign {
+  id            Int       @id @default(autoincrement())
+  name          String
+  slug          String    @unique  // URL-friendly: "chuong-trinh-1"
+  description   String?
+  isActive      Boolean   @default(true)
+  
+  // Commission settings
+  maxLevels     Int       @default(3)  // Số tầng hoa hồng tối đa
+  pendingDays   Int       @default(30) // Ngày chờ pending trước khi available
+  
+  // Payout settings
+  minPayout     Float     @default(200000) // Số dư tối thiểu để rút
+  taxRate       Float     @default(0)      // % thuế (0 = miễn thuế)
+  feeAmount     Float     @default(3300)   // Phí chuyển khoản
+  
+  // Points settings
+  pointsPerRegistration  Float    @default(1.0)   // Điểm/đăng ký xác thực
+  pointsRequired        Float    @default(10.0)   // Điểm cần để đổi
+  pointRedemptionValue  Float    @default(386868) // Giá trị quy đổi (1 khóa L1)
+  autoRedeem           Boolean   @default(false)  // Tự động đổi hay manual
+  
+  // Redemption course
+  redemptionCourseId    Int?     // Khóa học được đổi (Level 1)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  levels        AffiliateLevel[]
+  links         AffiliateLink[]
+  conversions   AffiliateConversion[]
+  registrations RegistrationPoint[]
+  
+  @@index([isActive])
+}
+
+// Cau hinh muc hoa hong theo tang
+model AffiliateLevel {
+  id          Int                @id @default(autoincrement())
+  campaignId  Int
+  campaign    AffiliateCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  level       Int                // 1 = F1, 2 = F2, 3 = F3...
+  percentage  Float              // % hoa hồng (VD: 10.0 = 10%)
+  minOrder    Float?             // Đơn hàng tối thiểu để nhận hoa hồng
+  
+  @@unique([campaignId, level])
+  @@index([campaignId])
+}
+
+// Link affiliate cua CTV
+model AffiliateLink {
+  id          Int                @id @default(autoincrement())
+  userId      Int
+  campaignId  Int
+  campaign    AffiliateCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  code        String             @unique  // Mã: "ABC123XYZ"
+  name        String?            // Tên chiến dịch con: "Link Facebook", "Banner 1"
+  source      String?            // facebook, zalo, google, email, website...
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  
+  // Relations
+  user        User               @relation(fields: [userId], references: [id])
+  clicks      AffiliateClick[]
+  conversions AffiliateConversion[]
+  
+  @@unique([userId, campaignId, name])
+  @@index([userId])
+  @@index([campaignId])
+}
+
+// Lich su click
+model AffiliateClick {
+  id          Int           @id @default(autoincrement())
+  linkId      Int
+  link        AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  userAgent   String?
+  referer     String?
+  url         String?       // Trang đích
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  deviceType  String?      // desktop, mobile, tablet
+  country     String?
+  city        String?
+  createdAt   DateTime      @default(now())
+  
+  @@index([linkId, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+// Conversion (khi co don hang)
+model AffiliateConversion {
+  id            Int                    @id @default(autoincrement())
+  linkId        Int
+  link          AffiliateLink          @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  campaignId    Int
+  campaign      AffiliateCampaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId    Int                    // User mua khóa học
+  enrollmentId Int?                   // Enrollment ID
+  orderId      String?                 // Mã đơn hàng
+  orderAmount  Float                  // Số tiền đơn hàng
+  productType  ProductType            @default(COURSE)
+  status        ConversionStatus       @default(PENDING)
+  fraudFlags   String[]               // ["SAME_IP", "SELF_REFERRAL"]
+  pendingUntil DateTime               // = createdAt + pendingDays
+  approvedAt   DateTime?
+  createdAt    DateTime               @default(now())
+  
+  // Relations
+  commissions  AffiliateCommission[]
+  
+  @@index([campaignId, status])
+  @@index([customerId])
+  @@index([pendingUntil])
+}
+
+// Diem dang ky - khi user moi xac thuc email
+model RegistrationPoint {
+  id              Int               @id @default(autoincrement())
+  referrerId      Int               // Nguoi gioi thieu (F1)
+  refereeId       Int               // Nguoi duoc gioi thieu
+  campaignId      Int
+  campaign        AffiliateCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  points          Float             @default(1.0)
+  status          PointStatus       @default(PENDING)
+  earnedAt        DateTime          @default(now())
+  confirmedAt     DateTime?         // Khi xac thuc email thanh cong
+  
+  // Relations
+  referrer        User              @relation("ReferrerRegistration", fields: [referrerId], references: [id])
+  referee         User              @relation("RefereeRegistration", fields: [refereeId], references: [id])
+  
+  @@index([referrerId])
+  @@index([refereeId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+// Hoa hong cua CTV
+model AffiliateCommission {
+  id            Int               @id @default(autoincrement())
+  conversionId  Int
+  conversion    AffiliateConversion @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+  affiliateId   Int
+  level         Int               // 1 = F1, 2 = F2, 3 = F3...
+  percentage    Float             // % duoc ap dung
+  grossAmount   Float             // So tien goc
+  taxAmount     Float             @default(0)
+  feeAmount     Float             @default(0)
+  netAmount     Float             // Thuc nhan = grossAmount - tax - fee
+  status        CommissionStatus  @default(PENDING)
+  availableAt   DateTime?         // Khi nao available de rut
+  paidAt        DateTime?
+  createdAt     DateTime          @default(now())
+  
+  // Relations
+  affiliate     User              @relation(fields: [affiliateId], references: [id])
+  
+  @@index([affiliateId, status])
+  @@index([availableAt])
+}
+
+// Vi cua CTV (chua diem + tien)
+model AffiliateWallet {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  user           User     @relation(fields: [userId], references: [id])
+  
+  // Points
+  points         Float    @default(0)     // Diem dang ky (khong het han)
+  
+  // Money
+  balance        Float    @default(0)      // Co the rut ngay
+  pendingBalance Float    @default(0)      // Dang cho pending
+  totalEarned    Float    @default(0)      // Tong da kiem
+  totalPaid      Float    @default(0)     // Tong da rut
+  
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  transactions    AffiliateTransaction[]
+  
+  @@index([userId])
+}
+
+// Lich su giao dich vi
+model AffiliateTransaction {
+  id              Int              @id @default(autoincrement())
+  walletId        Int
+  wallet          AffiliateWallet  @relation(fields: [walletId], references: [id])
+  amount          Float            // +/- so tien
+  type            TransactionType
+  description     String
+  refId           String?          // Lien ket: payout_id, commission_id
+  balanceBefore   Float
+  balanceAfter    Float
+  status          TransactionStatus @default(COMPLETED)
+  createdAt       DateTime         @default(now())
+  
+  @@index([walletId, createdAt])
+  @@index([type])
+}
+
+// Yeu cau rut tien
+model AffiliatePayout {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id])
+  amount        Float          // So tien yeu cau
+  taxAmount     Float          @default(0)
+  feeAmount     Float          @default(0)
+  netAmount     Float          // Thuc nhan
+  bankName      String
+  bankAccount   String
+  accountHolder String
+  qrCodeUrl     String?        // VietQR
+  status        PayoutStatus   @default(PENDING)
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  
+  @@index([status])
+  @@index([userId, status])
 }
 
 model SiteSettings {

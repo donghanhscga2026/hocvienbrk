@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { processEnrollmentCommission } from "@/lib/affiliate/commission-calculator"
 
 export async function getPaymentByEnrollmentId(enrollmentId: number) {
   try {
@@ -100,6 +101,17 @@ export async function verifyPaymentAction(
         data: { status: 'ACTIVE' }
       })
     ])
+
+    // Xử lý affiliate commission cho người giới thiệu
+    const commissionResult = await processEnrollmentCommission(
+      enrollment.userId,
+      enrollmentId,
+      enrollment.payment?.amount || 0
+    )
+    
+    if (commissionResult.success) {
+      console.log('[Payment] Affiliate commission processed:', commissionResult)
+    }
 
     revalidatePath('/')
     revalidatePath('/courses')
@@ -213,6 +225,12 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
   content: string;
 }) {
   try {
+    // Lấy enrollment info trước
+    const enrollmentInfo = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { user: true }
+    })
+
     const payment = await prisma.payment.update({
       where: { enrollmentId },
       data: {
@@ -233,6 +251,15 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
       where: { id: enrollmentId },
       data: { status: 'ACTIVE' }
     })
+
+    // Xử lý affiliate commission cho người giới thiệu
+    if (enrollmentInfo) {
+      await processEnrollmentCommission(
+        enrollmentInfo.userId,
+        enrollmentId,
+        transferData.amount
+      )
+    }
 
     return { success: true, payment }
   } catch (error: any) {

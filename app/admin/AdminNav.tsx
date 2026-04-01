@@ -2,9 +2,10 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Settings, Radio, Bell, Youtube } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Settings, Radio, Bell, Youtube, DollarSign } from 'lucide-react'
 
 const menuItems = [
+  { label: 'Affiliate', href: '/admin/affiliate', icon: DollarSign },
   { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard },
   { label: 'Bảng Tin', href: '/admin/posts', icon: FileText },
   { label: 'Số Đẹp', href: '/admin/reserved-ids', icon: Gem },
@@ -85,4 +86,9 @@ export const campaignSubNav = [
   { label: 'Danh Sách', href: '/admin/campaigns', icon: Mail },
   { label: 'Kết Nối Vệ Tinh', href: '/admin/email-senders', icon: Radio },
   { label: 'Cài Đặt', href: '/admin/email-settings', icon: Bell },
+]
+
+export const affiliateSubNav = [
+  { label: 'Dashboard', href: '/admin/affiliate', icon: DollarSign },
+  { label: 'Duyệt Rút Tiền', href: '/admin/affiliate/payouts', icon: CreditCard },
 ]
