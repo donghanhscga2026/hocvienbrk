@@ -147,7 +147,7 @@ export default async function Home() {
   const isCourseOneActive = enrollmentsMap[1]?.status === 'ACTIVE';
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-brk-background">
       {/* Header */}
       <Header session={session} userImage={userImage} />
 
@@ -174,7 +174,7 @@ export default async function Home() {
       />
 
       {/* Footer (Optional simple) */}
-      <footer className="bg-gray-100 py-12 text-center text-gray-500 text-sm">
+      <footer className="bg-brk-background py-12 text-center text-brk-muted text-sm">
         <p>© 2026 Học viện BRK. All rights reserved.</p>
       </footer>
     </main>

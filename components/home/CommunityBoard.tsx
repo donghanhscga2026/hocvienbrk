@@ -63,7 +63,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                     <Newspaper className="w-6 h-6 text-brk-primary" />
                     <div>
                         <h2 className="text-xl font-black text-brk-on-surface uppercase tracking-tight leading-none">Bảng tin</h2>
-                        <p className="text-[9px] text-brk-muted font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1} ({total} bài)</p>
+                        <p className="text-[9px] text-brk-accent font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1} ({total} bài)</p>
                     </div>
                 </div>
                 
