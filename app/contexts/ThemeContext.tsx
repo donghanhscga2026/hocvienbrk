@@ -1,12 +1,20 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ThemeId, getThemeById, applyThemeCSS, generateThemeOverrides } from './theme-config';
+import { ThemeId, getThemeById, generateThemeOverrides } from './theme-config';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedTheme = (localStorage.getItem('site-theme') as ThemeId) || 'default';
     const savedCustom = localStorage.getItem('site-custom-colors');
+    
+    if (savedTheme === 'default' && !savedCustom) {
+      // Default theme - clear any overrides
+      const styleEl = document.getElementById('theme-overrides');
+      if (styleEl) styleEl.textContent = '';
+      document.documentElement.removeAttribute('data-theme');
+      return;
+    }
     
     let theme = getThemeById(savedTheme);
     if (savedTheme === 'custom' && savedCustom) {
@@ -28,13 +36,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.head.appendChild(styleEl);
     }
     
-    styleEl.textContent = applyThemeCSS(theme.colors) + generateThemeOverrides(theme.colors, isDark);
-    
-    if (theme.id === 'default') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme.id);
-    }
+    styleEl.textContent = generateThemeOverrides(theme.colors, isDark);
+    document.documentElement.setAttribute('data-theme', theme.id);
   }, []);
 
   return <>{children}</>;

@@ -83,23 +83,21 @@ export default function HomeClient({
 
   return (
     <>
-      {session?.user && (
-        <section className="container mx-auto px-4 py-8">
-          {!customPath || customPath.length === 0 ? (
-            <Zero2HeroSurvey />
-          ) : (
-            <RealityMap 
-              customPath={customPath}
-              enrollmentsMap={enrollmentsMap}
-              allCourses={courses}
-              userGoal={userGoal || 'Hoàn thiện kỹ năng'}
-              targetPointId={targetPointId}
-              roadmapPoints={roadmapPoints}
-              onReset={resetSurveyAction}
-            />
-          )}
-        </section>
-      )}
+      <section className="container mx-auto px-4 py-8">
+        {!customPath || customPath.length === 0 ? (
+          <Zero2HeroSurvey session={session} />
+        ) : (
+          <RealityMap 
+            customPath={customPath}
+            enrollmentsMap={enrollmentsMap}
+            allCourses={courses}
+            userGoal={userGoal || 'Hoàn thiện kỹ năng'}
+            targetPointId={targetPointId}
+            roadmapPoints={roadmapPoints}
+            onReset={resetSurveyAction}
+          />
+        )}
+      </section>
 
       <section className="container mx-auto px-4 py-8">
         <CommunityBoard isAdmin={session?.user?.role === 'ADMIN'} />

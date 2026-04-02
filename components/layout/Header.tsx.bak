@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
-import { User, Settings, LogOut, ChevronDown, Sparkles, Check } from 'lucide-react'
+import { User, Settings, LogOut, ChevronDown, Sparkles, Palette, Check } from 'lucide-react'
 import { NOTIFICATION_EVENT, BRKNotification } from '@/lib/notifications-client'
 import { presetThemes, ThemeId, getThemeById, generateThemeOverrides, getTextColorForBg } from '@/app/contexts/theme-config'
 
@@ -168,14 +168,16 @@ export default function Header({ session, userImage }: { session: any, userImage
                                         <p className="text-xs font-bold text-white truncate">{session.user?.name}</p>
                                         <p className="text-[10px] text-zinc-500 truncate">{session.user?.email}</p>
                                     </div>
-                                    <Link
-                                        href="/admin"
-                                        onClick={() => setIsUserMenuOpen(false)}
-                                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-400 hover:bg-zinc-800 transition-colors font-bold"
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                        Công cụ hỗ trợ
-                                    </Link>
+                                    {session.user?.role === 'ADMIN' && (
+                                        <Link
+                                            href="/admin"
+                                            onClick={() => setIsUserMenuOpen(false)}
+                                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-400 hover:bg-zinc-800 transition-colors font-bold"
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                            Quản trị hệ thống
+                                        </Link>
+                                    )}
                                     <Link
                                         href="/account-settings"
                                         onClick={() => setIsUserMenuOpen(false)}
@@ -253,12 +255,11 @@ export default function Header({ session, userImage }: { session: any, userImage
                             </div>
                             
                             <Link href="/account-settings" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">CÀI ĐẶT TÀI KHOẢN</Link>
-                            <Link href="/admin" onClick={() => setIsMenuOpen(false)} className="py-2 text-yellow-400 hover:scale-105 transition-all flex items-center gap-2">
-                                <Settings className="w-4 h-4" />
-                                CÔNG CỤ HỖ TRỢ
-                            </Link>
                             <Link href="/" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">TRANG CHỦ</Link>
                             <Link href="#khoa-hoc" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">KHÓA HỌC</Link>
+                            {session.user?.role === 'ADMIN' && (
+                                <Link href="/admin" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">CHỨC NĂNG QUẢN TRỊ</Link>
+                            )}
                             <Link href="#" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">GIỚI THIỆU</Link>
                             
                             {/* Theme Picker - Mobile */}

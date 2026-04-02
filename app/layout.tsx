@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
+import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
@@ -31,6 +32,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <Providers>{children}</Providers>
+        <PendingSurveyHandler />
       </body>
     </html>
   );
