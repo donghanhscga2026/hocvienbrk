@@ -110,14 +110,13 @@ export default function ThemeSettingsPage() {
 
   const colorLabels: Record<keyof ThemeColors, { label: string; desc: string }> = {
     primary: { label: 'Primary', desc: 'Nút CTA, Vào học tiếp' },
-    secondary: { label: 'Secondary', desc: 'Màu nhấn, badge phụ' },
-    header: { label: 'Header', desc: 'Thanh điều hướng, NGÂN HÀNG PHƯỚC BÁU' },
-    bg: { label: 'Background', desc: 'Nền trang chính' },
-    bgSecondary: { label: 'Background 2', desc: 'Nền phụ, card' },
-    text: { label: 'Text', desc: 'Màu chữ chính' },
-    textSecondary: { label: 'Text Secondary', desc: 'Màu chữ mờ, mô tả' },
-    accent: { label: 'Accent', desc: 'Màu nhấn phụ' },
-    border: { label: 'Border', desc: 'Đường viền' },
+    onPrimary: { label: 'On Primary', desc: 'Chữ trên nút primary' },
+    surface: { label: 'Surface', desc: 'Nền card, modal, panel' },
+    onSurface: { label: 'On Surface', desc: 'Chữ chính trên surface' },
+    background: { label: 'Background', desc: 'Nền trang chính' },
+    muted: { label: 'Muted', desc: 'Chữ mờ, mô tả' },
+    accent: { label: 'Accent', desc: 'Màu nhấn (progress, badges)' },
+    outline: { label: 'Outline', desc: 'Đường viền' },
   };
 
   return (
@@ -157,9 +156,9 @@ export default function ThemeSettingsPage() {
                   )}
                   <div className="flex gap-1 mb-2">
                     <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.primary }} />
-                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.secondary }} />
-                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.bg }} />
-                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.text }} />
+                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.accent }} />
+                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.background }} />
+                    <div className="w-6 h-6 rounded border" style={{ backgroundColor: theme.colors.onSurface }} />
                   </div>
                   <p className="text-xs font-medium truncate">{theme.icon} {theme.name}</p>
                   {isActive && (
@@ -180,9 +179,9 @@ export default function ThemeSettingsPage() {
               <Unlock className="absolute top-2 right-2 h-3 w-3 text-amber-500" />
               <div className="flex gap-1 mb-2">
                 <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.primary || '#6366f1' }} />
-                <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.secondary || '#ec4899' }} />
-                <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.bg || '#fafafa' }} />
-                <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.text || '#18181b' }} />
+                <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.accent || '#ec4899' }} />
+                <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.background || '#fafafa' }} />
+                <div className="w-6 h-6 rounded border" style={{ backgroundColor: customColors?.onSurface || '#18181b' }} />
               </div>
               <p className="text-xs font-medium truncate">🎨 Tùy biến</p>
               {currentThemeId === 'custom' && (
@@ -307,29 +306,29 @@ export default function ThemeSettingsPage() {
         {/* Preview */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold mb-4">Xem trước</h2>
-          <div className="rounded-xl overflow-hidden border" style={{ borderColor: colors.text + '20' }}>
-            <div className="p-4 flex items-center gap-3" style={{ backgroundColor: colors.header }}>
+          <div className="rounded-xl overflow-hidden border" style={{ borderColor: colors.onSurface + '20' }}>
+            <div className="p-4 flex items-center gap-3" style={{ backgroundColor: colors.surface }}>
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-black"
                 style={{ backgroundColor: colors.primary }}
               >
                 B
               </div>
-              <span className="font-bold" style={{ color: colors.text }}>Học Viện BRK</span>
+              <span className="font-bold" style={{ color: colors.onSurface }}>Học Viện BRK</span>
               <nav className="ml-auto flex gap-4 text-sm" style={{ color: colors.primary }}>
                 Trang chủ
               </nav>
             </div>
-            <div className="p-6 space-y-4" style={{ backgroundColor: colors.bg, color: colors.text }}>
+            <div className="p-6 space-y-4" style={{ backgroundColor: colors.background, color: colors.onSurface }}>
               <div
                 className="p-4 rounded-lg"
-                style={{ backgroundColor: colors.bgSecondary }}
+                style={{ backgroundColor: colors.surface }}
               >
-                <h3 className="font-semibold" style={{ color: colors.text }}>Tiêu đề Card</h3>
-                <p className="text-sm" style={{ color: colors.textSecondary }}>Mô tả với màu secondary</p>
+                <h3 className="font-semibold" style={{ color: colors.onSurface }}>Tiêu đề Card</h3>
+                <p className="text-sm" style={{ color: colors.muted }}>Mô tả với màu muted</p>
                 <span
                   className="inline-block px-2 py-0.5 rounded text-xs font-medium mt-2"
-                  style={{ backgroundColor: colors.secondary, color: '#fff' }}
+                  style={{ backgroundColor: colors.accent, color: '#fff' }}
                 >
                   Tag phụ
                 </span>
@@ -343,15 +342,15 @@ export default function ThemeSettingsPage() {
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg font-semibold text-white"
-                  style={{ backgroundColor: colors.secondary }}
+                  style={{ backgroundColor: colors.accent }}
                 >
-                  Secondary
+                  Accent
                 </button>
                 <button
                   className="px-4 py-2 rounded-lg font-semibold"
-                  style={{ backgroundColor: colors.accent, color: '#000' }}
+                  style={{ backgroundColor: colors.outline, color: colors.onSurface }}
                 >
-                  Accent
+                  Outline
                 </button>
               </div>
             </div>

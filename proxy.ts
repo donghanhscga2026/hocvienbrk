@@ -9,7 +9,7 @@ export default auth((req) => {
     // req.auth
 })
 
-// Middleware để lưu ref cookie từ URL
+// Proxy để lưu ref cookie từ URL
 export function middleware(request: NextRequest) {
     const response = NextResponse.next()
     
