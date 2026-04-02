@@ -40,7 +40,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
     return (
         <>
             {/* Tỉ lệ 5:3 chuẩn xác bằng Aspect Ratio - Giúp trình duyệt tính toán Layout cực nhanh */}
-            <div className="relative w-full aspect-[5/3] sm:overflow-hidden rounded-2xl md:rounded-none shadow-2xl border border-white/5 group cursor-pointer"
+            <div className="relative w-full aspect-[5/3] sm:overflow-hidden rounded-2xl md:rounded-none shadow-2xl border border-brk-outline group cursor-pointer"
                 onClick={() => setIsOpen(true)}>
 
                 {/* ── Ảnh nền tối ưu ── */}
@@ -56,10 +56,10 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                             sizes="(max-width: 768px) 100vw, 1200px"
                         />
                     ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-black via-zinc-900 to-indigo-950" />
+                        <div className="w-full h-full bg-gradient-to-br from-brk-background via-brk-surface to-brk-primary/50" />
                     )}
                     {/* Lớp phủ tối nhẹ để nổi bật chữ */}
-                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] transition-colors duration-500 group-hover:bg-black/33" />
+                    <div className="absolute inset-0 bg-brk-surface/30 backdrop-blur-[1px] transition-colors duration-500 group-hover:bg-brk-surface/33" />
                 </div>
 
                 {/* ── TOÀN BỘ NỘI DUNG: Flex layout ── */}
@@ -77,16 +77,18 @@ export default function MessageCard({ message, session, userName, userId }: Mess
 
                             <span
                                 className="uppercase drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.5rem, 5vw, 3rem)', color: '#fbbf24', textShadow: '0 0 15px #fbbf2480, 0 0 30px #fbbf2450' }}
+                                style={{ fontSize: 'clamp(0.5rem, 5vw, 3rem)', color: '#f59e0b', textShadow: '0 0 15px rgba(245,158,11,0.5), 0 0 30px rgba(245,158,11,0.3)' }}
                             >
                                 NGÂN HÀNG PHƯỚC BÁU
                             </span>
 
                             <span
-                                className="rounded-full bg-white/10 border border-white/20 backdrop-blur-md"
+                                className="rounded-full backdrop-blur-md"
                                 style={{
                                     padding: 'clamp(3px,0.8%,8px) clamp(8px,4%,20px)',
-                                    marginTop: 'clamp(10px, 2%, 16px)'
+                                    marginTop: 'clamp(10px, 2%, 16px)',
+                                    backgroundColor: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid rgba(255,255,255,0.2)'
                                 }}
                             >
                                 <span
@@ -116,7 +118,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 style={{
                                     /* Font size đơn giản: tự động điều chỉnh theo độ dài nội dung */
                                     fontSize: `clamp(0.7rem, 2.5vw, 2rem)`,
-                                    color: '#fbbf24'
+                                    color: '#f59e0b'
                                 }}
                             >
                                 &ldquo;{displayMessage.content}&rdquo;
@@ -128,7 +130,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 style={{
                                     width: 'clamp(1.4rem, 3.2vw, 2.6rem)',
                                     height: 'clamp(1.4rem, 3.2vw, 2.6rem)',
-                                    backgroundColor: '#fbbf24'
+                                    backgroundColor: '#f59e0b'
                                 }}
                             >
                                 <Lightbulb
@@ -140,8 +142,8 @@ export default function MessageCard({ message, session, userName, userId }: Mess
 
                         {/* Gợi ý tương tác - Đẩy sát xuống dưới cùng của thông điệp */}
                         <p
-                            className="text-white/40 uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-1 group-hover:translate-y-0"
-                            style={{ fontSize: 'clamp(0.4rem, 0.75vw, 0.65rem)' }}
+                            className="uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-1 group-hover:translate-y-0"
+                            style={{ fontSize: 'clamp(0.4rem, 0.75vw, 0.65rem)', color: 'rgba(255,255,255,0.4)' }}
                         >
                             Nhấn để xem chi tiết →
                         </p>
@@ -153,7 +155,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
             {/* ── Modal chi tiết (Lazy Loaded) ── */}
             {isOpen && (
                 <Dialog open={isOpen}>
-                    <DialogContent className="sm:max-w-lg bg-zinc-950 border-zinc-800 text-white overflow-hidden p-0 shadow-2xl">
+                    <DialogContent className="sm:max-w-lg bg-brk-surface border-brk-outline text-brk-on-surface overflow-hidden p-0 shadow-xl">
                         <div className="relative w-full h-64">
                             {displayMessage.imageUrl ? (
                                 <Image
@@ -164,23 +166,24 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                     sizes="(max-width: 768px) 100vw, 500px"
                                 />
                             ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-purple-900 to-indigo-950" />
+                                <div className="w-full h-full bg-gradient-to-br from-brk-primary to-brk-primary" />
                             )}
-                            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
-                                <div className="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center mb-4 shadow-xl scale-110">
-                                    <Lightbulb className="w-6 h-6 text-black" />
+                            <div className="absolute inset-0 bg-brk-surface/40 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
+                                <div className="w-12 h-12 rounded-full bg-brk-primary flex items-center justify-center mb-4 shadow-xl scale-110">
+                                    <Lightbulb className="w-6 h-6 text-brk-on-primary" />
                                 </div>
-                                <p className="text-yellow-400 text-xl font-bold italic leading-tight whitespace-pre-line drop-shadow-md">
+                                <p className="text-brk-primary text-xl font-bold italic leading-tight whitespace-pre-line drop-shadow-md">
                                     &ldquo;{displayMessage.content}&rdquo;
                                 </p>
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-4 bg-zinc-950">
-                            <div className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line bg-white/5 p-5 rounded-2xl border border-white/5 shadow-inner">
+                        <div className="p-6 space-y-4 bg-brk-surface">
+                            <div className="text-brk-muted text-sm leading-relaxed whitespace-pre-line p-5 rounded-2xl shadow-inner"
+                                style={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 {displayMessage.detail}
                             </div>
-                            <p className="text-zinc-600 text-[11px] text-center pt-2 italic tracking-widest">
+                            <p className="text-brk-muted text-[11px] text-center pt-2 italic tracking-widest">
                                 💡 HỌC VIỆN BRK - NGÂN HÀNG PHƯỚC BÁU
                             </p>
                         </div>
@@ -188,7 +191,8 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                         {/* Nút đóng */}
                         <button
                             onClick={(e) => { e.stopPropagation(); setIsOpen(false) }}
-                            className="absolute top-4 right-4 text-white/70 hover:text-white transition-all bg-black/20 hover:bg-black/40 rounded-full p-2 z-20"
+                            className="absolute top-4 right-4 transition-all rounded-full p-2 z-20"
+                            style={{ color: 'rgba(255,255,255,0.7)', backgroundColor: 'rgba(0,0,0,0.2)' }}
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

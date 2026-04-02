@@ -1,85 +1,36 @@
 @import "tailwindcss";
 
+/* ============================= */
+/* CSS VARIABLES - Fallback (khi JS chưa load) */
+/* ============================= */
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  
-  /* Theme Variables - chỉ apply khi có data-theme */
-  --primary-color: #f59e0b;
-  --secondary-color: #0ea5e9;
-  --bg-color: #ffffff;
-  --text-color: #171717;
 }
 
-/* Base theme classes - áp dụng trước khi JS chạy (chống flash màu) */
-.text-brk-primary { color: #f59e0b !important; text-shadow: 0 0 10px rgba(245,158,11,0.25), 0 0 20px rgba(245,158,11,0.25) !important; }
-.text-brk-secondary { color: #0ea5e9 !important; text-shadow: 0 0 10px rgba(14,165,233,0.25), 0 0 20px rgba(14,165,233,0.25) !important; }
-.text-brk-text { color: #171717 !important; }
-.text-brk-bg { color: #ffffff !important; }
-.bg-brk-primary { background-color: #f59e0b !important; }
-.bg-brk-bg { background-color: #ffffff !important; }
-.bg-brk-header { background-color: #ffffff !important; }
-.text-brk-header { color: #000000 !important; }
+/* ============================= */
+/* SKELETON CSS - Không có màu cứng */
+/* Base styles cho page load trước khi JS chạy */
+/* ============================= */
 
-.text-brk-primary-75 { color: rgba(245, 158, 11, 0.75) !important; }
-.text-brk-primary-50 { color: rgba(245, 158, 11, 0.5) !important; }
-.text-brk-primary-25 { color: rgba(245, 158, 11, 0.25) !important; }
-.text-brk-primary-light { color: #fbbf24 !important; }
-.text-brk-primary-dark { color: #d97706 !important; }
-.text-brk-secondary-75 { color: rgba(14, 165, 233, 0.75) !important; }
-.text-brk-secondary-50 { color: rgba(14, 165, 233, 0.5) !important; }
-.text-brk-secondary-25 { color: rgba(14, 165, 233, 0.25) !important; }
-.text-brk-secondary-light { color: #38bdf8 !important; }
-.text-brk-secondary-dark { color: #0284c7 !important; }
-.text-brk-text-75 { color: rgba(23, 23, 23, 0.75) !important; }
-.text-brk-text-50 { color: rgba(23, 23, 23, 0.5) !important; }
-.text-brk-text-25 { color: rgba(23, 23, 23, 0.25) !important; }
-.text-brk-text-light { color: #404040 !important; }
-.text-brk-text-dark { color: #000000 !important; }
-.bg-brk-primary-light { background-color: #fbbf24 !important; }
-.bg-brk-primary-dark { background-color: #d97706 !important; }
-
-/* Theme High-End Business */
-[data-theme="highend"] {
-  --primary-color: #D4AF37;
-  --secondary-color: #1e3a5f;
-  --bg-color: #0f1419;
-  --text-color: #ffffff;
-}
-
-/* Theme Dark */
-[data-theme="dark"] {
-  --primary-color: #3b82f6;
-  --secondary-color: #8b5cf6;
-  --bg-color: #0f172a;
-  --text-color: #f8fafc;
-}
-
-/* Theme Light */
-[data-theme="light"] {
-  --primary-color: #6366f1;
-  --secondary-color: #ec4899;
-  --bg-color: #fafafa;
-  --text-color: #18181b;
-}
-
+/* Animation Glow - placeholder, sẽ được override bởi JS */
 @keyframes glow {
-  0%,
-  100% {
-    text-shadow: 0 0 10px #facc15, 0 0 20px #facc15, 2px 2px 0px #854d0e;
+  0%, 100% {
+    text-shadow: 0 0 10px var(--primary-fallback, #D4AF37), 0 0 20px var(--primary-fallback, #D4AF37);
   }
-
   50% {
-    text-shadow: 0 0 20px #fde047, 0 0 35px #fde047, 2px 2px 0px #854d0e;
+    text-shadow: 0 0 20px var(--primary-fallback, #D4AF37), 0 0 35px var(--primary-fallback, #D4AF37);
   }
 }
 
 .text-glow-3d {
   animation: glow 3s ease-in-out infinite;
-  color: #facc15;
   letter-spacing: 0.1em;
 }
 
+/* ============================= */
+/* BASE STYLES */
+/* ============================= */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

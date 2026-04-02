@@ -5,12 +5,11 @@ import Link from 'next/link';
 import { ArrowLeft, Check, Palette, Copy, Lock, Unlock } from 'lucide-react';
 import {
   presetThemes,
-  defaultColors,
   ThemeColors,
   ThemeId,
-  applyThemeCSS,
-  generateThemeOverrides,
+  generateThemeCSS,
   getThemeById,
+  isDarkTheme,
 } from '@/app/contexts/theme-config';
 
 const BASIC_COLORS = [
@@ -47,23 +46,13 @@ export default function ThemeSettingsPage() {
 
   const colors = getCurrentColors();
 
-  const isDark = currentThemeId === 'highend' || currentThemeId === 'dark';
+  const isDark = isDarkTheme(currentThemeId);
 
   const applyTheme = (themeId: ThemeId, customThemeColors?: ThemeColors) => {
-    if (themeId === 'default') {
-      localStorage.setItem('site-theme', 'default');
-      const styleEl = document.getElementById('theme-overrides');
-      if (styleEl) {
-        styleEl.textContent = '';
-      }
-      document.documentElement.removeAttribute('data-theme');
-      setCurrentThemeId('default');
-      setCustomColors(null);
-      return;
-    }
-
     let c: ThemeColors;
-    if (customThemeColors) {
+    if (themeId === 'default') {
+      c = presetThemes[0].colors; // Royal Empire là default
+    } else if (customThemeColors) {
       c = customThemeColors;
     } else if (themeId === 'custom' && customColors) {
       c = customColors;
@@ -72,24 +61,28 @@ export default function ThemeSettingsPage() {
       c = theme.colors;
     }
 
-    const isDarkTheme = themeId === 'highend' || themeId === 'dark';
+    const isDarkMode = isDarkTheme(themeId);
 
     localStorage.setItem('site-theme', themeId);
     if (themeId === 'custom' && customThemeColors) {
       localStorage.setItem('site-custom-colors', JSON.stringify(customThemeColors));
     }
     
-    let styleEl = document.getElementById('theme-overrides');
+    // Inject vào cùng style element với ThemeContext và Header
+    let styleEl = document.getElementById('theme-base-css');
     if (!styleEl) {
       styleEl = document.createElement('style');
-      styleEl.id = 'theme-overrides';
+      styleEl.id = 'theme-base-css';
       document.head.appendChild(styleEl);
     }
 
-    styleEl.textContent = applyThemeCSS(c) + generateThemeOverrides(c, isDarkTheme);
+    styleEl.textContent = generateThemeCSS(c, isDarkMode);
     document.documentElement.setAttribute('data-theme', themeId);
 
     setCurrentThemeId(themeId);
+    if (themeId === 'default') {
+      setCustomColors(null);
+    }
   };
 
   const handleColorChange = (colorKey: keyof ThemeColors, value: string) => {

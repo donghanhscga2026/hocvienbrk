@@ -35,40 +35,40 @@ export default async function AffiliateWithdrawPage() {
     const feeAmount = campaign?.feeAmount || 3300
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-brk-background p-6">
             <div className="max-w-2xl mx-auto">
                 <div className="mb-8">
-                    <a href="/affiliate" className="text-blue-600 hover:underline mb-2 inline-block">
+                    <a href="/affiliate" className="text-brk-primary hover:underline mb-2 inline-block">
                         ← Quay lại Dashboard
                     </a>
-                    <h1 className="text-2xl font-bold">Rút tiền</h1>
+                    <h1 className="text-2xl font-bold text-brk-on-surface">Rút tiền</h1>
                 </div>
 
                 {/* Balance Info */}
-                <div className="bg-white rounded-lg shadow p-6 mb-6">
+                <div className="bg-brk-surface rounded-lg shadow p-6 mb-6">
                     <div className="text-center">
-                        <p className="text-gray-500">Số dư khả dụng</p>
-                        <p className="text-4xl font-bold text-green-600 mt-2">
+                        <p className="text-brk-muted">Số dư khả dụng</p>
+                        <p className="text-4xl font-bold text-brk-accent mt-2">
                             {availableBalance.toLocaleString('vi-VN')}đ
                         </p>
                     </div>
                 </div>
 
                 {/* Withdraw Form */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold mb-4">Yêu cầu rút tiền</h2>
+                <div className="bg-brk-surface rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">Yêu cầu rút tiền</h2>
                     
                     {/* Bank Info */}
                     {user?.bankAccount && user?.bankName ? (
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                            <h3 className="font-medium mb-2">Thông tin tài khoản</h3>
-                            <p><span className="text-gray-500">Ngân hàng:</span> {user.bankName}</p>
-                            <p><span className="text-gray-500">Số tài khoản:</span> {user.bankAccount}</p>
-                            <p><span className="text-gray-500">Tên chủ tài khoản:</span> {user.bankHolder}</p>
+                        <div className="mb-6 p-4 bg-brk-background rounded-lg">
+                            <h3 className="font-medium mb-2 text-brk-on-surface">Thông tin tài khoản</h3>
+                            <p className="text-brk-on-surface"><span className="text-brk-muted">Ngân hàng:</span> {user.bankName}</p>
+                            <p className="text-brk-on-surface"><span className="text-brk-muted">Số tài khoản:</span> {user.bankAccount}</p>
+                            <p className="text-brk-on-surface"><span className="text-brk-muted">Tên chủ tài khoản:</span> {user.bankHolder}</p>
                         </div>
                     ) : (
-                        <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
-                            <p className="text-yellow-800">
+                        <div className="mb-6 p-4 bg-brk-accent rounded-lg">
+                            <p className="text-brk-primary">
                                 Bạn chưa cập nhật thông tin tài khoản ngân hàng. 
                                 Vui lòng cập nhật trong <a href="/account-settings" className="underline">Cài đặt tài khoản</a>.
                             </p>
@@ -91,25 +91,25 @@ export default async function AffiliateWithdrawPage() {
                         redirect('/affiliate')
                     }}>
                         <div className="mb-4">
-                            <label className="block text-sm font-medium mb-2">Số tiền muốn rút</label>
+                            <label className="block text-sm font-medium mb-2 text-brk-on-surface">Số tiền muốn rút</label>
                             <input
                                 type="number"
                                 name="amount"
                                 min={minPayout}
                                 max={availableBalance}
                                 placeholder={`Tối thiểu ${minPayout.toLocaleString('vi-VN')}đ`}
-                                className="w-full px-4 py-2 border rounded-lg"
+                                className="w-full px-4 py-2 border border-brk-outline rounded-lg bg-brk-background text-brk-on-surface"
                                 required
                             />
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-sm text-brk-muted mt-1">
                                 Số tiền tối thiểu: {minPayout.toLocaleString('vi-VN')}đ
                             </p>
                         </div>
 
                         {/* Fee Calculator Preview */}
-                        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                            <h3 className="font-medium mb-2">Chi tiết phí</h3>
-                            <div className="text-sm space-y-1">
+                        <div className="mb-6 p-4 bg-brk-primary/10 rounded-lg">
+                            <h3 className="font-medium mb-2 text-brk-on-surface">Chi tiết phí</h3>
+                            <div className="text-sm space-y-1 text-brk-on-surface">
                                 <div className="flex justify-between">
                                     <span>Phí chuyển khoản:</span>
                                     <span>{feeAmount.toLocaleString('vi-VN')}đ</span>
@@ -120,9 +120,9 @@ export default async function AffiliateWithdrawPage() {
                                     <span>Áp dụng khi {'>'} 2 triệu</span>
                                 </div>
                                 )}
-                                <div className="flex justify-between font-medium pt-2 border-t">
+                                <div className="flex justify-between font-medium pt-2 border-t border-brk-outline">
                                     <span>Thực nhận (ước tính):</span>
-                                    <span className="text-green-600">
+                                    <span className="text-brk-accent">
                                         ~{(availableBalance - feeAmount).toLocaleString('vi-VN')}đ
                                     </span>
                                 </div>
@@ -132,7 +132,7 @@ export default async function AffiliateWithdrawPage() {
                         <button
                             type="submit"
                             disabled={availableBalance < minPayout || !user?.bankAccount}
-                            className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            className="w-full bg-brk-accent text-brk-on-primary py-3 rounded-lg font-medium hover:opacity-90 disabled:bg-brk-background disabled:text-brk-muted disabled:cursor-not-allowed"
                         >
                             Gửi yêu cầu rút tiền
                         </button>
@@ -140,9 +140,9 @@ export default async function AffiliateWithdrawPage() {
                 </div>
 
                 {/* Info */}
-                <div className="mt-6 p-4 bg-gray-100 rounded-lg">
-                    <h3 className="font-medium mb-2">Lưu ý</h3>
-                    <ul className="text-sm text-gray-600 space-y-1">
+                <div className="mt-6 p-4 bg-brk-background rounded-lg">
+                    <h3 className="font-medium mb-2 text-brk-on-surface">Lưu ý</h3>
+                    <ul className="text-sm text-brk-muted space-y-1">
                         <li>• Yêu cầu rút tiền sẽ được xử lý trong 24-48 giờ</li>
                         <li>• Phí chuyển khoản: {feeAmount.toLocaleString('vi-VN')}đ/lần</li>
                         {taxRate > 0 && (

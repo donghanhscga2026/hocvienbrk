@@ -33,44 +33,44 @@ function calcDeadline(startedAt: Date | null, order: number) {
 // ─── Popup Quy tắc ─────────────────────────────────────────────────────────
 function RulesModal({ onClose }: { onClose: () => void }) {
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-end p-4 bg-black/50" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-start justify-end p-4 bg-brk-surface/50" onClick={onClose}>
             <div
-                className="mt-16 mr-2 w-80 bg-white rounded-xl shadow-2xl border border-orange-200 text-sm text-gray-700 overflow-hidden"
+                className="mt-16 mr-2 w-80 bg-brk-surface rounded-xl shadow-xl border border-brk-accent/20 text-sm text-brk-on-surface overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
-                <div className="bg-orange-500 text-white px-4 py-3 flex items-center justify-between">
+                <div className="bg-brk-accent text-brk-on-primary px-4 py-3 flex items-center justify-between">
                     <span className="font-bold text-base">📋 Quy tắc chấm điểm (Thang 10)</span>
                     <button onClick={onClose}><X className="w-4 h-4" /></button>
                 </div>
                 <div className="p-4 space-y-3">
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                        <p className="text-orange-700 text-xs font-semibold">✅ Điểm ≥ 5/10: Hoàn thành bài học và mở khóa bài tiếp theo.</p>
+                    <div className="rounded-lg px-3 py-2" style={{ backgroundColor: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
+                        <p className="text-brk-accent text-xs font-semibold">✅ Điểm ≥ 5/10: Hoàn thành bài học và mở khóa bài tiếp theo.</p>
                     </div>
                     <div>
-                        <p className="font-bold text-orange-600">1. Học theo Video (Max 2đ)</p>
-                        <p className="text-gray-600 mt-1">Xem &gt;50% <span className="text-green-600">(+1đ)</span>, Xem hết <span className="text-green-600">(+2đ)</span>.</p>
+                        <p className="font-bold text-brk-accent">1. Học theo Video (Max 2đ)</p>
+                        <p className="text-brk-muted mt-1">Xem &gt;50% <span className="text-brk-accent">(+1đ)</span>, Xem hết <span className="text-brk-accent">(+2đ)</span>.</p>
                     </div>
                     <div>
-                        <p className="font-bold text-orange-600">2. Bài học Tâm đắc Ngộ (Max 2đ)</p>
-                        <p className="text-gray-600 mt-1">Có chia sẻ <span className="text-green-600">(+1đ)</span>, Sâu sắc (dài hơn 50 ký tự) <span className="text-green-600">(+1đ)</span>.</p>
+                        <p className="font-bold text-brk-accent">2. Bài học Tâm đắc Ngộ (Max 2đ)</p>
+                        <p className="text-brk-muted mt-1">Có chia sẻ <span className="text-brk-accent">(+1đ)</span>, Sâu sắc (dài hơn 50 ký tự) <span className="text-brk-accent">(+1đ)</span>.</p>
                     </div>
                     <div>
-                        <p className="font-bold text-orange-600">3. Thực hành nộp link video (Max 3đ)</p>
-                        <p className="text-gray-600 mt-1">Mỗi link video <span className="text-green-600">(+1đ)</span>.</p>
+                        <p className="font-bold text-brk-accent">3. Thực hành nộp link video (Max 3đ)</p>
+                        <p className="text-brk-muted mt-1">Mỗi link video <span className="text-brk-accent">(+1đ)</span>.</p>
                     </div>
                     <div>
-                        <p className="font-bold text-orange-600">4. Hỗ trợ (Max 2đ)</p>
-                        <p className="text-gray-600 mt-1">
-                            Giúp người: Nhắc 2 đồng đội mình nhận hỗ trợ <span className="text-green-600">(+1đ)</span>.<br />
-                            Giúp người giúp người: Đồng đội mình nhắc 2 người họ nhận hỗ trợ <span className="text-green-600">(+1đ)</span>.<br />
-                            <span className="text-gray-400 text-xs">Nếu chưa có người để hỗ trợ: Nhắc ngược lên trên được tích vào ô đầu (+1đ).</span>
+                        <p className="font-bold text-brk-accent">4. Hỗ trợ (Max 2đ)</p>
+                        <p className="text-brk-muted mt-1">
+                            Giúp người: Nhắc 2 đồng đội mình nhận hỗ trợ <span className="text-brk-accent">(+1đ)</span>.<br />
+                            Giúp người giúp người: Đồng đội mình nhắc 2 người họ nhận hỗ trợ <span className="text-brk-accent">(+1đ)</span>.<br />
+                            <span className="text-brk-muted text-xs">Nếu chưa có người để hỗ trợ: Nhắc ngược lên trên được tích vào ô đầu (+1đ).</span>
                         </p>
                     </div>
                     <div>
-                        <p className="font-bold text-orange-600">5. Giữ tín đúng hạn (1đ)</p>
-                        <p className="text-gray-600 mt-1">
-                            Nộp trước 23:59 <span className="text-green-600">(+1đ)</span>.<br />
-                            <span className="text-red-500">Trừ điểm: Nộp muộn sau 23:59 (-1đ).</span>
+                        <p className="font-bold text-brk-accent">5. Giữ tín đúng hạn (1đ)</p>
+                        <p className="text-brk-muted mt-1">
+                            Nộp trước 23:59 <span className="text-brk-accent">(+1đ)</span>.<br />
+                            <span className="text-brk-accent">Trừ điểm: Nộp muộn sau 23:59 (-1đ).</span>
                         </p>
                     </div>
                 </div>
@@ -82,8 +82,8 @@ function RulesModal({ onClose }: { onClose: () => void }) {
 function SectionHead({ num, label, max, current }: { num: number; label: string; max: number; current: number }) {
     return (
         <div className="flex items-center justify-between mb-1.5">
-            <span className="font-semibold text-gray-800 text-sm">{num}. {label}</span>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${current > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}>
+            <span className="font-semibold text-brk-on-surface text-sm">{num}. {label}</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${current > 0 ? 'bg-brk-accent-20 text-brk-accent' : 'bg-brk-background text-brk-muted'}`}>
                 {current}/{max}
             </span>
         </div>
@@ -258,12 +258,12 @@ export default function AssignmentForm({
         <div className="flex flex-col h-full min-h-0 bg-[#FFFDE7]">
             {showRules && <RulesModal onClose={() => setShowRules(false)} />}
 
-            <div className="shrink-0 z-10 bg-[#FFFDE7] border-b border-orange-200 px-4 py-2">
+            <div className="shrink-0 z-10 bg-brk-primary/10 border-b border-brk-accent/20 px-4 py-2">
                 <div className="flex items-center justify-between">
-                    <p className="text-[11px] text-gray-500 leading-tight" suppressHydrationWarning>
-                        Hoàn thành trước 23:59 ngày <span className="font-semibold text-gray-700" suppressHydrationWarning>{formatDate(deadline)}</span>
+                    <p className="text-[11px] text-brk-muted leading-tight" suppressHydrationWarning>
+                        Hoàn thành trước 23:59 ngày <span className="font-semibold text-brk-on-surface" suppressHydrationWarning>{formatDate(deadline)}</span>
                     </p>
-                    <span className="text-sm font-black text-orange-500">Tổng: {total}/10</span>
+                    <span className="text-sm font-black text-brk-accent">Tổng: {total}/10</span>
                 </div>
 
                 <div className="flex gap-1.5 mt-1.5">
@@ -271,7 +271,7 @@ export default function AssignmentForm({
                         <button
                             onClick={handleSubmit}
                             disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black rounded-xl py-2 transition-all shadow-md disabled:opacity-60 text-sm"
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-brk-accent hover:brightness-110 active:scale-[0.98] text-brk-on-primary font-black rounded-xl py-2 transition-all shadow-md disabled:opacity-60 text-sm"
                         >
                             {loading
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -280,13 +280,14 @@ export default function AssignmentForm({
                         </button>
                     )}
                     {isCompleted && isOverdue && (
-                        <div className="flex-1 flex items-center justify-center gap-1.5 bg-gray-300 text-gray-500 font-black rounded-xl py-2 text-sm">
+                        <div className="flex-1 flex items-center justify-center gap-1.5 bg-brk-background text-brk-muted font-black rounded-xl py-2 text-sm">
                             ĐÃ HOÀN THÀNH CẬP NHẬT
                         </div>
                     )}
                     <button
                         onClick={() => setShowRules(true)}
-                        className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded-xl border border-orange-300 transition text-xs font-semibold"
+                        className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-xl border transition text-xs font-semibold"
+                        style={{ backgroundColor: 'rgba(249,115,22,0.1)', color: '#f97316', borderColor: 'rgba(249,115,22,0.3)' }}
                         title="Xem quy tắc chấm điểm"
                     >
                         <Info className="w-3.5 h-3.5" /> Quy tắc
@@ -295,15 +296,15 @@ export default function AssignmentForm({
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-3">
-                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="bg-brk-surface rounded-xl border border-brk-outline px-3 py-2.5 shadow-sm">
                     <SectionHead num={1} label={hasYouTubeVideo ? "Mở TRÍ = học theo Video (2đ)" : "Mở TRÍ = Nội dung bài học (2đ)"} max={2} current={vidScore} />
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-brk-background rounded-full overflow-hidden">
                         <div
-                            className={`h-full transition-all duration-500 rounded-full ${!hasYouTubeVideo ? 'bg-emerald-500' : 'bg-orange-400'}`}
+                            className={`h-full transition-all duration-500 rounded-full ${!hasYouTubeVideo ? 'bg-brk-accent' : 'bg-brk-accent'}`}
                             style={{ width: `${displayPercent}%` }}
                         />
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5">
+                    <p className="text-[10px] text-brk-muted mt-0.5">
                         {hasYouTubeVideo
                             ? `Đang xem: ${videoPercent.toFixed(0)}%`
                             : '✓ Không có video - Đã hoàn thành nội dung'}

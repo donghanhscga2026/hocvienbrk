@@ -29,33 +29,33 @@ export default async function AffiliateLinksPage() {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-brk-background p-6">
             <div className="max-w-4xl mx-auto">
                 <div className="mb-8">
-                    <a href="/affiliate" className="text-blue-600 hover:underline mb-2 inline-block">
+                    <a href="/affiliate" className="text-brk-primary hover:underline mb-2 inline-block">
                         ← Quay lại Dashboard
                     </a>
-                    <h1 className="text-2xl font-bold">Quản lý Link Affiliate</h1>
-                    <p className="text-gray-600">Tạo và theo dõi các link giới thiệu của bạn</p>
+                    <h1 className="text-2xl font-bold text-brk-on-surface">Quản lý Link Affiliate</h1>
+                    <p className="text-brk-muted">Tạo và theo dõi các link giới thiệu của bạn</p>
                 </div>
 
                 {/* My Main Link */}
                 {links.length > 0 && (
-                    <div className="bg-white rounded-lg shadow p-6 mb-6">
-                        <h2 className="text-lg font-semibold mb-4">Link Affiliate chính của bạn</h2>
+                    <div className="bg-brk-surface rounded-lg shadow p-6 mb-6">
+                        <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">Link Affiliate chính của bạn</h2>
                         
                         {links.filter(l => l.name === 'Link chính').map(link => (
-                            <div key={link.id} className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4">
+                            <div key={link.id} className="rounded-lg p-4" style={{ backgroundColor: 'rgba(14,165,233,0.1)' }}>
                                 <div className="flex items-center justify-between mb-3">
                                     <div>
-                                        <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded">Chính</span>
-                                        <span className="ml-2 text-sm text-gray-600">
+                                        <span className="bg-brk-primary text-brk-on-primary text-xs px-2 py-1 rounded">Chính</span>
+                                        <span className="ml-2 text-sm text-brk-muted">
                                             Code: <strong>{link.code}</strong>
                                         </span>
                                     </div>
                                     <div className="text-right text-sm">
-                                        <p><span className="text-gray-500">Clicks:</span> <strong>{link._count.clicks}</strong></p>
-                                        <p><span className="text-gray-500">Conversions:</span> <strong>{link._count.conversions}</strong></p>
+                                        <p><span className="text-brk-muted">Clicks:</span> <strong>{link._count.clicks}</strong></p>
+                                        <p><span className="text-brk-muted">Conversions:</span> <strong>{link._count.conversions}</strong></p>
                                     </div>
                                 </div>
                                 
@@ -64,11 +64,11 @@ export default async function AffiliateLinksPage() {
                                         type="text"
                                         value={`${baseUrl}/register?ref=${link.code}`}
                                         readOnly
-                                        className="flex-1 px-3 py-2 border rounded-lg bg-white"
+                                        className="flex-1 px-3 py-2 border border-brk-outline rounded-lg bg-brk-background text-brk-on-surface"
                                     />
                                     <button
                                         onClick={() => navigator.clipboard.writeText(`${baseUrl}/register?ref=${link.code}`)}
-                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                                        className="bg-brk-primary text-brk-on-surface px-4 py-2 rounded-lg hover:brightness-110"
                                     >
                                         Copy
                                     </button>
@@ -79,33 +79,33 @@ export default async function AffiliateLinksPage() {
                 )}
 
                 {/* All Links */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold mb-4">Tất cả Link ({links.length})</h2>
+                <div className="bg-brk-surface rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">Tất cả Link ({links.length})</h2>
                     
                     {links.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
+                        <div className="text-center py-8 text-brk-muted">
                             <p>Chưa có link nào được tạo</p>
                             <p className="text-sm mt-2">Link chính của bạn sẽ tự động được tạo khi bạn chia sẻ</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
                             {links.map(link => (
-                                <div key={link.id} className="border rounded-lg p-4">
+                                <div key={link.id} className="border border-brk-outline rounded-lg p-4">
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
-                                            <p className="font-medium">{link.name || 'Link không tên'}</p>
-                                            <p className="text-sm text-gray-500">
+                                            <p className="font-medium text-brk-on-surface">{link.name || 'Link không tên'}</p>
+                                            <p className="text-sm text-brk-muted">
                                                 {link.source && `Nguồn: ${link.source}`}
                                             </p>
                                         </div>
                                         <div className="flex gap-4 text-sm">
                                             <div className="text-center">
-                                                <p className="font-bold text-xl">{link._count.clicks}</p>
-                                                <p className="text-gray-500">Clicks</p>
+                                                <p className="font-bold text-xl text-brk-on-surface">{link._count.clicks}</p>
+                                                <p className="text-brk-muted">Clicks</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className="font-bold text-xl">{link._count.conversions}</p>
-                                                <p className="text-gray-500">Conversions</p>
+                                                <p className="font-bold text-xl text-brk-on-surface">{link._count.conversions}</p>
+                                                <p className="text-brk-muted">Conversions</p>
                                             </div>
                                         </div>
                                     </div>
@@ -115,11 +115,11 @@ export default async function AffiliateLinksPage() {
                                             type="text"
                                             value={`${baseUrl}/register?ref=${link.code}`}
                                             readOnly
-                                            className="flex-1 px-3 py-2 border rounded-lg text-sm bg-gray-50"
+                                            className="flex-1 px-3 py-2 border border-brk-outline rounded-lg text-sm bg-brk-background text-brk-on-surface"
                                         />
                                         <button
                                             onClick={() => navigator.clipboard.writeText(`${baseUrl}/register?ref=${link.code}`)}
-                                            className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-300 text-sm"
+                                            className="bg-brk-background text-brk-on-surface px-3 py-2 rounded-lg hover:bg-brk-surface text-sm"
                                         >
                                             Copy
                                         </button>
@@ -127,7 +127,7 @@ export default async function AffiliateLinksPage() {
                                             href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${baseUrl}/register?ref=${link.code}`)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                                            className="bg-brk-primary text-brk-on-surface px-3 py-2 rounded-lg hover:brightness-110 text-sm"
                                         >
                                             Share FB
                                         </a>
@@ -139,9 +139,9 @@ export default async function AffiliateLinksPage() {
                 </div>
 
                 {/* Share Tips */}
-                <div className="mt-6 bg-yellow-50 rounded-lg p-6">
-                    <h3 className="font-semibold mb-3">Mẹo chia sẻ hiệu quả</h3>
-                    <ul className="text-sm text-yellow-800 space-y-2">
+                <div className="mt-6 rounded-lg p-6" style={{ backgroundColor: 'rgba(245,158,11,0.1)' }}>
+                    <h3 className="font-semibold mb-3 text-brk-on-surface">Mẹo chia sẻ hiệu quả</h3>
+                    <ul className="text-sm text-brk-muted space-y-2">
                         <li>• Chia sẻ link trên <strong>Facebook, Zalo, Telegram</strong> để tiếp cận nhiều người</li>
                         <li>• Sử dụng hình ảnh đẹp và lời mời hấp dẫn để thu hút clicks</li>
                         <li>• Theo dõi số clicks và conversions để tối ưu chiến lược</li>

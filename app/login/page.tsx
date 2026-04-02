@@ -115,32 +115,32 @@ export default function LoginPage() {
     // ═══════════════════════════════════════════════════════════════════════════════
     if (isChangingPassword) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black flex items-center justify-center p-4">
+            <div className="min-h-screen bg-gradient-to-br from-brk-surface via-brk-background to-brk-surface flex items-center justify-center p-4">
                 <div className="w-full max-w-sm">
                     <div className="text-center mb-8">
-                        <h1 className="text-2xl font-black text-yellow-400 tracking-tight">⚠️ CẢNH BÁO BẢO MẬT</h1>
-                        <p className="text-zinc-400 text-sm mt-2">Bạn đang dùng mật khẩu mặc định. Vui lòng đổi sang mật khẩu cá nhân.</p>
+                        <h1 className="text-2xl font-black text-brk-primary tracking-tight">⚠️ CẢNH BÁO BẢO MẬT</h1>
+                        <p className="text-brk-muted text-sm mt-2">Bạn đang dùng mật khẩu mặc định. Vui lòng đổi sang mật khẩu cá nhân.</p>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-sm border border-yellow-500/30 rounded-2xl p-6 space-y-5 shadow-2xl">
-                        <div className="flex items-center gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                            <AlertTriangle className="h-6 w-6 text-yellow-500 shrink-0" />
-                            <p className="text-sm text-yellow-200">
-                                Mật khẩu <code className="bg-yellow-500/20 px-2 py-0.5 rounded">Brk#3773</code> là mật khẩu mặc định. 
+                    <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-primary/30 rounded-2xl p-6 space-y-5 shadow-2xl">
+                        <div className="flex items-center gap-3 p-4 bg-brk-primary-25 border border-brk-primary/30 rounded-xl">
+                            <AlertTriangle className="h-6 w-6 text-brk-primary shrink-0" />
+                            <p className="text-sm text-brk-primary">
+                                Mật khẩu <code className="bg-brk-primary/20 px-2 py-0.5 rounded">Brk#3773</code> là mật khẩu mặc định. 
                                 Để bảo vệ tài khoản, vui lòng đổi ngay.
                             </p>
                         </div>
 
                         <form onSubmit={handleSubmit(onChangePassword)} className="space-y-4">
                             {error && (
-                                <div className="rounded-lg bg-red-900/30 border border-red-700/50 p-3 text-sm text-red-400">{error}</div>
+                                <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                             )}
                             {success && (
-                                <div className="rounded-lg bg-green-900/30 border border-green-700/50 p-3 text-sm text-green-400">{success}</div>
+                                <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{success}</div>
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Mật khẩu mới</label>
+                                <label className="block text-sm font-medium text-brk-muted mb-1.5">Mật khẩu mới</label>
                                 <div className="relative">
                                     <input
                                         {...register("newPassword", { 
@@ -148,35 +148,35 @@ export default function LoginPage() {
                                             minLength: { value: 6, message: "Tối thiểu 6 ký tự" }
                                         })}
                                         type={showNewPassword ? "text" : "password"}
-                                        className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 pr-10 text-white text-sm placeholder:text-zinc-500 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                        className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
                                         placeholder="Nhập mật khẩu mới"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowNewPassword(!showNewPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface"
                                     >
                                         {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                     </button>
                                 </div>
-                                {errors.newPassword && <p className="mt-1 text-xs text-red-400">{errors.newPassword.message}</p>}
+                                {errors.newPassword && <p className="mt-1 text-xs text-brk-accent">{errors.newPassword.message}</p>}
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Xác nhận mật khẩu mới</label>
+                                <label className="block text-sm font-medium text-brk-muted mb-1.5"> Xác nhận mật khẩu mới</label>
                                 <input
                                     {...register("confirmPassword", { required: "Vui lòng xác nhận mật khẩu" })}
                                     type={showNewPassword ? "text" : "password"}
-                                    className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 text-white text-sm placeholder:text-zinc-500 focus:border-yellow-500 focus:outline-none focus:ring-1 focus:ring-yellow-500"
+                                    className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
                                     placeholder="Nhập lại mật khẩu mới"
                                 />
-                                {errors.confirmPassword && <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>}
+                                {errors.confirmPassword && <p className="mt-1 text-xs text-brk-accent">{errors.confirmPassword.message}</p>}
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full rounded-xl bg-yellow-500 hover:bg-yellow-600 px-4 py-3 text-sm font-bold text-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full rounded-xl bg-brk-primary hover:bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Đổi mật khẩu & Đăng nhập'}
                             </button>
@@ -184,7 +184,7 @@ export default function LoginPage() {
                             <button
                                 type="button"
                                 onClick={cancelPasswordChange}
-                                className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+                                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-sm font-medium text-brk-muted hover:text-brk-on-surface hover:border-brk-outline transition-colors"
                             >
                                 Đăng xuất & Đăng nhập sau
                             </button>
@@ -199,66 +199,66 @@ export default function LoginPage() {
     // GIAO DIỆN ĐĂNG NHẬP BÌNH THƯỜNG
     // ═══════════════════════════════════════════════════════════════════════════════
     return (
-        <div className="min-h-screen bg-gradient-to-br from-black via-zinc-900 to-black flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-brk-surface via-brk-background to-brk-surface flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-black text-white tracking-tight">HỌC VIỆN BRK</h1>
-                    <p className="text-zinc-400 text-sm mt-1">Đăng nhập để tiếp tục hành trình</p>
+                    <h1 className="text-2xl font-black text-brk-on-surface tracking-tight">HỌC VIỆN BRK</h1>
+                    <p className="text-brk-muted text-sm mt-1">Đăng nhập để tiếp tục hành trình</p>
                 </div>
 
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 space-y-5 shadow-2xl">
+                <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
                     {/* Google */}
                     <button
                         onClick={handleGoogleSignIn}
                         disabled={isLoading}
-                        className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-600 bg-white/5 px-4 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-3 rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-sm font-medium text-brk-on-surface hover:bg-brk-surface/10 transition-colors disabled:opacity-50"
                     >
                         <svg className="h-4 w-4 shrink-0" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z" /></svg>
                         Đăng nhập bằng Google
                     </button>
 
                     <div className="relative">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-zinc-700" /></div>
-                        <div className="relative flex justify-center text-xs"><span className="bg-transparent px-2 text-zinc-500">hoặc dùng tài khoản</span></div>
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
+                        <div className="relative flex justify-center text-xs"><span className="bg-transparent px-2 text-brk-muted">hoặc dùng tài khoản</span></div>
                     </div>
 
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         {error && (
-                            <div className="rounded-lg bg-red-900/30 border border-red-700/50 p-3 text-sm text-red-400">{error}</div>
+                            <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                         )}
                         <div>
-                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Email / SĐT / Mã học viên</label>
+                            <label className="block text-sm font-medium text-brk-muted mb-1.5">Email / SĐT / Mã học viên</label>
                             <input
                                 {...register("identifier", { required: "Vui lòng nhập thông tin" })}
                                 type="text"
                                 autoComplete="username"
-                                className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 text-white text-sm placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
                                 placeholder="Nhập email hoặc mã học viên"
                             />
-                            {errors.identifier && <p className="mt-1 text-xs text-red-400">{errors.identifier.message}</p>}
+                            {errors.identifier && <p className="mt-1 text-xs text-brk-accent">{errors.identifier.message}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Mật khẩu</label>
+                            <label className="block text-sm font-medium text-brk-muted mb-1.5">Mật khẩu</label>
                             <div className="relative">
                                 <input
                                     {...register("password", { required: "Vui lòng nhập mật khẩu" })}
                                     type={showPassword ? "text" : "password"}
                                     autoComplete="current-password"
-                                    className="w-full rounded-xl border border-zinc-700 bg-white/5 px-4 py-3 pr-10 text-white text-sm placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                    className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
                                     placeholder="••••••••"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface"
                                 >
                                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                 </button>
                             </div>
-                            {errors.password && <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>}
+                            {errors.password && <p className="mt-1 text-xs text-brk-accent">{errors.password.message}</p>}
                             <div className="mt-2 text-right">
-                                <Link href="/forgot-password" className="text-xs text-orange-400 hover:text-orange-300">
+                                <Link href="/forgot-password" className="text-xs text-brk-primary hover:text-brk-primary">
                                     Quên mật khẩu?
                                 </Link>
                             </div>
@@ -266,15 +266,15 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 px-4 py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full rounded-xl bg-brk-primary hover:bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Đăng nhập'}
                         </button>
                     </form>
 
-                    <p className="text-center text-sm text-zinc-500">
+                    <p className="text-center text-sm text-brk-muted">
                         Chưa có tài khoản?{' '}
-                        <Link href="/register" className="font-semibold text-orange-400 hover:text-orange-300">Đăng ký ngay</Link>
+                        <Link href="/register" className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
                 </div>
             </div>

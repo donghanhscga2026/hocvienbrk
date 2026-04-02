@@ -218,16 +218,16 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             {/* Header */}
             <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 z-50 fixed top-0 left-0 right-0">
                 <div className="flex items-center gap-3 min-w-0">
-                    <Link href="/" className="shrink-0 text-zinc-400 hover:text-white transition-colors">
+                    <Link href="/" className="shrink-0 text-brk-muted hover:text-brk-on-surface transition-colors">
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
-                    <h1 className="font-bold text-white truncate text-sm sm:text-base">{course.name_lop}</h1>
+                    <h1 className="font-bold text-brk-on-surface truncate text-sm sm:text-base">{course.name_lop}</h1>
                 </div>
                 
                 {statusMsg && (
                     <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${
-                        statusMsg.type === 'loading' ? 'bg-orange-500 text-white' :
-                        statusMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                        statusMsg.type === 'loading' ? 'bg-brk-accent text-brk-on-surface' :
+                        statusMsg.type === 'success' ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'
                     }`}>
                         {statusMsg.type === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
                         {statusMsg.text}
@@ -236,11 +236,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] sm:text-xs text-zinc-400 font-mono">{completedCount}/{course.lessons.length}</span>
-                        <div className="relative h-2 w-16 sm:w-24 bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(completedCount / course.lessons.length) * 100}%` }} />
+                        <span className="text-[10px] sm:text-xs text-brk-muted font-mono">{completedCount}/{course.lessons.length}</span>
+                        <div className="relative h-2 w-16 sm:w-24 bg-brk-background rounded-full overflow-hidden">
+                            <div className="h-full bg-brk-accent transition-all duration-500" style={{ width: `${(completedCount / course.lessons.length) * 100}%` }} />
                         </div>
-                        <span className="text-[10px] sm:text-xs font-bold text-emerald-400 min-w-[35px] text-right">
+                        <span className="text-[10px] sm:text-xs font-bold text-brk-accent min-w-[35px] text-right">
                             {Math.round((completedCount / course.lessons.length) * 100)}%
                         </span>
                     </div>
@@ -488,9 +488,9 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
             </div>
 
             {/* ─ Tiêu đề danh sách ─ */}
-            <div className="shrink-0 px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest text-white/60">Lộ trình học tập</span>
-                <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+            <div className="shrink-0 px-4 py-3 border-b border-brk-outline flex items-center justify-between bg-brk-background/50">
+                <span className="text-[10px] font-black text-brk-muted uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)' }}>Lộ trình học tập</span>
+                <span className="text-[10px] font-black text-brk-accent bg-brk-accent-10 px-2.5 py-0.5 rounded-full border border-brk-accent/20">
                     {completedCount}/{lessons.length} BÀI
                 </span>
             </div>
@@ -506,17 +506,18 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                             key={lesson.id}
                             onClick={() => unlocked && onLessonSelect(lesson.id)}
                             className={cn(
-                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b border-zinc-800/50 transition-all active:bg-zinc-800', 
-                                isActive && 'bg-zinc-800 border-l-4 border-l-orange-500', 
+                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b transition-all active:bg-brk-background', 
+                                'border-brk-outline/50',
+                                isActive && 'bg-brk-background border-l-4 border-l-brk-accent', 
                                 !unlocked && 'opacity-40 grayscale'
                             )}
                         >
                             <div className="shrink-0">
-                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : isActive ? <PlayCircle className="w-5 h-5 text-orange-400 animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-zinc-600" /> : <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center text-[8px] text-zinc-500">{lesson.order}</div>}
+                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5 text-brk-accent" /> : isActive ? <PlayCircle className="w-5 h-5 text-brk-accent animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-brk-muted" /> : <div className="w-4 h-4 rounded-full border border-brk-outline flex items-center justify-center text-[8px] text-brk-muted">{lesson.order}</div>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={cn('text-sm leading-snug', isActive ? 'text-white font-black' : 'text-zinc-400 font-medium')}>{lesson.title}</p>
-                                {prog?.totalScore !== undefined && <p className={cn('text-[10px] mt-1 font-bold', prog.totalScore >= 5 ? 'text-emerald-500' : 'text-orange-400')}>{prog.totalScore >= 5 ? '✓' : '✗'} Kết quả: {prog.totalScore}/10đ</p>}
+                                <p className={cn('text-sm leading-snug', isActive ? 'text-brk-on-primary font-black' : 'text-brk-muted font-medium')}>{lesson.title}</p>
+                                {prog?.totalScore !== undefined && <p className={cn('text-[10px] mt-1 font-bold', prog.totalScore >= 5 ? 'text-brk-accent' : 'text-brk-accent')}>{prog.totalScore >= 5 ? '✓' : '✗'} Kết quả: {prog.totalScore}/10đ</p>}
                             </div>
                         </button>
                     )

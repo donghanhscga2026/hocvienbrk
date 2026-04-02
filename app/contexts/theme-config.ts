@@ -1,13 +1,21 @@
 export interface ThemeColors {
-  primary: string;
-  secondary: string;
-  bg: string;
-  bgSecondary: string;
-  text: string;
-  textSecondary: string;
-  accent: string;
-  border: string;
-  header: string;
+  // Brand
+  primary: string;        // Màu thương hiệu (CTA, buttons)
+  onPrimary: string;       // Chữ trên primary (trắng/đen)
+
+  // Surface
+  surface: string;        // Cards, Modal, Panels
+  onSurface: string;       // Chữ chính trên surface
+
+  // Background
+  background: string;      // Nền trang
+  muted: string;           // Chữ phụ, mô tả
+
+  // Accent
+  accent: string;         // Màu nhấn (progress, badges)
+
+  // Outline
+  outline: string;        // Viền, borders
 }
 
 export function getContrastColor(bgColor: string): string {
@@ -20,7 +28,7 @@ export function getContrastColor(bgColor: string): string {
 }
 
 export function isDarkTheme(themeId: ThemeId | string): boolean {
-  return themeId === 'highend' || themeId === 'dark'
+  return themeId === 'highend' || themeId === 'dark' || themeId === 'ocean'
 }
 
 export function getTextColorForBg(bgColor: string, themeId: ThemeId): string {
@@ -33,7 +41,7 @@ export function getTextColorForBg(bgColor: string, themeId: ThemeId): string {
   }
 }
 
-export type ThemeId = 'default' | 'highend' | 'light' | 'dark' | 'custom';
+export type ThemeId = 'default' | 'highend' | 'light' | 'dark' | 'ocean' | 'custom';
 
 export interface Theme {
   id: ThemeId;
@@ -43,84 +51,99 @@ export interface Theme {
   locked: boolean;
 }
 
-export const defaultColors: ThemeColors = {
-  primary: '#f59e0b',
-  secondary: '#0ea5e9',
-  bg: '#ffffff',
-  bgSecondary: '#f9fafb',
-  text: '#171717',
-  textSecondary: '#6b7280',
-  accent: '#fbbf24',
-  border: '#e5e7eb',
-  header: '#ffffff',
-};
+export function getDefaultThemeColors(): ThemeColors {
+  return { ...presetThemes[0].colors };
+}
+
+export function getThemeColors(themeId: ThemeId): ThemeColors {
+  const theme = presetThemes.find(t => t.id === themeId);
+  return theme ? theme.colors : presetThemes[0].colors;
+}
 
 export const presetThemes: Theme[] = [
+  // Royal Empire - Minimalist Editorial (Quyền lực & Trung tính)
   {
     id: 'default',
-    name: 'Mặc định',
-    icon: '🎯',
+    name: 'Royal Empire',
+    icon: '👑',
     colors: {
-      primary: '#f59e0b',
-      secondary: '#0ea5e9',
-      bg: '#ffffff',
-      bgSecondary: '#f9fafb',
-      text: '#171717',
-      textSecondary: '#6b7280',
-      accent: '#fbbf24',
-      border: '#e5e7eb',
-      header: '#ffffff',
+      primary: '#4EB09B',
+      onPrimary: '#FFFFFF',
+      surface: '#FFFFFF',
+      background: '#FAE0C7',
+      onSurface: '#333333',
+      muted: '#FFB6AF',
+      accent: '#F28076',
+      outline: '#FBC193'
     },
     locked: true,
   },
-  {
-    id: 'highend',
-    name: 'Chuyên nghiệp',
-    icon: '💼',
-    colors: {
-      primary: '#D4AF37',
-      secondary: '#1e3a5f',
-      bg: '#0f1419',
-      bgSecondary: '#1a1a1a',
-      text: '#ffffff',
-      textSecondary: '#9ca3af',
-      accent: '#fbbf24',
-      border: '#374151',
-      header: '#0f1419',
-    },
-    locked: true,
-  },
+  // Digital Leader - Modern Corporate (Sạch sẽ & Tin cậy)
   {
     id: 'light',
-    name: 'Sáng',
-    icon: '☀️',
+    name: 'Digital Leader',
+    icon: '💻',
     colors: {
-      primary: '#6366f1',
-      secondary: '#ec4899',
-      bg: '#fafafa',
-      bgSecondary: '#f3f4f6',
-      text: '#18181b',
-      textSecondary: '#71717a',
-      accent: '#818cf8',
-      border: '#e5e7eb',
-      header: '#ffffff',
+      primary: '#41B3A3', //Màu thương hiệu (CTA, buttons)
+      onPrimary: '#FFFFFF', //Chữ trên primary (trắng/đen)
+      surface: '#FFFFFF', //Thường dùng cho Header,Cards, Modal, Panels
+      background: '#85DCB0', //Thường dùng cho Body
+      onSurface: '#2D3142', //Chữ chính trên surface
+      muted: '#E8A87C', //Chữ phụ, mô tả
+      accent: '#E27D60', //Màu nhấn (progress, badges)
+      outline: '#C38D9E' //Viền, borders
     },
     locked: true,
   },
+  // Dark - Dark Mode Premium (Sang trọng & Bí ẩn)
   {
     id: 'dark',
-    name: 'Tối',
+    name: 'Dark',
     icon: '🌙',
     colors: {
-      primary: '#3b82f6',
-      secondary: '#8b5cf6',
-      bg: '#0f172a',
-      bgSecondary: '#1e293b',
-      text: '#f8fafc',
-      textSecondary: '#94a3b8',
-      accent: '#60a5fa',
-      border: '#334155',
-      header: '#0f172a',
+      primary: '#8B5CF6',
+      onPrimary: '#FFFFFF',
+      surface: '#1E1E1E',
+      background: '#121212',
+      onSurface: '#F3F4F6',
+      muted: '#9CA3AF',
+      accent: '#10B981',
+      outline: '#333333'
+    },
+    locked: true,
+  },
+
+  // Energy & Growth - Vibrant Creative (Năng lượng & Phá cách)
+  {
+    id: 'highend',
+    name: 'Energy & Growth',
+    icon: '⚡',
+    colors: {
+      primary: '#EC4899',
+      onPrimary: '#FFFFFF',
+      surface: '#FFFFFF',
+      background: '#FAF5FF',
+      onSurface: '#4C1D95',
+      muted: '#6B7280',
+      accent: '#06B6D4',
+      outline: '#E9D5FF'
+    },
+    locked: true,
+  },
+  // Trust & Wisdom - Soft & Organic (Điềm tĩnh & Bền vững)
+  {
+    id: 'ocean',
+    name: 'Trust & Wisdom',
+    icon: '🌿',
+    colors: {
+      primary: '#059669',
+      onPrimary: '#FFFFFF',
+      surface: '#FFFFFF',
+      background: '#F0FDF4',
+      onSurface: '#064E3B',
+      muted: '#475569',
+      accent: '#FB923C',
+      outline: '#D1FAE5'
     },
     locked: true,
   },
@@ -131,7 +154,7 @@ export const getCustomThemeId = 'custom';
 export function getThemeById(id: ThemeId): Theme {
   const theme = presetThemes.find(t => t.id === id);
   if (theme) return theme;
-  
+
   const savedCustom = localStorage.getItem('site-custom-colors');
   if (savedCustom) {
     return {
@@ -142,7 +165,7 @@ export function getThemeById(id: ThemeId): Theme {
       locked: false,
     };
   }
-  
+
   return presetThemes[0];
 }
 
@@ -197,18 +220,17 @@ export function adjustLightness(hex: string, percent: number): string {
   return hslToHex(h, s, Math.max(0, Math.min(100, l + percent)))
 }
 
-export function generateThemeOverrides(colors: ThemeColors, isDark: boolean): string {
+export function generateThemeCSS(colors: ThemeColors, isDark: boolean): string {
   return `
     :root {
       --color-primary: ${colors.primary};
-      --color-secondary: ${colors.secondary};
-      --color-bg: ${colors.bg};
-      --color-bg-secondary: ${colors.bgSecondary};
-      --color-text: ${colors.text};
-      --color-text-secondary: ${colors.textSecondary};
+      --color-on-primary: ${colors.onPrimary};
+      --color-surface: ${colors.surface};
+      --color-background: ${colors.background};
+      --color-on-surface: ${colors.onSurface};
+      --color-muted: ${colors.muted};
       --color-accent: ${colors.accent};
-      --color-border: ${colors.border};
-      --color-header: ${colors.header};
+      --color-outline: ${colors.outline};
     }
 
     /* ====================== THEME CLASSES ====================== */
@@ -225,33 +247,8 @@ export function generateThemeOverrides(colors: ThemeColors, isDark: boolean): st
     .text-brk-primary-25 {
       color: ${hexToRgba(colors.primary, 0.25)} !important;
     }
-    .text-brk-secondary {
-      color: ${colors.secondary} !important;
-      text-shadow: 0 0 10px ${hexToRgba(colors.secondary, 0.25)}, 0 0 20px ${hexToRgba(colors.secondary, 0.25)} !important;
-    }
-    .text-brk-secondary-75 {
-      color: ${hexToRgba(colors.secondary, 0.75)} !important;
-    }
-    .text-brk-secondary-50 {
-      color: ${hexToRgba(colors.secondary, 0.5)} !important;
-    }
-    .text-brk-secondary-25 {
-      color: ${hexToRgba(colors.secondary, 0.25)} !important;
-    }
-    .text-brk-text {
-      color: ${colors.text} !important;
-    }
-    .text-brk-text-75 {
-      color: ${hexToRgba(colors.text, 0.75)} !important;
-    }
-    .text-brk-text-50 {
-      color: ${hexToRgba(colors.text, 0.5)} !important;
-    }
-    .text-brk-text-25 {
-      color: ${hexToRgba(colors.text, 0.25)} !important;
-    }
-    .text-brk-bg {
-      color: ${colors.bg} !important;
+    .text-brk-on-primary {
+      color: ${colors.onPrimary} !important;
     }
 
     /* ====================== LIGHTNESS LEVELS (đậm nhạt) ====================== */
@@ -261,29 +258,68 @@ export function generateThemeOverrides(colors: ThemeColors, isDark: boolean): st
     .text-brk-primary-dark {
       color: ${adjustLightness(colors.primary, -20)} !important;
     }
-    .text-brk-secondary-light {
-      color: ${adjustLightness(colors.secondary, 20)} !important;
+    .text-brk-on-surface-light {
+      color: ${adjustLightness(colors.onSurface, 20)} !important;
     }
-    .text-brk-secondary-dark {
-      color: ${adjustLightness(colors.secondary, -20)} !important;
+    .text-brk-on-surface-dark {
+      color: ${adjustLightness(colors.onSurface, -20)} !important;
     }
-    .text-brk-text-light {
-      color: ${adjustLightness(colors.text, 20)} !important;
+
+    /* ====================== SURFACE (Cards, Modal, Panels) ====================== */
+    .bg-brk-surface {
+      background-color: ${colors.surface} !important;
     }
-    .text-brk-text-dark {
-      color: ${adjustLightness(colors.text, -20)} !important;
+    .bg-brk-surface-light {
+      background-color: ${adjustLightness(colors.surface, 20)} !important;
     }
-    .bg-brk-bg {
-      background-color: ${colors.bg} !important;
+    .bg-brk-surface-dark {
+      background-color: ${adjustLightness(colors.surface, -20)} !important;
     }
-    .bg-brk-header {
-      background-color: ${colors.header} !important;
+    .text-brk-on-surface {
+      color: ${colors.onSurface} !important;
     }
-    .text-brk-header {
-      color: ${colors.header} !important;
+    .text-brk-on-surface-75 {
+      color: ${hexToRgba(colors.onSurface, 0.75)} !important;
     }
+    .text-brk-on-surface-50 {
+      color: ${hexToRgba(colors.onSurface, 0.5)} !important;
+    }
+    .text-brk-on-surface-25 {
+      color: ${hexToRgba(colors.onSurface, 0.25)} !important;
+    }
+
+    /* ====================== BACKGROUND (Page background) ====================== */
+    .bg-brk-background {
+      background-color: ${colors.background} !important;
+    }
+    .bg-brk-background-light {
+      background-color: ${adjustLightness(colors.background, 20)} !important;
+    }
+    .bg-brk-background-dark {
+      background-color: ${adjustLightness(colors.background, -20)} !important;
+    }
+
+    /* ====================== MUTED (Secondary text) ====================== */
+    .text-brk-muted {
+      color: ${colors.muted} !important;
+    }
+    .text-brk-muted-75 {
+      color: ${hexToRgba(colors.muted, 0.75)} !important;
+    }
+    .text-brk-muted-50 {
+      color: ${hexToRgba(colors.muted, 0.5)} !important;
+    }
+    .text-brk-muted-25 {
+      color: ${hexToRgba(colors.muted, 0.25)} !important;
+    }
+
+    /* ====================== PRIMARY BUTTONS (CTA) ====================== */
     .bg-brk-primary {
       background-color: ${colors.primary} !important;
+    }
+    .bg-brk-primary:hover {
+      background-color: ${colors.primary} !important;
+      filter: brightness(0.9);
     }
     .bg-brk-primary-light {
       background-color: ${adjustLightness(colors.primary, 20)} !important;
@@ -291,145 +327,104 @@ export function generateThemeOverrides(colors: ThemeColors, isDark: boolean): st
     .bg-brk-primary-dark {
       background-color: ${adjustLightness(colors.primary, -20)} !important;
     }
-
-    /* ====================== PRIMARY (Nút CTA chính) ====================== */
-    .bg-yellow-400, .bg-yellow-500, .bg-amber-400, .bg-amber-500, .bg-orange-500 {
-      background-color: ${colors.primary} !important;
+    .text-brk-on-primary {
+      color: ${colors.onPrimary} !important;
     }
-    .bg-yellow-400:hover, .bg-yellow-500:hover, .bg-amber-400:hover, .bg-amber-500:hover, .bg-orange-500:hover {
-      background-color: ${colors.primary} !important;
-      filter: brightness(0.9);
-    }
-    .text-yellow-400, .text-yellow-500, .text-amber-400, .text-amber-500 {
-      color: ${colors.primary} !important;
-    }
-    .border-yellow-400, .border-yellow-500, .border-amber-400 {
+    .border-brk-primary {
       border-color: ${colors.primary} !important;
     }
-    .hover\\:text-yellow-400:hover, nav a:hover {
-      color: ${colors.primary} !important;
+    .shadow-brk-primary\\/10 {
+      box-shadow: 0 10px 15px -3px ${hexToRgba(colors.primary, 0.1)} !important;
     }
-    .shadow-yellow-400\\/10, .shadow-yellow-400\\/20 {
-      box-shadow: 0 10px 15px -3px ${colors.primary}1a !important;
+    .shadow-brk-primary\\/20 {
+      box-shadow: 0 10px 15px -3px ${hexToRgba(colors.primary, 0.2)} !important;
     }
-    .ring-amber-200, .ring-yellow-200 {
-      --tw-ring-color: ${colors.primary}33 !important;
-    }
-    .bg-yellow-400\\/10, .bg-yellow-400\\/20 {
-      background-color: ${colors.primary}1a !important;
-    }
-    .bg-yellow-50 {
-      background-color: ${colors.primary}0d !important;
-    }
-    .text-yellow-600, .text-yellow-700, .text-yellow-800 {
-      color: ${colors.primary}cc !important;
+    .ring-brk-primary {
+      --tw-ring-color: ${hexToRgba(colors.primary, 0.2)} !important;
     }
 
-    /* ====================== SECONDARY (Header, Badge) ====================== */
-    header, header[class*="fixed"], header[class*="bg-black"], header[class*="bg-gray"] {
-      background-color: ${colors.header} !important;
+    /* ====================== ACCENT (Emphasis, Success) ====================== */
+    .text-brk-accent {
+      color: ${colors.accent} !important;
     }
-    .bg-sky-500, .bg-sky-600 {
-      background-color: ${colors.secondary} !important;
+    .bg-brk-accent {
+      background-color: ${colors.accent} !important;
     }
-    .text-sky-500, .text-sky-600 {
-      color: ${colors.secondary} !important;
+    .border-brk-accent {
+      border-color: ${colors.accent} !important;
     }
-    .bg-zinc-900, .bg-zinc-950 {
-      background-color: ${isDark ? colors.header : colors.bgSecondary} !important;
+    .text-brk-accent-hover:hover {
+      color: ${colors.accent} !important;
     }
-    .bg-orange-500\\/10 {
-      background-color: ${colors.primary}1a !important;
+    .bg-brk-accent-10 {
+      background-color: ${hexToRgba(colors.accent, isDark ? 0.15 : 0.1)} !important;
     }
-    .border-orange-500 {
-      border-color: ${colors.primary} !important;
+    .bg-brk-accent-20 {
+      background-color: ${hexToRgba(colors.accent, isDark ? 0.2 : 0.2)} !important;
     }
-    .text-orange-400, .text-orange-500, .text-orange-600 {
-      color: ${colors.primary} !important;
+    .bg-brk-accent-30 {
+      background-color: ${hexToRgba(colors.accent, isDark ? 0.3 : 0.3)} !important;
     }
-    .hover\\:bg-orange-500:hover {
-      background-color: ${colors.primary} !important;
-    }
-    .text-glow-3d {
-      color: ${colors.secondary} !important;
-      text-shadow: 0 0 10px ${colors.secondary}40, 0 0 20px ${colors.secondary}40 !important;
+    .bg-brk-accent-50 {
+      background-color: ${hexToRgba(colors.accent, 0.5)} !important;
     }
 
-    /* ====================== BACKGROUND ====================== */
+    /* ====================== OUTLINE (Borders) ====================== */
+    .border-brk-outline {
+      border-color: ${colors.outline} !important;
+    }
+    .border-brk-outline-light {
+      border-color: ${adjustLightness(colors.outline, 20)} !important;
+    }
+    .border-brk-outline-dark {
+      border-color: ${adjustLightness(colors.outline, -20)} !important;
+    }
+    .ring-brk-outline {
+      --tw-ring-color: ${colors.outline} !important;
+    }
+
+    /* ====================== LEGACY MAPPINGS (for backward compatibility) ====================== */
+    /* These map old class names to new design tokens */
+    .bg-brk-section {
+      background-color: ${colors.surface} !important;
+    }
+    .bg-brk-section-alt {
+      background-color: ${colors.background} !important;
+    }
+    .text-brk-section {
+      color: ${colors.onSurface} !important;
+    }
+    .text-brk-section-secondary {
+      color: ${colors.muted} !important;
+    }
+    .border-brk-section {
+      border-color: ${colors.outline} !important;
+    }
+    .ring-brk-section {
+      --tw-ring-color: ${colors.outline} !important;
+    }
+    .text-brk-bg {
+      color: ${colors.background} !important;
+    }
+    .bg-brk-bg {
+      background-color: ${colors.background} !important;
+    }
+
+
+
+    /* ====================== PAGE BODY & FOOTER ====================== */
     body {
-      background-color: ${colors.bg} !important;
-      color: ${colors.text} !important;
-    }
-    .bg-white {
-      background-color: ${isDark ? colors.bgSecondary : '#ffffff'} !important;
-    }
-    .bg-gray-50 {
-      background-color: ${colors.bgSecondary} !important;
-    }
-    .bg-gray-100 {
-      background-color: ${isDark ? 'rgba(255,255,255,0.05)' : '#f3f4f6'} !important;
-    }
-    .bg-white\\/5 {
-      background-color: ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)'} !important;
-    }
-    .bg-zinc-800 {
-      background-color: ${isDark ? 'rgba(255,255,255,0.1)' : '#3f3f46'} !important;
+      background-color: ${colors.background} !important;
+      color: ${colors.onSurface} !important;
     }
     footer {
-      background-color: ${isDark ? colors.bg : '#f3f4f6'} !important;
-    }
-
-    /* ====================== TEXT ====================== */
-    .text-white {
-      color: ${isDark ? '#ffffff' : colors.text} !important;
-    }
-    .text-gray-900, .text-zinc-900 {
-      color: ${isDark ? '#ffffff' : '#111827'} !important;
-    }
-    .text-gray-500, .text-zinc-500 {
-      color: ${colors.textSecondary} !important;
-    }
-    .text-gray-600, .text-zinc-600 {
-      color: ${isDark ? '#d4d4d8' : '#4b5563'} !important;
-    }
-    .text-gray-400 {
-      color: ${isDark ? '#a1a1aa' : '#9ca3af'} !important;
-    }
-    .text-gray-300 {
-      color: ${isDark ? '#d4d4d8' : '#d1d5db'} !important;
+      background-color: ${isDark ? colors.background : '#f3f4f6'} !important;
     }
     footer p, footer span {
-      color: ${colors.textSecondary} !important;
+      color: ${colors.muted} !important;
     }
 
-    /* ====================== BORDERS ====================== */
-    .border-gray-200 {
-      border-color: ${isDark ? 'rgba(255,255,255,0.1)' : '#e5e7eb'} !important;
-    }
-    .border-gray-100 {
-      border-color: ${isDark ? 'rgba(255,255,255,0.05)' : '#f3f4f6'} !important;
-    }
-    .border-white\\/20, .border-white\\/10 {
-      border-color: ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'} !important;
-    }
-    .border-zinc-800, .border-zinc-700 {
-      border-color: ${isDark ? 'rgba(255,255,255,0.1)' : '#3f3f46'} !important;
-    }
-
-    /* ====================== MODAL/OVERLAY ====================== */
-    .bg-zinc-950 {
-      background-color: ${isDark ? '#09090b' : '#ffffff'} !important;
-    }
-    .bg-slate-900\\/40 {
-      background-color: ${isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.4)'} !important;
-    }
-
-    /* ====================== HERO/GRADIENT ====================== */
-    .bg-gradient-to-br {
-      background: ${isDark ? colors.bg : 'linear-gradient(to bottom right, #000, #18181b)'} !important;
-    }
-
-    /* ====================== STATUS COLORS ====================== */
+    /* ====================== STATUS COLORS (adjust for dark mode) ====================== */
     .bg-green-50 {
       background-color: ${isDark ? 'rgba(34,197,94,0.1)' : '#f0fdf4'} !important;
     }

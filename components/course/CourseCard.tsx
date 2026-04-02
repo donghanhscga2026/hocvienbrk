@@ -93,9 +93,9 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
 
     return (
         <>
-            <div className={`group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full ${darkMode ? 'bg-zinc-900 border border-zinc-800' : 'bg-white border border-gray-100'}`}>
+            <div className="group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full bg-brk-surface border-brk-outline">
                 {/* Ảnh bìa - Đã tối ưu hóa */}
-                <div className="relative aspect-[16/9] w-full overflow-hidden shrink-0 bg-zinc-800">
+                <div className="relative aspect-[16/9] w-full overflow-hidden shrink-0 bg-brk-background">
                     <Image
                         src={course.link_anh_bia || 'https://i.postimg.cc/PJPkm7vB/1.jpg'}
                         alt={course.name_lop}
@@ -111,7 +111,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                     {/* Title */}
                     <div className="mb-3 flex items-center gap-2.5">
                         <span className="text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
-                        <h3 className={`text-base sm:text-lg font-black leading-tight truncate flex-1 ${darkMode ? 'text-white' : 'text-black'}`}
+                        <h3 className="text-base sm:text-lg font-black leading-tight truncate flex-1 text-brk-on-surface"
                             style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
                             {course.name_lop}
                         </h3>
@@ -119,12 +119,12 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
 
                     {/* Badges + Trạng thái + Ngày bắt đầu */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-yellow-400 text-gray-900' : 'bg-red-600 text-white'}`}>
+                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-brk-primary text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'}`}>
                             {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
                         </span>
                         {isActive && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-sky-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-primary px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
                                 Đã kích hoạt
                                 {enrollment?.startedAt && (
                                     <span className="opacity-80 font-normal" suppressHydrationWarning>
@@ -134,8 +134,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                             </span>
                         )}
                         {isPending && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm border border-orange-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-accent px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-accent/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
                                 Chờ thanh toán
                             </span>
                         )}
@@ -143,8 +143,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
 
                     {/* Mô tả */}
                     <div
-                        className={`mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words ${darkMode ? 'text-gray-300' : 'text-gray-500'
-                            }`}
+                        className="mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words text-brk-muted"
                         dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }}
                     />
 
@@ -153,14 +152,14 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                         onClick={handleAction}
                         disabled={loading}
                         className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
-                            ${loading ? 'bg-gray-400 text-white cursor-not-allowed' :
-                                isActive ? 'bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow-emerald-200' :
-                                isPending ? 'bg-orange-500 text-white hover:bg-orange-600 hover:shadow-orange-200' :
-                                    'bg-sky-500 text-white hover:bg-sky-600 hover:shadow-sky-200'}`}
+                            ${loading ? 'bg-brk-muted text-brk-on-surface cursor-not-allowed' :
+                                isActive ? 'bg-brk-accent text-brk-on-primary hover:bg-brk-accent hover:brightness-110' :
+                                isPending ? 'bg-brk-accent text-brk-on-primary hover:brightness-110' :
+                                    'bg-brk-primary text-brk-on-primary hover:brightness-110'}`}
                     >
                         {loading ? (
                             <span className="flex items-center gap-2 relative z-10">
-                                <svg className="h-5 w-5 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <svg className="h-5 w-5 animate-spin text-brk-on-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
@@ -192,7 +191,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                     </button>
 
                     {isPending && !loading && (
-                        <p className="mt-3 text-center text-xs font-bold text-orange-600 animate-pulse italic">
+                        <p className="mt-3 text-center text-xs font-bold text-brk-accent animate-pulse italic">
                             Đang chờ thanh toán...
                         </p>
                     )}

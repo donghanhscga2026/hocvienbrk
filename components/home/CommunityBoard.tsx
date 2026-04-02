@@ -60,36 +60,36 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
         <div className="space-y-6">
             <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-2">
-                    <Newspaper className="w-6 h-6 text-purple-600" />
+                    <Newspaper className="w-6 h-6 text-brk-primary" />
                     <div>
-                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight leading-none">Bảng tin</h2>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1} ({total} bài)</p>
+                        <h2 className="text-xl font-black text-brk-on-surface uppercase tracking-tight leading-none">Bảng tin</h2>
+                        <p className="text-[9px] text-brk-muted font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1} ({total} bài)</p>
                     </div>
                 </div>
                 
                 <div className="flex items-center gap-3">
                     {/* Nút điều hướng */}
-                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200">
+                    <div className="flex items-center gap-1 bg-brk-background p-1 rounded-xl border border-brk-outline">
                         <button 
                             onClick={prevGroup}
                             disabled={!hasPrevPage}
-                            className="p-1.5 rounded-lg hover:bg-white disabled:opacity-20 transition-all active:scale-90"
+                            className="p-1.5 rounded-lg hover:bg-brk-surface disabled:opacity-20 transition-all active:scale-90"
                         >
-                            <ChevronLeft className="w-4 h-4 text-gray-900" />
+                            <ChevronLeft className="w-4 h-4 text-brk-on-surface" />
                         </button>
                         <button 
                             onClick={nextGroup}
                             disabled={!hasNextPage}
-                            className="p-1.5 rounded-lg hover:bg-white disabled:opacity-20 transition-all active:scale-90"
+                            className="p-1.5 rounded-lg hover:bg-brk-surface disabled:opacity-20 transition-all active:scale-90"
                         >
-                            <ChevronRight className="w-4 h-4 text-gray-900" />
+                            <ChevronRight className="w-4 h-4 text-brk-on-surface" />
                         </button>
                     </div>
 
                     {isAdmin && (
                         <Link 
                             href="/admin/posts" 
-                            className="bg-black text-yellow-400 p-2 rounded-xl hover:bg-zinc-800 transition-all shadow-lg active:scale-95"
+                            className="bg-brk-surface text-brk-primary p-2 rounded-xl hover:bg-brk-background transition-all shadow-lg active:scale-95"
                         >
                             <PlusCircle className="w-5 h-5" />
                         </Link>
@@ -98,12 +98,12 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
             </div>
 
             {loading ? (
-                <div className="py-12 flex flex-col items-center justify-center text-gray-400 gap-2">
-                    <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                <div className="py-12 flex flex-col items-center justify-center text-brk-muted gap-2">
+                    <Loader2 className="w-8 h-8 animate-spin text-brk-primary" />
                     <p className="text-[10px] font-black uppercase tracking-widest">Đang cập nhật tin mới...</p>
                 </div>
             ) : posts.length === 0 ? (
-                <div className="py-12 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-gray-100 text-gray-400 mx-2">
+                <div className="py-12 text-center bg-brk-surface rounded-[2.5rem] border-2 border-dashed border-brk-outline text-brk-muted mx-2">
                     <p className="text-[10px] font-black uppercase tracking-widest">Hộp thư đang trống</p>
                 </div>
             ) : (
@@ -115,11 +115,11 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                             <div className="flex-none w-[120px] snap-center flex flex-col items-center justify-center gap-3">
                                 <button 
                                     onClick={prevGroup}
-                                    className="w-16 h-16 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center hover:bg-black hover:text-yellow-400 transition-all shadow-lg active:scale-90"
+                                    className="w-16 h-16 rounded-full bg-brk-background text-brk-muted flex items-center justify-center hover:bg-brk-surface hover:text-brk-primary transition-all shadow-lg active:scale-90"
                                 >
                                     <ArrowLeftCircle className="w-8 h-8" />
                                 </button>
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Quay lại</span>
+                                <span className="text-[10px] font-black text-brk-muted uppercase tracking-widest text-center">Quay lại</span>
                             </div>
                         )}
 
@@ -137,11 +137,11 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                             <div className="flex-none w-[150px] snap-center flex flex-col items-center justify-center gap-3">
                                 <button 
                                     onClick={nextGroup}
-                                    className="w-16 h-16 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-600 hover:text-white transition-all shadow-lg active:scale-90"
+                                    className="w-16 h-16 rounded-full bg-brk-primary-25 text-brk-primary flex items-center justify-center hover:bg-brk-primary hover:text-brk-on-primary transition-all shadow-lg active:scale-90"
                                 >
                                     <ArrowRightCircle className="w-8 h-8" />
                                 </button>
-                                <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Tiếp tục</span>
+                                <span className="text-[10px] font-black text-brk-primary uppercase tracking-widest">Tiếp tục</span>
                             </div>
                         )}
                     </div>

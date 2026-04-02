@@ -1,43 +1,38 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ThemeId, getThemeById, generateThemeOverrides } from './theme-config';
+import { ThemeId, getThemeById, generateThemeCSS, presetThemes, isDarkTheme } from './theme-config';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedTheme = (localStorage.getItem('site-theme') as ThemeId) || 'default';
     const savedCustom = localStorage.getItem('site-custom-colors');
     
-    if (savedTheme === 'default' && !savedCustom) {
-      // Default theme - clear any overrides
-      const styleEl = document.getElementById('theme-overrides');
-      if (styleEl) styleEl.textContent = '';
-      document.documentElement.removeAttribute('data-theme');
-      return;
-    }
+    // Lấy theme colors
+    let themeColors = presetThemes[0].colors; // Royal Empire là default
+    let themeId: ThemeId = 'default';
     
-    let theme = getThemeById(savedTheme);
     if (savedTheme === 'custom' && savedCustom) {
-      theme = {
-        id: 'custom',
-        name: 'Tùy biến',
-        icon: '🎨',
-        colors: JSON.parse(savedCustom),
-        locked: false,
-      };
+      themeColors = JSON.parse(savedCustom);
+      themeId = 'custom';
+    } else if (savedTheme !== 'default') {
+      const theme = getThemeById(savedTheme);
+      themeColors = theme.colors;
+      themeId = savedTheme;
     }
-
-    const isDark = theme.id === 'highend' || theme.id === 'dark';
     
-    let styleEl = document.getElementById('theme-overrides');
+    const isDark = isDarkTheme(themeId);
+    
+    // Inject CSS vào <head>
+    let styleEl = document.getElementById('theme-base-css');
     if (!styleEl) {
       styleEl = document.createElement('style');
-      styleEl.id = 'theme-overrides';
+      styleEl.id = 'theme-base-css';
       document.head.appendChild(styleEl);
     }
     
-    styleEl.textContent = generateThemeOverrides(theme.colors, isDark);
-    document.documentElement.setAttribute('data-theme', theme.id);
+    styleEl.textContent = generateThemeCSS(themeColors, isDark);
+    document.documentElement.setAttribute('data-theme', themeId);
   }, []);
 
   return <>{children}</>;

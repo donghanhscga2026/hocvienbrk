@@ -27,30 +27,30 @@ function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrol
     const isCompleted = enrollment?.status === 'COMPLETED'
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                <div className="h-32 bg-gradient-to-br from-purple-600 to-indigo-800 relative flex items-center justify-center">
-                    <BookOpen className="w-12 h-12 text-white/20" />
-                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors text-white">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-brk-surface/80 backdrop-blur-md p-4 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-brk-surface w-full max-w-sm rounded-[3rem] overflow-hidden border border-brk-outline shadow-xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                <div className="h-32 bg-gradient-to-br from-brk-primary to-brk-primary relative flex items-center justify-center">
+                    <BookOpen className="w-12 h-12 text-brk-on-primary/20" />
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-brk-surface/20 hover:bg-brk-surface/40 rounded-full transition-colors text-brk-on-primary">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
                 <div className="p-8 space-y-6">
-                    <div className="space-y-2 text-white">
+                    <div className="space-y-2 text-brk-on-surface">
                         <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${isActive || isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${isActive || isCompleted ? 'bg-brk-accent-20 text-brk-accent' : 'bg-brk-muted/20 text-brk-muted'}`}>
                                 {isCompleted ? 'Hoàn thành' : isActive ? 'Đã kích hoạt' : 'Chưa sở hữu'}
                             </span>
                         </div>
                         <h3 className="text-xl font-black uppercase tracking-tight leading-tight">{course.name_lop}</h3>
-                        <p className="text-gray-400 text-sm font-medium line-clamp-3">{course.mo_ta_ngan || 'Khám phá những kiến thức thực chiến cùng Học viện BRK.'}</p>
+                        <p className="text-brk-muted text-sm font-medium line-clamp-3">{course.mo_ta_ngan || 'Khám phá những kiến thức thực chiến cùng Học viện BRK.'}</p>
                     </div>
                     {isActive || isCompleted ? (
-                        <Link href={`/courses/${course.id_khoa}/learn`} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10">
+                        <Link href={`/courses/${course.id_khoa}/learn`} className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:brightness-110 transition-all active:scale-95 shadow-lg shadow-brk-accent/10">
                             <PlayCircle className="w-5 h-5" /> Vào học ngay
                         </Link>
                     ) : (
-                        <Link href={`/#khoa-hoc`} onClick={onClose} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 transition-all active:scale-95">
+                        <Link href={`/#khoa-hoc`} onClick={onClose} className="w-full bg-brk-background text-brk-on-surface py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brk-surface transition-all active:scale-95 border border-brk-outline">
                             Tìm hiểu thêm
                         </Link>
                     )}
@@ -65,14 +65,14 @@ function UpgradeRoadmapModal({ onClose, onConfirm }: { onClose: () => void, onCo
     const [isReseting, setIsReseting] = useState(false)
 
     return (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
-            <div className="bg-zinc-900 w-full max-w-sm rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl p-8 space-y-6 text-center">
-                <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto">
-                    <Sparkles className="w-8 h-8 text-yellow-400" />
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-brk-surface/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-brk-surface w-full max-w-sm rounded-[3rem] overflow-hidden border border-brk-outline shadow-xl p-8 space-y-6 text-center">
+                <div className="w-16 h-16 bg-brk-primary-25 rounded-full flex items-center justify-center mx-auto">
+                    <Sparkles className="w-8 h-8 text-brk-primary" />
                 </div>
                 <div className="space-y-2">
-                    <h3 className="text-xl font-black text-white uppercase italic">Nâng cấp lộ trình?</h3>
-                    <p className="text-gray-400 text-xs font-medium leading-relaxed">Chặng đường này đang bị khóa. Bạn có muốn thực hiện lại khảo sát để thiết lập lộ trình xa hơn không?</p>
+                    <h3 className="text-xl font-black text-brk-on-surface uppercase italic">Nâng cấp lộ trình?</h3>
+                    <p className="text-brk-muted text-xs font-medium leading-relaxed">Chặng đường này đang bị khóa. Bạn có muốn thực hiện lại khảo sát để thiết lập lộ trình xa hơn không?</p>
                 </div>
                 <div className="space-y-3">
                     <button
@@ -81,11 +81,11 @@ function UpgradeRoadmapModal({ onClose, onConfirm }: { onClose: () => void, onCo
                             setIsReseting(true)
                             await onConfirm()
                         }}
-                        className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-yellow-500 transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:brightness-110 transition-all flex items-center justify-center gap-2"
                     >
                         {isReseting ? <Loader2 className="animate-spin w-4 h-4" /> : 'Sẵn sàng nâng cấp'}
                     </button>
-                    <button onClick={onClose} className="w-full bg-white/5 text-gray-400 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all">Để sau</button>
+                    <button onClick={onClose} className="w-full bg-brk-background text-brk-muted py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-brk-surface transition-all border border-brk-outline">Để sau</button>
                 </div>
             </div>
         </div>
@@ -215,11 +215,11 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             <div className="relative space-y-4">
                 <div className="flex justify-between items-center px-2">
                     <div className="flex items-center gap-2">
-                        <Target className="w-4 h-4 text-gray-400" />
-                        <span className="text-[12px] font-black uppercase tracking-widest text-gray-400">Mục tiêu & lộ trình</span>
+                        <Target className="w-4 h-4 text-brk-muted" />
+                        <span className="text-[12px] font-black uppercase tracking-widest text-brk-muted">Mục tiêu & lộ trình</span>
                     </div>
                     {onReset && (
-                        <button onClick={() => { if (confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors border-b border-gray-200">
+                        <button onClick={() => { if (confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-brk-muted hover:text-brk-accent transition-colors border-b border-brk-outline">
                             🔄 Tạo lại lộ trình
                         </button>
                     )}
@@ -236,30 +236,30 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
 
                     return (
                         <div className="flex flex-col md:flex-row gap-0">
-                            {/* KHỐI MỤC TIÊU (QUẢ) */}
-                            <div className="md:w-1/3 bg-black text-yellow-400 py-1 px-2 rounded-t-[2rem] flex items-center gap-2 border-2 border-black shadow-lg">
-                                <div className="w-12 h-12 rounded-2xl bg-yellow-400/10 flex items-center justify-center text-3xl">🏆</div>
+                            {/* KHỐI MỤC TIÊU (QUẢ) - Dùng primary làm nền */}
+                            <div className="md:w-1/3 bg-brk-primary text-brk-on-primary py-1 px-2 rounded-t-[2rem] flex items-center gap-2 border-2 border-brk-accent shadow-lg">
+                                <div className="w-12 h-12 rounded-2xl bg-brk-on-primary/10 flex items-center justify-center text-3xl">🏆</div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-[12px] font-black text-white uppercase opacity-86 mb-0.5">(Quả như ý) TÔI MUỐN</div>
-                                    <div className="text-[18px] font-black uppercase tracking-tight truncate leading-none">{displayTitle}</div>
+                                    <div className="text-[12px] font-black text-brk-on-primary uppercase opacity-86 mb-0.5">(Quả như ý) TÔI MUỐN</div>
+                                    <div className="text-[18px] font-black uppercase tracking-tight truncate leading-none text-brk-accent">{displayTitle}</div>
                                 </div>
                             </div>
 
                             {/* KHỐI CAM KẾT TỔNG HỢP (NHÂN) */}
-                            <div className="md:w-2/3 bg-white py-3 px-5 rounded-b-[2.5rem] border-2 border-gray-100 flex flex-col justify-center gap-1 shadow-md">
-                                <div className="text-[12px] font-black uppercase text-gray-400 tracking-[0.2em] mb-1">(NHÂN TỐT) Cam kết hành động</div>
+                            <div className="md:w-2/3 bg-brk-surface py-3 px-5 rounded-b-[2.5rem] border-2 border-brk-outline flex flex-col justify-center gap-1 shadow-md">
+                                <div className="text-[12px] font-black uppercase text-brk-muted tracking-[0.2em] mb-1">(NHÂN TỐT) Cam kết hành động</div>
                                 <div className="space-y-2">
                                     {commitments.map((item: any, idx: number) => {
                                         const icons: any = { LEARN: '📚', VIDEO: '🎬', LIVE: '📡' };
                                         return (
-                                            <div key={idx} className="flex items-center gap-1 text-[11px] font-bold text-zinc-700 leading-tight">
+                                            <div key={idx} className="flex items-center gap-1 text-[11px] font-bold text-brk-on-surface leading-tight">
                                                 <span className="text-sm grayscale-[0.5] group-hover:grayscale-0">{icons[item.type] || '✨'}</span>
                                                 <span>{item.content}</span>
                                             </div>
                                         );
                                     })}
                                     {commitments.length === 0 && (
-                                        <p className="text-[10px] text-gray-400 italic">Đang cập nhật kế hoạch hành động...</p>
+                                        <p className="text-[10px] text-brk-muted italic">Đang cập nhật kế hoạch hành động...</p>
                                     )}
                                 </div>
                             </div>
@@ -269,12 +269,12 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             </div>
 
             {/* 2. UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (MOBILE OPTIMIZED) */}
-            <div className="bg-zinc-950 rounded-[3rem] py-3 px-3 md:p-12 border border-white/5 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#facc1505,transparent_70%)]"></div>
+            <div className="bg-brk-background rounded-[3rem] py-3 px-3 md:p-12 border border-brk-outline shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#f59e0b05,transparent_70%)]"></div>
 
                 <div className="relative z-10">
-                    <div className="flex items-center justify-center gap-3 mb-10 text-white">
-                        <Flag className="w-5 h-5 text-yellow-400" />
+                    <div className="flex items-center justify-center gap-3 mb-10 text-brk-on-surface">
+                        <Flag className="w-5 h-5 text-brk-primary" />
                         <h3 className="text-[12px] font-black uppercase tracking-[0.3em] italic">Lộ trình Zero 2 Hero</h3>
                     </div>
 
@@ -303,11 +303,11 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                             return (
                                                 <div key={stage.id} className="w-1/3 shrink-0 flex flex-col items-center relative z-10">
                                                     {!isLastInRow && (
-                                                        <div className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-gray-600 -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}></div>
+                                                        <div className={`absolute top-[28px] md:top-[40px] w-full h-[2px] border-t-2 border-dashed border-brk-muted -z-10 ${isReverseRow ? 'right-1/2' : 'left-1/2'}`}></div>
                                                     )}
                                                     {isLastInRow && isNotLastRow && (
                                                         /* Chỉnh h-[120px] và md:h-[180px] ở đây để khớp với gap ở trên */
-                                                        <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[120px] md:h-[180px] border-l-2 border-dashed border-gray-600 -z-10"></div>
+                                                        <div className="absolute top-[28px] md:top-[40px] left-1/2 -translate-x-1/2 w-[2px] h-[120px] md:h-[180px] border-l-2 border-dashed border-brk-muted -z-10"></div>
                                                     )}
                                                     <button
                                                         onClick={() => {
@@ -315,10 +315,10 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                             else setActiveStage(isActive ? null : stage.id)
                                                         }}
                                                         className={`w-14 h-14 md:w-20 md:h-20 rounded-full flex flex-col items-center justify-center border-2 transition-all duration-500 relative group active:scale-90 ${isUserGoal
-                                                            ? 'border-red-600 bg-yellow-400 text-white shadow-[0_0_60px_rgba(37,99,235,0.4)] scale-110 z-30'
+                                                            ? 'border-brk-accent bg-brk-primary text-brk-on-primary shadow-[0_0_60px_rgba(245,158,11,0.4)] scale-110 z-30'
                                                             : isLocked
-                                                                ? 'border-zinc-800 bg-zinc-900/50 text-zinc-600 opacity-40 cursor-not-allowed'
-                                                                : 'border-white/40 bg-zinc-600 text-white shadow-[0_0_20px_rgba(0,0,0,0.3)]'
+                                                                ? 'border-brk-outline bg-brk-background text-brk-muted opacity-40 cursor-not-allowed'
+                                                                : 'border-brk-outline bg-brk-primary text-brk-on-primary shadow-[0_0_20px_rgba(0,0,0,0.1)]'
                                                             }`}
                                                     >
                                                         {/* VÒNG TRÒN TIẾN ĐỘ (%) */}
@@ -331,50 +331,50 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                                                     strokeWidth="3"
                                                                     strokeDasharray="283"
                                                                     strokeDashoffset={283 - (283 * progress) / 100}
-                                                                    className={`transition-all duration-1000 text-green-600`}
+                                                                    className={`transition-all duration-1000 text-brk-accent`}
                                                                 />
                                                             </svg>
                                                         )}
 
                                                         {/* Hiệu ứng Pulsing cho Vị trí hiện tại */}
                                                         {isCurrentPos && !isLocked && (
-                                                            <span className="absolute inset-0 rounded-full bg-yellow-400 animate-ping opacity-20"></span>
+                                                            <span className="absolute inset-0 rounded-full bg-brk-primary animate-ping opacity-20"></span>
                                                         )}
 
                                                         {/* Hiệu ứng tỏa sáng động cho Đích đến */}
                                                         {isUserGoal && (
-                                                            <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-20"></span>
+                                                            <span className="absolute inset-0 rounded-full bg-brk-accent animate-ping opacity-20"></span>
                                                         )}
 
                                                         <span className={`text-xl md:text-3xl font-black relative z-10 ${isLocked ? 'grayscale' : ''}`}>{stage.icon}</span>
 
                                                         {/* Badge: Điểm đích */}
                                                         {isUserGoal && (
-                                                            <div className="absolute -top-6 bg-yellow-400 text-black text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-emerald-300 z-40 whitespace-nowrap">
+                                                            <div className="absolute -top-6 bg-brk-primary text-brk-on-primary text-[7px] font-black px-3 py-1 rounded-full uppercase tracking-tighter animate-bounce shadow-xl border border-brk-accent/50 z-40 whitespace-nowrap">
                                                                 <Trophy className="w-2.5 h-2.5 inline mr-1" /> Điểm đến của bạn
                                                             </div>
                                                         )}
 
                                                         {/* Badge: Vị trí hiện tại */}
                                                         {isCurrentPos && !isUserGoal && (
-                                                            <div className="absolute -top-8 bg-white text-black text-[10px] font-black px-2 py-1 rounded-full  tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
+                                                            <div className="absolute -top-8 bg-brk-surface text-brk-on-surface text-[10px] font-black px-2 py-1 rounded-full tracking-tighter animate-pulse shadow-xl z-40 whitespace-nowrap">
                                                                 <ArrowRight className="w-2.5 h-2.5 inline mr-1 rotate-90" /> Bạn đang ở đây
                                                             </div>
                                                         )}
 
                                                         {isLocked && (
-                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
-                                                                <Lock className="w-4 h-4 text-zinc-500" />
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-brk-surface/20 rounded-full">
+                                                                <Lock className="w-4 h-4 text-brk-muted" />
                                                             </div>
                                                         )}
 
-                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-white text-emerald-600 border-emerald-400' : isCurrentPos ? 'bg-yellow-400 text-black border-zinc-900' : isLocked ? 'bg-zinc-800 text-zinc-600 border-zinc-700' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2 ${isUserGoal ? 'bg-brk-surface text-brk-accent border-brk-accent' : isCurrentPos ? 'bg-brk-primary text-brk-on-primary border-brk-accent' : isLocked ? 'bg-brk-background text-brk-muted border-brk-outline' : 'bg-brk-background text-brk-on-surface border-brk-outline'}`}>
                                                             {stage.id}
                                                         </div>
                                                     </button>
 
                                                     <div className="mt-4 text-center px-1">
-                                                        <h4 className={`text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight transition-colors ${isUserGoal ? 'text-emerald-400' : isActive ? 'text-yellow-400' : isLocked ? 'text-zinc-700' : 'text-zinc-500'}`}>
+                                                        <h4 className={`text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight transition-colors ${isUserGoal ? 'text-brk-accent' : isActive ? 'text-brk-primary' : isLocked ? 'text-brk-muted' : 'text-brk-muted'}`}>
                                                             {stage.name}
                                                         </h4>
                                                     </div>
@@ -393,10 +393,10 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             <div className="space-y-4">
                 <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-yellow-500" />
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 italic">Bức tranh hiện thực</h3>
+                        <Sparkles className="w-4 h-4 text-brk-primary" />
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-brk-muted italic">Bức tranh hiện thực</h3>
                     </div>
-                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{customPath.length} mảnh ghép cần học</span>
+                    <span className="text-[8px] font-bold text-brk-muted uppercase tracking-widest">{customPath.length} mảnh ghép cần học</span>
                 </div>
 
                 {/* Sửa tính năng: Thu hẹp gap từ 3/4 xuống 1.5/2 để các mảnh ghép nằm sát nhau hơn theo yêu cầu */}
@@ -415,31 +415,31 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                         const progressPercent = isCompleted ? 100 : (enrollment?.completedCount / enrollment?.totalLessons) * 100 || 0
 
                         return (
-                            <div 
-                                key={courseId} 
+                            <div
+                                key={courseId}
                                 onClick={() => handleCourseClick(course, enrollment)}
-                                className={`group relative aspect-[23/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-zinc-700' : 'bg-zinc-300'} ${isHighlighted ? 'border-yellow-400 shadow-xl shadow-yellow-400/50 scale-105 z-10' : 'border-black'}`} 
+                                className={`group relative aspect-[23/9] rounded-[1.5rem] md:rounded-[2.5rem] p-1.5 sm:p-2 border-2 transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center text-center animate-in zoom-in duration-500 ${(isActive || isCompleted) ? 'bg-brk-primary' : 'bg-brk-background'} ${isHighlighted ? 'border-brk-primary shadow-xl shadow-brk-primary/50 scale-105 z-10' : 'border-brk-outline'}`}
                                 style={{ animationDelay: `${index * 50}ms` }}
                             >
                                 {enrollingCourseId === courseId && (
-                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-30">
-                                        <Loader2 className="w-6 h-6 animate-spin text-white" />
+                                    <div className="absolute inset-0 bg-brk-surface/50 flex items-center justify-center z-30">
+                                        <Loader2 className="w-6 h-6 animate-spin text-brk-on-primary" />
                                     </div>
                                 )}
 
                                 {/* Lớp màu xanh lá hiển thị tiến độ học tập (phủ từ trái sang) */}
                                 {(isActive || isCompleted) && (
                                     <div
-                                        className="absolute inset-0 bg-green-500/50 transition-all duration-1000 origin-left z-0"
+                                        className="absolute inset-0 bg-brk-accent transition-all duration-1000 origin-left z-0"
                                         style={{ width: `${progressPercent}%` }}
                                     />
                                 )}
 
                                 <div className="absolute top-2 right-2 z-20">
-                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : isActive ? <Play className="w-3 h-3 text-red-500 fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-blue-500 animate-spin" /> : <Lock className="w-3 h-3 text-zinc-400" />}
+                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-brk-accent" /> : isActive ? <Play className="w-3 h-3 text-brk-accent fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-brk-primary animate-spin" /> : <Lock className="w-3 h-3 text-brk-muted" />}
                                 </div>
 
-                                <h4 className={`text-[12px] sm:text-[10px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${isActive || isCompleted ? 'text-white' : 'text-zinc-500'}`}>
+                                <h4 className={`text-[12px] sm:text-[10px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${isActive || isCompleted ? 'text-brk-on-primary' : 'text-brk-muted'}`}>
                                     {/* Sửa tính năng: Chữ trắng chỉ dành cho khóa đã mở, chữ xám cho khóa chưa kích hoạt kể cả khi được chọn */}
                                     {course.name_lop}
                                 </h4>

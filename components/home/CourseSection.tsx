@@ -86,31 +86,31 @@ function CourseCategoryGroup({
             ref={groupRef}
             onMouseMove={handleActivity}
             onTouchStart={handleActivity}
-            className={`relative p-6 rounded-[2.5rem] border-2 transition-all duration-500 ${
+            className={`relative p-6 rounded-[2.5rem] transition-all duration-500 bg-brk-background border-brk-outline shadow-xl ${
                 isExpanded 
-                ? 'bg-white border-yellow-400 shadow-2xl z-20 mb-8' 
-                : 'bg-gray-50/50 border-gray-100 hover:border-gray-200 mb-4'
+                ? 'ring-2 ring-yellow-400 shadow-2xl z-20 mb-8' 
+                : 'mb-4'
             }`}
         >
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isExpanded ? 'bg-yellow-400 text-black' : 'bg-white text-gray-400 shadow-sm'}`}>
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isExpanded ? 'bg-brk-primary text-brk-on-primary' : 'bg-brk-surface text-brk-muted shadow-sm'}`}>
                         <LayoutGrid className="w-5 h-5" />
                     </div>
                     <div>
-                        <h3 className={`text-sm font-black uppercase tracking-widest ${isExpanded ? 'text-black' : 'text-gray-500'}`}>
+                        <h3 className="text-sm font-black uppercase tracking-widest text-brk-on-surface">
                             {categoryName}
                         </h3>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">
+                        <p className="text-[10px] font-bold text-brk-muted uppercase">
                             {courses.length} khóa học
                         </p>
                     </div>
                 </div>
 
                 {isExpanded && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 rounded-full border border-yellow-200 animate-in fade-in zoom-in duration-300">
-                        <Clock className="w-3 h-3 text-yellow-600 animate-pulse" />
-                        <span className="text-[9px] font-black text-yellow-700 uppercase">Đóng sau {countdown}s</span>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-brk-primary/10 rounded-full border border-brk-primary/20 animate-in fade-in zoom-in duration-300">
+                        <Clock className="w-3 h-3 text-brk-primary animate-pulse" />
+                        <span className="text-[9px] font-black text-brk-primary uppercase">Đóng sau {countdown}s</span>
                     </div>
                 )}
             </div>
@@ -138,8 +138,8 @@ function CourseCategoryGroup({
                         onClick={() => setIsExpanded(!isExpanded)}
                         className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ${
                             isExpanded 
-                            ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' 
-                            : 'bg-black text-white hover:bg-yellow-400 hover:text-black shadow-lg shadow-black/10'
+                            ? 'bg-brk-background text-brk-muted hover:bg-brk-surface' 
+                            : 'bg-brk-primary text-brk-on-primary shadow-lg shadow-black/10'
                         }`}
                     >
                         {isExpanded ? (
@@ -214,9 +214,9 @@ export default function CourseSection({
     // Nếu có groupedCourses thì hiển thị theo nhóm
     if (groupedCourses && groupedCourses.length > 0) {
         return (
-            <div className={`mb-16 rounded-[3rem] transition-all duration-500 ${darkMode ? '-mx-4 px-4 py-12 bg-zinc-950 shadow-2xl' : ''}`}>
+            <div className="mb-16 rounded-[3rem] transition-all duration-500 bg-brk-surface border-brk-outline p-4 md:p-12">
                 <div className="mb-10 text-center">
-                    <h2 className={`text-2xl md:text-3xl font-black uppercase tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
                         {title}
                     </h2>
                     <div className={`mx-auto mt-3 h-1.5 w-16 rounded-full ${accentColor}`}></div>
@@ -262,14 +262,14 @@ export default function CourseSection({
         <div 
             onMouseMove={handleActivity}
             onTouchStart={handleActivity}
-            className={`mb-12 rounded-[2.5rem] transition-all duration-500 relative ${
-                darkMode ? '-mx-4 px-4 py-10 bg-zinc-950 shadow-2xl shadow-black/50 border border-white/5' : 'bg-white p-6 md:p-10 border border-gray-100 shadow-xl'
-            } ${isExpanded ? 'ring-2 ring-yellow-400 z-30' : ''}`}
+            className={`mb-12 rounded-[2.5rem] transition-all duration-500 relative bg-brk-surface border-brk-outline shadow-xl p-6 md:p-10 ${
+                isExpanded ? 'ring-2 ring-brk-primary z-30' : ''
+            }`}
         >
             {/* Thông báo đếm ngược nổi */}
             {isExpanded && (
                 <div className="absolute top-6 right-6 z-50 animate-in fade-in zoom-in duration-300">
-                    <div className="bg-black text-yellow-400 px-4 py-2 rounded-full border border-yellow-400/30 shadow-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                    <div className="bg-brk-surface text-brk-primary px-4 py-2 rounded-full border border-brk-primary/30 shadow-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
                         <Clock className="w-3 h-3 animate-pulse" />
                         <span>Đóng sau {countdown}s</span>
                     </div>
@@ -277,12 +277,12 @@ export default function CourseSection({
             )}
 
             <div className="mb-8 text-center">
-                <h2 className={`text-2xl font-black uppercase tracking-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                <h2 className="text-2xl font-black uppercase tracking-tight text-brk-on-surface">
                     {title}
                 </h2>
                 <div className={`mx-auto mt-2 h-1 w-12 rounded-full ${accentColor}`}></div>
                 {title === 'Khóa học của tôi' && (
-                    <p className="mt-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Đang được sắp xếp theo lộ trình riêng của bạn</p>
+                    <p className="mt-3 text-[10px] font-black text-brk-muted uppercase tracking-widest">Theo thứ tự lộ trình riêng của bạn</p>
                 )}
             </div>
 
@@ -307,16 +307,16 @@ export default function CourseSection({
                 <div className="mt-10 flex justify-center">
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
-                        className={`group flex items-center gap-2 px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
+                        className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
                             isExpanded 
-                            ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' 
-                            : 'bg-yellow-400 text-black hover:bg-yellow-500 shadow-yellow-400/20'
+                            ? 'bg-brk-background text-brk-muted hover:bg-brk-surface' 
+                            : 'bg-brk-primary text-brk-on-primary shadow-brk-primary/20'
                         }`}
                     >
                         {isExpanded ? (
-                            <> Thu gọn lộ trình <ChevronUp className="w-4 h-4" /> </>
+                            <> Thu gọn lộ trình <ChevronUp className="w-3.5 h-3.5" /> </>
                         ) : (
-                            <> Xem toàn bộ lộ trình ({ (courses?.length || 0) - displayCount} khóa khác) <ChevronDown className="w-4 h-4 animate-bounce group-hover:animate-none" /> </>
+                            <> Xem tất cả ({ (courses?.length || 0) - displayCount} khóa) <ChevronDown className="w-3.5 h-3.5 animate-bounce group-hover:animate-none" /> </>
                         )}
                     </button>
                 </div>
