@@ -11,17 +11,17 @@ import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send, Spa
 
 function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
     return (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-white/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-xl rounded-[3rem] overflow-hidden border border-gray-200 shadow-2xl">
-                <div className="aspect-video bg-gray-100 relative flex items-center justify-center group cursor-pointer" onClick={() => videoUrl && window.open(videoUrl, '_blank')}>
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/20 to-transparent"></div>
-                    <Play className="w-16 h-16 text-yellow-500 fill-current group-hover:scale-110 transition-transform" />
-                    <p className="absolute bottom-4 left-6 text-gray-700 font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}</p>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-brk-surface/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+            <div className="bg-brk-surface w-full max-w-xl rounded-[3rem] overflow-hidden border border-brk-outline shadow-xl">
+                <div className="aspect-video bg-brk-background relative flex items-center justify-center group cursor-pointer" onClick={() => videoUrl && window.open(videoUrl, '_blank')}>
+                    <div className="absolute inset-0 bg-gradient-to-t from-brk-surface/50 to-transparent"></div>
+                    <Play className="w-16 h-16 text-brk-primary fill-current group-hover:scale-110 transition-transform" />
+                    <p className="absolute bottom-4 left-6 text-brk-on-surface font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}</p>
                 </div>
                 <div className="p-8 space-y-4">
-                    <h3 className="text-2xl font-black text-gray-900 uppercase">Cố vấn định hướng</h3>
-                    <p className="text-gray-600 text-sm leading-relaxed font-medium">Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện.</p>
-                    <button onClick={onClose} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-yellow-500 transition-all active:scale-95">Tôi đã hiểu - Quay lại chọn</button>
+                    <h3 className="text-2xl font-black text-brk-on-surface uppercase">Cố vấn định hướng</h3>
+                    <p className="text-brk-muted text-sm leading-relaxed font-medium">Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện.</p>
+                    <button onClick={onClose} className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-95">Tôi đã hiểu - Quay lại chọn</button>
                 </div>
             </div>
         </div>
@@ -294,28 +294,28 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
         }
     }
 
-    if (isLoading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-yellow-400" /></div>
+    if (isLoading) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-brk-primary" /></div>
 
     if (showSuccess) {
         const isGuest = !session?.user
         return (
-            <div className="bg-white rounded-[2rem] p-4 sm:p-6 md:p-8 text-center text-gray-900 border border-gray-200 shadow-xl animate-in zoom-in-95">
+            <div className="bg-brk-surface rounded-[2rem] p-4 sm:p-6 md:p-8 text-center text-brk-on-surface border border-brk-outline shadow-xl animate-in zoom-in-95">
                 <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/20">
-                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-brk-accent rounded-full flex items-center justify-center shadow-lg shadow-brk-accent/20">
+                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-brk-on-primary" />
                     </div>
                     <h2 className="text-lg sm:text-xl md:text-2xl font-black uppercase">Khảo sát hoàn tất!</h2>
                 </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 text-left max-w-md mx-auto">
-                    <p className="text-[9px] sm:text-[10px] font-black uppercase text-yellow-500 mb-2 sm:mb-3 md:mb-4 tracking-widest flex items-center gap-1 sm:gap-2">
+                <div className="bg-brk-background border border-brk-outline rounded-2xl sm:rounded-3xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 text-left max-w-md mx-auto">
+                    <p className="text-[9px] sm:text-[10px] font-black uppercase text-brk-primary mb-2 sm:mb-3 md:mb-4 tracking-widest flex items-center gap-1 sm:gap-2">
                         <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> AI đã xác định {identifiedCourseIds.length} chặng học:
                     </p>
                     <div className="space-y-1.5 sm:space-y-2 max-h-[120px] sm:max-h-[160px] md:max-h-[200px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
                         {identifiedCourseIds.map((id, idx) => {
                             const c = allCourses.find(item => item.id === id)
                             return (
-                                <div key={`${id}-${idx}`} className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-bold text-gray-700 animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
-                                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-yellow-400/20 flex items-center justify-center text-yellow-600 text-[9px] sm:text-[10px] font-black">{idx + 1}</div>
+                                <div key={`${id}-${idx}`} className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-bold text-brk-on-surface animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+                                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-brk-primary-25 flex items-center justify-center text-brk-primary text-[9px] sm:text-[10px] font-black">{idx + 1}</div>
                                     <span className="truncate">{c?.name_lop || `Chặng ${idx + 1}`}</span>
                                 </div>
                             )
@@ -324,19 +324,19 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                 </div>
                 {isGuest ? (
                     <>
-                        <p className="text-yellow-600 text-xs sm:text-sm font-bold mb-3 sm:mb-4">
+                        <p className="text-brk-primary text-xs sm:text-sm font-bold mb-3 sm:mb-4">
                             Kết quả đã được lưu tạm! Hãy Đăng nhập/đăng ký tài khoản để lưu chính thức kết quả cá nhân bạn.
                         </p>
                         <div className="flex gap-2 sm:gap-3 justify-between max-w-md mx-auto">
                             <button 
                                 onClick={() => router.push('/login')}
-                                className="flex-1 bg-yellow-400 text-black px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wide hover:bg-yellow-500 transition-all active:scale-95"
+                                className="flex-1 bg-brk-accent text-brk-on-primary px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
                             >
                                 Đăng nhập
                             </button>
                             <button 
                                 onClick={() => router.push('/register')}
-                                className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wide hover:bg-gray-200 transition-all active:scale-95 border border-gray-200"
+                                className="flex-1 bg-brk-background text-brk-muted px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wide hover:bg-brk-surface transition-all active:scale-95 border border-brk-outline"
                             >
                                 Đăng ký
                             </button>
@@ -344,8 +344,8 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                     </>
                 ) : (
                     <>
-                        <p className="text-gray-500 text-[10px] sm:text-xs mb-3 sm:mb-4 italic">Hệ thống đang lưu dữ liệu và chuyển hướng...</p>
-                        <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-yellow-500 mx-auto" />
+                        <p className="text-brk-muted text-[10px] sm:text-xs mb-3 sm:mb-4 italic">Hệ thống đang lưu dữ liệu và chuyển hướng...</p>
+                        <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-brk-primary mx-auto" />
                     </>
                 )}
             </div>
@@ -353,37 +353,36 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
     }
 
     return (
-        <div className="bg-white rounded-[3rem] p-6 md:p-10 text-gray-900 border border-gray-200 shadow-2xl relative overflow-hidden">
+        <div className="bg-brk-surface rounded-[3rem] p-6 md:p-10 text-brk-on-surface border border-brk-outline shadow-xl relative overflow-hidden">
             <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2 pb-2 border-b border-gray-100">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-brk-outline">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-lg shadow-yellow-400/20"><Target className="w-5 h-5" /></div>
+                        <div className="w-10 h-10 rounded-2xl bg-brk-accent flex items-center justify-center text-brk-on-primary shadow-lg shadow-brk-accent/20"><Target className="w-5 h-5" /></div>
                         <div>
-                            <h2 className="text-sg font-black text-yellow-500 uppercase tracking-tight italic">Zero 2 Hero</h2>
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Thiết kế lộ trình</p>
+                            <h2 className="text-sg font-black text-brk-primary uppercase tracking-tight italic">Zero 2 Hero</h2>
+                            <p className="text-[9px] font-black text-brk-muted uppercase tracking-widest">Thiết kế lộ trình</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
                         {history.length > 0 && (
                             <button 
                                 onClick={handleBack}
-                                className="py-2 px-2
-                             bg-yellow-400 text-black rounded-2xl hover:bg-yellow-500 transition-all active:scale-90 shadow-lg shadow-yellow-400/10 animate-in fade-in zoom-in"
+                                className="py-2 px-2 bg-brk-primary text-brk-on-primary rounded-2xl hover:brightness-110 transition-all active:scale-90 shadow-lg shadow-brk-primary/10 animate-in fade-in zoom-in"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                         )}
                         {identifiedCourseIds.length > 0 && (
-                            <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 animate-in zoom-in">
-                                <BookOpen className="w-3 h-3 text-yellow-500" />
-                                <span className="text-[10px] font-black text-yellow-500">{identifiedCourseIds.length}</span>
+                            <div className="flex items-center gap-2 bg-brk-background px-4 py-2 rounded-xl border border-brk-outline animate-in zoom-in">
+                                <BookOpen className="w-3 h-3 text-brk-primary" />
+                                <span className="text-[10px] font-black text-brk-primary">{identifiedCourseIds.length}</span>
                             </div>
                         )}
                     </div>
                 </div>
                 <div className="animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h3 className="text-base font-black leading-snug mb-1 tracking-tight">{currentQuestion.question}</h3>
-                    <p className="text-gray-500 text-[10px] mb-6 font-medium italic">
+                    <h3 className="text-base font-black leading-snug mb-1 tracking-tight text-brk-on-surface">{currentQuestion.question}</h3>
+                    <p className="text-brk-muted text-[10px] mb-6 font-medium italic">
                         {currentQuestion.description || 'Hãy chọn đáp án đúng nhất bạn muốn!'}
                     </p>
                     {currentQuestion.type === 'CHOICE' && (
@@ -392,9 +391,9 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                                 <button 
                                     key={opt.id} 
                                     onClick={() => handleNext(opt.id, opt.label)} 
-                                    className="w-full text-left bg-white hover:bg-gray-100 border border-transparent py-2 px-3 rounded-2xl transition-all duration-300 group active:scale-[0.98] shadow-xl"
+                                    className="w-full text-left bg-brk-surface hover:bg-brk-background border border-brk-outline py-2 px-3 rounded-2xl transition-all duration-300 group active:scale-[0.98] shadow-xl"
                                 >
-                                    <span className="text-xs font-black text-zinc-900 leading-relaxed transition-colors">
+                                    <span className="text-xs font-black text-brk-on-surface leading-relaxed transition-colors">
                                         {opt.label}
                                     </span>
                                 </button>
@@ -405,11 +404,11 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                     {currentQuestion.type === 'FREE_TEXT' && (
                         <div className="space-y-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Câu trả lời của bạn</label>
+                                <label className="text-[10px] font-black uppercase text-brk-muted ml-1 italic">Câu trả lời của bạn</label>
                                 <textarea 
                                     value={freeText} 
                                     onChange={e => setFreeText(e.target.value)} 
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-5 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400 min-h-[120px] transition-all" 
+                                    className="w-full bg-brk-background border border-brk-outline rounded-2xl p-5 text-sm font-bold outline-none focus:ring-2 focus:ring-brk-primary min-h-[120px] transition-all text-brk-on-surface" 
                                     placeholder="Nhập nội dung trả lời tại đây..." 
                                 />
                             </div>
@@ -419,7 +418,7 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                                     handleNext('free_text_submit', freeText);
                                     setFreeText(''); // Reset cho câu sau
                                 }} 
-                                className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-yellow-500 transition-all active:scale-95 shadow-lg shadow-yellow-400/10 flex items-center justify-center gap-2"
+                                className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:brightness-110 transition-all active:scale-95 shadow-lg shadow-brk-accent/10 flex items-center justify-center gap-2"
                             >
                                 <Send className="w-3 h-3" /> Tiếp tục khảo sát
                             </button>
@@ -430,36 +429,36 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Tên Kênh / Lĩnh vực</label>
-                                    <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Nhập tên..." />
+                                    <label className="text-[10px] font-black uppercase text-brk-muted ml-1 italic">Tên Kênh / Lĩnh vực</label>
+                                    <input type="text" value={input1} onChange={e => setInput1(e.target.value)} className="w-full bg-brk-background border border-brk-outline rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-brk-primary text-brk-on-surface" placeholder="Nhập tên..." />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black uppercase text-gray-500 ml-1 italic">Link TikTok / Bio</label>
-                                    <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-yellow-400" placeholder="@id_cua_ban" />
+                                    <label className="text-[10px] font-black uppercase text-brk-muted ml-1 italic">Link TikTok / Bio</label>
+                                    <input type="text" value={input2} onChange={e => setInput2(e.target.value)} className="w-full bg-brk-background border border-brk-outline rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-brk-primary text-brk-on-surface" placeholder="@id_cua_ban" />
                                 </div>
                             </div>
                             <div className="flex gap-3">
                                 {currentQuestion.options?.map((opt: any) => (
-                                    <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/10' : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'}`}>{opt.label}</button>
+                                    <button key={opt.id} onClick={() => handleNext(opt.id, opt.label)} className={`flex-1 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${opt.label?.toLowerCase() === 'tiếp tục' || opt.label?.toLowerCase() === 'xác nhận' ? 'bg-brk-accent text-brk-on-primary shadow-lg shadow-brk-accent/10' : 'bg-brk-background text-brk-muted border border-brk-outline hover:bg-brk-surface'}`}>{opt.label}</button>
                                 ))}
                             </div>
                         </div>
                     )}
                     {currentQuestion.type === 'INPUT_GOAL' && (
-                        <div className="space-y-4 text-black text-left">
-                            <div className="bg-white p-5 md:p-8 rounded-[2.5rem] border-2 border-yellow-400/20 space-y-5 shadow-2xl">
+                        <div className="space-y-4 text-brk-on-surface text-left">
+                            <div className="bg-brk-surface p-5 md:p-8 rounded-[2.5rem] border-2 border-brk-primary/20 space-y-5 shadow-xl">
                                 {/* PHẦN 1: MỤC TIÊU */}
                                 <div className="space-y-3">
-                                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <Target className="w-3.5 h-3.5 text-yellow-500" /> 1. Mục tiêu: (QUẢ) Tôi muốn
+                                    <h4 className="text-[10px] font-black uppercase text-brk-muted tracking-widest flex items-center gap-2">
+                                        <Target className="w-3.5 h-3.5 text-brk-primary" /> 1. Mục tiêu: (QUẢ) Tôi muốn
                                     </h4>
 
                                     {/* TRƯỜNG HỢP: BÁN HÀNG */}
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('bán hàng')) && (
                                         <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
                                             <span>ĐẠT</span>
-                                            <input type="text" value={moneyGoal} onChange={e => setMoneyGoal(e.target.value)} className="w-28 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-emerald-600 outline-none" />
-                                            <span className="text-gray-400 font-bold italic text-[10px]">VNĐ/THÁNG</span>
+                                            <input type="text" value={moneyGoal} onChange={e => setMoneyGoal(e.target.value)} className="w-28 bg-brk-background border-none rounded-lg px-2 py-1 text-center text-brk-accent outline-none" />
+                                            <span className="text-brk-muted font-bold italic text-[10px]">VNĐ/THÁNG</span>
                                         </div>
                                     )}
 
@@ -467,32 +466,32 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('nhân hiệu')) && (
                                         <div className="flex flex-wrap items-center gap-2 text-sm font-black leading-tight">
                                             <span>TÔI MUỐN ĐẠT</span>
-                                            <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-20 bg-gray-100 border-none rounded-lg px-2 py-1 text-center text-yellow-600 outline-none" />
-                                            <span className="text-gray-400 font-bold italic text-[10px]">FOLLOW</span>
+                                            <input type="number" value={targetVal} onChange={e => setTargetVal(e.target.value)} className="w-20 bg-brk-background border-none rounded-lg px-2 py-1 text-center text-brk-primary outline-none" />
+                                            <span className="text-brk-muted font-bold italic text-[10px]">FOLLOW</span>
                                         </div>
                                     )}
 
                                     {/* TRƯỜNG HỢP: LAN TỎA GIÁ TRỊ */}
                                     {Object.values(answers).some(val => String(val).toLowerCase().includes('lan tỏa')) && (
-                                        <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-blue-700 font-bold text-[11px] italic leading-snug">
+                                        <div className="p-3 bg-brk-primary-25 rounded-xl border border-brk-primary/20 text-brk-primary font-bold text-[11px] italic leading-snug">
                                             🎯 Mục tiêu là lan tỏa giá trị cộng đồng thông qua hành động cụ thể.
                                         </div>
                                     )}
                                 </div>
 
                                 {/* PHẦN 2: CAM KẾT HÀNH ĐỘNG */}
-                                <div className="space-y-3 pt-4 border-t border-gray-100">
-                                    <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> 2. Cam kết (NHÂN) hành động
+                                <div className="space-y-3 pt-4 border-t border-brk-outline">
+                                    <h4 className="text-[10px] font-black uppercase text-brk-muted tracking-widest flex items-center gap-2">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-brk-accent" /> 2. Cam kết (NHÂN) hành động
                                     </h4>
 
                                     <div className="space-y-4">
                                         {/* Cam kết Video */}
                                         <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
                                             <span className="shrink-0">🎬 Tôi sẽ đăng ít nhất: 
-                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-7 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            <input type="number" value={videoPerDay} onChange={e => setVideoPerDay(e.target.value)} className="w-7 bg-brk-background border border-brk-outline rounded-md py-0.5 text-center font-black text-brk-accent" />
                                             Video mỗi ngày</span>
-                                            <span> đều đặn liên tục trong: <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-red-600" />
+                                            <span> đều đặn liên tục trong: <input type="number" value={days} onChange={e => setDays(e.target.value)} className="w-10 bg-brk-background border border-brk-outline rounded-md py-0.5 text-center font-black text-brk-accent" />
                                             ngày</span>
                                         </div>
 
@@ -500,16 +499,16 @@ export default function Zero2HeroSurvey({ session, onComplete }: { session?: any
                                         {Object.values(answers).some(val => String(val).toLowerCase().includes('livestream')) && (
                                             <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold leading-tight">
                                                 <span className="shrink-0">📡 Tôi sẽ livestream tối thiểu: 
-                                                <input type="number" value={livePerDay} onChange={e => setLivePerDay(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
+                                                <input type="number" value={livePerDay} onChange={e => setLivePerDay(e.target.value)} className="w-10 bg-brk-background border border-brk-outline rounded-md py-0.5 text-center font-black text-brk-accent" />
                                                 phút</span>
-                                                <span> mỗi ngày đều đặn trong:<input type="number" value={liveDays} onChange={e => setDays(e.target.value)} className="w-10 bg-gray-50 border border-gray-200 rounded-md py-0.5 text-center font-black text-orange-600" />
+                                                <span> mỗi ngày đều đặn trong:<input type="number" value={liveDays} onChange={e => setDays(e.target.value)} className="w-10 bg-brk-background border border-brk-outline rounded-md py-0.5 text-center font-black text-brk-accent" />
                                                 ngày</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 transition-all active:scale-95 disabled:opacity-50">
+                            <button disabled={isSubmitting} onClick={() => handleNext('yes', 'Xác nhận')} className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50">
                                 {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="w-3 h-3" />} Xác nhận & Cam kết
                             </button>
                         </div>

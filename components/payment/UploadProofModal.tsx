@@ -61,12 +61,12 @@ export default function UploadProofModal({ enrollmentId, onClose, onSuccess }: U
     }
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-bold mb-4">Upload biên lai chuyển khoản</h3>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-brk-surface/60 p-4">
+            <div className="bg-brk-surface rounded-2xl p-6 w-full max-w-md">
+                <h3 className="text-xl font-bold mb-4 text-brk-on-surface">Upload biên lai chuyển khoản</h3>
                 
                 <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-brk-muted mb-2">
                         Chọn ảnh biên lai
                     </label>
                     <input
@@ -74,14 +74,14 @@ export default function UploadProofModal({ enrollmentId, onClose, onSuccess }: U
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
-                        className="w-full border rounded-lg p-2"
+                        className="w-full border border-brk-outline rounded-lg p-2 bg-brk-background"
                     />
                 </div>
 
                 {preview && (
                     <div className="mb-4">
-                        <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                        <div className="relative w-full h-48 border rounded-lg overflow-hidden">
+                        <p className="text-sm text-brk-muted mb-2">Preview:</p>
+                        <div className="relative w-full h-48 border border-brk-outline rounded-lg overflow-hidden">
                             <img src={preview} alt="Preview" className="object-contain w-full h-full" />
                         </div>
                     </div>
@@ -90,14 +90,14 @@ export default function UploadProofModal({ enrollmentId, onClose, onSuccess }: U
                 <div className="flex gap-3">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2 border rounded-lg font-medium hover:bg-gray-50"
+                        className="flex-1 px-4 py-2 border border-brk-outline rounded-lg font-medium hover:bg-brk-background text-brk-on-surface"
                     >
                         Hủy
                     </button>
                     <button
                         onClick={handleUpload}
                         disabled={!preview || uploading}
-                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-brk-primary text-brk-on-primary rounded-lg font-medium hover:brightness-110 disabled:opacity-50"
                     >
                         {uploading ? 'Đang tải...' : 'Xác nhận'}
                     </button>

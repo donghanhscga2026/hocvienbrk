@@ -115,8 +115,8 @@ export default function HomeClient({
                 isCourseOneActive={isCourseOneActive}
                 userPhone={userPhone}
                 userId={userId}
-                darkMode={true}
-                accentColor="bg-emerald-500"
+                darkMode={false}
+                accentColor="bg-brk-accent"
               />
             )}
 

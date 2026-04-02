@@ -10,28 +10,37 @@ import { Sparkles } from "lucide-react";
 export default async function Home() {
   const session = await auth();
 
-  // [OPTIMIZE] Parallel: lấy tất cả dữ liệu cùng lúc (bao gồm enrollments)
-  const [courses, userRecord, roadmapPoints, message, enrollments] = await Promise.all([
-    (prisma as any).course.findMany({
-      where: { status: true },
-      orderBy: [{ pin: 'asc' }, { id: 'asc' }]
-    }),
-    session?.user?.id
-      ? (prisma as any).user.findUnique({
+  // [SEQUENTIAL] Dùng await tuần tự thay vì Promise.all để tránh quá connection limit
+  // Supabase free tier có connection limit thấp
+
+  // 1. Lấy courses
+  const courses = await (prisma as any).course.findMany({
+    where: { status: true },
+    orderBy: [{ pin: 'asc' }, { id: 'asc' }]
+  });
+
+  // 2. Lấy user record
+  const userRecord = session?.user?.id
+    ? await (prisma as any).user.findUnique({
         where: { id: parseInt(session.user.id) },
         select: { 
           name: true, id: true, image: true, phone: true,
-          roadmap: true // Lấy bảng UserRoadmap mới
+          roadmap: true
         }
       })
-      : Promise.resolve(null),
-    (prisma as any).roadmapPoint.findMany({
-      orderBy: { pointId: 'asc' }
-    }),
-    getRandomMessage(),
-    // [OPTIMIZE] Đưa enrollment vào Promise.all để chạy song song
-    session?.user?.id
-      ? (prisma as any).enrollment.findMany({
+    : null;
+
+  // 3. Lấy roadmap points
+  const roadmapPoints = await (prisma as any).roadmapPoint.findMany({
+    orderBy: { pointId: 'asc' }
+  });
+
+  // 4. Lấy message
+  const message = await getRandomMessage();
+
+  // 5. Lấy enrollments
+  const enrollments = session?.user?.id
+    ? await (prisma as any).enrollment.findMany({
         where: { userId: parseInt(session.user.id) },
         select: {
           id: true,
@@ -61,8 +70,7 @@ export default async function Home() {
           }
         }
       })
-      : Promise.resolve([])
-  ]);
+    : [];
 
   const userName = userRecord?.name ?? null;
   const userId = userRecord?.id ?? null;

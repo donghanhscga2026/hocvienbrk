@@ -175,20 +175,20 @@ export default async function AffiliateDashboardPage() {
         : ''
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-brk-background p-6">
             <div className="max-w-6xl mx-auto">
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold">Affiliate Dashboard</h1>
-                    <p className="text-gray-600">Chào mừng bạn đến với chương trình Affiliate</p>
+                    <h1 className="text-2xl font-bold text-brk-on-surface">Affiliate Dashboard</h1>
+                    <p className="text-brk-muted">Chào mừng bạn đến với chương trình Affiliate</p>
                 </div>
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     {/* Points */}
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
-                        <h3 className="text-blue-100 text-sm">Điểm Đăng Ký</h3>
+                    <div className="bg-gradient-to-br from-brk-primary to-blue-600 rounded-lg shadow p-6 text-brk-on-primary">
+                        <h3 className="text-brk-on-primary/80 text-sm">Điểm Đăng Ký</h3>
                         <p className="text-3xl font-bold mt-2">{data.points.total}</p>
-                        <p className="text-blue-200 text-sm mt-1">
+                        <p className="text-brk-on-primary/80 text-sm mt-1">
                             {data.points.referrals} người đăng ký qua bạn
                         </p>
                         {campaign && (
@@ -199,43 +199,43 @@ export default async function AffiliateDashboardPage() {
                     </div>
 
                     {/* Direct Referrals (F1) */}
-                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow p-6 text-white">
-                        <h3 className="text-indigo-100 text-sm">F1 - Người đăng ký qua bạn</h3>
+                    <div className="bg-gradient-to-br from-brk-primary to-indigo-600 rounded-lg shadow p-6 text-brk-on-primary">
+                        <h3 className="text-brk-on-primary/80 text-sm">F1 - Người đăng ký qua bạn</h3>
                         <p className="text-3xl font-bold mt-2">{data.levelBreakdown.f1}</p>
-                        <p className="text-indigo-200 text-sm mt-1">
+                        <p className="text-brk-on-primary/80 text-sm mt-1">
                             Mỗi người = 1 điểm
                         </p>
                     </div>
 
                     {/* Balance */}
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-6 text-white">
-                        <h3 className="text-green-100 text-sm">Số dư khả dụng</h3>
+                    <div className="bg-gradient-to-br from-brk-accent to-green-600 rounded-lg shadow p-6 text-brk-on-primary">
+                        <h3 className="text-brk-on-primary/80 text-sm">Số dư khả dụng</h3>
                         <p className="text-3xl font-bold mt-2">
                             {(data.wallet?.balance || 0).toLocaleString('vi-VN')}đ
                         </p>
-                        <p className="text-green-200 text-sm mt-1">
+                        <p className="text-brk-on-primary/80 text-sm mt-1">
                             Có thể rút ngay
                         </p>
                     </div>
 
                     {/* Pending */}
-                    <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg shadow p-6 text-white">
-                        <h3 className="text-yellow-100 text-sm">Chờ xử lý</h3>
+                    <div className="bg-gradient-to-br from-brk-primary to-yellow-600 rounded-lg shadow p-6 text-brk-on-primary">
+                        <h3 className="text-brk-on-primary/80 text-sm">Chờ xử lý</h3>
                         <p className="text-3xl font-bold mt-2">
                             {(data.wallet?.pendingBalance || 0).toLocaleString('vi-VN')}đ
                         </p>
-                        <p className="text-yellow-200 text-sm mt-1">
+                        <p className="text-brk-on-primary/80 text-sm mt-1">
                             Đang trong thời gian đối soát
                         </p>
                     </div>
 
                     {/* Total Earned */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-6 text-white">
-                        <h3 className="text-purple-100 text-sm">Tổng thu nhập</h3>
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-6 text-brk-on-primary">
+                        <h3 className="text-brk-on-primary/80 text-sm">Tổng thu nhập</h3>
                         <p className="text-3xl font-bold mt-2">
                             {data.commissionSummary.total.toLocaleString('vi-VN')}đ
                         </p>
-                        <p className="text-purple-200 text-sm mt-1">
+                        <p className="text-brk-on-primary/80 text-sm mt-1">
                             Tất cả hoa hồng đã nhận
                         </p>
                     </div>
@@ -243,25 +243,25 @@ export default async function AffiliateDashboardPage() {
 
                 {/* Affiliate Link */}
                 {myLink && (
-                    <div className="bg-white rounded-lg shadow p-6 mb-8">
-                        <h2 className="text-lg font-semibold mb-4">Link Affiliate của bạn</h2>
+                    <div className="bg-brk-surface rounded-lg shadow p-6 mb-8">
+                        <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">Link Affiliate của bạn</h2>
                         <div className="flex gap-4 items-center">
                             <div className="flex-1">
                                 <input
                                     type="text"
                                     value={affiliateUrl}
                                     readOnly
-                                    className="w-full px-4 py-2 border rounded-lg bg-gray-50"
+                                    className="w-full px-4 py-2 border border-brk-outline rounded-lg bg-brk-background text-brk-on-surface"
                                 />
                             </div>
                             <button
                                 onClick={() => navigator.clipboard.writeText(affiliateUrl)}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                                className="bg-brk-primary text-brk-on-surface px-4 py-2 rounded-lg hover:brightness-110"
                             >
                                 Copy Link
                             </button>
                         </div>
-                        <p className="text-sm text-gray-500 mt-2">
+                        <p className="text-sm text-brk-muted mt-2">
                             Chia sẻ link này để nhận hoa hồng khi có người đăng ký hoặc mua khóa học
                         </p>
                     </div>
@@ -269,21 +269,21 @@ export default async function AffiliateDashboardPage() {
 
                 {/* Campaign Info */}
                 {campaign && (
-                    <div className="bg-white rounded-lg shadow p-6 mb-8">
-                        <h2 className="text-lg font-semibold mb-4">Cấu hình hoa hồng</h2>
+                    <div className="bg-brk-surface rounded-lg shadow p-6 mb-8">
+                        <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">Cấu hình hoa hồng</h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {campaign.levels.map(level => (
-                                <div key={level.level} className="bg-gray-100 rounded-lg p-4 text-center">
-                                    <p className="text-2xl font-bold text-green-600">{level.percentage}%</p>
-                                    <p className="text-gray-600">F{level.level}</p>
+                                <div key={level.level} className="bg-brk-background rounded-lg p-4 text-center">
+                                    <p className="text-2xl font-bold text-brk-accent">{level.percentage}%</p>
+                                    <p className="text-brk-muted">F{level.level}</p>
                                 </div>
                             ))}
                         </div>
-                        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                            <p className="text-sm text-blue-800">
+                        <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: 'rgba(14,165,233,0.1)' }}>
+                            <p className="text-sm text-brk-accent">
                                 <strong>Quy đổi điểm:</strong> {campaign.pointsRequired} điểm = {campaign.pointRedemptionValue.toLocaleString('vi-VN')}đ
                             </p>
-                            <p className="text-sm text-blue-800 mt-1">
+                            <p className="text-sm text-brk-accent mt-1">
                                 Thời gian đối soát: {campaign.pendingDays} ngày
                             </p>
                         </div>
@@ -292,27 +292,27 @@ export default async function AffiliateDashboardPage() {
 
                 {/* Danh sách F1 - Người đăng ký qua bạn */}
                 {data.directReferrals.length > 0 && (
-                    <div className="bg-white rounded-lg shadow p-6 mb-8">
-                        <h2 className="text-lg font-semibold mb-4">
+                    <div className="bg-brk-surface rounded-lg shadow p-6 mb-8">
+                        <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">
                             Người đăng ký qua link của bạn ({data.directReferrals.length})
                         </h2>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="bg-gray-50">
+                                <thead className="bg-brk-background">
                                     <tr>
-                                        <th className="px-4 py-2 text-left">#ID</th>
-                                        <th className="px-4 py-2 text-left">Tên</th>
-                                        <th className="px-4 py-2 text-left">Email</th>
-                                        <th className="px-4 py-2 text-left">Ngày đăng ký</th>
+                                        <th className="px-4 py-2 text-left text-brk-on-surface">#ID</th>
+                                        <th className="px-4 py-2 text-left text-brk-on-surface">Tên</th>
+                                        <th className="px-4 py-2 text-left text-brk-on-surface">Email</th>
+                                        <th className="px-4 py-2 text-left text-brk-on-surface">Ngày đăng ký</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {data.directReferrals.map((ref: any) => (
-                                        <tr key={ref.id} className="border-t">
-                                            <td className="px-4 py-2">{ref.id}</td>
-                                            <td className="px-4 py-2">{ref.name || 'Chưa cập nhật'}</td>
-                                            <td className="px-4 py-2">{ref.email}</td>
-                                            <td className="px-4 py-2">
+                                        <tr key={ref.id} className="border-t border-brk-outline">
+                                            <td className="px-4 py-2 text-brk-on-surface">{ref.id}</td>
+                                            <td className="px-4 py-2 text-brk-on-surface">{ref.name || 'Chưa cập nhật'}</td>
+                                            <td className="px-4 py-2 text-brk-on-surface">{ref.email}</td>
+                                            <td className="px-4 py-2 text-brk-on-surface">
                                                 {new Date(ref.createdAt).toLocaleDateString('vi-VN')}
                                             </td>
                                         </tr>
@@ -325,31 +325,31 @@ export default async function AffiliateDashboardPage() {
 
                 {/* Recent Commissions */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <div className="bg-white rounded-lg shadow p-6">
+                    <div className="bg-brk-surface rounded-lg shadow p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold">Hoa hồng gần đây</h2>
-                            <Link href="/affiliate/commissions" className="text-blue-600 text-sm hover:underline">
+                            <h2 className="text-lg font-semibold text-brk-on-surface">Hoa hồng gần đây</h2>
+                            <Link href="/affiliate/commissions" className="text-brk-primary text-sm hover:underline">
                                 Xem tất cả
                             </Link>
                         </div>
                         {data.commissions.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">Chưa có hoa hồng nào</p>
+                            <p className="text-brk-muted text-center py-4">Chưa có hoa hồng nào</p>
                         ) : (
                             <div className="space-y-3">
                                 {data.commissions.slice(0, 5).map(commission => (
-                                    <div key={commission.id} className="flex justify-between items-center border-b pb-2">
+                                    <div key={commission.id} className="flex justify-between items-center border-b border-brk-outline pb-2">
                                         <div>
-                                            <p className="font-medium">Tầng {commission.level}</p>
-                                            <p className="text-sm text-gray-500">
+                                            <p className="font-medium text-brk-on-surface">Tầng {commission.level}</p>
+                                            <p className="text-sm text-brk-muted">
                                                 {commission.percentage}% • #{commission.conversion?.id}
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-medium text-green-600">
+                                            <p className="font-medium text-brk-accent">
                                                 +{commission.netAmount.toLocaleString('vi-VN')}đ
                                             </p>
                                             <p className={`text-xs ${
-                                                commission.status === 'PENDING' ? 'text-yellow-600' : 'text-green-600'
+                                                commission.status === 'PENDING' ? 'text-brk-muted' : 'text-brk-accent'
                                             }`}>
                                                 {commission.status === 'PENDING' ? 'Chờ' : 'Khả dụng'}
                                             </p>
@@ -361,26 +361,26 @@ export default async function AffiliateDashboardPage() {
                     </div>
 
                     {/* Recent Transactions */}
-                    <div className="bg-white rounded-lg shadow p-6">
+                    <div className="bg-brk-surface rounded-lg shadow p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold">Giao dịch gần đây</h2>
-                            <Link href="/affiliate/wallet" className="text-blue-600 text-sm hover:underline">
+                            <h2 className="text-lg font-semibold text-brk-on-surface">Giao dịch gần đây</h2>
+                            <Link href="/affiliate/wallet" className="text-brk-primary text-sm hover:underline">
                                 Xem tất cả
                             </Link>
                         </div>
                         {data.recentTransactions.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">Chưa có giao dịch nào</p>
+                            <p className="text-brk-muted text-center py-4">Chưa có giao dịch nào</p>
                         ) : (
                             <div className="space-y-3">
                                 {data.recentTransactions.slice(0, 5).map(tx => (
-                                    <div key={tx.id} className="flex justify-between items-center border-b pb-2">
+                                    <div key={tx.id} className="flex justify-between items-center border-b border-brk-outline pb-2">
                                         <div>
-                                            <p className="font-medium text-sm">{tx.description}</p>
-                                            <p className="text-xs text-gray-500">
+                                            <p className="font-medium text-sm text-brk-on-surface">{tx.description}</p>
+                                            <p className="text-xs text-brk-muted">
                                                 {new Date(tx.createdAt).toLocaleDateString('vi-VN')}
                                             </p>
                                         </div>
-                                        <p className={`font-medium ${tx.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        <p className={`font-medium ${tx.amount >= 0 ? 'text-brk-accent' : 'text-brk-accent'}`}>
                                             {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString('vi-VN')}đ
                                         </p>
                                     </div>
@@ -391,36 +391,36 @@ export default async function AffiliateDashboardPage() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="bg-gray-100 rounded-lg p-6">
-                    <h2 className="text-lg font-semibold mb-4">Thao tác nhanh</h2>
+                <div className="bg-brk-background rounded-lg p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">Thao tác nhanh</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <Link
                             href="/affiliate/withdraw"
-                            className="bg-white rounded-lg p-4 text-center hover:shadow-md transition"
+                            className="bg-brk-surface rounded-lg p-4 text-center hover:shadow-md transition"
                         >
                             <div className="text-2xl mb-2">💰</div>
-                            <p className="font-medium">Rút tiền</p>
+                            <p className="font-medium text-brk-on-surface">Rút tiền</p>
                         </Link>
                         <Link
                             href="/affiliate/links"
-                            className="bg-white rounded-lg p-4 text-center hover:shadow-md transition"
+                            className="bg-brk-surface rounded-lg p-4 text-center hover:shadow-md transition"
                         >
                             <div className="text-2xl mb-2">🔗</div>
-                            <p className="font-medium">Quản lý Link</p>
+                            <p className="font-medium text-brk-on-surface">Quản lý Link</p>
                         </Link>
                         <Link
                             href="/affiliate/earnings"
-                            className="bg-white rounded-lg p-4 text-center hover:shadow-md transition"
+                            className="bg-brk-surface rounded-lg p-4 text-center hover:shadow-md transition"
                         >
                             <div className="text-2xl mb-2">📊</div>
-                            <p className="font-medium">Thu nhập</p>
+                            <p className="font-medium text-brk-on-surface">Thu nhập</p>
                         </Link>
                         <Link
                             href="/affiliate/referrals"
-                            className="bg-white rounded-lg p-4 text-center hover:shadow-md transition"
+                            className="bg-brk-surface rounded-lg p-4 text-center hover:shadow-md transition"
                         >
                             <div className="text-2xl mb-2">👥</div>
-                            <p className="font-medium">Người giới thiệu</p>
+                            <p className="font-medium text-brk-on-surface">Người giới thiệu</p>
                         </Link>
                     </div>
                 </div>
