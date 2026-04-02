@@ -1,5 +1,4 @@
 import { auth } from "@/auth"
-import { Role } from "@prisma/client"
 import { redirect } from "next/navigation"
 
 export default async function AdminLayout({
@@ -10,9 +9,6 @@ export default async function AdminLayout({
   const session = await auth()
 
   if (!session?.user) redirect("/login")
-  if (session.user.role !== Role.ADMIN) {
-    return <div className="p-10 text-center text-red-600 font-bold">403 - KHÔNG CÓ QUYỀN TRUY CẬP</div>
-  }
 
   return <>{children}</>
 }

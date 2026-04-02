@@ -70,7 +70,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
                             <span
                                 className="uppercase drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.5rem, 6vw, 4rem)', color: '#ffffff' }}
+                                style={{ fontSize: 'clamp(0.2rem, 5vw, 3rem)', color: '#ffffff' }}
                             >
                                 HỌC VIỆN BRK
                             </span>
