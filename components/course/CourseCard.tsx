@@ -119,11 +119,11 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
 
                     {/* Badges + Trạng thái + Ngày bắt đầu */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-brk-primary text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'}`}>
+                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'}`}>
                             {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
                         </span>
                         {isActive && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-primary px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-background-dark px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
                                 <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
                                 Đã kích hoạt
                                 {enrollment?.startedAt && (
@@ -143,7 +143,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
 
                     {/* Mô tả */}
                     <div
-                        className="mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words text-brk-muted"
+                        className="mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words text-brk-on-surface"
                         dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }}
                     />
 
@@ -153,7 +153,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                         disabled={loading}
                         className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
                             ${loading ? 'bg-brk-muted text-brk-on-surface cursor-not-allowed' :
-                                isActive ? 'bg-brk-accent text-brk-on-primary hover:bg-brk-accent hover:brightness-110' :
+                                isActive ? 'bg-brk-primary text-brk-on-primary hover:bg-brk-accent hover:brightness-110' :
                                 isPending ? 'bg-brk-accent text-brk-on-primary hover:brightness-110' :
                                     'bg-brk-primary text-brk-on-primary hover:brightness-110'}`}
                     >

@@ -24,7 +24,7 @@ export default function PostCard({ post, onClick }: PostCardProps) {
             
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-purple-600 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-brk-accent uppercase tracking-widest">
                         <UserIcon className="w-3 h-3" />
                         <span>{post.author?.name || 'Admin'}</span>
                     </div>
@@ -48,7 +48,7 @@ export default function PostCard({ post, onClick }: PostCardProps) {
                     <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
                     <span>{post._count?.comments || 0} bình luận</span>
                 </div>
-                <span className="text-purple-600">Xem chi tiết →</span>
+                <span className="text-brk-primary">Xem chi tiết →</span>
             </div>
         </div>
     )

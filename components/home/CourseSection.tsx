@@ -101,7 +101,7 @@ function CourseCategoryGroup({
                         <h3 className="text-sm font-black uppercase tracking-widest text-brk-on-surface">
                             {categoryName}
                         </h3>
-                        <p className="text-[10px] font-bold text-brk-muted uppercase">
+                        <p className="text-[10px] font-bold text-brk-accent uppercase">
                             {courses.length} khóa học
                         </p>
                     </div>
@@ -139,7 +139,7 @@ function CourseCategoryGroup({
                         className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ${
                             isExpanded 
                             ? 'bg-brk-background text-brk-muted hover:bg-brk-surface' 
-                            : 'bg-brk-primary text-brk-on-primary shadow-lg shadow-black/10'
+                            : 'bg-brk-background-dark text-brk-on-primary shadow-lg shadow-black/10'
                         }`}
                     >
                         {isExpanded ? (
@@ -282,7 +282,7 @@ export default function CourseSection({
                 </h2>
                 <div className={`mx-auto mt-2 h-1 w-12 rounded-full ${accentColor}`}></div>
                 {title === 'Khóa học của tôi' && (
-                    <p className="mt-3 text-[10px] font-black text-brk-muted uppercase tracking-widest">Theo thứ tự lộ trình riêng của bạn</p>
+                    <p className="mt-3 text-[10px] font-black text-brk-accent uppercase tracking-widest">Theo thứ tự lộ trình riêng của bạn</p>
                 )}
             </div>
 
@@ -310,7 +310,7 @@ export default function CourseSection({
                         className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
                             isExpanded 
                             ? 'bg-brk-background text-brk-muted hover:bg-brk-surface' 
-                            : 'bg-brk-primary text-brk-on-primary shadow-brk-primary/20'
+                            : 'bg-brk-background-dark text-brk-on-primary shadow-brk-primary/20'
                         }`}
                     >
                         {isExpanded ? (

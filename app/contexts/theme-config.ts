@@ -81,17 +81,17 @@ export const presetThemes: Theme[] = [
   // Digital Leader - Modern Corporate (Sạch sẽ & Tin cậy)
   {
     id: 'light',
-    name: 'Digital Leader',
+    name: 'Star Light',
     icon: '💻',
     colors: {
-      primary: '#41B3A3', //Màu thương hiệu (CTA, buttons)
-      onPrimary: '#FFFFFF', //Chữ trên primary (trắng/đen)
-      surface: '#FFFFFF', //Thường dùng cho Header,Cards, Modal, Panels
-      background: '#85DCB0', //Thường dùng cho Body
-      onSurface: '#2D3142', //Chữ chính trên surface
-      muted: '#E8A87C', //Chữ phụ, mô tả
-      accent: '#E27D60', //Màu nhấn (progress, badges)
-      outline: '#C38D9E' //Viền, borders
+      primary: '#ffaf01ff',    // Xanh dương (Màu chủ đạo cho CTA, Buttons - tạo sự tin cậy)
+      onPrimary: '#FFFFFF',    // Trắng (Chữ hiển thị trên nền Primary)
+      surface: '#ffffffff',      // Trắng (Nền cho Header, Cards, Modals để giữ sự sạch sẽ)
+      background: '#F3F7FF',   // Xanh nhạt tinh khôi (Màu nền Body - giúp website dịu mắt hơn trắng thuần)
+      onSurface: '#333A56',    // Xanh đen đậm (Chữ chính - đảm bảo độ tương phản để đọc nội dung)
+      muted: '#4e545cff',        // Xanh lơ (Chữ phụ, mô tả hoặc các icon không quan trọng)
+      accent: '#666666ff',       // Tím Lavender (Màu nhấn cho Progress bar, Badges hoặc Hover)
+      outline: '#e2dfddff'       // Cam đào (Màu viền Borders, đường kẻ phân cách - tạo điểm nhấn ấm áp)
     },
     locked: true,
   },
@@ -101,13 +101,13 @@ export const presetThemes: Theme[] = [
     name: 'Dark',
     icon: '🌙',
     colors: {
-      primary: '#8B5CF6',
+      primary: '#d49216ff',
       onPrimary: '#FFFFFF',
       surface: '#1E1E1E',
       background: '#121212',
       onSurface: '#F3F4F6',
       muted: '#9CA3AF',
-      accent: '#10B981',
+      accent: '#454d5fff',
       outline: '#333333'
     },
     locked: true,
@@ -119,14 +119,14 @@ export const presetThemes: Theme[] = [
     name: 'Energy & Growth',
     icon: '⚡',
     colors: {
-      primary: '#EC4899',
-      onPrimary: '#FFFFFF',
-      surface: '#FFFFFF',
-      background: '#FAF5FF',
-      onSurface: '#4C1D95',
-      muted: '#6B7280',
-      accent: '#06B6D4',
-      outline: '#E9D5FF'
+      primary: '#DE741C',      // Cam đậm (Màu chủ đạo cho CTA, Buttons - màu của hành động và năng lượng)
+      onPrimary: '#FFFFFF',    // Trắng (Chữ trên nền cam để đảm bảo độ tương phản cao)
+      surface: '#FFFFFF',      // Trắng (Dùng cho Header, Cards nội dung để giữ sự cân bằng thị giác)
+      background: '#FDF7F2',   // Kem cam nhạt (Màu nền toàn trang - giúp website ấm áp và đồng bộ với bảng màu)
+      onSurface: '#593E67',    // Tím đậm nhất (Chữ chính cho tiêu đề và nội dung - thay cho màu đen khô khan)
+      muted: '#84495F',        // Tím hồng (Dùng cho mô tả phụ, các icon hoặc thông tin bổ trợ)
+      accent: '#FEA837',       // Vàng cam sáng (Màu nhấn cho Progress bar, Badges hoặc các thông báo quan trọng)
+      outline: '#B85B56'       // Đỏ nâu (Dùng cho đường viền Borders hoặc đường kẻ phân đoạn để tạo chiều sâu)
     },
     locked: true,
   },
@@ -136,14 +136,14 @@ export const presetThemes: Theme[] = [
     name: 'Trust & Wisdom',
     icon: '🌿',
     colors: {
-      primary: '#059669',
-      onPrimary: '#FFFFFF',
-      surface: '#FFFFFF',
-      background: '#F0FDF4',
-      onSurface: '#064E3B',
-      muted: '#475569',
-      accent: '#FB923C',
-      outline: '#D1FAE5'
+      primary: '#3a3838ff',      // Đỏ điện tử rực rỡ (Màu chủ đạo cho CTA, Buttons - tạo sự bùng nổ, thúc giục hành động)
+      onPrimary: '#FFFFFF',    // Trắng (Chữ trên nền đỏ để đạt độ tương phản tuyệt đối)
+      surface: '#505050ff',      // Trắng (Thanh Header, các thẻ Cards nội dung để giữ sự cân bằng và dễ đọc)
+      background: '#000000ff',   // Xám khói nhạt (Màu nền toàn trang - giúp website trông cao cấp và êm ái hơn trắng thuần)
+      onSurface: '#ffffffff',    // Đen Navy sâu (Chữ chính cho tiêu đề và nội dung - đây là màu đậm nhất trong bảng của bạn)
+      muted: '#eee4f3ff',        // Tím xám trung tính (Dùng cho mô tả phụ, các icon hoặc thông tin không ưu tiên)
+      accent: '#9e9e9eff',       // Xanh Navy trung bình (Dùng cho các mảng nhấn lớn, Badge hoặc trạng thái đang thực hiện)
+      outline: '#363636ff'       // Xám lạnh (Dùng cho các đường viền Borders, đường kẻ phân tách hoặc Placeholder trong ô nhập liệu)
     },
     locked: true,
   },

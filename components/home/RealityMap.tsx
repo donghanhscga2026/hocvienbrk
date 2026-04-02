@@ -215,11 +215,11 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             <div className="relative space-y-4">
                 <div className="flex justify-between items-center px-2">
                     <div className="flex items-center gap-2">
-                        <Target className="w-4 h-4 text-brk-muted" />
-                        <span className="text-[12px] font-black uppercase tracking-widest text-brk-muted">Mục tiêu & lộ trình</span>
+                        <Target className="w-4 h-4 text-brk-on-surface" />
+                        <span className="text-[12px] font-black uppercase tracking-widest text-brk-on-surface ">Mục tiêu & lộ trình</span>
                     </div>
                     {onReset && (
-                        <button onClick={() => { if (confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-brk-muted hover:text-brk-accent transition-colors border-b border-brk-outline">
+                        <button onClick={() => { if (confirm('Làm lại khảo sát?')) onReset() }} className="text-[10px] font-black uppercase tracking-widest text-brk-on-surface hover:text-brk-accent transition-colors border-b border-brk-outline">
                             🔄 Tạo lại lộ trình
                         </button>
                     )}
@@ -241,13 +241,13 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                 <div className="w-12 h-12 rounded-2xl bg-brk-on-primary/10 flex items-center justify-center text-3xl">🏆</div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[12px] font-black text-brk-on-primary uppercase opacity-86 mb-0.5">(Quả như ý) TÔI MUỐN</div>
-                                    <div className="text-[18px] font-black uppercase tracking-tight truncate leading-none text-brk-accent">{displayTitle}</div>
+                                    <div className="text-[18px] font-black uppercase tracking-tight truncate leading-none text-brk-on-surface">{displayTitle}</div>
                                 </div>
                             </div>
 
                             {/* KHỐI CAM KẾT TỔNG HỢP (NHÂN) */}
                             <div className="md:w-2/3 bg-brk-surface py-3 px-5 rounded-b-[2.5rem] border-2 border-brk-outline flex flex-col justify-center gap-1 shadow-md">
-                                <div className="text-[12px] font-black uppercase text-brk-muted tracking-[0.2em] mb-1">(NHÂN TỐT) Cam kết hành động</div>
+                                <div className="text-[12px] font-black uppercase text-brk-accent tracking-[0.2em] mb-1">(NHÂN TỐT) Cam kết hành động</div>
                                 <div className="space-y-2">
                                     {commitments.map((item: any, idx: number) => {
                                         const icons: any = { LEARN: '📚', VIDEO: '🎬', LIVE: '📡' };
@@ -269,8 +269,8 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
             </div>
 
             {/* 2. UI CHẶNG ĐƯỜNG - S-CURVE TIMELINE (MOBILE OPTIMIZED) */}
-            <div className="bg-brk-background rounded-[3rem] py-3 px-3 md:p-12 border border-brk-outline shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#f59e0b05,transparent_70%)]"></div>
+            <div className="bg-brk-surface rounded-[3rem] py-3 px-3 md:p-12 border border-brk-outline shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,var(--color-accent)05,transparent_70%)]"></div>
 
                 <div className="relative z-10">
                     <div className="flex items-center justify-center gap-3 mb-10 text-brk-on-surface">
@@ -394,9 +394,9 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                 <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-brk-primary" />
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-brk-muted italic">Bức tranh hiện thực</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-brk-on-surface italic">Bức tranh hiện thực</h3>
                     </div>
-                    <span className="text-[8px] font-bold text-brk-muted uppercase tracking-widest">{customPath.length} mảnh ghép cần học</span>
+                    <span className="text-[8px] font-bold text-brk-on-surface uppercase tracking-widest">{customPath.length} mảnh ghép cần học</span>
                 </div>
 
                 {/* Sửa tính năng: Thu hẹp gap từ 3/4 xuống 1.5/2 để các mảnh ghép nằm sát nhau hơn theo yêu cầu */}
@@ -436,7 +436,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
                                 )}
 
                                 <div className="absolute top-2 right-2 z-20">
-                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-brk-accent" /> : isActive ? <Play className="w-3 h-3 text-brk-accent fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-brk-primary animate-spin" /> : <Lock className="w-3 h-3 text-brk-muted" />}
+                                    {isCompleted ? <CheckCircle2 className="w-3 h-3 text-brk-accent" /> : isActive ? <Play className="w-3 h-3 text-brk-accent fill-current animate-pulse" /> : isPending ? <Loader2 className="w-3 h-3 text-brk-primary animate-spin" /> : <Lock className="w-3 h-3 text-brk-on-surface" />}
                                 </div>
 
                                 <h4 className={`text-[12px] sm:text-[10px] font-black leading-[1.1] tracking-tighter line-clamp-2 pl-1 pr-3 w-full text-left relative z-10 ${isActive || isCompleted ? 'text-brk-on-primary' : 'text-brk-muted'}`}>
