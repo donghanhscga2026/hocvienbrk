@@ -3,11 +3,22 @@
 import prisma from "@/lib/prisma"
 import { CommissionStatus, ConversionStatus } from "@prisma/client"
 
+interface LevelConfig {
+    level: number
+    percentage: number
+    minOrder?: number | null
+}
+
 export async function processEnrollmentCommission(
     userId: number,
     enrollmentId: number,
-    coursePrice: number
+    coursePrice: number,
+    options?: {
+        landingSlug?: string | null
+        userAffiliateCode?: string
+    }
 ) {
+    const { landingSlug, userAffiliateCode } = options || {}
     try {
         // 1. Tìm thông tin user và referrer
         const user = await prisma.user.findUnique({
@@ -62,7 +73,21 @@ export async function processEnrollmentCommission(
             linkId = existingLink.id
         }
 
-        // 5. Tạo Conversion
+        // Get landing if slug provided
+        let landingId: number | undefined
+        if (landingSlug) {
+            const landing = await prisma.landingPage.findUnique({
+                where: { slug: landingSlug }
+            })
+            if (landing) {
+                landingId = landing.id
+            }
+        }
+
+        // 5. Get commission levels (check for landing-specific override)
+        const levels = await getCommissionLevels(campaign, landingSlug)
+
+        // 6. Tạo Conversion
         const pendingUntil = new Date()
         pendingUntil.setDate(pendingUntil.getDate() + campaign.pendingDays)
 
@@ -76,18 +101,20 @@ export async function processEnrollmentCommission(
                 orderAmount: coursePrice,
                 productType: 'COURSE',
                 status: ConversionStatus.PENDING,
-                pendingUntil
+                pendingUntil,
+                landingSlug,
+                landingId
             }
         })
 
-        // 6. Trace upline và tính hoa hồng
+        // 7. Trace upline và tính hoa hồng
         const uplineChain = await traceUpline(userId, campaign.maxLevels)
 
         let totalCommission = 0
         const commissionResults = []
 
         for (const upline of uplineChain) {
-            const levelConfig = campaign.levels.find(l => l.level === upline.level)
+            const levelConfig = levels.find(l => l.level === upline.level)
 
             if (!levelConfig) continue
 
@@ -131,13 +158,14 @@ export async function processEnrollmentCommission(
                 level: upline.level,
                 percentage: levelConfig.percentage,
                 grossAmount,
-                netAmount
+                netAmount,
+                landingSlug
             })
 
             totalCommission += netAmount
         }
 
-        console.log(`[Commission] Created ${commissionResults.length} commissions, total: ${totalCommission}`)
+        console.log(`[Commission] Created ${commissionResults.length} commissions (landing: ${landingSlug || 'none'}), total: ${totalCommission}`)
 
         return {
             success: true,
@@ -182,6 +210,29 @@ async function traceUpline(userId: number, maxLevels: number) {
     }
 
     return chain
+}
+
+async function getCommissionLevels(campaign: any, landingSlug?: string | null): Promise<LevelConfig[]> {
+    // Check for landing-specific override
+    if (landingSlug && campaign.landingOverrides) {
+        const overrides = campaign.landingOverrides as Record<string, { f1: number; f2: number; f3: number }>
+        if (overrides[landingSlug]) {
+            const custom = overrides[landingSlug]
+            const maxLevels = campaign.maxLevels || 3
+            const levels: LevelConfig[] = []
+            if (maxLevels >= 1) levels.push({ level: 1, percentage: custom.f1 })
+            if (maxLevels >= 2) levels.push({ level: 2, percentage: custom.f2 })
+            if (maxLevels >= 3) levels.push({ level: 3, percentage: custom.f3 })
+            return levels
+        }
+    }
+    
+    // Return default campaign levels
+    return campaign.levels.map((l: any) => ({
+        level: l.level,
+        percentage: l.percentage,
+        minOrder: l.minOrder
+    }))
 }
 
 async function ensureWalletAndUpdate(

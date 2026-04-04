@@ -1,178 +1,75 @@
-'use server'
+'use client'
 
-import { auth } from "@/auth"
-import { redirect } from "next/navigation"
-import prisma from "@/lib/prisma"
+import { useEffect, useState } from 'react'
 import Link from "next/link"
 
-async function getLevelBreakdown(userId: number) {
-    const closures = await prisma.userClosure.findMany({
-        where: {
-            ancestorId: userId,
-            depth: 1
-        },
-        include: {
-            descendant: { select: { emailVerified: true } }
+interface DashboardData {
+    points: { total: number; referrals: number }
+    levelBreakdown: { f1: number; f2: number; f3: number }
+    wallet: { balance: number; pendingBalance: number; totalEarned: number } | null
+    directReferrals: any[]
+    commissions: any[]
+    recentTransactions: any[]
+    commissionSummary: { pending: number; available: number; total: number }
+}
+
+interface Campaign {
+    levels: { level: number; percentage: number }[]
+    pointsRequired: number
+    pendingDays: number
+    pointRedemptionValue: number
+}
+
+interface MyLink {
+    code: string
+}
+
+export default function AffiliateDashboardPage() {
+    const [data, setData] = useState<DashboardData | null>(null)
+    const [campaign, setCampaign] = useState<Campaign | null>(null)
+    const [myLink, setMyLink] = useState<MyLink | null>(null)
+    const [loading, setLoading] = useState(true)
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    async function loadData() {
+        try {
+            const res = await fetch('/api/affiliate/dashboard')
+            if (res.ok) {
+                const result = await res.json()
+                setData(result.data)
+                setCampaign(result.campaign)
+                setMyLink(result.myLink)
+            }
+        } catch (e) {
+            console.error(e)
         }
-    })
-    
-    const f1 = closures.filter(c => 
-        c.descendant.emailVerified && c.descendantId !== 0
-    ).length
-    
-    return { f1, f2: 0, f3: 0 }
-}
+        setLoading(false)
+    }
 
-async function getDirectReferrals(userId: number) {
-    const closures = await prisma.userClosure.findMany({
-        where: {
-            ancestorId: userId,
-            depth: 1
-        },
-        include: {
-            descendant: {
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    emailVerified: true,
-                    createdAt: true
-                }
+    async function copyLink() {
+        if (myLink) {
+            try {
+                await navigator.clipboard.writeText(`${baseUrl}/register?ref=${myLink.code}`)
+                alert('Đã copy!')
+            } catch (e) {
+                console.error(e)
             }
-        },
-        orderBy: { descendant: { createdAt: 'desc' } },
-        take: 10
-    })
-    
-    return closures
-        .filter(c => c.descendant.emailVerified && c.descendantId !== 0)
-        .map(c => c.descendant)
-}
-
-async function getAffiliateDashboardData(userId: number) {
-    const [
-        wallet,
-        confirmedPoints,
-        allReferrals,
-        commissions,
-        recentTransactions,
-        levelBreakdown,
-        directReferrals
-    ] = await Promise.all([
-        prisma.affiliateWallet.findUnique({
-            where: { userId }
-        }),
-        prisma.registrationPoint.aggregate({
-            where: { referrerId: userId, status: 'CONFIRMED' },
-            _count: true,
-            _sum: { points: true }
-        }),
-        prisma.registrationPoint.groupBy({
-            by: ['status'],
-            where: { referrerId: userId },
-            _count: true
-        }),
-        prisma.affiliateCommission.findMany({
-            where: { affiliateId: userId },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
-            include: {
-                conversion: {
-                    include: { campaign: true }
-                }
-            }
-        }),
-        prisma.affiliateTransaction.findMany({
-            where: {
-                wallet: { userId }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 10
-        }),
-        getLevelBreakdown(userId),
-        getDirectReferrals(userId)
-    ])
-
-    // Calculate commission summary
-    const commissionSummary = {
-        pending: 0,
-        available: 0,
-        total: 0
+        }
     }
 
-    for (const c of commissions) {
-        if (c.status === 'PENDING') commissionSummary.pending += c.netAmount
-        else commissionSummary.available += c.netAmount
-        commissionSummary.total += c.netAmount
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-brk-background flex items-center justify-center">
+                <p>Đang tải...</p>
+            </div>
+        )
     }
 
-    const totalReferrals = allReferrals.reduce((acc, s) => acc + s._count, 0)
-
-    return {
-        wallet,
-        points: {
-            total: confirmedPoints._sum.points || 0,
-            referrals: confirmedPoints._count || 0
-        },
-        levelBreakdown,
-        directReferrals,
-        totalReferrals,
-        commissionSummary,
-        commissions,
-        recentTransactions
-    }
-}
-
-async function getCampaign() {
-    return prisma.affiliateCampaign.findFirst({
-        where: { slug: 'default', isActive: true },
-        include: { levels: { orderBy: { level: 'asc' } } }
-    })
-}
-
-async function getMyAffiliateLink(userId: number) {
-    const campaign = await prisma.affiliateCampaign.findFirst({
-        where: { slug: 'default', isActive: true }
-    })
-    
-    if (!campaign) return null
-
-    let link = await prisma.affiliateLink.findFirst({
-        where: { userId, campaignId: campaign.id }
-    })
-
-    if (!link) {
-        link = await prisma.affiliateLink.create({
-            data: {
-                userId,
-                campaignId: campaign.id,
-                code: `BRK${userId}`,
-                name: 'Link chính',
-                source: 'website'
-            }
-        })
-    }
-
-    return link
-}
-
-export default async function AffiliateDashboardPage() {
-    const session = await auth()
-    if (!session?.user?.id) {
-        redirect('/login')
-    }
-
-    const userId = Number(session.user.id)
-
-    const [data, campaign, myLink] = await Promise.all([
-        getAffiliateDashboardData(userId),
-        getCampaign(),
-        getMyAffiliateLink(userId)
-    ])
-
-    const affiliateUrl = myLink 
-        ? `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/register?ref=${myLink.code}`
-        : ''
+    const affiliateUrl = myLink ? `${baseUrl}/register?ref=${myLink.code}` : ''
 
     return (
         <div className="min-h-screen bg-brk-background p-6">
@@ -184,12 +81,11 @@ export default async function AffiliateDashboardPage() {
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    {/* Points */}
                     <div className="bg-gradient-to-br from-brk-primary to-blue-600 rounded-lg shadow p-6 text-brk-on-primary">
                         <h3 className="text-brk-on-primary/80 text-sm">Điểm Đăng Ký</h3>
-                        <p className="text-3xl font-bold mt-2">{data.points.total}</p>
+                        <p className="text-3xl font-bold mt-2">{data?.points.total || 0}</p>
                         <p className="text-brk-on-primary/80 text-sm mt-1">
-                            {data.points.referrals} người đăng ký qua bạn
+                            {data?.points.referrals || 0} người đăng ký qua bạn
                         </p>
                         {campaign && (
                             <p className="text-xs mt-2 opacity-75">
@@ -198,45 +94,31 @@ export default async function AffiliateDashboardPage() {
                         )}
                     </div>
 
-                    {/* Direct Referrals (F1) */}
                     <div className="bg-gradient-to-br from-brk-primary to-indigo-600 rounded-lg shadow p-6 text-brk-on-primary">
                         <h3 className="text-brk-on-primary/80 text-sm">F1 - Người đăng ký qua bạn</h3>
-                        <p className="text-3xl font-bold mt-2">{data.levelBreakdown.f1}</p>
+                        <p className="text-3xl font-bold mt-2">{data?.levelBreakdown.f1 || 0}</p>
                         <p className="text-brk-on-primary/80 text-sm mt-1">
                             Mỗi người = 1 điểm
                         </p>
                     </div>
 
-                    {/* Balance */}
                     <div className="bg-gradient-to-br from-brk-accent to-green-600 rounded-lg shadow p-6 text-brk-on-primary">
                         <h3 className="text-brk-on-primary/80 text-sm">Số dư khả dụng</h3>
                         <p className="text-3xl font-bold mt-2">
-                            {(data.wallet?.balance || 0).toLocaleString('vi-VN')}đ
+                            {(data?.wallet?.balance || 0).toLocaleString('vi-VN')}đ
                         </p>
                         <p className="text-brk-on-primary/80 text-sm mt-1">
                             Có thể rút ngay
                         </p>
                     </div>
 
-                    {/* Pending */}
                     <div className="bg-gradient-to-br from-brk-primary to-yellow-600 rounded-lg shadow p-6 text-brk-on-primary">
                         <h3 className="text-brk-on-primary/80 text-sm">Chờ xử lý</h3>
                         <p className="text-3xl font-bold mt-2">
-                            {(data.wallet?.pendingBalance || 0).toLocaleString('vi-VN')}đ
+                            {(data?.wallet?.pendingBalance || 0).toLocaleString('vi-VN')}đ
                         </p>
                         <p className="text-brk-on-primary/80 text-sm mt-1">
                             Đang trong thời gian đối soát
-                        </p>
-                    </div>
-
-                    {/* Total Earned */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-6 text-brk-on-primary">
-                        <h3 className="text-brk-on-primary/80 text-sm">Tổng thu nhập</h3>
-                        <p className="text-3xl font-bold mt-2">
-                            {data.commissionSummary.total.toLocaleString('vi-VN')}đ
-                        </p>
-                        <p className="text-brk-on-primary/80 text-sm mt-1">
-                            Tất cả hoa hồng đã nhận
                         </p>
                     </div>
                 </div>
@@ -255,7 +137,7 @@ export default async function AffiliateDashboardPage() {
                                 />
                             </div>
                             <button
-                                onClick={() => navigator.clipboard.writeText(affiliateUrl)}
+                                onClick={copyLink}
                                 className="bg-brk-primary text-brk-on-surface px-4 py-2 rounded-lg hover:brightness-110"
                             >
                                 Copy Link
@@ -290,8 +172,8 @@ export default async function AffiliateDashboardPage() {
                     </div>
                 )}
 
-                {/* Danh sách F1 - Người đăng ký qua bạn */}
-                {data.directReferrals.length > 0 && (
+                {/* Danh sách F1 */}
+                {data?.directReferrals && data.directReferrals.length > 0 && (
                     <div className="bg-brk-surface rounded-lg shadow p-6 mb-8">
                         <h2 className="text-lg font-semibold mb-4 text-brk-on-surface">
                             Người đăng ký qua link của bạn ({data.directReferrals.length})
@@ -322,73 +204,6 @@ export default async function AffiliateDashboardPage() {
                         </div>
                     </div>
                 )}
-
-                {/* Recent Commissions */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <div className="bg-brk-surface rounded-lg shadow p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-brk-on-surface">Hoa hồng gần đây</h2>
-                            <Link href="/affiliate/commissions" className="text-brk-primary text-sm hover:underline">
-                                Xem tất cả
-                            </Link>
-                        </div>
-                        {data.commissions.length === 0 ? (
-                            <p className="text-brk-muted text-center py-4">Chưa có hoa hồng nào</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {data.commissions.slice(0, 5).map(commission => (
-                                    <div key={commission.id} className="flex justify-between items-center border-b border-brk-outline pb-2">
-                                        <div>
-                                            <p className="font-medium text-brk-on-surface">Tầng {commission.level}</p>
-                                            <p className="text-sm text-brk-muted">
-                                                {commission.percentage}% • #{commission.conversion?.id}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-medium text-brk-accent">
-                                                +{commission.netAmount.toLocaleString('vi-VN')}đ
-                                            </p>
-                                            <p className={`text-xs ${
-                                                commission.status === 'PENDING' ? 'text-brk-muted' : 'text-brk-accent'
-                                            }`}>
-                                                {commission.status === 'PENDING' ? 'Chờ' : 'Khả dụng'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Recent Transactions */}
-                    <div className="bg-brk-surface rounded-lg shadow p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-brk-on-surface">Giao dịch gần đây</h2>
-                            <Link href="/affiliate/wallet" className="text-brk-primary text-sm hover:underline">
-                                Xem tất cả
-                            </Link>
-                        </div>
-                        {data.recentTransactions.length === 0 ? (
-                            <p className="text-brk-muted text-center py-4">Chưa có giao dịch nào</p>
-                        ) : (
-                            <div className="space-y-3">
-                                {data.recentTransactions.slice(0, 5).map(tx => (
-                                    <div key={tx.id} className="flex justify-between items-center border-b border-brk-outline pb-2">
-                                        <div>
-                                            <p className="font-medium text-sm text-brk-on-surface">{tx.description}</p>
-                                            <p className="text-xs text-brk-muted">
-                                                {new Date(tx.createdAt).toLocaleDateString('vi-VN')}
-                                            </p>
-                                        </div>
-                                        <p className={`font-medium ${tx.amount >= 0 ? 'text-brk-accent' : 'text-brk-accent'}`}>
-                                            {tx.amount >= 0 ? '+' : ''}{tx.amount.toLocaleString('vi-VN')}đ
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
 
                 {/* Quick Actions */}
                 <div className="bg-brk-background rounded-lg p-6">

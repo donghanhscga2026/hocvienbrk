@@ -1,32 +1,65 @@
-'use server'
+'use client'
 
+import { useEffect, useState } from 'react'
 import { auth } from "@/auth"
-import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
+import Link from "next/link"
 
-async function getAffiliateLinks(userId: number) {
-    const links = await prisma.affiliateLink.findMany({
-        where: { userId },
-        include: {
-            campaign: true,
-            _count: {
-                select: { clicks: true, conversions: true }
-            }
-        },
-        orderBy: { createdAt: "desc" }
-    })
-    return links
+interface LinkItem {
+    id: number
+    code: string
+    name: string | null
+    source: string | null
+    _count: { clicks: number; conversions: number }
 }
 
-export default async function AffiliateLinksPage() {
-    const session = await auth()
-    if (!session?.user?.id) {
-        redirect('/login')
+interface LandingItem {
+    slug: string
+    title: string
+}
+
+export default function AffiliateLinksPage() {
+    const [links, setLinks] = useState<LinkItem[]>([])
+    const [landings, setLandings] = useState<LandingItem[]>([])
+    const [loading, setLoading] = useState(true)
+    const [user, setUser] = useState<any>(null)
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+
+    useEffect(() => {
+        loadData()
+    }, [])
+
+    async function loadData() {
+        try {
+            const res = await fetch('/api/affiliate/links')
+            if (res.ok) {
+                const data = await res.json()
+                setLinks(data.links || [])
+                setLandings(data.landings || [])
+                setUser(data.user)
+            }
+        } catch (e) {
+            console.error(e)
+        }
+        setLoading(false)
     }
 
-    const userId = Number(session.user.id)
-    const links = await getAffiliateLinks(userId)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+    async function copyToClipboard(text: string) {
+        try {
+            await navigator.clipboard.writeText(text)
+            alert('Đã copy!')
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-brk-background flex items-center justify-center">
+                <p>Đang tải...</p>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-brk-background p-6">
@@ -67,7 +100,7 @@ export default async function AffiliateLinksPage() {
                                         className="flex-1 px-3 py-2 border border-brk-outline rounded-lg bg-brk-background text-brk-on-surface"
                                     />
                                     <button
-                                        onClick={() => navigator.clipboard.writeText(`${baseUrl}/register?ref=${link.code}`)}
+                                        onClick={() => copyToClipboard(`${baseUrl}/register?ref=${link.code}`)}
                                         className="bg-brk-primary text-brk-on-surface px-4 py-2 rounded-lg hover:brightness-110"
                                     >
                                         Copy
@@ -118,7 +151,7 @@ export default async function AffiliateLinksPage() {
                                             className="flex-1 px-3 py-2 border border-brk-outline rounded-lg text-sm bg-brk-background text-brk-on-surface"
                                         />
                                         <button
-                                            onClick={() => navigator.clipboard.writeText(`${baseUrl}/register?ref=${link.code}`)}
+                                            onClick={() => copyToClipboard(`${baseUrl}/register?ref=${link.code}`)}
                                             className="bg-brk-background text-brk-on-surface px-3 py-2 rounded-lg hover:bg-brk-surface text-sm"
                                         >
                                             Copy

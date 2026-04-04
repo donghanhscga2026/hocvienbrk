@@ -5,32 +5,69 @@ import type { NextRequest } from "next/server"
 
 const { auth } = NextAuth(authConfig)
 
-export default auth((req) => {
-    // req.auth
-})
+interface AffiliateCookie {
+    r: string
+    l: string | null
+    t: number
+}
 
-// Proxy để lưu ref cookie từ URL
-export function middleware(request: NextRequest) {
+const RESERVED_PATHS = new Set([
+    'api', 'admin', 'affiliate', 'login', 'register', 'courses', 
+    'auth', 'dashboard', 'account', 'settings', 'profile',
+    'user', 'checkout', 'payment', 'static', 'assets', '_next',
+    'landing', 'forgot-password'
+])
+
+export default auth(async function middleware(request: NextRequest & { auth: any }) {
     const response = NextResponse.next()
     
-    // Lấy ref từ URL query param
     const refCode = request.nextUrl.searchParams.get('ref')
+    const pathParts = request.nextUrl.pathname.split('/').filter(Boolean)
+    const potentialSlug = pathParts.length > 0 ? pathParts[0] : null
     
-    if (refCode) {
-        // Lưu vào cookie trong 30 ngày
-        response.cookies.set('aff_ref', refCode, {
-            maxAge: 30 * 24 * 60 * 60, // 30 days
-            httpOnly: false, // Có thể đọc từ client
-            sameSite: 'lax',
-            path: '/'
-        })
+    if (!potentialSlug || RESERVED_PATHS.has(potentialSlug)) {
+        if (refCode) {
+            saveRefCookie(response, refCode, null)
+        }
+        return response
     }
     
-    return response
+    const session = request.auth
+    
+    saveRefCookie(response, refCode || '', potentialSlug)
+    
+    if (!session?.user) {
+        const redirectUrl = new URL('/register', request.url)
+        redirectUrl.searchParams.set('redirect', potentialSlug)
+        if (refCode) {
+            redirectUrl.searchParams.set('ref', refCode)
+        }
+        return NextResponse.redirect(redirectUrl)
+    } else {
+        const redirectUrl = new URL(`/landing/${potentialSlug}`, request.url)
+        return NextResponse.redirect(redirectUrl)
+    }
+})
+
+function saveRefCookie(response: NextResponse, refCode: string, landingSlug: string | null) {
+    if (!refCode) return
+    
+    const cookieData: AffiliateCookie = {
+        r: refCode,
+        l: landingSlug,
+        t: Date.now()
+    }
+    
+    response.cookies.set('aff_ref', JSON.stringify(cookieData), {
+        maxAge: 30 * 24 * 60 * 60,
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/'
+    })
 }
 
 export const config = {
     matcher: [
-        "/((?!api|_next/static|_next/image|favicon.ico).*)",
+        "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)).*)",
     ],
 }
