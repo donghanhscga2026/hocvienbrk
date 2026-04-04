@@ -1,0 +1,129 @@
+import { NextResponse } from 'next/server'
+import { auth } from '@/auth'
+import prisma from '@/lib/prisma'
+
+export async function GET() {
+    try {
+        const session = await auth()
+        
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        
+        const userId = typeof session.user.id === 'string' 
+            ? parseInt(session.user.id) 
+            : session.user.id
+        
+        const [
+            wallet,
+            confirmedPoints,
+            allReferrals,
+            commissions,
+            recentTransactions,
+            campaign,
+            myLink,
+            closures
+        ] = await Promise.all([
+            prisma.affiliateWallet.findUnique({ where: { userId } }),
+            prisma.registrationPoint.aggregate({
+                where: { referrerId: userId, status: 'CONFIRMED' },
+                _count: true,
+                _sum: { points: true }
+            }),
+            prisma.registrationPoint.groupBy({
+                by: ['status'],
+                where: { referrerId: userId },
+                _count: true
+            }),
+            prisma.affiliateCommission.findMany({
+                where: { affiliateId: userId },
+                orderBy: { createdAt: 'desc' },
+                take: 10
+            }),
+            prisma.affiliateTransaction.findMany({
+                where: { wallet: { userId } },
+                orderBy: { createdAt: 'desc' },
+                take: 10
+            }),
+            prisma.affiliateCampaign.findFirst({
+                where: { slug: 'default', isActive: true },
+                include: { levels: { orderBy: { level: 'asc' } } }
+            }),
+            getOrCreateLink(userId),
+            prisma.userClosure.findMany({
+                where: { ancestorId: userId, depth: 1 },
+                include: {
+                    descendant: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            emailVerified: true,
+                            createdAt: true
+                        }
+                    }
+                },
+                take: 10
+            })
+        ])
+        
+        const f1Count = closures.filter(c => 
+            c.descendant.emailVerified && c.descendantId !== 0
+        ).length
+        
+        const commissionSummary = { pending: 0, available: 0, total: 0 }
+        for (const c of commissions) {
+            if (c.status === 'PENDING') commissionSummary.pending += c.netAmount
+            else commissionSummary.available += c.netAmount
+            commissionSummary.total += c.netAmount
+        }
+        
+        return NextResponse.json({
+            data: {
+                wallet,
+                points: {
+                    total: confirmedPoints._sum.points || 0,
+                    referrals: confirmedPoints._count || 0
+                },
+                levelBreakdown: { f1: f1Count, f2: 0, f3: 0 },
+                directReferrals: closures
+                    .filter(c => c.descendant.emailVerified && c.descendantId !== 0)
+                    .map(c => c.descendant),
+                commissionSummary,
+                commissions,
+                recentTransactions
+            },
+            campaign,
+            myLink
+        })
+    } catch (error) {
+        console.error('[API] Dashboard error:', error)
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    }
+}
+
+async function getOrCreateLink(userId: number) {
+    const campaign = await prisma.affiliateCampaign.findFirst({
+        where: { slug: 'default', isActive: true }
+    })
+    
+    if (!campaign) return null
+
+    let link = await prisma.affiliateLink.findFirst({
+        where: { userId, campaignId: campaign.id }
+    })
+
+    if (!link) {
+        link = await prisma.affiliateLink.create({
+            data: {
+                userId,
+                campaignId: campaign.id,
+                code: `BRK${userId}`,
+                name: 'Link chính',
+                source: 'website'
+            }
+        })
+    }
+
+    return link
+}

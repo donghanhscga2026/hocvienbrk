@@ -1,10 +1,12 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import PaymentModal from './PaymentModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
+import ShareModal from '@/components/share/ShareModal'
+import { Share2 } from 'lucide-react'
 
 interface CourseCardProps {
     course: any
@@ -30,7 +32,15 @@ interface CourseCardProps {
 
 export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
+    const [showShare, setShowShare] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (isLoggedIn && userId) {
+            setAffiliateCode(String(userId))
+        }
+    }, [isLoggedIn, userId])
 
     // Override phi_coc nếu đã kích hoạt khóa 1
     const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
@@ -122,6 +132,17 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                         <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'}`}>
                             {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
                         </span>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setShowShare(true)
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-brk-surface px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
+                        >
+                            <Share2 className="w-3 h-3" />
+                            Chia sẻ
+                        </button>
                         {isActive && (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-background-dark px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
                                 <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
@@ -208,6 +229,13 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                     onClose={() => setShowPayment(false)}
                 />
             )}
+
+            <ShareModal
+                isOpen={showShare}
+                onClose={() => setShowShare(false)}
+                course={course}
+                affiliateCode={affiliateCode}
+            />
         </>
     )
 }

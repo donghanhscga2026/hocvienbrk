@@ -2,12 +2,12 @@
 
 import { signIn, signOut, useSession } from "next-auth/react"
 import { useForm } from "react-hook-form"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
 
-export default function LoginPage() {
+function LoginForm() {
     const { data: session } = useSession()
     const [isLoading, setIsLoading] = useState(false)
     const [isChangingPassword, setIsChangingPassword] = useState(false)
@@ -16,6 +16,10 @@ export default function LoginPage() {
     const [showNewPassword, setShowNewPassword] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    
+    const redirectSlug = searchParams.get('redirect')
+    const refCode = searchParams.get('ref')
 
     const { register, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
@@ -47,8 +51,12 @@ export default function LoginPage() {
             if (result?.error) {
                 setError("Thông tin đăng nhập không chính xác. Vui lòng thử lại.")
             } else {
-                // Kiểm tra lại session để xem có cần đổi mật khẩu không
-                router.push("/")
+                // Redirect về course landing page nếu có redirect param
+                if (redirectSlug) {
+                    router.push(`/landing/${redirectSlug}`)
+                } else {
+                    router.push("/")
+                }
                 router.refresh()
             }
         } catch (err) {
@@ -274,10 +282,22 @@ export default function LoginPage() {
 
                     <p className="text-center text-sm text-brk-muted">
                         Chưa có tài khoản?{' '}
-                        <Link href="/register" className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
+                        <Link href={redirectSlug ? `/register?redirect=${redirectSlug}${refCode ? '&ref=' + refCode : ''}` : "/register"} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-brk-surface via-brk-background to-brk-surface flex items-center justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin text-brk-primary" />
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     )
 }

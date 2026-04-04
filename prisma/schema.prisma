@@ -317,6 +317,8 @@ model Course {
   type          CourseType   @default(NORMAL)
   lessons       Lesson[]
   enrollments   Enrollment[]
+  landingPages  LandingPage[]
+  testimonials  CourseTestimonial[]
 }
 
 model Lesson {
@@ -597,6 +599,52 @@ model Theme {
 }
 
 // ==========================================
+// LANDING PAGE MODULE - 2026-04-03
+// ==========================================
+
+model LandingPage {
+  id            Int      @id @default(autoincrement())
+  slug          String   @unique  // URL slug: "hocxaykenh", "tiktok-2025"
+  
+  // Content
+  title         String
+  subtitle      String?
+  description   String?  @db.Text
+  heroImage     String?
+  ctaText       String   @default("Đăng ký ngay")
+  ctaLink       String?  // Custom CTA link (default: /register)
+  
+  // Template
+  template      String   @default("hero-cta")  // "hero-cta", "feature-grid", "video-intro", "webinar-reg", "testimonial"
+  config        Json?    // Template-specific settings: { backgroundColor, textColor, accentColor, features[], etc. }
+  
+  // Commission override per landing
+  customCommission Json?  // { f1: 15, f2: 7, f3: 3 } - override campaign commission
+  
+  // Relations
+  courseId      Int?
+  course        Course?  @relation(fields: [courseId], references: [id])
+  
+  // Stats
+  viewCount     Int      @default(0)
+  clickCount    Int      @default(0)
+  
+  // Status
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  clicks        AffiliateClick[]
+  conversions   AffiliateConversion[]
+  registrations RegistrationPoint[]
+  
+  @@index([slug])
+  @@index([isActive])
+  @@index([courseId])
+}
+
+// ==========================================
 // AFFILIATE SYSTEM MODELS - Phase 1
 // ==========================================
 
@@ -607,6 +655,7 @@ model AffiliateCampaign {
   slug          String    @unique  // URL-friendly: "chuong-trinh-1"
   description   String?
   isActive      Boolean   @default(true)
+  isDefault     Boolean   @default(false)  // Campaign mac dinh
   
   // Commission settings
   maxLevels     Int       @default(3)  // Số tầng hoa hồng tối đa
@@ -625,6 +674,9 @@ model AffiliateCampaign {
   
   // Redemption course
   redemptionCourseId    Int?     // Khóa học được đổi (Level 1)
+  
+  // Landing page commission overrides
+  landingOverrides Json?  // { "hocxaykenh": { f1: 15, f2: 7, f3: 3 }, ... }
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -688,10 +740,18 @@ model AffiliateClick {
   deviceType  String?      // desktop, mobile, tablet
   country     String?
   city        String?
+  
+  // Landing page tracking
+  landingSlug   String?      // LandingPage.slug (denormalized)
+  landingId     Int?
+  landing       LandingPage? @relation(fields: [landingId], references: [id])
+  
   createdAt   DateTime      @default(now())
   
   @@index([linkId, createdAt])
   @@index([ipAddress, createdAt])
+  @@index([landingSlug])
+  @@index([landingId])
 }
 
 // Conversion (khi co don hang)
@@ -712,12 +772,19 @@ model AffiliateConversion {
   approvedAt   DateTime?
   createdAt    DateTime               @default(now())
   
+  // Landing page tracking
+  landingSlug   String?      // LandingPage.slug
+  landingId     Int?
+  landing       LandingPage? @relation(fields: [landingId], references: [id])
+  
   // Relations
   commissions  AffiliateCommission[]
   
   @@index([campaignId, status])
   @@index([customerId])
   @@index([pendingUntil])
+  @@index([landingSlug])
+  @@index([landingId])
 }
 
 // Diem dang ky - khi user moi xac thuc email
@@ -732,6 +799,11 @@ model RegistrationPoint {
   earnedAt        DateTime          @default(now())
   confirmedAt     DateTime?         // Khi xac thuc email thanh cong
   
+  // Landing page tracking
+  landingSlug     String?
+  landingId       Int?
+  landing         LandingPage?      @relation(fields: [landingId], references: [id])
+  
   // Relations
   referrer        User              @relation("ReferrerRegistration", fields: [referrerId], references: [id])
   referee         User              @relation("RefereeRegistration", fields: [refereeId], references: [id])
@@ -740,6 +812,7 @@ model RegistrationPoint {
   @@index([refereeId])
   @@index([campaignId])
   @@index([status])
+  @@index([landingSlug])
 }
 
 // Hoa hong cua CTV
@@ -838,4 +911,23 @@ model SiteSettings {
   theme       Theme    @relation(fields: [themeId], references: [id])
 
   @@unique([themeId])
+}
+
+model CourseTestimonial {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  name        String
+  role        String?
+  avatar      String?
+  content     String
+  rating      Int       @default(5)
+  courseName  String?
+  isFeatured  Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@index([courseId, isActive])
+  @@index([isFeatured])
 }

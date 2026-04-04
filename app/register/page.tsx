@@ -44,6 +44,7 @@ function RegisterForm() {
     const searchParams = useSearchParams()
 
     const urlRef = searchParams.get('ref')
+    const redirectSlug = searchParams.get('redirect')
 
     const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
         defaultValues: {
@@ -110,6 +111,13 @@ function RegisterForm() {
             if (result?.success) {
                 setSuccess(result.message)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
+                
+                // Auto redirect to course landing page after 2 seconds
+                if (redirectSlug) {
+                    setTimeout(() => {
+                        router.push(`/landing/${redirectSlug}`)
+                    }, 2000)
+                }
             } else if (result?.message || result?.errors) {
                 if (result.errors) {
                     setFieldErrors(result.errors)
@@ -145,11 +153,20 @@ function RegisterForm() {
                         <p className="text-sm text-brk-accent leading-relaxed mb-6">
                             {success}
                         </p>
-                        <div className="pt-4 border-t border-brk-accent/30">
-                            <Link href="/login" className="text-sm font-semibold text-brk-primary hover:text-brk-primary-hover">
-                                Quay lại trang đăng nhập &rarr;
-                            </Link>
-                        </div>
+                        {redirectSlug ? (
+                            <div className="pt-4 border-t border-brk-accent/30">
+                                <p className="text-sm text-brk-accent mb-2">Đang chuyển đến khóa học...</p>
+                                <div className="w-full bg-brk-accent/20 rounded-full h-2 mb-2">
+                                    <div className="bg-brk-accent h-2 rounded-full w-full animate-pulse" />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="pt-4 border-t border-brk-accent/30">
+                                <Link href="/login" className="text-sm font-semibold text-brk-primary hover:text-brk-primary-hover">
+                                    Quay lại trang đăng nhập &rarr;
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -356,7 +373,7 @@ function RegisterForm() {
                 {!success && (
                     <p className="text-center text-sm text-brk-muted">
                         Đã có tài khoản?{" "}
-                        <Link href="/login" className="font-medium text-brk-primary hover:text-brk-primary-hover">
+                        <Link href={redirectSlug ? `/login?redirect=${redirectSlug}${urlRef ? '&ref=' + urlRef : ''}` : "/login"} className="font-medium text-brk-primary hover:text-brk-primary-hover">
                             Đăng nhập
                         </Link>
                     </p>

@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings, Layout } from 'lucide-react'
 
 const tools = [
   { label: 'Affiliate', href: '/admin/affiliate', icon: DollarSign, color: 'bg-emerald-500', minRole: 'user' as const },
+  { label: 'Landing Pages', href: '/admin/landings', icon: Layout, color: 'bg-pink-500', minRole: 'admin' as const },
   { label: 'Nhân Mạch', href: '/admin/genealogy', icon: Users, color: 'bg-indigo-500', minRole: 'user' as const },
   { label: 'Cài Đặt', href: '/admin/settings', icon: Settings, color: 'bg-gray-500', minRole: 'user' as const },
   { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard, color: 'bg-green-500', minRole: 'teacher' as const },

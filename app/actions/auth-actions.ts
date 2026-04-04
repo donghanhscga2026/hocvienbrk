@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { addUserToClosure } from "@/lib/closure-helpers"
+import { trackAffiliateConversion } from "@/lib/affiliate/tracking"
+import { cookies } from "next/headers"
 
 function normalizePhone(phone: string): string {
   if (!phone) return '';
@@ -131,6 +133,27 @@ export async function registerUser(prevState: any, formData: FormData) {
         
         // Them closure rows cho genealogy
         await addUserToClosure(user.id, user.referrerId)
+        
+        // Track affiliate conversion
+        try {
+            // Get affiliate data from cookie
+            const cookieStore = await cookies()
+            const affRefCookie = cookieStore.get('aff_ref')
+            
+            if (affRefCookie) {
+                const affData = JSON.parse(decodeURIComponent(affRefCookie.value))
+                if (affData.r) {
+                    await trackAffiliateConversion({
+                        refCode: affData.r,
+                        userId: user.id,
+                        landingSlug: affData.l || null,
+                        type: 'REGISTRATION'
+                    })
+                }
+            }
+        } catch (e) {
+            console.error('[Track] Failed to track conversion:', e)
+        }
         
         // Revalidate genealogy cache
         revalidatePath('/admin/genealogy')

@@ -6,6 +6,20 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")
     const url = searchParams.get("url")
+    
+    // Parse body for additional params
+    let body: { landing?: string; campaignId?: number } = {}
+    try {
+      const text = await request.text()
+      if (text) {
+        body = JSON.parse(text)
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+    
+    const landingSlug = body.landing || searchParams.get("landing")
+    const campaignId = body.campaignId ? parseInt(String(body.campaignId)) : undefined
 
     if (!code) {
       return NextResponse.json({ error: "Missing code" }, { status: 400 })
@@ -19,6 +33,17 @@ export async function POST(request: NextRequest) {
 
     if (!link || !link.isActive) {
       return NextResponse.json({ error: "Invalid code" }, { status: 404 })
+    }
+
+    // Validate landing slug if provided
+    let landingId: number | undefined
+    if (landingSlug) {
+      const landing = await prisma.landingPage.findUnique({
+        where: { slug: landingSlug }
+      })
+      if (landing) {
+        landingId = landing.id
+      }
     }
 
     // Lấy thông tin từ request
@@ -40,7 +65,7 @@ export async function POST(request: NextRequest) {
       deviceType = "tablet"
     }
 
-    // Ghi nhận click
+    // Ghi nhận click với landing info
     const click = await prisma.affiliateClick.create({
       data: {
         linkId: link.id,
@@ -51,14 +76,25 @@ export async function POST(request: NextRequest) {
         utmSource,
         utmMedium,
         utmCampaign,
-        deviceType
+        deviceType,
+        landingSlug: landingSlug || null,
+        landingId: landingId
       }
     })
+
+    // Increment landing click count if applicable
+    if (landingId) {
+      prisma.landingPage.update({
+        where: { id: landingId },
+        data: { clickCount: { increment: 1 } }
+      }).catch(console.error)
+    }
 
     return NextResponse.json({
       success: true,
       clickId: click.id,
-      linkId: link.id
+      linkId: link.id,
+      landing: landingSlug || null
     })
 
   } catch (error) {
@@ -72,6 +108,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")
+    const landing = searchParams.get("landing")
 
     if (!code) {
       return NextResponse.json({ error: "Missing code" }, { status: 400 })
@@ -81,6 +118,7 @@ export async function GET(request: NextRequest) {
       where: { code },
       include: {
         clicks: {
+          where: landing ? { landingSlug: landing } : undefined,
           orderBy: { createdAt: "desc" },
           take: 100
         },
@@ -101,8 +139,19 @@ export async function GET(request: NextRequest) {
     const recentClicks = await prisma.affiliateClick.count({
       where: {
         linkId: link.id,
-        createdAt: { gte: sevenDaysAgo }
+        createdAt: { gte: sevenDaysAgo },
+        ...(landing ? { landingSlug: landing } : {})
       }
+    })
+
+    // Thống kê theo landing
+    const landingStats = await prisma.affiliateClick.groupBy({
+      by: ['landingSlug'],
+      where: {
+        linkId: link.id,
+        landingSlug: { not: null }
+      },
+      _count: true
     })
 
     return NextResponse.json({
@@ -119,7 +168,11 @@ export async function GET(request: NextRequest) {
         conversionRate: link._count.clicks > 0 
           ? ((link._count.conversions / link._count.clicks) * 100).toFixed(2) + "%"
           : "0%"
-      }
+      },
+      landingStats: landingStats.map(stat => ({
+        landingSlug: stat.landingSlug,
+        clicks: stat._count
+      }))
     })
 
   } catch (error) {
