@@ -38,9 +38,9 @@ export default function LandingsPage() {
             {/* Header */}
             <header className="bg-black text-white shadow-lg">
                 <div className="flex items-center justify-between p-4 max-w-6xl mx-auto">
-                    <Link href="/admin" className="flex items-center gap-2 text-yellow-400 hover:text-yellow-300">
+                    <Link href="/tools" className="flex items-center gap-2 text-yellow-400 hover:text-yellow-300">
                         <ArrowLeft className="h-5 w-5" />
-                        <span className="text-sm font-black tracking-wider">VỀ TRANG CHỦ</span>
+                        <span className="text-sm font-black tracking-wider">VỀ TRANG CÔNG CỤ</span>
                     </Link>
                     <h1 className="text-lg font-black tracking-widest text-yellow-400">
                         LANDING PAGES

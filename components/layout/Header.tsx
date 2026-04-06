@@ -4,9 +4,33 @@ import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
-import { User, Settings, LogOut, ChevronDown, Sparkles, Check } from 'lucide-react'
+import { Settings, LogOut, ChevronDown, Sparkles, Check, Youtube, DollarSign, Layout, Users, CreditCard, BookOpen, FileText, Gem, Mail, Map, Lock } from 'lucide-react'
 import { NOTIFICATION_EVENT, BRKNotification } from '@/lib/notifications-client'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
+
+const tools = [
+    { label: 'Lấy Link YouTube', href: '/tools/youtube-links', icon: Youtube, color: 'bg-red-600', minRole: 'public' as const },
+    { label: 'Quản lý Video', href: '/tools/youtube-manager', icon: Youtube, color: 'bg-red-700', minRole: 'user' as const },
+    { label: 'Cài Đặt', href: '/admin/settings', icon: Settings, color: 'bg-gray-500', minRole: 'public' as const },
+    { label: 'Affiliate', href: '/admin/affiliate', icon: DollarSign, color: 'bg-emerald-500', minRole: 'user' as const },
+    { label: 'Nhân Mạch', href: '/admin/genealogy', icon: Users, color: 'bg-indigo-500', minRole: 'user' as const },
+    { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard, color: 'bg-green-500', minRole: 'teacher' as const },
+    { label: 'Thành Viên', href: '/admin/students', icon: Users, color: 'bg-cyan-500', minRole: 'teacher' as const },
+    { label: 'Khóa Học', href: '/admin/courses', icon: BookOpen, color: 'bg-orange-500', minRole: 'teacher' as const },
+    { label: 'Bảng Tin', href: '/admin/posts', icon: FileText, color: 'bg-blue-500', minRole: 'admin' as const },
+    { label: 'Số Đẹp', href: '/admin/reserved-ids', icon: Gem, color: 'bg-purple-500', minRole: 'admin' as const },
+    { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map, color: 'bg-teal-500', minRole: 'admin' as const },
+    { label: 'Email MKT', href: '/admin/campaigns', icon: Mail, color: 'bg-red-400', minRole: 'admin' as const },
+]
+
+function canAccessTool(userRole: string, minRole: string): boolean {
+    if (minRole === 'public') return true
+    if (!userRole || userRole === 'guest') return false
+    if (minRole === 'user') return true
+    if (minRole === 'teacher' && (userRole === 'TEACHER' || userRole === 'ADMIN')) return true
+    if (minRole === 'admin' && userRole === 'ADMIN') return true
+    return false
+}
 
 function getAllThemes() {
     if (typeof window === 'undefined') return presetThemes
@@ -59,6 +83,8 @@ export default function Header({ session, userImage }: { session: any, userImage
     const [showThemePicker, setShowThemePicker] = useState(false)
     const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('default')
     const userMenuRef = useRef<HTMLDivElement>(null)
+
+    const userRole = session?.user?.role as string || 'guest'
 
     useEffect(() => {
         // Load current theme
@@ -137,6 +163,7 @@ export default function Header({ session, userImage }: { session: any, userImage
                 <nav className="hidden flex-1 items-center justify-center gap-12 text-[13px] font-black md:flex">
                     <Link href="/" className="text-brk-primary transition-all hover:scale-105 tracking-widest">TRANG CHỦ</Link>
                     <Link href="#khoa-hoc" className="text-brk-primary transition-all hover:scale-105 tracking-widest">KHÓA HỌC</Link>
+                    <Link href="/tools" className="text-brk-primary transition-all hover:scale-105 tracking-widest">CÔNG CỤ HỖ TRỢ</Link>
                     <Link href="#" className="text-brk-primary transition-all hover:scale-105 tracking-widest">GIỚI THIỆU</Link>
                 </nav>
 
@@ -213,12 +240,20 @@ export default function Header({ session, userImage }: { session: any, userImage
                             )}
                         </div>
                     ) : (
-                        <Link
-                            href="/login"
-                            className="hidden sm:inline-block rounded-full bg-brk-accent px-6 py-2 text-xs font-black text-brk-on-surface shadow-md transition-all hover:brightness-110 hover:scale-105"
-                        >
-                            ĐĂNG NHẬP
-                        </Link>
+                        <>
+                            <Link
+                                href="/admin"
+                                className="hidden sm:inline-block rounded-full bg-brk-secondary px-4 py-2 text-xs font-black text-brk-on-secondary shadow-md transition-all hover:brightness-110 hover:scale-105"
+                            >
+                                CÔNG CỤ
+                            </Link>
+                            <Link
+                                href="/login"
+                                className="hidden sm:inline-block rounded-full bg-brk-accent px-6 py-2 text-xs font-black text-brk-on-surface shadow-md transition-all hover:brightness-110 hover:scale-105"
+                            >
+                                ĐĂNG NHẬP
+                            </Link>
+                        </>
                     )}
 
                     {/* Hamburger/Avatar Button - Mobile */}
@@ -271,10 +306,11 @@ export default function Header({ session, userImage }: { session: any, userImage
                             </div>
                             
                             <Link href="/account-settings" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">CÀI ĐẶT TÀI KHOẢN</Link>
-                            <Link href="/admin" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all flex items-center gap-2">
+                            <Link href="/tools" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all flex items-center gap-2">
                                 <Settings className="w-4 h-4" />
                                 CÔNG CỤ HỖ TRỢ
                             </Link>
+                            
                             <Link href="/" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">TRANG CHỦ</Link>
                             <Link href="#khoa-hoc" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">KHÓA HỌC</Link>
                             <Link href="#" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">GIỚI THIỆU</Link>
@@ -311,6 +347,7 @@ export default function Header({ session, userImage }: { session: any, userImage
                         <nav className="flex flex-col gap-6 text-center text-sm font-black">
                             <Link href="/" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">TRANG CHỦ</Link>
                             <Link href="#khoa-hoc" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">KHÓA HỌC</Link>
+                            <Link href="/tools" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-secondary hover:scale-105 transition-all">CÔNG CỤ HỖ TRỢ</Link>
                             <Link href="#" onClick={() => setIsMenuOpen(false)} className="py-2 text-brk-primary hover:scale-105 transition-all">GIỚI THIỆU</Link>
                             
                             {/* Theme Picker - Mobile */}
