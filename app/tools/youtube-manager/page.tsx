@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Youtube, Link2, RefreshCw, Trash2, Check, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff, Globe, Lock, FileText } from 'lucide-react'
@@ -19,7 +19,7 @@ interface ChannelInfo {
   id: string
 }
 
-export default function YouTubeToolsPage() {
+function YouTubeToolsContent() {
   const searchParams = useSearchParams()
   const [connected, setConnected] = useState(false)
   const [channel, setChannel] = useState<ChannelInfo | null>(null)
@@ -426,4 +426,21 @@ export default function YouTubeToolsPage() {
       )}
     </div>
   )
+}
+
+function YouTubeToolsWithSuspense() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-400">
+        <Loader2 className="w-8 h-8 animate-spin text-red-500 mb-2" />
+        <p className="text-xs font-black uppercase">Đang tải...</p>
+      </div>
+    }>
+      <YouTubeToolsContent />
+    </Suspense>
+  )
+}
+
+export default function YouTubeToolsPage() {
+  return <YouTubeToolsWithSuspense />
 }
