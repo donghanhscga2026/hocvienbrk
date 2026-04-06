@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     console.log('YouTube callback - session:', session?.user?.email)
     
     if (!session?.user?.id) {
-      return NextResponse.redirect(`${baseUrl}/admin/youtube-tools?error=unauthorized`)
+      return NextResponse.redirect(`${baseUrl}/tools/youtube-links?error=unauthorized`)
     }
 
     const userId = parseInt(String(session.user.id))
@@ -29,11 +29,11 @@ export async function GET(req: NextRequest) {
     console.log('YouTube callback - has code:', !!code)
 
     if (error) {
-      return NextResponse.redirect(`${baseUrl}/admin/youtube-tools?error=${error}`)
+      return NextResponse.redirect(`${baseUrl}/tools/youtube-links?error=${error}`)
     }
 
     if (!code) {
-      return NextResponse.redirect(`${baseUrl}/admin/youtube-tools?error=no_code`)
+      return NextResponse.redirect(`${baseUrl}/tools/youtube-links?error=no_code`)
     }
 
     console.log('Getting tokens from code...')
@@ -73,9 +73,9 @@ export async function GET(req: NextRequest) {
       create: { userId, ...tokenData },
     })
 
-    return NextResponse.redirect(`${baseUrl}/admin/youtube-tools?success=connected`)
+    return NextResponse.redirect(`${baseUrl}/tools/youtube-links?success=connected`)
   } catch (error: any) {
     console.error('YouTube Callback Error:', error?.message || error)
-    return NextResponse.redirect(`${baseUrl}/admin/youtube-tools?error=callback_failed&detail=${encodeURIComponent(error?.message || 'Unknown')}`)
+    return NextResponse.redirect(`${baseUrl}/tools/youtube-links?error=callback_failed&detail=${encodeURIComponent(error?.message || 'Unknown')}`)
   }
 }

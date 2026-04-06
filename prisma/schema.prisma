@@ -413,6 +413,7 @@ enum Role {
   STUDENT
   INSTRUCTOR
   AFFILIATE
+  TEACHER
 }
 
 enum CourseType {
@@ -930,4 +931,21 @@ model CourseTestimonial {
   
   @@index([courseId, isActive])
   @@index([isFeatured])
+}
+
+model Tool {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  description String?
+  icon        String?
+  url         String
+  roles       Role[]
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([slug])
 }

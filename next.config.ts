@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   // Tăng tốc phản hồi HTTP
   compress: true,
 
+  allowedDevOrigins: ["192.168.1.3:3000"],
+
   // Tối ưu serverless deploy
   output: "standalone",
 

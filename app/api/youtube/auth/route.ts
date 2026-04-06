@@ -7,6 +7,6 @@ export async function GET() {
     return NextResponse.redirect(authUrl)
   } catch (error: any) {
     console.error('YouTube Auth Error:', error)
-    return NextResponse.redirect('/admin/youtube-tools?error=auth_failed')
+    return NextResponse.redirect('/tools/youtube-links?error=auth_failed')
   }
 }
