@@ -6,7 +6,7 @@ import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, ArrowLeft } from 
 import Link from 'next/link'
 import ToolHeader from '@/components/tools/ToolHeader'
 
-export default function AdminCoursesPage() {
+export default function ToolsCoursesPage() {
     const [courses, setCourses] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -24,7 +24,7 @@ export default function AdminCoursesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="KHÓA HỌC" backUrl="/admin" />
+            <ToolHeader title="KHÓA HỌC" />
 
             <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
                 <div className="flex items-center justify-between mt-4">
@@ -67,7 +67,7 @@ export default function AdminCoursesPage() {
                                                 #{course.id}
                                             </div>
                                             <Link 
-                                                href={`/admin/courses/${course.id}`} 
+                                                href={`/tools/courses/${course.id}`} 
                                                 className="inline-flex items-center justify-center w-8 h-8 bg-black text-yellow-400 rounded-full hover:bg-zinc-800 active:scale-90 transition-all shadow-md"
                                             >
                                                 <Settings className="w-4 h-4" />

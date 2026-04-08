@@ -22,19 +22,15 @@ import '@xyflow/react/dist/style.css'
 import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, GenealogyNode } from '@/app/actions/admin-actions'
 import ToolHeader from '@/components/tools/ToolHeader'
 
-// ... (các loại type giữ nguyên)
-
 const GenealogyCard = (props: NodeProps) => {
   const data = props.data as unknown as GenealogyNode & {
     isRoot?: boolean;
-    isSearchTarget?: boolean;  // SỬA 2026-03-30: Thêm prop highlight
+    isSearchTarget?: boolean;
     onToggleExpand?: (id: number) => void;
     onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
   }
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
-
-  // SỬA 2026-03-30: Highlight node target khi tìm kiếm
   const isTarget = data.isSearchTarget
 
   return (
@@ -81,7 +77,6 @@ const GenealogyCard = (props: NodeProps) => {
   )
 }
 
-// SỬA 2026-03-30: Card đơn giản cho search - 2 dòng, responsive
 const SearchNodeCard = (props: NodeProps) => {
   const data = props.data as { id: number; name: string | null; isTarget?: boolean; level?: number }
   const levelColors = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-rose-500', 'bg-orange-500']
@@ -92,7 +87,6 @@ const SearchNodeCard = (props: NodeProps) => {
         bg-white rounded-xl px-3 py-2 w-32 sm:w-40 shadow-xl
         ${data.isTarget ? 'border-4 border-amber-400 ring-4 ring-amber-200' : 'border-2 border-slate-200'}
       `}>
-        {/* Dòng 1: Fn + #ID */}
         <div className="flex items-center justify-between mb-1">
           <div className={`
             text-[10px] font-black px-1.5 py-0.5 rounded-full text-white
@@ -102,7 +96,6 @@ const SearchNodeCard = (props: NodeProps) => {
           </div>
           <div className="font-black text-slate-900 text-xs sm:text-sm">#{data.id}</div>
         </div>
-        {/* Dòng 2: Tên căn giữa */}
         <div className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase text-center truncate">
           {data.name || 'HV'}
         </div>
@@ -114,8 +107,6 @@ const SearchNodeCard = (props: NodeProps) => {
 
 const nodeTypes = { genealogyCard: GenealogyCard, searchNode: SearchNodeCard }
 
-// --- Main Flow Logic ---
-
 function GenealogyFlow() {
   const { fitView, setCenter } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -124,13 +115,12 @@ function GenealogyFlow() {
   const [error, setError] = useState<string | null>(null)
 
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
-  const [activeFocusMap, setActiveFocusMap] = useState<Map<number, number>>(new Map()) // parentId -> activeChildId
+  const [activeFocusMap, setActiveFocusMap] = useState<Map<number, number>>(new Map())
   const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B', totalSub: number } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
 
-  // SỬA 2026-03-30: Thêm state cho tính năng tìm kiếm
   const [searchInput, setSearchInput] = useState<string>('')
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState<boolean>(false)
@@ -139,7 +129,6 @@ function GenealogyFlow() {
     targetId: number;
   } | null>(null)
 
-  // Hàm ghép cây thông minh
   const mergeSubtree = useCallback((root: GenealogyNode, subtree: GenealogyNode): GenealogyNode => {
     if (root.id === subtree.id) return { ...root, ...subtree }
     if (root.children) {
@@ -148,7 +137,6 @@ function GenealogyFlow() {
     return root
   }, [])
 
-  // Tính vị trí của node trong cây (dựa trên thuật toán layout giống generateGraphNodes)
   const getNodePosition = useCallback((tree: GenealogyNode, targetId: number, px: number = 0, py: number = 0, focusMap: Map<number, number> = new Map(), isParentVisibleAndExpanded: boolean = true): { x: number; y: number } | null => {
     if (tree.id === targetId) return { x: px, y: py }
 
@@ -165,7 +153,6 @@ function GenealogyFlow() {
     return null
   }, [])
 
-  // Hàm vẽ cây chuẩn logic
   const generateGraphNodes = useCallback((
     parent: GenealogyNode,
     px: number,
@@ -189,7 +176,6 @@ function GenealogyFlow() {
       },
     })
 
-    // 2. Kiểm tra xem có cần vẽ các con của Node này không
     const isRoot = parent.id === fullTree?.id;
     const isFocusNode = isParentVisibleAndExpanded;
 
@@ -198,14 +184,11 @@ function GenealogyFlow() {
         const childX = px + (index - (parent.children.length - 1) / 2) * 200
         const childY = py + 300
 
-        // Chỉ hiển thị F2 khi có F3 (subIsExpanded)
         const subIsExpanded = currentFocusMap.get(parent.id) === child.id
 
-        // Đệ quy vẽ con
         const sub = generateGraphNodes(child, childX, childY, actions, currentFocusMap, subIsExpanded)
         resNodes.push(...sub.resNodes); resEdges.push(...sub.resEdges)
 
-        // Nối dây
         resEdges.push({
           id: `edge-${parent.id}-${child.id}`,
           source: nodeId,
@@ -218,7 +201,6 @@ function GenealogyFlow() {
     return { resNodes, resEdges }
   }, [])
 
-  // Xử lý Toggle Nhánh (Tải dữ liệu và cập nhật Lộ trình)
   const handleToggleExpand = useCallback(async (id: number) => {
     console.log(`[Action] Trigger Toggle Expand for Node #${id}`);
     setLoading(true)
@@ -276,7 +258,6 @@ function GenealogyFlow() {
     setLoading(false);
   }, [fullTree, mergeSubtree, selectedSystem])
 
-  // Handle chon he thong (0=Hoc vien, 1=TCA, 2=KTC, null=chua chon)
   const handleSystemChange = useCallback(async (systemId: number | null) => {
     setSelectedSystem(systemId)
     setLoading(true)
@@ -288,10 +269,8 @@ function GenealogyFlow() {
 
     try {
       if (systemId === null) {
-        // Chua chon: khong load gi
         setFullTree(null)
       } else if (systemId === 0) {
-        // Hoc vien: lay toan bo tree
         const result = await getGenealogyTreeAction(0)
         if (result.success && result.tree) {
           setFullTree(result.tree)
@@ -299,7 +278,6 @@ function GenealogyFlow() {
           setError(result.error || 'Lỗi tải dữ liệu')
         }
       } else {
-        // He thong TCA/KTC
         const result = await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
           setFullTree(result.tree)
@@ -313,20 +291,16 @@ function GenealogyFlow() {
     setLoading(false)
   }, [])
 
-  // Khởi tạo
   const initTree = useCallback(async (rootId: number = 0) => {
     setLoading(true); setError(null); setActiveFocusMap(new Map()); lastExpandedIdRef.current = null
 
     let result;
     if (selectedSystem === null) {
-      // Chua chon: khong load gi
       setLoading(false)
       return
     } else if (selectedSystem === 0) {
-      // Hoc vien
       result = await getGenealogyTreeAction(rootId)
     } else {
-      // TCA/KTC
       result = await getSystemTreeAction(selectedSystem)
     }
 
@@ -338,7 +312,6 @@ function GenealogyFlow() {
     setLoading(false)
   }, [selectedSystem])
 
-  // SỬA 2026-03-30: Handler tìm kiếm theo ID
   const handleSearch = useCallback(async () => {
     const id = parseInt(searchInput.replace('#', ''))
     if (isNaN(id)) {
@@ -351,47 +324,38 @@ function GenealogyFlow() {
     setSearchResult(null)
 
     try {
-      // Chỉ truyền systemId khi chọn TCA(1) hoặc KTC(2), không truyền cho Học viên(0)
       const systemIdForSearch = selectedSystem === 0 ? undefined : (selectedSystem ?? undefined)
       console.log('[SEARCH] Searching for ID:', id, 'systemId:', systemIdForSearch)
 
-      // Nếu tìm trong hệ thống Học viên (0), load luôn cây con của node đó
       if (selectedSystem === 0 || selectedSystem === null) {
         const childrenResult = await getGenealogyChildrenAction(id)
         console.log('[SEARCH] Fetch children result:', childrenResult.success ? 'Success' : 'Failed')
         
         if (childrenResult.success && childrenResult.tree) {
-          // Load cây gốc trước
           const treeResult = await getGenealogyTreeAction(0)
           if (treeResult.success && treeResult.tree) {
-            // Ghép cây con vào cây gốc
             const subtreeWithId = { ...childrenResult.tree, isRoot: false } as GenealogyNode
             setFullTree(prev => {
               if (!prev) return subtreeWithId
-              // Merge cây con vào vị trí của node id
               return mergeSubtree(prev, subtreeWithId)
             })
           }
         }
       }
 
-      // Sau đó tìm kiếm như bình thường
       const result = await searchGenealogyByIdAction(id, systemIdForSearch)
       console.log('[SEARCH] Result:', JSON.stringify(result))
 
       if (result.success && result.path && result.path.length > 0) {
-        // Lưu kết quả search đơn giản
         setSearchResult({
           path: result.path.map(n => ({ id: n.id, name: n.name })),
           targetId: result.targetId
         })
         console.log('[SEARCH] searchResult set with', result.path.length, 'nodes')
         
-        // SỬA: Focus vào node target bằng cách expand path
         const targetId = result.targetId
         setActiveFocusMap(prev => {
           const next = new Map(prev)
-          // Tìm parent của target và set focus
           for (let i = 0; i < result.path.length - 1; i++) {
             next.set(result.path[i].id, result.path[i + 1].id)
           }
@@ -414,7 +378,6 @@ function GenealogyFlow() {
     setLoading(false)
   }, [searchInput, selectedSystem, mergeSubtree])
 
-  // SỬA 2026-03-30: Handler xóa tìm kiếm, quay về tree gốc
   const handleClearSearch = useCallback(() => {
     setSearchInput('')
     setSearchError(null)
@@ -423,13 +386,11 @@ function GenealogyFlow() {
     initTree(0)
   }, [initTree])
 
-  // Render Effect
   useEffect(() => {
     if (fullTree) {
       const { resNodes, resEdges } = generateGraphNodes(fullTree, 0, 0, { onToggleExpand: handleToggleExpand }, activeFocusMap, true)
       setNodes(resNodes); setEdges(resEdges)
 
-      // Pan to target node (chỉ khi có target)
       const targetId = lastExpandedIdRef.current
       if (targetId) {
         const pos = getNodePosition(fullTree, targetId, 0, 0, activeFocusMap, true)
@@ -444,7 +405,6 @@ function GenealogyFlow() {
     }
   }, [fullTree, activeFocusMap.size, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition])
 
-  // SỬA 2026-03-30: Fit view khi có kết quả tìm kiếm
   useEffect(() => {
     if (searchResult) {
       setTimeout(() => {
@@ -455,7 +415,7 @@ function GenealogyFlow() {
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden font-sans text-slate-900">
-      <ToolHeader title="NHÂN MẠCH" backUrl="/admin" />
+      <ToolHeader title="NHÂN MẠCH" />
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-6 px-4 py-2 bg-white border-b">
@@ -523,7 +483,6 @@ function GenealogyFlow() {
         )}
       </div>
 
-      {/* Error banner */}
       {error && (
         <div className="bg-red-500 text-white px-4 py-2 text-xs font-bold">
           {error}

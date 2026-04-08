@@ -88,7 +88,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     return (
         <div className="max-w-md mx-auto space-y-6 pb-20">
             {/* Nút quay lại */}
-            <Link href="/admin/students" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
+            <Link href="/tools/students" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Danh sách học viên
             </Link>
 

@@ -236,7 +236,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
 
     return (
         <div className="max-w-md mx-auto space-y-8 pb-32">
-            <Link href="/admin/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
+            <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Khóa học
             </Link>
 

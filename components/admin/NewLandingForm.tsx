@@ -393,7 +393,7 @@ export function NewLandingForm({ courses }: NewLandingFormProps) {
             {/* Actions */}
             <div className="flex items-center justify-end gap-4 mt-6">
                 <Link
-                    href="/admin/landings"
+                    href="/tools/landings"
                     className="px-6 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
                     Hủy

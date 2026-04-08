@@ -4,23 +4,14 @@ import { ArrowLeft } from "lucide-react"
 import { deleteReservedIdAction, getReservedIds } from "@/app/actions/admin-actions"
 import { AddReservedIdForm } from "./add-form"
 import { ChangeUserIdForm } from "./change-id-form"
+import ToolHeader from "@/components/tools/ToolHeader"
 
 export default async function ReservedIdsPage() {
     const reservedIds = await getReservedIds()
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <header className="bg-black text-white shadow-lg sticky top-0 z-50">
-                <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
-                    <div className="flex items-center gap-3">
-                        <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
-                            <ArrowLeft className="h-4 w-4" />
-                            <span className="text-xs font-medium">Quay ra</span>
-                        </Link>
-                        <h1 className="text-lg font-bold text-yellow-400">💎 Số Đẹp</h1>
-                    </div>
-                </div>
-            </header>
+            <ToolHeader title="SỐ ĐẸP" backUrl="/admin" />
 
             <div className="p-4 max-w-4xl mx-auto space-y-8">
                 <div>

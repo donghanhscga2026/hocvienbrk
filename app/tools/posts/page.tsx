@@ -6,7 +6,7 @@ import { getPostsAction, createPostAction } from '@/app/actions/post-actions'
 import { Plus, Newspaper, Save, Loader2, Image as ImageIcon, X, Trash2, ArrowLeft } from 'lucide-react'
 import ToolHeader from '@/components/tools/ToolHeader'
 
-export default function AdminPostsPage() {
+export default function ToolsPostsPage() {
     const [posts, setPosts] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [showCreate, setShowCreate] = useState(false)
@@ -46,7 +46,7 @@ export default function AdminPostsPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="BẢNG TIN" backUrl="/admin" />
+            <ToolHeader title="BẢNG TIN" />
 
             <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
                 <div className="flex items-center justify-between mt-4">
@@ -60,8 +60,8 @@ export default function AdminPostsPage() {
                         {showCreate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                     </button>
                 </div>
+            </div>
 
-                {/* Form Đăng bài mới */}
             {showCreate && (
                 <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-purple-100 animate-in slide-in-from-top-4 duration-300">
                     <h2 className="text-lg font-black text-gray-900 mb-4 uppercase tracking-tight flex items-center gap-2">
@@ -115,7 +115,6 @@ export default function AdminPostsPage() {
                 </div>
             )}
 
-            {/* Danh sách bài viết hiện có */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                 <div className="w-full">
                     <table className="w-full text-left border-collapse table-fixed">
@@ -159,7 +158,6 @@ export default function AdminPostsPage() {
                         </tbody>
                     </table>
                 </div>
-            </div>
             </div>
         </div>
     )

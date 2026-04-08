@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useState, useEffect, Suspense } from 'react'
 import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings, Layout, X, Info, Loader2 } from 'lucide-react'
 import { Role } from '@prisma/client'
+import ToolHeader from '@/components/tools/ToolHeader'
 
 interface Tool {
   id: number
@@ -79,19 +80,19 @@ function ToolsGrid({ tools, userRole }: { tools: Tool[], userRole: string }) {
         const hasAccess = canAccessTool(userRole, tool.roles)
         
         return (
-          <div key={tool.id} className="relative">
+          <div key={tool.id} className="relative h-24">
             <Link
               href={tool.url}
-              className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all active:scale-95 ${
+              className={`flex flex-col items-center justify-between h-full p-3 rounded-2xl border transition-all active:scale-95 ${
                 hasAccess 
                   ? 'bg-white border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200' 
                   : 'bg-gray-50 border-gray-100 hover:bg-yellow-50 hover:border-yellow-300'
               }`}
             >
-              <div className={`p-3 rounded-xl ${colorClass} text-white mb-2`}>
-                <Icon className="h-6 w-6" />
+              <div className={`p-2 rounded-lg ${colorClass} text-white`}>
+                <Icon className="h-5 w-5" />
               </div>
-              <span className={`text-xs font-bold text-center leading-tight ${hasAccess ? 'text-gray-700' : 'text-gray-400'}`}>{tool.name}</span>
+              <span className={`text-[10px] sm:text-xs font-bold text-center leading-tight line-clamp-2 ${hasAccess ? 'text-gray-700' : 'text-gray-400'}`}>{tool.name}</span>
               {!hasAccess && (
                 <div className="absolute top-2 right-2">
                   <Lock className="h-3 w-3 text-gray-400" />
@@ -145,15 +146,16 @@ export default function ToolsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-black text-white shadow-lg">
-        <div className="flex items-center justify-between p-4 max-w-lg mx-auto">
-          <Link href="/tools" className="flex items-center gap-2 text-yellow-400 hover:text-yellow-300 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-            <span className="text-sm font-black tracking-wider">VỀ TRANG CÔNG CỤ</span>
-          </Link>
-          <h1 className="text-lg font-black tracking-widest text-yellow-400">
-            {isAdmin ? 'ADMIN BRK' : isTeacher ? 'TEACHER PANEL' : 'CÔNG CỤ'}
+      <header className="bg-brk-surface text-brk-on-surface shadow-lg sticky top-0 z-50">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-1">
+            <Link href="/" className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-xs font-medium">TRANG CHỦ</span>
+            </Link>
+          </div>
+          <h1 className="text-sm font-bold absolute right-4">
+            {isAdmin ? 'ADMIN BRK' : isTeacher ? 'TEACHER' : 'CÔNG CỤ'}
           </h1>
         </div>
       </header>
@@ -181,8 +183,8 @@ export default function ToolsPage() {
       )}
 
       {/* Info Banner */}
-      <div className="max-w-lg mx-auto p-4">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
+      <div className="max-w-lg mx-auto px-4 pt-2">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-3">
           <p className="text-xs text-yellow-800 text-center">
             {isAdmin ? 'Chào Admin! Bạn có quyền truy cập tất cả công cụ.' :
              isTeacher ? 'Chào Giáo viên! Một số công cụ bị giới hạn.' :
