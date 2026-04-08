@@ -10,12 +10,14 @@ declare module "next-auth" {
         user: {
             id: string
             role: Role
+            affiliateCode?: string
         } & DefaultSession["user"]
     }
 
     interface User {
         id?: string
         role: Role
+        affiliateCode?: string
     }
 }
 
