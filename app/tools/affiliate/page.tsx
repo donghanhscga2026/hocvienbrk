@@ -50,12 +50,26 @@ function DashboardTab() {
 
     async function loadData() {
         try {
-            const res = await fetch('/api/affiliate/dashboard')
+            const res = await fetch('/api/affiliate/dashboard?_t=' + Date.now())
+            console.log('[Dashboard] Response status:', res.status)
             if (res.ok) {
                 const result = await res.json()
+                
+                // Debug: Log raw response
+                const rawData = JSON.stringify(result)
+                console.log('[Dashboard] Raw response length:', rawData.length)
+                
+                // Check what we're getting
+                console.log('[Dashboard] result.data:', result.data ? 'exists' : 'null')
+                console.log('[Dashboard] levelBreakdown:', result.data?.levelBreakdown)
+                console.log('[Dashboard] wallet:', result.data?.wallet)
+                console.log('[Dashboard] points:', result.data?.points)
+                
                 setData(result.data)
                 setCampaign(result.campaign)
                 setMyLink(result.myLink)
+            } else {
+                console.error('[Dashboard] Error:', await res.text())
             }
         } catch (e) { console.error(e) }
         setLoading(false)
