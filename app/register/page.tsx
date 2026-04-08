@@ -46,6 +46,67 @@ function RegisterForm() {
     const urlRef = searchParams.get('ref')
     const redirectSlug = searchParams.get('redirect')
 
+    const getAffiliateRef = () => {
+        if (typeof window === 'undefined') return null
+        try {
+            const stored = localStorage.getItem('affiliate_ref')
+            if (!stored) return null
+            const data = JSON.parse(stored)
+            const expiryMs = 30 * 24 * 60 * 60 * 1000
+            if (Date.now() - data.timestamp > expiryMs) {
+                localStorage.removeItem('affiliate_ref')
+                return null
+            }
+            return data.ref
+        } catch {
+            return null
+        }
+    }
+
+    // Resolve ref to userId using the new API
+    const resolveRefToUserId = async (ref: string): Promise<string | null> => {
+        try {
+            const res = await fetch(`/api/affiliate/resolve-ref?ref=${encodeURIComponent(ref)}`)
+            const data = await res.json()
+            if (data.found && data.userId) {
+                return data.userId.toString()
+            }
+            return null
+        } catch {
+            return null
+        }
+    }
+
+    // Initial ref resolution
+    const [initialRef, setInitialRef] = useState<string>("")
+    const [resolvedRef, setResolvedRef] = useState<string>("")
+
+    useEffect(() => {
+        const processRef = async () => {
+            const ref = urlRef || getAffiliateRef()
+            if (ref) {
+                // Check if it's already a user ID (numeric)
+                if (/^\d+$/.test(ref)) {
+                    setInitialRef(ref)
+                    setResolvedRef(ref)
+                } else {
+                    // Resolve custom ref to userId
+                    const userId = await resolveRefToUserId(ref)
+                    if (userId) {
+                        setInitialRef(userId)
+                        setResolvedRef(userId)
+                        // Clear localStorage after successful resolution
+                        localStorage.removeItem('affiliate_ref')
+                    } else {
+                        setInitialRef(ref)
+                        setResolvedRef(ref)
+                    }
+                }
+            }
+        }
+        processRef()
+    }, [urlRef])
+
     const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
         defaultValues: {
             name: "",
@@ -53,9 +114,15 @@ function RegisterForm() {
             countryCode: "+84",
             phone: "",
             password: "",
-            referrerId: urlRef || ""
+            referrerId: ""
         }
     })
+
+    useEffect(() => {
+        if (resolvedRef) {
+            setValue("referrerId", resolvedRef)
+        }
+    }, [resolvedRef, setValue])
 
     const countryCode = watch("countryCode")
     const formReferrerId = watch("referrerId")

@@ -433,8 +433,258 @@ function WithdrawTab() {
     )
 }
 
+interface AffiliateRef {
+    id: number
+    refKey: string
+    type: string
+    description: string | null
+    isActive: boolean
+    createdAt: string
+}
+
+function RefsTab() {
+    const [refs, setRefs] = useState<AffiliateRef[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showForm, setShowForm] = useState(false)
+    const [newRefKey, setNewRefKey] = useState('')
+    const [newDescription, setNewDescription] = useState('')
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState<string | null>(null)
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+
+    useEffect(() => {
+        loadRefs()
+    }, [])
+
+    async function loadRefs() {
+        try {
+            const res = await fetch('/api/affiliate/refs')
+            if (res.ok) {
+                const data = await res.json()
+                setRefs(data.refs || [])
+            }
+        } catch (e) { console.error(e) }
+        setLoading(false)
+    }
+
+    async function createRef() {
+        if (!newRefKey.trim()) {
+            setError('Vui lòng nhập ref key')
+            return
+        }
+
+        const normalized = newRefKey.toLowerCase().trim()
+        if (!/^[a-z0-9]{1,10}$/.test(normalized)) {
+            setError('Ref key: 1-10 ký tự, chỉ a-z và số')
+            return
+        }
+
+        setError(null)
+        try {
+            const res = await fetch('/api/affiliate/refs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    refKey: normalized,
+                    description: newDescription.trim() || null,
+                    type: 'CUSTOM_ALIAS'
+                })
+            })
+            const data = await res.json()
+            
+            if (!res.ok) {
+                setError(data.error || 'Lỗi khi tạo ref')
+                return
+            }
+
+            setSuccess('Tạo ref thành công!')
+            setNewRefKey('')
+            setNewDescription('')
+            setShowForm(false)
+            loadRefs()
+            setTimeout(() => setSuccess(null), 3000)
+        } catch (e) {
+            setError('Lỗi khi tạo ref')
+        }
+    }
+
+    async function deleteRef(id: number) {
+        if (!confirm('Bạn có chắc muốn xóa ref này?')) return
+        
+        try {
+            const res = await fetch(`/api/affiliate/refs?id=${id}`, { method: 'DELETE' })
+            if (res.ok) {
+                loadRefs()
+            }
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    async function toggleRef(ref: AffiliateRef) {
+        try {
+            await fetch('/api/affiliate/refs', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    refId: ref.id,
+                    isActive: !ref.isActive
+                })
+            })
+            loadRefs()
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="text-center py-12 text-gray-400">
+                <p>Đang tải...</p>
+            </div>
+        )
+    }
+
+    return (
+        <div>
+            {/* Info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                <h4 className="font-bold text-blue-700 mb-2">🔤 Custom Refs</h4>
+                <p className="text-sm text-blue-600">
+                    Tạo ref key tùy chỉnh để chia sẻ link dễ nhớ. 
+                    Ví dụ: <code>nbcuong</code> → <code>{baseUrl}/register?ref=nbcuong</code>
+                </p>
+                <ul className="text-xs text-blue-500 mt-2 space-y-1">
+                    <li>• 1-10 ký tự, chỉ a-z và số</li>
+                    <li>• Không trùng với user ID hoặc affiliate code</li>
+                    <li>• Người click sẽ được track về bạn</li>
+                </ul>
+            </div>
+
+            {/* Success message */}
+            {success && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-4">
+                    {success}
+                </div>
+            )}
+
+            {/* Create form */}
+            {showForm ? (
+                <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+                    <h3 className="font-bold text-gray-700 mb-3">Tạo Ref Mới</h3>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs text-gray-500">Ref Key *</label>
+                            <input
+                                type="text"
+                                value={newRefKey}
+                                onChange={(e) => setNewRefKey(e.target.value.toLowerCase())}
+                                placeholder="nbcuong"
+                                maxLength={10}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500">Mô tả (tùy chọn)</label>
+                            <input
+                                type="text"
+                                value={newDescription}
+                                onChange={(e) => setNewDescription(e.target.value)}
+                                placeholder="Link của anh Cường"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                            />
+                        </div>
+                        {error && (
+                            <div className="text-red-500 text-sm">{error}</div>
+                        )}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={createRef}
+                                className="flex-1 bg-emerald-500 text-white py-2 rounded-lg font-medium text-sm"
+                            >
+                                Tạo
+                            </button>
+                            <button
+                                onClick={() => { setShowForm(false); setError(null); setNewRefKey(''); setNewDescription('') }}
+                                className="px-4 py-2 border border-gray-200 rounded-lg text-sm"
+                            >
+                                Hủy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <button
+                    onClick={() => setShowForm(true)}
+                    className="w-full bg-emerald-500 text-white py-3 rounded-xl font-bold mb-4"
+                >
+                    + Tạo Ref Mới
+                </button>
+            )}
+
+            {/* Refs list */}
+            {refs.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                    <p>Chưa có ref nào</p>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                    {refs.map((ref) => (
+                        <div
+                            key={ref.id}
+                            className={`bg-white rounded-xl border p-4 flex items-center justify-between ${
+                                ref.isActive ? 'border-gray-100' : 'border-gray-200 opacity-60'
+                            }`}
+                        >
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-gray-800">{ref.refKey}</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                        ref.type === 'USER_ID' ? 'bg-blue-100 text-blue-600' :
+                                        ref.type === 'AFFILIATE_CODE' ? 'bg-purple-100 text-purple-600' :
+                                        'bg-orange-100 text-orange-600'
+                                    }`}>
+                                        {ref.type}
+                                    </span>
+                                    {!ref.isActive && (
+                                        <span className="text-xs text-gray-400">(Tắt)</span>
+                                    )}
+                                </div>
+                                {ref.description && (
+                                    <p className="text-xs text-gray-500 mt-1">{ref.description}</p>
+                                )}
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {baseUrl}/register?ref={ref.refKey}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => toggleRef(ref)}
+                                    className={`text-xs px-2 py-1 rounded ${
+                                        ref.isActive 
+                                            ? 'bg-yellow-100 text-yellow-700' 
+                                            : 'bg-green-100 text-green-700'
+                                    }`}
+                                >
+                                    {ref.isActive ? 'Tắt' : 'Bật'}
+                                </button>
+                                <button
+                                    onClick={() => deleteRef(ref.id)}
+                                    className="text-xs px-2 py-1 rounded bg-red-100 text-red-700"
+                                >
+                                    Xóa
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 export default function AffiliateToolsPage() {
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'links' | 'withdraw'>('dashboard')
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'links' | 'withdraw' | 'refs'>('dashboard')
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
@@ -463,6 +713,16 @@ export default function AffiliateToolsPage() {
                         🔗 Links
                     </button>
                     <button
+                        onClick={() => setActiveTab('refs')}
+                        className={`flex-1 py-3 px-2 rounded-xl font-bold text-xs transition-all ${
+                            activeTab === 'refs'
+                                ? 'bg-emerald-500 text-white'
+                                : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                    >
+                        🔤 Refs
+                    </button>
+                    <button
                         onClick={() => setActiveTab('withdraw')}
                         className={`flex-1 py-3 px-2 rounded-xl font-bold text-xs transition-all ${
                             activeTab === 'withdraw'
@@ -476,6 +736,7 @@ export default function AffiliateToolsPage() {
 
                 {activeTab === 'dashboard' && <DashboardTab />}
                 {activeTab === 'links' && <LinksTab />}
+                {activeTab === 'refs' && <RefsTab />}
                 {activeTab === 'withdraw' && <WithdrawTab />}
             </div>
         </div>

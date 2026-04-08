@@ -252,6 +252,26 @@ export default function ToolsPage() {
   const copyShareLink = async () => {
     if (shareModal) {
       await navigator.clipboard.writeText(shareModal.url)
+      
+      if (userId) {
+        try {
+          const userAgent = typeof window !== 'undefined' ? navigator.userAgent : ''
+          let deviceType = 'desktop'
+          if (/mobile/i.test(userAgent)) deviceType = 'mobile'
+          else if (/tablet|ipad/i.test(userAgent)) deviceType = 'tablet'
+          
+          await fetch('/api/track/click?url=' + encodeURIComponent(shareModal.url) + '&code=' + userId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ref: userId,
+            })
+          })
+        } catch (err) {
+          console.error('Failed to track click:', err)
+        }
+      }
+      
       setAlert({
         type: 'success',
         title: '✅ Đã copy!',

@@ -56,6 +56,7 @@ model User {
   commissions          AffiliateCommission[]
   wallet               AffiliateWallet?
   affiliatePayouts     AffiliatePayout[]
+  affiliateRefs        AffiliateRef[]
 
   @@index([email])
   @@index([phone])
@@ -432,6 +433,13 @@ enum AffiliateStatus {
   SUSPENDED
 }
 
+enum RefType {
+  USER_ID
+  AFFILIATE_CODE
+  CUSTOM_ALIAS
+  CAMPAIGN
+}
+
 enum ConversionStatus {
   PENDING
   APPROVED
@@ -753,6 +761,21 @@ model AffiliateClick {
   @@index([ipAddress, createdAt])
   @@index([landingSlug])
   @@index([landingId])
+}
+
+// Custom ref mapping (nbcuong -> userId, video -> userId, etc)
+model AffiliateRef {
+  id          Int       @id @default(autoincrement())
+  refKey      String    @unique // max 10 chars, a-z0-9
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  type        RefType   @default(USER_ID)
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([userId])
 }
 
 // Conversion (khi co don hang)

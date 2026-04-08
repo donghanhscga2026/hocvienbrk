@@ -1,5 +1,91 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { sendToolShareClickNotification } from "@/lib/notifications"
+
+async function resolveRefToUserId(ref: string): Promise<number | null> {
+  // 1. Tìm trong AffiliateRef (custom aliases)
+  const customRef = await prisma.affiliateRef.findUnique({
+    where: { refKey: ref.toLowerCase() }
+  })
+  if (customRef) return customRef.userId
+
+  // 2. Parse as number (direct user ID)
+  const numericId = parseInt(ref, 10)
+  if (!isNaN(numericId) && numericId > 0) {
+    const user = await prisma.user.findUnique({ where: { id: numericId } })
+    if (user) return numericId
+  }
+
+  // 3. Tìm theo affiliateCode
+  const userByCode = await prisma.user.findUnique({
+    where: { affiliateCode: ref.toUpperCase() }
+  })
+  if (userByCode) return userByCode.id
+
+  return null
+}
+
+async function getOrCreateDefaultLink(userId: number) {
+  const userIdStr = userId.toString()
+  
+  // Tìm link mặc định với code = userId
+  let link = await prisma.affiliateLink.findFirst({
+    where: { 
+      userId,
+      code: userIdStr,
+      name: "Default Tool Share"
+    }
+  })
+
+  if (!link) {
+    // Tìm campaign mặc định
+    let campaign = await prisma.affiliateCampaign.findFirst({
+      where: { isDefault: true },
+      include: { levels: true }
+    })
+
+    if (!campaign) {
+      // Tạo campaign mặc định với levels
+      campaign = await prisma.affiliateCampaign.create({
+        data: {
+          name: "Default Campaign",
+          slug: "default-campaign",
+          isDefault: true,
+          isActive: true,
+          maxLevels: 3,
+          pendingDays: 7,
+          minPayout: 100000,
+          taxRate: 0,
+          feeAmount: 0,
+          pointsPerRegistration: 1,
+          pointsRequired: 10,
+          pointRedemptionValue: 1000,
+          autoRedeem: false,
+          levels: {
+            create: [
+              { level: 1, percentage: 10.0 },
+              { level: 2, percentage: 5.0 },
+              { level: 3, percentage: 2.0 },
+            ]
+          }
+        },
+        include: { levels: true }
+      })
+    }
+
+    link = await prisma.affiliateLink.create({
+      data: {
+        userId,
+        campaignId: campaign.id,
+        code: userIdStr,
+        name: "Default Tool Share",
+        source: "TOOL_SHARE",
+      }
+    })
+  }
+
+  return link
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,7 +94,7 @@ export async function POST(request: NextRequest) {
     const url = searchParams.get("url")
     
     // Parse body for additional params
-    let body: { landing?: string; campaignId?: number } = {}
+    let body: { landing?: string; campaignId?: number; ref?: string } = {}
     try {
       const text = await request.text()
       if (text) {
@@ -20,20 +106,20 @@ export async function POST(request: NextRequest) {
     
     const landingSlug = body.landing || searchParams.get("landing")
     const campaignId = body.campaignId ? parseInt(String(body.campaignId)) : undefined
+    const refKey = body.ref || code
 
-    if (!code) {
-      return NextResponse.json({ error: "Missing code" }, { status: 400 })
+    if (!refKey) {
+      return NextResponse.json({ error: "Missing ref parameter" }, { status: 400 })
     }
 
-    // Tìm link affiliate
-    const link = await prisma.affiliateLink.findUnique({
-      where: { code },
-      include: { campaign: true }
-    })
-
-    if (!link || !link.isActive) {
-      return NextResponse.json({ error: "Invalid code" }, { status: 404 })
+    // Resolve ref to userId
+    const userId = await resolveRefToUserId(refKey)
+    if (!userId) {
+      return NextResponse.json({ error: "Invalid ref - user not found" }, { status: 404 })
     }
+
+    // Get or create default link for this user
+    const link = await getOrCreateDefaultLink(userId)
 
     // Validate landing slug if provided
     let landingId: number | undefined
@@ -90,10 +176,21 @@ export async function POST(request: NextRequest) {
       }).catch(console.error)
     }
 
+    // Gửi Telegram notification
+    sendToolShareClickNotification({
+      refUserId: userId,
+      url: url || "",
+      deviceType,
+      referer: referer || null,
+      ipAddress,
+      city: null,
+    }).catch(console.error)
+
     return NextResponse.json({
       success: true,
       clickId: click.id,
       linkId: link.id,
+      userId: userId,
       landing: landingSlug || null
     })
 
