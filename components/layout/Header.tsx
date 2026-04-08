@@ -214,7 +214,7 @@ export default function Header({ session, userImage }: { session: any, userImage
                                         <p className="text-[10px] text-brk-muted truncate">{session.user?.email}</p>
                                     </div>
                                     <Link
-                                        href="/admin"
+                                        href="/tools"
                                         onClick={() => setIsUserMenuOpen(false)}
                                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors font-bold"
                                     >
@@ -242,7 +242,7 @@ export default function Header({ session, userImage }: { session: any, userImage
                     ) : (
                         <>
                             <Link
-                                href="/admin"
+                                href="/tools"
                                 className="hidden sm:inline-block rounded-full bg-brk-secondary px-4 py-2 text-xs font-black text-brk-on-secondary shadow-md transition-all hover:brightness-110 hover:scale-105"
                             >
                                 CÔNG CỤ

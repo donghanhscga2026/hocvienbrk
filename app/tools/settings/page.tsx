@@ -1,11 +1,13 @@
+'use client'
+
 import Link from "next/link"
-import { ArrowLeft, Palette, Globe } from "lucide-react"
+import { Palette, Globe, Settings } from "lucide-react"
 import ToolHeader from "@/components/tools/ToolHeader"
 
 export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader title="CÀI ĐẶT" backUrl="/tools" />
+      <ToolHeader title="CÀI ĐẶT" />
 
       <div className="p-4 max-w-lg mx-auto">
         <div className="space-y-4 mt-4">

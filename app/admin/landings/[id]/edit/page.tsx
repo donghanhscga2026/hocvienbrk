@@ -32,7 +32,7 @@ export default async function EditLandingPage({ params }: EditPageProps) {
         <div className="p-6">
             <div className="mb-6">
                 <Link
-                    href="/admin/landings"
+                    href="/tools/landings"
                     className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
                 >
                     <ArrowLeft className="w-4 h-4" />

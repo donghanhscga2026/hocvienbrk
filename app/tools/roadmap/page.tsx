@@ -1,4 +1,3 @@
-
 'use client'
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
@@ -26,7 +25,6 @@ import Link from 'next/link'
 import { Loader2, ArrowLeft, Plus, CheckCircle, Trash2, Edit3, Settings, Save, RefreshCw, X, ChevronUp, ChevronDown } from 'lucide-react';
 import ToolHeader from '@/components/tools/ToolHeader';
 
-// Định nghĩa các loại Node tùy chỉnh
 const nodeTypes = {
   questionNode: QuestionNode,
   optionNode: OptionNode,
@@ -45,7 +43,6 @@ const RoadmapBuilderContent = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [showMobileProps, setShowMobileProps] = useState(false);
 
-  // Editor states
   const reactFlowWrapper = useRef<any>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
@@ -54,7 +51,6 @@ const RoadmapBuilderContent = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load dữ liệu
   useEffect(() => {
     loadSurveys();
     loadCourses();
@@ -65,7 +61,6 @@ const RoadmapBuilderContent = () => {
         setIsInitializing(true);
         const list = await getAllSurveys();
         if (list.length === 0) {
-            // Tự động khởi tạo bản gốc nếu trống
             const res = await createSurvey('Lộ trình Zero 2 Hero (Bản gốc)');
             if (res.success) loadSurveys();
         } else {
@@ -83,7 +78,6 @@ const RoadmapBuilderContent = () => {
     setCourses(list || []);
   };
 
-  // ─── XỬ LÝ DANH SÁCH ──────────────────────────────────────────────────
   const handleCreateNew = async () => {
     const name = window.prompt('Nhập tên cho bài khảo sát mới:');
     if (!name) return;
@@ -91,7 +85,6 @@ const RoadmapBuilderContent = () => {
     if (res.success) loadSurveys();
   };
 
-  // [OPTIMIZE] Chỉ tải flow khi bấm "Thiết kế sơ đồ" - tránh tải cả MB dữ liệu khi chỉ cần list
   const handleEdit = async (survey: any) => {
     setCurrentSurveyId(survey.id);
     setView('EDITOR');
@@ -99,7 +92,6 @@ const RoadmapBuilderContent = () => {
     setIsInitializing(true);
     
     try {
-      // [OPTIMIZE] Gọi API riêng để lấy flow - chỉ khi cần thiết kế
       const flowData = await getSurveyFlow(survey.id);
       const flow = flowData?.flow as any;
       setNodes(Array.isArray(flow?.nodes) ? flow.nodes : []);
@@ -127,7 +119,6 @@ const RoadmapBuilderContent = () => {
     }
   };
 
-  // ─── XỬ LÝ EDITOR ─────────────────────────────────────────
   const onSave = async () => {
     if (!currentSurveyId) return;
     setIsSaving(true);
@@ -170,7 +161,6 @@ const RoadmapBuilderContent = () => {
     setSelectedNode({ ...selectedNode, data: { ...selectedNode.data, ...newData } });
   };
 
-  // TÍNH TOÁN THỨ TỰ NODE TỰ ĐỘNG
   const getOrderedNodes = useCallback(() => {
     if (nodes.length === 0) return nodes;
 
@@ -178,7 +168,6 @@ const RoadmapBuilderContent = () => {
     const visited = new Set<string>();
     let currentOrder = 1;
 
-    // Tìm các node gốc (không có edge trỏ vào)
     const targetIds = new Set(edges.map((e: any) => e.target));
     const rootNodes = nodes.filter((n: any) => n.type === 'questionNode' && !targetIds.has(n.id));
     
@@ -191,7 +180,6 @@ const RoadmapBuilderContent = () => {
         nodeOrderMap.set(nodeId, currentOrder++);
       }
 
-      // Tìm các node tiếp theo thông qua edges và optionNodes/courseNodes
       const outEdges = edges.filter((e: any) => e.source === nodeId);
       for (const edge of outEdges) {
         traverse(edge.target);
@@ -200,7 +188,6 @@ const RoadmapBuilderContent = () => {
 
     rootNodes.forEach(root => traverse(root.id));
 
-    // Cập nhật dữ liệu node với số thứ tự
     return nodes.map((n: any) => ({
       ...n,
       data: { ...n.data, orderIndex: nodeOrderMap.get(n.id) }
@@ -209,7 +196,6 @@ const RoadmapBuilderContent = () => {
 
   const nodesWithOrder = getOrderedNodes();
 
-  // LOGIC NẠP DỮ LIỆU TỪ BẢN CŨ
   const onMigrateFromOldVersion = () => {
     if (!window.confirm('CẢNH BÁO: Thao tác này sẽ XÓA TOÀN BỘ sơ đồ hiện tại và nạp lại dữ liệu từ file code gốc. Bạn có chắc chắn?')) return;
     
@@ -248,17 +234,15 @@ const RoadmapBuilderContent = () => {
     setEdges(newEdges);
   };
 
-  // Tự động mở bảng thuộc tính trên Mobile khi chọn Node
   useEffect(() => {
     if (selectedNode) setShowMobileProps(true);
   }, [selectedNode]);
 
   if (isInitializing) return <div className="p-20 flex justify-center"><Loader2 className="animate-spin text-yellow-400" /></div>;
 
-  // VIEW: LIST SURVYES
   if (view === 'LIST') return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader title="LỘ TRÌNH" backUrl="/admin" />
+      <ToolHeader title="LỘ TRÌNH" />
       <div className="space-y-6 animate-in fade-in duration-500 text-black mx-auto px-4 py-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="text-xl font-black uppercase tracking-tight">Quản lý khảo sát</h2>
@@ -293,10 +277,8 @@ const RoadmapBuilderContent = () => {
     </div>
   );
 
-  // VIEW: EDITOR (Optimized for Mobile)
   return (
     <div className="fixed inset-0 z-[100] md:relative md:h-[calc(100vh-150px)] flex flex-col bg-[#F8F9FA] overflow-hidden text-black">
-      {/* 1. Header (Top) */}
       <div className="bg-black p-3 md:p-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
             <button onClick={() => setView('LIST')} className="p-2 bg-white/10 text-white rounded-xl"><ArrowLeft className="w-4 h-4" /></button>
@@ -317,7 +299,6 @@ const RoadmapBuilderContent = () => {
         </button>
       </div>
 
-      {/* 2. Toolbar (Horizontal on Mobile, Sidebar on Desktop) */}
       <div className="bg-white border-b border-gray-200 p-2 overflow-x-auto flex flex-row gap-2 no-scrollbar shrink-0 md:hidden">
         {[
           { type: 'questionNode', color: 'orange', label: '❓ CÂU HỎI' },
@@ -330,7 +311,6 @@ const RoadmapBuilderContent = () => {
             key={tool.type} 
             className="shrink-0 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-black text-[9px] uppercase active:bg-yellow-50 active:border-yellow-400 transition-colors"
             onClick={() => {
-                // Trên mobile, thay vì kéo thả (khó), ta click để add vào giữa màn hình
                 const newNode = {
                     id: getId(),
                     type: tool.type,
@@ -346,7 +326,6 @@ const RoadmapBuilderContent = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Desktop Sidebar (Hidden on mobile) */}
         <aside className="hidden md:flex w-72 bg-gray-50 border-r border-gray-200 p-6 flex-col gap-4 overflow-y-auto">
           <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-200 pb-2">Thư viện khối</div>
           <div className="grid grid-cols-1 gap-3">
@@ -448,7 +427,6 @@ const RoadmapBuilderContent = () => {
           )}
         </aside>
 
-        {/* 3. Canvas Area (Full space) */}
         <div className="flex-1 relative" ref={reactFlowWrapper}>
           <ReactFlow nodes={nodesWithOrder} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect} onInit={setReactFlowInstance} onDrop={onDrop} onDragOver={onDragOver} onNodeClick={(_, node) => setSelectedNode(node)} nodeTypes={nodeTypes} fitView minZoom={0.1} maxZoom={2} panOnScroll={true} selectionOnDrag={true}>
             <Background color="#E5E7EB" variant={"dots" as any} gap={20} size={1} />
@@ -456,7 +434,6 @@ const RoadmapBuilderContent = () => {
           </ReactFlow>
         </div>
 
-        {/* 4. Mobile Properties Overlay (Bottom Sheet) */}
         {selectedNode && (
             <div className={`md:hidden fixed bottom-0 left-0 right-0 z-[150] transition-transform duration-300 transform ${showMobileProps ? 'translate-y-0' : 'translate-y-[85%]'}`}>
                 <div className="bg-white rounded-t-[2.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.15)] border-t border-gray-100">

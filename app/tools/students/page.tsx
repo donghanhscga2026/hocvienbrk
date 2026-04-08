@@ -34,7 +34,7 @@ const roleTextColors: Record<string, string> = {
 
 const PAGE_SIZE = 20
 
-export default function AdminStudentsPage() {
+export default function ToolsStudentsPage() {
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -97,7 +97,7 @@ export default function AdminStudentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <ToolHeader title="THÀNH VIÊN" backUrl="/admin" />
+      <ToolHeader title="THÀNH VIÊN" />
 
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {total > 0 ? `${startItem}-${endItem} / ${total}` : '0'}
@@ -179,7 +179,7 @@ export default function AdminStudentsPage() {
               return (
                 <Link
                   key={student.id}
-                  href={`/admin/students/${student.id}`}
+                  href={`/tools/students/${student.id}`}
                   prefetch={false}
                   className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
                 >

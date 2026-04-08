@@ -390,7 +390,7 @@ export function EditLandingForm({ landing, courses }: EditLandingFormProps) {
                 
                 <div className="flex items-center gap-4">
                     <Link
-                        href="/admin/landings"
+                        href="/tools/landings"
                         className="px-6 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                         Hủy

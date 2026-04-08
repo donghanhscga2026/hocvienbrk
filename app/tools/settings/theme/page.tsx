@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Check, Palette, Copy, Lock, Unlock } from 'lucide-react';
+import { Check, Palette, Copy, Lock, Unlock } from 'lucide-react';
 import {
   presetThemes,
   ThemeColors,
@@ -94,9 +93,11 @@ export default function ThemeSettingsPage() {
   };
 
   const handlePresetClick = (themeId: ThemeId) => {
-    setCustomColors(null);
-    localStorage.removeItem('site-custom-colors');
-    applyTheme(themeId);
+    setCustomColors(null)
+    localStorage.removeItem('site-custom-colors')
+    applyTheme(themeId)
+    // Reload to ensure CSS updates across entire site
+    setTimeout(() => window.location.reload(), 100)
   };
 
   const handleReset = () => {
@@ -122,7 +123,7 @@ export default function ThemeSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <ToolHeader title="GIAO DIỆN" backUrl="/tools/settings" />
+      <ToolHeader title="GIAO DIỆN" />
 
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         {/* Preset Themes */}

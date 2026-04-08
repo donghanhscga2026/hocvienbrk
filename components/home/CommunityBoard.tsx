@@ -88,7 +88,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
 
                     {isAdmin && (
                         <Link 
-                            href="/admin/posts" 
+                            href="/tools/posts" 
                             className="bg-brk-surface text-brk-primary p-2 rounded-xl hover:bg-brk-background transition-all shadow-lg active:scale-95"
                         >
                             <PlusCircle className="w-5 h-5" />

@@ -109,7 +109,7 @@ export default function PaymentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <ToolHeader title="THANH TOÁN" backUrl="/admin" />
+      <ToolHeader title="THANH TOÁN" />
 
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {payments.length} yêu cầu

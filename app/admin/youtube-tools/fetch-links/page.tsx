@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Play, Search, Loader2, Copy, Download, FileSpreadsheet, Check, AlertCircle, Info, X } from 'lucide-react'
+import ToolHeader from '@/components/tools/ToolHeader'
 
 interface VideoResult {
   stt: number
@@ -109,18 +110,7 @@ export default function FetchLinksPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-black text-white shadow-lg sticky top-0 z-50">
-        <div className="flex items-center justify-between p-4 max-w-2xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/admin" className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-white/10 hover:bg-white/20">
-              <ArrowLeft className="h-4 w-4" />
-              <span className="text-xs font-medium">Quay ra</span>
-            </Link>
-            <h1 className="text-lg font-bold text-red-500">📥 Lấy link video</h1>
-          </div>
-        </div>
-      </header>
+      <ToolHeader title="LẤY LINK VIDEO" backUrl="/admin" />
 
       {/* Notice for non-logged in users */}
       {showNotice && !session && (
