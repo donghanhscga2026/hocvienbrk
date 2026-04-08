@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import "./globals.css";
 import Providers from "./providers";
 import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
+import AffiliateTracker from "@/components/AffiliateTracker";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
@@ -65,7 +66,10 @@ export default async function RootLayout({
         className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
         suppressHydrationWarning
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <AffiliateTracker />
+        </Providers>
         <PendingSurveyHandler />
       </body>
     </html>

@@ -9,12 +9,13 @@ import { google } from 'googleapis';
 /**
  * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
  */
-export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' = 'ACTIVATE') {
+export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' = 'ACTIVATE') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIdMap = {
     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
     ACTIVATE: process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID,
     LESSON: process.env.TELEGRAM_CHAT_ID_LESSON || process.env.TELEGRAM_CHAT_ID,
+    TOOL_CLICK: process.env.TELEGRAM_CHAT_ID_AFFILIATE || process.env.TELEGRAM_CHAT_ID,
   };
   const chatId = chatIdMap[type];
   if (!token || !chatId) return;
@@ -32,6 +33,36 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
   } catch (error) {
     console.error(`❌ Telegram Error:`, error);
   }
+}
+
+export async function sendToolShareClickNotification(data: {
+  refUserId: number
+  url: string
+  deviceType: string | null
+  referer: string | null
+  ipAddress: string | null
+  city: string | null
+}) {
+  const time = new Date().toLocaleString('vi-VN', { 
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  
+  const message = `🔗 <b>Tool Share Click!</b>
+━━━━━━━━━━━━━━
+👤 Người chia sẻ: #${data.refUserId}
+🔗 Link: ${data.url}
+📱 Device: ${data.deviceType || 'Unknown'}
+🌐 Referrer: ${data.referer || 'Direct'}
+🌍 IP: ${data.ipAddress || 'Unknown'}
+🏙️ City: ${data.city || 'Unknown'}
+⏰ Time: ${time}`
+
+  await sendTelegram(message, 'TOOL_CLICK')
 }
 
 /**
