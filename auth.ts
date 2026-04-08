@@ -117,6 +117,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.role = (user as any).role;
                 token.needsPasswordChange = (user as any).needsPasswordChange;
                 token.isUnverifiedLegacy = (user as any).isUnverifiedLegacy;
+                token.affiliateCode = (user as any).affiliateCode;
             }
 
             if (trigger === "update" && session?.role) {
@@ -131,6 +132,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.role = token.role as Role;
                 (session.user as any).needsPasswordChange = token.needsPasswordChange as boolean;
                 (session.user as any).isUnverifiedLegacy = token.isUnverifiedLegacy as boolean;
+                (session.user as any).affiliateCode = token.affiliateCode as string | undefined;
             }
             return session;
         }

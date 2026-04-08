@@ -1,11 +1,27 @@
 @import "tailwindcss";
 
 /* ============================= */
-/* CSS VARIABLES - Fallback (khi JS chưa load) */
+/* CSS VARIABLES - Default Theme (from DB) */
 /* ============================= */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FAE0C7; /* Classic theme background */
+  --foreground: #333333;
+  --primary: #4EB09B;
+  --primary-fallback: #4EB09B;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121212;
+    --foreground: #F3F4F6;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-be-vietnam-pro), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ============================= */
@@ -26,22 +42,6 @@
 .text-glow-3d {
   animation: glow 3s ease-in-out infinite;
   letter-spacing: 0.1em;
-}
-
-/* ============================= */
-/* BASE STYLES */
-/* ============================= */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-be-vietnam-pro), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ============================= */
