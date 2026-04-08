@@ -109,21 +109,32 @@ async function getOrCreateLink(userId: number) {
     
     if (!campaign) return null
 
-    let link = await prisma.affiliateLink.findFirst({
-        where: { userId, campaignId: campaign.id }
+    // Dùng userId trực tiếp làm code
+    const code = userId.toString()
+    
+    // Tìm link với code = userId
+    const existing = await prisma.affiliateLink.findFirst({
+        where: { code, userId }
     })
 
-    if (!link) {
-        link = await prisma.affiliateLink.create({
+    if (existing) return existing
+
+    // Tạo mới
+    try {
+        return await prisma.affiliateLink.create({
             data: {
                 userId,
                 campaignId: campaign.id,
-                code: `BRK${userId}`,
+                code,
                 name: 'Link chính',
                 source: 'website'
             }
         })
+    } catch (error: any) {
+        // Nếu bị trùng code, fallback về link bất kỳ của user
+        if (error.code === 'P2002') {
+            return await prisma.affiliateLink.findFirst({ where: { userId } })
+        }
+        return null
     }
-
-    return link
 }
