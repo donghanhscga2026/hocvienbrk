@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export default function NewCampaignPage() {
+function NewCampaignContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const cloneId = searchParams.get("cloneId");
@@ -599,4 +599,16 @@ export default function NewCampaignPage() {
       </div>
     </div>
   );
+}
+
+export default function NewCampaignPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    }>
+      <NewCampaignContent />
+    </Suspense>
+  )
 }

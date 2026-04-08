@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useSearchParams, usePathname } from 'next/navigation'
 
 const STORAGE_KEY = 'affiliate_ref'
@@ -11,7 +11,7 @@ interface AffiliateRef {
   timestamp: number
 }
 
-export default function AffiliateTracker() {
+function AffiliateTrackerInner() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
 
@@ -32,6 +32,14 @@ export default function AffiliateTracker() {
   }, [searchParams, pathname])
 
   return null
+}
+
+export default function AffiliateTracker() {
+  return (
+    <Suspense fallback={null}>
+      <AffiliateTrackerInner />
+    </Suspense>
+  )
 }
 
 export function getAffiliateRef(): string | null {

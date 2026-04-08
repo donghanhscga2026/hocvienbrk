@@ -2,11 +2,19 @@
 
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings, Layout, Loader2, Share2, Copy, X } from 'lucide-react'
 import { Role } from '@prisma/client'
 import ToolHeader from '@/components/tools/ToolHeader'
 import { AlertBanner, AlertConfig } from '@/components/tools/Alert'
+
+function AlertBannerWrapper({ alert, onClose }: { alert: AlertConfig | null, onClose: () => void }) {
+  return (
+    <Suspense fallback={null}>
+      <AlertBanner alert={alert} onClose={onClose} />
+    </Suspense>
+  )
+}
 
 interface Tool {
   id: number
@@ -290,7 +298,7 @@ export default function ToolsPage() {
     <div className="min-h-screen bg-gray-50">
       <ToolHeader />
 
-      <AlertBanner alert={alert} onClose={closeAlert} />
+      <AlertBannerWrapper alert={alert} onClose={closeAlert} />
 
       {/* Info Banner */}
       <div className="max-w-lg mx-auto px-4 pt-2">
