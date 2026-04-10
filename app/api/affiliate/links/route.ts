@@ -1,18 +1,9 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/auth'
-import prisma from '@/lib/prisma'
+import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
 
 export async function GET() {
     try {
-        const session = await auth()
-        
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-        
-        const userId = typeof session.user.id === 'string' 
-            ? parseInt(session.user.id) 
-            : session.user.id
+        const userId = 0 // Admin
         
         const user = await prisma.user.findUnique({
             where: { id: userId },
@@ -30,6 +21,11 @@ export async function GET() {
             orderBy: { createdAt: 'desc' }
         })
         
+        const refs = await prisma.affiliateRef.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' }
+        })
+        
         const landings = await prisma.landingPage.findMany({
             where: { isActive: true },
             select: { slug: true, title: true }
@@ -37,6 +33,7 @@ export async function GET() {
         
         return NextResponse.json({
             links,
+            refs,
             landings,
             user,
             baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
