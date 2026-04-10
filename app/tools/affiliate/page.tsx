@@ -188,13 +188,18 @@ function DashboardTab() {
 
 function LinksTab() {
     const [links, setLinks] = useState<LinkItem[]>([])
+    const [refs, setRefs] = useState<AffiliateRef[]>([])
     const [loading, setLoading] = useState(true)
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
 
     useEffect(() => {
         fetch('/api/affiliate/links')
-            .then(res => res.ok ? res.json() : { links: [] })
-            .then(data => { setLinks(data.links || []); setLoading(false) })
+            .then(res => res.ok ? res.json() : { links: [], refs: [] })
+            .then(data => { 
+                setLinks(data.links || []) 
+                setRefs(data.refs || [])
+                setLoading(false) 
+            })
             .catch(() => setLoading(false))
     }, [])
 
@@ -242,6 +247,49 @@ function LinksTab() {
                         >
                             Copy
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Refs Section */}
+            {refs.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                    <h3 className="font-bold text-gray-900 mb-3">🔤 Custom Refs ({refs.length})</h3>
+                    <div className="space-y-3">
+                        {refs.map(ref => (
+                            <div key={ref.id} className="border border-gray-100 rounded-lg p-3">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-900">{ref.refKey}</span>
+                                        <span className={`text-xs px-2 py-0.5 rounded ${
+                                            ref.type === 'CUSTOM_ALIAS' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                                        }`}>
+                                            {ref.type}
+                                        </span>
+                                        {!ref.isActive && (
+                                            <span className="text-xs text-gray-400">(Tắt)</span>
+                                        )}
+                                    </div>
+                                </div>
+                                {ref.description && (
+                                    <p className="text-xs text-gray-500 mb-2">{ref.description}</p>
+                                )}
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={`${baseUrl}/register?ref=${ref.refKey}`}
+                                        readOnly
+                                        className="flex-1 px-2 py-1 border rounded text-sm bg-gray-50"
+                                    />
+                                    <button
+                                        onClick={() => copyToClipboard(`${baseUrl}/register?ref=${ref.refKey}`)}
+                                        className="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm"
+                                    >
+                                        Copy
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
