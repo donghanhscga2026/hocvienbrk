@@ -35,8 +35,8 @@ model User {
   closureAsAncestor   UserClosure[] @relation("ClosureAncestor")
   closureAsDescendant UserClosure[] @relation("ClosureDescendant")
   
-  // System relations (TCA/KTC)
-  system System?
+  // System relations (TCA/KTC) - bỏ unique để cho phép nhiều cây
+  systems System[]
   
   // Zero 2 Hero Data - Tách sang bảng UserRoadmap
   roadmap       UserRoadmap?
@@ -546,20 +546,34 @@ model YouTubeToken {
 // SYSTEM FEATURE - He thong TCA/KTC
 // ==========================================
 
+// ==========================================
+// SYSTEM TREE - 2026-04-10
+// ==========================================
+
+// Bảng lưu danh sách cây hệ thống (TCA/KTC)
+model SystemTree {
+  id        Int      @id @default(autoincrement())
+  onSystem  Int      // 1=TCA, 2=KTC
+  createdAt DateTime @default(now())
+  
+  @@index([onSystem])
+  @@map("system_tree")
+}
+
 // Thong tin he thong cua user (TCA=1, KTC=2)
+// Link với SystemTree qua treeId
 model System {
-  autoId    Int       @id @default(autoincrement())  // ID tu dong cho phep refSysId
-  userId    Int       @unique  // Lien ket voi User.id
-  onSystem  Int       // 1=TCA, 2=KTC
+  autoId    Int       @id @default(autoincrement())
+  userId    Int       // Lien ket voi User.id
+  onSystem  Int       // 1=TCA, 2=KTC (cũng là SystemTree.id)
   refSysId  Int       @default(0)  // UserID cua F1 trong he thong (0 = root)
   createdAt DateTime  @default(now())
   
-  user       User           @relation(fields: [userId], references: [id])
-  upline     System?        @relation("SystemUpline", fields: [refSysId], references: [userId])
-  referrals  System[]       @relation("SystemUpline")
+  user       User             @relation(fields: [userId], references: [id])
   closuresAsAncestor   SystemClosure[] @relation("SystemClosureAncestor")
   closuresAsDescendant SystemClosure[] @relation("SystemClosureDescendant")
   
+  @@unique([userId, onSystem]) // 1 user per system
   @@index([userId])
   @@index([onSystem])
   @@index([refSysId])

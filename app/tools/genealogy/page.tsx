@@ -19,15 +19,89 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, GenealogyNode } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, GenealogyNode } from '@/app/actions/admin-actions'
 import ToolHeader from '@/components/tools/ToolHeader'
+
+// Constants cho tree layout
+const NODE_WIDTH = 160
+const NODE_HEIGHT = 100  // Chiều cao ước tính của node (bao gồm padding)
+const HORIZONTAL_SPACING = 200  // Khoảng cách horizontal tối thiểu giữa các node cùng hàng
+const VERTICAL_SPACING = 300    // Khoảng cách vertical = 3 × node height (3 × 100 = 300)
+
+// Đếm số con trực tiếp của node
+const countDirectChildren = (node: GenealogyNode, isFullMode: boolean): number => {
+  if (isFullMode) {
+    return (node.groupA?.length || 0) + (node.groupB?.length || 0) + (node.children?.length || 0)
+  }
+  return node.children?.length || 0
+}
+
+// Tính chiều rộng của subtree (ước tính an toàn)
+const getSubtreeWidth = (node: GenealogyNode, isFullMode: boolean): number => {
+  if (isFullMode) {
+    const directChildren = (node.groupA?.length || 0) + (node.groupB?.length || 0) + (node.children?.length || 0)
+    if (directChildren === 0) return NODE_WIDTH
+    // Recurse cho children
+    let totalChildWidth = 0
+    if (node.groupA) totalChildWidth += node.groupA.length * NODE_WIDTH
+    if (node.groupB) totalChildWidth += node.groupB.length * NODE_WIDTH
+    if (node.children) {
+      for (const child of node.children) {
+        totalChildWidth += getSubtreeWidth(child, isFullMode)
+      }
+    }
+    return Math.max(NODE_WIDTH, totalChildWidth + HORIZONTAL_SPACING * Math.max(0, directChildren - 1))
+  }
+  if (!node.children?.length) return NODE_WIDTH
+  let w = node.children.reduce((sum, c) => sum + getSubtreeWidth(c, isFullMode), 0)
+  w += HORIZONTAL_SPACING * Math.max(0, node.children.length - 1)
+  return Math.max(NODE_WIDTH, w)
+}
+
+// Build position map với thuật toán đơn giản
+const calculateNodePositions = (root: GenealogyNode, isFullMode: boolean): Map<number, { x: number; y: number }> => {
+  const positions = new Map<number, { x: number; y: number }>()
+  
+  // BFS để tính positions - tránh infinite recursion
+  const queue: { node: GenealogyNode; x: number; y: number }[] = [{ node: root, x: 0, y: 0 }]
+  
+  while (queue.length > 0) {
+    const { node, x, y } = queue.shift()!
+    if (positions.has(node.id)) continue // Tránh duplicate
+    positions.set(node.id, { x, y })
+    
+    const children = isFullMode && (node.groupA?.length || node.groupB?.length)
+      ? [...(node.groupA || []), ...(node.groupB || []), ...(node.children || [])]
+      : node.children || []
+    
+    if (children.length === 0) continue
+    
+    // Tính total width của các children
+    const childWidths = children.map(c => getSubtreeWidth(c as GenealogyNode, isFullMode))
+    const totalWidth = childWidths.reduce((sum, w) => sum + w, 0) + HORIZONTAL_SPACING * Math.max(0, children.length - 1)
+    
+    // Đặt children từ trái sang phải
+    let currentX = x - totalWidth / 2
+    for (let i = 0; i < children.length; i++) {
+      const childX = currentX + childWidths[i] / 2
+      const childY = y + VERTICAL_SPACING
+      queue.push({ node: children[i] as GenealogyNode, x: childX, y: childY })
+      currentX += childWidths[i] + HORIZONTAL_SPACING
+    }
+  }
+  
+  return positions
+}
 
 const GenealogyCard = (props: NodeProps) => {
   const data = props.data as unknown as GenealogyNode & {
     isRoot?: boolean;
     isSearchTarget?: boolean;
+    editMode?: boolean;
     onToggleExpand?: (id: number) => void;
     onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
+    onAddChild?: (parentId: number) => void;
+    onDeleteNode?: (nodeId: number) => void;
   }
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
@@ -48,6 +122,25 @@ const GenealogyCard = (props: NodeProps) => {
         <div className="text-slate-800 font-bold text-[13px] text-center border-y border-slate-50 uppercase tracking-tighter line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
           {data.name || 'Học viên'}
         </div>
+        {/* Edit buttons - chỉ hiện khi editMode = true */}
+        {data.editMode && (
+          <div className="flex gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); data.onAddChild?.(data.id); }}
+              className="flex-1 py-1 rounded-lg bg-indigo-500 text-white text-[10px] font-bold hover:bg-indigo-600"
+            >
+              +F1
+            </button>
+            {!data.isRoot && (
+              <button
+                onClick={(e) => { e.stopPropagation(); data.onDeleteNode?.(data.id); }}
+                className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
+              >
+                X
+              </button>
+            )}
+          </div>
+        )}
         <div className="flex justify-between items-center mt-1 relative h-10 px-0">
           <button
             onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA, data.groupATotalSub); }}
@@ -115,11 +208,21 @@ function GenealogyFlow() {
   const [error, setError] = useState<string | null>(null)
 
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
-  const [activeFocusMap, setActiveFocusMap] = useState<Map<number, number>>(new Map())
   const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B', totalSub: number } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
+  const activeFocusMapRef = useRef<Map<number, number>>(new Map())
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
+  const focusMapSizeRef = useRef<number>(0)
+  const [focusMapVersion, setFocusMapVersion] = useState(0) // trigger re-render
+
+  // Position map cho tree layout (Reingold-Tilford)
+  const positionMapRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const [positionVersion, setPositionVersion] = useState(0)
+
+  // Add F1 and delete node modals
+  const [addF1Modal, setAddF1Modal] = useState<{ parentId: number, show: boolean }>({ parentId: 0, show: false })
+  const [deleteNodeModal, setDeleteNodeModal] = useState<{ nodeId: number, show: boolean }>({ nodeId: 0, show: false })
 
   const [searchInput, setSearchInput] = useState<string>('')
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -128,6 +231,15 @@ function GenealogyFlow() {
     path: { id: number; name: string | null }[];
     targetId: number;
   } | null>(null)
+
+  // Edit and display modes
+  const [editMode, setEditMode] = useState<boolean>(false)
+  const [displayMode, setDisplayMode] = useState<'default' | 'full'>('default')
+
+  // User list for Add F1 modal
+  const [usersList, setUsersList] = useState<{ id: number; name: string | null; email: string | null }[]>([])
+  const [userSearch, setUserSearch] = useState<string>('')
+  const [loadingUsers, setLoadingUsers] = useState<boolean>(false)
 
   const mergeSubtree = useCallback((root: GenealogyNode, subtree: GenealogyNode): GenealogyNode => {
     if (root.id === subtree.id) return { ...root, ...subtree }
@@ -159,47 +271,98 @@ function GenealogyFlow() {
     py: number,
     actions: any,
     currentFocusMap: Map<number, number>,
-    isParentVisibleAndExpanded: boolean = true
+    isParentVisibleAndExpanded: boolean = true,
+    nodeEditMode?: boolean,
+    nodeDisplayMode?: 'default' | 'full',
+    positionMap?: Map<number, { x: number; y: number }>
   ) => {
     const resNodes: Node[] = []
     const resEdges: Edge[] = []
     const nodeId = `node-${parent.id}`
 
-    resNodes.push({
-      id: nodeId,
-      type: 'genealogyCard',
-      position: { x: px, y: py },
-      data: {
-        ...parent,
-        onToggleExpand: actions.onToggleExpand,
-        onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub })
-      },
-    })
+    // Xác định vị trí thực tế của node
+    let actualX = px
+    let actualY = py
+    if (positionMap && positionMap.has(parent.id)) {
+      const pos = positionMap.get(parent.id)!
+      actualX = pos.x
+      actualY = pos.y
+    }
+
+    // Dành cho ReactFlow xử lý draggable
+    const nodePosition = { x: actualX, y: actualY }
+
+    // Tránh duplicate node keys
+    if (!resNodes.some(n => n.id === nodeId)) {
+      resNodes.push({
+        id: nodeId,
+        type: 'genealogyCard',
+        position: nodePosition,
+        draggable: true,
+        data: {
+          ...parent,
+          editMode: nodeEditMode ?? editMode,
+          onToggleExpand: actions.onToggleExpand,
+          onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
+          onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
+          onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true })
+        },
+      })
+    }
 
     const isRoot = parent.id === fullTree?.id;
-    const isFocusNode = isParentVisibleAndExpanded;
+    const isFullMode = (nodeDisplayMode ?? displayMode) === 'full'
+    // Full mode: luôn expand tất cả (hiển thị toàn bộ cây)
+    // Default mode: chỉ hiển thị khi được click expand
+    const isFocusNode = isFullMode || isParentVisibleAndExpanded;
 
-    if (isFocusNode && parent.children && parent.children.length > 0) {
-      parent.children.forEach((child, index) => {
-        const childX = px + (index - (parent.children.length - 1) / 2) * 200
-        const childY = py + 300
+    // Full mode: hiển thị toàn bộ cây từ children (không phân nhóm A/B/C)
+    // Default mode: chỉ group C (có F3) là children
+    let childrenToRender = isFullMode
+      ? [...(parent.groupA || []), ...(parent.groupB || []), ...(parent.children || [])]
+      : parent.children
+
+    if (childrenToRender) {
+      // Loại bỏ duplicate children để không tạo ra duplicate ReactFlow nodes/edges
+      childrenToRender = Array.from(new Map(childrenToRender.map(c => [c.id, c])).values())
+    }
+
+    if (isFocusNode && childrenToRender && childrenToRender.length > 0) {
+      // Sử dụng positionMap nếu có (Reingold-Tilford)
+      childrenToRender.forEach((child, index) => {
+        let childX: number, childY: number
+        
+        if (positionMap && positionMap.has(child.id)) {
+          const pos = positionMap.get(child.id)!
+          childX = pos.x
+          childY = pos.y
+        } else {
+          // Fallback: tính khoảng cách dựa trên số lượng children
+          const nodeWidth = Math.max(NODE_WIDTH + HORIZONTAL_SPACING, NODE_WIDTH + HORIZONTAL_SPACING * childrenToRender.length)
+          childX = px + (index - (childrenToRender.length - 1) / 2) * nodeWidth
+          childY = py + VERTICAL_SPACING
+        }
 
         const subIsExpanded = currentFocusMap.get(parent.id) === child.id
 
-        const sub = generateGraphNodes(child, childX, childY, actions, currentFocusMap, subIsExpanded)
+        const sub = generateGraphNodes(child, childX, childY, actions, currentFocusMap, subIsExpanded, nodeEditMode, nodeDisplayMode, positionMap)
         resNodes.push(...sub.resNodes); resEdges.push(...sub.resEdges)
 
-        resEdges.push({
-          id: `edge-${parent.id}-${child.id}`,
-          source: nodeId,
-          target: `node-${child.id}`,
-          style: { stroke: '#f43f5e', strokeWidth: 3 },
-          type: 'smoothstep'
-        })
+        // Tránh duplicate edge keys
+        const edgeId = `edge-${parent.id}-${child.id}`
+        if (!resEdges.some(e => e.id === edgeId)) {
+          resEdges.push({
+            id: edgeId,
+            source: nodeId,
+            target: `node-${child.id}`,
+            style: { stroke: '#f43f5e', strokeWidth: 3 },
+            type: 'smoothstep'
+          })
+        }
       })
     }
     return { resNodes, resEdges }
-  }, [])
+  }, [editMode, displayMode, setAddF1Modal, setDeleteNodeModal, setModalData])
 
   const handleToggleExpand = useCallback(async (id: number) => {
     console.log(`[Action] Trigger Toggle Expand for Node #${id}`);
@@ -237,17 +400,15 @@ function GenealogyFlow() {
         console.log(`[Logic] Parent of #${id} is #${pId !== null ? pId : 'Unknown'}`);
 
         if (pId !== null) {
-          setActiveFocusMap(prev => {
-            const next = new Map(prev);
-            if (next.get(pId) === id) {
-              console.log(`[Focus] Collapsing Node #${id}`);
-              next.delete(pId);
-            } else {
-              console.log(`[Focus] Expanding Node #${id}, auto-collapsing siblings`);
-              next.set(pId, id);
-            }
-            return next;
-          });
+          if (activeFocusMapRef.current.get(pId) === id) {
+            console.log(`[Focus] Collapsing Node #${id}`);
+            activeFocusMapRef.current.delete(pId);
+          } else {
+            console.log(`[Focus] Expanding Node #${id}, auto-collapsing siblings`);
+            activeFocusMapRef.current.set(pId, id);
+          }
+          focusMapSizeRef.current = activeFocusMapRef.current.size;
+          setFocusMapVersion(v => v + 1);
         }
       } else {
         console.log(`[API] Failed or no tree: fullTree=`, !!fullTree);
@@ -262,7 +423,9 @@ function GenealogyFlow() {
     setSelectedSystem(systemId)
     setLoading(true)
     setError(null)
-    setActiveFocusMap(new Map())
+    activeFocusMapRef.current = new Map()
+    focusMapSizeRef.current = 0
+    setFocusMapVersion(v => v + 1)
     lastExpandedIdRef.current = null
     setIsSearchMode(false)
     setSearchResult(null)
@@ -278,6 +441,8 @@ function GenealogyFlow() {
           setError(result.error || 'Lỗi tải dữ liệu')
         }
       } else {
+        // Luôn dùng getSystemTreeAction vì API này đã trả về cấu trúc lồng nhau đúng. 
+        // Thay đổi UI Full Mode sẽ chỉ thay đổi cách parse tree ở generateGraphNodes
         const result = await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
           setFullTree(result.tree)
@@ -291,8 +456,11 @@ function GenealogyFlow() {
     setLoading(false)
   }, [])
 
+  // Không cần useEffect catch displayMode để refetch nữa vì dữ liệu tree chung đã có đủ F1, F2
+
+
   const initTree = useCallback(async (rootId: number = 0) => {
-    setLoading(true); setError(null); setActiveFocusMap(new Map()); lastExpandedIdRef.current = null
+    setLoading(true); setError(null); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
 
     let result;
     if (selectedSystem === null) {
@@ -354,13 +522,12 @@ function GenealogyFlow() {
         console.log('[SEARCH] searchResult set with', result.path.length, 'nodes')
         
         const targetId = result.targetId
-        setActiveFocusMap(prev => {
-          const next = new Map(prev)
-          for (let i = 0; i < result.path.length - 1; i++) {
-            next.set(result.path[i].id, result.path[i + 1].id)
-          }
-          return next
-        })
+        activeFocusMapRef.current = new Map()
+        for (let i = 0; i < result.path.length - 1; i++) {
+          activeFocusMapRef.current.set(result.path[i].id, result.path[i + 1].id)
+        }
+        focusMapSizeRef.current = activeFocusMapRef.current.size
+        setFocusMapVersion(v => v + 1)
         
         setError(null)
       } else {
@@ -388,22 +555,94 @@ function GenealogyFlow() {
 
   useEffect(() => {
     if (fullTree) {
-      const { resNodes, resEdges } = generateGraphNodes(fullTree, 0, 0, { onToggleExpand: handleToggleExpand }, activeFocusMap, true)
-      setNodes(resNodes); setEdges(resEdges)
-
-      const targetId = lastExpandedIdRef.current
-      if (targetId) {
-        const pos = getNodePosition(fullTree, targetId, 0, 0, activeFocusMap, true)
-        if (pos) {
-          setCenter(pos.x + 180, pos.y + 180, { zoom: 1.2, duration: 600 })
-        } else {
-          fitView({ padding: 0.2, duration: 800 })
+      // Tính position map (Reingold-Tilford) cho full mode
+      const isFullMode = displayMode === 'full'
+      if (isFullMode || editMode) {
+        try {
+          const newMap = calculateNodePositions(fullTree, isFullMode)
+          positionMapRef.current = newMap
+          setPositionVersion(v => v + 1)
+        } catch (e) {
+          console.error('[Tree] Position map error:', e)
         }
-      } else {
-        fitView({ padding: 0.2, duration: 800 })
       }
+
+      const { resNodes, resEdges } = generateGraphNodes(fullTree, 0, 0, { onToggleExpand: handleToggleExpand }, activeFocusMapRef.current, true, editMode, displayMode, positionMapRef.current)
+      
+      const uniqueNodes = Array.from(new Map(resNodes.map(item => [item.id, item])).values())
+      const uniqueEdges = Array.from(new Map(resEdges.map(item => [item.id, item])).values())
+      
+      setNodes(uniqueNodes); setEdges(uniqueEdges)
+
+      // Fit view after render
+      setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100)
     }
-  }, [fullTree, activeFocusMap.size, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition])
+  }, [fullTree, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
+
+  // Fetch users when Add F1 modal opens
+  useEffect(() => {
+    if (addF1Modal.show && usersList.length === 0) {
+      setLoadingUsers(true)
+      fetch('/api/admin/users/list')
+        .then(res => res.json())
+        .then(data => {
+          if (data.users) setUsersList(data.users)
+        })
+        .catch(console.error)
+        .finally(() => setLoadingUsers(false))
+    }
+  }, [addF1Modal.show, usersList.length])
+
+  // Filtered users based on search
+  const filteredUsers = userSearch.trim()
+    ? usersList.filter(u => 
+        u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+        u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+        String(u.id).includes(userSearch)
+      )
+    : usersList.slice(0, 50)
+
+  // Handle add child
+  const handleAddChild = async (childId: number) => {
+    if (!selectedSystem) return
+    try {
+      const res = await fetch('/api/system-tree/add-child', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ onSystem: selectedSystem, parentId: addF1Modal.parentId, childId })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAddF1Modal({ parentId: 0, show: false })
+        initTree(0)
+      } else {
+        alert(data.error || 'Lỗi khi thêm F1')
+      }
+    } catch (e) {
+      alert('Lỗi khi thêm F1')
+    }
+  }
+
+  // Handle delete node
+  const handleDeleteNode = async () => {
+    if (!selectedSystem) return
+    try {
+      const res = await fetch('/api/system-tree/delete-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ onSystem: selectedSystem, nodeId: deleteNodeModal.nodeId })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setDeleteNodeModal({ nodeId: 0, show: false })
+        initTree(0)
+      } else {
+        alert(data.error || 'Lỗi khi xóa node')
+      }
+    } catch (e) {
+      alert('Lỗi khi xóa node')
+    }
+  }
 
   useEffect(() => {
     if (searchResult) {
@@ -456,31 +695,52 @@ function GenealogyFlow() {
           XEM
         </button>
 
-        {selectedSystem !== null && selectedSystem !== undefined && (
-          <div className="relative flex items-center flex-1 max-w-[200px]">
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo ID"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className={`w-full bg-white text-slate-700 text-xs font-bold pl-3 pr-12 py-1.5 rounded-lg border border-gray-200 outline-none placeholder:text-slate-400 ${searchError ? 'ring-2 ring-red-500' : ''}`}
-            />
-            {searchInput && (
-              <button
-                onClick={() => { setSearchInput(''); setSearchError(null); }}
-                className="absolute right-10 text-red-400 hover:text-red-300"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
+        {/* Edit mode controls */}
+        <>
+          <button 
+            onClick={() => setEditMode(!editMode)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+              editMode 
+                ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            }`}
+          >
+            {editMode ? 'HỦY' : 'SỬA'}
+          </button>
+          
+          <select
+            value={displayMode}
+            onChange={(e) => setDisplayMode(e.target.value as 'default' | 'full')}
+            className="bg-white text-slate-700 text-xs font-bold px-2 py-1.5 rounded-lg border border-gray-200 outline-none cursor-pointer"
+          >
+            <option value="default">Mặc định</option>
+            <option value="full">Full</option>
+          </select>
+        </>
+
+        <div className="relative flex items-center flex-1 max-w-[200px]">
+          <input
+            type="text"
+            placeholder="Tìm kiếm theo ID"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className={`w-full bg-white text-slate-700 text-xs font-bold pl-3 pr-12 py-1.5 rounded-lg border border-gray-200 outline-none placeholder:text-slate-400 ${searchError ? 'ring-2 ring-red-500' : ''}`}
+          />
+          {searchInput && (
             <button
-              onClick={handleSearch}
-              className="absolute right-1 p-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 transition-all"
+              onClick={() => { setSearchInput(''); setSearchError(null); }}
+              className="absolute right-10 text-red-400 hover:text-red-300"
             >
-              <Search className="h-3 w-3" />
+              <X className="h-3 w-3" />
             </button>
-          </div>
-        )}
+          )}
+          <button
+            onClick={handleSearch}
+            className="absolute right-1 p-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 transition-all"
+          >
+            <Search className="h-3 w-3" />
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -499,7 +759,7 @@ function GenealogyFlow() {
           <div className="w-full h-full">
             <ReactFlow
               nodes={searchResult ? searchResult.path.map((node, i) => ({
-                id: `search-${node.id}`,
+                id: `search-${node.id}-${i}`,
                 type: 'searchNode',
                 position: { x: 0, y: i * 110 },
                 data: {
@@ -511,8 +771,8 @@ function GenealogyFlow() {
               })) : nodes}
               edges={searchResult ? searchResult.path.slice(0, -1).map((node, i) => ({
                 id: `search-edge-${i}`,
-                source: `search-${node.id}`,
-                target: `search-${searchResult.path[i + 1].id}`,
+                source: `search-${node.id}-${i}`,
+                target: `search-${searchResult.path[i + 1].id}-${i + 1}`,
                 style: { stroke: '#f43f5e', strokeWidth: 2 },
                 type: 'straight'
               })) : edges}
@@ -560,14 +820,50 @@ function GenealogyFlow() {
                         <div className="w-10 h-10 rounded-xl bg-slate-180 text-slate-500 flex items-center justify-center font-black text-xs">#{u.id}</div>
                         <div><div className="text-sm font-black text-slate-900">{u.name || 'Học viên'}</div><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-emerald-600">TS: {u.totalSubCount}</div></div>
                       </div>
-                      {modalData.type === 'B' && <ChevronDown className={`w-5 h-5 text-slate-300 transition-transform ${expandedF2Id === u.id ? 'rotate-180 text-sky-500' : ''}`} />}
+                      <div className="flex items-center gap-2">
+                        {editMode && (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setAddF1Modal({ parentId: u.id, show: true }); }}
+                              className="px-2 py-1 rounded bg-indigo-500 text-white text-[10px] font-bold hover:bg-indigo-600"
+                            >
+                              +F1
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteNodeModal({ nodeId: u.id, show: true }); }}
+                              className="px-2 py-1 rounded bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
+                            >
+                              X
+                            </button>
+                          </div>
+                        )}
+                        {modalData.type === 'B' && <ChevronDown className={`w-5 h-5 text-slate-300 transition-transform ${expandedF2Id === u.id ? 'rotate-180 text-sky-500' : ''}`} />}
+                      </div>
                     </div>
                     {expandedF2Id === u.id && modalData.type === 'B' && (
                       <div className="p-2 pl-14 space-y-1 animate-in slide-in-from-top-2">
                         {u.children?.map((f2: any) => (
                           <div key={f2.id} className="p-3 bg-white border border-sky-180 rounded-2xl flex items-center justify-between shadow-sm">
-                            <span className="text-[10px] font-black text-sky-600">#{f2.id}</span>
-                            <span className="text-xs font-bold text-slate-600">{f2.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-black text-sky-600">#{f2.id}</span>
+                              <span className="text-xs font-bold text-slate-600">{f2.name}</span>
+                            </div>
+                            {editMode && (
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setAddF1Modal({ parentId: f2.id, show: true }); }}
+                                  className="px-2 py-1 rounded bg-indigo-500 text-white text-[10px] font-bold hover:bg-indigo-600"
+                                >
+                                  +F1
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setDeleteNodeModal({ nodeId: f2.id, show: true }); }}
+                                  className="px-2 py-1 rounded bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
+                                >
+                                  X
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -585,6 +881,71 @@ function GenealogyFlow() {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
       `}</style>
+
+      {/* Add F1 Modal */}
+      {addF1Modal.show && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black">Thêm F1 cho #{addF1Modal.parentId}</h2>
+              <button onClick={() => { setAddF1Modal({ parentId: 0, show: false }); setUserSearch(''); }} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="relative mb-3">
+              <input
+                type="text"
+                placeholder="Tìm user..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm font-bold"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+              {loadingUsers ? (
+                <div className="text-center py-4 text-sm text-gray-400">Đang tải...</div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center py-4 text-sm text-gray-400">Không tìm thấy user</div>
+              ) : (
+                filteredUsers.map(u => (
+                  <button
+                    key={u.id}
+                    onClick={() => handleAddChild(u.id)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-indigo-50 border border-transparent hover:border-indigo-200 transition-all text-left"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center font-black text-xs">#{u.id}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-slate-900 truncate">{u.name || 'HV'}</div>
+                      <div className="text-[10px] text-gray-400 truncate">{u.email}</div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <button onClick={() => { setAddF1Modal({ parentId: 0, show: false }); setUserSearch(''); }} className="w-full py-2 bg-gray-200 rounded-lg font-bold mt-3">Đóng</button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Node Modal */}
+      {deleteNodeModal.show && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black text-red-600">Xóa node #{deleteNodeModal.nodeId}</h2>
+              <button onClick={() => setDeleteNodeModal({ nodeId: 0, show: false })} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">Bạn có chắc chắn muốn xóa node này không?</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteNodeModal({ nodeId: 0, show: false })} className="flex-1 py-2 bg-gray-200 rounded-lg font-bold">Hủy</button>
+              <button onClick={handleDeleteNode} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600">Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
