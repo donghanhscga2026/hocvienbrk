@@ -8,24 +8,40 @@ export async function addUserToSystemClosure(
     refSysId: number,
     systemId: number
 ): Promise<void> {
-    // 1. Tao/Upsert System record
-    const systemRecord = await prisma.system.upsert({
-        where: { userId },
-        update: { onSystem: systemId, refSysId },
-        create: { userId, onSystem: systemId, refSysId }
+    // 1. Find existing or create new System record
+    const existing = await prisma.system.findFirst({
+        where: { userId, onSystem: systemId }
     })
+    
+    let systemRecord
+    if (existing) {
+        systemRecord = await prisma.system.update({
+            where: { autoId: existing.autoId },
+            data: { refSysId }
+        })
+    } else {
+        systemRecord = await prisma.system.create({
+            data: { 
+                userId, 
+                onSystem: systemId, 
+                refSysId
+            }
+        })
+    }
 
     const { autoId } = systemRecord
 
     // 2. Chen closure cho chinh user do (ancestor = descendant = autoId, depth = 0)
-    await prisma.systemClosure.create({
-        data: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
+    await prisma.systemClosure.upsert({
+        where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } },
+        update: { depth: 0 },
+        create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
     }).catch(() => { }) // Ignore if exists
 
     // 3. Neu co upline (refSysId > 0), copy tat ca closure cua upline va cap nhat depth
     if (refSysId > 0) {
-        const uplineSystem = await prisma.system.findUnique({
-            where: { userId: refSysId }
+        const uplineSystem = await prisma.system.findFirst({
+            where: { userId: refSysId, onSystem: systemId }
         })
 
         if (uplineSystem) {
@@ -57,8 +73,8 @@ export async function checkUserInSystem(
     userId: number,
     systemId: number
 ): Promise<{ inSystem: boolean; systemRecord: any }> {
-    const systemRecord = await prisma.system.findUnique({
-        where: { userId }
+    const systemRecord = await prisma.system.findFirst({
+        where: { userId, onSystem: systemId }
     })
 
     if (!systemRecord) {
@@ -66,7 +82,7 @@ export async function checkUserInSystem(
     }
 
     return {
-        inSystem: systemRecord.onSystem === systemId,
+        inSystem: true,
         systemRecord
     }
 }
@@ -88,15 +104,22 @@ export async function buildSystemClosuresFromData(
     // 1. Xoa closure cu cua system nay
     await prisma.systemClosure.deleteMany({ where: { systemId } })
 
-    // 2. Upsert tat ca System records
+    // 2. Create/Update System records
     const systemRecords: Map<number, number> = new Map() // userId -> autoId
     
     for (const row of data) {
-        const record = await prisma.system.upsert({
-            where: { userId: row.userId },
-            update: { onSystem: systemId, refSysId: row.refSysId },
-            create: { userId: row.userId, onSystem: systemId, refSysId: row.refSysId }
-        })
+        const existing = await prisma.system.findFirst({ where: { userId: row.userId, onSystem: systemId } })
+        let record
+        if (existing) {
+            record = await prisma.system.update({
+                where: { autoId: existing.autoId },
+                data: { refSysId: row.refSysId }
+            })
+        } else {
+            record = await prisma.system.create({
+                data: { userId: row.userId, onSystem: systemId, refSysId: row.refSysId }
+            })
+        }
         systemRecords.set(row.userId, record.autoId)
     }
 
