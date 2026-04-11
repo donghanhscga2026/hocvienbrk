@@ -134,7 +134,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         // Them closure rows cho genealogy
         await addUserToClosure(user.id, user.referrerId)
         
-        // Track affiliate conversion
+        // Track affiliate conversion and System Enrollment
         try {
             // Get affiliate data from cookie
             const cookieStore = await cookies()
@@ -146,13 +146,26 @@ export async function registerUser(prevState: any, formData: FormData) {
                     await trackAffiliateConversion({
                         refCode: affData.r,
                         userId: user.id,
-                        landingSlug: affData.l || null,
+                        landingSlug: affData.l || affData.c || null,
                         type: 'REGISTRATION'
                     })
+                    
+                    // Handle System Enrollment if 's' is present in cookie
+                    if (affData.s === 'tca' || affData.s === 'ktc') {
+                        const systemId = affData.s === 'tca' ? 1 : 2;
+                        
+                        // We need to link to the referrer's system closure
+                        // refId is user.referrerId, which we assigned earlier (it came from refCode)
+                        if (user.referrerId) {
+                            const { addUserToSystemClosure } = await import('@/lib/system-closure-helpers');
+                            await addUserToSystemClosure(user.id, user.referrerId, systemId);
+                            console.log(`✅ Auto-enrolled user #${user.id} to System ${affData.s.toUpperCase()} under referrer #${user.referrerId}`);
+                        }
+                    }
                 }
             }
         } catch (e) {
-            console.error('[Track] Failed to track conversion:', e)
+            console.error('[Track] Failed to track conversion or system enrollment:', e)
         }
         
         // Revalidate genealogy cache

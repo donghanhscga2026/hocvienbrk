@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 
 export interface AffiliateData {
     r: string
-    l: string | null
+    l?: string | null
+    c?: string | null
+    s?: string | null
     t: number
 }
 
