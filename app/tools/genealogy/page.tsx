@@ -214,6 +214,17 @@ function GenealogyFlow() {
   const activeFocusMapRef = useRef<Map<number, number>>(new Map())
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
   const focusMapSizeRef = useRef<number>(0)
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const sysInfo = params.get('sysInfo')
+      if (sysInfo) {
+        alert(`Chào mừng bạn! Bạn đã tham gia vào hệ thống kinh doanh ${sysInfo.toUpperCase()}.`)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
+  }, [])
   const [focusMapVersion, setFocusMapVersion] = useState(0) // trigger re-render
 
   // Position map cho tree layout (Reingold-Tilford)
