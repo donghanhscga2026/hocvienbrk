@@ -24,7 +24,7 @@ export default function ToolsCoursesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="KHÓA HỌC" />
+            <ToolHeader title="KHÓA HỌC" backUrl="/tools" />
 
             <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
                 <div className="flex items-center justify-between mt-4">

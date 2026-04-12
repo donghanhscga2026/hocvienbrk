@@ -242,7 +242,7 @@ const RoadmapBuilderContent = () => {
 
   if (view === 'LIST') return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader title="LỘ TRÌNH" />
+      <ToolHeader title="LỘ TRÌNH" backUrl="/tools" />
       <div className="space-y-6 animate-in fade-in duration-500 text-black mx-auto px-4 py-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="text-xl font-black uppercase tracking-tight">Quản lý khảo sát</h2>

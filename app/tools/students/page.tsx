@@ -97,8 +97,7 @@ export default function ToolsStudentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <ToolHeader title="THÀNH VIÊN" />
-
+    <ToolHeader title="THÀNH VIÊN" backUrl="/tools" />
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {total > 0 ? `${startItem}-${endItem} / ${total}` : '0'}
       </div>
