@@ -19,6 +19,7 @@ interface LessonSidebarProps {
     startedAt: Date | null
     resetAt: Date | null
     onResetStartDate: (date: Date) => Promise<void>
+    courseType?: string
 }
 
 function formatDateVN(date: Date | null) {
@@ -33,7 +34,8 @@ function toInputValue(date: Date | null): string {
     return d.toISOString().slice(0, 10)
 }
 
-function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<string, any>) {
+function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<string, any>, courseType?: string) {
+    if (courseType === 'LIB') return true
     if (lesson.order === 1) return true
     const prev = lessons.find(l => l.order === lesson.order - 1)
     if (!prev) return true
@@ -42,7 +44,7 @@ function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<st
 }
 
 export default function LessonSidebar({
-    lessons, currentLessonId, onLessonSelect, progress, startedAt, resetAt, onResetStartDate
+    lessons, currentLessonId, onLessonSelect, progress, startedAt, resetAt, onResetStartDate, courseType
 }: LessonSidebarProps) {
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dateInput, setDateInput] = useState(toInputValue(startedAt))
@@ -140,7 +142,7 @@ export default function LessonSidebar({
                     const prog = filteredProgress[lesson.id]
                     const isCompleted = prog?.status === 'COMPLETED'
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = isLessonUnlocked(lesson, lessons, filteredProgress)
+                    const unlocked = isLessonUnlocked(lesson, lessons, filteredProgress, courseType)
 
                     return (
                         <button

@@ -189,6 +189,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [phiCoc, setPhiCoc] = useState(0)
     const [idKhoa, setIdKhoa] = useState('')
     const [noidungEmail, setNoidungEmail] = useState('')
+    const [type, setType] = useState('NORMAL')
 
     const fetchData = async () => {
         setLoading(true)
@@ -199,6 +200,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             setPhiCoc(res.phi_coc || 0)
             setIdKhoa(res.id_khoa || '')
             setNoidungEmail(res.noidung_email || '')
+            setType(res.type || 'NORMAL')
         }
         setLoading(false)
     }
@@ -210,7 +212,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         setSaving(true)
         setMessage(null)
         const res = await updateCourseAction(parseInt(id), {
-            name_lop: nameLop, phi_coc: phiCoc, id_khoa: idKhoa, noidung_email: noidungEmail
+            name_lop: nameLop, phi_coc: phiCoc, id_khoa: idKhoa, noidung_email: noidungEmail, type
         })
         if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học!' })
         else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
@@ -248,6 +250,21 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học</label>
                         <input type="text" value={nameLop} onChange={(e) => setNameLop(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                    </div>
+                    <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
+                        <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                            <option value="NORMAL">Bình thường</option>
+                            <option value="CHALLENGE">Thử thách</option>
+                            <option value="LIB">Tài liệu (LIB)</option>
+                        </select>
+                        {type === 'LIB' && <p className="text-xs text-blue-600 mt-1 pl-1 font-bold">⚠️ Cần cấu hình whitelist email trong Admin để truy cập LIB.</p>}
+                        {type === 'LIB' && (
+                            <div className="mt-2 pl-1">
+                                <Link href={`/admin/courses/${id}/lib-access`} className="inline-flex items-center gap-1 text-xs text-purple-600 hover:underline font-bold bg-purple-50 px-3 py-1.5 rounded-lg transition-colors">
+                                    → Quản lý danh sách truy cập tài liệu
+                                </Link>
+                            </div>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí</label>

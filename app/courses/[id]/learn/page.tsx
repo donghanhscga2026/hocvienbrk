@@ -46,10 +46,23 @@ export default async function CourseLearnPage({
   // Lấy course trước (để kiểm tra tồn tại)
   const course = await prisma.course.findUnique({
     where: { id_khoa: id },
-    select: { id: true },
+    select: { id: true, type: true },
   })
 
   if (!course) redirect(`/courses/${id}`)
+
+  if (course.type === 'LIB') {
+    if (!session?.user?.email) redirect(`/courses/${id}?error=lib_access_denied`)
+    const hasAccess = await prisma.courseLibAccess.findUnique({
+      where: {
+        courseId_email: {
+          courseId: course.id,
+          email: session.user.email
+        }
+      }
+    })
+    if (!hasAccess) redirect(`/courses/${id}?error=lib_access_denied`)
+  }
 
   // Lấy enrollment bằng courseId (giữ nguyên query gốc)
   const enrollment = await prisma.enrollment.findUnique({
@@ -115,7 +128,7 @@ export default async function CourseLearnPage({
   return (
     <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
       <CoursePlayer
-        course={{ ...enrollment.course, lessons: lessonsWithPlaylist }}
+        course={{ ...enrollment.course, type: course.type, lessons: lessonsWithPlaylist }}
         enrollment={enrollment}
         session={session}
       />

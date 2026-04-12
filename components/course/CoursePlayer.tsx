@@ -256,6 +256,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         progress={progressMap}
                         startedAt={startedAt}
                         resetAt={enrollment.resetAt}
+                        courseType={course.type}
                         onResetStartDate={async (d: Date) => {
                             await confirmStartDateAction(course.id, d)
                             window.location.reload()
@@ -278,6 +279,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 serverPlaylist={currentLesson?.playlist} // [OPTIMIZE] Truyền playlist đã parse từ Server
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
+                                courseType={course.type}
                             />
                         </div>
                     </div>
@@ -308,6 +310,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             onLessonSelect={handleLessonSelect}
                                             progress={progressMap}
                                             startedAt={startedAt}
+                                            courseType={course.type}
                                             onResetStartDate={async (d: Date) => { await confirmStartDateAction(course.id, d); window.location.reload(); }}
                                         />
                                     </div>
@@ -323,7 +326,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                         </div>
                                     </div>
                                 )}
-                                {mobileTab === 'record' && (
+                                {mobileTab === 'record' && course.type !== 'LIB' && (
                                     <div className="flex-1 overflow-hidden">
                                         <AssignmentForm
                                             key={currentLessonId}
@@ -351,7 +354,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 {[
                                     { id: 'list', icon: ListVideo, label: 'Danh sách' },
                                     { id: 'content', icon: FileText, label: 'Nội dung' },
-                                    { id: 'record', icon: ClipboardCheck, label: 'Ghi nhận' },
+                                    ...(course.type !== 'LIB' ? [{ id: 'record', icon: ClipboardCheck, label: 'Ghi nhận' }] : []),
                                 ].map(tab => (
                                     <button
                                         key={tab.id}
@@ -367,7 +370,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     )}
                 </main>
 
-                {!isMobile && (
+                {!isMobile && course.type !== 'LIB' && (
                     <div className="w-[400px] shrink-0 border-l border-zinc-800 flex flex-col">
                         <AssignmentForm
                             key={currentLessonId}
@@ -411,7 +414,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     )
 }
 
-function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progress, startedAt, onResetStartDate }: any) {
+function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progress, startedAt, onResetStartDate, courseType }: any) {
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dateInput, setDateInput] = useState(startedAt ? new Date(startedAt).toISOString().slice(0, 10) : '')
     const [saving, setSaving] = useState(false)
@@ -500,7 +503,7 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                 {lessons.map((lesson: any) => {
                     const prog = filteredProgress[lesson.id]
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = lesson.order === 1 || (filteredProgress[lessons.find((l:any)=>l.order===lesson.order-1)?.id]?.status === 'COMPLETED')
+                    const unlocked = courseType === 'LIB' || lesson.order === 1 || (filteredProgress[lessons.find((l:any)=>l.order===lesson.order-1)?.id]?.status === 'COMPLETED')
                     return (
                         <button
                             key={lesson.id}

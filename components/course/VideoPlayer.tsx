@@ -19,6 +19,7 @@ interface VideoPlayerProps {
     playlistData?: any 
     lastVideoIndex?: number 
     serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client
+    courseType?: string
 }
 
 type PlaylistItem = {
@@ -49,7 +50,8 @@ export default function VideoPlayer({
     onPercentChange,
     playlistData,
     lastVideoIndex = 0,
-    serverPlaylist // [OPTIMIZE] Ưu tiên playlist từ Server, chỉ parse client nếu không có
+    serverPlaylist, // [OPTIMIZE] Ưu tiên playlist từ Server, chỉ parse client nếu không có
+    courseType
 }: VideoPlayerProps) {
     // [OPTIMIZE] Ưu tiên playlist từ Server, fallback sang parse từ videoUrl (backward compatible)
     const playlist = useMemo(() => {
@@ -191,7 +193,8 @@ const toggleFullScreen = () => {
                     autoplay: 1, 
                     modestbranding: 1, 
                     rel: 0, 
-                    start: startTime 
+                    start: startTime,
+                    origin: window.location.origin
                 },
                 events: {
                     onStateChange: (e: any) => {
