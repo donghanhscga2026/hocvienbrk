@@ -7,7 +7,7 @@ import ToolHeader from "@/components/tools/ToolHeader"
 export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader title="CÀI ĐẶT" />
+      <ToolHeader title="CÀI ĐẶT" backUrl="/tools" />
 
       <div className="p-4 max-w-lg mx-auto">
         <div className="space-y-4 mt-4">
