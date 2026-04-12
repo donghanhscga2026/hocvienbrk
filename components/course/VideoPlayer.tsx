@@ -194,7 +194,8 @@ const toggleFullScreen = () => {
                     modestbranding: 1, 
                     rel: 0, 
                     start: startTime,
-                    origin: window.location.origin
+                    origin: window.location.origin,
+                    fs: 0
                 },
                 events: {
                     onStateChange: (e: any) => {
@@ -238,11 +239,22 @@ const toggleFullScreen = () => {
             isFullscreen ? "fixed inset-0 z-[9999] h-screen w-screen" : "w-full"
         )}>
             <div className={cn(
-                "relative bg-black overflow-hidden shadow-2xl transition-all",
+                "relative bg-black overflow-hidden shadow-2xl transition-all flex flex-col",
                 isFullscreen ? "flex-1" : "w-full aspect-video"
             )}>
                 {currentItem?.type === 'video' ? (
-                    <div id="multimedia-player" className="w-full h-full" />
+                    <div className="relative w-full flex-1 group">
+                        <div id="multimedia-player" className="absolute inset-0 w-full h-full" />
+                        
+                        {/* THE MỘT LỚP PHỦ TRANSPARENT CHẶN CLICK VÀO TITLE VÀ NÚT SHARE Ở TOP */}
+                        {courseType === 'LIB' && (
+                            <div 
+                                className="absolute top-0 left-0 right-0 h-[65px] z-[90] bg-transparent opacity-0 cursor-default" 
+                                title="Video được bảo vệ" 
+                                onContextMenu={(e) => e.preventDefault()}
+                            />
+                        )}
+                    </div>
                 ) : (
                     <div className="w-full h-full bg-white relative flex flex-col">
                         <iframe src={getEmbedUrl(currentItem.url)} className="flex-1 border-0" allow="autoplay" title="Tài liệu" />
