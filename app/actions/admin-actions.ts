@@ -95,7 +95,7 @@ async function buildStandardTree(
             },
             select: { id: true, name: true }
         })
-        f1Data = users.map(u => ({ ...u, autoId: u.id, user: u }))
+        f1Data = users.map((u: { id: number; name: string | null }) => ({ ...u, autoId: u.id, user: u }))
     }
 
     if (f1Data.length === 0) {
@@ -420,7 +420,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
             prisma.user.groupBy({ by: ['role'], _count: { id: true } })
         ])
         const roleCounts: Record<string, number> = {}
-        rawRoleCounts.forEach(rc => { roleCounts[rc.role] = rc._count.id })
+        rawRoleCounts.forEach((rc: any) => { roleCounts[rc.role] = rc._count.id })
         roleCounts['ALL'] = await prisma.user.count()
         roleCounts['COURSE_86_DAYS'] = await prisma.enrollment.count({ where: { courseId: 1 } })
         const totalPages = Math.ceil(total / limit)
@@ -623,16 +623,16 @@ export async function getFullSystemTreeAction(systemId: number) {
         
         // Batch query: Lấy users one-time
         const users = await prisma.user.findMany({ where: { id: { in: [...userIdSet] } } })
-        const userMap = new Map(users.map(u => [u.id, u.name]))
+        const userMap = new Map<number, string | null>(users.map((u: { id: number; name: string | null }) => [u.id, u.name]))
         
         // Transform closure data với đúng format mới
-        const closureData = allClosures.map(c => ({
+        const closureData = allClosures.map((c: any) => ({
             ancestorAutoId: c.ancestorId,
             descendantAutoId: c.descendantId,
             depth: c.depth,
             userId: autoToUser.get(c.descendantId) || 0,
             name: userMap.get(autoToUser.get(c.descendantId) || 0) || null
-        })).filter(c => c.userId > 0)
+        })).filter((c: any) => c.userId > 0)
         
         // Build tree với rootSysAutoId và autoToUser map
         const tree = buildFullTreeFromClosures(

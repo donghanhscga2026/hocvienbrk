@@ -22,15 +22,18 @@ import '@xyflow/react/dist/style.css'
 import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, GenealogyNode } from '@/app/actions/admin-actions'
 import ToolHeader from '@/components/tools/ToolHeader'
 
-// ... (các loại type giữ nguyên)
+// Định nghĩa types cho React Flow
+type NodeData = GenealogyNode & {
+  isSearchTarget?: boolean;
+  onToggleExpand?: (id: number) => void;
+  onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
+  isTarget?: boolean; // Cho search node
+  level?: number;     // Cho search node
+  [key: string]: unknown; // Index signature for compatibility with Record<string, unknown>
+}
 
-const GenealogyCard = (props: NodeProps) => {
-  const data = props.data as unknown as GenealogyNode & {
-    isRoot?: boolean;
-    isSearchTarget?: boolean;  // SỬA 2026-03-30: Thêm prop highlight
-    onToggleExpand?: (id: number) => void;
-    onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
-  }
+const GenealogyCard = (props: NodeProps<Node<NodeData>>) => {
+  const data = props.data
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
 
@@ -82,8 +85,8 @@ const GenealogyCard = (props: NodeProps) => {
 }
 
 // SỬA 2026-03-30: Card đơn giản cho search - 2 dòng, responsive
-const SearchNodeCard = (props: NodeProps) => {
-  const data = props.data as { id: number; name: string | null; isTarget?: boolean; level?: number }
+const SearchNodeCard = (props: NodeProps<Node<NodeData>>) => {
+  const data = props.data
   const levelColors = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-rose-500', 'bg-orange-500']
   return (
     <>

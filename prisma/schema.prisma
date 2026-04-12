@@ -320,6 +320,7 @@ model Course {
   enrollments   Enrollment[]
   landingPages  LandingPage[]
   testimonials  CourseTestimonial[]
+  libAccesses   CourseLibAccess[]
 }
 
 model Lesson {
@@ -420,7 +421,22 @@ enum Role {
 enum CourseType {
   NORMAL
   CHALLENGE
+  LIB
 }
+
+model CourseLibAccess {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  email       String    // Email được cấp quyền xem
+  createdAt   DateTime  @default(now())
+  
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, email])
+  @@index([courseId])
+  @@index([email])
+}
+
 
 // ==========================================
 // AFFILIATE SYSTEM ENUMS

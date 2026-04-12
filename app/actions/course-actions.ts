@@ -24,7 +24,8 @@ export async function enrollInCourseAction(courseId: number) {
                 stk: true,
                 name_stk: true,
                 bank_stk: true,
-                noidung_email: true
+                noidung_email: true,
+                type: true
             }
         })
 
@@ -36,16 +37,31 @@ export async function enrollInCourseAction(courseId: number) {
             select: { id: true, name: true, phone: true, email: true }
         })
 
-        // Kiểm tra xem user có active course 1 không
-        const vipEnrollment = await prisma.enrollment.findFirst({
-            where: {
-                userId,
-                courseId: 1,
-                status: 'ACTIVE'
-            }
-        })
-
-        const effectivePhiCoc = vipEnrollment ? 0 : course.phi_coc
+        // Xử lý riêng cho loại khóa học LIB
+        let effectivePhiCoc = course.phi_coc
+        let isLibAllowed = false
+        
+        if (course.type === 'LIB') {
+            if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")
+            const libAccess = await prisma.courseLibAccess.findUnique({
+                where: { courseId_email: { courseId, email: user.email } }
+            })
+            if (!libAccess) throw new Error("Bạn chưa được cấp quyền truy cập tài liệu này. Vui lòng liên hệ Admin.")
+            
+            // Bypass phi_coc, chuyển thẳng trạng thái ACTIVE
+            effectivePhiCoc = 0
+            isLibAllowed = true
+        } else {
+            // Kiểm tra xem user có active course 1 không (Chỉ áp dụng khóa thường/Challenge)
+            const vipEnrollment = await prisma.enrollment.findFirst({
+                where: {
+                    userId,
+                    courseId: 1,
+                    status: 'ACTIVE'
+                }
+            })
+            if (vipEnrollment) effectivePhiCoc = 0
+        }
 
         const existing = await prisma.enrollment.findUnique({
             where: { userId_courseId: { userId, courseId } }
