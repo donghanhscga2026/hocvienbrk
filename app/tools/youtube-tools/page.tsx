@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Play, Search, Loader2, Copy, Download, FileSpreadsheet, Check, AlertCircle, Info, X, Youtube, Link2, RefreshCw, Trash2, CheckCircle2, Eye, Globe, Lock, FileText } from 'lucide-react'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 interface VideoResult {
   stt: number
@@ -813,7 +813,7 @@ export default function YouTubeToolsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <ToolHeader title="YOUTUBE TOOLS" backUrl="/tools" />
+      <MainHeader title="YOUTUBE TOOLS" toolSlug="youtube-tools" />
 
       <div className="max-w-4xl mx-auto p-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex">

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getStudentsAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight } from 'lucide-react'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 const roleConfig: Record<string, { label: string; icon: any; color: string; bgColor: string; textColor: string }> = {
   ALL: { label: 'Tất cả', icon: Users, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
@@ -97,7 +97,7 @@ export default function ToolsStudentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-    <ToolHeader title="THÀNH VIÊN" backUrl="/tools" />
+    <MainHeader title="THÀNH VIÊN" toolSlug="students" />
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {total > 0 ? `${startItem}-${endItem} / ${total}` : '0'}
       </div>

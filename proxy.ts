@@ -17,7 +17,7 @@ const RESERVED_PATHS = new Set([
     'api', 'admin', 'affiliate', 'login', 'register', 'courses', 
     'auth', 'dashboard', 'account', 'settings', 'profile',
     'user', 'checkout', 'payment', 'static', 'assets', '_next',
-    'landing', 'forgot-password', 'tools'
+    'landing', 'forgot-password', 'tools', 'account-settings'
 ])
 
 export default auth(async function middleware(request: NextRequest & { auth: any }) {

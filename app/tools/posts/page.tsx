@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getPostsAction, createPostAction } from '@/app/actions/post-actions'
 import { Plus, Newspaper, Save, Loader2, Image as ImageIcon, X, Trash2, ArrowLeft } from 'lucide-react'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 export default function ToolsPostsPage() {
     const [posts, setPosts] = useState<any[]>([])
@@ -46,7 +46,7 @@ export default function ToolsPostsPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="BẢNG TIN" />
+            <MainHeader title="BẢNG TIN" toolSlug="posts" />
 
             <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
                 <div className="flex items-center justify-between mt-4">

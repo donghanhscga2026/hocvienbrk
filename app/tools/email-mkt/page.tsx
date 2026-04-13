@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 import { Suspense } from 'react'
 import ClientContent from './ClientContent'
 
@@ -34,7 +34,7 @@ export default async function EmailMktPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <ToolHeader title="EMAIL MKT" />
+      <MainHeader title="EMAIL MKT" toolSlug="email-mkt" />
       <div className="max-w-lg mx-auto p-4">
         <div className="flex justify-end mb-4">
           <Link href="/admin/campaigns/new">

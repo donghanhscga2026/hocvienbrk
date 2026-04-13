@@ -10,7 +10,7 @@ import {
   getThemeById,
   isDarkTheme,
 } from '@/app/contexts/theme-config';
-import ToolHeader from '@/components/tools/ToolHeader';
+import MainHeader from '@/components/layout/MainHeader';
 
 const BASIC_COLORS = [
   '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6',
@@ -123,7 +123,7 @@ export default function ThemeSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <ToolHeader title="GIAO DIỆN" />
+      <MainHeader title="GIAO DIỆN" toolSlug="theme" />
 
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         {/* Preset Themes */}
