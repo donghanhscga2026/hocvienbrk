@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { getPendingPayments, getAllPayments, verifyPaymentAction, rejectPaymentAction } from '@/app/actions/payment-actions'
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import Image from 'next/image'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 interface PaymentData {
   id: number
@@ -109,7 +109,7 @@ export default function PaymentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <ToolHeader title="THANH TOÁN" />
+      <MainHeader title="THANH TOÁN" toolSlug="payments" />
 
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {payments.length} yêu cầu

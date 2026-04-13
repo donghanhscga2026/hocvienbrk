@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Inter } from "next/font/google";
+import Script from "next/script";
 import prisma from "@/lib/prisma";
 import "./globals.css";
 import Providers from "./providers";
@@ -60,7 +61,12 @@ export default async function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }} />
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
+        >
+          {INITIAL_SCRIPT}
+        </Script>
       </head>
       <body
         className={`${beVietnamPro.variable} ${inter.variable} antialiased`}

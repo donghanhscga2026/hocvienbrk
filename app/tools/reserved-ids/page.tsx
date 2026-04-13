@@ -3,14 +3,14 @@ import { ArrowLeft } from "lucide-react"
 import { deleteReservedIdAction, getReservedIds } from "@/app/actions/admin-actions"
 import { AddReservedIdForm } from "./components/AddReservedIdForm"
 import { ChangeUserIdForm } from "./components/ChangeUserIdForm"
-import ToolHeader from "@/components/tools/ToolHeader"
+import MainHeader from "@/components/layout/MainHeader"
 
 export default async function ReservedIdsPage() {
     const reservedIds = await getReservedIds()
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="SỐ ĐẸP" />
+            <MainHeader title="SỐ ĐẸP" toolSlug="reserved-ids" />
 
             <div className="p-4 max-w-4xl mx-auto space-y-6">
                 <div>

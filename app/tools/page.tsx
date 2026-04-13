@@ -5,7 +5,8 @@ import { useSession } from 'next-auth/react'
 import { useState, useEffect, Suspense } from 'react'
 import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings, Layout, Loader2, Share2, Copy, X } from 'lucide-react'
 import { Role } from '@prisma/client'
-import ToolHeader from '@/components/tools/ToolHeader'
+
+import MainHeader from '@/components/layout/MainHeader'
 import { AlertBanner, AlertConfig } from '@/components/tools/Alert'
 
 function AlertBannerWrapper({ alert, onClose }: { alert: AlertConfig | null, onClose: () => void }) {
@@ -296,7 +297,7 @@ export default function ToolsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader />
+      <MainHeader title="CÔNG CỤ" />
 
       <AlertBannerWrapper alert={alert} onClose={closeAlert} />
 

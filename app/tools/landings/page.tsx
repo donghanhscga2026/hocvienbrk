@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Plus, Eye, Edit, Trash2, ToggleLeft, ToggleRight, FileText } from 'lucide-react'
 import { getLandingPages, deleteLandingPage } from '@/app/actions/landing-actions'
 import { useEffect, useState } from 'react'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 export default function LandingsPage() {
     const [landings, setLandings] = useState<any[]>([])
@@ -36,7 +36,7 @@ export default function LandingsPage() {
     
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="LANDING PAGES" />
+            <MainHeader title="LANDING PAGES" toolSlug="landings" />
 
             <div className="max-w-6xl mx-auto p-6">
                 <div className="flex items-center justify-between mb-6">

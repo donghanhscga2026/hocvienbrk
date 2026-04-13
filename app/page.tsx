@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import Header from "@/components/layout/Header";
+import MainHeader from "@/components/layout/MainHeader";
 import MessageCard from "@/components/home/MessageCard";
 import HomeClient from "@/components/home/HomeClient";
 import prisma from "@/lib/prisma";
@@ -121,7 +121,7 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-brk-background">
       {/* Header */}
-      <Header session={session} userImage={userImage} />
+      <MainHeader title="HỌC VIỆN BRK" />
 
       {/* Hero Section */}
       <div className="pt-16">

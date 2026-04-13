@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { getAdminCoursesAction } from '@/app/actions/admin-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 export default function ToolsCoursesPage() {
     const [courses, setCourses] = useState<any[]>([])
@@ -24,7 +24,7 @@ export default function ToolsCoursesPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <ToolHeader title="KHÓA HỌC" backUrl="/tools" />
+            <MainHeader title="KHÓA HỌC" toolSlug="courses" />
 
             <div className="p-4 max-w-lg mx-auto space-y-6 pb-20">
                 <div className="flex items-center justify-between mt-4">

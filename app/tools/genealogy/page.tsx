@@ -20,7 +20,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 // Constants cho tree layout
 const NODE_WIDTH = 160
@@ -742,7 +742,7 @@ function GenealogyFlow() {
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden font-sans text-slate-900">
-      <ToolHeader title="NHÂN MẠCH" toolSlug="genealogy" />
+      <MainHeader title="NHÂN MẠCH" toolSlug="genealogy" />
 
       {/* Controls */}
       <div className="flex flex-nowrap items-center gap-1 px-2 py-2 bg-gray-50 border-b overflow-x-auto">
