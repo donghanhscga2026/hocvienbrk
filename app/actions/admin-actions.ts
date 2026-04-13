@@ -260,21 +260,24 @@ export async function getGenealogyChildrenAction(parentId: number) {
 export async function getSystemTreeAction(systemId: number) {
     const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
+    const isRootAdmin = userId === 0
     try {
         let rootUserId = userId // Mặc định lấy chính mình làm gốc
         
         const systemInfo = await getUserSystemInfo(userId)
         // Nếu không thuộc hệ thống này
         if (!systemInfo || systemInfo.onSystem !== systemId) {
-            if (isAdmin) {
-                // Nếu là Admin, cho phép xem từ Gốc cao nhất của hệ thống
+            if (isRootAdmin) {
+                // Admin id=0 được xem tất cả
                 const root = await getSystemRootUser(systemId)
                 if (!root) return { success: false, error: "Không tìm thấy root" }
                 rootUserId = root.id
             } else {
-                return { success: false, error: "Bạn không thuộc hệ thống này" }
+                // Admin id!=0 hoặc user thường không thuộc hệ thống
+                return { success: false, error: "Bạn chưa tham gia hệ thống này" }
             }
         }
+        // Nếu thuộc hệ thống (bao gồm cả admin id!=0), xem từ vị trí mình trở xuống
         
         const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId)
         return { success: true, tree }
@@ -714,7 +717,7 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
             })
         }
         
-        directChildren.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            directChildren.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         
         return { 
             success: true, 
@@ -731,4 +734,91 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
             }
         }
     } catch (error: any) { return { success: false, error: error.message } }
+}
+
+// ==========================================
+// SYSTEM TREE - LẤY DANH SÁCH HỆ THỐNG
+// ==========================================
+
+export interface SystemTreeInfo {
+    onSystem: number
+    nameSystem?: string
+}
+
+export async function getAvailableSystemsAction() {
+    try {
+        console.log('[getAvailableSystemsAction] Fetching systems from DB...')
+        const systems = await prisma.systemTree.findMany({
+            orderBy: { onSystem: 'asc' },
+            select: {
+                onSystem: true,
+                nameSystem: true
+            }
+        })
+        console.log('[getAvailableSystemsAction] Systems found:', systems)
+        return { success: true, systems }
+    } catch (error: any) {
+        console.error('[getAvailableSystemsAction] Error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+// ==========================================
+// LẤY THÔNG TIN USER HIỆN TẠI
+// ==========================================
+
+export async function getCurrentUserRoleAction() {
+    const session = await auth()
+    console.log('[getCurrentUserRoleAction] Session:', session)
+    if (!session?.user?.id) {
+        return { success: false, role: null }
+    }
+    const role = session.user.role
+    console.log('[getCurrentUserRoleAction] User role:', role, typeof role)
+    const userId = parseInt(session.user.id)
+    const validUserId = isNaN(userId) || userId < 0 ? null : userId
+    return { 
+        success: true, 
+        role: role,
+        userId: validUserId
+    }
+}
+
+// ==========================================
+// SYSTEM TREE - TẠO ROOT MỚI (CHỈ ADMIN)
+// ==========================================
+
+export async function createSystemRootAction(systemId: number, userId: number) {
+    const session = await auth()
+    if (!session?.user?.id) throw new Error("Unauthorized")
+    
+    // Chỉ admin mới được tạo root
+    if (session.user.role !== Role.ADMIN) {
+        return { success: false, error: "Chỉ admin mới được tạo hệ thống mới" }
+    }
+    
+    try {
+        // Kiểm tra đã có root chưa
+        const existingRoot = await prisma.system.findFirst({
+            where: { onSystem: systemId, refSysId: 0 }
+        })
+        
+        if (existingRoot) {
+            return { success: false, error: "Hệ thống đã có root" }
+        }
+        
+        // Tạo root mới
+        const newSystem = await prisma.system.create({
+            data: {
+                userId: userId,
+                onSystem: systemId,
+                refSysId: 0  // Root
+            }
+        })
+        
+        return { success: true, system: newSystem }
+    } catch (error: any) {
+        console.error('[createSystemRootAction] Error:', error)
+        return { success: false, error: error.message }
+    }
 }

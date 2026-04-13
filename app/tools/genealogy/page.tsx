@@ -19,7 +19,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, GenealogyNode } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import ToolHeader from '@/components/tools/ToolHeader'
 
 // Constants cho tree layout
@@ -213,7 +213,42 @@ function GenealogyFlow() {
   const lastExpandedIdRef = useRef<number | null>(null)
   const activeFocusMapRef = useRef<Map<number, number>>(new Map())
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
+  const [availableSystems, setAvailableSystems] = useState<SystemTreeInfo[]>([])
+  const [isTreeEmpty, setIsTreeEmpty] = useState<boolean>(false)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const [displayMode, setDisplayMode] = useState<'default' | 'full'>('default')
   const focusMapSizeRef = useRef<number>(0)
+  
+  // Load available systems from database
+  useEffect(() => {
+    async function loadSystems() {
+      console.log('[Genealogy] Loading available systems...')
+      try {
+        const result = await getAvailableSystemsAction()
+        console.log('[Genealogy] Systems result:', result)
+        if (result.success && Array.isArray(result.systems) && result.systems.length > 0) {
+          setAvailableSystems(result.systems)
+          console.log('[Genealogy] Systems loaded from DB:', result.systems.length)
+        } else {
+          console.log('[Genealogy] No systems or error:', result.error)
+        }
+      } catch (err) {
+        console.error('[Genealogy] Error loading systems:', err)
+      }
+    }
+    loadSystems()
+    
+    // Load current user role
+    async function loadUserRole() {
+      const result = await getCurrentUserRoleAction()
+      console.log('[Genealogy] User role result:', result)
+      if (result.success && result.role === 'ADMIN') {
+        setIsAdmin(true)
+        console.log('[Genealogy] Set isAdmin = true')
+      }
+    }
+    loadUserRole()
+  }, [])
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -233,6 +268,7 @@ function GenealogyFlow() {
 
   // Add F1 and delete node modals
   const [addF1Modal, setAddF1Modal] = useState<{ parentId: number, show: boolean }>({ parentId: 0, show: false })
+  const [createRootModal, setCreateRootModal] = useState<{ show: boolean, systemId: number | null }>({ show: false, systemId: null })
   const [deleteNodeModal, setDeleteNodeModal] = useState<{ nodeId: number, show: boolean }>({ nodeId: 0, show: false })
 
   const [searchInput, setSearchInput] = useState<string>('')
@@ -245,7 +281,6 @@ function GenealogyFlow() {
 
   // Edit and display modes
   const [editMode, setEditMode] = useState<boolean>(false)
-  const [displayMode, setDisplayMode] = useState<'default' | 'full'>('default')
 
   // User list for Add F1 modal
   const [usersList, setUsersList] = useState<{ id: number; name: string | null; email: string | null }[]>([])
@@ -434,6 +469,7 @@ function GenealogyFlow() {
     setSelectedSystem(systemId)
     setLoading(true)
     setError(null)
+    setIsTreeEmpty(false)
     activeFocusMapRef.current = new Map()
     focusMapSizeRef.current = 0
     setFocusMapVersion(v => v + 1)
@@ -441,28 +477,51 @@ function GenealogyFlow() {
     setIsSearchMode(false)
     setSearchResult(null)
 
+    // Lấy userId hiện tại
+    const roleResult = await getCurrentUserRoleAction()
+    const currentUserId = roleResult.userId || 0
+    const isAdminNow = roleResult.success && roleResult.role === 'ADMIN'
+
     try {
       if (systemId === null) {
         setFullTree(null)
       } else if (systemId === 0) {
-        const result = await getGenealogyTreeAction(0)
+        // Hệ thống Học viên - lấy từ user đang đăng nhập
+        const result = await getGenealogyTreeAction(currentUserId)
         if (result.success && result.tree) {
           setFullTree(result.tree)
+          setIsTreeEmpty(false)
         } else {
-          setError(result.error || 'Lỗi tải dữ liệu')
+          setFullTree(null)
+          setIsTreeEmpty(true)
+          alert('Chưa có dữ liệu nhân mạch. Hãy bắt đầu giới thiệu thành viên để xây dựng cây.')
         }
       } else {
-        // Luôn dùng getSystemTreeAction vì API này đã trả về cấu trúc lồng nhau đúng. 
-        // Thay đổi UI Full Mode sẽ chỉ thay đổi cách parse tree ở generateGraphNodes
+        // Hệ thống TCA/KTC
         const result = await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
           setFullTree(result.tree)
+          setIsTreeEmpty(false)
         } else {
-          setError(result.error || 'Bạn không thuộc hệ thống này')
+          const errMsg = result.error || ''
+          // Nếu lỗi là "không tìm thấy root" hoặc "không thuộc hệ thống"
+          const isNoRootError = errMsg.includes('root') || errMsg.includes('thuộc')
+          
+          if (isAdminNow && isNoRootError) {
+            // Admin + hệ thống chưa có root
+            setFullTree(null)
+            setIsTreeEmpty(true)
+            alert('Hệ thống chưa có dữ liệu. Nhấn nút + để tạo cây sơ đồ với bạn làm root.')
+          } else {
+            // User thường hoặc đã có root nhưng không thuộc
+            setFullTree(null)
+            alert('Bạn chưa tham gia hệ thống đã chọn')
+          }
         }
       }
     } catch (e) {
-      setError('Lỗi khi tải dữ liệu')
+      setFullTree(null)
+      setError("Lỗi khi tải dữ liệu")
     }
     setLoading(false)
   }, [])
@@ -471,7 +530,7 @@ function GenealogyFlow() {
 
 
   const initTree = useCallback(async (rootId: number = 0) => {
-    setLoading(true); setError(null); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
+    setLoading(true); setError(null); setIsTreeEmpty(false); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
 
     let result;
     if (selectedSystem === null) {
@@ -485,8 +544,12 @@ function GenealogyFlow() {
 
     if (result && result.success && result.tree) {
       setFullTree(result.tree)
+      setIsTreeEmpty(false)
     } else if (result) {
-      setError(result.error || 'Lỗi tải dữ liệu')
+      // Khi không tìm thấy cây (root không tồn tại)
+      setFullTree(null)
+      setIsTreeEmpty(true)
+      setError(null)
     }
     setLoading(false)
   }, [selectedSystem])
@@ -604,6 +667,20 @@ function GenealogyFlow() {
     }
   }, [addF1Modal.show, usersList.length])
 
+  // Fetch users when Create Root modal opens
+  useEffect(() => {
+    if (createRootModal.show && usersList.length === 0) {
+      setLoadingUsers(true)
+      fetch('/api/admin/users/list')
+        .then(res => res.json())
+        .then(data => {
+          if (data.users) setUsersList(data.users)
+        })
+        .catch(console.error)
+        .finally(() => setLoadingUsers(false))
+    }
+  }, [createRootModal.show, usersList.length])
+
   // Filtered users based on search
   const filteredUsers = userSearch.trim()
     ? usersList.filter(u => 
@@ -665,52 +742,85 @@ function GenealogyFlow() {
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden font-sans text-slate-900">
-      <ToolHeader title="NHÂN MẠCH" />
-
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-6 px-4 py-2 bg-white border-b">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-          <span className="text-[10px] font-bold text-slate-500">Chỉ F1</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-          <span className="text-[10px] font-bold text-slate-500">Có F2</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-rose-500"></div>
-          <span className="text-[10px] font-bold text-slate-500">Có F3↗ </span>
-        </div>
-      </div>
+      <ToolHeader title="NHÂN MẠCH" toolSlug="genealogy" />
 
       {/* Controls */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b">
-        <div className="relative">
+      <div className="flex flex-nowrap items-center gap-1 px-2 py-2 bg-gray-50 border-b overflow-x-auto">
+        {/* Dropdown chọn hệ thống - đủ rộng hiển thị mũi tên */}
+        <div className="relative shrink-0">
           <select
             value={selectedSystem === null ? '' : selectedSystem}
             onChange={(e) => {
               const val = e.target.value
-              handleSystemChange(val === '' ? null : Number(val))
+              const systemId = val === '' ? null : Number(val)
+              setSelectedSystem(systemId)
+              if (systemId !== null && systemId !== 0) {
+                setDisplayMode('full')
+              } else {
+                setDisplayMode('default')
+              }
+              handleSystemChange(systemId)
             }}
-            className="appearance-none bg-white text-slate-700 text-xs font-bold px-3 py-1.5 pr-8 rounded-lg border border-gray-200 outline-none cursor-pointer hover:bg-gray-100 transition-all"
+            className="w-28 sm:w-32 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer"
           >
-            <option value="">Chọn theo hệ thống</option>
-            <option value="0">Học viên</option>
-            <option value="1">TCA</option>
-            <option value="2">KTC</option>
+            <option value="">Chọn hệ thống</option>
+            {availableSystems.map((sys) => (
+              <option key={sys.onSystem} value={sys.onSystem}>
+                {sys.nameSystem || sys.onSystem}
+              </option>
+            ))}
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <svg className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
 
-        <button onClick={() => initTree(0)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-[10px] font-bold hover:bg-emerald-600 transition-all">
-          XEM
-        </button>
+        {/* Dropdown chế độ hiển thị */}
+        <select
+          value={displayMode}
+          onChange={(e) => setDisplayMode(e.target.value as 'default' | 'full')}
+          className="w-14 sm:w-16 bg-white text-slate-700 text-[10px] font-bold px-1 py-1.5 rounded-lg border border-gray-200 outline-none cursor-pointer shrink-0"
+        >
+          <option value="default">Gọn</option>
+          <option value="full">Full</option>
+        </select>
 
-        {/* Edit mode controls */}
-        <>
+        {/* Nút Tạo cây/Sửa */}
+        {isTreeEmpty && selectedSystem !== null && selectedSystem !== 0 ? (
           <button 
+            type="button"
+            onClick={async (e) => {
+              console.log('[Tạo cây] Clicked', e)
+              e.preventDefault()
+              e.stopPropagation()
+              const roleResult = await getCurrentUserRoleAction()
+              console.log('[Tạo cây] Role result:', roleResult)
+              if (!roleResult.userId && roleResult.userId !== 0) {
+                alert('Bạn chưa đăng nhập')
+                return
+              }
+              const userId = roleResult.userId ?? 0
+              setLoading(true)
+              const result = await createSystemRootAction(selectedSystem, userId)
+              console.log('[Tạo cây] Result:', result)
+              if (result.success) {
+                handleSystemChange(selectedSystem)
+              } else {
+                alert(result.error || 'Lỗi khi tạo root')
+                setLoading(false)
+              }
+            }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 transition-all shrink-0"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="hidden sm:inline">Tạo cây</span>
+          </button>
+        ) : (
+          <button
             onClick={() => setEditMode(!editMode)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
               editMode 
                 ? 'bg-orange-500 text-white hover:bg-orange-600' 
                 : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -718,38 +828,32 @@ function GenealogyFlow() {
           >
             {editMode ? 'HỦY' : 'SỬA'}
           </button>
-          
-          <select
-            value={displayMode}
-            onChange={(e) => setDisplayMode(e.target.value as 'default' | 'full')}
-            className="bg-white text-slate-700 text-xs font-bold px-2 py-1.5 rounded-lg border border-gray-200 outline-none cursor-pointer"
-          >
-            <option value="default">Mặc định</option>
-            <option value="full">Full</option>
-          </select>
-        </>
+        )}
 
-        <div className="relative flex items-center flex-1 max-w-[200px]">
+        {/* Ô tìm kiếm - nhỏ gọn */}
+        <div className="relative flex items-center w-[140px] sm:w-[170px] shrink-0">
           <input
             type="text"
-            placeholder="Tìm kiếm theo ID"
+            placeholder="Tìm theo ID..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className={`w-full bg-white text-slate-700 text-xs font-bold pl-3 pr-12 py-1.5 rounded-lg border border-gray-200 outline-none placeholder:text-slate-400 ${searchError ? 'ring-2 ring-red-500' : ''}`}
+            className={`w-full bg-white text-slate-700 text-[10px] font-bold pl-2 pr-6 py-1.5 rounded-lg border border-gray-200 outline-none placeholder:text-slate-400 ${searchError ? 'ring-1 ring-red-500' : ''}`}
           />
           {searchInput && (
             <button
               onClick={() => { setSearchInput(''); setSearchError(null); }}
-              className="absolute right-10 text-red-400 hover:text-red-300"
+              className="absolute right-4 text-red-400"
             >
               <X className="h-3 w-3" />
             </button>
           )}
           <button
             onClick={handleSearch}
-            className="absolute right-1 p-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 transition-all"
+            className="absolute right-1 p-1 rounded bg-blue-600 text-white"
           >
-            <Search className="h-3 w-3" />
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </button>
         </div>
       </div>
