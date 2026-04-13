@@ -19,7 +19,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, GenealogyNode } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import ToolHeader from '@/components/tools/ToolHeader'
 
 // Định nghĩa types cho React Flow
@@ -132,6 +132,27 @@ function GenealogyFlow() {
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
+  const [availableSystems, setAvailableSystems] = useState<SystemTreeInfo[]>([])
+
+  // Load available systems from database
+  useEffect(() => {
+    async function loadSystems() {
+      console.log('[Admin Genealogy] Loading available systems...')
+      try {
+        const result = await getAvailableSystemsAction()
+        console.log('[Admin Genealogy] Systems result:', result)
+        if (result.success && Array.isArray(result.systems)) {
+          setAvailableSystems(result.systems)
+          console.log('[Admin Genealogy] Systems loaded:', result.systems.length)
+        } else {
+          console.log('[Admin Genealogy] No systems or error:', result)
+        }
+      } catch (err) {
+        console.error('[Admin Genealogy] Error loading systems:', err)
+      }
+    }
+    loadSystems()
+  }, [])
 
   // SỬA 2026-03-30: Thêm state cho tính năng tìm kiếm
   const [searchInput, setSearchInput] = useState<string>('')
@@ -488,9 +509,13 @@ function GenealogyFlow() {
             className="appearance-none bg-white text-slate-700 text-xs font-bold px-3 py-1.5 pr-8 rounded-lg border border-gray-200 outline-none cursor-pointer hover:bg-gray-100 transition-all"
           >
             <option value="">Chọn theo hệ thống</option>
-            <option value="0">Học viên</option>
-            <option value="1">TCA</option>
-            <option value="2">KTC</option>
+            {availableSystems.length > 0 ? availableSystems.map((sys) => (
+              <option key={sys.onSystem} value={sys.onSystem}>
+                {sys.nameSystem || `Hệ thống ${sys.onSystem}`}
+              </option>
+            )) : (
+              <option disabled>Đang tải... (debug: {availableSystems.length} systems)</option>
+            )}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>

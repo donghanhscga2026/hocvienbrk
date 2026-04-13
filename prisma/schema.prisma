@@ -566,13 +566,12 @@ model YouTubeToken {
 // SYSTEM TREE - 2026-04-10
 // ==========================================
 
-// Bảng lưu danh sách cây hệ thống (TCA/KTC)
 model SystemTree {
-  id        Int      @id @default(autoincrement())
-  onSystem  Int      // 1=TCA, 2=KTC
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  onSystem    Int      @unique // 0=Học viên, 1=TCA, 2=KTC
+  nameSystem  String   @map("name_system") // Tên của hệ thống
+  createdAt   DateTime @default(now())
   
-  @@index([onSystem])
   @@map("system_tree")
 }
 
@@ -1001,4 +1000,21 @@ model Tool {
 
   @@index([isActive])
   @@index([slug])
+}
+
+// ==========================================
+// TOOL HELP - Hướng dẫn sử dụng công cụ
+// ==========================================
+
+model ToolHelp {
+  id          Int       @id @default(autoincrement())
+  toolSlug    String    @unique // slug của tool: "genealogy", "affiliate", "courses",...
+  title       String    // tiêu đề modal
+  content     Json      // nội dung hướng dẫn (array of sections)
+  order       Int       @default(0) // thứ tự hiển thị
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([toolSlug])
 }
