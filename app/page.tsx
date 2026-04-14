@@ -89,8 +89,6 @@ export default async function Home() {
     };
   });
 
-
-
   // 1. Lọc lấy các khóa học đã đăng ký
   const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
 
@@ -121,13 +119,11 @@ export default async function Home() {
   return (
     <main className="min-h-screen bg-brk-background">
       {/* Header */}
-      <MainHeader title="HỌC VIỆN BRK" />
+      <MainHeader title="NGÔI NHÀ CỦA BẠN" />
 
       {/* Hero Section */}
-      <div className="pt-16">
-        <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
-      </div>
-
+              <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
+      
       {/* Lộ trình Zero 2 Hero & Course Sections - Client Component */}
       <HomeClient 
         courses={courses}
@@ -147,7 +143,7 @@ export default async function Home() {
 
       {/* Footer (Optional simple) */}
       <footer className="bg-brk-background py-12 text-center text-brk-muted text-sm">
-        <p>© 2026 Học viện BRK. All rights reserved.</p>
+        <p>© 2026 BRK. All rights reserved.</p>
       </footer>
     </main>
   );

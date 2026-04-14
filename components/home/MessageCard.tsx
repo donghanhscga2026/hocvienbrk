@@ -29,7 +29,7 @@ interface MessageCardProps {
 const DEFAULT_MESSAGE: Message = {
     id: 0,
     content: "Tri thức là sức mạnh - Học hôm nay, thành công ngày mai",
-    detail: "Học viện BRK mang đến những tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp. Mỗi ngày học tập là một bước tiến trên con đường thành công.",
+    detail: "BRK mang đến những tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp. Mỗi ngày học tập là một bước tiến trên con đường thành công.",
     imageUrl: null
 }
 
@@ -72,7 +72,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                                 className="uppercase drop-shadow-xl"
                                 style={{ fontSize: 'clamp(0.2rem, 5vw, 3rem)', color: '#ffffff' }}
                             >
-                                HỌC VIỆN BRK
+                                BRK
                             </span>
 
                             <span
