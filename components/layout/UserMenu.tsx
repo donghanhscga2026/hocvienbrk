@@ -3,12 +3,14 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
-import { Settings, LogOut, ChevronDown, LogIn } from 'lucide-react'
+import { Settings, LogOut, ChevronDown, LogIn, Check } from 'lucide-react'
+import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
 
 export default function UserMenu() {
     const { data: session } = useSession()
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [userImage, setUserImage] = useState<string | null>(null)
+    const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('default')
     const userMenuRef = useRef<HTMLDivElement>(null)
 
     const userName = session?.user?.name || ''
@@ -29,6 +31,34 @@ export default function UserMenu() {
                 .catch(console.error)
         }
     }, [session?.user?.id])
+
+    // Load current theme from localStorage
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('site-theme') as ThemeId || 'default'
+            setCurrentThemeId(saved)
+        }
+    }, [])
+
+    // Apply theme function
+    function applyThemeQuick(themeId: ThemeId) {
+        localStorage.setItem('site-theme', themeId)
+        let themeColors = presetThemes[0].colors
+        if (themeId !== 'default') {
+            const theme = getThemeById(themeId)
+            themeColors = theme.colors
+        }
+        const isDark = isDarkTheme(themeId)
+        let styleEl = document.getElementById('theme-base-css')
+        if (!styleEl) {
+            styleEl = document.createElement('style')
+            styleEl.id = 'theme-base-css'
+            document.head.appendChild(styleEl)
+        }
+        styleEl.textContent = generateThemeCSS(themeColors, isDark)
+        document.documentElement.setAttribute('data-theme', themeId)
+        setCurrentThemeId(themeId)
+    }
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -75,6 +105,29 @@ export default function UserMenu() {
                         <p className="text-xs font-bold text-brk-on-surface truncate">{session.user?.name}</p>
                         <p className="text-[10px] text-brk-muted truncate">{session.user?.email}</p>
                     </div>
+
+                    {/* Theme Picker */}
+                    <div className="border-t border-brk-outline pt-2 mt-2">
+                        <p className="px-4 py-1 text-[10px] font-bold text-brk-muted uppercase">Theme</p>
+                        <div className="flex items-center gap-1 px-4 pb-2">
+                            {presetThemes.map((theme) => (
+                                <button
+                                    key={theme.id}
+                                    onClick={() => applyThemeQuick(theme.id)}
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+                                        currentThemeId === theme.id ? 'ring-2 ring-brk-primary scale-110' : ''
+                                    }`}
+                                    style={{ backgroundColor: theme.colors.primary }}
+                                    title={theme.name}
+                                >
+                                    {currentThemeId === theme.id && <Check className="w-3 h-3" style={{ color: getTextColorForBg(theme.colors.primary, theme.id) }} />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="border-t border-brk-outline pt-2 mt-2" />
+
                     <Link
                         href="/tools"
                         onClick={() => setIsUserMenuOpen(false)}
@@ -86,14 +139,14 @@ export default function UserMenu() {
                     <Link
                         href="/account-settings"
                         onClick={() => setIsUserMenuOpen(false)}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-on-surface hover:bg-brk-background transition-colors"
                     >
                         <Settings className="h-4 w-4" />
                         Cài đặt tài khoản
                     </Link>
                     <button
                         onClick={() => signOut()}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-accent hover:bg-brk-background transition-colors"
                     >
                         <LogOut className="h-4 w-4" />
                         Đăng xuất

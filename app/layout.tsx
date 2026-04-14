@@ -19,8 +19,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Học Viện BRK - Nâng Tầm Năng Lực",
-  description: "Học viện đào tạo thực chiến về AI, Nhân hiệu và Affiliate",
+  title: "Cộng đồng BRK - Nâng Tầm Năng Lực",
+  description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
 };
 
 async function getSiteTheme() {
