@@ -10,7 +10,7 @@ export default function UserMenu() {
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [userImage, setUserImage] = useState<string | null>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
-    
+
     const userName = session?.user?.name || ''
     const userInitials = userName
         ? userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -83,21 +83,17 @@ export default function UserMenu() {
                         <Settings className="h-4 w-4" />
                         Công cụ hỗ trợ
                     </Link>
-                    <button
-                        onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            setIsUserMenuOpen(false)
-                            window.location.replace('/account-settings')
-                        }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-on-surface hover:bg-brk-background transition-colors"
+                    <Link
+                        href="/account-settings"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors"
                     >
                         <Settings className="h-4 w-4" />
                         Cài đặt tài khoản
-                    </button>
+                    </Link>
                     <button
                         onClick={() => signOut()}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-accent hover:bg-brk-background transition-colors"
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors"
                     >
                         <LogOut className="h-4 w-4" />
                         Đăng xuất
