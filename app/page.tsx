@@ -1,35 +1,91 @@
-import { auth } from "@/auth";
-import MainHeader from "@/components/layout/MainHeader";
-import MessageCard from "@/components/home/MessageCard";
-import HomeClient from "@/components/home/HomeClient";
-import prisma from "@/lib/prisma";
-import { getRandomMessage } from "./actions/message-actions";
-import { resetSurveyAction } from "./actions/survey-actions";
-import { Sparkles } from "lucide-react";
+import { Metadata } from 'next'
+import { auth } from '@/auth'
+
+import MainHeader from '@/components/layout/MainHeader'
+import HeroSection from '@/components/home/HeroSection'
+import HomePageClient from '@/components/home/HomePageClient'
+import FooterSection from '@/components/home/FooterSection'
+
+import prisma from '@/lib/prisma'
+import { getDefaultProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
+import { getRandomMessage } from './actions/message-actions'
+import { resetSurveyAction } from './actions/survey-actions'
+
+export const metadata: Metadata = {
+  title: 'Học viện BRK - Ngân hàng Phước Báu',
+  description: 'Học viện đào tạo kỹ năng thực chiến hàng đầu Việt Nam',
+}
 
 export default async function Home() {
-  const session = await auth();
+  const session = await auth()
+  
+  // Lấy BRK Profile mặc định
+  const profile = await getDefaultProfile()
+  
+  // Nếu không có profile, dùng fallback
+  const safeProfile = profile || {
+    title: 'NGÂN HÀNG PHƯỚC BÁU',
+    subtitle: 'Tri thức là sức mạnh',
+    showCommunity: true,
+    showAllCourses: true,
+    communityTitle: 'Bảng tin cộng đồng',
+    coursesTitle: 'Khóa học nổi bật',
+    allCoursesTitle: 'Tất cả khóa học',
+    footerText: '© 2026 Ngân hàng Phước Báu. Mọi quyền được bảo lưu.',
+    backgroundColor: null,
+    heroImage: null,
+    heroOverlay: 0.3,
+    messageContent: null,
+    messageDetail: null,
+    messageImage: null,
+    surveyTitle: null,
+    customRoadmap: null,
+    roadmapTitle: null,
+    courseIds: null,
+    accentColor: null,
+    textColor: null,
+    footerLinks: null,
+    metaTitle: 'Học viện BRK',
+    metaDescription: null,
+    metaImage: null,
+    themeId: null,
+    viewCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
 
-  // [OPTIMIZED] Dùng single query thay vì nhiều queries để giảm connection usage
-  // Supabase free tier có connection limit thấp (1 connection)
-  
-  const userIdNum = session?.user?.id ? parseInt(session.user.id) : null;
-  
-  const [courses, userRecord, roadmapPoints, message, enrollments] = await Promise.all([
-    (prisma as any).course.findMany({
-      where: { status: true },
-      orderBy: [{ pin: 'asc' }, { id: 'asc' }]
-    }),
-    userIdNum
-      ? (prisma as any).user.findUnique({
-          where: { id: userIdNum },
-          select: { name: true, id: true, image: true, phone: true, roadmap: true }
-        })
-      : null,
-    (prisma as any).roadmapPoint.findMany({ orderBy: { pointId: 'asc' } }),
+  // Tăng view count (async)
+  if (profile?.slug) {
+    incrementProfileView(profile.slug).catch(console.error)
+  }
+
+  // Lấy user ID
+  const userIdNum = session?.user?.id ? parseInt(session.user.id) : null
+
+  // Lấy các data cần thiết (parallel)
+  const [
+    courses,
+    survey,
+    posts,
+    message,
+    userRecord,
+    enrollments,
+    roadmapPoints
+  ] = await Promise.all([
+    getCoursesForProfile(safeProfile),
+    getSurveyForProfile(safeProfile),
+    getPostsForProfile(safeProfile),
     getRandomMessage(),
     userIdNum
-      ? (prisma as any).enrollment.findMany({
+      ? prisma.user.findUnique({
+          where: { id: userIdNum },
+          select: {
+            name: true, id: true, image: true, phone: true, roadmap: true
+          }
+        })
+      : null,
+    userIdNum
+      ? prisma.enrollment.findMany({
           where: { userId: userIdNum },
           select: {
             id: true,
@@ -41,44 +97,29 @@ export default async function Home() {
             _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
           }
         })
-      : []
-  ]);
+      : [],
+    prisma.roadmapPoint.findMany({ orderBy: { pointId: 'asc' } })
+  ])
 
-  const userName = userRecord?.name ?? null;
-  const userId = userRecord?.id ?? null;
-  const userImage = userRecord?.image ?? session?.user?.image ?? null;
-  const userPhone = userRecord?.phone ?? null;
-  
-  // Dữ liệu từ bảng Roadmap mới
-  const userRoadmap = userRecord?.roadmap;
-  const customPath = (userRoadmap?.customPath as number[] | null) ?? null; // Đảm bảo luôn là null nếu không có
-  const userGoal = userRoadmap?.goal ?? null;
-  const targetPointId = userRoadmap?.targetPointId ?? 1;
-  const safeRoadmapPoints = roadmapPoints || []; // Đảm bảo là mảng
-
-  // 1. Sử dụng Set để lưu ID khóa học đã đăng ký
-  let myCourseIds = new Set<number>();
-
-  let enrollmentsMap: Record<number, { 
-    status: string; 
-    startedAt: Date | null; 
-    completedCount: number; 
-    totalLessons: number;
-    enrollmentId?: number;
+  // Xử lý enrollments map
+  const myCourseIds = new Set<number>()
+  const enrollmentsMap: Record<number, {
+    status: string
+    startedAt: Date | null
+    completedCount: number
+    totalLessons: number
+    enrollmentId?: number
     payment?: {
-      id: number;
-      status: string;
-      proofImage?: string | null;
-    };
-  }> = {};
-
-  // [OPTIMIZE] enrollments đã lấy sẵn từ Promise.all, không cần query lại
-  (enrollments as any[]).forEach((e: any) => {
-    // Chỉ thêm vào danh sách "Khóa học của tôi" nếu đã kích hoạt hoặc hoàn thành
-    if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
-      myCourseIds.add(e.courseId);
+      id: number
+      status: string
+      proofImage?: string | null
     }
+  }> = {}
 
+  enrollments.forEach((e: any) => {
+    if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
+      myCourseIds.add(e.courseId)
+    }
     enrollmentsMap[e.courseId] = {
       status: e.status,
       startedAt: e.startedAt,
@@ -86,65 +127,76 @@ export default async function Home() {
       totalLessons: e.course?._count?.lessons || 0,
       enrollmentId: e.id,
       payment: e.payment
-    };
-  });
-
-  // 1. Lọc lấy các khóa học đã đăng ký
-  const myCourses = courses.filter((c: any) => myCourseIds.has(c.id));
-
-  // Lọc khóa học chưa đăng ký và ưu tiên PENDING lên đầu
-  const otherCourses = courses
-    .filter((c: any) => !myCourseIds.has(c.id))
-    .sort((a: any, b: any) => {
-      const aPending = enrollmentsMap[a.id]?.status === 'PENDING' ? 0 : 1
-      const bPending = enrollmentsMap[b.id]?.status === 'PENDING' ? 0 : 1
-      return aPending - bPending
-    })
-
-  // Gom nhóm khóa học theo category cho phần "Tất cả khóa học"
-  const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
-    const category = course.category || "Khác";
-    const existingGroup = acc.find(g => g.category === category);
-    if (existingGroup) {
-      existingGroup.courses.push(course);
-    } else {
-      acc.push({ category, courses: [course] });
     }
-    return acc;
-  }, []);
+  })
 
-  // Kiểm tra user có kích hoạt khóa 1 (86 ngày) không
-  const isCourseOneActive = enrollmentsMap[1]?.status === 'ACTIVE';
+  // Phân loại courses
+  const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
+  const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
+
+  // Group courses theo category
+  const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
+    const category = course.category || "Khác"
+    const existingGroup = acc.find(g => g.category === category)
+    if (existingGroup) {
+      existingGroup.courses.push(course)
+    } else {
+      acc.push({ category, courses: [course] })
+    }
+    return acc
+  }, [])
+
+  // User data
+  const userName = userRecord?.name ?? null
+  const userId = userRecord?.id ?? null
+  const userPhone = userRecord?.phone ?? null
+  const userRoadmap = userRecord?.roadmap
+  const customPath = userRoadmap?.customPath ?? null
+  const userGoal = userRoadmap?.goal ?? null
+  const targetPointId = userRoadmap?.targetPointId ?? 1
 
   return (
-    <main className="min-h-screen bg-brk-background">
+    <main className="min-h-screen" style={{
+      backgroundColor: safeProfile.backgroundColor || undefined
+    }}>
       {/* Header */}
-      <MainHeader title="NGÔI NHÀ CỦA BẠN" />
-
-      {/* Hero Section */}
-              <MessageCard message={message} session={session} userName={userName || ''} userId={userId ? String(userId) : ''} />
+      <MainHeader
+        title={safeProfile.title || 'TRANG CHỦ'}
+        profile={profile}
+      />
       
-      {/* Lộ trình Zero 2 Hero & Course Sections - Client Component */}
-      <HomeClient 
+      {/* Hero Section - Full width, Server-side render */}
+      <HeroSection
+        profile={safeProfile}
+        session={session}
+        userName={userName || ''}
+        userId={userId ? String(userId) : ''}
+        isDefault={profile?.isDefault || false}
+        messageImageUrl={message?.imageUrl || null}
+      />
+      
+      {/* Home Page Client - Survey + Community + Courses */}
+      <HomePageClient
+        profile={safeProfile}
         courses={courses}
         myCourses={myCourses}
         groupedOtherCourses={groupedOtherCourses}
+        posts={posts}
         session={session}
         enrollmentsMap={enrollmentsMap}
-        isCourseOneActive={isCourseOneActive}
+        isCourseOneActive={enrollmentsMap[1]?.status === 'ACTIVE'}
         userPhone={userPhone}
         userId={userId}
-        customPath={customPath}
+        customPath={customPath as number[] | null}
         userGoal={userGoal}
         targetPointId={targetPointId}
-        roadmapPoints={safeRoadmapPoints}
+        roadmapPoints={roadmapPoints || []}
+        survey={survey}
         resetSurveyAction={resetSurveyAction}
       />
-
-      {/* Footer (Optional simple) */}
-      <footer className="bg-brk-background py-12 text-center text-brk-muted text-sm">
-        <p>© 2026 BRK. All rights reserved.</p>
-      </footer>
+      
+      {/* Footer */}
+      <FooterSection profile={safeProfile} />
     </main>
-  );
+  )
 }

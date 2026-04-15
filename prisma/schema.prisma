@@ -57,6 +57,11 @@ model User {
   wallet               AffiliateWallet?
   affiliatePayouts     AffiliatePayout[]
   affiliateRefs        AffiliateRef[]
+  
+  // [SITE_PROFILE] Khóa học do user giảng dạy
+  courses             Course[]
+  // [SITE_PROFILE] SiteProfile của user (nếu là Teacher)
+  siteProfile         SiteProfile?
 
   @@index([email])
   @@index([phone])
@@ -206,8 +211,13 @@ model Post {
   authorId  Int
   author    User          @relation("UserToPost", fields: [authorId], references: [id], onDelete: Cascade)
   comments  PostComment[]
+  
+  // [COMMUNITY_CUSTOMIZATION] Category filter
+  categoryId Int?
+  category   PostCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([authorId])
+  @@index([categoryId])
 }
 
 model PostComment {
@@ -222,6 +232,20 @@ model PostComment {
 
   @@index([postId])
   @@index([userId])
+}
+
+// [COMMUNITY_CUSTOMIZATION] Categories for posts
+model PostCategory {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String?  @unique
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  
+  posts       Post[]
+
+  @@index([order])
 }
 
 model Account {
@@ -284,6 +308,12 @@ model Survey {
   isActive    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // [SITE_PROFILE] Survey riêng cho SiteProfile nào (null = dùng chung)
+  profileId   Int?
+  profile     SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  @@index([profileId])
 }
 
 model ReservedId {
@@ -321,6 +351,12 @@ model Course {
   landingPages  LandingPage[]
   testimonials  CourseTestimonial[]
   libAccesses   CourseLibAccess[]
+  
+  // [SITE_PROFILE] Giáo viên chịu trách nhiệm khóa học
+  teacherId     Int?
+  teacher       User?       @relation(fields: [teacherId], references: [id])
+  
+  @@index([teacherId])
 }
 
 model Lesson {
@@ -632,6 +668,7 @@ model Theme {
   updatedAt     DateTime @updatedAt
 
   siteSettings  SiteSettings?
+  siteProfiles  SiteProfile[]  // [SITE_PROFILE]
 
   @@index([id])
 }
@@ -662,6 +699,10 @@ model LandingPage {
   // Relations
   courseId      Int?
   course        Course?  @relation(fields: [courseId], references: [id])
+  
+  // [SITE_PROFILE] Landing riêng cho SiteProfile nào (null = global)
+  profileId     Int?
+  profile       SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
   
   // Stats
   viewCount     Int      @default(0)
@@ -694,6 +735,10 @@ model AffiliateCampaign {
   description   String?
   isActive      Boolean   @default(true)
   isDefault     Boolean   @default(false)  // Campaign mac dinh
+  
+  // [SITE_PROFILE] Campaign riêng cho SiteProfile nào (null = campaign global)
+  profileId     Int?      @unique
+  profile       SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
   
   // Commission settings
   maxLevels     Int       @default(3)  // Số tầng hoa hồng tối đa
@@ -1017,4 +1062,122 @@ model ToolHelp {
   updatedAt   DateTime  @updatedAt
 
   @@index([toolSlug])
+}
+
+// ==========================================
+// SITE_PROFILE SYSTEM - 2026-04-14
+// Hệ thống trang chủ động cho Teacher
+// ==========================================
+
+model SiteProfile {
+  id              Int       @id @default(autoincrement())
+  
+  // ─────────────────────────────────────────────────────────
+  // IDENTITY
+  // 2 loại profile:
+  // 1. BRK gốc: userId = null, slug = "brk", isDefault = true
+  // 2. Teacher: userId = User.id, slug = tùy chỉnh
+  // ─────────────────────────────────────────────────────────
+  userId          Int?      @unique  // null = BRK gốc
+  user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug            String    @unique
+  
+  isActive        Boolean   @default(false)
+  isDefault       Boolean   @default(false)  // true = BRK gốc
+  
+  // ─────────────────────────────────────────────────────────
+  // HERO SECTION
+  // ─────────────────────────────────────────────────────────
+  heroImage       String?   // Ảnh nền hero
+  heroOverlay     Float?    @default(0.3)  // Độ mờ overlay (0-1)
+  
+  title           String?   // "NGÂN HÀNG PHƯỚC BÁU" → tùy biến
+  subtitle        String?   // "Tri thức là sức mạnh"
+  
+  // Custom message (thay Message.content)
+  messageContent  String?
+  messageDetail   String?
+  messageImage    String?   // Ảnh trong modal chi tiết
+  
+  // ─────────────────────────────────────────────────────────
+  // SURVEY SECTION
+  // ─────────────────────────────────────────────────────────
+  surveyTitle     String?   // "Zero 2 Hero" → tùy biến
+  
+  // ─────────────────────────────────────────────────────────
+  // ROADMAP SECTION
+  // ─────────────────────────────────────────────────────────
+  customRoadmap   Json?     // { targetPointId, customPath, ... }
+  roadmapTitle    String?   // "Lộ trình Zero 2 Hero" → tùy biến
+  
+  // ─────────────────────────────────────────────────────────
+  // COURSES SECTION
+  // ─────────────────────────────────────────────────────────
+  // null = hiện tất cả khóa của teacher (hoặc tất cả nếu BRK)
+  // [] = ẩn section này
+  courseIds       Json?     // [1,2,3] - Danh sách cụ thể
+  courseCategoryFilter Json?  // [category1, category2] - Lọc theo categories
+  
+  coursesTitle    String?   // "Khóa học của tôi" → tùy biến
+  allCoursesTitle String?   // "Tất cả khóa học" → tùy biến
+  showAllCourses  Boolean   @default(true)  // Hiện "Tất cả khóa học"
+  
+  // ─────────────────────────────────────────────────────────
+  // COMMUNITY SECTION
+  // ─────────────────────────────────────────────────────────
+  showCommunity   Boolean   @default(true)
+  communityTitle  String?   // "Bảng tin" → tùy biến
+  
+  // [COMMUNITY_CUSTOMIZATION] Filter posts by category
+  communityCategoryId Int?
+  communityLimit      Int      @default(10)  // Số bài viết hiển thị
+
+  // ─────────────────────────────────────────────────────────
+  // SURVEY SECTION
+  // ─────────────────────────────────────────────────────────
+  // [SURVEY_CUSTOMIZATION] Survey riêng được chọn
+  selectedSurveyId Int?
+  
+  // ─────────────────────────────────────────────────────────
+  // FOOTER SECTION
+  // ─────────────────────────────────────────────────────────
+  footerText      String?
+  footerLinks     Json?     // [{label, url}, ...]
+  
+  // ─────────────────────────────────────────────────────────
+  // SEO
+  // ─────────────────────────────────────────────────────────
+  metaTitle       String?
+  metaDescription String?
+  metaImage       String?
+  
+  // ─────────────────────────────────────────────────────────
+  // THEME (Full customization)
+  // ─────────────────────────────────────────────────────────
+  themeId         String?   // Theme riêng (null = dùng theme mặc định)
+  theme           Theme?     @relation(fields: [themeId], references: [id])
+  
+  // Override colors trực tiếp (ưu tiên hơn themeId)
+  accentColor     String?
+  backgroundColor String?
+  textColor      String?
+  
+  // ─────────────────────────────────────────────────────────
+  // STATS
+  // ─────────────────────────────────────────────────────────
+  viewCount       Int       @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // ─────────────────────────────────────────────────────────
+  // RELATIONS
+  // ─────────────────────────────────────────────────────────
+  surveys         Survey[]
+  landingPages    LandingPage[]    // Landing pages riêng
+  affiliateCampaign AffiliateCampaign?  // Campaign affiliate riêng (1-1 vì @unique)
+  
+  @@index([slug])
+  @@index([userId])
+  @@index([isActive])
 }

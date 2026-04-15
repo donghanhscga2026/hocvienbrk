@@ -1,59 +1,38 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { getPostsAction } from '@/app/actions/post-actions'
 import PostCard from './PostCard'
 import PostDetailModal from './PostDetailModal'
 import { Newspaper, Loader2, PlusCircle, ChevronLeft, ChevronRight, ArrowRightCircle, ArrowLeftCircle } from 'lucide-react'
 import Link from 'next/link'
 
 interface CommunityBoardProps {
+    posts?: any[]
     isAdmin: boolean
+    title?: string
 }
 
-const POSTS_LIMIT = 10 // [OPTIMIZE] Giới hạn số posts ban đầu
-
-export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
-    const [posts, setPosts] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+export default function CommunityBoard({ posts = [], isAdmin, title = 'Bảng tin' }: CommunityBoardProps) {
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
     
-    // [OPTIMIZE] Server-side pagination
-    const [currentPage, setCurrentPage] = useState(0)
-    const [totalPages, setTotalPages] = useState(0)
-    const [total, setTotal] = useState(0)
-
-    const fetchPosts = async (page: number = 0) => {
-        setLoading(true)
-        
-        const res = await getPostsAction(page, POSTS_LIMIT)
-        
-        if (res.success) {
-            setPosts(res.posts || [])
-            setTotal(res.total || 0)
-            setTotalPages(res.totalPages || 0)
-            setCurrentPage(page)
-        }
-        
-        setLoading(false)
-    }
-
-    useEffect(() => {
-        fetchPosts(0)
-    }, [])
-
-    const startItem = currentPage * POSTS_LIMIT + 1
-    const endItem = Math.min((currentPage + 1) * POSTS_LIMIT, total)
+    // Client-side pagination với posts từ server
+    const [displayCount, setDisplayCount] = useState(3)
     
-    // Server-side pagination, no client slicing needed
-    const hasNextPage = currentPage < totalPages - 1
+    const total = posts.length
+    const totalPages = Math.ceil(total / displayCount) || 1
+    const [currentPage, setCurrentPage] = useState(0)
+    
+    const visiblePosts = posts.slice(0, (currentPage + 1) * displayCount)
+    const hasMore = visiblePosts.length < posts.length
+    
+    const hasNextPage = hasMore
     const hasPrevPage = currentPage > 0
 
     const nextGroup = () => { 
-        if (hasNextPage) fetchPosts(currentPage + 1) 
+        if (hasNextPage) setCurrentPage(prev => prev + 1) 
     }
     const prevGroup = () => { 
-        if (hasPrevPage) fetchPosts(currentPage - 1) 
+        if (hasPrevPage) setCurrentPage(prev => prev - 1) 
     }
 
     return (
@@ -62,8 +41,8 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                 <div className="flex items-center gap-2">
                     <Newspaper className="w-6 h-6 text-brk-primary" />
                     <div>
-                        <h2 className="text-xl font-black text-brk-on-surface uppercase tracking-tight leading-none">Bảng tin</h2>
-                        <p className="text-[9px] text-brk-accent font-bold uppercase mt-1">Trang {currentPage + 1} / {totalPages || 1} ({total} bài)</p>
+                        <h2 className="text-xl font-black text-brk-on-surface uppercase tracking-tight leading-none">{title}</h2>
+                        <p className="text-[9px] text-brk-accent font-bold uppercase mt-1">({total} bài)</p>
                     </div>
                 </div>
                 
@@ -97,12 +76,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                 </div>
             </div>
 
-            {loading ? (
-                <div className="py-12 flex flex-col items-center justify-center text-brk-muted gap-2">
-                    <Loader2 className="w-8 h-8 animate-spin text-brk-primary" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Đang cập nhật tin mới...</p>
-                </div>
-            ) : posts.length === 0 ? (
+            {posts.length === 0 ? (
                 <div className="py-12 text-center bg-brk-surface rounded-[2.5rem] border-2 border-dashed border-brk-outline text-brk-muted mx-2">
                     <p className="text-[10px] font-black uppercase tracking-widest">Hộp thư đang trống</p>
                 </div>
@@ -123,7 +97,7 @@ export default function CommunityBoard({ isAdmin }: CommunityBoardProps) {
                             </div>
                         )}
 
-                        {posts.map((post: any) => (
+                        {visiblePosts.map((post: any) => (
                             <div key={post.id} className="flex-none w-[85%] sm:w-[350px] snap-center">
                                 <PostCard 
                                     post={post} 
