@@ -39,13 +39,23 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
   
   // Multi-profile support: Ưu tiên profileSlug > course.id_khoa
+  // Nếu không có cả 2 thì là trang chủ tổng
   const shareSlug = profileSlug || course.id_khoa
-  const shareUrl = affiliateCode 
-    ? `${baseUrl}/${shareSlug}?ref=${encodeURIComponent(affiliateCode)}`
-    : `${baseUrl}/${shareSlug}`
+  const shareUrl = shareSlug 
+    ? (affiliateCode 
+        ? `${baseUrl}/${shareSlug}?ref=${encodeURIComponent(affiliateCode)}`
+        : `${baseUrl}/${shareSlug}`)
+    : (affiliateCode 
+        ? `${baseUrl}/?ref=${encodeURIComponent(affiliateCode)}`
+        : baseUrl)
 
+  // Title tùy theo loại share
+  const shareTitle = profileSlug || course.id_khoa 
+    ? `Khóa học: ${course.name_lop} - Học viện BRK`
+    : 'Trang cá nhân - Học viện BRK'
+  
   const encodedUrl = encodeURIComponent(shareUrl)
-  const encodedTitle = encodeURIComponent(`Khóa học: ${course.name_lop} - Học viện BRK`)
+  const encodedTitle = encodeURIComponent(shareTitle)
 
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
@@ -89,7 +99,9 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
                 <Share2 className="w-5 h-5 text-brk-primary" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-brk-on-surface">Chia sẻ khóa học</h3>
+                <h3 className="text-lg font-black text-brk-on-surface">
+                  {profileSlug || course.id_khoa ? 'Chia sẻ khóa học' : 'Chia sẻ link giới thiệu'}
+                </h3>
                 <p className="text-xs text-brk-muted">Gửi cho bạn bè để nhận hoa hồng</p>
               </div>
             </div>

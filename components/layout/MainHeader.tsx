@@ -5,9 +5,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { HelpCircle, X, ArrowLeft } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { getToolHelpAction, ToolHelpData } from '@/app/actions/help-actions'
 import { useHomeSlug } from '@/hooks/useHomeSlug'
 import UserMenu from './UserMenu'
+import dynamic from 'next/dynamic'
+
+const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
 
 interface MainHeaderProps {
     title: string
@@ -18,10 +22,15 @@ interface MainHeaderProps {
 export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
     const pathname = usePathname()
     const router = useRouter()
+    const { data: session } = useSession()
     const [showHelp, setShowHelp] = useState(false)
+    const [showShare, setShowShare] = useState(false)
     const [helpData, setHelpData] = useState<ToolHelpData | null>(null)
     const [helpLoading, setHelpLoading] = useState(false)
     const { homeSlug, isReady } = useHomeSlug()
+    
+    // Lấy userId từ session (chú ý xử lý id=0)
+    const userId = session?.user?.id != null ? String(session.user.id) : null
     
     const isHomePage = pathname === '/'
     const isToolsRoot = pathname === '/tools'
@@ -106,6 +115,24 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                             >
                                 <HelpCircle className="h-4 w-4" />
                                 <span className="text-xs font-medium hidden sm:inline">Hỗ trợ</span>
+                            </button>
+                        )}
+
+                        {/* Share Button - Chỉ hiện khi đã đăng nhập */}
+                        {userId && (
+                            <button
+                                onClick={() => setShowShare(true)}
+                                className="shrink-0 transition-opacity hover:opacity-80"
+                                title="Chia sẻ link affiliate"
+                            >
+                                <Image
+                                    src="/Share_Link_3d.png"
+                                    alt="Chia sẻ"
+                                    width={36}
+                                    height={36}
+                                    className="object-contain"
+                                    style={{ width: 'auto', height: '32px' }}
+                                />
                             </button>
                         )}
 
@@ -200,6 +227,17 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Share Modal - Chia sẻ link affiliate */}
+            {showShare && (
+                <ShareModal
+                    isOpen={showShare}
+                    onClose={() => setShowShare(false)}
+                    course={{ id_khoa: '', name_lop: 'Trang cá nhân - Học viện BRK' }}
+                    affiliateCode={userId}
+                    profileSlug={hasCustomHome ? homeSlug : null}
+                />
             )}
         </>
     )
