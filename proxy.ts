@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import { authConfig } from "./auth.config"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import prisma from "@/lib/prisma"
 
 const { auth } = NextAuth(authConfig)
 
@@ -17,7 +18,8 @@ const RESERVED_PATHS = new Set([
     'api', 'admin', 'affiliate', 'login', 'register', 'courses', 
     'auth', 'dashboard', 'account', 'settings', 'profile',
     'user', 'checkout', 'payment', 'static', 'assets', '_next',
-    'landing', 'forgot-password', 'tools', 'account-settings'
+    'landing', 'forgot-password', 'tools', 'account-settings',
+    'tca', 'ktc' // System paths
 ])
 
 export default auth(async function middleware(request: NextRequest & { auth: any }) {
@@ -27,26 +29,41 @@ export default auth(async function middleware(request: NextRequest & { auth: any
     const pathParts = request.nextUrl.pathname.split('/').filter(Boolean)
     const potentialSlug = pathParts.length > 0 ? pathParts[0] : null
     
-    if (!potentialSlug || RESERVED_PATHS.has(potentialSlug)) {
+    // Root path (giautoandien.io.vn/) → cho phép qua, app/page.tsx sẽ xử lý
+    if (!potentialSlug) {
         if (refCode) {
             saveRefCookie(response, refCode, null, null, null)
         }
         return response
     }
     
-    const session = request.auth
-    
-    let systemName: string | null = null
-    let courseSlug: string | null = null
-    let landingSlug: string | null = null
-    
-    if (potentialSlug === 'tca' || potentialSlug === 'ktc') {
-        systemName = potentialSlug
-    } else {
-        courseSlug = potentialSlug // It can be either course or landing, proxy treats them same for now
+    // Check nếu là reserved path
+    if (RESERVED_PATHS.has(potentialSlug)) {
+        if (refCode) {
+            saveRefCookie(response, refCode, null, null, null)
+        }
+        return response
     }
     
-    saveRefCookie(response, refCode || '', landingSlug, courseSlug, systemName)
+    // Check nếu là SiteProfile slug (từ database)
+    const isSiteProfile = await checkIsSiteProfile(potentialSlug)
+    
+    if (isSiteProfile) {
+        // SiteProfile → cho phép qua (route /[slug]/page.tsx sẽ xử lý)
+        if (refCode) {
+            saveRefCookie(response, refCode, null, null, null)
+        }
+        return response
+    }
+    
+    // Không phải SiteProfile → xử lý như cũ (course/landing)
+    const session = request.auth
+    
+    // Kiểm tra course/landing slug
+    const courseSlug = potentialSlug
+    const landingSlug = potentialSlug
+    
+    saveRefCookie(response, refCode || '', landingSlug, courseSlug, null)
     
     if (!session?.user) {
         const redirectUrl = new URL('/register', request.url)
@@ -56,15 +73,39 @@ export default auth(async function middleware(request: NextRequest & { auth: any
         }
         return NextResponse.redirect(redirectUrl)
     } else {
-        if (systemName) {
-            const redirectUrl = new URL(`/tools/genealogy?sysInfo=${systemName}`, request.url)
-            return NextResponse.redirect(redirectUrl)
-        } else {
-            const redirectUrl = new URL(`/landing/${potentialSlug}`, request.url)
-            return NextResponse.redirect(redirectUrl)
-        }
+        const redirectUrl = new URL(`/landing/${potentialSlug}`, request.url)
+        return NextResponse.redirect(redirectUrl)
     }
 })
+
+// Cache để tránh query database quá nhiều
+let profileSlugCache: Set<string> | null = null
+let cacheTimestamp = 0
+const CACHE_TTL = 60 * 1000 // 1 phút
+
+async function checkIsSiteProfile(slug: string): Promise<boolean> {
+    // Check cache trước
+    if (profileSlugCache && Date.now() - cacheTimestamp < CACHE_TTL) {
+        return profileSlugCache.has(slug)
+    }
+    
+    try {
+        // Query database
+        const profiles = await prisma.siteProfile.findMany({
+            where: { isActive: true },
+            select: { slug: true }
+        })
+        
+        profileSlugCache = new Set(profiles.map((p: { slug: string }) => p.slug))
+        cacheTimestamp = Date.now()
+        
+        return profileSlugCache.has(slug)
+    } catch (error) {
+        console.error('Error checking SiteProfile:', error)
+        // Fallback: cho phép qua nếu lỗi (để tránh block pages hợp lệ)
+        return true
+    }
+}
 
 function saveRefCookie(
     response: NextResponse, 

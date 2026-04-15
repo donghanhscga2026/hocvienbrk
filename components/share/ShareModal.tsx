@@ -11,9 +11,10 @@ interface ShareModalProps {
     name_lop: string
   }
   affiliateCode: string | null
+  profileSlug?: string | null
 }
 
-export default function ShareModal({ isOpen, onClose, course, affiliateCode }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, course, affiliateCode, profileSlug = null }: ShareModalProps) {
   const [copied, setCopied] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -36,9 +37,12 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode }: S
   if (!mounted || !isOpen) return null
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  
+  // Multi-profile support: Ưu tiên profileSlug > course.id_khoa
+  const shareSlug = profileSlug || course.id_khoa
   const shareUrl = affiliateCode 
-    ? `${baseUrl}/${course.id_khoa}?ref=${encodeURIComponent(affiliateCode)}`
-    : `${baseUrl}/${course.id_khoa}`
+    ? `${baseUrl}/${shareSlug}?ref=${encodeURIComponent(affiliateCode)}`
+    : `${baseUrl}/${shareSlug}`
 
   const encodedUrl = encodeURIComponent(shareUrl)
   const encodedTitle = encodeURIComponent(`Khóa học: ${course.name_lop} - Học viện BRK`)

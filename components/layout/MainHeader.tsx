@@ -6,11 +6,13 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { HelpCircle, X, ArrowLeft } from 'lucide-react'
 import { getToolHelpAction, ToolHelpData } from '@/app/actions/help-actions'
+import { useHomeSlug } from '@/hooks/useHomeSlug'
 import UserMenu from './UserMenu'
 
 interface MainHeaderProps {
     title: string
     toolSlug?: string
+    profile?: any
 }
 
 export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
@@ -19,9 +21,11 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
     const [showHelp, setShowHelp] = useState(false)
     const [helpData, setHelpData] = useState<ToolHelpData | null>(null)
     const [helpLoading, setHelpLoading] = useState(false)
+    const { homeSlug, isReady } = useHomeSlug()
     
     const isHomePage = pathname === '/'
     const isToolsRoot = pathname === '/tools'
+    const hasCustomHome = isReady && homeSlug
 
     useEffect(() => {
         if (toolSlug) {
@@ -54,29 +58,37 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
         <>
             <header className="sticky top-0 z-50 w-full bg-brk-surface text-brk-on-surface shadow-xl border-b border-brk-outline">
                 <div className="flex items-center justify-between h-14 px-2 sm:px-4">
-                    {/* LEFT: Logo hoặc Back button */}
-                    <div className="flex items-center gap-1 shrink-0">
-                        {isHomePage ? (
-                            <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
-                                <Image
-                                    src="/logobrk-50px.png"
-                                    alt="BRK Logo"
-                                    width={120}
-                                    height={40}
-                                    priority
-                                    className="object-contain"
-                                    style={{ height: '36px', width: 'auto' }}
-                                />
-                            </Link>
-                        ) : (
-                            <button
-                                onClick={handleBackClick}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                            >
-                                <ArrowLeft className="h-4 w-4" />
-                                <span className="text-xs font-medium uppercase hidden sm:inline">Quay lại</span>
-                            </button>
-                        )}
+                    {/* LEFT: Logo BRK + Home icon */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Logo BRK - Luôn về / */}
+                        <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
+                            <Image
+                                src="/logobrk-50px.png"
+                                alt="BRK Logo"
+                                width={120}
+                                height={40}
+                                priority
+                                className="object-contain"
+                                style={{ height: '36px', width: 'auto' }}
+                            />
+                        </Link>
+                        
+                        {/* Home 3D Icon - Về trang profile đang là "Home" */}
+                        <button
+                            onClick={() => router.push(hasCustomHome ? `/${homeSlug}` : '/brk')}
+                            className="shrink-0 transition-opacity hover:opacity-80"
+                            title={`Trang chủ: ${hasCustomHome ? homeSlug : 'brk'}`}
+                        >
+                            <Image
+                                src="/icon_home_3d.png"
+                                alt="Trang chủ"
+                                width={120}
+                                height={36}
+                                priority
+                                className="object-contain"
+                                style={{ height: '36px', width: 'auto' }}
+                            />
+                        </button>
                     </div>
 
                     {/* CENTER: Page Title */}

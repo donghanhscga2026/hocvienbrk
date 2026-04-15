@@ -28,7 +28,7 @@ function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => 
     )
 }
 
-export default function Zero2HeroSurvey({ session, onComplete }: { session?: any, onComplete?: () => void }) {
+export default function Zero2HeroSurvey({ session, survey, onComplete }: { session?: any, survey?: any | null, onComplete?: () => void }) {
     const router = useRouter()
     
     // States

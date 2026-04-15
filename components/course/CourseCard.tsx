@@ -28,9 +28,10 @@ interface CourseCardProps {
     userId?: number | null
     priority?: boolean
     darkMode?: boolean
+    profileSlug?: string | null
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [showShare, setShowShare] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -235,6 +236,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                 onClose={() => setShowShare(false)}
                 course={course}
                 affiliateCode={affiliateCode}
+                profileSlug={profileSlug}
             />
         </>
     )

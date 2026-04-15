@@ -13,6 +13,7 @@ interface CourseCategoryGroupProps {
     userPhone: string | null
     userId: number | null
     darkMode?: boolean
+    profileSlug?: string | null
 }
 
 function CourseCategoryGroup({
@@ -23,7 +24,8 @@ function CourseCategoryGroup({
     isCourseOneActive,
     userPhone,
     userId,
-    darkMode = false
+    darkMode = false,
+    profileSlug = null
 }: CourseCategoryGroupProps) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [countdown, setCountdown] = useState(10)
@@ -127,6 +129,7 @@ function CourseCategoryGroup({
                             userId={userId}
                             priority={index === 0}
                             darkMode={darkMode}
+                            profileSlug={profileSlug}
                         />
                     </div>
                 ))}
@@ -165,6 +168,7 @@ interface CourseSectionProps {
     userId: number | null
     darkMode?: boolean
     accentColor?: string
+    profileSlug?: string | null
 }
 
 export default function CourseSection({
@@ -177,7 +181,8 @@ export default function CourseSection({
     userPhone,
     userId,
     darkMode = false,
-    accentColor = 'bg-blue-600'
+    accentColor = 'bg-blue-600',
+    profileSlug = null
 }: CourseSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [countdown, setCountdown] = useState(10)
@@ -234,6 +239,7 @@ export default function CourseSection({
                             userPhone={userPhone}
                             userId={userId}
                             darkMode={darkMode}
+                            profileSlug={profileSlug}
                         />
                     ))}
                 </div>
@@ -298,6 +304,7 @@ export default function CourseSection({
                             userId={userId}
                             priority={index < 3}
                             darkMode={darkMode}
+                            profileSlug={profileSlug}
                         />
                     </div>
                 ))}

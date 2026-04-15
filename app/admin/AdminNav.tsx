@@ -2,9 +2,11 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Settings, Radio, Bell, Youtube, DollarSign } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Settings, Radio, Bell, Youtube, DollarSign, Layout } from 'lucide-react'
 
 const menuItems = [
+  { label: 'Trang Chủ', href: '/', icon: ArrowLeft },
+  { label: 'Site Profiles', href: '/tools/site-profiles', icon: Layout },
   { label: 'Affiliate', href: '/admin/affiliate', icon: DollarSign },
   { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard },
   { label: 'Bảng Tin', href: '/admin/posts', icon: FileText },
@@ -16,7 +18,6 @@ const menuItems = [
   { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map },
   { label: 'Chiến Dịch Email', href: '/admin/campaigns', icon: Mail },
   { label: 'Nhân Mạch', href: '/admin/genealogy', icon: Users },
-  { label: 'Trang Chủ', href: '/', icon: ArrowLeft },
 ]
 
 export default function AdminNav() {
