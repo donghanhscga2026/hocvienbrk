@@ -1099,6 +1099,10 @@ model SiteProfile {
   messageDetail   String?
   messageImage    String?   // Ảnh trong modal chi tiết
   
+  // [GREETING] Lời chào động theo thời gian
+  // Cấu trúc: { morning: "...", afternoon: "...", evening: "..." }
+  greetingMessages Json?
+  
   // ─────────────────────────────────────────────────────────
   // SURVEY SECTION
   // ─────────────────────────────────────────────────────────

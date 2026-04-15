@@ -56,7 +56,7 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
 
     return (
         <>
-            <header className="sticky top-0 z-50 w-full bg-brk-surface text-brk-on-surface shadow-xl border-b border-brk-outline">
+            <header className="sticky top-0 z-50 w-full bg-brk-surface text-brk-on-surface shadow-xl">
                 <div className="flex items-center justify-between h-14 px-2 sm:px-4">
                     {/* LEFT: Logo BRK + Home icon */}
                     <div className="flex items-center gap-2 shrink-0">
@@ -82,11 +82,11 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                             <Image
                                 src="/icon_home_3d.png"
                                 alt="Trang chủ"
-                                width={120}
+                                width={36}
                                 height={36}
                                 priority
                                 className="object-contain"
-                                style={{ height: '36px', width: 'auto' }}
+                                style={{ width: 'auto', height: '36px' }}
                             />
                         </button>
                     </div>

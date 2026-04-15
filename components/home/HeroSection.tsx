@@ -41,15 +41,39 @@ export default function HeroSection({
     const heroOverlay = profile.heroOverlay ?? 0.3
     const accentColor = profile.accentColor || '#f59e0b'
     
-    // Xác định tiêu đề hiển thị
-    // Default (BRK): Hiển thị "BRK" + "NGÂN HÀNG PHƯỚC BÁU"
-    // Teacher: Hiển thị tên teacher từ profile.user.name hoặc profile.title
-    const teacherName = profile.user?.name || profile.title || ''
-    const displayTitle = isDefault ? null : teacherName
-    
-    const subtitle = profile.subtitle || 'Mến chào bạn hữu đường xa!'
+    // Xác định tiêu đề hiển thị theo yêu cầu mới
+    // Dòng 1 = title field, Dòng 2 = subtitle field, Dòng 3 = greeting động
+    const displayLine1 = isDefault ? 'BRK' : (profile.title || 'BRK')
+    const displayLine2 = isDefault ? 'NGÂN HÀNG PHƯỚC BÁU' : (profile.subtitle || '')
+    const subtitle = profile.subtitle || 'Mến chào bạn hữu đường xa!' // Giữ để dùng cho fallback
     const messageContent = profile.messageContent || 'Học hôm nay, thành công ngày mai'
     const messageDetail = profile.messageDetail || 'Tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp.'
+    
+    // Lấy greeting theo thời gian
+    const getGreeting = () => {
+      const hour = new Date().getHours()
+      const defaultGreetings = {
+        morning: 'Chúc ngày mới an vui, giàu toàn diện',
+        afternoon: 'Chúc buổi chiều năng lượng, thuận lợi',
+        evening: 'Chúc buổi tối hạnh phúc, bình yên'
+      }
+      const savedGreetings = (profile as any).greetingMessages || defaultGreetings
+      
+      if (hour >= 5 && hour < 12) {
+        return savedGreetings.morning || defaultGreetings.morning
+      } else if (hour >= 12 && hour < 18) {
+        return savedGreetings.afternoon || defaultGreetings.afternoon
+      } else {
+        return savedGreetings.evening || defaultGreetings.evening
+      }
+    }
+    
+    // Format greeting: Mến chào {userName} [{userId}] {greetingMessage}
+    // Chú ý: userId có thể = 0, nên dùng String(userId) !== '' để check
+    const userIdStr = String(userId)
+    const greetingMessage = session?.user && userIdStr !== ''
+      ? `Mến chào ${userName || 'Học viên'} [${userIdStr}] ${getGreeting()}`
+      : getGreeting()
 
     return (
         <>
@@ -60,7 +84,7 @@ export default function HeroSection({
                     {heroImage ? (
                         <Image
                             src={heroImage}
-                            alt={`${displayTitle || 'BRK'} Background`}
+                            alt={`${displayLine1} Background`}
                             fill
                             priority
                             quality={70}
@@ -79,24 +103,33 @@ export default function HeroSection({
                 <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[30px] md:pt-[70px] pb-[4%] text-center">
                     <div className="flex flex-col items-center shrink-0">
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
+                            {/* Dòng 1: title field */}
                             <span
                                 className="uppercase drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.2rem, 5vw, 3rem)', color: '#ffffff' }}
+                                style={{ 
+                                    fontSize: 'clamp(0.2rem, 5vw, 3rem)', 
+                                    color: '#ffffff',
+                                    textShadow: '0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.6), 2px 2px 4px rgba(0,0,0,0.8)',
+                                    WebkitTextStroke: '0.5px rgba(0,0,0,0.5)'
+                                }}
                             >
-                            {isDefault ? 'BRK' : displayTitle}
-                        </span>
+                                {displayLine1}
+                            </span>
 
+                            {/* Dòng 2: subtitle field */}
                             <span
                                 className="uppercase drop-shadow-xl"
                                 style={{ 
                                     fontSize: 'clamp(0.5rem, 5vw, 3rem)', 
                                     color: accentColor, 
-                                    textShadow: `0 0 15px ${accentColor}50, 0 0 30px ${accentColor}30` 
+                                    textShadow: `0 0 15px ${accentColor}80, 0 0 30px ${accentColor}50, 0 0 45px ${accentColor}30, 0 0 60px ${accentColor}20, 2px 2px 4px rgba(0,0,0,0.7)`,
+                                    WebkitTextStroke: '0.5px rgba(0,0,0,0.4)'
                                 }}
                             >
-                                {isDefault ? 'NGÂN HÀNG PHƯỚC BÁU' : ''}
+                                {displayLine2}
                             </span>
 
+                            {/* Dòng 3: greeting động */}
                             <span
                                 className="rounded-full backdrop-blur-md"
                                 style={{
@@ -108,11 +141,13 @@ export default function HeroSection({
                             >
                                 <span
                                     className="block font-semibold whitespace-nowrap"
-                                    style={{ fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', color: '#ffffff' }}
+                                    style={{ 
+                                        fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', 
+                                        color: '#ffffff',
+                                        textShadow: '0 0 8px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.8)'
+                                    }}
                                 >
-                                    {session?.user
-                                        ? `Mến chào ${userName || 'Học viên'} - Mã học tập ${userId}`
-                                        : subtitle}
+                                    {greetingMessage}
                                 </span>
                             </span>
                         </h1>
@@ -197,7 +232,7 @@ export default function HeroSection({
                                 {messageDetail}
                             </div>
                             <p className="text-brk-muted text-[11px] text-center pt-2 italic tracking-widest">
-                                💡 {isDefault ? 'HỌC VIỆN BRK - NGÂN HÀNG PHƯỚC BÁU' : displayTitle?.toUpperCase()}
+                                💡 {isDefault ? 'HỌC VIỆN BRK - NGÂN HÀNG PHƯỚC BÁU' : displayLine1?.toUpperCase()}
                             </p>
                         </div>
 

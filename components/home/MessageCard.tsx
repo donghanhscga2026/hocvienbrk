@@ -40,7 +40,7 @@ export default function MessageCard({ message, session, userName, userId }: Mess
     return (
         <>
             {/* Tỉ lệ 5:3 chuẩn xác bằng Aspect Ratio - Giúp trình duyệt tính toán Layout cực nhanh */}
-            <div className="relative w-full aspect-[5/3] sm:overflow-hidden rounded-2xl md:rounded-none shadow-2xl border border-brk-outline group cursor-pointer"
+            <div className="relative w-full aspect-[5/3] sm:overflow-hidden shadow-2xl border border-brk-outline group cursor-pointer"
                 onClick={() => setIsOpen(true)}>
 
                 {/* ── Ảnh nền tối ưu ── */}
@@ -70,14 +70,24 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
                             <span
                                 className="uppercase drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.2rem, 5vw, 3rem)', color: '#ffffff' }}
+                                style={{ 
+                                    fontSize: 'clamp(0.2rem, 5vw, 3rem)', 
+                                    color: '#ffffff',
+                                    textShadow: '0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.6), 2px 2px 4px rgba(0,0,0,0.8)',
+                                    WebkitTextStroke: '0.5px rgba(0,0,0,0.5)'
+                                }}
                             >
                                 BRK
                             </span>
 
                             <span
                                 className="uppercase drop-shadow-xl"
-                                style={{ fontSize: 'clamp(0.5rem, 5vw, 3rem)', color: '#f59e0b', textShadow: '0 0 15px rgba(245,158,11,0.5), 0 0 30px rgba(245,158,11,0.3)' }}
+                                style={{ 
+                                    fontSize: 'clamp(0.5rem, 5vw, 3rem)', 
+                                    color: '#f59e0b', 
+                                    textShadow: '0 0 15px rgba(245,158,11,0.8), 0 0 30px rgba(245,158,11,0.5), 0 0 45px rgba(245,158,11,0.3), 0 0 60px rgba(245,158,11,0.2), 2px 2px 4px rgba(0,0,0,0.7)',
+                                    WebkitTextStroke: '0.5px rgba(0,0,0,0.4)'
+                                }}
                             >
                                 NGÂN HÀNG PHƯỚC BÁU
                             </span>
@@ -93,7 +103,11 @@ export default function MessageCard({ message, session, userName, userId }: Mess
                             >
                                 <span
                                     className="block font-semibold whitespace-nowrap"
-                                    style={{ fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', color: '#ffffff' }}
+                                    style={{ 
+                                        fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', 
+                                        color: '#ffffff',
+                                        textShadow: '0 0 8px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.8)'
+                                    }}
                                 >
                                     {session?.user
                                         ? `Mến chào ${userName || 'Học viên'} - Mã học tập ${userId}`

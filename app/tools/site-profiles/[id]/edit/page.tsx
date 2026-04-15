@@ -42,6 +42,17 @@ export default function EditSiteProfilePage({ params }: PageProps) {
   const [metaTitle, setMetaTitle] = useState('')
   const [metaDescription, setMetaDescription] = useState('')
   const [metaImage, setMetaImage] = useState('')
+  const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null)
+  const [communityCategoryId, setCommunityCategoryId] = useState<number | null>(null)
+  const [greetingMessages, setGreetingMessages] = useState({
+    morning: '',
+    afternoon: '',
+    evening: ''
+  })
+
+  // Data for selects
+  const [surveys, setSurveys] = useState<any[]>([])
+  const [postCategories, setPostCategories] = useState<any[]>([])
 
   useEffect(() => {
     if (isAdmin) {
@@ -73,11 +84,40 @@ export default function EditSiteProfilePage({ params }: PageProps) {
         setMetaTitle(data.metaTitle || '')
         setMetaDescription(data.metaDescription || '')
         setMetaImage(data.metaImage || '')
+        setSelectedSurveyId(data.selectedSurveyId || null)
+        setCommunityCategoryId(data.communityCategoryId || null)
+        
+        // Greeting messages
+        const defaultGreetings = {
+          morning: 'Chúc ngày mới an vui, giàu toàn diện',
+          afternoon: 'Chúc buổi chiều năng lượng, thuận lợi',
+          evening: 'Chúc buổi tối hạnh phúc, bình yên'
+        }
+        const savedGreetings = (data as any).greetingMessages || defaultGreetings
+        setGreetingMessages(savedGreetings)
+        
+        // Load surveys và categories
+        loadSelectData()
       }
     } catch (error) {
       console.error('Error loading profile:', error)
     }
     setLoading(false)
+  }
+
+  async function loadSelectData() {
+    try {
+      const [surveysRes, categoriesRes] = await Promise.all([
+        fetch('/api/admin/surveys?fields=id,title'),
+        fetch('/api/admin/post-categories?fields=id,name')
+      ])
+      const surveysData = await surveysRes.json()
+      const categoriesData = await categoriesRes.json()
+      if (surveysData.data) setSurveys(surveysData.data)
+      if (categoriesData.data) setPostCategories(categoriesData.data)
+    } catch (error) {
+      console.error('Error loading select data:', error)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -103,6 +143,9 @@ export default function EditSiteProfilePage({ params }: PageProps) {
       metaTitle: metaTitle || undefined,
       metaDescription: metaDescription || undefined,
       metaImage: metaImage || undefined,
+      selectedSurveyId: selectedSurveyId || undefined,
+      communityCategoryId: communityCategoryId || undefined,
+      greetingMessages: greetingMessages,
     })
 
     if (result.error) {
@@ -295,6 +338,70 @@ export default function EditSiteProfilePage({ params }: PageProps) {
             </div>
           </section>
 
+          {/* Survey Section */}
+          <section className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-800 border-b border-gray-100 pb-2">
+              Khảo sát
+            </h2>
+            
+            <div>
+              <label className="block text-xs font-black text-gray-500 uppercase mb-1">Chọn khảo sát hiển thị</label>
+              <select
+                value={selectedSurveyId || ''}
+                onChange={e => setSelectedSurveyId(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
+              >
+                <option value="">Mặc định (hiển thị tất cả)</option>
+                {surveys.map(survey => (
+                  <option key={survey.id} value={survey.id}>{survey.title}</option>
+                ))}
+              </select>
+            </div>
+          </section>
+
+          {/* Greeting Messages Section */}
+          <section className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-800 border-b border-gray-100 pb-2">
+              Lời chào mừng (theo thời gian)
+            </h2>
+            <p className="text-xs text-gray-500">
+              Cấu hình lời chào hiển thị trên trang chủ. Để trống để dùng mặc định.
+            </p>
+            
+            <div>
+              <label className="block text-xs font-black text-gray-500 uppercase mb-1">Buổi sáng (5h - 12h)</label>
+              <input
+                type="text"
+                value={greetingMessages.morning}
+                onChange={e => setGreetingMessages(prev => ({ ...prev, morning: e.target.value }))}
+                placeholder="Chúc ngày mới an vui, giàu toàn diện"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-black text-gray-500 uppercase mb-1">Buổi chiều (12h - 18h)</label>
+              <input
+                type="text"
+                value={greetingMessages.afternoon}
+                onChange={e => setGreetingMessages(prev => ({ ...prev, afternoon: e.target.value }))}
+                placeholder="Chúc buổi chiều năng lượng, thuận lợi"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-black text-gray-500 uppercase mb-1">Buổi tối (18h - 5h)</label>
+              <input
+                type="text"
+                value={greetingMessages.evening}
+                onChange={e => setGreetingMessages(prev => ({ ...prev, evening: e.target.value }))}
+                placeholder="Chúc buổi tối hạnh phúc, bình yên"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
+              />
+            </div>
+          </section>
+
           {/* Appearance */}
           <section className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
             <h2 className="text-lg font-bold text-gray-800 border-b border-gray-100 pb-2">
@@ -361,13 +468,30 @@ export default function EditSiteProfilePage({ params }: PageProps) {
                 </label>
               </div>
               {showCommunity && (
-                <input
-                  type="text"
-                  value={communityTitle}
-                  onChange={e => setCommunityTitle(e.target.value)}
-                  placeholder="Tiêu đề Bảng tin"
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
-                />
+                <>
+                  <input
+                    type="text"
+                    value={communityTitle}
+                    onChange={e => setCommunityTitle(e.target.value)}
+                    placeholder="Tiêu đề Bảng tin"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
+                  />
+                  {postCategories.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-black text-gray-500 uppercase mb-1">Chuyên mục Bản tin</label>
+                      <select
+                        value={communityCategoryId || ''}
+                        onChange={e => setCommunityCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
+                      >
+                        <option value="">Tất cả chuyên mục</option>
+                        {postCategories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="flex items-center gap-3">

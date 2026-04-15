@@ -167,7 +167,7 @@ export default async function TeacherHomePage({ params }: PageProps) {
                 profile={profile}
                 session={session}
                 userName={userName || ''}
-                userId={userId ? String(userId) : ''}
+                userId={userId !== null ? String(userId) : ''}
                 isDefault={profile.isDefault || false}
                 messageImageUrl={message?.imageUrl || null}
             />
