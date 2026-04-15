@@ -12,7 +12,7 @@ import { getRandomMessage } from './actions/message-actions'
 import { resetSurveyAction } from './actions/survey-actions'
 
 export const metadata: Metadata = {
-  title: 'Học viện BRK - Ngân hàng Phước Báu',
+  title: 'BRK - Ngân hàng Phước Báu',
   description: 'Học viện đào tạo kỹ năng thực chiến hàng đầu Việt Nam',
 }
 
@@ -24,7 +24,7 @@ export default async function Home() {
   
   // Nếu không có profile, dùng fallback
   const safeProfile = profile || {
-    title: 'NGÂN HÀNG PHƯỚC BÁU',
+    title: 'TRANG CHỦ',
     subtitle: 'Tri thức là sức mạnh',
     showCommunity: true,
     showAllCourses: true,
@@ -45,7 +45,7 @@ export default async function Home() {
     accentColor: null,
     textColor: null,
     footerLinks: null,
-    metaTitle: 'Học viện BRK',
+    metaTitle: 'BRK',
     metaDescription: null,
     metaImage: null,
     themeId: null,
@@ -59,8 +59,8 @@ export default async function Home() {
     incrementProfileView(profile.slug).catch(console.error)
   }
 
-  // Lấy user ID
-  const userIdNum = session?.user?.id ? parseInt(session.user.id) : null
+  // Lấy user ID - Dùng != null để xử lý userId = 0
+  const userIdNum = session?.user?.id != null ? parseInt(session.user.id) : null
 
   // Lấy các data cần thiết (parallel)
   const [
@@ -76,7 +76,7 @@ export default async function Home() {
     getSurveyForProfile(safeProfile),
     getPostsForProfile(safeProfile),
     getRandomMessage(),
-    userIdNum
+    userIdNum != null
       ? prisma.user.findUnique({
           where: { id: userIdNum },
           select: {
@@ -84,7 +84,7 @@ export default async function Home() {
           }
         })
       : null,
-    userIdNum
+    userIdNum != null
       ? prisma.enrollment.findMany({
           where: { userId: userIdNum },
           select: {
@@ -170,7 +170,7 @@ export default async function Home() {
         profile={safeProfile}
         session={session}
         userName={userName || ''}
-        userId={userId ? String(userId) : ''}
+        userId={userId !== null ? String(userId) : ''}
         isDefault={profile?.isDefault || false}
         messageImageUrl={message?.imageUrl || null}
       />

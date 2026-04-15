@@ -112,7 +112,7 @@ export async function sendWelcomeEmail(to: string, studentName: string, studentI
 }
 
 export async function sendVerificationEmail(to: string, studentName: string, token: string) {
-  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://hocvienbrk.com'}/api/auth/verify?token=${token}`;
+  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'}/api/auth/verify?token=${token}`;
   const subject = `[Học Viện BRK] Xác minh tài khoản của bạn`;
   const htmlBody = `
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; rounded: 8px;">

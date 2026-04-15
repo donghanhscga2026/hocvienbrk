@@ -294,6 +294,13 @@ export async function updateSiteProfile(id: number, data: {
   accentColor?: string
   backgroundColor?: string
   textColor?: string
+  selectedSurveyId?: number | null
+  communityCategoryId?: number | null
+  greetingMessages?: {
+    morning: string
+    afternoon: string
+    evening: string
+  } | null
 }) {
   // Kiểm tra slug trùng nếu đang update slug
   if (data.slug) {
@@ -322,7 +329,7 @@ export async function updateSiteProfile(id: number, data: {
 
   const profile = await prisma.siteProfile.update({
     where: { id },
-    data
+    data: data as any
   })
 
   return { success: true, profile }
