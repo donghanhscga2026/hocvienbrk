@@ -37,6 +37,9 @@ model User {
   
   // System relations (TCA/KTC) - bỏ unique để cho phép nhiều cây
   systems System[]
+
+  // TCA Member relation (1 user có thể có nhiều TCA membership)
+  tcaMembers TCAMember[]
   
   // Zero 2 Hero Data - Tách sang bảng UserRoadmap
   roadmap       UserRoadmap?
@@ -647,6 +650,82 @@ model SystemClosure {
   @@index([systemId])
   @@index([depth])
   @@map("system_closure")
+}
+
+// ==========================================
+// TCA SYNC SYSTEM - 2026-04-17
+// ==========================================
+
+// Lưu thông tin TCA từ Portal, liên kết với User qua userId
+model TCAMember {
+  id              Int       @id @default(autoincrement())
+  tcaId          Int       @unique  // ID từ TCA Portal
+  userId         Int       // FK → User.id
+
+  // Tree data (từ group_tree)
+  type           String    // 'folder' hoặc 'item'
+  groupName      String?
+  name           String
+  personalScore  Decimal?  @db.Decimal(10, 3)
+  totalScore     Decimal?  @db.Decimal(10, 3)
+  level          Int?
+  location       String?
+  personalRate   String?
+  teamRate       String?
+  hasBH          Boolean   @default(false)
+  hasTD          Boolean   @default(false)
+
+  // Detail data (từ ajax_get_member_info)
+  phone          String?
+  email          String?
+  address        String?
+  joinDate       DateTime?
+  contractDate   DateTime?
+  promotionDate  DateTime?
+
+  // TCA Hierarchy
+  parentTcaId    Int?      // TCA ID của F1
+  parentName    String?
+  teamSize       Int       @default(0)
+
+  // Tracking
+  lastSyncedAt   DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User      @relation(fields: [userId], references: [id])
+
+  @@index([tcaId])
+  @@index([userId])
+  @@index([parentTcaId])
+  @@map("tca_member")
+}
+
+// Lưu lịch sử sync để rollback khi cần
+model TCASyncHistory {
+  id              Int       @id @default(autoincrement())
+  syncId          String    // UUID cho mỗi lần sync
+  action          String    // 'CREATE_USER', 'UPDATE_USER', 'CREATE_SYSTEM', 'UPDATE_SYSTEM', 'CREATE_TCA_MEMBER', 'UPDATE_TCA_MEMBER', 'CREATE_CLOSURE', 'UPDATE_REFERRER'
+  tableName       String    // 'User', 'System', 'TCAMember', 'SystemClosure'
+  recordId        Int?      // ID của record bị ảnh hưởng
+
+  // Snapshot trước/sau khi thay đổi
+  beforeData      Json?     // Dữ liệu cũ (null nếu là INSERT)
+  afterData       Json?     // Dữ liệu mới (null nếu là DELETE)
+
+  // Metadata
+  tcaId           Int?      // TCA ID liên quan
+  totalRecords    Int       // Số records trong sync này
+  status          String    @default("PENDING")  // 'PENDING', 'COMPLETED', 'ROLLED_BACK'
+  errorMessage    String?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([syncId])
+  @@index([tcaId])
+  @@index([tableName])
+  @@index([createdAt])
+  @@map("tca_sync_history")
 }
 
 // ==========================================

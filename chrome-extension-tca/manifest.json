@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "TCA to BRK Sync",
+  "version": "2.0.0",
+  "description": "Sync group_tree data from TCA portal to BRK system with auto-sync",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "*://portal.tca.com.vn/*",
+    "*://giautoandien.io.vn/*"
+  ],
+  "action": {
+    "default_title": "TCA Sync"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://portal.tca.com.vn/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected-script.js"],
+      "matches": ["*://portal.tca.com.vn/*"]
+    }
+  ]
+}
