@@ -236,7 +236,8 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                     onClose={() => setShowShare(false)}
                     course={{ id_khoa: '', name_lop: 'Trang cá nhân - Học viện BRK' }}
                     affiliateCode={userId}
-                    profileSlug={hasCustomHome ? homeSlug : null}
+                    // Share: Nếu đang ở trang chủ / thì profileSlug = null, nếu đang ở trang con thì dùng homeSlug
+                    profileSlug={isHomePage ? null : (hasCustomHome ? homeSlug : null)}
                 />
             )}
         </>

@@ -115,60 +115,60 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
 
           <div className="mb-6">
             <p className="text-sm font-medium text-brk-on-surface mb-2">{course.name_lop}</p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 px-4 py-2.5 bg-brk-background rounded-xl border border-brk-outline text-sm font-mono text-brk-muted truncate">
-                {shareUrl}
-              </div>
-              <button
-                onClick={handleCopyLink}
-                className={`shrink-0 px-4 py-2.5 rounded-xl font-black text-sm transition-all ${
-                  copied 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-brk-primary text-brk-on-primary hover:brightness-110'
-                }`}
-              >
-                {copied ? (
-                  <span className="flex items-center gap-1.5">
-                    <Check className="w-4 h-4" /> Đã copy
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <Link2 className="w-4 h-4" /> Copy
-                  </span>
-                )}
-              </button>
+            <div className="w-full px-4 py-2.5 bg-brk-background rounded-xl border border-brk-outline text-sm font-mono text-brk-muted truncate">
+              {shareUrl}
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
+            {/* Facebook */}
             <button
               onClick={() => handleShare(shareLinks.facebook)}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-[#1877F2]/10 hover:bg-[#1877F2]/20 transition-colors group"
+              className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#1877F2]/10 hover:bg-[#1877F2]/20 transition-colors group"
             >
-              <div className="w-12 h-12 rounded-full bg-[#1877F2] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <Facebook className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-full bg-[#1877F2] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <Facebook className="w-5 h-5 text-white" />
               </div>
               <span className="text-xs font-bold text-[#1877F2]">Facebook</span>
             </button>
 
+            {/* Zalo */}
             <button
               onClick={() => handleShare(shareLinks.zalo)}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-[#0068FF]/10 hover:bg-[#0068FF]/20 transition-colors group"
+              className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#0068FF]/10 hover:bg-[#0068FF]/20 transition-colors group"
             >
-              <div className="w-12 h-12 rounded-full bg-[#0068FF] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <MessageCircle className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-full bg-[#0068FF] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <span className="text-xs font-bold text-[#0068FF]">Zalo</span>
             </button>
 
+            {/* Telegram */}
             <button
               onClick={() => handleShare(shareLinks.telegram)}
-              className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-[#26A5E4]/10 hover:bg-[#26A5E4]/20 transition-colors group"
+              className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#26A5E4]/10 hover:bg-[#26A5E4]/20 transition-colors group"
             >
-              <div className="w-12 h-12 rounded-full bg-[#26A5E4] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <Send className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-full bg-[#26A5E4] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <Send className="w-5 h-5 text-white" />
               </div>
               <span className="text-xs font-bold text-[#26A5E4]">Telegram</span>
+            </button>
+
+            {/* Copy */}
+            <button
+              onClick={handleCopyLink}
+              className={`flex flex-col items-center gap-2 p-3 rounded-2xl font-bold transition-all ${
+                copied 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-brk-primary/10 text-brk-primary hover:bg-brk-primary/20'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform ${
+                copied ? 'bg-white text-green-500' : 'bg-brk-primary text-white'
+              }`}>
+                {copied ? <Check className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
+              </div>
+              <span className="text-xs">{copied ? 'Đã copy' : 'Copy'}</span>
             </button>
           </div>
 
