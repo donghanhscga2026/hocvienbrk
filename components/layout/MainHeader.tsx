@@ -111,7 +111,7 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                         {toolSlug && (
                             <button
                                 onClick={() => setShowHelp(true)}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors text-brk-muted hover:text-brk-accent"
+                                className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors bg-brk-accent hover:text-brk-accent"
                             >
                                 <HelpCircle className="h-4 w-4" />
                                 <span className="text-xs font-medium hidden sm:inline">Hỗ trợ</span>
@@ -236,8 +236,8 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                     onClose={() => setShowShare(false)}
                     course={{ id_khoa: '', name_lop: 'Trang cá nhân - Học viện BRK' }}
                     affiliateCode={userId}
-                    // Share: Nếu đang ở trang chủ / thì profileSlug = null, nếu đang ở trang con thì dùng homeSlug
                     profileSlug={isHomePage ? null : (hasCustomHome ? homeSlug : null)}
+                    shareType="header"
                 />
             )}
         </>
