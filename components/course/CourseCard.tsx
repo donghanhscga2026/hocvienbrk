@@ -38,7 +38,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
     const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
 
     useEffect(() => {
-        if (isLoggedIn && userId) {
+        // Dùng != null để handle userId = 0 (ID hợp lệ)
+        if (isLoggedIn && userId != null) {
             setAffiliateCode(String(userId))
         }
     }, [isLoggedIn, userId])
@@ -237,6 +238,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                 course={course}
                 affiliateCode={affiliateCode}
                 profileSlug={profileSlug}
+                shareType="course"
             />
         </>
     )

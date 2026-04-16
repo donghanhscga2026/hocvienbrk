@@ -78,7 +78,7 @@ function DashboardTab() {
     async function copyLink() {
         if (myLink) {
             try {
-                await navigator.clipboard.writeText(`${baseUrl}/register?ref=${myLink.code}`)
+                await navigator.clipboard.writeText(`${baseUrl}/?ref=${myLink.code}`)
                 alert('Đã copy!')
             } catch (e) { console.error(e) }
         }
@@ -92,7 +92,7 @@ function DashboardTab() {
         )
     }
 
-    const affiliateUrl = myLink ? `${baseUrl}/register?ref=${myLink.code}` : ''
+    const affiliateUrl = myLink ? `${baseUrl}/?ref=${myLink.code}` : ''
 
     return (
         <div className="space-y-6">
@@ -237,12 +237,12 @@ function LinksTab() {
                     <div className="flex gap-2">
                         <input
                             type="text"
-                            value={`${baseUrl}/register?ref=${mainLink.code}`}
+                            value={`${baseUrl}/?ref=${mainLink.code}`}
                             readOnly
                             className="flex-1 px-3 py-2 border rounded-lg bg-gray-50 text-sm"
                         />
                         <button
-                            onClick={() => copyToClipboard(`${baseUrl}/register?ref=${mainLink.code}`)}
+                            onClick={() => copyToClipboard(`${baseUrl}/?ref=${mainLink.code}`)}
                             className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm"
                         >
                             Copy
@@ -277,12 +277,12 @@ function LinksTab() {
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
-                                        value={`${baseUrl}/register?ref=${ref.refKey}`}
+                                        value={`${baseUrl}/?ref=${ref.refKey}`}
                                         readOnly
                                         className="flex-1 px-2 py-1 border rounded text-sm bg-gray-50"
                                     />
                                     <button
-                                        onClick={() => copyToClipboard(`${baseUrl}/register?ref=${ref.refKey}`)}
+                                        onClick={() => copyToClipboard(`${baseUrl}/?ref=${ref.refKey}`)}
                                         className="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm"
                                     >
                                         Copy
@@ -312,12 +312,12 @@ function LinksTab() {
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
-                                        value={`${baseUrl}/register?ref=${link.code}`}
+                                        value={`${baseUrl}/?ref=${link.code}`}
                                         readOnly
                                         className="flex-1 px-2 py-1 border rounded text-sm bg-gray-50"
                                     />
                                     <button
-                                        onClick={() => copyToClipboard(`${baseUrl}/register?ref=${link.code}`)}
+                                        onClick={() => copyToClipboard(`${baseUrl}/?ref=${link.code}`)}
                                         className="bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm"
                                     >
                                         Copy
@@ -614,7 +614,7 @@ function RefsTab() {
                 <h4 className="font-bold text-blue-700 mb-2">🔤 Custom Refs</h4>
                 <p className="text-sm text-blue-600">
                     Tạo ref key tùy chỉnh để chia sẻ link dễ nhớ. 
-                    Ví dụ: <code>nbcuong</code> → <code>{baseUrl}/register?ref=nbcuong</code>
+                    Ví dụ: <code>nbcuong</code> → <code>{baseUrl}/?ref=nbcuong</code>
                 </p>
                 <ul className="text-xs text-blue-500 mt-2 space-y-1">
                     <li>• 1-10 ký tự, chỉ a-z và số</li>
@@ -716,7 +716,7 @@ function RefsTab() {
                                     <p className="text-xs text-gray-500 mt-1">{ref.description}</p>
                                 )}
                                 <p className="text-xs text-gray-400 mt-1">
-                                    {baseUrl}/register?ref={ref.refKey}
+                                    {baseUrl}/?ref={ref.refKey}
                                 </p>
                             </div>
                             <div className="flex gap-2">

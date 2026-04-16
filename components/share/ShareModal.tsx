@@ -12,9 +12,10 @@ interface ShareModalProps {
   }
   affiliateCode: string | null
   profileSlug?: string | null
+  shareType?: 'course' | 'header'  // Phân biệt share từ course hay header
 }
 
-export default function ShareModal({ isOpen, onClose, course, affiliateCode, profileSlug = null }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, course, affiliateCode, profileSlug = null, shareType = 'course' }: ShareModalProps) {
   const [copied, setCopied] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -37,23 +38,34 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
   if (!mounted || !isOpen) return null
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-  
-  // Multi-profile support: Ưu tiên profileSlug > course.id_khoa
-  // Nếu không có cả 2 thì là trang chủ tổng
-  const shareSlug = profileSlug || course.id_khoa
-  const shareUrl = shareSlug 
-    ? (affiliateCode 
-        ? `${baseUrl}/${shareSlug}?ref=${encodeURIComponent(affiliateCode)}`
-        : `${baseUrl}/${shareSlug}`)
-    : (affiliateCode 
-        ? `${baseUrl}/?ref=${encodeURIComponent(affiliateCode)}`
-        : baseUrl)
 
-  // Title tùy theo loại share
-  const shareTitle = profileSlug || course.id_khoa 
-    ? `Khóa học: ${course.name_lop} - Học viện BRK`
-    : 'Trang cá nhân - Học viện BRK'
-  
+  // Logic tạo shareUrl theo shareType:
+  // - 'course': share khóa học → /{course.id_khoa}/?ref=7
+  // - 'header': share từ header → /?ref=7 hoặc /{profileSlug}/?ref=7
+  const shareUrl = (() => {
+    if (shareType === 'course' && course?.id_khoa) {
+      // Share khóa học cụ thể
+      return affiliateCode
+        ? `${baseUrl}/${course.id_khoa}?ref=${encodeURIComponent(affiliateCode)}`
+        : `${baseUrl}/${course.id_khoa}`
+    }
+    // Share từ header (trang chủ hoặc profile)
+    if (profileSlug) {
+      return affiliateCode
+        ? `${baseUrl}/${profileSlug}?ref=${encodeURIComponent(affiliateCode)}`
+        : `${baseUrl}/${profileSlug}`
+    }
+    // Trang chủ mặc định
+    return affiliateCode
+      ? `${baseUrl}/?ref=${encodeURIComponent(affiliateCode)}`
+      : baseUrl
+  })()
+
+  // Title tùy theo shareType
+  const shareTitle = shareType === 'course'
+    ? `Khóa học: ${course.name_lop} - Cộng đồng học tập BRK`
+    : 'Trang chủ - Cộng đồng học tập BRK'
+
   const encodedUrl = encodeURIComponent(shareUrl)
   const encodedTitle = encodeURIComponent(shareTitle)
 
@@ -86,11 +98,11 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div 
+      <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       <div className="relative w-full max-w-md bg-brk-surface rounded-3xl shadow-2xl border border-brk-outline overflow-hidden animate-in zoom-in-95 fade-in duration-200">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
@@ -102,20 +114,20 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
                 <h3 className="text-lg font-black text-brk-on-surface">
                   {profileSlug || course.id_khoa ? 'Chia sẻ khóa học' : 'Chia sẻ link giới thiệu'}
                 </h3>
-                <p className="text-xs text-brk-muted">Gửi cho bạn bè để nhận hoa hồng</p>
+                <p className="text-xs text-brk-accent">Biết ơn bạn đã gieo hạt chia sẻ</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-brk-background flex items-center justify-center hover:bg-brk-muted/20 transition-colors"
+              className="w-8 h-8 rounded-full bg-brk-accent flex items-center justify-center hover:bg-brk-muted/20 transition-colors"
             >
-              <X className="w-4 h-4 text-brk-muted" />
+              <X className="w-4 h-4 text-brk-on-surface" />
             </button>
           </div>
 
           <div className="mb-6">
             <p className="text-sm font-medium text-brk-on-surface mb-2">{course.name_lop}</p>
-            <div className="w-full px-4 py-2.5 bg-brk-background rounded-xl border border-brk-outline text-sm font-mono text-brk-muted truncate">
+            <div className="w-full px-4 py-2.5 bg-brk-background rounded-xl border border-brk-outline text-sm font-mono text-brk-on-surface truncate">
               {shareUrl}
             </div>
           </div>
@@ -157,15 +169,13 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
             {/* Copy */}
             <button
               onClick={handleCopyLink}
-              className={`flex flex-col items-center gap-2 p-3 rounded-2xl font-bold transition-all ${
-                copied 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-brk-primary/10 text-brk-primary hover:bg-brk-primary/20'
-              }`}
+              className={`flex flex-col items-center gap-2 p-3 rounded-2xl font-bold transition-all ${copied
+                ? 'bg-green-500 text-white'
+                : 'bg-brk-primary/10 text-brk-primary hover:bg-brk-primary/20'
+                }`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform ${
-                copied ? 'bg-white text-green-500' : 'bg-brk-primary text-white'
-              }`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform ${copied ? 'bg-white text-green-500' : 'bg-brk-primary text-white'
+                }`}>
                 {copied ? <Check className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
               </div>
               <span className="text-xs">{copied ? 'Đã copy' : 'Copy'}</span>

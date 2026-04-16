@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Check, Palette, Copy, Lock, Unlock } from 'lucide-react';
+import { Check, Palette, Copy, Lock, Unlock, Table2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   presetThemes,
   ThemeColors,
@@ -24,6 +24,7 @@ export default function ThemeSettingsPage() {
   const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('default');
   const [customColors, setCustomColors] = useState<ThemeColors | null>(null);
   const [activeColorPicker, setActiveColorPicker] = useState<string | null>(null);
+  const [showColorTable, setShowColorTable] = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -128,7 +129,17 @@ export default function ThemeSettingsPage() {
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         {/* Preset Themes */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold mb-4">Giao diện có sẵn</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Giao diện có sẵn</h2>
+            <button
+              onClick={() => setShowColorTable(!showColorTable)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <Table2 className="h-4 w-4" />
+              {showColorTable ? 'Ẩn bảng màu' : 'Bảng màu đầy đủ'}
+              {showColorTable ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {presetThemes.map((theme) => {
               const isActive = currentThemeId === theme.id && !customColors;
@@ -185,6 +196,116 @@ export default function ThemeSettingsPage() {
             Các giao diện có sẵn (trừ Tùy biến) là cố định, không thể chỉnh sửa màu.
           </p>
         </div>
+
+        {/* Bảng màu đầy đủ */}
+        {showColorTable && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold mb-4">Bảng tham chiếu màu - Theme hiện tại</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-3 font-semibold text-gray-600">CSS Class</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-600">Màu</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-600">HEX</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-600">Ý nghĩa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Primary */}
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">text-brk-primary</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.primary }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.primary)} title="Click để copy">{colors.primary}</td>
+                    <td className="py-2 px-3 text-gray-500">Chữ màu chính</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">bg-brk-primary</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.primary }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.primary)} title="Click để copy">{colors.primary}</td>
+                    <td className="py-2 px-3 text-gray-500">Nền nút CTA, buttons</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">text-brk-on-primary</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.onPrimary }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.onPrimary)} title="Click để copy">{colors.onPrimary}</td>
+                    <td className="py-2 px-3 text-gray-500">Chữ trên nút primary</td>
+                  </tr>
+                  {/* Surface */}
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">bg-brk-surface</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.surface }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.surface)} title="Click để copy">{colors.surface}</td>
+                    <td className="py-2 px-3 text-gray-500">Nền cards, modal, panel</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">text-brk-on-surface</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.onSurface }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.onSurface)} title="Click để copy">{colors.onSurface}</td>
+                    <td className="py-2 px-3 text-gray-500">Chữ chính trên surface</td>
+                  </tr>
+                  {/* Background */}
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">bg-brk-background</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.background }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.background)} title="Click để copy">{colors.background}</td>
+                    <td className="py-2 px-3 text-gray-500">Nền trang chính</td>
+                  </tr>
+                  {/* Muted */}
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">text-brk-muted</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.muted }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.muted)} title="Click để copy">{colors.muted}</td>
+                    <td className="py-2 px-3 text-gray-500">Chữ mờ, mô tả phụ</td>
+                  </tr>
+                  {/* Accent */}
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">text-brk-accent</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.accent }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.accent)} title="Click để copy">{colors.accent}</td>
+                    <td className="py-2 px-3 text-gray-500">Màu nhấn (progress, badges)</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">bg-brk-accent</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.accent }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.accent)} title="Click để copy">{colors.accent}</td>
+                    <td className="py-2 px-3 text-gray-500">Background màu nhấn</td>
+                  </tr>
+                  {/* Outline */}
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">border-brk-outline</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.outline }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs cursor-pointer hover:text-blue-600" onClick={() => copyHex(colors.outline)} title="Click để copy">{colors.outline}</td>
+                    <td className="py-2 px-3 text-gray-500">Viền borders</td>
+                  </tr>
+                  {/* Variants */}
+                  <tr className="bg-gray-50">
+                    <td colSpan={4} className="py-2 px-3 font-semibold text-gray-500 text-xs">Các biến thể màu (alpha/opacity)</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">bg-brk-accent-10</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.accent + '1A' }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs">{colors.accent}1A</td>
+                    <td className="py-2 px-3 text-gray-500">Background accent 10% opacity</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">bg-brk-accent-20</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.accent + '33' }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs">{colors.accent}33</td>
+                    <td className="py-2 px-3 text-gray-500">Background accent 20% opacity</td>
+                  </tr>
+                  <tr className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 font-mono text-xs">text-brk-primary-75</td>
+                    <td className="py-2 px-3"><div className="w-6 h-6 rounded border border-gray-300" style={{ backgroundColor: colors.primary + 'BF' }} /></td>
+                    <td className="py-2 px-3 font-mono text-xs">{colors.primary}BF</td>
+                    <td className="py-2 px-3 text-gray-500">Primary 75% opacity</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">Click vào HEX để copy. Bảng màu cập nhật theo theme đang chọn.</p>
+          </div>
+        )}
 
         {/* Custom Colors */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
