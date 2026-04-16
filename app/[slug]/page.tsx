@@ -3,7 +3,7 @@ import { Metadata } from 'next'
 import { auth } from '@/auth'
 
 import MainHeader from '@/components/layout/MainHeader'
-import HeroSection from '@/components/home/HeroSection'
+import MessageCard from '@/components/home/MessageCard'
 import HomePageClient from '@/components/home/HomePageClient'
 import FooterSection from '@/components/home/FooterSection'
 import SetHomeSlug from '@/components/home/SetHomeSlug'
@@ -163,7 +163,7 @@ export default async function TeacherHomePage({ params }: PageProps) {
             />
             
             {/* Hero Section - Full width, Server-side render */}
-            <HeroSection
+            <MessageCard
                 profile={profile}
                 session={session}
                 userName={userName || ''}
