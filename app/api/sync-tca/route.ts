@@ -220,51 +220,88 @@ export async function POST(request: Request) {
         let userId: number
         let isNewUser = false
 
-        // Resolve parent info trước khi tạo User
+        // ======== 1. TÌM PARENT USER & SYSTEM ========
         const parentTcaId = node.parentFolderId
         let parentUserId: number | null = null
         let parentSystemId: number | null = null
 
-        // DEBUG: Log để trace referrerId
-        console.log(`[TCA Sync]   DEBUG: TCA ${node.id}, parentFolderId=${parentTcaId} (type: ${typeof parentTcaId})`)
+        console.log(`[TCA Sync]   TCA ${node.id}, parentFolderId=${parentTcaId}`)
 
         if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') {
           const parentIdNum = Number(parentTcaId)
-          console.log(`[TCA Sync]   DEBUG: Parent ID = ${parentIdNum}`)
           
-          // Thử lấy từ batch trước
+          // Thử 1: Parent đã sync trong batch này
           if (tcaIdToUserId.has(parentIdNum)) {
             parentUserId = tcaIdToUserId.get(parentIdNum)!
             parentSystemId = tcaIdToSystemId.get(parentIdNum) || null
-            console.log(`[TCA Sync]   DEBUG: Parent found in BATCH, parentUserId=${parentUserId}`)
+            console.log(`[TCA Sync]   Parent in BATCH: User ${parentUserId}, System ${parentSystemId}`)
           } else {
-            // Resolve từ DB
-            console.log(`[TCA Sync]   DEBUG: Parent NOT in batch, checking DB...`)
+            // Thử 2: Tìm TCAMember của parent
             const parentTCAMember = await (prisma as any).tCAMember?.findUnique({
-              where: { tcaId: parentIdNum },
-              include: { user: { select: { id: true } } }
+              where: { tcaId: parentIdNum }
             })
-            if (parentTCAMember && parentTCAMember.userId) {
+            
+            if (parentTCAMember?.userId) {
               parentUserId = parentTCAMember.userId
-              console.log(`[TCA Sync]   DEBUG: Parent found in DB, parentUserId=${parentUserId}`)
-              
-              const parentSystem = await prisma.system.findFirst({
-                where: { userId: parentTCAMember.userId, onSystem: 1 }
-              })
-              if (parentSystem) {
-                parentSystemId = parentSystem.autoId
+              if (parentUserId != null) {
+                const parentSystem = await prisma.system.findFirst({
+                  where: { userId: parentUserId, onSystem: 1 }
+                })
+                parentSystemId = parentSystem?.autoId || null
+                console.log(`[TCA Sync]   Parent in TCAMember: User ${parentUserId}, System ${parentSystemId}`)
               }
             } else {
-              console.log(`[TCA Sync]   DEBUG: Parent NOT found anywhere!`)
+              // Thử 3: Parent là FOLDER - tìm qua memberInfo
+              const parentMemberInfo = body.memberInfo?.[parentIdNum]
+              if (parentMemberInfo?.phone || parentMemberInfo?.email) {
+                const parentUser = await prisma.user.findFirst({
+                  where: {
+                    OR: [
+                      parentMemberInfo.phone ? { phone: { contains: parentMemberInfo.phone.replace(/\D/g, '') } } : undefined,
+                      parentMemberInfo.email ? { email: parentMemberInfo.email } : undefined
+                    ].filter(Boolean) as any[]
+                  }
+                })
+                
+                if (parentUser) {
+                  parentUserId = parentUser.id
+                  const parentSystem = await prisma.system.findFirst({
+                    where: { userId: parentUserId, onSystem: 1 }
+                  })
+                  parentSystemId = parentSystem?.autoId || null
+                  console.log(`[TCA Sync]   Parent via memberInfo: User ${parentUserId}, System ${parentSystemId}`)
+                }
+              }
+              
+              // Thử 4: Tìm sibling trong DB
+              if (!parentUserId) {
+                const siblingMembers = await (prisma as any).tCAMember?.findMany({
+                  where: { parentTcaId: parentIdNum },
+                  take: 1
+                })
+                
+                if (siblingMembers?.[0]) {
+                  const siblingUser = await prisma.user.findUnique({
+                    where: { id: siblingMembers[0].userId }
+                  })
+                  
+                  if (siblingUser?.referrerId) {
+                    parentUserId = siblingUser.referrerId
+                    const parentSystem = await prisma.system.findFirst({
+                      where: { userId: parentUserId, onSystem: 1 }
+                    })
+                    parentSystemId = parentSystem?.autoId || null
+                    console.log(`[TCA Sync]   Parent via sibling: User ${parentUserId}, System ${parentSystemId}`)
+                  }
+                }
+              }
             }
           }
-          
-          console.log(`[TCA Sync]   Parent TCA ${parentIdNum} → User ${parentUserId}, System ${parentSystemId}`)
         } else {
-          console.log(`[TCA Sync]   DEBUG: Root node (no parent), parentUserId=null`)
+          console.log(`[TCA Sync]   Root node (no parent)`)
         }
 
-        console.log(`[TCA Sync]   DEBUG: Final parentUserId=${parentUserId} before creating user`)
+        console.log(`[TCA Sync]   FINAL: parentUserId=${parentUserId}, parentSystemId=${parentSystemId}`)
 
         if (existingUser) {
           userId = existingUser.id
@@ -325,33 +362,76 @@ export async function POST(request: Request) {
         let systemId: number
 
         if (!existingSystem) {
+          // Tạo System với refSysId đúng ngay từ đầu
           const newSystem = await prisma.system.create({
             data: {
               userId: userId,
               onSystem: 1,
-              refSysId: 0
+              refSysId: parentSystemId || 0
             }
           })
           systemId = newSystem.autoId
           stats.systemsCreated++
           createdRecords.push({ table: 'System', id: systemId, tcaId: node.id })
-          console.log(`[TCA Sync]   Created NEW system: ${systemId}`)
+          console.log(`[TCA Sync]   Created NEW system: ${systemId} with refSysId=${parentSystemId || 0}`)
+          
+          // ---------- 3. Tạo SystemClosure ----------
+          if (parentSystemId) {
+            // Copy closures từ parent
+            const parentClosures = await prisma.systemClosure.findMany({
+              where: { descendantId: parentSystemId, systemId: 1 }
+            })
+            
+            for (const closure of parentClosures) {
+              await prisma.systemClosure.create({
+                data: {
+                  ancestorId: closure.ancestorId,
+                  descendantId: systemId,
+                  depth: closure.depth + 1,
+                  systemId: 1
+                }
+              })
+            }
+            
+            // Thêm self closure
+            await prisma.systemClosure.create({
+              data: {
+                ancestorId: systemId,
+                descendantId: systemId,
+                depth: 0,
+                systemId: 1
+              }
+            })
+            
+            console.log(`[TCA Sync]   Created ${parentClosures.length + 1} SystemClosure records`)
+          } else {
+            // Root node - chỉ tạo self closure
+            await prisma.systemClosure.create({
+              data: {
+                ancestorId: systemId,
+                descendantId: systemId,
+                depth: 0,
+                systemId: 1
+              }
+            })
+            console.log(`[TCA Sync]   Created self SystemClosure`)
+          }
         } else {
           systemId = existingSystem.autoId
           stats.systemsUpdated++
           console.log(`[TCA Sync]   Found existing system: ${systemId}`)
+          
+          // Update refSysId nếu cần
+          if (parentSystemId && existingSystem.refSysId !== parentSystemId) {
+            await prisma.system.update({
+              where: { autoId: systemId },
+              data: { refSysId: parentSystemId }
+            })
+            console.log(`[TCA Sync]   Updated refSysId: ${systemId} -> ${parentSystemId}`)
+          }
         }
 
         tcaIdToSystemId.set(node.id, systemId)
-
-        // ---------- 3. Update System refSysId ----------
-        if (parentSystemId && existingSystem && existingSystem.refSysId !== parentSystemId) {
-          await prisma.system.update({
-            where: { autoId: systemId },
-            data: { refSysId: parentSystemId }
-          })
-          console.log(`[TCA Sync]   Updated refSysId: ${systemId} -> ${parentSystemId}`)
-        }
 
         // ---------- 4. Upsert TCAMember ----------
         const existingTCAMember = await (prisma as any).tCAMember?.findUnique({
