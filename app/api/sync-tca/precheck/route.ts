@@ -42,6 +42,23 @@ export async function POST(request: Request) {
     console.log('Total nodes:', allNodes?.length || 0)
     console.log('==========================================')
 
+    // Helper function to normalize phone number
+    const normalizePhone = (phone: string | null): string | null => {
+      if (!phone) return null;
+      // Remove all non-digit characters
+      const digits = phone.replace(/\D/g, '');
+      // If starts with 84, remove it
+      if (digits.startsWith('84') && digits.length === 11) {
+        return '0' + digits.substring(2);
+      }
+      // If starts with 0, keep as is
+      if (digits.startsWith('0')) {
+        return digits;
+      }
+      // Otherwise return original
+      return phone;
+    }
+
     if (!allNodes || !Array.isArray(allNodes)) {
       return NextResponse.json(
         { error: 'Invalid payload: allNodes required' },
@@ -63,6 +80,7 @@ export async function POST(request: Request) {
         type: string
         email: string | null
         phone: string | null
+        normalizedPhone: string | null
         status: 'NEW_USER' | 'EXISTING_USER' | 'NEW_SYSTEM' | 'EXISTING_SYSTEM'
         existingUserId: number | null
         existingSystemId: number | null
@@ -74,29 +92,52 @@ export async function POST(request: Request) {
       const info = memberInfo?.[node.id] || {}
       const email = info.email || null
       const phone = info.phone || null
+      const normalizedPhone = normalizePhone(phone);
+
+      console.log(`[Precheck] TCA ID ${node.id}: email=${email}, phone=${phone} -> normalized=${normalizedPhone}`);
 
       // Check if user exists (by phone OR email)
-      let existingUser = null
-      if (phone || email) {
+      let existingUser = null;
+      if (normalizedPhone || email) {
+        // First try exact match
         existingUser = await prisma.user.findFirst({
           where: {
             OR: [
-              phone ? { phone } : undefined,
-              email ? { email } : undefined
+              normalizedPhone ? { phone: normalizedPhone } : undefined,
+              email ? { email: email } : undefined
             ].filter(Boolean) as { phone: string }[] | { email: string }[]
           }
-        })
+        });
+
+        // If no exact match, try fuzzy phone match (get all users with phone containing digits)
+        if (!existingUser && normalizedPhone) {
+          const allUsers = await prisma.user.findMany({
+            where: {
+              phone: { not: null }
+            }
+          });
+          
+          // Find user with matching normalized phone
+          for (const user of allUsers) {
+            if (user.phone && normalizePhone(user.phone) === normalizedPhone) {
+              existingUser = user;
+              console.log(`[Precheck] Found user by fuzzy phone match: ${user.id}`);
+              break;
+            }
+          }
+        }
       }
 
       // Check if system exists
-      let existingSystem = null
+      let existingSystem = null;
       if (existingUser) {
         existingSystem = await prisma.system.findFirst({
           where: {
             userId: existingUser.id,
             onSystem: 1
           }
-        })
+        });
+        console.log(`[Precheck] User ${existingUser.id} found, system exists: ${!!existingSystem}`);
       }
 
       // Determine status
@@ -125,6 +166,7 @@ export async function POST(request: Request) {
         type: node.type,
         email,
         phone,
+        normalizedPhone,
         status: status as 'NEW_USER' | 'EXISTING_USER' | 'NEW_SYSTEM' | 'EXISTING_SYSTEM',
         existingUserId: existingUser?.id || null,
         existingSystemId: existingSystem?.autoId || null,
