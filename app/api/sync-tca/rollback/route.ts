@@ -52,7 +52,6 @@ async function createBackupFile(data: {
     ...data
   }
   
-  // Log backup data (in production, save to file or cloud storage)
   console.log('[TCA Rollback] Backup created:', backupId)
   console.log('[TCA Rollback] Backup data:', JSON.stringify(backupData, null, 2))
   
@@ -84,39 +83,127 @@ export async function POST(request: Request) {
     let syncId = ''
     let totalRecords = 0
 
-    // Get records based on mode
+    // =====================================================
+    // MODE: Rollback by SyncId
+    // =====================================================
     if (mode === 'syncId') {
       const { syncId: targetSyncId } = body as RollbackBySyncId
       syncId = targetSyncId
 
       const history = await (prisma as any).tCASyncHistory.findMany({
         where: { syncId: targetSyncId },
-        orderBy: { id: 'desc' }
+        orderBy: { id: 'asc' }
       })
 
       if (history.length === 0) {
         return NextResponse.json({
           success: false,
-          error: 'No history found for this syncId'
+          error: 'Không tìm thấy lịch sử sync này'
         }, { headers: CORS_HEADERS })
       }
 
-      for (const record of history) {
-        if (record.action === 'CREATE_USER' && record.recordId && record.tcaId) {
-          recordsToDelete.users.push({ id: record.recordId, tcaId: record.tcaId })
-        } else if (record.action === 'CREATE_SYSTEM' && record.recordId && record.tcaId) {
-          recordsToDelete.systems.push({ autoId: record.recordId, tcaId: record.tcaId })
-        } else if (record.action === 'CREATE_TCA_MEMBER' && record.recordId && record.tcaId) {
-          recordsToDelete.tcaMembers.push({ id: record.recordId, tcaId: record.tcaId })
-        } else if (record.action === 'CREATE_CLOSURE' && record.afterData) {
-          const data = record.afterData as { systemId?: number }
-          if (data?.systemId) {
-            recordsToDelete.closures.push({ systemId: data.systemId })
+      // Get sync timestamp and TCA IDs from SYNC_START
+      const syncStartRecord = history.find((h: { action: string }) => h.action === 'SYNC_START')
+      const syncTimestamp = syncStartRecord?.createdAt ? new Date(syncStartRecord.createdAt) : new Date()
+      
+      let tcaIdsFromSync: number[] = []
+      if (syncStartRecord?.afterData) {
+        const afterData = syncStartRecord.afterData as { nodeIds?: number[]; totalNodes?: number }
+        if (afterData?.nodeIds && Array.isArray(afterData.nodeIds)) {
+          tcaIdsFromSync = afterData.nodeIds
+        }
+      }
+
+      // Check if history has detailed CREATE records
+      const hasDetailedHistory = history.some((h: { action: string }) => 
+        ['CREATE_USER', 'CREATE_SYSTEM', 'CREATE_TCA_MEMBER', 'CREATE_CLOSURE'].includes(h.action)
+      )
+
+      if (hasDetailedHistory) {
+        // Standard rollback using detailed history
+        console.log('[TCA Rollback] Using detailed history')
+        for (const record of history) {
+          if (record.action === 'CREATE_USER' && record.recordId && record.tcaId) {
+            recordsToDelete.users.push({ id: record.recordId, tcaId: record.tcaId })
+          } else if (record.action === 'CREATE_SYSTEM' && record.recordId && record.tcaId) {
+            recordsToDelete.systems.push({ autoId: record.recordId, tcaId: record.tcaId })
+          } else if (record.action === 'CREATE_TCA_MEMBER' && record.recordId && record.tcaId) {
+            recordsToDelete.tcaMembers.push({ id: record.recordId, tcaId: record.tcaId })
+          } else if (record.action === 'CREATE_CLOSURE' && record.afterData) {
+            const data = record.afterData as { systemId?: number }
+            if (data?.systemId) {
+              recordsToDelete.closures.push({ systemId: data.systemId })
+            }
           }
+        }
+      } else if (tcaIdsFromSync.length > 0) {
+        // No detailed history but we have TCA IDs from SYNC_START
+        console.log('[TCA Rollback] Finding TCAMembers by TCA IDs from sync:', tcaIdsFromSync)
+        
+        for (const tcaId of tcaIdsFromSync) {
+          const tcaMember = await (prisma as any).tCAMember?.findUnique({
+            where: { tcaId }
+          })
+          if (tcaMember) {
+            recordsToDelete.tcaMembers.push({ id: tcaMember.id, tcaId })
+            
+            const system = await prisma.system.findFirst({
+              where: { userId: tcaMember.userId, onSystem: 1 }
+            })
+            if (system) {
+              recordsToDelete.systems.push({ autoId: system.autoId, tcaId })
+              recordsToDelete.closures.push({ systemId: system.autoId })
+            }
+            
+            recordsToDelete.users.push({ id: tcaMember.userId, tcaId })
+          }
+        }
+      } else {
+        // No detailed history and no TCA IDs - find by timestamp
+        const timeWindow = 60 * 60 * 1000 // 1 hour
+        const fromTime = new Date(syncTimestamp.getTime() - timeWindow)
+        const toTime = new Date(syncTimestamp.getTime() + timeWindow)
+        
+        console.log('[TCA Rollback] Finding TCAMembers synced between', fromTime, 'and', toTime)
+        
+        const recentTCAMembers = await (prisma as any).tCAMember?.findMany({
+          where: {
+            lastSyncedAt: {
+              gte: fromTime,
+              lte: toTime
+            }
+          }
+        })
+        
+        if (recentTCAMembers && recentTCAMembers.length > 0) {
+          console.log('[TCA Rollback] Found', recentTCAMembers.length, 'TCAMembers to rollback')
+          
+          for (const tcaMember of recentTCAMembers) {
+            recordsToDelete.tcaMembers.push({ id: tcaMember.id, tcaId: tcaMember.tcaId })
+            
+            const system = await prisma.system.findFirst({
+              where: { userId: tcaMember.userId, onSystem: 1 }
+            })
+            if (system) {
+              recordsToDelete.systems.push({ autoId: system.autoId, tcaId: tcaMember.tcaId })
+              recordsToDelete.closures.push({ systemId: system.autoId })
+            }
+            
+            recordsToDelete.users.push({ id: tcaMember.userId, tcaId: tcaMember.tcaId })
+          }
+        } else {
+          return NextResponse.json({
+            success: false,
+            error: 'Không tìm thấy dữ liệu để rollback cho sync này',
+            hint: 'Sync này có thể không tạo dữ liệu hoặc dữ liệu đã được xóa trước đó.'
+          }, { headers: CORS_HEADERS })
         }
       }
       totalRecords = history.length
 
+    // =====================================================
+    // MODE: Rollback by TCA IDs
+    // =====================================================
     } else if (mode === 'tcaIds') {
       const { tcaIds } = body as RollbackByTcaIds
       syncId = 'manual_' + uuidv4()
@@ -141,6 +228,9 @@ export async function POST(request: Request) {
       }
       totalRecords = tcaIds.length
 
+    // =====================================================
+    // MODE: Rollback by Date Range
+    // =====================================================
     } else if (mode === 'dateRange') {
       const { fromDate, toDate } = body as RollbackByDate
       syncId = 'daterange_' + uuidv4()
@@ -255,7 +345,6 @@ export async function POST(request: Request) {
         }).catch(() => { })
         deleted.users++
       } catch (e) {
-        // User might have other data, skip deletion
         errors.push({ table: 'User', id: user.id, error: String(e) })
       }
     }
@@ -291,7 +380,7 @@ export async function POST(request: Request) {
       syncId,
       deleted,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Deleted: ${deleted.users} users, ${deleted.systems} systems, ${deleted.tcaMembers} tcaMembers, ${deleted.closures} closures`
+      message: `Đã xóa: ${deleted.users} users, ${deleted.systems} systems, ${deleted.tcaMembers} tcaMembers, ${deleted.closures} closures`
     }, { headers: CORS_HEADERS })
 
   } catch (error) {
@@ -342,7 +431,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     status: 'TCA Rollback API',
-    version: '2.0.0',
+    version: '3.0.0',
     usage: {
       method: 'POST',
       body: {

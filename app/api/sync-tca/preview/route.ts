@@ -133,6 +133,10 @@ export async function POST(request: Request) {
         expectedUserId: number | null
         expectedSystemId: number | null
         parentTcaId: number | null
+        parentUserId: number | null  // Resolved từ DB hoặc batch
+        parentSource: 'DB' | 'BATCH' | null
+        expectedReferrerId: number | null
+        expectedRefSysId: number | null
         closuresToCreate: number
       }[]
     }
@@ -250,8 +254,47 @@ export async function POST(request: Request) {
         }
       }
 
+      // Resolve parent info
       const parentId = node.parentFolderId;
       const parentTcaId = (!parentId || parentId === 'root' || parentId === '0') ? null : Number(parentId);
+      
+      let parentUserId: number | null = null;
+      let parentSource: 'DB' | 'BATCH' | null = null;
+      let parentSystemId: number | null = null;
+      
+      if (parentTcaId) {
+        // Thử resolve từ batch trước
+        const batchNode = allNodes.find(n => n.id === parentTcaId);
+        if (batchNode) {
+          // Parent có trong batch - tìm userId của parent trong batch
+          const parentInfo = preview.rows.find(r => r.tcaId === parentTcaId);
+          if (parentInfo) {
+            parentUserId = parentInfo.currentData?.userId || parentInfo.expectedUserId;
+            parentSystemId = parentInfo.currentData?.systemId || parentInfo.expectedSystemId;
+            if (parentUserId) parentSource = 'BATCH';
+          }
+        } else {
+          // Parent không có trong batch - resolve từ DB
+          const parentTCAMember = await (prisma as any).tCAMember?.findUnique({
+            where: { tcaId: parentTcaId },
+            include: { user: { select: { id: true } } }
+          });
+          if (parentTCAMember) {
+            parentUserId = parentTCAMember.userId;
+            parentSource = 'DB';
+            
+            // Lấy parent system
+            if (parentUserId) {
+              const parentSystem = await prisma.system.findFirst({
+                where: { userId: parentUserId, onSystem: 1 }
+              });
+              if (parentSystem) {
+                parentSystemId = parentSystem.autoId;
+              }
+            }
+          }
+        }
+      }
 
       preview.rows.push({
         tcaId: node.id,
@@ -279,6 +322,10 @@ export async function POST(request: Request) {
         expectedUserId,
         expectedSystemId,
         parentTcaId,
+        parentUserId,
+        parentSource,
+        expectedReferrerId: parentUserId,  // referrerId = parentUserId
+        expectedRefSysId: parentSystemId,
         closuresToCreate
       })
     }
