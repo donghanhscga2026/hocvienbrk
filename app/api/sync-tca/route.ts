@@ -190,37 +190,51 @@ export async function POST(request: Request) {
 
         console.log(`[TCA Sync] Processing TCA ${node.id}: ${node.name}`)
 
-        // ---------- 1. Find/Create User ----------
+        // ======== LOGIC XÁC ĐỊNH USER TỒN TẠI ========
+        // Ưu tiên: Phone → Email
         const normalizedPhone = phone ? phone.replace(/\D/g, '') : null
         let existingUser = null
+        let needEmailUpdate = false
+        let phoneMatch = false
+        let emailMatch = false
 
-        if (normalizedPhone || email) {
-          existingUser = await prisma.user.findFirst({
-            where: {
-              OR: [
-                normalizedPhone ? { phone: normalizedPhone } : undefined,
-                email ? { email: email } : undefined
-              ].filter(Boolean) as { phone: string }[] | { email: string }[]
-            }
+        // Thử 1: Tìm theo phone trước
+        if (normalizedPhone) {
+          const allUsers = await prisma.user.findMany({
+            where: { phone: { not: null } }
           })
-
-          if (!existingUser && normalizedPhone) {
-            const allUsers = await prisma.user.findMany({
-              where: { phone: { not: null } }
-            })
-            for (const user of allUsers) {
-              if (user.phone && user.phone.replace(/\D/g, '') === normalizedPhone) {
-                existingUser = user
-                break
+          for (const user of allUsers) {
+            if (user.phone && user.phone.replace(/\D/g, '') === normalizedPhone) {
+              existingUser = user
+              phoneMatch = true
+              
+              // Check email
+              if (email && user.email?.toLowerCase() !== email.toLowerCase()) {
+                needEmailUpdate = true
+                console.log(`[TCA Sync]   Phone trùng nhưng email không: DB=${user.email}, TCA=${email}`)
+              } else {
+                emailMatch = true
               }
+              break
             }
+          }
+        }
+
+        // Thử 2: Tìm theo email (nếu không tìm được theo phone)
+        if (!existingUser && email) {
+          existingUser = await prisma.user.findFirst({
+            where: { email: { equals: email, mode: 'insensitive' } }
+          })
+          if (existingUser) {
+            emailMatch = true
+            console.log(`[TCA Sync]   Chỉ email trùng: User ${existingUser.id} - CẢNH BÁO xử lý tay!`)
           }
         }
 
         let userId: number
         let isNewUser = false
 
-        // ======== 1. TÌM PARENT USER & SYSTEM ========
+        // ======== TÌM PARENT USER & SYSTEM ========
         const parentTcaId = node.parentFolderId
         let parentUserId: number | null = null
         let parentSystemId: number | null = null
@@ -251,25 +265,43 @@ export async function POST(request: Request) {
                 console.log(`[TCA Sync]   Parent in TCAMember: User ${parentUserId}, System ${parentSystemId}`)
               }
             } else {
-              // Thử 3: Parent là FOLDER - tìm qua memberInfo
-              const parentMemberInfo = body.memberInfo?.[parentIdNum]
-              if (parentMemberInfo?.phone || parentMemberInfo?.email) {
-                const parentUser = await prisma.user.findFirst({
-                  where: {
-                    OR: [
-                      parentMemberInfo.phone ? { phone: { contains: parentMemberInfo.phone.replace(/\D/g, '') } } : undefined,
-                      parentMemberInfo.email ? { email: parentMemberInfo.email } : undefined
-                    ].filter(Boolean) as any[]
-                  }
-                })
+              // Thử 3: Parent là FOLDER - tìm memberInfo của folder parent
+              const parentFolderInfo = body.memberInfo?.[parentIdNum]
+              if (parentFolderInfo) {
+                const parentFolderPhone = parentFolderInfo.phone?.replace(/\D/g, '') || null
+                const parentFolderEmail = parentFolderInfo.email || null
                 
-                if (parentUser) {
-                  parentUserId = parentUser.id
-                  const parentSystem = await prisma.system.findFirst({
-                    where: { userId: parentUserId, onSystem: 1 }
+                // Tìm user qua phone trước
+                if (parentFolderPhone) {
+                  const allUsers = await prisma.user.findMany({
+                    where: { phone: { not: null } }
                   })
-                  parentSystemId = parentSystem?.autoId || null
-                  console.log(`[TCA Sync]   Parent via memberInfo: User ${parentUserId}, System ${parentSystemId}`)
+                  for (const user of allUsers) {
+                    if (user.phone && user.phone.replace(/\D/g, '') === parentFolderPhone) {
+                      parentUserId = user.id
+                      const parentSystem = await prisma.system.findFirst({
+                        where: { userId: parentUserId, onSystem: 1 }
+                      })
+                      parentSystemId = parentSystem?.autoId || null
+                      console.log(`[TCA Sync]   Parent via folder phone: User ${parentUserId}, System ${parentSystemId}`)
+                      break
+                    }
+                  }
+                }
+                
+                // Nếu không tìm được qua phone, thử email
+                if (!parentUserId && parentFolderEmail) {
+                  const parentUserByEmail = await prisma.user.findFirst({
+                    where: { email: { equals: parentFolderEmail, mode: 'insensitive' } }
+                  })
+                  if (parentUserByEmail) {
+                    parentUserId = parentUserByEmail.id
+                    const parentSystem = await prisma.system.findFirst({
+                      where: { userId: parentUserId, onSystem: 1 }
+                    })
+                    parentSystemId = parentSystem?.autoId || null
+                    console.log(`[TCA Sync]   Parent via folder email: User ${parentUserId}, System ${parentSystemId}`)
+                  }
                 }
               }
               
@@ -291,7 +323,7 @@ export async function POST(request: Request) {
                       where: { userId: parentUserId, onSystem: 1 }
                     })
                     parentSystemId = parentSystem?.autoId || null
-                    console.log(`[TCA Sync]   Parent via sibling: User ${parentUserId}, System ${parentSystemId}`)
+                    console.log(`[TCA Sync]   Parent via sibling referrerId: User ${parentUserId}, System ${parentSystemId}`)
                   }
                 }
               }
@@ -300,7 +332,7 @@ export async function POST(request: Request) {
         } else {
           // Root TCA - referrerId = 861 (TCA_ROOT_USER)
           parentUserId = 861
-          parentSystemId = 13807 // System ID của User 861
+          parentSystemId = 13807
           console.log(`[TCA Sync]   Root TCA - referrerId = 861, System = 13807`)
         }
 
@@ -308,7 +340,7 @@ export async function POST(request: Request) {
 
         if (existingUser) {
           userId = existingUser.id
-          console.log(`[TCA Sync]   Found existing user: ${userId}`)
+          console.log(`[TCA Sync]   Found existing user: ${userId}, needEmailUpdate=${needEmailUpdate}`)
 
           const updates: { name?: string; phone?: string | null } = {}
           let hasUpdate = false
@@ -320,6 +352,12 @@ export async function POST(request: Request) {
           if (phone && !existingUser.phone) {
             updates.phone = phone
             hasUpdate = true
+          }
+          // NOTE: Nếu email không trùng, chỉ gợi ý, không tự động cập nhật
+          if (needEmailUpdate) {
+            console.log(`[TCA Sync]   ⚠️ GỢI Ý: Phone trùng nhưng email khác!`)
+            console.log(`[TCA Sync]   DB email: ${existingUser.email}, TCA email: ${email}`)
+            console.log(`[TCA Sync]   User ${userId} - Cần xem xét cập nhật email!`)
           }
 
           if (hasUpdate) {
