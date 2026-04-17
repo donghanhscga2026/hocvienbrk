@@ -41,6 +41,15 @@ interface MemberInfo {
   promotionDate?: string
 }
 
+interface ExpectedIds {
+  [tcaId: number]: {
+    userId: number | null
+    systemId: number | null
+    referrerId: number | null
+    refSysId: number | null
+  }
+}
+
 interface SyncPayload {
   source: string
   timestamp: number
@@ -51,6 +60,7 @@ interface SyncPayload {
     folders: number
     items: number
   }
+  expectedIds?: ExpectedIds
 }
 
 async function sendTelegramNotification(message: string) {
@@ -370,8 +380,20 @@ export async function POST(request: Request) {
           }
         } else {
           const hashedPassword = await bcrypt.hash('Brk#3773', 10)
-          const { getNextAvailableId } = await import('@/lib/id-helper')
-          const newId = await getNextAvailableId()
+          
+          // Ưu tiên dùng expectedUserId/referrerId từ preview nếu có
+          const expectedData = body.expectedIds?.[node.id]
+          let newId: number
+          
+          if (expectedData?.userId) {
+            newId = expectedData.userId
+          } else {
+            const { getNextAvailableId } = await import('@/lib/id-helper')
+            newId = await getNextAvailableId()
+          }
+          
+          // referrerId: ưu tiên expectedReferrerId > parentUserId
+          const referrerId = expectedData?.referrerId ?? parentUserId
 
           const newUser = await prisma.user.create({
             data: {
@@ -381,7 +403,7 @@ export async function POST(request: Request) {
               phone: phone,
               password: hashedPassword,
               role: 'STUDENT',
-              referrerId: parentUserId
+              referrerId: referrerId
             }
           })
 
@@ -403,12 +425,17 @@ export async function POST(request: Request) {
         let systemId: number
 
         if (!existingSystem) {
-          // Tạo System với refSysId đúng ngay từ đầu
+          // Ưu tiên dùng expectedSystemId từ preview nếu có
+          const expectedData = body.expectedIds?.[node.id]
+          
+          // refSysId: ưu tiên expectedRefSysId > parentSystemId
+          const refSysId = expectedData?.refSysId ?? parentSystemId
+          
           const newSystem = await prisma.system.create({
             data: {
               userId: userId,
               onSystem: 1,
-              refSysId: parentSystemId || 0
+              refSysId: refSysId || 0
             }
           })
           systemId = newSystem.autoId
