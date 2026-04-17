@@ -22,6 +22,7 @@
   let fetchedCount = 0;    // Số member info đã fetch
   let allNodesGlobal = []; // Lưu allNodes để dùng sau
   let precheckDone = false; // Flag để tránh gọi precheck nhiều lần
+  let previewCache = {};   // Lưu preview response để dùng khi sync
 
   function injectScript() {
     const script = document.createElement('script');
@@ -561,6 +562,10 @@
 
         if (!result.success) throw new Error(result.error || 'Preview failed');
 
+        // Lưu preview response vào cache để dùng khi sync
+        previewCache = result;
+        console.log('[TCA Sync] Preview cached:', result.rows?.length, 'rows');
+
         // Update stats
         document.getElementById('preview-total').textContent = result.total;
         document.getElementById('preview-create-all').textContent = result.willCreate.users;
@@ -770,18 +775,11 @@
 
       updateStep(0, 'Bat dau dong bo...');
       
-      // Fetch preview again to get match info
+      // Dùng previewCache thay vì gọi preview lại
       try {
-        updateStep(0, 'Dang goi API Preview de lay thong tin match...');
-        const previewRes = await fetch(SYNC_PREVIEW_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            allNodes: selectedNodes,
-            memberInfo: selectedMemberInfo
-          })
-        });
-        const previewData = await previewRes.json();
+        const previewData = previewCache;
+        
+        updateStep(0, 'Su dung du lieu tu preview da co san...');
         
         if (previewData.rows) {
           updateStep(1, `
@@ -796,20 +794,24 @@
         updateStep(2, 'Dang gui yeu cau dong bo toi server...');
         console.log('[TCA Sync] Executing sync for', selectedNodes.length, 'nodes');
 
-        // Build expectedIds từ preview data
+        // Build expectedIds từ preview cache - filter chỉ lấy selected IDs
         const expectedIds = {};
         if (previewData.rows && previewData.rows.length > 0) {
           previewData.rows.forEach(row => {
-            if (row.expectedUserId || row.expectedSystemId || row.expectedReferrerId || row.expectedRefSysId) {
-              expectedIds[row.tcaId] = {
-                userId: row.expectedUserId || null,
-                systemId: row.expectedSystemId || null,
-                referrerId: row.expectedReferrerId || null,
-                refSysId: row.expectedRefSysId || null
-              };
+            // Chỉ lấy những TCA ID nào được check để sync
+            if (selectedIds.includes(row.tcaId)) {
+              if (row.expectedUserId || row.expectedSystemId || row.expectedReferrerId || row.expectedRefSysId) {
+                expectedIds[row.tcaId] = {
+                  userId: row.expectedUserId || null,
+                  systemId: row.expectedSystemId || null,
+                  referrerId: row.expectedReferrerId || null,
+                  refSysId: row.expectedRefSysId || null
+                };
+              }
             }
           });
           console.log('[TCA Sync] expectedIds:', expectedIds);
+          console.log('[TCA Sync] selectedIds:', selectedIds);
         }
 
         const response = await fetch(SYNC_ENDPOINT, {

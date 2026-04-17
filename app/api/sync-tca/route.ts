@@ -412,7 +412,7 @@ export async function POST(request: Request) {
           stats.usersCreated++
           createdRecords.push({ table: 'User', id: userId, tcaId: node.id })
 
-          console.log(`[TCA Sync]   Created NEW user: ${userId} with referrerId: ${parentUserId}`)
+          console.log(`[TCA Sync]   Created NEW user: ${userId} with referrerId: ${referrerId}`)
         }
 
         tcaIdToUserId.set(node.id, userId)
@@ -441,7 +441,7 @@ export async function POST(request: Request) {
           systemId = newSystem.autoId
           stats.systemsCreated++
           createdRecords.push({ table: 'System', id: systemId, tcaId: node.id })
-          console.log(`[TCA Sync]   Created NEW system: ${systemId} with refSysId=${parentSystemId || 0}`)
+          console.log(`[TCA Sync]   Created NEW system: ${systemId} with refSysId=${refSysId || 0}`)
           
           // ---------- 3. Tạo SystemClosure ----------
           if (parentSystemId) {
