@@ -29,40 +29,63 @@
   function extractNodeInfo(item) {
     const id = item.additionalParameters?.id;
     
-    // item.name đã là text đã parse sẵn, format: "NHÓM - TÊN - ĐIỂM - Cấp X"
-    // Hoặc: "TÊN - ĐIỂM - Cấp X" (không có nhóm)
-    const nameText = item.name || '';
+    // item.name chứa HTML, cần strip trước khi parse
+    const rawName = item.name || '';
     
-    // Parse từ name field trực tiếp (không phải HTML)
-    const parts = nameText.split(' - ');
+    // Strip HTML tags để lấy text thuần
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = rawName;
+    const nameText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    // Parse text thuần: tìm pattern SCORE / SCORE để xác định vị trí
+    // Format: "NHÓM - TÊN - 17.463 / 52.161 - Cấp X" hoặc "TÊN - 17.463 / 52.161 - Cấp X"
     
     let groupName = '';
-    let fullName = nameText; // Default
+    let fullName = nameText.trim();
     let personalScore = '0';
     let totalScore = '0';
     let level = '1';
     
-    if (parts.length === 4) {
-      // Format: "NHÓM - TÊN - ĐIỂM - Cấp X"
-      groupName = parts[0].trim();
-      fullName = parts[1].trim();
-      const scoreMatch = parts[2].trim().match(/([\d.]+)\s*\/\s*([\d.]+)/);
-      if (scoreMatch) {
-        personalScore = scoreMatch[1];
-        totalScore = scoreMatch[2];
-      }
-      const levelMatch = parts[3].match(/Cấp\s*(\d+)/);
+    // Tìm pattern điểm số: số/số (có thể có số thập phân)
+    const scorePattern = /([\d.]+)\s*\/\s*([\d.]+)/;
+    const scoreMatch = nameText.match(scorePattern);
+    
+    if (scoreMatch) {
+      personalScore = scoreMatch[1];
+      totalScore = scoreMatch[2];
+      
+      // Lấy phần trước dấu "/" để parse group/name
+      const beforeScore = nameText.substring(0, nameText.indexOf(scoreMatch[0])).trim();
+      const parts = beforeScore.split(' - ').map(p => p.trim()).filter(p => p.length > 0);
+      
+      // Tìm "Cấp X" trong text
+      const levelMatch = nameText.match(/Cấp\s*(\d+)/);
       if (levelMatch) level = levelMatch[1];
-    } else if (parts.length === 3) {
-      // Format: "TÊN - ĐIỂM - Cấp X"
-      fullName = parts[0].trim();
-      const scoreMatch = parts[1].trim().match(/([\d.]+)\s*\/\s*([\d.]+)/);
-      if (scoreMatch) {
-        personalScore = scoreMatch[1];
-        totalScore = scoreMatch[2];
+      
+      if (parts.length === 1) {
+        // Format: "TÊN"
+        groupName = '';
+        fullName = parts[0];
+      } else if (parts.length === 2) {
+        // Format: "NHÓM - TÊN"
+        groupName = parts[0];
+        fullName = parts[1];
+      } else if (parts.length >= 3) {
+        // Format: "NHÓM - TÊN - [extra]"
+        // groupName = parts[0], name = parts[1]
+        groupName = parts[0];
+        fullName = parts[1];
       }
-      const levelMatch = parts[2].match(/Cấp\s*(\d+)/);
-      if (levelMatch) level = levelMatch[1];
+    } else {
+      // Không tìm thấy pattern điểm, thử parse đơn giản
+      const parts = nameText.split(' - ').map(p => p.trim()).filter(p => p.length > 0);
+      if (parts.length >= 2) {
+        fullName = parts[parts.length - 1];
+        groupName = parts.slice(0, -1).join(' - ');
+      } else if (parts.length === 1) {
+        fullName = parts[0];
+        groupName = '';
+      }
     }
     
     // Extract location từ rawHtml

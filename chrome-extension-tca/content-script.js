@@ -9,6 +9,10 @@
 
   let memberInfoCache = {};
   let precheckCache = {};  // Store precheck results: { tcaId: { exists: boolean, userId: number } }
+  let pendingNodeIds = [];  // IDs cần fetch member info
+  let fetchedCount = 0;    // Số member info đã fetch
+  let allNodesGlobal = []; // Lưu allNodes để dùng sau
+  let precheckDone = false; // Flag để tránh gọi precheck nhiều lần
 
   function injectScript() {
     const script = document.createElement('script');
@@ -22,39 +26,76 @@
 
   function callPrecheckAPI(nodes) {
     return new Promise((resolve, reject) => {
-      const members = nodes
-        .filter(n => n.type === 'item')  // Only check items, not folders
-        .map(n => ({
-          tcaId: n.id,
-          name: n.name,
-          phone: n.phone || '',
-          email: n.email || ''
-        }));
+      // Build allNodes format
+      const allNodes = nodes.map(n => ({
+        id: n.id,
+        type: n.type,
+        name: n.name
+      }));
+      
+      // Build memberInfo format
+      const memberInfo = {};
+      nodes.forEach(n => {
+        memberInfo[n.id] = {
+          phone: n.phone || null,
+          email: n.email || null
+        };
+      });
 
-      if (members.length === 0) {
+      if (allNodes.length === 0) {
+        console.log('[TCA Sync] No nodes to precheck');
         resolve({});
         return;
       }
 
-      console.log('[TCA Sync] Calling precheck for', members.length, 'members...');
+      console.log('[TCA Sync] === PRECHECK START ===');
+      console.log('[TCA Sync] Nodes:', allNodes.length);
+      console.log('[TCA Sync] API URL:', PRECHECK_ENDPOINT);
+      
+      // Log first few nodes
+      const sampleNodes = allNodes.slice(0, 3);
+      sampleNodes.forEach(n => {
+        console.log(`[TCA Sync]   Node ${n.id}: ${n.name}, phone=${memberInfo[n.id]?.phone || 'none'}, email=${memberInfo[n.id]?.email || 'none'}`);
+      });
       
       fetch(PRECHECK_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ members })
+        body: JSON.stringify({ allNodes, memberInfo })
       })
       .then(res => {
-        if (!res.ok) throw new Error('Precheck failed: ' + res.status);
+        console.log('[TCA Sync] Response status:', res.status, res.statusText);
+        if (!res.ok) {
+          throw new Error('Precheck failed: ' + res.status);
+        }
         return res.json();
       })
       .then(data => {
-        console.log('[TCA Sync] Precheck result:', data);
-        precheckCache = data.results || {};
+        console.log('[TCA Sync] === PRECHECK RESPONSE ===');
+        console.log('[TCA Sync] Success:', data.success);
+        console.log('[TCA Sync] Total members:', data.members?.length || 0);
+        
+        // Build precheckCache from members array - MERGE instead of replace
+        if (data.members && Array.isArray(data.members)) {
+          data.members.forEach(m => {
+            precheckCache[m.tcaId] = {
+              exists: m.status === 'EXISTING_SYSTEM',
+              userFound: m.existingUserId !== null,
+              userId: m.existingUserId
+            };
+            if (m.existingUserId) {
+              console.log(`[TCA Sync]   Found: TCA ${m.tcaId} -> User ${m.existingUserId} (${m.name})`);
+            }
+          });
+          console.log('[TCA Sync] Cache entries:', Object.keys(precheckCache).length);
+        }
+        
+        console.log('[TCA Sync] === PRECHECK END ===');
         resolve(precheckCache);
       })
       .catch(err => {
-        console.error('[TCA Sync] Precheck error:', err);
-        resolve({});  // Return empty on error
+        console.error('[TCA Sync] Precheck ERROR:', err.message || err);
+        resolve({});
       });
     });
   }
@@ -62,24 +103,50 @@
   function handleMemberInfo(data) {
     const { memberId, email, phone } = data;
     memberInfoCache[memberId] = { email, phone };
-    console.log('[TCA Sync] 📋 Member contact updated:', { memberId, email, phone });
+    fetchedCount++;
+    console.log(`[TCA Sync] 📋 Member contact updated: ${memberId} (${fetchedCount}/${allNodesGlobal.length})`);
     
     // Update panel if exists
     const emailCell = document.querySelector(`[data-member-email="${memberId}"]`);
     const phoneCell = document.querySelector(`[data-member-phone="${memberId}"]`);
     if (emailCell) emailCell.textContent = email || '-';
     if (phoneCell) phoneCell.textContent = phone || '-';
+    
+    // Gọi precheck khi TẤT CẢ members đã được fetch
+    if (!precheckDone && fetchedCount >= allNodesGlobal.length) {
+      precheckDone = true;
+      console.log(`[TCA Sync] === ALL MEMBER INFO FETCHED === (${fetchedCount}/${allNodesGlobal.length})`);
+      
+      // Cập nhật allNodes với member info mới nhất
+      allNodesGlobal.forEach(node => {
+        if (memberInfoCache[node.id]) {
+          node.email = memberInfoCache[node.id].email;
+          node.phone = memberInfoCache[node.id].phone;
+        }
+      });
+      
+      // Gọi precheck với dữ liệu đầy đủ
+      callPrecheckAPI(allNodesGlobal).then(() => {
+        console.log('[TCA Sync] === PRECHECK COMPLETE ===');
+        // Cập nhật panel nếu đang hiển thị
+        const panel = document.getElementById('tca-sync-panel');
+        if (panel) {
+          panel.remove();
+          showDataPanel(allNodesGlobal, { total: allNodesGlobal.length, folders: 0, items: allNodesGlobal.filter(n => n.type === 'item').length }, memberInfoCache);
+        }
+      });
+    }
   }
 
   function showDataPanel(allNodes, stats, memberInfo) {
     console.log('[TCA Sync] showDataPanel called with', allNodes.length, 'nodes');
+    console.log('[TCA Sync] precheckCache keys:', Object.keys(precheckCache));
+    console.log('[TCA Sync] precheckCache[60073]:', precheckCache[60073]);
+    console.log('[TCA Sync] precheckCache[61752]:', precheckCache[61752]);
     
     // Remove existing panel
     const existing = document.getElementById('tca-sync-panel');
     if (existing) existing.remove();
-
-    // Alert user
-    alert(` TCA Data Extracted!\n\n${allNodes.length} nodes scanned\n\nDang tu dong lay Email va Phone...`);
     
     // Build node map for parent lookup
     const nodeMap = new Map();
@@ -95,7 +162,7 @@
       position: fixed !important;
       top: 10px !important;
       right: 10px !important;
-      width: 700px !important;
+      width: 800px !important;
       max-height: 85vh !important;
       max-width: 95vw !important;
       background: #ffffff !important;
@@ -116,16 +183,16 @@
     // Count members with contact info
     const withContact = allNodes.filter(n => memberInfoMap[n.id]?.email || memberInfoMap[n.id]?.phone).length;
     
-    // Count precheck results
-    const items = allNodes.filter(n => n.type === 'item');
-    const existsInDB = items.filter(n => precheckCache[n.id]?.exists).length;
-    const newItems = items.length - existsInDB;
+    // Count precheck results - tính cho TẤT CẢ nodes (không phân biệt folder/item)
+    const existsInDB = allNodes.filter(n => precheckCache[n.id]?.exists).length;
+    const userOnlyCount = allNodes.filter(n => precheckCache[n.id]?.userFound && !precheckCache[n.id]?.exists).length;
+    const newItems = allNodes.filter(n => !precheckCache[n.id]?.exists && !precheckCache[n.id]?.userFound).length;
 
     // Header
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted</h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.0.8</span></h2>
           <small style="color:#666;">Auto-scanned from TCA Portal</small>
         </div>
         <button id="btn-close" style="
@@ -133,30 +200,34 @@
         ">X Close</button>
       </div>
       
-      <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:15px;">
-        <div style="background:#e8f5e9; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-          <div style="font-size:20px; font-weight:bold; color:#2e7d32;">${allNodes.length}</div>
-          <div style="color:#555; font-size:10px;">Tong Nodes</div>
+      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:15px;">
+        <div style="background:#e8f5e9; padding:8px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
+          <div style="font-size:18px; font-weight:bold; color:#2e7d32;">${allNodes.length}</div>
+          <div style="color:#555; font-size:9px;">Tong</div>
         </div>
-        <div style="background:#fff3e0; padding:10px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
-          <div style="font-size:20px; font-weight:bold; color:#e65100;">${allNodes.filter(n => n.type === 'folder').length}</div>
-          <div style="color:#555; font-size:10px;">Folders</div>
+        <div style="background:#fff3e0; padding:8px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
+          <div style="font-size:18px; font-weight:bold; color:#e65100;">${allNodes.filter(n => n.type === 'folder').length}</div>
+          <div style="color:#555; font-size:9px;">Folders</div>
         </div>
-        <div style="background:#e3f2fd; padding:10px; border-radius:8px; text-align:center; border:1px solid #bbdefb;">
-          <div style="font-size:20px; font-weight:bold; color:#1565c0;">${items.length}</div>
-          <div style="color:#555; font-size:10px;">Items</div>
+        <div style="background:#e3f2fd; padding:8px; border-radius:8px; text-align:center; border:1px solid #bbdefb;">
+          <div style="font-size:18px; font-weight:bold; color:#1565c0;">${allNodes.filter(n => n.type === 'item').length}</div>
+          <div style="color:#555; font-size:9px;">Items</div>
         </div>
-        <div style="background:#fce4ec; padding:10px; border-radius:8px; text-align:center; border:1px solid #f48fb1;">
-          <div style="font-size:20px; font-weight:bold; color:#c2185b;" id="contact-count">${withContact}</div>
-          <div style="color:#555; font-size:10px;">Co Email/Phone</div>
+        <div style="background:#fce4ec; padding:8px; border-radius:8px; text-align:center; border:1px solid #f48fb1;">
+          <div style="font-size:18px; font-weight:bold; color:#c2185b;">${withContact}</div>
+          <div style="color:#555; font-size:9px;">Email/Phone</div>
         </div>
-        <div style="background:#c8e6c9; padding:10px; border-radius:8px; text-align:center; border:1px solid #a5d6a7;">
-          <div style="font-size:20px; font-weight:bold; color:#2e7d32;">${existsInDB}</div>
-          <div style="color:#555; font-size:10px;">Da co trong DB</div>
+        <div style="background:#c8e6c9; padding:8px; border-radius:8px; text-align:center; border:1px solid #a5d6a7;">
+          <div style="font-size:18px; font-weight:bold; color:#2e7d32;">${existsInDB}</div>
+          <div style="color:#555; font-size:9px;">EXISTS</div>
         </div>
-        <div style="background:#fff9c4; padding:10px; border-radius:8px; text-align:center; border:1px solid #fff176;">
-          <div style="font-size:20px; font-weight:bold; color:#f57f17;">${newItems}</div>
-          <div style="color:#555; font-size:10px;">Moi can them</div>
+        <div style="background:#bbdefb; padding:8px; border-radius:8px; text-align:center; border:1px solid #90caf9;">
+          <div style="font-size:18px; font-weight:bold; color:#1565c0;">${userOnlyCount}</div>
+          <div style="color:#555; font-size:9px;">USER</div>
+        </div>
+        <div style="background:#fff9c4; padding:8px; border-radius:8px; text-align:center; border:1px solid #fff176;">
+          <div style="font-size:18px; font-weight:bold; color:#f57f17;">${newItems}</div>
+          <div style="color:#555; font-size:9px;">NEW</div>
         </div>
       </div>
       
@@ -166,10 +237,11 @@
             <tr>
               <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:40px;">ID</th>
               <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333;">Ten thanh vien</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:60px;">CN/Tong</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:70px;">DB</th>
-              <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333; width:120px;">Email</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:90px;">Phone</th>
+              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">CN/Tong</th>
+              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">DB</th>
+              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">UserID</th>
+              <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333; width:110px;">Email</th>
+              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:80px;">Phone</th>
             </tr>
           </thead>
           <tbody id="tca-nodes-body">
@@ -178,7 +250,7 @@
       </div>
       
       <div style="margin-top:10px; padding:8px; background:#e8f5e9; border-radius:6px; font-size:11px; color:#2e7d32;">
-        <strong>Dang tu dong lay Email va Phone cho ${allNodes.length} thanh vien...</strong>
+        <strong>Da lay du lieu cho ${allNodes.length} thanh vien tu TCA Portal</strong>
       </div>
       
       <div style="margin-top:15px; padding:10px; background:#f5f5f5; border-radius:8px; text-align:center;">
@@ -223,16 +295,29 @@
       const email = contact.email || '-';
       const phone = contact.phone || '-';
       
-      // Get precheck status
+      // Get precheck status & UserID - KHÔNG phân biệt folder/item
       const precheckResult = precheckCache[node.id];
-      const isExisting = precheckResult?.exists;
-      const dbStatus = node.type === 'folder' ? '-' : (isExisting ? '<span style="color:#2e7d32;font-weight:bold;">EXISTS</span>' : '<span style="color:#e65100;font-weight:bold;">NEW</span>');
+      const isExisting = precheckResult?.exists;  // User + System both exist
+      const userFound = precheckResult?.userFound;  // User found (may not have System)
+      const userId = precheckResult?.userId;
+      
+      // DB status: EXISTS = User+System, USER = User only, NEW = No user
+      let dbStatus = '-';
+      if (isExisting) {
+        dbStatus = '<span style="color:#2e7d32;font-weight:bold;">EXISTS</span>';
+      } else if (userFound) {
+        dbStatus = '<span style="color:#1565c0;font-weight:bold;">USER</span>';
+      } else {
+        dbStatus = '<span style="color:#e65100;font-weight:bold;">NEW</span>';
+      }
+      const userIdDisplay = userId ? `<span style="color:#1565c0;font-weight:bold;">${userId}</span>` : '-';
       
       tr.innerHTML = `
         <td style="padding:6px 4px; text-align:center; font-family:monospace; font-size:10px; color:#333;">${node.id}</td>
         <td style="padding:6px 4px; color:#000; font-weight:${node.type === 'folder' ? 'bold' : 'normal'}; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${node.name || '-'}">${node.name || '-'}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px; color:#333;">${node.personalScore || '0'}/${node.totalScore || '0'}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px;">${dbStatus}</td>
+        <td style="padding:6px 4px; text-align:center; font-size:10px; color:#1565c0; font-weight:bold;">${userIdDisplay}</td>
         <td style="padding:6px 4px; font-size:10px; color:${email === '-' ? '#999' : '#1565c0'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-member-email="${node.id}">${email}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px; color:${phone === '-' ? '#999' : '#e65100'};" data-member-phone="${node.id}">${phone}</td>
       `;
@@ -346,6 +431,9 @@
       });
     }
 
+    // Lưu allNodes toàn cục để dùng sau
+    allNodesGlobal = allNodes;
+    
     // Merge member info
     memberInfoCache = data.memberInfo || {};
     
@@ -360,10 +448,8 @@
     console.log('[TCA Sync] Built allNodes:', allNodes.length, 'nodes');
     console.log('[TCA Sync] Member info:', Object.keys(memberInfoCache).length, 'contacts');
 
-    // Call precheck API before showing panel
-    console.log('[TCA Sync] Calling precheck API...');
-    await callPrecheckAPI(allNodes);
-
+    // KHÔNG gọi precheck ở đây - sẽ gọi sau khi member info fetch xong
+    
     // Save to localStorage
     try {
       localStorage.setItem('tca_full_tree', JSON.stringify({ ...data, allNodes, precheckCache }));
@@ -389,7 +475,7 @@
     if (!event.data || !event.data.type) return;
     
     if (event.data.type === FULL_TREE_TYPE) {
-      handleFullTree(event.data);
+      handleFullTree(event.data);  // async - will run in background
     }
     
     if (event.data.type === MEMBER_INFO_TYPE) {
@@ -398,9 +484,17 @@
   }
 
   function init() {
+    // Reset state khi khởi tạo
+    memberInfoCache = {};
+    precheckCache = {};
+    pendingNodeIds = [];
+    fetchedCount = 0;
+    allNodesGlobal = [];
+    precheckDone = false;
+    
     injectScript();
     window.addEventListener('message', handleMessage);
-    console.log('[TCA Sync] Content script initialized');
+    console.log('[TCA Sync] Content script initialized - RESET all state');
     console.log('[TCA Sync] Auto-scan enabled - will capture full tree');
   }
 
