@@ -4,9 +4,17 @@
   const MESSAGE_TYPE = 'TCA_XHR_CAPTURE';
   const FULL_TREE_TYPE = 'TCA_FULL_TREE';
   const MEMBER_INFO_TYPE = 'TCA_MEMBER_INFO';
-  const SYNC_ENDPOINT = 'https://giautoandien.io.vn/api/sync-tca';
-  const PRECHECK_ENDPOINT = 'https://giautoandien.io.vn/api/sync-tca/precheck';
-  const SYNC_PREVIEW_ENDPOINT = 'https://giautoandien.io.vn/api/sync-tca/preview';
+
+  // Auto-detect API base URL based on current environment
+  const isLocalDev = window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1' ||
+                     window.location.hostname.includes('ngrok');
+  const API_BASE = isLocalDev ? 'http://localhost:3000' : 'https://giautoandien.io.vn';
+  const SYNC_ENDPOINT = API_BASE + '/api/sync-tca';
+  const PRECHECK_ENDPOINT = API_BASE + '/api/sync-tca/precheck';
+  const SYNC_PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
+
+  console.log('[TCA Sync] API Base:', API_BASE);
 
   let memberInfoCache = {};
   let precheckCache = {};  // Store precheck results: { tcaId: { exists: boolean, userId: number } }
@@ -382,14 +390,14 @@
       </div>
       
       <div style="padding:15px 20px; background:#e8f5e9; border-bottom:1px solid #ddd;">
-        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px;">
+        <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:10px;">
           <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
             <div id="preview-total" style="font-size:24px; font-weight:bold; color:#333;">0</div>
             <div style="color:#666; font-size:10px;">Tong</div>
           </div>
           <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
             <div id="preview-create-all" style="font-size:24px; font-weight:bold; color:#2e7d32;">0</div>
-            <div style="color:#666; font-size:10px;">Tao moi</div>
+            <div style="color:#666; font-size:10px;">Tao User</div>
           </div>
           <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #bbdefb;">
             <div id="preview-create-system" style="font-size:24px; font-weight:bold; color:#1565c0;">0</div>
@@ -404,22 +412,33 @@
             <div style="color:#666; font-size:10px;">Khong doi</div>
           </div>
           <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
+            <div id="preview-closures" style="font-size:24px; font-weight:bold; color:#7b1fa2;">0</div>
+            <div style="color:#666; font-size:10px;">Closures</div>
+          </div>
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
             <div id="preview-selected" style="font-size:24px; font-weight:bold; color:#2e7d32;">0</div>
             <div style="color:#666; font-size:10px;">Da chon</div>
           </div>
         </div>
+        <div style="margin-top:10px; font-size:11px; color:#666;">
+          Next User ID: <span id="next-user-id" style="color:#2e7d32; font-weight:bold;">-</span> | 
+          Next System ID: <span id="next-system-id" style="color:#1565c0; font-weight:bold;">-</span>
+        </div>
       </div>
       
       <div id="preview-table-container" style="flex:1; overflow:auto; padding:0 20px;">
-        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1000px;">
+        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1100px;">
           <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
             <tr>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">#</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">Chon</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">TCA ID</th>
               <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd;">Ten</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:80px;">Hanh dong</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">UserID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:100px;">Hanh dong</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:55px;">UserID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:55px;">New UserID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:55px;">New SysID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">#Closure</th>
               <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd;">Thay doi</th>
             </tr>
           </thead>
@@ -511,6 +530,9 @@
         document.getElementById('preview-create-system').textContent = result.willCreate.systems;
         document.getElementById('preview-update').textContent = result.willUpdate.tcaMembers;
         document.getElementById('preview-skip').textContent = result.willSkip;
+        document.getElementById('preview-closures').textContent = result.willCreate.closures || 0;
+        document.getElementById('next-user-id').textContent = result.nextAvailableUserId || '-';
+        document.getElementById('next-system-id').textContent = result.nextAvailableSystemId || '-';
 
         // Fill table
         const tbody = document.getElementById('preview-tbody');
@@ -526,17 +548,24 @@
           const isSelected = row.action !== 'SKIP';
           if (isSelected) selectedCount++;
 
+          // Color for new IDs
+          const newUserIdColor = row.expectedUserId ? '#2e7d32' : '#999';
+          const newSysIdColor = row.expectedSystemId ? '#1565c0' : '#999';
+
           tr.innerHTML = `
             <td style="padding:6px 4px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
             <td style="padding:6px 4px; text-align:center;">
               <input type="checkbox" class="preview-checkbox" data-tca-id="${row.tcaId}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
             </td>
             <td style="padding:6px 4px; text-align:center; font-family:monospace; color:#333;">${row.tcaId}</td>
-            <td style="padding:6px 4px; color:#000; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${row.name}">${row.name}</td>
+            <td style="padding:6px 4px; color:#000; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${row.name}">${row.name}</td>
             <td style="padding:6px 4px; text-align:center;">
               <span style="background:${row.actionColor}; color:white; padding:3px 8px; border-radius:4px; font-size:10px; white-space:nowrap;">${row.actionLabel}</span>
             </td>
             <td style="padding:6px 4px; text-align:center; color:${row.currentData?.userId ? '#1565c0' : '#999'}; font-weight:bold;">${row.currentData?.userId || '-'}</td>
+            <td style="padding:6px 4px; text-align:center; color:${newUserIdColor}; font-weight:bold;">${row.expectedUserId || '-'}</td>
+            <td style="padding:6px 4px; text-align:center; color:${newSysIdColor}; font-weight:bold;">${row.expectedSystemId || '-'}</td>
+            <td style="padding:6px 4px; text-align:center; color:#7b1fa2; font-size:10px;">${row.closuresToCreate || 0}</td>
             <td style="padding:6px 4px; font-size:10px; color:#666;">
               ${row.changes.length > 0 ? row.changes.map(c => `<div style="color:#e65100;">${c}</div>`).join('') : '<span style="color:#999;">-</span>'}
             </td>

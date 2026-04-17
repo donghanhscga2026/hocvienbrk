@@ -17,7 +17,7 @@ interface TCANode {
   id: number
   type: string
   name: string
-  parentFolderId?: number
+  parentFolderId?: number | string
   personalScore?: string
   totalScore?: string
   level?: string
@@ -49,6 +49,18 @@ const normalizePhone = (phone: string | null): string | null => {
   return phone;
 }
 
+function calculateClosures(node: TCANode, parentMap: Map<number, TCANode>): number {
+  const parentId = node.parentFolderId;
+  if (!parentId || parentId === 'root' || parentId === '0') {
+    return 1;
+  }
+  const parent = parentMap.get(Number(parentId));
+  if (!parent) {
+    return 1;
+  }
+  return 1 + calculateClosures(parent, parentMap);
+}
+
 export async function POST(request: Request) {
   try {
     const body: PrecheckPayload = await request.json()
@@ -64,11 +76,37 @@ export async function POST(request: Request) {
       )
     }
 
+    // Build parent map for closure calculation
+    const parentMap = new Map<number, TCANode>();
+    allNodes.forEach(n => {
+      const pid = n.parentFolderId;
+      if (pid && pid !== 'root' && pid !== '0') {
+        parentMap.set(n.id, n);
+      }
+    });
+
+    // Import getNextAvailableId
+    const { getNextAvailableId } = await import('@/lib/id-helper');
+
+    let nextAvailableUserId = await getNextAvailableId();
+    let nextAvailableSystemId = 1;
+
+    // Get current max system autoId
+    const maxSystem = await prisma.system.findFirst({
+      orderBy: { autoId: 'desc' },
+      select: { autoId: true }
+    });
+    if (maxSystem) {
+      nextAvailableSystemId = maxSystem.autoId + 1;
+    }
+
     const preview = {
       total: allNodes.length,
-      willCreate: { users: 0, systems: 0, tcaMembers: 0 },
+      willCreate: { users: 0, systems: 0, tcaMembers: 0, closures: 0 },
       willUpdate: { users: 0, systems: 0, tcaMembers: 0 },
       willSkip: 0,
+      nextAvailableUserId,
+      nextAvailableSystemId,
       rows: [] as {
         tcaId: number
         name: string
@@ -92,6 +130,10 @@ export async function POST(request: Request) {
           hasChanges: boolean
         }
         changes: string[]
+        expectedUserId: number | null
+        expectedSystemId: number | null
+        parentTcaId: number | null
+        closuresToCreate: number
       }[]
     }
 
@@ -134,7 +176,6 @@ export async function POST(request: Request) {
         })
 
         if (existingSystem) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           existingTCAMember = await (prisma as any).tCAMember.findUnique({
             where: { tcaId: node.id }
           })
@@ -145,20 +186,30 @@ export async function POST(request: Request) {
       let actionLabel: string
       let actionColor: string
       const changes: string[] = []
+      let expectedUserId: number | null = null
+      let expectedSystemId: number | null = null
+      let closuresToCreate = 0
 
       if (!existingUser) {
         action = 'CREATE_ALL'
         actionLabel = 'Tao User + System + TCA'
         actionColor = '#2e7d32'
+        expectedUserId = nextAvailableUserId++
+        expectedSystemId = nextAvailableSystemId++
+        closuresToCreate = calculateClosures(node, parentMap)
         preview.willCreate.users++
         preview.willCreate.systems++
         preview.willCreate.tcaMembers++
+        preview.willCreate.closures += closuresToCreate
       } else if (!existingSystem) {
         action = 'CREATE_SYSTEM'
         actionLabel = 'Tao System + TCA'
         actionColor = '#1565c0'
+        expectedSystemId = nextAvailableSystemId++
+        closuresToCreate = calculateClosures(node, parentMap)
         preview.willCreate.systems++
         preview.willCreate.tcaMembers++
+        preview.willCreate.closures += closuresToCreate
       } else {
         action = 'UPDATE'
         actionLabel = 'Cap nhat TCA'
@@ -199,6 +250,9 @@ export async function POST(request: Request) {
         }
       }
 
+      const parentId = node.parentFolderId;
+      const parentTcaId = (!parentId || parentId === 'root' || parentId === '0') ? null : Number(parentId);
+
       preview.rows.push({
         tcaId: node.id,
         name: node.name,
@@ -221,7 +275,11 @@ export async function POST(request: Request) {
           phone,
           hasChanges: changes.length > 0
         },
-        changes
+        changes,
+        expectedUserId,
+        expectedSystemId,
+        parentTcaId,
+        closuresToCreate
       })
     }
 
@@ -229,7 +287,9 @@ export async function POST(request: Request) {
       total: preview.total,
       willCreate: preview.willCreate,
       willUpdate: preview.willUpdate,
-      willSkip: preview.willSkip
+      willSkip: preview.willSkip,
+      nextAvailableUserId: preview.nextAvailableUserId,
+      nextAvailableSystemId: preview.nextAvailableSystemId
     })
 
     return NextResponse.json({
@@ -249,7 +309,7 @@ export async function POST(request: Request) {
 export async function GET() {
   return NextResponse.json({
     status: 'TCA Sync Preview API',
-    version: '1.0.0',
+    version: '2.0.0',
     description: 'Preview sync plan with detailed actions per member',
     usage: {
       method: 'POST',
@@ -260,10 +320,12 @@ export async function GET() {
     },
     response: {
       total: 'Tong so thanh vien',
-      willCreate: 'So user/system/tcamember se tao moi',
+      willCreate: 'So user/system/tcamember/closures se tao moi',
       willUpdate: 'So user/system/tcamember se cap nhat',
       willSkip: 'So dong khong thay doi',
-      rows: 'Array chi tiet tung dong voi action, changes'
+      nextAvailableUserId: 'User ID tiep theo se duoc gan',
+      nextAvailableSystemId: 'System autoId tiep theo se duoc gan',
+      rows: 'Array chi tiet tung dong voi expectedUserId, expectedSystemId, closuresToCreate'
     }
   }, { headers: CORS_HEADERS })
 }
