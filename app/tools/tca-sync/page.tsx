@@ -71,13 +71,8 @@ export default function TCASyncAdminPage() {
   }
 
   async function handleRollback() {
-    if (!showConfirm) {
-      setShowConfirm(true)
-      return
-    }
-
-    if (confirmText !== 'XAC NHAN XOA') {
-      alert('Vui long nhap dung "XAC NHAN XOA" de xac nhan')
+    // Chỉ cần 1 lần confirm
+    if (!confirm('Bạn có chắc muốn xóa dữ liệu?\n\nHành động này không thể hoàn tác!')) {
       return
     }
 
@@ -103,8 +98,6 @@ export default function TCASyncAdminPage() {
 
       const result = await res.json()
       setRollbackResult(result)
-      setShowConfirm(false)
-      setConfirmText('')
       fetchData()
     } catch (e) {
       console.error('Rollback failed:', e)
