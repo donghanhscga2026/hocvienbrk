@@ -122,6 +122,8 @@ export async function POST(request: Request) {
           name: string | null
           email: string | null
           phone: string | null
+          referrerId: number | null
+          refSysId: number | null
         } | null
         newData: {
           name: string
@@ -310,7 +312,9 @@ export async function POST(request: Request) {
           systemId: existingSystem?.autoId || null,
           name: existingUser.name,
           email: existingUser.email,
-          phone: existingUser.phone
+          phone: existingUser.phone,
+          referrerId: existingUser.referrerId,
+          refSysId: existingSystem?.refSysId || null
         } : null,
         newData: {
           name: node.name,
