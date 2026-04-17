@@ -65,25 +65,25 @@
       if (parts.length === 1) {
         // Format: "TÊN"
         groupName = '';
-        fullName = parts[0];
+        fullName = parts[0].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
       } else if (parts.length === 2) {
         // Format: "NHÓM - TÊN"
-        groupName = parts[0];
-        fullName = parts[1];
+        groupName = parts[0].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
+        fullName = parts[1].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
       } else if (parts.length >= 3) {
         // Format: "NHÓM - TÊN - [extra]"
         // groupName = parts[0], name = parts[1]
-        groupName = parts[0];
-        fullName = parts[1];
+        groupName = parts[0].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
+        fullName = parts[1].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
       }
     } else {
       // Không tìm thấy pattern điểm, thử parse đơn giản
       const parts = nameText.split(' - ').map(p => p.trim()).filter(p => p.length > 0);
       if (parts.length >= 2) {
-        fullName = parts[parts.length - 1];
-        groupName = parts.slice(0, -1).join(' - ');
+        fullName = parts[parts.length - 1].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
+        groupName = parts.slice(0, -1).join(' - ').replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
       } else if (parts.length === 1) {
-        fullName = parts[0];
+        fullName = parts[0].replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
         groupName = '';
       }
     }
