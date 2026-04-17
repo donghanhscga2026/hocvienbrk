@@ -152,47 +152,80 @@ export async function POST(request: Request) {
       const normalizedPhone = normalizePhone(phone)
 
       // ====== LOGIC XÁC ĐỊNH USER TỒN TẠI ======
+      // QUY TẮC: Cùng 1 User phải match CẢ phone VÀ email mới là P+E
       // Ưu tiên: Phone → Email
-      let existingUser = null
+      let existingUser: any = null
       let matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null = null
       let emailMismatch = false
       let needEmailUpdate = false
+      let matchDetails = ''
 
-      // Thử 1: Tìm theo phone trước
+      // Bước 1: Tìm TẤT CẢ users có phone trùng
+      const phoneMatches: any[] = []
       if (normalizedPhone) {
         const allUsers = await prisma.user.findMany({
           where: { phone: { not: null } }
         })
         for (const user of allUsers) {
           if (user.phone && normalizePhone(user.phone) === normalizedPhone) {
-            existingUser = user
-            matchType = 'PHONE_ONLY'
-            
-            // Check email
-            if (email && user.email?.toLowerCase() !== email.toLowerCase()) {
-              emailMismatch = true
-              needEmailUpdate = true
-            } else if (email && user.email?.toLowerCase() === email.toLowerCase()) {
-              matchType = 'PHONE_EMAIL'
-            }
-            break
+            phoneMatches.push(user)
           }
         }
       }
 
-      // Thử 2: Tìm theo email (nếu không tìm được theo phone)
-      if (!existingUser && email) {
-        existingUser = await prisma.user.findFirst({
-          where: { email: { equals: email, mode: 'insensitive' } }
+      // Bước 2: Tìm user có email trùng
+      const emailMatches: any[] = []
+      if (email) {
+        const emailUsers = await prisma.user.findMany({
+          where: {}
         })
-        if (existingUser) {
-          matchType = 'EMAIL_ONLY'
+        for (const user of emailUsers) {
+          if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
+            emailMatches.push(user)
+          }
         }
       }
 
+      // Bước 3: Xác định match type theo quy tắc
+      // Ưu tiên 1: Tìm user vừa trùng phone VỪA trùng email (cùng 1 user)
+      const phoneAndEmailMatch = phoneMatches.find((pu: any) => 
+        emailMatches.some((eu: any) => eu.id === pu.id)
+      )
+      
+      if (phoneAndEmailMatch) {
+        existingUser = phoneAndEmailMatch
+        matchType = 'PHONE_EMAIL'
+        matchDetails = `User ${existingUser.id} match P+E`
+      } else if (phoneMatches.length > 0) {
+        existingUser = phoneMatches[0]
+        matchType = 'PHONE_ONLY'
+        
+        if (email && existingUser.email && existingUser.email.toLowerCase() !== email.toLowerCase()) {
+          emailMismatch = true
+          needEmailUpdate = true
+          matchDetails = `User ${existingUser.id} match P, email khac (${existingUser.email} vs ${email})`
+        } else if (!email) {
+          matchDetails = `User ${existingUser.id} match P (TCA khong co email)`
+        } else if (!existingUser.email) {
+          matchDetails = `User ${existingUser.id} match P (DB khong co email)`
+        } else {
+          matchDetails = `User ${existingUser.id} match P`
+        }
+      } else if (emailMatches.length > 0) {
+        existingUser = emailMatches[0]
+        matchType = 'EMAIL_ONLY'
+        matchDetails = `User ${existingUser.id} match E (khong co P)`
+      }
+
       // Debug log
-      if (node.id === 61928) {
-        console.log(`[Preview] TCA 61928: phone=${normalizedPhone}, email=${email}, matchType=${matchType}, userId=${existingUser?.id}`)
+      if (node.id === 61928 || matchType !== null) {
+        console.log(`[Preview] TCA ${node.id}: phone=${normalizedPhone}, email=${email}, matchType=${matchType}, userId=${existingUser?.id} - ${matchDetails}`)
+        if (phoneMatches.length > 1) {
+          console.log(`[Preview]   WARNING: ${phoneMatches.length} users cung phone! Users:`, phoneMatches.map((u: any) => u.id))
+        }
+        if (emailMatches.length > 1) {
+          console.log(`[Preview]   WARNING: ${emailMatches.length} users cung email! Users:`, emailMatches.map((u: any) => u.id))
+        }
       }
 
       let existingSystem = null

@@ -205,7 +205,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.5.0</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.5.1</span></h2>
           <small style="color:#666;">Auto-scanned from TCA Portal</small>
         </div>
         <button id="btn-close" style="
@@ -333,29 +333,38 @@
       }
       const userIdDisplay = userId ? `<span style="color:#1565c0;font-weight:bold;">${userId}</span>` : '-';
       
-      // Match type display
+      // Match type display với tooltip chi tiết
       let matchDisplay = '-';
-      let matchColor = '#999';
+      let matchBgColor = '#999';
+      let matchTitle = '';
+      
       if (matchType === 'PHONE_EMAIL') {
-        matchDisplay = '<span style="background:#2e7d32;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P+E</span>';
-        matchColor = '#2e7d32';
+        matchDisplay = '<span style="background:#2e7d32;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">P+E</span>';
+        matchBgColor = '#2e7d32';
+        matchTitle = `Phone va Email cung trung - User ${userId} da xac nhan`;
       } else if (matchType === 'PHONE_ONLY') {
         if (emailMismatch) {
-          matchDisplay = '<span style="background:#f57c00;color:white;padding:1px 4px;border-radius:3px;font-size:9px;" title="Phone trùng, Email khác: ' + (existingUserEmail || '?') + ' vs ' + (email || '-') + '">P!</span>';
-          matchColor = '#f57c00';
+          matchDisplay = '<span style="background:#f57c00;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">P! EMAIL</span>';
+          matchBgColor = '#f57c00';
+          matchTitle = `CANH BAO: Phone trung (User ${userId}) nhung Email khac!\n` +
+                       `  TCA email: ${email || '-'}\n` +
+                       `  DB email: ${existingUserEmail || '-'}\n` +
+                       `  => Se goi y cap nhat email`;
         } else {
-          matchDisplay = '<span style="background:#1565c0;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P</span>';
-          matchColor = '#1565c0';
+          matchDisplay = '<span style="background:#1565c0;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">P</span>';
+          matchBgColor = '#1565c0';
+          matchTitle = `Phone trung - User ${userId}`;
         }
       } else if (matchType === 'EMAIL_ONLY') {
-        matchDisplay = '<span style="background:#d32f2f;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">E</span>';
-        matchColor = '#d32f2f';
+        matchDisplay = '<span style="background:#d32f2f;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">E</span>';
+        matchBgColor = '#d32f2f';
+        matchTitle = `CHI Email trung - User ${userId}. Phone khong trung!`;
       }
       
       tr.innerHTML = `
         <td style="padding:6px 4px; text-align:center; font-family:monospace; font-size:10px; color:#333;">${node.id}</td>
         <td style="padding:6px 4px; color:#000; font-weight:${node.type === 'folder' ? 'bold' : 'normal'}; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${node.name || '-'}">${node.name || '-'}</td>
-        <td style="padding:6px 4px; text-align:center; font-size:10px;" title="Match: ${matchType || '-'}">${matchDisplay}</td>
+        <td style="padding:6px 4px; text-align:center; font-size:10px;" title="${matchTitle}">${matchDisplay}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px;">${dbStatus}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px; color:#1565c0; font-weight:bold;">${userIdDisplay}</td>
         <td style="padding:6px 4px; font-size:10px; color:${email === '-' ? '#999' : '#1565c0'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-member-email="${node.id}">${email}</td>
@@ -672,9 +681,119 @@
       const cancelBtn = document.getElementById('btn-preview-cancel');
       syncBtn.disabled = true;
       cancelBtn.disabled = true;
-      syncBtn.textContent = 'Dang dong bo...';
 
+      // Create step-by-step progress panel
+      const progressPanel = document.createElement('div');
+      progressPanel.id = 'sync-progress-panel';
+      progressPanel.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 500px; background: #fff; border-radius: 12px; z-index: 10000000001;
+        font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5); padding: 25px;
+        text-align: center;
+      `;
+      
+      let currentStep = 0;
+      const steps = [
+        { id: 'step1', text: 'Buoc 1: Kiem tra du lieu...', icon: '1' },
+        { id: 'step2', text: 'Buoc 2: Xu ly user...', icon: '2' },
+        { id: 'step3', text: 'Buoc 3: Tao/Cap nhat System...', icon: '3' },
+        { id: 'step4', text: 'Buoc 4: Tao/Cap nhat TCA Member...', icon: '4' },
+        { id: 'step5', text: 'Buoc 5: Tao SystemClosure...', icon: '5' },
+        { id: 'step6', text: 'Buoc 6: Hoan tat!', icon: '6' }
+      ];
+
+      progressPanel.innerHTML = `
+        <h2 style="margin:0 0 20px 0; color:#2e7d32;">Dang dong bo ${selectedNodes.length} thanh vien</h2>
+        <div style="text-align:left; margin-bottom:20px;">
+          ${steps.map((s, i) => `
+            <div id="${s.id}" style="display:flex; align-items:center; margin:10px 0; opacity:0.4; transition:opacity 0.3s;">
+              <div style="width:28px; height:28px; border-radius:50%; background:#ddd; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:12px; transition:background 0.3s;">${s.icon}</div>
+              <span style="color:#666;">${s.text}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div id="step-detail" style="padding:10px; background:#f5f5f5; border-radius:8px; font-size:12px; color:#666; min-height:40px;"></div>
+        <div style="margin-top:20px;">
+          <button id="btn-cancel-sync" style="background:#d32f2f; border:none; color:white; padding:10px 25px; border-radius:5px; cursor:pointer; font-weight:bold;">Huy</button>
+        </div>
+      `;
+
+      document.body.appendChild(progressPanel);
+      document.getElementById('btn-cancel-sync').addEventListener('click', () => {
+        if (confirm('Huy dong bo? Da dong bo se khong bi roll back.')) {
+          progressPanel.remove();
+          syncBtn.disabled = false;
+          cancelBtn.disabled = false;
+          syncBtn.textContent = 'Dong y Dong bo';
+        }
+      });
+
+      function updateStep(stepIndex, detail = '', success = false) {
+        for (let i = 0; i < steps.length; i++) {
+          const stepEl = document.getElementById(steps[i].id);
+          if (i < stepIndex) {
+            stepEl.style.opacity = '1';
+            stepEl.querySelector('div').style.background = '#2e7d32';
+          } else if (i === stepIndex) {
+            stepEl.style.opacity = '1';
+            stepEl.querySelector('div').style.background = success ? '#2e7d32' : '#1565c0';
+          } else {
+            stepEl.style.opacity = '0.4';
+            stepEl.querySelector('div').style.background = '#ddd';
+          }
+        }
+        if (detail) {
+          document.getElementById('step-detail').innerHTML = detail;
+        }
+      }
+
+      function showMatchSummary(rows) {
+        const peCount = rows.filter(r => r.matchType === 'PHONE_EMAIL').length;
+        const pCount = rows.filter(r => r.matchType === 'PHONE_ONLY').length;
+        const pWarnCount = rows.filter(r => r.matchType === 'PHONE_ONLY' && r.emailMismatch).length;
+        const eCount = rows.filter(r => r.matchType === 'EMAIL_ONLY').length;
+        const newCount = rows.filter(r => !r.matchType).length;
+        
+        return `
+          <div style="margin-top:10px; text-align:left;">
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+              <span style="background:#2e7d32;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">P+E: ${peCount}</span>
+              <span style="background:#1565c0;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">P: ${pCount - pWarnCount}</span>
+              <span style="background:#f57c00;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">P! (email khac): ${pWarnCount}</span>
+              <span style="background:#d32f2f;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">E: ${eCount}</span>
+              <span style="background:#999;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">MOI: ${newCount}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      updateStep(0, 'Bat dau dong bo...');
+      
+      // Fetch preview again to get match info
       try {
+        updateStep(0, 'Dang goi API Preview de lay thong tin match...');
+        const previewRes = await fetch(SYNC_PREVIEW_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            allNodes: selectedNodes,
+            memberInfo: selectedMemberInfo
+          })
+        });
+        const previewData = await previewRes.json();
+        
+        if (previewData.rows) {
+          updateStep(1, `
+            <strong>Phan tich ket qua match:</strong>
+            ${previewData.rows.length} thanh vien can xu ly
+            ${showMatchSummary(previewData.rows)}
+          `);
+        }
+        
+        await new Promise(r => setTimeout(r, 500)); // Small delay for visibility
+        
+        updateStep(2, 'Dang gui yeu cau dong bo toi server...');
         console.log('[TCA Sync] Executing sync for', selectedNodes.length, 'nodes');
 
         const response = await fetch(SYNC_ENDPOINT, {
@@ -695,6 +814,16 @@
         console.log('[TCA Sync] Sync result:', result);
 
         if (result.success) {
+          updateStep(3, `
+            <strong>Dong bo thanh cong!</strong><br>
+            Tao User: ${result.stats.usersCreated}<br>
+            Tao System: ${result.stats.systemsCreated}<br>
+            TCA Member: ${result.stats.tcaMembersCreated} tao, ${result.stats.tcaMembersUpdated} cap nhat
+          `, true);
+          
+          await new Promise(r => setTimeout(r, 1500));
+          progressPanel.remove();
+          
           alert(`Dong bo thanh cong!\n\n` +
             `Tao User: ${result.stats.usersCreated}\n` +
             `Cap nhat User: ${result.stats.usersUpdated}\n` +
@@ -710,6 +839,7 @@
 
       } catch (err) {
         console.error('[TCA Sync] Sync error:', err);
+        progressPanel.remove();
         alert('Loi dong bo: ' + err.message);
         syncBtn.disabled = false;
         cancelBtn.disabled = false;
