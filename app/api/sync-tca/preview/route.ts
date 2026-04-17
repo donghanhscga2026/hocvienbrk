@@ -136,7 +136,7 @@ export async function POST(request: Request) {
         expectedSystemId: number | null
         parentTcaId: number | null
         parentUserId: number | null  // Resolved từ DB hoặc batch
-        parentSource: 'DB' | 'BATCH' | null
+        parentSource: 'DB' | 'BATCH' | 'ROOT' | null
         expectedReferrerId: number | null
         expectedRefSysId: number | null
         closuresToCreate: number
@@ -259,13 +259,15 @@ export async function POST(request: Request) {
       // Resolve parent info
       const parentId = node.parentFolderId;
       const parentTcaId = (!parentId || parentId === 'root' || parentId === '0') ? null : Number(parentId);
+      const TCA_ROOT_USER_ID = 861;
+      const TCA_ROOT_SYSTEM_ID = 13807;
       
       let parentUserId: number | null = null;
-      let parentSource: 'DB' | 'BATCH' | null = null;
+      let parentSource: 'DB' | 'BATCH' | 'ROOT' | null = null;
       let parentSystemId: number | null = null;
       
       if (parentTcaId) {
-        // Thử resolve từ batch trước
+        // Non-root TCA - tìm parent cụ thể
         const batchNode = allNodes.find(n => n.id === parentTcaId);
         if (batchNode) {
           // Parent có trong batch - tìm userId của parent trong batch
@@ -296,6 +298,11 @@ export async function POST(request: Request) {
             }
           }
         }
+      } else {
+        // Root TCA - referrerId = 861, systemId = 13807
+        parentUserId = TCA_ROOT_USER_ID;
+        parentSystemId = TCA_ROOT_SYSTEM_ID;
+        parentSource = 'ROOT';
       }
 
       preview.rows.push({
