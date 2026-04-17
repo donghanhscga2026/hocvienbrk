@@ -298,7 +298,10 @@ export async function POST(request: Request) {
             }
           }
         } else {
-          console.log(`[TCA Sync]   Root node (no parent)`)
+          // Root TCA - referrerId = 861 (TCA_ROOT_USER)
+          parentUserId = 861
+          parentSystemId = 13807 // System ID của User 861
+          console.log(`[TCA Sync]   Root TCA - referrerId = 861, System = 13807`)
         }
 
         console.log(`[TCA Sync]   FINAL: parentUserId=${parentUserId}, parentSystemId=${parentSystemId}`)
