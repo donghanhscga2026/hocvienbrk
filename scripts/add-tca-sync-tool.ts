@@ -20,7 +20,7 @@ async function main() {
         name: 'TCA Sync',
         description: 'bgGreen500| Đồng bộ dữ liệu TCA từ Portal',
         icon: 'Settings',
-        url: '/admin/tca-sync',
+        url: '/tools/tca-sync',
         roles: ['ADMIN'],
         order: 100,
         isActive: true
@@ -40,7 +40,7 @@ async function main() {
         slug: 'tca-sync',
         description: 'bgGreen500| Đồng bộ dữ liệu TCA từ Portal',
         icon: 'Settings',
-        url: '/admin/tca-sync',
+        url: '/tools/tca-sync',
         roles: ['ADMIN'],
         order: (maxOrder?.order || 0) + 1,
         isActive: true
