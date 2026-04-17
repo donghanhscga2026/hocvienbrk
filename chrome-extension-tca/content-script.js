@@ -6,6 +6,7 @@
   const MEMBER_INFO_TYPE = 'TCA_MEMBER_INFO';
   const SYNC_ENDPOINT = 'https://giautoandien.io.vn/api/sync-tca';
   const PRECHECK_ENDPOINT = 'https://giautoandien.io.vn/api/sync-tca/precheck';
+  const SYNC_PREVIEW_ENDPOINT = 'https://giautoandien.io.vn/api/sync-tca/preview';
 
   let memberInfoCache = {};
   let precheckCache = {};  // Store precheck results: { tcaId: { exists: boolean, userId: number } }
@@ -260,8 +261,12 @@
         ">📥 Download CSV</button>
         <button id="btn-json" style="
           background:#e65100; border:none; color:white; padding:10px 20px; border-radius:5px; 
-          cursor:pointer; font-weight:bold; font-size:12px;
+          cursor:pointer; font-weight:bold; margin-right:10px; font-size:12px;
         ">📄 Download JSON</button>
+        <button id="btn-sync-preview" style="
+          background:#1565c0; border:none; color:white; padding:10px 20px; border-radius:5px; 
+          cursor:pointer; font-weight:bold; font-size:12px;
+        ">🔄 Xem de xuat dong bo</button>
       </div>
     `;
 
@@ -271,6 +276,7 @@
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
     document.getElementById('btn-csv').addEventListener('click', window.downloadTCACSV);
     document.getElementById('btn-json').addEventListener('click', window.downloadTCAJSON);
+    document.getElementById('btn-sync-preview').addEventListener('click', () => showSyncPreviewPanel());
 
     // Fill table with parent info
     const tbody = document.getElementById('tca-nodes-body');
@@ -326,6 +332,303 @@
 
     // Store data for download functions
     window.tcaExtractedData = { allNodes, stats, memberInfo: memberInfoMap, precheckCache };
+  }
+
+  function showSyncPreviewPanel() {
+    console.log('[TCA Sync] showSyncPreviewPanel called');
+    
+    const data = window.tcaExtractedData;
+    if (!data || !data.allNodes || data.allNodes.length === 0) {
+      alert('Chua co du lieu! Vui long scan TCA truoc.');
+      return;
+    }
+
+    // Remove existing preview panel
+    const existing = document.getElementById('tca-sync-preview-panel');
+    if (existing) existing.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'tca-sync-preview-overlay';
+    overlay.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5); z-index: 9999999;
+    `;
+
+    // Create panel
+    const panel = document.createElement('div');
+    panel.id = 'tca-sync-preview-panel';
+    panel.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 95vw; max-width: 1200px; max-height: 90vh;
+      background: #fff; border-radius: 12px; z-index: 10000000;
+      font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4); overflow: hidden;
+      display: flex; flex-direction: column;
+    `;
+
+    // Header
+    panel.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 20px; background:#f5f5f5; border-bottom:2px solid #ddd;">
+        <div>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;">Xem de xuat dong bo</h2>
+          <small style="color:#666;">Kiem tra chi tiet truoc khi dong bo</small>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btn-preview-select-all" style="background:#1565c0; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Chon tat ca</button>
+          <button id="btn-preview-deselect-all" style="background:#666; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Bo chon tat ca</button>
+          <button id="btn-preview-close" style="background:#d32f2f; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">X Dong</button>
+        </div>
+      </div>
+      
+      <div style="padding:15px 20px; background:#e8f5e9; border-bottom:1px solid #ddd;">
+        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:10px;">
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
+            <div id="preview-total" style="font-size:24px; font-weight:bold; color:#333;">0</div>
+            <div style="color:#666; font-size:10px;">Tong</div>
+          </div>
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
+            <div id="preview-create-all" style="font-size:24px; font-weight:bold; color:#2e7d32;">0</div>
+            <div style="color:#666; font-size:10px;">Tao moi</div>
+          </div>
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #bbdefb;">
+            <div id="preview-create-system" style="font-size:24px; font-weight:bold; color:#1565c0;">0</div>
+            <div style="color:#666; font-size:10px;">Tao System</div>
+          </div>
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
+            <div id="preview-update" style="font-size:24px; font-weight:bold; color:#e65100;">0</div>
+            <div style="color:#666; font-size:10px;">Cap nhat</div>
+          </div>
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #e0e0e0;">
+            <div id="preview-skip" style="font-size:24px; font-weight:bold; color:#999;">0</div>
+            <div style="color:#666; font-size:10px;">Khong doi</div>
+          </div>
+          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
+            <div id="preview-selected" style="font-size:24px; font-weight:bold; color:#2e7d32;">0</div>
+            <div style="color:#666; font-size:10px;">Da chon</div>
+          </div>
+        </div>
+      </div>
+      
+      <div id="preview-table-container" style="flex:1; overflow:auto; padding:0 20px;">
+        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1000px;">
+          <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
+            <tr>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">#</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">Chon</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">TCA ID</th>
+              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd;">Ten</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:80px;">Hanh dong</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">UserID</th>
+              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd;">Thay doi</th>
+            </tr>
+          </thead>
+          <tbody id="preview-tbody">
+          </tbody>
+        </table>
+      </div>
+      
+      <div style="padding:15px 20px; background:#f5f5f5; border-top:2px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
+        <div style="color:#666; font-size:11px;">
+          Nhan "Chon tat ca" hoac "Bo chon tat ca" de tuy chinh.
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btn-preview-cancel" style="background:#666; border:none; color:white; padding:12px 25px; border-radius:5px; cursor:pointer; font-weight:bold;">Huy</button>
+          <button id="btn-preview-sync" style="background:#2e7d32; border:none; color:white; padding:12px 30px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:14px;">Dong y Dong bo</button>
+        </div>
+      </div>
+      
+      <div id="preview-loading" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.9); display:none; justify-content:center; align-items:center; flex-direction:column; gap:15px;">
+        <div style="font-size:18px; color:#2e7d32; font-weight:bold;">Dang lay de xuat dong bo...</div>
+        <div style="width:200px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden;">
+          <div id="preview-progress-bar" style="width:0%; height:100%; background:#2e7d32; transition:width 0.3s;"></div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(panel);
+
+    // Event listeners
+    document.getElementById('btn-preview-close').addEventListener('click', closePreview);
+    document.getElementById('btn-preview-cancel').addEventListener('click', closePreview);
+    overlay.addEventListener('click', closePreview);
+
+    document.getElementById('btn-preview-select-all').addEventListener('click', () => {
+      document.querySelectorAll('.preview-checkbox').forEach(cb => cb.checked = true);
+      updateSelectedCount();
+    });
+
+    document.getElementById('btn-preview-deselect-all').addEventListener('click', () => {
+      document.querySelectorAll('.preview-checkbox').forEach(cb => cb.checked = false);
+      updateSelectedCount();
+    });
+
+    document.getElementById('btn-preview-sync').addEventListener('click', executeSync);
+
+    // Fetch preview data
+    fetchPreviewData();
+
+    function closePreview() {
+      const p = document.getElementById('tca-sync-preview-panel');
+      const o = document.getElementById('tca-sync-preview-overlay');
+      if (p) p.remove();
+      if (o) o.remove();
+    }
+
+    function updateSelectedCount() {
+      const checked = document.querySelectorAll('.preview-checkbox:checked').length;
+      document.getElementById('preview-selected').textContent = checked;
+    }
+
+    async function fetchPreviewData() {
+      const loading = document.getElementById('preview-loading');
+      loading.style.display = 'flex';
+
+      try {
+        console.log('[TCA Sync] Fetching sync preview...');
+        console.log('[TCA Sync] Nodes:', data.allNodes.length);
+        
+        const response = await fetch(SYNC_PREVIEW_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            allNodes: data.allNodes,
+            memberInfo: data.memberInfo
+          })
+        });
+
+        if (!response.ok) throw new Error('Preview failed: ' + response.status);
+        
+        const result = await response.json();
+        console.log('[TCA Sync] Preview result:', result);
+
+        if (!result.success) throw new Error(result.error || 'Preview failed');
+
+        // Update stats
+        document.getElementById('preview-total').textContent = result.total;
+        document.getElementById('preview-create-all').textContent = result.willCreate.users;
+        document.getElementById('preview-create-system').textContent = result.willCreate.systems;
+        document.getElementById('preview-update').textContent = result.willUpdate.tcaMembers;
+        document.getElementById('preview-skip').textContent = result.willSkip;
+
+        // Fill table
+        const tbody = document.getElementById('preview-tbody');
+        let selectedCount = 0;
+
+        result.rows.forEach((row, idx) => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #eee';
+          if (idx % 2 === 0) tr.style.background = '#fff';
+          else tr.style.background = '#fafafa';
+
+          // Skip rows are not selected by default
+          const isSelected = row.action !== 'SKIP';
+          if (isSelected) selectedCount++;
+
+          tr.innerHTML = `
+            <td style="padding:6px 4px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
+            <td style="padding:6px 4px; text-align:center;">
+              <input type="checkbox" class="preview-checkbox" data-tca-id="${row.tcaId}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
+            </td>
+            <td style="padding:6px 4px; text-align:center; font-family:monospace; color:#333;">${row.tcaId}</td>
+            <td style="padding:6px 4px; color:#000; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${row.name}">${row.name}</td>
+            <td style="padding:6px 4px; text-align:center;">
+              <span style="background:${row.actionColor}; color:white; padding:3px 8px; border-radius:4px; font-size:10px; white-space:nowrap;">${row.actionLabel}</span>
+            </td>
+            <td style="padding:6px 4px; text-align:center; color:${row.currentData?.userId ? '#1565c0' : '#999'}; font-weight:bold;">${row.currentData?.userId || '-'}</td>
+            <td style="padding:6px 4px; font-size:10px; color:#666;">
+              ${row.changes.length > 0 ? row.changes.map(c => `<div style="color:#e65100;">${c}</div>`).join('') : '<span style="color:#999;">-</span>'}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        document.getElementById('preview-selected').textContent = selectedCount;
+
+        // Add checkbox listener for count update
+        document.querySelectorAll('.preview-checkbox').forEach(cb => {
+          cb.addEventListener('change', updateSelectedCount);
+        });
+
+        loading.style.display = 'none';
+
+      } catch (err) {
+        console.error('[TCA Sync] Preview error:', err);
+        loading.style.display = 'none';
+        alert('Loi lay de xuat dong bo: ' + err.message);
+        closePreview();
+      }
+    }
+
+    async function executeSync() {
+      const selectedCheckboxes = document.querySelectorAll('.preview-checkbox:checked:not(:disabled)');
+      const selectedIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.dataset.tcaId));
+      
+      if (selectedIds.length === 0) {
+        alert('Vui long chon it nhat 1 dong de dong bo!');
+        return;
+      }
+
+      if (!confirm(`Dong bo ${selectedIds.length} thanh vien vao he thong BRK?\n\nSo du lieu lon co the mat thoi gian. Tiep tuc?`)) {
+        return;
+      }
+
+      // Filter selected nodes
+      const selectedNodes = data.allNodes.filter(n => selectedIds.includes(n.id));
+      const selectedMemberInfo = {};
+      selectedIds.forEach(id => {
+        if (data.memberInfo?.[id]) selectedMemberInfo[id] = data.memberInfo[id];
+      });
+
+      const syncBtn = document.getElementById('btn-preview-sync');
+      const cancelBtn = document.getElementById('btn-preview-cancel');
+      syncBtn.disabled = true;
+      cancelBtn.disabled = true;
+      syncBtn.textContent = 'Dang dong bo...';
+
+      try {
+        console.log('[TCA Sync] Executing sync for', selectedNodes.length, 'nodes');
+
+        const response = await fetch(SYNC_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'TCA_EXT_PREVIEW',
+            timestamp: Date.now(),
+            allNodes: selectedNodes,
+            memberInfo: selectedMemberInfo,
+            stats: { total: selectedNodes.length, folders: 0, items: selectedNodes.length }
+          })
+        });
+
+        if (!response.ok) throw new Error('Sync failed: ' + response.status);
+        
+        const result = await response.json();
+        console.log('[TCA Sync] Sync result:', result);
+
+        if (result.success) {
+          alert(`Dong bo thanh cong!\n\n` +
+            `Tao User: ${result.stats.usersCreated}\n` +
+            `Cap nhat User: ${result.stats.usersUpdated}\n` +
+            `Tao System: ${result.stats.systemsCreated}\n` +
+            `Tao TCA Member: ${result.stats.tcaMembersCreated}\n` +
+            `Cap nhat TCA Member: ${result.stats.tcaMembersUpdated}\n` +
+            `Loi: ${result.stats.failed}`
+          );
+          closePreview();
+        } else {
+          throw new Error(result.error || 'Sync failed');
+        }
+
+      } catch (err) {
+        console.error('[TCA Sync] Sync error:', err);
+        alert('Loi dong bo: ' + err.message);
+        syncBtn.disabled = false;
+        cancelBtn.disabled = false;
+        syncBtn.textContent = 'Dong y Dong bo';
+      }
+    }
   }
 
   // Make functions globally accessible
