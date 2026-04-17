@@ -201,7 +201,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.0.8</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.4.1</span></h2>
           <small style="color:#666;">Auto-scanned from TCA Portal</small>
         </div>
         <button id="btn-close" style="
