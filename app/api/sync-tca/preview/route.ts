@@ -136,7 +136,7 @@ export async function POST(request: Request) {
         expectedSystemId: number | null
         parentTcaId: number | null
         parentUserId: number | null  // Resolved từ DB hoặc batch
-        parentSource: 'DB' | 'BATCH' | 'ROOT' | null
+        parentSource: 'DB' | 'BATCH' | 'FOLDER' | 'ROOT' | null
         expectedReferrerId: number | null
         expectedRefSysId: number | null
         closuresToCreate: number
@@ -149,28 +149,48 @@ export async function POST(request: Request) {
       const phone = info.phone || null
       const normalizedPhone = normalizePhone(phone)
 
+      // ====== LOGIC XÁC ĐỊNH USER TỒN TẠI ======
+      // Ưu tiên: Phone → Email
       let existingUser = null
-      if (normalizedPhone || email) {
-        existingUser = await prisma.user.findFirst({
-          where: {
-            OR: [
-              normalizedPhone ? { phone: normalizedPhone } : undefined,
-              email ? { email: email } : undefined
-            ].filter(Boolean) as { phone: string }[] | { email: string }[]
-          }
-        })
+      let matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null = null
+      let emailMismatch = false
+      let needEmailUpdate = false
 
-        if (!existingUser && normalizedPhone) {
-          const allUsers = await prisma.user.findMany({
-            where: { phone: { not: null } }
-          })
-          for (const user of allUsers) {
-            if (user.phone && normalizePhone(user.phone) === normalizedPhone) {
-              existingUser = user
-              break
+      // Thử 1: Tìm theo phone trước
+      if (normalizedPhone) {
+        const allUsers = await prisma.user.findMany({
+          where: { phone: { not: null } }
+        })
+        for (const user of allUsers) {
+          if (user.phone && normalizePhone(user.phone) === normalizedPhone) {
+            existingUser = user
+            matchType = 'PHONE_ONLY'
+            
+            // Check email
+            if (email && user.email?.toLowerCase() !== email.toLowerCase()) {
+              emailMismatch = true
+              needEmailUpdate = true
+            } else if (email && user.email?.toLowerCase() === email.toLowerCase()) {
+              matchType = 'PHONE_EMAIL'
             }
+            break
           }
         }
+      }
+
+      // Thử 2: Tìm theo email (nếu không tìm được theo phone)
+      if (!existingUser && email) {
+        existingUser = await prisma.user.findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } }
+        })
+        if (existingUser) {
+          matchType = 'EMAIL_ONLY'
+        }
+      }
+
+      // Debug log
+      if (node.id === 61928) {
+        console.log(`[Preview] TCA 61928: phone=${normalizedPhone}, email=${email}, matchType=${matchType}, userId=${existingUser?.id}`)
       }
 
       let existingSystem = null
@@ -195,6 +215,7 @@ export async function POST(request: Request) {
       let expectedUserId: number | null = null
       let expectedSystemId: number | null = null
       let closuresToCreate = 0
+      let matchInfo = ''
 
       if (!existingUser) {
         action = 'CREATE_ALL'
@@ -207,6 +228,29 @@ export async function POST(request: Request) {
         preview.willCreate.systems++
         preview.willCreate.tcaMembers++
         preview.willCreate.closures += closuresToCreate
+        matchInfo = 'USER_MOI'
+      } else if (matchType === 'PHONE_ONLY' && needEmailUpdate) {
+        // Phone trùng nhưng email không - gợi ý cập nhật email
+        action = 'CREATE_SYSTEM'
+        actionLabel = 'Goi y cap nhat email'
+        actionColor = '#f57c00'
+        expectedSystemId = nextAvailableSystemId++
+        closuresToCreate = calculateClosures(node, parentMap)
+        preview.willCreate.systems++
+        preview.willCreate.tcaMembers++
+        preview.willCreate.closures += closuresToCreate
+        matchInfo = 'PHONE_TRUNG_EMAIL_KHONG'
+      } else if (matchType === 'EMAIL_ONLY') {
+        // Chỉ email trùng - cảnh báo
+        action = 'CREATE_SYSTEM'
+        actionLabel = 'CANH BAO: chi email trung'
+        actionColor = '#d32f2f'
+        expectedSystemId = nextAvailableSystemId++
+        closuresToCreate = calculateClosures(node, parentMap)
+        preview.willCreate.systems++
+        preview.willCreate.tcaMembers++
+        preview.willCreate.closures += closuresToCreate
+        matchInfo = 'EMAIL_TRUNG_PHONE_KHONG'
       } else if (!existingSystem) {
         action = 'CREATE_SYSTEM'
         actionLabel = 'Tao System + TCA'
@@ -216,10 +260,12 @@ export async function POST(request: Request) {
         preview.willCreate.systems++
         preview.willCreate.tcaMembers++
         preview.willCreate.closures += closuresToCreate
+        matchInfo = 'PHONE_EMAIL_TRUNG'
       } else {
         action = 'UPDATE'
         actionLabel = 'Cap nhat TCA'
         actionColor = '#e65100'
+        matchInfo = matchType === 'PHONE_EMAIL' ? 'USER_TON_TAI' : 'PHONE_EMAIL_TRUNG'
 
         if (existingTCAMember) {
           const newPersonalScore = node.personalScore ? parseFloat(node.personalScore) : null
@@ -262,13 +308,8 @@ export async function POST(request: Request) {
       const TCA_ROOT_USER_ID = 861;
       const TCA_ROOT_SYSTEM_ID = 13807;
       
-      // DEBUG
-      if (node.id === 60214) {
-        console.log(`[Preview] TCA 60214: parentFolderId=${parentId} (type: ${typeof parentId}), parentTcaId=${parentTcaId}`);
-      }
-      
       let parentUserId: number | null = null;
-      let parentSource: 'DB' | 'BATCH' | 'ROOT' | null = null;
+      let parentSource: 'DB' | 'BATCH' | 'FOLDER' | 'ROOT' | null = null;
       let parentSystemId: number | null = null;
       
       if (parentTcaId) {
@@ -285,21 +326,72 @@ export async function POST(request: Request) {
         } else {
           // Parent không có trong batch - resolve từ DB
           const parentTCAMember = await (prisma as any).tCAMember?.findUnique({
-            where: { tcaId: parentTcaId },
-            include: { user: { select: { id: true } } }
+            where: { tcaId: parentTcaId }
           });
-          if (parentTCAMember) {
+          
+          if (parentTCAMember?.userId) {
+            // Parent có TCAMember trong DB
             parentUserId = parentTCAMember.userId;
             parentSource = 'DB';
             
-            // Lấy parent system
-            if (parentUserId) {
+            if (parentUserId != null) {
               const parentSystem = await prisma.system.findFirst({
                 where: { userId: parentUserId, onSystem: 1 }
               });
               if (parentSystem) {
                 parentSystemId = parentSystem.autoId;
               }
+            }
+          } else {
+            // Parent là FOLDER - tìm memberInfo của folder parent
+            const parentFolderInfo = memberInfo?.[parentTcaId];
+            if (parentFolderInfo) {
+              const parentFolderPhone = parentFolderInfo.phone?.replace(/\D/g, '') || null;
+              const parentFolderEmail = parentFolderInfo.email || null;
+              
+              // Tìm user qua phone trước
+              if (parentFolderPhone) {
+                const allUsers = await prisma.user.findMany({
+                  where: { phone: { not: null } }
+                });
+                for (const user of allUsers) {
+                  if (user.phone && normalizePhone(user.phone) === parentFolderPhone) {
+                    parentUserId = user.id;
+                    parentSource = 'FOLDER';
+                    
+                    const parentSystem = await prisma.system.findFirst({
+                      where: { userId: parentUserId, onSystem: 1 }
+                    });
+                    if (parentSystem) {
+                      parentSystemId = parentSystem.autoId;
+                    }
+                    break;
+                  }
+                }
+              }
+              
+              // Nếu không tìm được qua phone, thử qua email
+              if (!parentUserId && parentFolderEmail) {
+                const userByEmail = await prisma.user.findFirst({
+                  where: { email: { equals: parentFolderEmail, mode: 'insensitive' } }
+                });
+                if (userByEmail) {
+                  parentUserId = userByEmail.id;
+                  parentSource = 'FOLDER';
+                  
+                  const parentSystem = await prisma.system.findFirst({
+                    where: { userId: parentUserId, onSystem: 1 }
+                  });
+                  if (parentSystem) {
+                    parentSystemId = parentSystem.autoId;
+                  }
+                }
+              }
+            }
+            
+            // Debug
+            if (node.id === 61928) {
+              console.log(`[Preview] TCA 61928 parent: folderInfo=${JSON.stringify(memberInfo?.[parentTcaId])}, parentUserId=${parentUserId}`);
             }
           }
         }
