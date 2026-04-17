@@ -34,6 +34,7 @@ interface RollbackResult {
   }
   message?: string
   error?: string
+  hint?: string
 }
 
 export default function TCASyncAdminPage() {
@@ -82,7 +83,7 @@ export default function TCASyncAdminPage() {
 
     setLoading(true)
     try {
-      let payload: Record<string, unknown> = { mode: rollbackMode }
+      const payload: Record<string, unknown> = { mode: rollbackMode }
 
       if (rollbackMode === 'syncId') {
         payload.syncId = rollbackInput.trim()
@@ -111,6 +112,38 @@ export default function TCASyncAdminPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleQuickRollback(syncId: string) {
+    if (!confirm(`Rollback tất cả dữ liệu của sync ${syncId}?\n\nHành động này sẽ xóa vĩnh viễn dữ liệu!`)) {
+      return
+    }
+    if (!confirm(`Xác nhận lần cuối: Bạn chắc chắn muốn xóa dữ liệu của sync ${syncId}?`)) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/sync-tca/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'syncId', syncId })
+      })
+
+      const result = await res.json()
+      setRollbackResult(result)
+      fetchData()
+    } catch (e) {
+      console.error('Rollback failed:', e)
+      setRollbackResult({ success: false, syncId: '', error: String(e) })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text)
+    alert(`Đã copy: ${text}`)
   }
 
   if (status === 'loading' || loading) {
@@ -184,13 +217,21 @@ export default function TCASyncAdminPage() {
                     <th className="px-2 py-1 text-left">Table</th>
                     <th className="px-2 py-1 text-left">Status</th>
                     <th className="px-2 py-1 text-left">Date</th>
+                    <th className="px-2 py-1 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {history.map((h, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="px-2 py-1 font-mono text-xs" title={h.syncId}>
-                        {h.syncId.slice(0, 8)}...
+                    <tr key={i} className="border-t hover:bg-gray-50">
+                      <td className="px-2 py-1">
+                        <button 
+                          onClick={() => copyToClipboard(h.syncId)}
+                          className="font-mono text-xs text-blue-600 hover:text-blue-800 underline"
+                          title="Click để copy SyncId"
+                        >
+                          {h.syncId.slice(0, 8)}...
+                        </button>
+                        <div className="text-xs text-gray-400">Hover để xem đầy đủ</div>
                       </td>
                       <td className="px-2 py-1">
                         <span className={`px-2 py-0.5 rounded text-xs ${
@@ -215,11 +256,24 @@ export default function TCASyncAdminPage() {
                       <td className="px-2 py-1 text-xs text-gray-500">
                         {new Date(h.createdAt).toLocaleString('vi-VN')}
                       </td>
+                      <td className="px-2 py-1 text-center">
+                        {h.status === 'COMPLETED' && h.action === 'SYNC_START' && (
+                          <button
+                            onClick={() => handleQuickRollback(h.syncId)}
+                            className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+                          >
+                            Rollback
+                          </button>
+                        )}
+                        {h.status === 'ROLLED_BACK' && (
+                          <span className="text-xs text-gray-400">Đã rollback</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {history.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-2 py-4 text-center text-gray-500">
+                      <td colSpan={6} className="px-2 py-4 text-center text-gray-500">
                         Chưa có lịch sử sync
                       </td>
                     </tr>
@@ -278,7 +332,7 @@ export default function TCASyncAdminPage() {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {rollbackMode === 'syncId' && 'Nhập SyncId cần rollback:'}
+                  {rollbackMode === 'syncId' && 'Nhập SyncId (click vào ID trong bảng để copy):'}
                   {rollbackMode === 'tcaIds' && 'Nhập TCA IDs (cách nhau bởi dấu phẩy):'}
                   {rollbackMode === 'dateRange' && 'Nhập ngày (định dạng: 2026-04-17, 2026-04-18):'}
                 </label>
@@ -286,12 +340,12 @@ export default function TCASyncAdminPage() {
                   type="text"
                   value={rollbackInput}
                   onChange={(e) => setRollbackInput(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   placeholder={
-                    rollbackMode === 'syncId' ? 'abc123-def456-...' :
+                    rollbackMode === 'syncId' ? 'Dán SyncId đã copy từ bảng trên' :
                     rollbackMode === 'tcaIds' ? '60073, 60074, 61297' :
                     '2026-04-17, 2026-04-18'
                   }
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                 />
               </div>
 
@@ -341,6 +395,9 @@ export default function TCASyncAdminPage() {
                   {rollbackResult.error && (
                     <p className="text-sm text-red-600 mt-1">Error: {rollbackResult.error}</p>
                   )}
+                  {rollbackResult.hint && (
+                    <p className="text-sm text-orange-600 mt-1">Hint: {rollbackResult.hint}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -351,9 +408,9 @@ export default function TCASyncAdminPage() {
         <div className="mt-8 bg-blue-50 rounded-lg p-4">
           <h3 className="font-bold text-blue-900 mb-2">Hướng dẫn sử dụng</h3>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li><strong>Rollback theo SyncId:</strong> Xóa tất cả dữ liệu tạo bởi một lần sync cụ thể</li>
-            <li><strong>Rollback theo TCA IDs:</strong> Xóa dữ liệu của các thành viên cụ thể (60073, 60074, ...)</li>
-            <li><strong>Rollback theo Ngày:</strong> Xóa tất cả dữ liệu sync trong khoảng thời gian</li>
+            <li><strong>Khuyến nghị:</strong> Sử dụng <span className="bg-orange-100 text-orange-700 px-1 rounded">Rollback theo TCA IDs</span> để xóa chính xác từng thành viên</li>
+            <li><strong>Rollback theo TCA IDs:</strong> Nhập các TCA IDs cần xóa (VD: 60073, 60074, 61345)</li>
+            <li><strong>Rollback theo Ngày:</strong> Nhập khoảng ngày (VD: 2026-04-17, 2026-04-18)</li>
             <li className="text-red-600 font-medium">Dữ liệu sau khi xóa sẽ KHÔNG thể khôi phục!</li>
             <li>Backup sẽ được ghi log ra console trước khi xóa</li>
           </ul>

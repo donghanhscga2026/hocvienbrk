@@ -220,6 +220,39 @@ export async function POST(request: Request) {
         let userId: number
         let isNewUser = false
 
+        // Resolve parent info trước khi tạo User
+        const parentTcaId = node.parentFolderId
+        let parentUserId: number | null = null
+        let parentSystemId: number | null = null
+
+        if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') {
+          const parentIdNum = Number(parentTcaId)
+          
+          // Thử lấy từ batch trước
+          if (tcaIdToUserId.has(parentIdNum)) {
+            parentUserId = tcaIdToUserId.get(parentIdNum)!
+            parentSystemId = tcaIdToSystemId.get(parentIdNum) || null
+          } else {
+            // Resolve từ DB
+            const parentTCAMember = await (prisma as any).tCAMember?.findUnique({
+              where: { tcaId: parentIdNum },
+              include: { user: { select: { id: true } } }
+            })
+            if (parentTCAMember && parentTCAMember.userId) {
+              parentUserId = parentTCAMember.userId
+              
+              const parentSystem = await prisma.system.findFirst({
+                where: { userId: parentTCAMember.userId, onSystem: 1 }
+              })
+              if (parentSystem) {
+                parentSystemId = parentSystem.autoId
+              }
+            }
+          }
+          
+          console.log(`[TCA Sync]   Parent TCA ${parentIdNum} → User ${parentUserId}, System ${parentSystemId}`)
+        }
+
         if (existingUser) {
           userId = existingUser.id
           console.log(`[TCA Sync]   Found existing user: ${userId}`)
@@ -257,7 +290,7 @@ export async function POST(request: Request) {
               phone: phone,
               password: hashedPassword,
               role: 'STUDENT',
-              referrerId: null
+              referrerId: parentUserId
             }
           })
 
@@ -266,7 +299,7 @@ export async function POST(request: Request) {
           stats.usersCreated++
           createdRecords.push({ table: 'User', id: userId, tcaId: node.id })
 
-          console.log(`[TCA Sync]   Created NEW user: ${userId} (expected ID from preview)`)
+          console.log(`[TCA Sync]   Created NEW user: ${userId} with referrerId: ${parentUserId}`)
         }
 
         tcaIdToUserId.set(node.id, userId)
@@ -299,16 +332,12 @@ export async function POST(request: Request) {
         tcaIdToSystemId.set(node.id, systemId)
 
         // ---------- 3. Update System refSysId ----------
-        const parentTcaId = node.parentFolderId
-        if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0' && tcaIdToSystemId.has(Number(parentTcaId))) {
-          const parentSystemId = tcaIdToSystemId.get(Number(parentTcaId))!
-          if (existingSystem && existingSystem.refSysId !== parentSystemId) {
-            await prisma.system.update({
-              where: { autoId: systemId },
-              data: { refSysId: parentSystemId }
-            })
-            console.log(`[TCA Sync]   Updated refSysId: ${systemId} -> ${parentSystemId}`)
-          }
+        if (parentSystemId && existingSystem && existingSystem.refSysId !== parentSystemId) {
+          await prisma.system.update({
+            where: { autoId: systemId },
+            data: { refSysId: parentSystemId }
+          })
+          console.log(`[TCA Sync]   Updated refSysId: ${systemId} -> ${parentSystemId}`)
         }
 
         // ---------- 4. Upsert TCAMember ----------

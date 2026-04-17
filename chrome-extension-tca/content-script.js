@@ -427,19 +427,22 @@
       </div>
       
       <div id="preview-table-container" style="flex:1; overflow:auto; padding:0 20px;">
-        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1100px;">
+        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1400px;">
           <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
             <tr>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">#</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">Chon</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">TCA ID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:30px;">#</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:30px;">Chon</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">TCA ID</th>
               <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd;">Ten</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:100px;">Hanh dong</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:55px;">UserID</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:55px;">New UserID</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:55px;">New SysID</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">#Closure</th>
-              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd;">Thay doi</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:80px;">Hanh dong</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Cur User</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">New User</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">New Sys</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Parent TCA</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">Parent User</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">RefID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">RefSys</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:35px;">#Cl</th>
             </tr>
           </thead>
           <tbody id="preview-tbody">
@@ -552,23 +555,27 @@
           const newUserIdColor = row.expectedUserId ? '#2e7d32' : '#999';
           const newSysIdColor = row.expectedSystemId ? '#1565c0' : '#999';
 
+          // Parent source color
+          const parentSourceColor = row.parentSource === 'DB' ? '#1565c0' : row.parentSource === 'BATCH' ? '#2e7d32' : '#999';
+          
           tr.innerHTML = `
-            <td style="padding:6px 4px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
-            <td style="padding:6px 4px; text-align:center;">
+            <td style="padding:4px 2px; text-align:center; color:#999; font-size:9px;">${idx + 1}</td>
+            <td style="padding:4px 2px; text-align:center;">
               <input type="checkbox" class="preview-checkbox" data-tca-id="${row.tcaId}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
             </td>
-            <td style="padding:6px 4px; text-align:center; font-family:monospace; color:#333;">${row.tcaId}</td>
-            <td style="padding:6px 4px; color:#000; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${row.name}">${row.name}</td>
-            <td style="padding:6px 4px; text-align:center;">
-              <span style="background:${row.actionColor}; color:white; padding:3px 8px; border-radius:4px; font-size:10px; white-space:nowrap;">${row.actionLabel}</span>
+            <td style="padding:4px 2px; text-align:center; font-family:monospace; color:#333; font-size:10px;">${row.tcaId}</td>
+            <td style="padding:4px 2px; color:#000; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px;" title="${row.name}">${row.name}</td>
+            <td style="padding:4px 2px; text-align:center;">
+              <span style="background:${row.actionColor}; color:white; padding:2px 6px; border-radius:3px; font-size:9px; white-space:nowrap;">${row.actionLabel}</span>
             </td>
-            <td style="padding:6px 4px; text-align:center; color:${row.currentData?.userId ? '#1565c0' : '#999'}; font-weight:bold;">${row.currentData?.userId || '-'}</td>
-            <td style="padding:6px 4px; text-align:center; color:${newUserIdColor}; font-weight:bold;">${row.expectedUserId || '-'}</td>
-            <td style="padding:6px 4px; text-align:center; color:${newSysIdColor}; font-weight:bold;">${row.expectedSystemId || '-'}</td>
-            <td style="padding:6px 4px; text-align:center; color:#7b1fa2; font-size:10px;">${row.closuresToCreate || 0}</td>
-            <td style="padding:6px 4px; font-size:10px; color:#666;">
-              ${row.changes.length > 0 ? row.changes.map(c => `<div style="color:#e65100;">${c}</div>`).join('') : '<span style="color:#999;">-</span>'}
-            </td>
+            <td style="padding:4px 2px; text-align:center; color:${row.currentData?.userId ? '#1565c0' : '#ccc'}; font-weight:bold; font-size:10px;">${row.currentData?.userId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${newUserIdColor}; font-weight:bold; font-size:10px;">${row.expectedUserId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${newSysIdColor}; font-weight:bold; font-size:10px;">${row.expectedSystemId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${row.parentTcaId ? '#333' : '#ccc'}; font-size:10px;" title="${row.parentSource || ''}">${row.parentTcaId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${row.parentUserId ? parentSourceColor : '#ccc'}; font-weight:bold; font-size:10px;">${row.parentUserId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${row.expectedReferrerId ? '#2e7d32' : '#ccc'}; font-weight:bold; font-size:10px;">${row.expectedReferrerId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${row.expectedRefSysId ? '#1565c0' : '#ccc'}; font-size:10px;">${row.expectedRefSysId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:#7b1fa2; font-size:9px;">${row.closuresToCreate || 0}</td>
           `;
           tbody.appendChild(tr);
         });
