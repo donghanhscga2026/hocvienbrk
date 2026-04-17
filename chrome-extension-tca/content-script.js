@@ -90,10 +90,14 @@
             precheckCache[m.tcaId] = {
               exists: m.status === 'EXISTING_SYSTEM',
               userFound: m.existingUserId !== null,
-              userId: m.existingUserId
+              userId: m.existingUserId,
+              matchType: m.matchType,
+              emailMismatch: m.emailMismatch,
+              existingUserEmail: m.existingUserEmail,
+              referrerId: m.referrerId
             };
             if (m.existingUserId) {
-              console.log(`[TCA Sync]   Found: TCA ${m.tcaId} -> User ${m.existingUserId} (${m.name})`);
+              console.log(`[TCA Sync]   Found: TCA ${m.tcaId} -> User ${m.existingUserId} (${m.name}), matchType=${m.matchType}, emailMismatch=${m.emailMismatch}`);
             }
           });
           console.log('[TCA Sync] Cache entries:', Object.keys(precheckCache).length);
@@ -201,7 +205,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.4.1</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.5.0</span></h2>
           <small style="color:#666;">Auto-scanned from TCA Portal</small>
         </div>
         <button id="btn-close" style="
@@ -246,7 +250,7 @@
             <tr>
               <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:40px;">ID</th>
               <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333;">Ten thanh vien</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">CN/Tong</th>
+              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:45px;">Match</th>
               <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">DB</th>
               <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">UserID</th>
               <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333; width:110px;">Email</th>
@@ -314,6 +318,9 @@
       const isExisting = precheckResult?.exists;  // User + System both exist
       const userFound = precheckResult?.userFound;  // User found (may not have System)
       const userId = precheckResult?.userId;
+      const matchType = precheckResult?.matchType;
+      const emailMismatch = precheckResult?.emailMismatch;
+      const existingUserEmail = precheckResult?.existingUserEmail;
       
       // DB status: EXISTS = User+System, USER = User only, NEW = No user
       let dbStatus = '-';
@@ -326,10 +333,29 @@
       }
       const userIdDisplay = userId ? `<span style="color:#1565c0;font-weight:bold;">${userId}</span>` : '-';
       
+      // Match type display
+      let matchDisplay = '-';
+      let matchColor = '#999';
+      if (matchType === 'PHONE_EMAIL') {
+        matchDisplay = '<span style="background:#2e7d32;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P+E</span>';
+        matchColor = '#2e7d32';
+      } else if (matchType === 'PHONE_ONLY') {
+        if (emailMismatch) {
+          matchDisplay = '<span style="background:#f57c00;color:white;padding:1px 4px;border-radius:3px;font-size:9px;" title="Phone trùng, Email khác: ' + (existingUserEmail || '?') + ' vs ' + (email || '-') + '">P!</span>';
+          matchColor = '#f57c00';
+        } else {
+          matchDisplay = '<span style="background:#1565c0;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P</span>';
+          matchColor = '#1565c0';
+        }
+      } else if (matchType === 'EMAIL_ONLY') {
+        matchDisplay = '<span style="background:#d32f2f;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">E</span>';
+        matchColor = '#d32f2f';
+      }
+      
       tr.innerHTML = `
         <td style="padding:6px 4px; text-align:center; font-family:monospace; font-size:10px; color:#333;">${node.id}</td>
         <td style="padding:6px 4px; color:#000; font-weight:${node.type === 'folder' ? 'bold' : 'normal'}; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${node.name || '-'}">${node.name || '-'}</td>
-        <td style="padding:6px 4px; text-align:center; font-size:10px; color:#333;">${node.personalScore || '0'}/${node.totalScore || '0'}</td>
+        <td style="padding:6px 4px; text-align:center; font-size:10px;" title="Match: ${matchType || '-'}">${matchDisplay}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px;">${dbStatus}</td>
         <td style="padding:6px 4px; text-align:center; font-size:10px; color:#1565c0; font-weight:bold;">${userIdDisplay}</td>
         <td style="padding:6px 4px; font-size:10px; color:${email === '-' ? '#999' : '#1565c0'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-member-email="${node.id}">${email}</td>
@@ -427,13 +453,14 @@
       </div>
       
       <div id="preview-table-container" style="flex:1; overflow:auto; padding:0 20px;">
-        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1200px;">
+        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1300px;">
           <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
             <tr>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:25px;">#</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:25px;">Chon</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">TCA ID</th>
-              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd; width:80px;">Ten</th>
+              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd; width:70px;">Ten</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">Match</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:70px;">Hanh dong</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Cur User</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">New User</th>
@@ -565,13 +592,32 @@
           const refSysId = row.expectedRefSysId ?? currentRefSysId;
           const refSysIdColor = refSysId != null ? '#1565c0' : '#ccc';
           
+          // Get match type from API response
+          const matchType = row.matchType || null;
+          const emailMismatch = row.emailMismatch || false;
+          
+          // Match type display
+          let matchDisplay = '-';
+          if (matchType === 'PHONE_EMAIL') {
+            matchDisplay = '<span style="background:#2e7d32;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P+E</span>';
+          } else if (matchType === 'PHONE_ONLY') {
+            if (emailMismatch) {
+              matchDisplay = '<span style="background:#f57c00;color:white;padding:1px 4px;border-radius:3px;font-size:9px;" title="Email khac">P!</span>';
+            } else {
+              matchDisplay = '<span style="background:#1565c0;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P</span>';
+            }
+          } else if (matchType === 'EMAIL_ONLY') {
+            matchDisplay = '<span style="background:#d32f2f;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">E</span>';
+          }
+          
           tr.innerHTML = `
             <td style="padding:4px 2px; text-align:center; color:#999; font-size:9px;">${idx + 1}</td>
             <td style="padding:4px 2px; text-align:center;">
               <input type="checkbox" class="preview-checkbox" data-tca-id="${row.tcaId}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
             </td>
             <td style="padding:4px 2px; text-align:center; font-family:monospace; color:#333; font-size:10px;">${row.tcaId}</td>
-            <td style="padding:4px 2px; color:#000; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px;" title="${row.name}">${row.name}</td>
+            <td style="padding:4px 2px; color:#000; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px;" title="${row.name}">${row.name}</td>
+            <td style="padding:4px 2px; text-align:center; font-size:10px;">${matchDisplay}</td>
             <td style="padding:4px 2px; text-align:center;">
               <span style="background:${row.actionColor}; color:white; padding:2px 6px; border-radius:3px; font-size:9px; white-space:nowrap;">${row.actionLabel}</span>
             </td>

@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       willUpdateSystems: 0,
       willCreateTCAMembers: 0,
       willUpdateTCAMembers: 0,
+      warnings: 0,
       members: [] as {
         tcaId: number
         name: string
@@ -82,8 +83,12 @@ export async function POST(request: Request) {
         phone: string | null
         normalizedPhone: string | null
         status: 'NEW_USER' | 'EXISTING_USER' | 'NEW_SYSTEM' | 'EXISTING_SYSTEM'
+        matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null
+        emailMismatch: boolean
         existingUserId: number | null
+        existingUserEmail: string | null
         existingSystemId: number | null
+        referrerId: number | null
         message: string
       }[]
     }
@@ -140,6 +145,26 @@ export async function POST(request: Request) {
         console.log(`[Precheck] User ${existingUser.id} found, system exists: ${!!existingSystem}`);
       }
 
+      // Determine matchType and emailMismatch
+      let matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null = null
+      let emailMismatch = false
+
+      if (existingUser) {
+        if (normalizedPhone) {
+          // Check if email also matches
+          if (email && existingUser.email?.toLowerCase() === email.toLowerCase()) {
+            matchType = 'PHONE_EMAIL'
+          } else {
+            matchType = 'PHONE_ONLY'
+            if (email && existingUser.email && existingUser.email.toLowerCase() !== email.toLowerCase()) {
+              emailMismatch = true
+            }
+          }
+        } else if (email) {
+          matchType = 'EMAIL_ONLY'
+        }
+      }
+
       // Determine status
       let status: string
       let message: string
@@ -168,8 +193,12 @@ export async function POST(request: Request) {
         phone,
         normalizedPhone,
         status: status as 'NEW_USER' | 'EXISTING_USER' | 'NEW_SYSTEM' | 'EXISTING_SYSTEM',
+        matchType,
+        emailMismatch,
         existingUserId: existingUser?.id || null,
+        existingUserEmail: existingUser?.email || null,
         existingSystemId: existingSystem?.autoId || null,
+        referrerId: existingUser?.referrerId || null,
         message
       })
     }
