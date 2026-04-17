@@ -262,6 +262,11 @@ export async function POST(request: Request) {
       const TCA_ROOT_USER_ID = 861;
       const TCA_ROOT_SYSTEM_ID = 13807;
       
+      // DEBUG
+      if (node.id === 60214) {
+        console.log(`[Preview] TCA 60214: parentFolderId=${parentId} (type: ${typeof parentId}), parentTcaId=${parentTcaId}`);
+      }
+      
       let parentUserId: number | null = null;
       let parentSource: 'DB' | 'BATCH' | 'ROOT' | null = null;
       let parentSystemId: number | null = null;
