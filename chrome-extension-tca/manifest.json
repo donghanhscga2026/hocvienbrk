@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Sync group_tree data from TCA portal to BRK system with auto-sync",
   "permissions": [
     "activeTab",
