@@ -225,21 +225,28 @@ export async function POST(request: Request) {
         let parentUserId: number | null = null
         let parentSystemId: number | null = null
 
+        // DEBUG: Log để trace referrerId
+        console.log(`[TCA Sync]   DEBUG: TCA ${node.id}, parentFolderId=${parentTcaId} (type: ${typeof parentTcaId})`)
+
         if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') {
           const parentIdNum = Number(parentTcaId)
+          console.log(`[TCA Sync]   DEBUG: Parent ID = ${parentIdNum}`)
           
           // Thử lấy từ batch trước
           if (tcaIdToUserId.has(parentIdNum)) {
             parentUserId = tcaIdToUserId.get(parentIdNum)!
             parentSystemId = tcaIdToSystemId.get(parentIdNum) || null
+            console.log(`[TCA Sync]   DEBUG: Parent found in BATCH, parentUserId=${parentUserId}`)
           } else {
             // Resolve từ DB
+            console.log(`[TCA Sync]   DEBUG: Parent NOT in batch, checking DB...`)
             const parentTCAMember = await (prisma as any).tCAMember?.findUnique({
               where: { tcaId: parentIdNum },
               include: { user: { select: { id: true } } }
             })
             if (parentTCAMember && parentTCAMember.userId) {
               parentUserId = parentTCAMember.userId
+              console.log(`[TCA Sync]   DEBUG: Parent found in DB, parentUserId=${parentUserId}`)
               
               const parentSystem = await prisma.system.findFirst({
                 where: { userId: parentTCAMember.userId, onSystem: 1 }
@@ -247,11 +254,17 @@ export async function POST(request: Request) {
               if (parentSystem) {
                 parentSystemId = parentSystem.autoId
               }
+            } else {
+              console.log(`[TCA Sync]   DEBUG: Parent NOT found anywhere!`)
             }
           }
           
           console.log(`[TCA Sync]   Parent TCA ${parentIdNum} → User ${parentUserId}, System ${parentSystemId}`)
+        } else {
+          console.log(`[TCA Sync]   DEBUG: Root node (no parent), parentUserId=null`)
         }
+
+        console.log(`[TCA Sync]   DEBUG: Final parentUserId=${parentUserId} before creating user`)
 
         if (existingUser) {
           userId = existingUser.id
