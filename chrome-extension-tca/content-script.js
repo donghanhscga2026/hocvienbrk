@@ -796,6 +796,22 @@
         updateStep(2, 'Dang gui yeu cau dong bo toi server...');
         console.log('[TCA Sync] Executing sync for', selectedNodes.length, 'nodes');
 
+        // Build expectedIds từ preview data
+        const expectedIds = {};
+        if (previewData.rows && previewData.rows.length > 0) {
+          previewData.rows.forEach(row => {
+            if (row.expectedUserId || row.expectedSystemId || row.expectedReferrerId || row.expectedRefSysId) {
+              expectedIds[row.tcaId] = {
+                userId: row.expectedUserId || null,
+                systemId: row.expectedSystemId || null,
+                referrerId: row.expectedReferrerId || null,
+                refSysId: row.expectedRefSysId || null
+              };
+            }
+          });
+          console.log('[TCA Sync] expectedIds:', expectedIds);
+        }
+
         const response = await fetch(SYNC_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -804,7 +820,8 @@
             timestamp: Date.now(),
             allNodes: selectedNodes,
             memberInfo: selectedMemberInfo,
-            stats: { total: selectedNodes.length, folders: 0, items: selectedNodes.length }
+            stats: { total: selectedNodes.length, folders: 0, items: selectedNodes.length },
+            expectedIds: expectedIds
           })
         });
 
