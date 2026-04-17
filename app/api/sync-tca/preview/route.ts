@@ -116,6 +116,8 @@ export async function POST(request: Request) {
         action: 'CREATE_ALL' | 'CREATE_SYSTEM' | 'UPDATE' | 'SKIP'
         actionLabel: string
         actionColor: string
+        matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null
+        emailMismatch: boolean
         currentData: {
           userId: number | null
           systemId: number | null
@@ -411,6 +413,8 @@ export async function POST(request: Request) {
         action,
         actionLabel,
         actionColor,
+        matchType,
+        emailMismatch,
         currentData: existingUser ? {
           userId: existingUser.id,
           systemId: existingSystem?.autoId || null,
