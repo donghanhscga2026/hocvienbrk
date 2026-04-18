@@ -489,6 +489,7 @@
         </div>
         <div style="display:flex; gap:10px;">
           <button id="btn-demo-cancel" style="background:rgba(255,255,255,0.2); border:1px solid white; color:white; padding:8px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">QUAY LẠI SỬA</button>
+          <button id="btn-promote" style="background:#ff9800; border:none; color:white; padding:8px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">🚀 ĐẨY LÊN PRODUCTION</button>
           <button id="btn-final-sync" style="background:#ffeb3b; border:none; color:#333; padding:10px 30px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:14px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">✅ XÁC NHẬN ĐỒNG BỘ THẬT</button>
         </div>
       </div>
@@ -525,6 +526,32 @@
     });
 
     document.getElementById('btn-demo-cancel').addEventListener('click', () => panel.remove());
+    
+    // Nút Promote - Copy Test data lên Production
+    document.getElementById('btn-promote').addEventListener('click', () => {
+      if (!confirm('Đẩy dữ liệu Test lên Production?\n\nSau khi đẩy, dữ liệu Test sẽ bị XÓA.')) return;
+      if (!confirm('Xác nhận lần cuối?')) return;
+      
+      const url = API_BASE + '/api/sync-tca/promote';
+      addTcaLog('Đang Promote dữ liệu Test lên Production...');
+      
+      fetch(url, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            addTcaLog('✅ Promote thành công! ' + data.message);
+            alert('Promote thành công!\n' + data.message);
+          } else {
+            addTcaLog('❌ Promote thất bại: ' + data.error);
+            alert('Lỗi: ' + data.error);
+          }
+        })
+        .catch(err => {
+          addTcaLog('Lỗi: ' + err.message);
+        });
+    });
+    
+    // Nút Xác nhận - Ghi vào bảng Test (Staging)
     document.getElementById('btn-final-sync').addEventListener('click', () => {
       if (confirm('BẠN CÓ CHẮC CHẮN? Dữ liệu sẽ được ghi thật vào Database ngay bây giờ.')) {
         panel.remove();
