@@ -8,11 +8,9 @@ import { v4 as uuidv4 } from 'uuid'
 // ==========================================
 const STAGING_MODE = true; // TRUE: Chỉ ghi vào bảng Test | FALSE: Ghi vào bảng thật
 
-// Helper động để gọi Closure dựa trên chế độ
+// Helper để duy trì phả hệ Closure
 import { addUserToClosure } from '@/lib/closure-helpers'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
-import { addUserToClosureTest } from '@/lib/closure-helpers-test'
-import { addUserToSystemClosureTest } from '@/lib/system-closure-helpers-test'
 
 const prisma = new PrismaClient()
 
@@ -169,15 +167,13 @@ export async function POST(request: Request) {
           stats.usersCreated++;
           createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: node.id });
 
-          // Closure theo chế độ
-          if (STAGING_MODE) await addUserToClosureTest(targetUserId, targetReferrerId);
-          else await addUserToClosure(targetUserId, targetReferrerId);
+          // Closure
+          await addUserToClosure(targetUserId, targetReferrerId);
         }
 
         // 2. Xử lý System
         const systemParentId = targetRefSysId || 0;
-        if (STAGING_MODE) await addUserToSystemClosureTest(targetUserId, systemParentId, 1);
-        else await addUserToSystemClosure(targetUserId, systemParentId, 1);
+        await addUserToSystemClosure(targetUserId, systemParentId, 1);
         
         const systemRecord = await systemModel.findFirst({ where: { userId: targetUserId, onSystem: 1 } });
         if (systemRecord) stats.systemsCreated++;
