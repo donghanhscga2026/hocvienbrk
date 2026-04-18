@@ -2,7 +2,115 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
+
+interface TestData {
+  users: number
+  systems: number
+  tcaMembers: number
+  closures: number
+}
+
+interface PromoteResult {
+  success: boolean
+  stats?: TestData
+  message?: string
+  error?: string
+}
+
+function TestPanel() {
+  const [testData, setTestData] = useState<TestData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [promoting, setPromoting] = useState(false)
+  const [promoteResult, setPromoteResult] = useState<PromoteResult | null>(null)
+
+  async function fetchTestData() {
+    try {
+      const res = await fetch('/api/sync-tca/show-data?table=test')
+      const data = await res.json()
+      setTestData(data.stats || null)
+    } catch (e) {
+      console.error('Failed to fetch test data:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handlePromote() {
+    if (!confirm('Đẩy dữ liệu Test lên Production?\n\nSau khi đẩy, dữ liệu Test sẽ bị XÓA.')) {
+      return
+    }
+    if (!confirm('Xác nhận lần cuối: Dữ liệu Test sẽ được copy sang Production và XÓA khỏi bảng Test.')) {
+      return
+    }
+
+    setPromoting(true)
+    setPromoteResult(null)
+    try {
+      const res = await fetch('/api/sync-tca/promote', { method: 'POST' })
+      const result = await res.json()
+      setPromoteResult(result)
+      fetchTestData()
+    } catch (e) {
+      setPromoteResult({ success: false, error: String(e) })
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTestData()
+  }, [])
+
+  if (loading) {
+    return <div className="p-4 text-gray-500">Đang tải dữ liệu Test...</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h3 className="font-bold text-yellow-800 mb-2">Dữ liệu Test (Staging)</h3>
+        <div className="grid grid-cols-4 gap-4">
+          <div>
+            <div className="text-2xl font-bold text-green-600">{testData?.users || 0}</div>
+            <div className="text-sm text-gray-500">UserTest</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-blue-600">{testData?.systems || 0}</div>
+            <div className="text-sm text-gray-500">SystemTest</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-orange-600">{testData?.tcaMembers || 0}</div>
+            <div className="text-sm text-gray-500">TCAMemberTest</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-purple-600">{testData?.closures || 0}</div>
+            <div className="text-sm text-gray-500">Closures Test</div>
+          </div>
+        </div>
+      </div>
+
+      {(testData?.users || 0) > 0 && (
+        <button
+          onClick={handlePromote}
+          disabled={promoting}
+          className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg disabled:opacity-50"
+        >
+          {promoting ? 'Đang đẩy...' : '🚀 ĐẨY LÊN PRODUCTION'}
+        </button>
+      )}
+
+      {promoteResult && (
+        <div className={`p-4 rounded-lg ${promoteResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <p className={`font-bold ${promoteResult.success ? 'text-green-700' : 'text-red-700'}`}>
+            {promoteResult.success ? '✅ Đẩy thành công!' : '❌ Thất bại!'}
+          </p>
+          {promoteResult.message && <p className="text-sm mt-1">{promoteResult.message}</p>}
+          {promoteResult.error && <p className="text-sm text-red-600 mt-1">Error: {promoteResult.error}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface SyncHistory {
   id: number
@@ -42,16 +150,12 @@ export default function TCASyncAdminPage() {
   const [history, setHistory] = useState<SyncHistory[]>([])
   const [stats, setStats] = useState<SyncStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'history' | 'test'>('history')
   const [rollbackMode, setRollbackMode] = useState<'syncId' | 'tcaIds' | 'dateRange'>('syncId')
   const [rollbackInput, setRollbackInput] = useState('')
   const [rollbackResult, setRollbackResult] = useState<RollbackResult | null>(null)
-  const [confirmText, setConfirmText] = useState('')
-  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      redirect('/auth/signin')
-    }
     if (status === 'authenticated') {
       fetchData()
     }
@@ -71,7 +175,6 @@ export default function TCASyncAdminPage() {
   }
 
   async function handleRollback() {
-    // Chỉ cần 1 lần confirm
     if (!confirm('Bạn có chắc muốn xóa dữ liệu?\n\nHành động này không thể hoàn tác!')) {
       return
     }
@@ -164,12 +267,41 @@ export default function TCASyncAdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">TCA Sync Tools</h1>
           <p className="text-gray-600 mt-2">Quản lý và rollback dữ liệu đồng bộ từ TCA</p>
         </div>
 
-        {/* Stats */}
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-2 font-medium rounded-t-lg ${
+              activeTab === 'history'
+                ? 'bg-white border-t border-l border-r border-gray-200 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📊 Lịch sử Sync
+          </button>
+          <button
+            onClick={() => setActiveTab('test')}
+            className={`px-4 py-2 font-medium rounded-t-lg ${
+              activeTab === 'test'
+                ? 'bg-yellow-50 border-t border-l border-r border-yellow-200 text-yellow-700'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🧪 Test Data
+          </button>
+        </div>
+
+        {activeTab === 'test' ? (
+          <div className="bg-white rounded-lg shadow p-6">
+            <TestPanel />
+          </div>
+        ) : (
+          <>
         {stats && (
           <div className="grid grid-cols-5 gap-4 mb-8">
             <div className="bg-white p-4 rounded-lg shadow">
@@ -196,7 +328,6 @@ export default function TCASyncAdminPage() {
         )}
 
         <div className="grid grid-cols-2 gap-8">
-          {/* Sync History */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b">
               <h2 className="text-xl font-bold text-gray-900">Lịch sử Sync</h2>
@@ -224,7 +355,6 @@ export default function TCASyncAdminPage() {
                         >
                           {h.syncId.slice(0, 8)}...
                         </button>
-                        <div className="text-xs text-gray-400">Hover để xem đầy đủ</div>
                       </td>
                       <td className="px-2 py-1">
                         <span className={`px-2 py-0.5 rounded text-xs ${
@@ -258,9 +388,6 @@ export default function TCASyncAdminPage() {
                             Rollback
                           </button>
                         )}
-                        {h.status === 'ROLLED_BACK' && (
-                          <span className="text-xs text-gray-400">Đã rollback</span>
-                        )}
                       </td>
                     </tr>
                   ))}
@@ -276,7 +403,6 @@ export default function TCASyncAdminPage() {
             </div>
           </div>
 
-          {/* Rollback Panel */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b">
               <h2 className="text-xl font-bold text-red-600">Rollback</h2>
@@ -310,24 +436,13 @@ export default function TCASyncAdminPage() {
                     />
                     Theo TCA IDs
                   </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="dateRange"
-                      checked={rollbackMode === 'dateRange'}
-                      onChange={(e) => setRollbackMode(e.target.value as 'dateRange')}
-                      className="mr-2"
-                    />
-                    Theo Ngày
-                  </label>
                 </div>
               </div>
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {rollbackMode === 'syncId' && 'Nhập SyncId (click vào ID trong bảng để copy):'}
+                  {rollbackMode === 'syncId' && 'Nhập SyncId:'}
                   {rollbackMode === 'tcaIds' && 'Nhập TCA IDs (cách nhau bởi dấu phẩy):'}
-                  {rollbackMode === 'dateRange' && 'Nhập ngày (định dạng: 2026-04-17, 2026-04-18):'}
                 </label>
                 <input
                   type="text"
@@ -335,49 +450,18 @@ export default function TCASyncAdminPage() {
                   onChange={(e) => setRollbackInput(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                   placeholder={
-                    rollbackMode === 'syncId' ? 'Dán SyncId đã copy từ bảng trên' :
-                    rollbackMode === 'tcaIds' ? '60073, 60074, 61297' :
-                    '2026-04-17, 2026-04-18'
+                    rollbackMode === 'syncId' ? 'Dán SyncId' : '60073, 60074, 61297'
                   }
                 />
               </div>
 
-              {showConfirm && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700 mb-2">
-                    Cảnh báo: Bạn sắp xóa dữ liệu! Nhập <strong>XAC NHAN XOA</strong> để tiếp tục:
-                  </p>
-                  <input
-                    type="text"
-                    value={confirmText}
-                    onChange={(e) => setConfirmText(e.target.value)}
-                    placeholder="XAC NHAN XOA"
-                    className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                <button
-                  onClick={handleRollback}
-                  disabled={loading || !rollbackInput.trim()}
-                  className={`px-4 py-2 rounded-lg font-medium ${
-                    showConfirm
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'bg-orange-500 hover:bg-orange-600 text-white'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {loading ? 'Đang xử lý...' : showConfirm ? 'XÁC NHẬN XÓA' : 'Rollback'}
-                </button>
-                {showConfirm && (
-                  <button
-                    onClick={() => { setShowConfirm(false); setConfirmText('') }}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
-                  >
-                    Hủy
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={handleRollback}
+                disabled={loading || !rollbackInput.trim()}
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Đang xử lý...' : 'Rollback'}
+              </button>
 
               {rollbackResult && (
                 <div className={`mt-4 p-3 rounded-lg ${rollbackResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
@@ -388,26 +472,13 @@ export default function TCASyncAdminPage() {
                   {rollbackResult.error && (
                     <p className="text-sm text-red-600 mt-1">Error: {rollbackResult.error}</p>
                   )}
-                  {rollbackResult.hint && (
-                    <p className="text-sm text-orange-600 mt-1">Hint: {rollbackResult.hint}</p>
-                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {/* Instructions */}
-        <div className="mt-8 bg-blue-50 rounded-lg p-4">
-          <h3 className="font-bold text-blue-900 mb-2">Hướng dẫn sử dụng</h3>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li><strong>Khuyến nghị:</strong> Sử dụng <span className="bg-orange-100 text-orange-700 px-1 rounded">Rollback theo TCA IDs</span> để xóa chính xác từng thành viên</li>
-            <li><strong>Rollback theo TCA IDs:</strong> Nhập các TCA IDs cần xóa (VD: 60073, 60074, 61345)</li>
-            <li><strong>Rollback theo Ngày:</strong> Nhập khoảng ngày (VD: 2026-04-17, 2026-04-18)</li>
-            <li className="text-red-600 font-medium">Dữ liệu sau khi xóa sẽ KHÔNG thể khôi phục!</li>
-            <li>Backup sẽ được ghi log ra console trước khi xóa</li>
-          </ul>
-        </div>
+          </>
+        )}
       </div>
     </div>
   )
