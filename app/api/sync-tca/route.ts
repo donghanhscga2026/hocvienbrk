@@ -274,7 +274,7 @@ export async function POST(request: Request) {
 
         const tcaMemberData = {
           tcaId: node.id,
-          userId: userId,
+          userId: targetUserId,
           type: node.type || 'item',
           groupName: node.groupName || null,
           name: node.name || '',
@@ -292,7 +292,7 @@ export async function POST(request: Request) {
           joinDate: parseDate(memberInfo.joinDate),
           contractDate: parseDate(memberInfo.contractDate),
           promotionDate: parseDate(memberInfo.promotionDate),
-          parentTcaId: (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') ? Number(parentTcaId) : null,
+          parentTcaId: (node.parentFolderId && node.parentFolderId !== 'root' && node.parentFolderId !== '0') ? Number(node.parentFolderId) : null,
           parentName: node.parentFolderName || null,
           teamSize: 0,
           lastSyncedAt: new Date()
