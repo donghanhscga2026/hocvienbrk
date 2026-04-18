@@ -233,8 +233,7 @@ export async function POST(request: Request) {
           }
           console.log(`[TCA Sync]   Updated existing User ${targetUserId}`);
         } else {
-          // TẠO MỚI User với đúng ID yêu cầu
-          const hashedPassword = await bcrypt.hash('Brk#3773', 10);
+          // Tạo User mới
           await prisma.user.create({
             data: {
               id: targetUserId,
@@ -248,9 +247,21 @@ export async function POST(request: Request) {
           });
           stats.usersCreated++;
           createdRecords.push({ table: 'User', id: targetUserId, tcaId: node.id });
-          console.log(`[TCA Sync]   Created NEW User ${targetUserId} with Referrer ${targetReferrerId}`);
 
-          // Tạo phả hệ giới thiệu (Referral Tree) bằng helper của dự án
+          // GHI LỊCH SỬ ĐỂ ROLLBACK
+          await (prisma as any).tCASyncHistory?.create({
+            data: {
+              syncId,
+              action: 'CREATE_USER',
+              tableName: 'User',
+              recordId: targetUserId,
+              tcaId: node.id,
+              afterData: { referrerId: targetReferrerId },
+              status: 'COMPLETED'
+            }
+          }).catch(() => {});
+
+          // Tạo phả hệ giới thiệu
           await addUserToClosure(targetUserId, targetReferrerId).catch(e => {
             console.log(`[TCA Sync]   Warning: addUserToClosure error:`, e.message);
           });
