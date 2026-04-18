@@ -170,7 +170,6 @@
         if (saved) {
           const data = JSON.parse(saved);
           previewRows = data.rows || [];
-          console.log('[TCA Sync] Loaded previewRows from localStorage:', previewRows.length);
           addTcaLog(`Đã tải ${previewRows.length} dòng dữ liệu so sánh từ bộ nhớ tạm.`);
         }
       } catch (e) {
@@ -208,28 +207,25 @@
       total: rows.length,
       createAll: rows.filter(r => r.action === 'CREATE_ALL').length,
       createSystem: rows.filter(r => r.action === 'CREATE_SYSTEM').length,
-      update: rows.filter(r => r.action === 'UPDATE').length,
-      skip: rows.filter(r => r.action === 'SKIP').length,
-      newUser: rows.filter(r => r.match === 'NEW').length,
-      phoneEmail: rows.filter(r => r.match === 'PHONE_EMAIL').length
+      update: rows.filter(r => r.action === 'UPDATE').length
     };
     
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Data Explorer <span style="font-size:10px; color:#999; font-weight:normal;">v4.1.2</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#999; font-weight:normal;">v4.2.2</span></h2>
           <div style="display:flex; gap:8px;">
-            <button id="btn-sync-preview" style="background:#2e7d32; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🚀 ĐỒNG BỘ NGAY</button>
+            <button id="btn-check-sample" style="background:#e65100; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA DỮ LIỆU MẪU (LOCAL)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
             <button id="btn-json" style="background:#7b1fa2; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📄 JSON</button>
-            <button id="btn-demo-preview-top" style="background:#e65100; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🎯 DEMO</button>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:15px;">
           <div style="font-size:11px; color:#666; background:#fff; padding:4px 8px; border-radius:4px; border:1px solid #ddd;">
             <span style="color:#2e7d32; font-weight:bold;">Tạo: ${viewStats.createAll + viewStats.createSystem}</span> | 
             <span style="color:#f57c00; font-weight:bold;">Sửa: ${viewStats.update}</span> | 
-            <span>Tổng: ${viewStats.total}</span>
+            <span>Tổng: ${viewStats.total}</span> |
+            <span id="selected-count-label" style="color:#1565c0; font-weight:bold;">Đã chọn: 0</span>
           </div>
           <button id="btn-close" style="background:#d32f2f; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">X</button>
         </div>
@@ -242,6 +238,9 @@
             <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1100px;">
               <thead style="position:sticky; top:0; background:#eeeeee; z-index:10; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
                 <tr>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:30px;">
+                    <input type="checkbox" id="check-all-nodes" checked title="Chọn tất cả">
+                  </th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:35px;">#</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">TCAID</th>
                   <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:150px;">Tên Thành Viên</th>
@@ -270,36 +269,29 @@
 
     document.body.appendChild(panel);
     updateLogDisplay();
-    addTcaLog('Hệ thống đã áp dụng logic đối chiếu dữ liệu v4.1.2: Ưu tiên Referrer hiện tại từ DB (bao gồm ID 0).');
+    addTcaLog('Đã sẵn sàng v4.2.1: Tạo dữ liệu mẫu Local giúp khớp 100% với Dashboard.');
     
     // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
-    document.getElementById('btn-csv').addEventListener('click', () => {
-      addTcaLog('Bắt đầu tải file CSV...');
-      window.downloadTCACSV();
-    });
-    document.getElementById('btn-json').addEventListener('click', () => {
-      addTcaLog('Bắt đầu tải file JSON...');
-      window.downloadTCAJSON();
-    });
-    document.getElementById('btn-sync-preview').addEventListener('click', () => {
-      addTcaLog('Mở bảng điều khiển đồng bộ...');
-      showSyncPreviewPanel();
-    });
-    document.getElementById('btn-demo-preview-top').addEventListener('click', () => {
-      addTcaLog('Đang chạy Demo Preview (Simulated)...');
-      window.callDemoPreview();
+    document.getElementById('btn-csv').addEventListener('click', () => window.downloadTCACSV());
+    document.getElementById('btn-json').addEventListener('click', () => window.downloadTCAJSON());
+    document.getElementById('btn-check-sample').addEventListener('click', () => prepareAndShowDemo());
+    
+    const checkAll = document.getElementById('check-all-nodes');
+    checkAll.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      document.querySelectorAll('.node-checkbox').forEach(cb => cb.checked = isChecked);
+      updateSelectedCount();
     });
 
     // Điền dữ liệu vào bảng
     const tbody = document.getElementById('tca-nodes-body');
     const displayRows = previewRows.length > 0 ? previewRows : allNodes;
     
+    // Lưu trữ dữ liệu đã chốt logic để gửi đi Demo/Sync
+    window.tcaFinalizedNodes = [];
+
     displayRows.forEach((row, idx) => {
-      const tr = document.createElement('tr');
-      tr.style.background = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
-      tr.style.borderBottom = '1px solid #eee';
-      
       const tcaId = row.id || row.tcaId;
       const name = row.name || '-';
       const parentTcaId = row.parentTcaId || '-';
@@ -308,28 +300,40 @@
       const email = row.email || '-';
       const phone = row.phone || '-';
 
-      // --- LOGIC ĐỐI CHIẾU DỮ LIỆU CHÍNH XÁC ---
+      // --- BỘ NÃO LOGIC TẬP TRUNG (Frontend Master) ---
       
-      // 1. UserID: Ưu tiên DB (Xanh), nếu mới thì lấy đề xuất (Đỏ)
+      // 1. UserID
       const dbUserId = row.db?.userId;
       const newUserId = row.userId;
-      const userIdVal = dbUserId || newUserId || '-';
-      const userIdColor = dbUserId ? '#1565c0' : (newUserId ? '#d32f2f' : '#999');
+      const userIdVal = dbUserId || newUserId || null;
 
-      // 2. RefID (referrerId): 
-      // NẾU User đã tồn tại trong DB VÀ đã có referrerId (kể cả 0) => Hiện cái cũ (Xanh)
-      // NẾU CHƯA CÓ hoặc User MỚI => Theo TCA (Đỏ)
+      // 2. RefID (referrerId): Ưu tiên DB (kể cả 0), nếu không có mới lấy đề xuất TCA
       const hasDbReferrer = row.db && (row.db.referrerId !== null && row.db.referrerId !== undefined);
-      const refIdVal = hasDbReferrer ? row.db.referrerId : (row.referrerId !== undefined ? row.referrerId : '-');
-      const refIdColor = hasDbReferrer ? '#1565c0' : (row.referrerId !== undefined ? '#d32f2f' : '#999');
+      const referrerIdVal = hasDbReferrer ? row.db.referrerId : (row.referrerId !== undefined ? row.referrerId : null);
 
-      // 3. refSysId: Tuân thủ cấu trúc TCA (Đỏ nếu tạo mới, Xanh nếu trùng DB hiện tại)
-      const tcaRefSysId = row.refSysId; // Đây là parent theo TCA đã được Server tính toán
-      const dbRefSysId = row.db?.refSysId;
-      const refSysIdVal = tcaRefSysId !== undefined ? tcaRefSysId : (dbRefSysId || '-');
-      const refSysIdColor = (tcaRefSysId !== undefined && tcaRefSysId === dbRefSysId) ? '#1565c0' : '#d32f2f';
+      // 3. refSysId: Tuyệt đối tuân thủ cấu trúc cây TCA
+      const refSysIdVal = row.refSysId !== undefined ? row.refSysId : (row.db?.refSysId || null);
 
-      // Match display
+      // Lưu vào mảng finalized để gửi đi
+      window.tcaFinalizedNodes.push({
+        tcaId, name, email, phone,
+        userId: userIdVal,
+        referrerId: referrerIdVal,
+        refSysId: refSysIdVal,
+        action,
+        match,
+        parentTcaId
+      });
+
+      // --- RENDER GIAO DIỆN DỰA TRÊN DỮ LIỆU ĐÃ CHỐT ---
+      const tr = document.createElement('tr');
+      tr.style.background = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
+      tr.style.borderBottom = '1px solid #eee';
+
+      const userIdColor = dbUserId ? '#1565c0' : (newUserId ? '#d32f2f' : '#999');
+      const refIdColor = hasDbReferrer ? '#1565c0' : (referrerIdVal !== null ? '#d32f2f' : '#999');
+      const refSysIdColor = (refSysIdVal !== null && refSysIdVal === row.db?.refSysId) ? '#1565c0' : '#d32f2f';
+
       let matchDisplay = '-';
       let matchColor = '#999';
       if (match === 'PHONE_EMAIL') { matchDisplay = 'P+E'; matchColor = '#2e7d32'; }
@@ -337,7 +341,6 @@
       else if (match === 'EMAIL_ONLY') { matchDisplay = 'E'; matchColor = '#c2185b'; }
       else if (match === 'NEW') { matchDisplay = 'NEW'; matchColor = '#555'; }
       
-      // Action display
       let actionLabel = action;
       let actionBg = '#999';
       if (action === 'CREATE_ALL') { actionLabel = 'Tạo All'; actionBg = '#2e7d32'; }
@@ -345,21 +348,26 @@
       else if (action === 'UPDATE') { actionLabel = 'Cập nhật'; actionBg = '#f57c00'; }
 
       tr.innerHTML = `
+        <td style="padding:6px 2px; text-align:center;">
+          <input type="checkbox" class="node-checkbox" data-tca-id="${tcaId}" checked>
+        </td>
         <td style="padding:6px 2px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
         <td style="padding:6px 2px; text-align:center; font-family:monospace; font-weight:bold;">${tcaId}</td>
         <td style="padding:6px 4px; color:#000; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;" title="${name}">${name}</td>
         <td style="padding:6px 2px; text-align:center; color:#666;">${parentTcaId}</td>
         <td style="padding:6px 2px; text-align:center;"><span style="background:${matchColor};color:white;padding:1px 4px;border-radius:2px;font-size:9px;">${matchDisplay}</span></td>
-        <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userIdVal}</td>
-        <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${refIdVal}</td>
+        <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userIdVal || '-'}</td>
+        <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${referrerIdVal !== null ? referrerIdVal : '-'}</td>
         <td style="padding:6px 2px; text-align:center;"><span style="background:${actionBg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;">${actionLabel}</span></td>
-        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysIdVal}</td>
+        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysIdVal || '-'}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px; max-width:120px; overflow:hidden; text-overflow:ellipsis;" title="${email}">${email}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
       `;
       tbody.appendChild(tr);
     });
 
+    updateSelectedCount();
+    document.querySelectorAll('.node-checkbox').forEach(cb => cb.addEventListener('change', updateSelectedCount));
     window.tcaExtractedData = { allNodes, viewStats, memberInfo, previewRows };
   }
 
@@ -370,498 +378,208 @@
     }
   }
 
-  function showSyncPreviewPanel() {
-    console.log('[TCA Sync] showSyncPreviewPanel called');
-    
-    const data = window.tcaExtractedData;
-    if (!data || !data.allNodes || data.allNodes.length === 0) {
-      alert('Chua co du lieu! Vui long scan TCA truoc.');
+  function updateSelectedCount() {
+    const checked = document.querySelectorAll('.node-checkbox:checked').length;
+    const label = document.getElementById('selected-count-label');
+    if (label) label.textContent = `Đã chọn: ${checked}`;
+  }
+
+  async function prepareAndShowDemo() {
+    const selectedCheckboxes = document.querySelectorAll('.node-checkbox:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.dataset.tcaId));
+    if (selectedIds.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 thành viên!');
       return;
     }
 
-    // Remove existing preview panel
-    const existing = document.getElementById('tca-sync-preview-panel');
+    addTcaLog(`Đang tạo dữ liệu mẫu Local cho ${selectedIds.length} thành viên...`);
+    const finalizedSource = window.tcaFinalizedNodes || [];
+    const selectedNodes = finalizedSource.filter(n => selectedIds.includes(n.tcaId));
+
+    // --- THUẬT TOÁN TẠO BẢNG DỮ LIỆU MÔ PHỎNG (LOCAL) ---
+    const tables = {
+      User: selectedNodes.map(n => ({
+        id: n.userId,
+        name: n.name,
+        email: n.email,
+        phone: n.phone,
+        referrerId: n.referrerId
+      })),
+      System: selectedNodes.map(n => ({
+        userId: n.userId,
+        refSysId: n.refSysId
+      })),
+      TCAMember: selectedNodes.map(n => ({
+        tcaId: n.tcaId,
+        userId: n.userId,
+        name: n.name,
+        email: n.email,
+        phone: n.phone,
+        parentTcaId: n.parentTcaId
+      })),
+      user_closure: [],
+      system_closure: []
+    };
+
+    // Tạo closure cơ bản (tự tham chiếu depth 0 và cha trực tiếp depth 1)
+    selectedNodes.forEach(n => {
+      tables.user_closure.push({ ancestor: n.userId, descendant: n.userId, depth: 0 });
+      if (n.referrerId !== null) {
+        tables.user_closure.push({ ancestor: n.referrerId, descendant: n.userId, depth: 1 });
+      }
+      tables.system_closure.push({ ancestor: n.userId, descendant: n.userId, depth: 0 });
+      if (n.refSysId !== null) {
+        tables.system_closure.push({ ancestor: n.refSysId, descendant: n.userId, depth: 1 });
+      }
+    });
+
+    addTcaLog('Bảng mẫu Local đã được xây dựng thành công.');
+    showDemoResultPanel(tables, selectedNodes, {}, {});
+  }
+
+  function showDemoResultPanel(tables, selectedNodes, selectedMemberInfo, expectedIds) {
+    const existing = document.getElementById('tca-demo-panel');
     if (existing) existing.remove();
 
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.id = 'tca-sync-preview-overlay';
-    overlay.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5); z-index: 9999999999;
-    `;
-
-    // Create panel
     const panel = document.createElement('div');
-    panel.id = 'tca-sync-preview-panel';
+    panel.id = 'tca-demo-panel';
     panel.style.cssText = `
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 95vw; max-width: 1200px; max-height: 90vh;
-      background: #fff; border-radius: 12px; z-index: 10000000000;
-      font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.4); overflow: hidden;
-      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8); z-index: 1000000000;
+      display: flex; justify-content: center; align-items: center;
+      font-family: 'Segoe UI', Arial, sans-serif;
     `;
 
-    // Header
-    panel.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 20px; background:#f5f5f5; border-bottom:2px solid #ddd;">
+    const content = document.createElement('div');
+    content.style.cssText = `
+      width: 95vw; height: 95vh; background: #fff; border-radius: 12px;
+      display: flex; flex-direction: column; overflow: hidden;
+    `;
+
+    const tableNames = Object.keys(tables);
+    let activeTab = tableNames[0];
+
+    function renderTables() {
+      return tableNames.map(name => `
+        <div id="tab-content-${name}" style="display: ${name === activeTab ? 'block' : 'none'}; flex:1; overflow:auto;">
+          <h3 style="padding: 10px 15px; margin:0; background:#e8f5e9; color:#2e7d32; position:sticky; top:0;">Bảng: ${name} (${tables[name].length} dòng)</h3>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; font-family:monospace;">
+            <thead style="background:#f5f5f5; position:sticky; top:35px;">
+              <tr>
+                ${Object.keys(tables[name][0] || {}).map(k => `<th style="padding:8px; border:1px solid #ddd;">${k}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${tables[name].map(row => `
+                <tr>
+                  ${Object.values(row).map(v => `<td style="padding:6px; border:1px solid #ddd; word-break:break-all;">${v === null ? '<span style="color:#ccc;">null</span>' : v}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `).join('');
+    }
+
+    content.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 20px; background:#2e7d32; color:white;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;">Xem de xuat dong bo</h2>
-          <small style="color:#666;">Kiem tra chi tiet truoc khi dong bo</small>
+          <h2 style="margin:0; font-size:20px;">XEM TRƯỚC DỮ LIỆU SẼ ĐẨY VÀO DATABASE</h2>
+          <small>Kiểm tra kỹ trước khi xác nhận đồng bộ thực tế</small>
         </div>
         <div style="display:flex; gap:10px;">
-          <button id="btn-demo-preview" style="background:#7b1fa2; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">🎯 DemoPreview</button>
-          <button id="btn-show-data" style="background:#00897b; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">📊 ShowData</button>
-          <button id="btn-preview-select-all" style="background:#1565c0; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Chon tat ca</button>
-          <button id="btn-preview-deselect-all" style="background:#666; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Bo chon tat ca</button>
-          <span id="panel-version" style="color:#666; font-size:10px; align-self:center;">v3.1.1</span>
-          <button id="btn-preview-close" style="background:#d32f2f; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">X Dong</button>
+          <button id="btn-demo-cancel" style="background:rgba(255,255,255,0.2); border:1px solid white; color:white; padding:8px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">QUAY LẠI SỬA</button>
+          <button id="btn-final-sync" style="background:#ffeb3b; border:none; color:#333; padding:10px 30px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:14px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">✅ XÁC NHẬN ĐỒNG BỘ THẬT</button>
         </div>
       </div>
       
-      <div style="padding:15px 20px; background:#e8f5e9; border-bottom:1px solid #ddd;">
-        <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:10px;">
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-            <div id="preview-total" style="font-size:24px; font-weight:bold; color:#333;">0</div>
-            <div style="color:#666; font-size:10px;">Tong</div>
+      <div style="display:flex; background:#f0f0f0; border-bottom:1px solid #ddd;">
+        ${tableNames.map(name => `
+          <div class="demo-tab" data-tab="${name}" style="padding:12px 25px; cursor:pointer; font-weight:bold; border-right:1px solid #ddd; ${name === activeTab ? 'background:#fff; color:#2e7d32; border-bottom:3px solid #2e7d32;' : 'color:#666;'}">
+            ${name}
           </div>
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-            <div id="preview-create-all" style="font-size:24px; font-weight:bold; color:#2e7d32;">0</div>
-            <div style="color:#666; font-size:10px;">Tao User</div>
-          </div>
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #bbdefb;">
-            <div id="preview-create-system" style="font-size:24px; font-weight:bold; color:#1565c0;">0</div>
-            <div style="color:#666; font-size:10px;">Tao System</div>
-          </div>
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
-            <div id="preview-update" style="font-size:24px; font-weight:bold; color:#e65100;">0</div>
-            <div style="color:#666; font-size:10px;">Cap nhat</div>
-          </div>
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #e0e0e0;">
-            <div id="preview-skip" style="font-size:24px; font-weight:bold; color:#999;">0</div>
-            <div style="color:#666; font-size:10px;">Khong doi</div>
-          </div>
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-            <div id="preview-closures" style="font-size:24px; font-weight:bold; color:#7b1fa2;">0</div>
-            <div style="color:#666; font-size:10px;">Closures</div>
-          </div>
-          <div style="background:#fff; padding:10px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-            <div id="preview-selected" style="font-size:24px; font-weight:bold; color:#2e7d32;">0</div>
-            <div style="color:#666; font-size:10px;">Da chon</div>
-          </div>
-        </div>
-        <div style="margin-top:10px; font-size:11px; color:#666;">
-          Next User ID: <span id="next-user-id" style="color:#2e7d32; font-weight:bold;">-</span> | 
-          Next System ID: <span id="next-system-id" style="color:#1565c0; font-weight:bold;">-</span>
-        </div>
+        `).join('')}
       </div>
       
-      <div id="preview-table-container" style="flex:1; overflow:auto; padding:0 20px;">
-        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:900px;">
-          <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
-            <tr>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:25px;">#</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:25px;">Chon</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">TCA ID</th>
-              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd; width:80px;">Ten</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">Match</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:70px;">Hanh dong</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">UserID</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">RefID</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">refSysId</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Changes</th>
-            </tr>
-          </thead>
-          <tbody id="preview-tbody">
-          </tbody>
-        </table>
-      </div>
-      
-      <div style="padding:15px 20px; background:#f5f5f5; border-top:2px solid #ddd; display:flex; justify-content:space-between; align-items:center;">
-        <div style="color:#666; font-size:11px;">
-          Nhan "Chon tat ca" hoac "Bo chon tat ca" de tuy chinh.
-        </div>
-        <div style="display:flex; gap:10px;">
-          <button id="btn-preview-cancel" style="background:#666; border:none; color:white; padding:12px 25px; border-radius:5px; cursor:pointer; font-weight:bold;">Huy</button>
-          <button id="btn-preview-sync" style="background:#2e7d32; border:none; color:white; padding:12px 30px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:14px;">Dong y Dong bo</button>
-        </div>
-      </div>
-      
-      <div id="preview-loading" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.9); display:none; justify-content:center; align-items:center; flex-direction:column; gap:15px;">
-        <div style="font-size:18px; color:#2e7d32; font-weight:bold;">Dang lay de xuat dong bo...</div>
-        <div style="width:200px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden;">
-          <div id="preview-progress-bar" style="width:0%; height:100%; background:#2e7d32; transition:width 0.3s;"></div>
-        </div>
+      <div id="demo-tab-container" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
+        ${renderTables()}
       </div>
     `;
 
-    document.body.appendChild(overlay);
+    panel.appendChild(content);
     document.body.appendChild(panel);
 
-    // Event listeners
-    document.getElementById('btn-preview-close').addEventListener('click', closePreview);
-    document.getElementById('btn-demo-preview').addEventListener('click', window.callDemoPreview);
-    document.getElementById('btn-show-data').addEventListener('click', window.callShowData);
-    document.getElementById('btn-preview-cancel').addEventListener('click', closePreview);
-    overlay.addEventListener('click', closePreview);
-
-    document.getElementById('btn-preview-select-all').addEventListener('click', () => {
-      document.querySelectorAll('.preview-checkbox').forEach(cb => cb.checked = true);
-      updateSelectedCount();
+    // Tab logic
+    document.querySelectorAll('.demo-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeTab = tab.dataset.tab;
+        document.querySelectorAll('.demo-tab').forEach(t => {
+          t.style.background = t.dataset.tab === activeTab ? '#fff' : '#f0f0f0';
+          t.style.color = t.dataset.tab === activeTab ? '#2e7d32' : '#666';
+          t.style.borderBottom = t.dataset.tab === activeTab ? '3px solid #2e7d32' : 'none';
+        });
+        tableNames.forEach(name => {
+          document.getElementById(`tab-content-${name}`).style.display = name === activeTab ? 'block' : 'none';
+        });
+      });
     });
 
-    document.getElementById('btn-preview-deselect-all').addEventListener('click', () => {
-      document.querySelectorAll('.preview-checkbox').forEach(cb => cb.checked = false);
-      updateSelectedCount();
+    document.getElementById('btn-demo-cancel').addEventListener('click', () => panel.remove());
+    document.getElementById('btn-final-sync').addEventListener('click', () => {
+      if (confirm('BẠN CÓ CHẮC CHẮN? Dữ liệu sẽ được ghi thật vào Database ngay bây giờ.')) {
+        panel.remove();
+        executeFinalSync(selectedNodes, selectedMemberInfo, expectedIds, tables);
+      }
     });
+  }
 
-    document.getElementById('btn-preview-sync').addEventListener('click', executeSync);
+  async function executeFinalSync(nodes, memberInfo, expectedIds, confirmedData) {
+    const progressPanel = document.createElement('div');
+    progressPanel.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 400px; background: #fff; border-radius: 12px; z-index: 2000000000;
+      padding: 30px; box-shadow: 0 10px 50px rgba(0,0,0,0.5); text-align: center;
+    `;
+    progressPanel.innerHTML = `
+      <h2 style="color:#2e7d32; margin-top:0;">ĐANG ĐẨY DỮ LIỆU...</h2>
+      <div style="margin: 20px 0; font-size: 14px; color:#666;">Vui lòng không đóng trình duyệt.</div>
+      <div style="width:100%; height:8px; background:#eee; border-radius:4px; overflow:hidden;">
+        <div id="sync-progress" style="width:30%; height:100%; background:#2e7d32; transition:width 0.5s;"></div>
+      </div>
+    `;
+    document.body.appendChild(progressPanel);
+    addTcaLog('Bắt đầu đẩy dữ liệu thật vào DB...');
 
-    // Fetch preview data
-    fetchPreviewData();
-
-    function closePreview() {
-      const p = document.getElementById('tca-sync-preview-panel');
-      const o = document.getElementById('tca-sync-preview-overlay');
-      if (p) p.remove();
-      if (o) o.remove();
-    }
-
-    function updateSelectedCount() {
-      const checked = document.querySelectorAll('.preview-checkbox:checked').length;
-      document.getElementById('preview-selected').textContent = checked;
-    }
-
-    async function fetchPreviewData() {
-      const loading = document.getElementById('preview-loading');
-      loading.style.display = 'flex';
-
-      try {
-        console.log('[TCA Sync] Fetching sync preview...');
-        console.log('[TCA Sync] Nodes:', data.allNodes.length);
-        
-        const response = await fetch(SYNC_PREVIEW_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            allNodes: data.allNodes,
-            memberInfo: data.memberInfo
-          })
-        });
-
-        if (!response.ok) throw new Error('Preview failed: ' + response.status);
-        
-        const result = await response.json();
-        console.log('[TCA Sync] Preview result:', result);
-
-        if (!result.success) throw new Error(result.error || 'Preview failed');
-
-        // Lưu preview response vào cache để dùng khi sync
-        previewCache = result;
-        console.log('[TCA Sync] Preview cached:', result.rows?.length, 'rows');
-
-        // Update stats - new format
-        const createAll = result.rows.filter(r => r.action === 'CREATE_ALL').length;
-        const createSystem = result.rows.filter(r => r.action === 'CREATE_SYSTEM').length;
-        const update = result.rows.filter(r => r.action === 'UPDATE').length;
-        const skip = result.rows.filter(r => r.action === 'SKIP').length;
-        
-        document.getElementById('preview-total').textContent = result.total;
-        document.getElementById('preview-create-all').textContent = createAll;
-        document.getElementById('preview-create-system').textContent = createSystem;
-        document.getElementById('preview-update').textContent = update;
-        document.getElementById('preview-skip').textContent = skip;
-        document.getElementById('preview-closures').textContent = createAll + createSystem;
-        document.getElementById('next-user-id').textContent = result.nextAvailableUserId || '-';
-        document.getElementById('next-system-id').textContent = result.nextAvailableSystemId || '-';
-
-        // Fill table - new format (1 bảng tổng hợp)
-        const tbody = document.getElementById('preview-tbody');
-        let selectedCount = 0;
-
-        result.rows.forEach((row, idx) => {
-          const tr = document.createElement('tr');
-          tr.style.borderBottom = '1px solid #eee';
-          if (idx % 2 === 0) tr.style.background = '#fff';
-          else tr.style.background = '#fafafa';
-
-          // Skip rows are not selected by default
-          const isSelected = row.action !== 'SKIP';
-          if (isSelected) selectedCount++;
-
-          // UserID: existing (row.db?.userId) or new (row.userId for CREATE_ALL)
-          const existingUserId = row.db?.userId;
-          const userId = row.userId;
-          const userIdColor = userId && !existingUserId ? '#2e7d32' : (existingUserId ? '#1565c0' : '#999');
-
-          // Match type display
-          const matchType = row.match || null;
-          let matchDisplay = '-';
-          if (matchType === 'PHONE_EMAIL') {
-            matchDisplay = '<span style="background:#2e7d32;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P+E</span>';
-          } else if (matchType === 'PHONE_ONLY') {
-            matchDisplay = '<span style="background:#1565c0;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P</span>';
-          } else if (matchType === 'EMAIL_ONLY') {
-            matchDisplay = '<span style="background:#d32f2f;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">E</span>';
-          } else if (matchType === 'NEW') {
-            matchDisplay = '<span style="background:#666;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">NEW</span>';
-          }
-
-          // Action label
-          let actionLabel = row.action;
-          if (row.action === 'CREATE_ALL') actionLabel = 'Tạo User+System';
-          else if (row.action === 'CREATE_SYSTEM') actionLabel = 'Tạo System';
-          else if (row.action === 'UPDATE') actionLabel = 'Cập nhật';
-          else if (row.action === 'SKIP') actionLabel = 'Bỏ qua';
-          const actionColor = row.action === 'CREATE_ALL' ? '#2e7d32' : (row.action === 'CREATE_SYSTEM' ? '#1565c0' : (row.action === 'UPDATE' ? '#f57c00' : '#999'));
-
-          // refSysId = parentUserId (UserID, not System autoId)
-          const refId = row.referrerId;
-          const refSysId = row.refSysId;
-
-          tr.innerHTML = `
-            <td style="padding:4px 2px; text-align:center; color:#999; font-size:9px;">${idx + 1}</td>
-            <td style="padding:4px 2px; text-align:center;">
-              <input type="checkbox" class="preview-checkbox" data-tca-id="${row.id}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
-            </td>
-            <td style="padding:4px 2px; text-align:center; font-family:monospace; color:#333; font-size:10px;">${row.id}</td>
-            <td style="padding:4px 2px; color:#000; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px;" title="${row.name}">${row.name}</td>
-            <td style="padding:4px 2px; text-align:center; font-size:10px;">${matchDisplay}</td>
-            <td style="padding:4px 2px; text-align:center;">
-              <span style="background:${actionColor}; color:white; padding:2px 6px; border-radius:3px; font-size:9px; white-space:nowrap;">${actionLabel}</span>
-            </td>
-            <td style="padding:4px 2px; text-align:center; color:${userIdColor}; font-weight:bold; font-size:10px;">${userId || '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:${refId ? '#2e7d32' : '#ccc'}; font-weight:bold; font-size:10px;">${refId || '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:${refSysId ? '#1565c0' : '#ccc'}; font-size:10px;">${refSysId || '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:#7b1fa2; font-size:9px;">${row.changes?.length || 0}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        document.getElementById('preview-selected').textContent = selectedCount;
-
-        // Add checkbox listener for count update
-        document.querySelectorAll('.preview-checkbox').forEach(cb => {
-          cb.addEventListener('change', updateSelectedCount);
-        });
-
-        loading.style.display = 'none';
-
-      } catch (err) {
-        console.error('[TCA Sync] Preview error:', err);
-        loading.style.display = 'none';
-        alert('Loi lay de xuat dong bo: ' + err.message);
-        closePreview();
-      }
-    }
-
-    async function executeSync() {
-      const selectedCheckboxes = document.querySelectorAll('.preview-checkbox:checked:not(:disabled)');
-      const selectedIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.dataset.tcaId));
-      
-      if (selectedIds.length === 0) {
-        alert('Vui long chon it nhat 1 dong de dong bo!');
-        return;
-      }
-
-      if (!confirm(`Dong bo ${selectedIds.length} thanh vien vao he thong BRK?\n\nSo du lieu lon co the mat thoi gian. Tiep tuc?`)) {
-        return;
-      }
-
-      // Filter selected nodes
-      const selectedNodes = data.allNodes.filter(n => selectedIds.includes(n.id));
-      const selectedMemberInfo = {};
-      selectedIds.forEach(id => {
-        if (data.memberInfo?.[id]) selectedMemberInfo[id] = data.memberInfo[id];
+    try {
+      const response = await fetch(SYNC_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'TCA_EXT_FINAL_CONFIRMED',
+          timestamp: Date.now(),
+          allNodes: nodes,
+          memberInfo: memberInfo,
+          expectedIds: expectedIds,
+          confirmedData: confirmedData // Gửi kèm dữ liệu đã confirm để server thực thi
+        })
       });
 
-      const syncBtn = document.getElementById('btn-preview-sync');
-      const cancelBtn = document.getElementById('btn-preview-cancel');
-      syncBtn.disabled = true;
-      cancelBtn.disabled = true;
+      const result = await response.json();
+      progressPanel.remove();
 
-      // Create step-by-step progress panel
-      const progressPanel = document.createElement('div');
-      progressPanel.id = 'sync-progress-panel';
-      progressPanel.style.cssText = `
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        width: 500px; background: #fff; border-radius: 12px; z-index: 10000000001;
-        font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.5); padding: 25px;
-        text-align: center;
-      `;
-      
-      let currentStep = 0;
-      const steps = [
-        { id: 'step1', text: 'Buoc 1: Kiem tra du lieu...', icon: '1' },
-        { id: 'step2', text: 'Buoc 2: Xu ly user...', icon: '2' },
-        { id: 'step3', text: 'Buoc 3: Tao/Cap nhat System...', icon: '3' },
-        { id: 'step4', text: 'Buoc 4: Tao/Cap nhat TCA Member...', icon: '4' },
-        { id: 'step5', text: 'Buoc 5: Tao SystemClosure...', icon: '5' },
-        { id: 'step6', text: 'Buoc 6: Hoan tat!', icon: '6' }
-      ];
-
-      progressPanel.innerHTML = `
-        <h2 style="margin:0 0 20px 0; color:#2e7d32;">Dang dong bo ${selectedNodes.length} thanh vien</h2>
-        <div style="text-align:left; margin-bottom:20px;">
-          ${steps.map((s, i) => `
-            <div id="${s.id}" style="display:flex; align-items:center; margin:10px 0; opacity:0.4; transition:opacity 0.3s;">
-              <div style="width:28px; height:28px; border-radius:50%; background:#ddd; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:12px; transition:background 0.3s;">${s.icon}</div>
-              <span style="color:#666;">${s.text}</span>
-            </div>
-          `).join('')}
-        </div>
-        <div id="step-detail" style="padding:10px; background:#f5f5f5; border-radius:8px; font-size:12px; color:#666; min-height:40px;"></div>
-        <div style="margin-top:20px;">
-          <button id="btn-cancel-sync" style="background:#d32f2f; border:none; color:white; padding:10px 25px; border-radius:5px; cursor:pointer; font-weight:bold;">Huy</button>
-        </div>
-      `;
-
-      document.body.appendChild(progressPanel);
-      document.getElementById('btn-cancel-sync').addEventListener('click', () => {
-        if (confirm('Huy dong bo? Da dong bo se khong bi roll back.')) {
-          progressPanel.remove();
-          syncBtn.disabled = false;
-          cancelBtn.disabled = false;
-          syncBtn.textContent = 'Dong y Dong bo';
-        }
-      });
-
-      function updateStep(stepIndex, detail = '', success = false) {
-        for (let i = 0; i < steps.length; i++) {
-          const stepEl = document.getElementById(steps[i].id);
-          if (i < stepIndex) {
-            stepEl.style.opacity = '1';
-            stepEl.querySelector('div').style.background = '#2e7d32';
-          } else if (i === stepIndex) {
-            stepEl.style.opacity = '1';
-            stepEl.querySelector('div').style.background = success ? '#2e7d32' : '#1565c0';
-          } else {
-            stepEl.style.opacity = '0.4';
-            stepEl.querySelector('div').style.background = '#ddd';
-          }
-        }
-        if (detail) {
-          document.getElementById('step-detail').innerHTML = detail;
-        }
+      if (result.success) {
+        addTcaLog(`ĐỒNG BỘ THÀNH CÔNG! Tạo: ${result.stats.usersCreated} User, ${result.stats.systemsCreated} System.`);
+        alert('CHÚC MỪNG! Dữ liệu đã được đồng bộ an toàn.');
+      } else {
+        addTcaLog(`LỖI ĐỒNG BỘ: ${result.error}`);
+        alert('Lỗi: ' + result.error);
       }
-
-      function showMatchSummary(rows) {
-        const peCount = rows.filter(r => r.matchType === 'PHONE_EMAIL').length;
-        const pCount = rows.filter(r => r.matchType === 'PHONE_ONLY').length;
-        const pWarnCount = rows.filter(r => r.matchType === 'PHONE_ONLY' && r.emailMismatch).length;
-        const eCount = rows.filter(r => r.matchType === 'EMAIL_ONLY').length;
-        const newCount = rows.filter(r => !r.matchType).length;
-        
-        return `
-          <div style="margin-top:10px; text-align:left;">
-            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
-              <span style="background:#2e7d32;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">P+E: ${peCount}</span>
-              <span style="background:#1565c0;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">P: ${pCount - pWarnCount}</span>
-              <span style="background:#f57c00;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">P! (email khac): ${pWarnCount}</span>
-              <span style="background:#d32f2f;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">E: ${eCount}</span>
-              <span style="background:#999;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">MOI: ${newCount}</span>
-            </div>
-          </div>
-        `;
-      }
-
-      updateStep(0, 'Bat dau dong bo...');
-      
-      // Dùng previewCache thay vì gọi preview lại
-      try {
-        const previewData = previewCache;
-        
-        updateStep(0, 'Su dung du lieu tu preview da co san...');
-        
-        if (previewData.rows) {
-          updateStep(1, `
-            <strong>Phan tich ket qua match:</strong>
-            ${previewData.rows.length} thanh vien can xu ly
-            ${showMatchSummary(previewData.rows)}
-          `);
-        }
-        
-        await new Promise(r => setTimeout(r, 500)); // Small delay for visibility
-        
-        updateStep(2, 'Dang gui yeu cau dong bo toi server...');
-        console.log('[TCA Sync] Executing sync for', selectedNodes.length, 'nodes');
-
-        // Build expectedIds từ preview cache - filter chỉ lấy selected IDs (new format)
-        const expectedIds = {};
-        if (previewData.rows && previewData.rows.length > 0) {
-          previewData.rows.forEach(row => {
-            // Chỉ lấy những TCA ID nào được check để sync
-            if (selectedIds.includes(row.id)) {
-              // userId: new format uses row.userId directly
-              if (row.userId || row.referrerId || row.refSysId) {
-                expectedIds[row.id] = {
-                  userId: row.userId || null,
-                  referrerId: row.referrerId || null,
-                  refSysId: row.refSysId || null
-                };
-              }
-            }
-          });
-          console.log('[TCA Sync] expectedIds:', expectedIds);
-          console.log('[TCA Sync] selectedIds:', selectedIds);
-        }
-
-        const response = await fetch(SYNC_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            source: 'TCA_EXT_PREVIEW',
-            timestamp: Date.now(),
-            allNodes: selectedNodes,
-            memberInfo: selectedMemberInfo,
-            stats: { total: selectedNodes.length, folders: 0, items: selectedNodes.length },
-            expectedIds: expectedIds
-          })
-        });
-
-        if (!response.ok) throw new Error('Sync failed: ' + response.status);
-        
-        const result = await response.json();
-        console.log('[TCA Sync] Sync result:', result);
-
-        if (result.success) {
-          updateStep(3, `
-            <strong>Dong bo thanh cong!</strong><br>
-            Tao User: ${result.stats.usersCreated}<br>
-            Tao System: ${result.stats.systemsCreated}<br>
-            TCA Member: ${result.stats.tcaMembersCreated} tao, ${result.stats.tcaMembersUpdated} cap nhat
-          `, true);
-          
-          await new Promise(r => setTimeout(r, 1500));
-          progressPanel.remove();
-          
-          alert(`Dong bo thanh cong!\n\n` +
-            `Tao User: ${result.stats.usersCreated}\n` +
-            `Cap nhat User: ${result.stats.usersUpdated}\n` +
-            `Tao System: ${result.stats.systemsCreated}\n` +
-            `Tao TCA Member: ${result.stats.tcaMembersCreated}\n` +
-            `Cap nhat TCA Member: ${result.stats.tcaMembersUpdated}\n` +
-            `Loi: ${result.stats.failed}`
-          );
-          closePreview();
-        } else {
-          throw new Error(result.error || 'Sync failed');
-        }
-
-      } catch (err) {
-        console.error('[TCA Sync] Sync error:', err);
-        progressPanel.remove();
-        alert('Loi dong bo: ' + err.message);
-        syncBtn.disabled = false;
-        cancelBtn.disabled = false;
-        syncBtn.textContent = 'Dong y Dong bo';
-      }
+    } catch (err) {
+      if (typeof progressPanel !== 'undefined') progressPanel.remove();
+      addTcaLog(`LỖI KẾT NỐI: ${err.message}`);
     }
   }
 
-  // Make functions globally accessible
   // DemoPreview - xem du lieu se tao (khong day len DB)
   window.callDemoPreview = async function() {
     const data = window.tcaExtractedData;

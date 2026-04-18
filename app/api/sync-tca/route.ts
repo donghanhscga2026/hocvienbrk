@@ -198,176 +198,79 @@ export async function POST(request: Request) {
         const memberInfo = body.memberInfo?.[node.id] || {}
         const phone = memberInfo.phone || null
         const email = memberInfo.email || null
-
-        console.log(`[TCA Sync] Processing TCA ${node.id}: ${node.name}`)
-
-        // ======== LOGIC XÁC ĐỊNH USER TỒN TẠI ========
-        // Ưu tiên: Phone → Email
-        const normalizedPhone = phone ? phone.replace(/\D/g, '') : null
-        let existingUser = null
-        let needEmailUpdate = false
-        let phoneMatch = false
-        let emailMatch = false
-
-        // Thử 1: Tìm theo phone trước
-        if (normalizedPhone) {
-          const allUsers = await prisma.user.findMany({
-            where: { phone: { not: null } }
-          })
-          for (const user of allUsers) {
-            if (user.phone && user.phone.replace(/\D/g, '') === normalizedPhone) {
-              existingUser = user
-              phoneMatch = true
-              
-              // Check email
-              if (email && user.email?.toLowerCase() !== email.toLowerCase()) {
-                needEmailUpdate = true
-                console.log(`[TCA Sync]   Phone trùng nhưng email không: DB=${user.email}, TCA=${email}`)
-              } else {
-                emailMatch = true
-              }
-              break
-            }
-          }
+        
+        // Lấy dữ liệu ID đã chốt từ Frontend
+        const expected = body.expectedIds?.[node.id];
+        if (!expected || !expected.userId) {
+          console.log(`[TCA Sync] Skipping ${node.id}: No finalized UserID provided`);
+          continue;
         }
 
-        // Thử 2: Tìm theo email (nếu không tìm được theo phone)
-        if (!existingUser && email) {
-          existingUser = await prisma.user.findFirst({
-            where: { email: { equals: email, mode: 'insensitive' } }
-          })
-          if (existingUser) {
-            emailMatch = true
-            console.log(`[TCA Sync]   Chỉ email trùng: User ${existingUser.id} - CẢNH BÁO xử lý tay!`)
-          }
-        }
+        const targetUserId = expected.userId;
+        const targetReferrerId = expected.referrerId; // Có thể là 0
+        const targetRefSysId = expected.refSysId;
 
-        let userId: number
-        let isNewUser = false
+        console.log(`[TCA Sync] Processing TCA ${node.id} -> User ${targetUserId}`);
 
-        // ======== TÌM PARENT TỪ PREVIEW HOẶC BATCH ========
-        // Ưu tiên: expectedIds (từ preview) → batch → root mặc định
-        const parentTcaId = node.parentFolderId
-        let parentUserId: number | null = null
-
-        console.log(`[TCA Sync]   TCA ${node.id}, parentFolderId=${parentTcaId}`)
-
-        // Thử 1: Lấy từ expectedIds (preview đã tính sẵn)
-        const expectedData = body.expectedIds?.[node.id]
-        if (expectedData?.referrerId) {
-          parentUserId = expectedData.referrerId
-          console.log(`[TCA Sync]   Parent from expectedIds: User ${parentUserId}`)
-        } 
-        // Thử 2: Lấy từ batch (parent đã xử lý trong cùng batch)
-        else if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') {
-          const parentIdNum = Number(parentTcaId)
-          if (tcaIdToUserId.has(parentIdNum)) {
-            parentUserId = tcaIdToUserId.get(parentIdNum)!
-            console.log(`[TCA Sync]   Parent from BATCH: User ${parentUserId}`)
-          }
-        }
-        // Thử 3: Root TCA (refSysId = 0 cho root)
-        if (!parentUserId) {
-          parentUserId = 861
-          console.log(`[TCA Sync]   Root TCA fallback - User ${parentUserId}`)
-        }
-
-        console.log(`[TCA Sync]   FINAL: parentUserId=${parentUserId}`)
+        // 1. Kiểm tra sự tồn tại của User dựa trên ID duy nhất
+        let existingUser = await prisma.user.findUnique({
+          where: { id: targetUserId }
+        });
 
         if (existingUser) {
-          userId = existingUser.id
-          console.log(`[TCA Sync]   Found existing user: ${userId}, needEmailUpdate=${needEmailUpdate}`)
-
-          const updates: { name?: string; phone?: string | null } = {}
-          let hasUpdate = false
-
-          if (node.name && existingUser.name !== node.name) {
-            updates.name = node.name
-            hasUpdate = true
-          }
-          if (phone && !existingUser.phone) {
-            updates.phone = phone
-            hasUpdate = true
-          }
-          // NOTE: Nếu email không trùng, chỉ gợi ý, không tự động cập nhật
-          if (needEmailUpdate) {
-            console.log(`[TCA Sync]   ⚠️ GỢI Ý: Phone trùng nhưng email khác!`)
-            console.log(`[TCA Sync]   DB email: ${existingUser.email}, TCA email: ${email}`)
-            console.log(`[TCA Sync]   User ${userId} - Cần xem xét cập nhật email!`)
-          }
-
-          if (hasUpdate) {
-            existingUser = await prisma.user.update({
-              where: { id: existingUser.id },
+          // CHỈ CẬP NHẬT thông tin cho phép nếu User đã tồn tại
+          const updates: any = {};
+          if (node.name && existingUser.name !== node.name) updates.name = node.name;
+          if (phone && !existingUser.phone) updates.phone = phone;
+          if (email && !existingUser.email) updates.email = email;
+          
+          if (Object.keys(updates).length > 0) {
+            await prisma.user.update({
+              where: { id: targetUserId },
               data: updates
-            })
-            stats.usersUpdated++
-            console.log(`[TCA Sync]   Updated user: ${userId}`)
+            });
+            stats.usersUpdated++;
           }
+          console.log(`[TCA Sync]   Updated existing User ${targetUserId}`);
         } else {
-          const hashedPassword = await bcrypt.hash('Brk#3773', 10)
-          
-          // Lấy User ID từ expected hoặc tự generate
-          const expectedData = body.expectedIds?.[node.id]
-          let newId: number
-          
-          if (expectedData?.userId) {
-            newId = expectedData.userId
-          } else {
-            const { getNextAvailableId } = await import('@/lib/id-helper')
-            newId = await getNextAvailableId()
-          }
-
-          // Dùng parentUserId đã tính ở trên làm referrerId
-          const newUser = await prisma.user.create({
+          // TẠO MỚI User với đúng ID yêu cầu
+          const hashedPassword = await bcrypt.hash('Brk#3773', 10);
+          await prisma.user.create({
             data: {
-              id: newId,
+              id: targetUserId,
               name: node.name || `TCA User ${node.id}`,
               email: email || `tca_${node.id}@placeholder.local`,
               phone: phone,
               password: hashedPassword,
               role: 'STUDENT',
-              referrerId: parentUserId
+              referrerId: targetReferrerId
             }
-          })
+          });
+          stats.usersCreated++;
+          createdRecords.push({ table: 'User', id: targetUserId, tcaId: node.id });
+          console.log(`[TCA Sync]   Created NEW User ${targetUserId} with Referrer ${targetReferrerId}`);
 
-          userId = newUser.id
-          isNewUser = true
-          stats.usersCreated++
-          createdRecords.push({ table: 'User', id: userId, tcaId: node.id })
-
-          console.log(`[TCA Sync]   Created NEW user: ${userId} with referrerId: ${parentUserId}`)
-
-          // ========== BƯỚC 2: Tạo user_closure (theo referrerId) ==========
-          // Dùng helper để tạo closures từ referrer
-          await addUserToClosure(userId, parentUserId).catch(e => {
-            console.log(`[TCA Sync]   Warning: addUserToClosure error:`, e.message)
-          })
-          console.log(`[TCA Sync]   Created user_closure for user ${userId}`)
+          // Tạo phả hệ giới thiệu (Referral Tree) bằng helper của dự án
+          await addUserToClosure(targetUserId, targetReferrerId).catch(e => {
+            console.log(`[TCA Sync]   Warning: addUserToClosure error:`, e.message);
+          });
         }
 
-        // Lưu userId immediately sau khi tạo/Update user
-        tcaIdToUserId.set(node.id, userId)
+        // Lưu vết ID để xử lý batch
+        tcaIdToUserId.set(node.id, targetUserId);
 
-        // ---------- 2. Tạo System + SystemClosure bằng helper ----------
-        // refSysId = parentUserId (userId của parent) - ĐÚNG theo schema
-        const refSysId = parentUserId || 0
-        await addUserToSystemClosure(userId, refSysId, 1)
+        // 2. Tạo/Cập nhật System + SystemClosure (Cây hệ thống TCA)
+        // Luôn sử dụng helper dự án để đảm bảo tính nhất quán
+        const systemParentId = targetRefSysId || 0;
+        await addUserToSystemClosure(targetUserId, systemParentId, 1);
         
-        // Lấy systemId vừa tạo/được
-        const systemRecord = await prisma.system.findFirst({ where: { userId: userId, onSystem: 1 } })
-        const systemId = systemRecord?.autoId || 0
-        
-        if (systemRecord) {
-          stats.systemsCreated++
-          createdRecords.push({ table: 'System', id: systemId, tcaId: node.id })
-        }
-        console.log(`[TCA Sync]   Created/Updated System with refSysId=${refSysId}`)
+        console.log(`[TCA Sync]   Ensured System position under parent ${systemParentId}`);
 
-        // ---------- 4. Upsert TCAMember ----------
+        // 3. Upsert TCAMember (Dữ liệu lịch sử)
         const existingTCAMember = await (prisma as any).tCAMember?.findUnique({
           where: { tcaId: node.id }
-        })
+        });
+
 
         const tcaMemberData = {
           tcaId: node.id,
