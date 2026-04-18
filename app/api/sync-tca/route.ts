@@ -122,6 +122,9 @@ export async function POST(request: Request) {
 
     stats.totalRecords = body.allNodes.length
     const sortedNodes = sortNodesByHierarchy(body.allNodes)
+    
+    console.log('[TCA Sync] STAGING_MODE:', STAGING_MODE)
+    console.log('[TCA Sync] ExpectedIds:', JSON.stringify(body.expectedIds))
 
     for (const node of sortedNodes) {
       try {
@@ -130,7 +133,12 @@ export async function POST(request: Request) {
         const email = memberInfo.email || null
         const expected = body.expectedIds?.[node.id];
         
-        if (!expected || !expected.userId) continue;
+        if (!expected || !expected.userId) {
+          console.log('[TCA Sync] Skip node', node.id, '- no expected userId');
+          continue;
+        }
+        
+        console.log('[TCA Sync] Processing node', node.id, '-> userId:', expected.userId);
 
         const targetUserId = expected.userId;
         const targetReferrerId = expected.referrerId; 
@@ -168,6 +176,7 @@ export async function POST(request: Request) {
           });
           stats.usersCreated++;
           createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: node.id });
+          console.log('[TCA Sync] Created', STAGING_MODE ? 'UserTest' : 'User', 'id:', targetUserId);
 
           // Closure (dùng helper tương ứng với mode)
           if (STAGING_MODE) {
