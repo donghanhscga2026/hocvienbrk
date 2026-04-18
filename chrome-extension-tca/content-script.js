@@ -280,6 +280,15 @@
           background:#1565c0; border:none; color:white; padding:10px 20px; border-radius:5px; 
           cursor:pointer; font-weight:bold; font-size:12px;
         ">🔄 Xem de xuat dong bo</button>
+        <button id="btn-demo-preview" style="
+          background:#7b1fa2; border:none; color:white; padding:10px 20px; border-radius:5px; 
+          cursor:pointer; font-weight:bold; font-size:12px;
+        ">🎯 DemoPreview</button>
+        <button id="btn-show-data" style="
+          background:#00897b; border:none; color:white; padding:10px 20px; border-radius:5px; 
+          cursor:pointer; font-weight:bold; font-size:12px;
+        ">📊 ShowData</button>
+        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v3.0.0</span>
       </div>
     `;
 
@@ -290,6 +299,8 @@
     document.getElementById('btn-csv').addEventListener('click', window.downloadTCACSV);
     document.getElementById('btn-json').addEventListener('click', window.downloadTCAJSON);
     document.getElementById('btn-sync-preview').addEventListener('click', () => showSyncPreviewPanel());
+    document.getElementById('btn-demo-preview').addEventListener('click', () => callDemoPreview());
+    document.getElementById('btn-show-data').addEventListener('click', () => callShowData());
 
     // Fill table with parent info
     const tbody = document.getElementById('tca-nodes-body');
@@ -868,6 +879,120 @@
   }
 
   // Make functions globally accessible
+  // DemoPreview - xem du lieu se tao (khong day len DB)
+  window.callDemoPreview = async function() {
+    const data = window.tcaExtractedData;
+    if (!data || !data.allNodes || data.allNodes.length === 0) {
+      alert('Chua co du lieu! Vui long quet TCA truoc.');
+      return;
+    }
+
+    const API_BASE = window.TCA_API_BASE || '';
+    const url = API_BASE + '/api/sync-tca/demo-preview';
+
+    console.log('[TCA Sync] Calling DemoPreview:', url);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          allNodes: data.allNodes,
+          memberInfo: data.memberInfo
+        })
+      });
+
+      const result = await response.json();
+      console.log('[TCA Sync] DemoPreview result:', result);
+
+      if (result.success) {
+        // Hien ket qua trong alert
+        const summary = result.summary;
+        const msg = `🎯 DEMO PREVIEW RESULTS\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `Tong TCA: ${summary.totalTCA}\n` +
+          `Users (create): ${summary.usersToCreate}\n` +
+          `Users (exists): ${summary.usersExists}\n` +
+          `User Closures: ${summary.userClosures}\n` +
+          `TCAMembers: ${summary.tcaMembers}\n` +
+          `Systems: ${summary.systems}\n` +
+          `System Closures: ${summary.systemClosures}\n\n` +
+          `Xem chi tiet trong console!`;
+
+        alert(msg);
+
+        // Log chi tiet ra console
+        console.table(result.data.users);
+        console.table(result.data.systems);
+        console.table(result.data.systemClosures);
+      } else {
+        alert('Loi: ' + result.error);
+      }
+    } catch (err) {
+      console.error('[TCA Sync] DemoPreview error:', err);
+      alert('Loi goi API: ' + err.message);
+    }
+  };
+
+  // ShowData - xem du lieu cac bang
+  window.callShowData = async function() {
+    const data = window.tcaExtractedData;
+    if (!data || !data.allNodes || data.allNodes.length === 0) {
+      alert('Chua co du lieu! Vui long quet TCA truoc.');
+      return;
+    }
+
+    const API_BASE = window.TCA_API_BASE || '';
+    const url = API_BASE + '/api/sync-tca/show-data';
+
+    console.log('[TCA Sync] Calling ShowData:', url);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          allNodes: data.allNodes,
+          memberInfo: data.memberInfo
+        })
+      });
+
+      const result = await response.json();
+      console.log('[TCA Sync] ShowData result:', result);
+
+      if (result.success) {
+        const summary = result.summary;
+        const msg = `📊 SHOW DATA RESULTS\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `Users: ${summary.users}\n` +
+          `user_closure: ${summary.userClosures}\n` +
+          `TCAMember: ${summary.tcaMembers}\n` +
+          `System: ${summary.systems}\n` +
+          `SystemClosure: ${summary.systemClosures}\n\n` +
+          `Xem chi tiet trong console!`;
+
+        alert(msg);
+
+        // Log chi tiet ra console
+        console.log('=== User ===');
+        console.table(result.tables.User);
+        console.log('=== user_closure ===');
+        console.table(result.tables.user_closure);
+        console.log('=== TCAMember ===');
+        console.table(result.tables.TCAMember);
+        console.log('=== System ===');
+        console.table(result.tables.System);
+        console.log('=== SystemClosure ===');
+        console.table(result.tables.SystemClosure);
+      } else {
+        alert('Loi: ' + result.error);
+      }
+    } catch (err) {
+      console.error('[TCA Sync] ShowData error:', err);
+      alert('Loi goi API: ' + err.message);
+    }
+  };
+
   window.downloadTCACSV = function() {
     const data = window.tcaExtractedData;
     if (!data) {

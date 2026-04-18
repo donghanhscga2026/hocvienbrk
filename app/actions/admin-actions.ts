@@ -76,12 +76,12 @@ async function buildStandardTree(
         rootAutoId = rootSys.autoId
     }
 
-    // 2. Lấy F1s trực tiếp
+    // 2. Lấy F1s trực tiếp (refSysId = userId của parent - ĐÚNG theo schema)
     let f1Data: any[] = []
     if (isSystem) {
         f1Data = await prisma.system.findMany({
             where: { 
-                refSysId: rootAutoId, 
+                refSysId: rootId,  // Tìm theo userId của parent
                 onSystem: systemId,
                 userId: { not: rootId }
             },
@@ -813,6 +813,16 @@ export async function createSystemRootAction(systemId: number, userId: number) {
                 userId: userId,
                 onSystem: systemId,
                 refSysId: 0  // Root
+            }
+        })
+        
+        // Tạo self-closure cho root
+        await prisma.systemClosure.create({
+            data: {
+                ancestorId: newSystem.autoId,
+                descendantId: newSystem.autoId,
+                depth: 0,
+                systemId: systemId
             }
         })
         
