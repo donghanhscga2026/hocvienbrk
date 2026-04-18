@@ -134,13 +134,16 @@ export async function POST(request: Request) {
         const expected = body.expectedIds?.[node.id];
         
         // Auto-generate userId nếu không có expectedIds (dự phòng)
+        // Fix: Kiểm tra cả null và 0
         const useUserId = (expected?.userId != null) ? expected.userId : (900000 + node.id);
-        const useReferrerId = (expected?.referrerId != null) ? expected.referrerId : (
-          (!node.parentFolderId || node.parentFolderId === 'root' || node.parentFolderId === '0') 
+        const useReferrerId = (expected?.referrerId != null && expected?.referrerId !== 0) 
+          ? expected.referrerId 
+          : ((!node.parentFolderId || node.parentFolderId === 'root' || node.parentFolderId === '0') 
             ? 861 
-            : 900000 + Number(node.parentFolderId)
-        );
-        const useRefSysId = (expected?.refSysId != null) ? expected.refSysId : useReferrerId;
+            : 900000 + Number(node.parentFolderId));
+        const useRefSysId = (expected?.refSysId != null && expected?.refSysId !== 0) 
+          ? expected.refSysId 
+          : useReferrerId;
         
         console.log('[TCA Sync] Processing node', node.id, '-> userId:', useUserId, '(auto:', !expected, ')');
 
