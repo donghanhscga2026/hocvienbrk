@@ -231,7 +231,7 @@ export async function POST(request: Request) {
     }
 
     const duration = Date.now() - startTime;
-    return NextResponse.json({ success: true, syncId, stats, staging: STAGING_MODE, message: STAGING_MODE ? 'GHI VÀO BẢNG TEST THÀNH CÔNG' : 'Sync completed' }, { headers: CORS_HEADERS })
+    return NextResponse.json({ success: true, syncId, stats, failedRecords: failedRecords.slice(0, 5), staging: STAGING_MODE, message: STAGING_MODE ? 'GHI VÀO BẢNG TEST THÀNH CÔNG' : 'Sync completed' }, { headers: CORS_HEADERS })
 
   } catch (error) {
     console.error('[TCA Sync] ERROR:', error)
