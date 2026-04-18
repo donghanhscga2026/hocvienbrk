@@ -434,7 +434,23 @@
     });
 
     addTcaLog('Bảng mẫu Local đã được xây dựng thành công.');
-    showDemoResultPanel(tables, selectedNodes, {}, {});
+    
+    // Build expectedIds từ previewRows để truyền sang executeFinalSync
+    const expectedIdsMap = {};
+    if (previewRows && previewRows.length > 0) {
+      previewRows.forEach(row => {
+        if (row.userId) {
+          expectedIdsMap[row.id] = {
+            userId: row.userId,
+            referrerId: row.referrerId || row.parentUserId || null,
+            refSysId: row.refSysId || row.parentUserId || null
+          };
+        }
+      });
+      addTcaLog('Expected IDs prepared: ' + previewRows.length + ' rows');
+    }
+    
+    showDemoResultPanel(tables, selectedNodes, memberInfoCache, expectedIdsMap);
   }
 
   function showDemoResultPanel(tables, selectedNodes, selectedMemberInfo, expectedIds) {
