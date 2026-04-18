@@ -614,6 +614,7 @@
       });
 
       const result = await response.json();
+      console.log('[SYNC] Response:', JSON.stringify(result).slice(0, 500));
       progressPanel.remove();
 
       if (result.success) {
