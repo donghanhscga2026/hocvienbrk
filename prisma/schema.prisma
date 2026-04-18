@@ -729,6 +729,115 @@ model TCASyncHistory {
 }
 
 // ==========================================
+// TCA SYNC TEST TABLES - 2026-04-18
+// Dùng để test sync trước khi đẩy lên Production
+// ==========================================
+
+model UserTest {
+  id              Int          @id @default(autoincrement())
+  name            String?
+  email           String       @unique
+  emailVerified   DateTime?
+  image           String?
+  password        String?
+  passwordChanged  Boolean      @default(false)
+  phone           String?      @unique
+  role            Role         @default(STUDENT)
+  referrerId      Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  closureAsAncestor   UserClosureTest[] @relation("TestClosureAncestor")
+  closureAsDescendant UserClosureTest[] @relation("TestClosureDescendant")
+
+  @@index([email])
+  @@index([phone])
+  @@index([referrerId])
+  @@map("user_test")
+}
+
+// Closure Table cho UserTest - Copy cấu trúc từ UserClosure
+model UserClosureTest {
+    ancestorId   Int @map("ancestor_id")
+    descendantId Int @map("descendant_id")
+    depth        Int @default(0)
+
+    ancestor   UserTest @relation("TestClosureAncestor", fields: [ancestorId], references: [id])
+    descendant UserTest @relation("TestClosureDescendant", fields: [descendantId], references: [id])
+
+    @@id([ancestorId, descendantId])
+    @@index([ancestorId])
+    @@index([descendantId])
+    @@index([depth])
+    @@map("user_closure_test")
+}
+
+// SystemTest - Copy cấu trúc từ System
+model SystemTest {
+  autoId    Int       @id @default(autoincrement())
+  userId    Int
+  onSystem  Int
+  refSysId  Int       @default(0)
+  createdAt DateTime  @default(now())
+  
+  @@unique([userId, onSystem])
+  @@index([userId])
+  @@index([onSystem])
+  @@index([refSysId])
+  @@map("system_test")
+}
+
+// SystemClosureTest - Copy cấu trúc từ SystemClosure
+model SystemClosureTest {
+  ancestorId   Int
+  descendantId Int
+  depth        Int     @default(0)
+  systemId     Int
+  
+  @@id([ancestorId, descendantId, systemId])
+  @@index([ancestorId])
+  @@index([descendantId])
+  @@index([systemId])
+  @@index([depth])
+  @@map("system_closure_test")
+}
+
+// TCAMemberTest - Copy cấu trúc từ TCAMember (bản đơn giản hóa)
+model TCAMemberTest {
+  id              Int       @id @default(autoincrement())
+  tcaId          Int       @unique
+  userId         Int
+  type           String    @default("item")
+  groupName      String?
+  name           String
+  personalScore  Decimal?  @db.Decimal(10, 3)
+  totalScore     Decimal?  @db.Decimal(10, 3)
+  level          Int?
+  location       String?
+  personalRate   String?
+  teamRate       String?
+  hasBH          Boolean   @default(false)
+  hasTD          Boolean   @default(false)
+  phone          String?
+  email          String?
+  address        String?
+  joinDate       DateTime?
+  contractDate   DateTime?
+  promotionDate  DateTime?
+  parentTcaId    Int?
+  parentName    String?
+  teamSize       Int       @default(0)
+  lastSyncedAt   DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tcaId])
+  @@index([userId])
+  @@index([parentTcaId])
+  @@map("tca_member_test")
+}
+
+// ==========================================
 // THEME SYSTEM - 2026-03-30
 // ==========================================
 
