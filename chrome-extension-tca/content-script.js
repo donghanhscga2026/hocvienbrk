@@ -198,17 +198,10 @@
       opacity: 1 !important;
     `;
 
-    // Count members with contact info
-    const withContact = allNodes.filter(n => memberInfoMap[n.id]?.email || memberInfoMap[n.id]?.phone).length;
-    
-    // Count precheck results - tính cho TẤT CẢ nodes (không phân biệt folder/item)
-    const existsInDB = allNodes.filter(n => precheckCache[n.id]?.exists).length;
-    const userOnlyCount = allNodes.filter(n => precheckCache[n.id]?.userFound && !precheckCache[n.id]?.exists).length;
-    const newItems = allNodes.filter(n => !precheckCache[n.id]?.exists && !precheckCache[n.id]?.userFound).length;
-
     // Header - Bảng tổng hợp với 14 columns từ /preview API
     // Dùng previewRows nếu có, không thì dùng allNodes
     const rows = previewRows.length > 0 ? previewRows : allNodes;
+    const withContact = rows.filter(r => r.email || r.phone).length;
     const stats = {
       total: rows.length,
       createAll: rows.filter(r => r.action === 'CREATE_ALL').length,
@@ -224,7 +217,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data (Bảng tổng hợp) <span style="font-size:10px; color:#999;">v4.0.0</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data (Bảng tổng hợp) <span style="font-size:10px; color:#999;">v4.0.1</span></h2>
           <small style="color:#666;">Bước 1: Quét TCA → Xuất bảng đầy đủ</small>
         </div>
         <div>
@@ -292,7 +285,7 @@
           background:#e65100; border:none; color:white; padding:10px 20px; border-radius:5px; 
           cursor:pointer; font-weight:bold; margin-right:10px; font-size:12px;
         ">📄 Download JSON</button>
-        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v4.0.0</span>
+        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v4.0.1</span>
       </div>
     `;
 
