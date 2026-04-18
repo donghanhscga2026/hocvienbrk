@@ -747,9 +747,9 @@
       return;
     }
 
-    // Build node map for parent name lookup
-    const nodeMap = new Map();
-    data.allNodes.forEach(n => nodeMap.set(n.id, n));
+    // Build previewRows map for UserID lookup (từ bảng TCA Dashboard đang hiển thị)
+    const previewMap = new Map();
+    (data.previewRows || []).forEach(row => previewMap.set(row.id, row));
 
     // Header với parent info - UTF-8 with BOM for Vietnamese
     const BOM = '\uFEFF';
@@ -760,10 +760,10 @@
       const email = contact.email || '';
       const phone = contact.phone || '';
       
-      // Get precheck status
-      const precheckResult = data.precheckCache?.[node.id];
-      const dbStatus = precheckResult?.exists ? 'EXISTS' : (node.type === 'item' ? 'NEW' : '-');
-      const userId = precheckResult?.userId || '';
+      // Get từ previewRows (chính là data trên bảng TCA Dashboard)
+      const previewRow = previewMap.get(node.id);
+      const dbStatus = previewRow?.match || '-';
+      const userId = previewRow?.userId || '';
       
       csv += `${node.id},"${node.name || ''}",${node.personalScore || '0'},${node.totalScore || '0'},${node.level || '1'},"${node.location || ''}","${node.personalRate || '-'}","${node.teamRate || '-'}","${node.hasBH ? 'Yes' : 'No'}","${node.hasTD ? 'Yes' : 'No'}","${node.type}","${email}","${phone}","${dbStatus}",${userId}\n`;
     });
@@ -788,15 +788,22 @@
       return;
     }
 
-    // Build enriched data with parent names
-    const nodeMap = new Map();
-    data.allNodes.forEach(n => nodeMap.set(n.id, n));
+    // Build previewRows map (từ bảng TCA Dashboard đang hiển thị)
+    const previewMap = new Map();
+    (data.previewRows || []).forEach(row => previewMap.set(row.id, row));
     
-    const enrichedData = data.allNodes.map(node => ({
-      ...node,
-      precheckStatus: data.precheckCache?.[node.id]?.exists ? 'EXISTS' : (node.type === 'item' ? 'NEW' : '-'),
-      userId: data.precheckCache?.[node.id]?.userId || null
-    }));
+    // Enrich data với previewRows (UserID từ bảng đang hiển thị)
+    const enrichedData = data.allNodes.map(node => {
+      const previewRow = previewMap.get(node.id);
+      return {
+        ...node,
+        match: previewRow?.match || '-',
+        action: previewRow?.action || '-',
+        userId: previewRow?.userId || null,
+        referrerId: previewRow?.referrerId || null,
+        refSysId: previewRow?.refSysId || null
+      };
+    });
 
     const blob = new Blob([JSON.stringify({ ...data, enrichedData }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -809,19 +816,6 @@
     URL.revokeObjectURL(url);
     
     console.log('[TCA Sync] JSON downloaded!');
-  };
-
-  window.downloadTCAJSON = function() {
-    const data = window.tcaExtractedData;
-    if (!data) return;
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tca_data_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   async function handleFullTree(data) {
