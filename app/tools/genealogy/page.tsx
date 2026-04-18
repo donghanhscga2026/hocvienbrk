@@ -790,16 +790,15 @@ function GenealogyFlow() {
           <button 
             type="button"
             onClick={async (e) => {
-              console.log('[Tạo cây] Clicked', e)
               e.preventDefault()
               e.stopPropagation()
-              const roleResult = await getCurrentUserRoleAction()
-              console.log('[Tạo cây] Role result:', roleResult)
-              if (!roleResult.userId && roleResult.userId !== 0) {
-                alert('Bạn chưa đăng nhập')
+              const userIdInput = prompt('Nhập User ID làm root:')
+              if (!userIdInput) return
+              const userId = parseInt(userIdInput)
+              if (isNaN(userId) || userId <= 0) {
+                alert('User ID không hợp lệ')
                 return
               }
-              const userId = roleResult.userId ?? 0
               setLoading(true)
               const result = await createSystemRootAction(selectedSystem, userId)
               console.log('[Tạo cây] Result:', result)

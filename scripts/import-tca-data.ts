@@ -123,18 +123,22 @@ async function importTCAData(jsonFilePath: string) {
       console.log(`   👤 Created placeholder user: ${fullName}`)
     }
 
-    // Determine parent System ID
-    let parentSystemId: number | null = null
-    if (node.parentFolderId && tcaIdToSystemId.has(node.parentFolderId)) {
-      parentSystemId = tcaIdToSystemId.get(node.parentFolderId)!
+    // Determine parent: lấy parentSystem qua parentFolderId, rồi lấy userId của parent
+    let parentUserId = 0
+    if (node.parentFolderId) {
+      const parentAutoId = tcaIdToSystemId.get(node.parentFolderId)
+      if (parentAutoId) {
+        const parentSystem = await prisma.system.findUnique({ where: { autoId: parentAutoId } })
+        parentUserId = parentSystem?.userId || 0
+      }
     }
 
-    // Create System record
+    // Create System record với refSysId = parent userId (ĐÚNG theo schema)
     const systemRecord = await prisma.system.create({
       data: {
         userId: node.id,
         onSystem: 1, // TCA
-        refSysId: parentSystemId || 0 // 0 = root if no parent
+        refSysId: parentUserId
       }
     })
 
@@ -151,24 +155,27 @@ async function importTCAData(jsonFilePath: string) {
     })
 
     // If has parent, create closure entries for all ancestors
-    if (parentSystemId) {
-      const ancestors = await prisma.systemClosure.findMany({
-        where: { descendantId: parentSystemId, systemId: 1 }
-      })
-
-      for (const ancestor of ancestors) {
-        await prisma.systemClosure.create({
-          data: {
-            ancestorId: ancestor.ancestorId,
-            descendantId: systemRecord.autoId,
-            depth: ancestor.depth + 1,
-            systemId: 1
-          }
+    if (parentUserId > 0) {
+      const parentAutoId = tcaIdToSystemId.get(node.parentFolderId ?? 0)
+      if (parentAutoId != null) {
+        const ancestors = await prisma.systemClosure.findMany({
+          where: { descendantId: parentAutoId, systemId: 1 }
         })
+
+        for (const ancestor of ancestors) {
+          await prisma.systemClosure.create({
+            data: {
+              ancestorId: ancestor.ancestorId,
+              descendantId: systemRecord.autoId,
+              depth: ancestor.depth + 1,
+              systemId: 1
+            }
+          })
+        }
       }
     }
 
-    console.log(`   ✅ Imported: TCA ID ${node.id} (${node.name.substring(0, 30)}...) - Parent: ${parentSystemId || 'ROOT'}`)
+    console.log(`   ✅ Imported: TCA ID ${node.id} (${node.name.substring(0, 30)}...) - Parent: ${parentUserId || 'ROOT'}`)
     imported++
   }
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { PrismaClient, Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
+import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
+import { addUserToClosure } from '@/lib/closure-helpers'
 
 const prisma = new PrismaClient()
 
@@ -183,7 +185,6 @@ export async function POST(request: Request) {
     }).catch(() => { })
 
     const tcaIdToUserId = new Map<number, number>()
-    const tcaIdToSystemId = new Map<number, number>()
     const sortedNodes = sortNodesByHierarchy(body.allNodes)
 
     console.log('[TCA Sync] Sorted nodes (parents first):', sortedNodes.map(n => n.id))
@@ -248,7 +249,6 @@ export async function POST(request: Request) {
         // Ưu tiên: expectedIds (từ preview) → batch → root mặc định
         const parentTcaId = node.parentFolderId
         let parentUserId: number | null = null
-        let parentSystemId: number | null = null
 
         console.log(`[TCA Sync]   TCA ${node.id}, parentFolderId=${parentTcaId}`)
 
@@ -256,26 +256,23 @@ export async function POST(request: Request) {
         const expectedData = body.expectedIds?.[node.id]
         if (expectedData?.referrerId) {
           parentUserId = expectedData.referrerId
-          parentSystemId = expectedData.refSysId
-          console.log(`[TCA Sync]   Parent from expectedIds: User ${parentUserId}, System ${parentSystemId}`)
+          console.log(`[TCA Sync]   Parent from expectedIds: User ${parentUserId}`)
         } 
         // Thử 2: Lấy từ batch (parent đã xử lý trong cùng batch)
         else if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') {
           const parentIdNum = Number(parentTcaId)
           if (tcaIdToUserId.has(parentIdNum)) {
             parentUserId = tcaIdToUserId.get(parentIdNum)!
-            parentSystemId = tcaIdToSystemId.get(parentIdNum) || null
-            console.log(`[TCA Sync]   Parent from BATCH: User ${parentUserId}, System ${parentSystemId}`)
+            console.log(`[TCA Sync]   Parent from BATCH: User ${parentUserId}`)
           }
         }
-        // Thử 3: Root TCA
+        // Thử 3: Root TCA (refSysId = 0 cho root)
         if (!parentUserId) {
           parentUserId = 861
-          parentSystemId = 13807
-          console.log(`[TCA Sync]   Root TCA fallback - User ${parentUserId}, System ${parentSystemId}`)
+          console.log(`[TCA Sync]   Root TCA fallback - User ${parentUserId}`)
         }
 
-        console.log(`[TCA Sync]   FINAL: parentUserId=${parentUserId}, parentSystemId=${parentSystemId}`)
+        console.log(`[TCA Sync]   FINAL: parentUserId=${parentUserId}`)
 
         if (existingUser) {
           userId = existingUser.id
@@ -340,94 +337,32 @@ export async function POST(request: Request) {
           createdRecords.push({ table: 'User', id: userId, tcaId: node.id })
 
           console.log(`[TCA Sync]   Created NEW user: ${userId} with referrerId: ${parentUserId}`)
+
+          // ========== BƯỚC 2: Tạo user_closure (theo referrerId) ==========
+          // Dùng helper để tạo closures từ referrer
+          await addUserToClosure(userId, parentUserId).catch(e => {
+            console.log(`[TCA Sync]   Warning: addUserToClosure error:`, e.message)
+          })
+          console.log(`[TCA Sync]   Created user_closure for user ${userId}`)
         }
 
         // Lưu userId immediately sau khi tạo/Update user
         tcaIdToUserId.set(node.id, userId)
 
-        // ---------- 2. Find/Create System ----------
-        let existingSystem = await prisma.system.findFirst({
-          where: { userId: userId, onSystem: 1 }
-        })
-
-        let systemId: number
-
-        if (!existingSystem) {
-          // Ưu tiên dùng expectedSystemId từ preview nếu có
-          const expectedData = body.expectedIds?.[node.id]
-          
-          // refSysId: ưu tiên expectedRefSysId > parentSystemId
-          const refSysId = expectedData?.refSysId ?? parentSystemId
-          
-          const newSystem = await prisma.system.create({
-            data: {
-              userId: userId,
-              onSystem: 1,
-              refSysId: refSysId || 0
-            }
-          })
-          systemId = newSystem.autoId
+        // ---------- 2. Tạo System + SystemClosure bằng helper ----------
+        // refSysId = parentUserId (userId của parent) - ĐÚNG theo schema
+        const refSysId = parentUserId || 0
+        await addUserToSystemClosure(userId, refSysId, 1)
+        
+        // Lấy systemId vừa tạo/được
+        const systemRecord = await prisma.system.findFirst({ where: { userId: userId, onSystem: 1 } })
+        const systemId = systemRecord?.autoId || 0
+        
+        if (systemRecord) {
           stats.systemsCreated++
           createdRecords.push({ table: 'System', id: systemId, tcaId: node.id })
-          console.log(`[TCA Sync]   Created NEW system: ${systemId} with refSysId=${refSysId || 0}`)
-          
-          // ---------- 3. Tạo SystemClosure ----------
-          if (parentSystemId) {
-            // Copy closures từ parent
-            const parentClosures = await prisma.systemClosure.findMany({
-              where: { descendantId: parentSystemId, systemId: 1 }
-            })
-            
-            for (const closure of parentClosures) {
-              await prisma.systemClosure.create({
-                data: {
-                  ancestorId: closure.ancestorId,
-                  descendantId: systemId,
-                  depth: closure.depth + 1,
-                  systemId: 1
-                }
-              })
-            }
-            
-            // Thêm self closure
-            await prisma.systemClosure.create({
-              data: {
-                ancestorId: systemId,
-                descendantId: systemId,
-                depth: 0,
-                systemId: 1
-              }
-            })
-            
-            console.log(`[TCA Sync]   Created ${parentClosures.length + 1} SystemClosure records`)
-          } else {
-            // Root node - chỉ tạo self closure
-            await prisma.systemClosure.create({
-              data: {
-                ancestorId: systemId,
-                descendantId: systemId,
-                depth: 0,
-                systemId: 1
-              }
-            })
-            console.log(`[TCA Sync]   Created self SystemClosure`)
-          }
-        } else {
-          systemId = existingSystem.autoId
-          stats.systemsUpdated++
-          console.log(`[TCA Sync]   Found existing system: ${systemId}`)
-          
-          // Update refSysId nếu cần
-          if (parentSystemId && existingSystem.refSysId !== parentSystemId) {
-            await prisma.system.update({
-              where: { autoId: systemId },
-              data: { refSysId: parentSystemId }
-            })
-            console.log(`[TCA Sync]   Updated refSysId: ${systemId} -> ${parentSystemId}`)
-          }
         }
-
-        tcaIdToSystemId.set(node.id, systemId)
+        console.log(`[TCA Sync]   Created/Updated System with refSysId=${refSysId}`)
 
         // ---------- 4. Upsert TCAMember ----------
         const existingTCAMember = await (prisma as any).tCAMember?.findUnique({

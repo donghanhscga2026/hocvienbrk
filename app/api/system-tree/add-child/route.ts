@@ -28,12 +28,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User đã có trong hệ thống' }, { status: 400 })
     }
 
-    // Tạo bản ghi System cho F1 (child có refSysId = parent.autoId)
+    // Tạo bản ghi System cho F1 (child có refSysId = parent userId)
     const systemRecord = await prisma.system.create({
       data: {
         userId: childId,
         onSystem,
-        refSysId: parentRecord.autoId
+        refSysId: parentId
       }
     })
 
