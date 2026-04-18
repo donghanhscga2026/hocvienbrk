@@ -18,22 +18,6 @@ interface ShowDataPayload {
   memberInfo: Record<number, any>
 }
 
-// Sort: parents first
-function sortByHierarchy(nodes: any[]) {
-  const nodeMap = new Map<number, any>()
-  nodes.forEach(n => nodeMap.set(n.id, n))
-
-  function getDepth(node: any): number {
-    const pid = node.parentFolderId
-    if (!pid || pid === 'root' || pid === '0') return 0
-    const parent = nodeMap.get(Number(pid))
-    if (!parent) return 0
-    return 1 + getDepth(parent)
-  }
-
-  return [...nodes].sort((a, b) => getDepth(a) - getDepth(b))
-}
-
 export async function POST(request: Request) {
   try {
     const body: ShowDataPayload = await request.json()
@@ -45,156 +29,140 @@ export async function POST(request: Request) {
       )
     }
 
-    // Lấy users từ DB để map phone/email -> user
-    const users = await prisma.user.findMany({ 
-      where: { phone: { not: null } },
-      select: { id: true, name: true, email: true, phone: true, referrerId: true }
+    // GỌI API PREVIEW ĐỂ LẤY DỮ LIỆU ĐÚNG!
+    const previewUrl = process.env.API_BASE_URL || 'http://localhost:3000'
+    const previewResponse = await fetch(previewUrl + '/api/sync-tca/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        allNodes: body.allNodes,
+        memberInfo: body.memberInfo
+      })
     })
-    
-    const phoneToUser = new Map<string, any>()
-    const emailToUser = new Map<string, any>()
-    for (const u of users) {
-      if (u.phone) phoneToUser.set(u.phone.replace(/\D/g, ''), u)
-      if (u.email) emailToUser.set(u.email.toLowerCase(), u)
+
+    const previewResult = await previewResponse.json()
+
+    if (!previewResult?.rows) {
+      return NextResponse.json(
+        { error: 'Preview API failed: ' + previewResult?.error },
+        { status: 500, headers: CORS_HEADERS }
+      )
     }
 
-    // Sort nodes parents first
-    const sortedNodes = sortByHierarchy(body.allNodes)
+    const rows = previewResult.rows
 
-    // Mock data structures (NHƯ KHI INSERT THẬT)
-    let tcaIdToUserId = new Map<number, number>()
-    const mockUsers: any[] = []
-    const mockUserClosures: any[] = []
-    const mockTCAMembers: any[] = []
-    const mockSystems: any[] = []
-    const mockSystemClosures: any[] = []
-    
-    let nextUserId = 0
-    const maxUser = await prisma.user.findFirst({ orderBy: { id: 'desc' } })
-    nextUserId = (maxUser?.id || 0) + 1
+    // Build tables từ preview data
+    const User: any[] = []
+    const user_closure: any[] = []
+    const TCAMember: any[] = []
+    const System: any[] = []
+    const SystemClosure: any[] = []
 
-    const reserved = await prisma.reservedId.findMany({ select: { id: true } })
-    const reservedIds = new Set(reserved.map(r => r.id))
-    const reservedIdList = Array.from(reservedIds)
+    // Map tcaId -> userId cho closure
+    const nodeMap = new Map<number, any>()
+    rows.forEach((r: any) => nodeMap.set(r.tcaId, r))
 
-    for (const node of sortedNodes) {
-      const info = body.memberInfo?.[node.id] || {}
-      const phone = info.phone || ''
-      const normalizedPhone = phone.replace(/\D/g, '')
-      const email = info.email || ''
-      
-      // === BƯỚC 1: USER ===
-      let userId: number
-      let action: string
-      let existingUser = null
-      
-      if (normalizedPhone) existingUser = phoneToUser.get(normalizedPhone)
-      if (!existingUser && email) existingUser = emailToUser.get(email.toLowerCase())
-      
-      if (existingUser) {
-        userId = existingUser.id
-        action = 'EXISTS'
-      } else {
-        while (reservedIdList.includes(nextUserId) || users.find(u => u.id === nextUserId)) {
-          nextUserId++
-        }
-        userId = nextUserId++
-        action = 'CREATE'
-      }
+    function getDepth(tcaId: number): number {
+      const r = nodeMap.get(tcaId)
+      if (!r || !r.parentTcaId) return 0
+      return 1 + getDepth(r.parentTcaId)
+    }
 
-      tcaIdToUserId.set(node.id, userId)
+    const sortedRows = [...rows].sort((a, b) => getDepth(a.tcaId) - getDepth(b.tcaId))
+    const tcaIdToUserId = new Map<number, number>()
 
-      // Parent lookup cho closure
-      let parentUserId: number | null = null
-      if (node.parentFolderId && node.parentFolderId !== 'root' && node.parentFolderId !== '0') {
-        parentUserId = tcaIdToUserId.get(Number(node.parentFolderId)) ?? null
-      }
-      const referrerId = existingUser?.referrerId ?? parentUserId
+    for (const row of sortedRows) {
+      const uid = row.expectedUserId || row.userId
+      const action = row.expectedUserId ? 'CREATE' : 'EXISTS'
 
-      // === BƯỚC 2: USER_CLOSURE ===
-      if (referrerId) {
-        mockUserClosures.push({
+      tcaIdToUserId.set(row.tcaId, uid)
+
+      // User
+      User.push({
+        table: 'User',
+        action: action,
+        id: uid,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        referrerId: row.expectedReferrerId || row.referrerId || 0
+      })
+
+      // user_closure
+      if (row.referrerId && row.expectedUserId) {
+        user_closure.push({
           table: 'user_closure',
           action: 'CREATE',
-          ancestorId: referrerId,
-          descendantId: userId,
+          ancestorId: row.referrerId,
+          descendantId: uid,
           depth: 1
         })
       }
 
-      // === BƯỚC 3: TCAMEMBER ===
-      mockTCAMembers.push({
+      // TCAMember
+      TCAMember.push({
         table: 'TCAMember',
-        action: action === 'EXISTS' ? 'UPDATE' : 'CREATE',
-        tcaId: node.id,
-        userId: userId,
-        name: node.name,
-        parentTcaId: (node.parentFolderId === 'root' || !node.parentFolderId) ? null : Number(node.parentFolderId),
-        phone: phone,
-        email: email
+        action: row.expectedUserId ? 'CREATE' : 'UPDATE',
+        tcaId: row.tcaId,
+        userId: uid,
+        name: row.name,
+        parentTcaId: row.parentTcaId,
+        phone: row.phone,
+        email: row.email
       })
 
-      // === BƯỚC 4: SYSTEM ===
-      mockSystems.push({
+      // System
+      System.push({
         table: 'System',
-        action: action === 'EXISTS' ? 'UPDATE' : 'CREATE',
-        userId: userId,
+        action: row.expectedUserId ? 'CREATE' : 'UPDATE',
+        userId: uid,
         onSystem: 1,
-        refSysId: parentUserId || 0
+        refSysId: row.expectedReferrerId || 0
       })
 
-      // === BƯỚC 5: SYSTEM_CLOSURE ===
-      mockSystemClosures.push({
+      // SystemClosure
+      SystemClosure.push({
         table: 'SystemClosure',
         action: 'CREATE',
-        ancestorId: userId,
-        descendantId: userId,
+        ancestorId: uid,
+        descendantId: uid,
         depth: 0,
         systemId: 1
       })
-      
-      if (parentUserId && parentUserId > 0) {
-        const parentClosures = mockSystemClosures.filter((c: any) => c.descendantId === parentUserId)
-        for (const pc of parentClosures) {
-          mockSystemClosures.push({
-            table: 'SystemClosure',
-            action: 'CREATE',
-            ancestorId: pc.ancestorId,
-            descendantId: userId,
-            depth: pc.depth + 1,
-            systemId: 1
-          })
+
+      const parentTcaId = row.parentTcaId
+      if (parentTcaId) {
+        const parentUserId = tcaIdToUserId.get(parentTcaId)
+        if (parentUserId) {
+          const parentClosures = SystemClosure.filter(sc => sc.descendantId === parentUserId)
+          for (const pc of parentClosures) {
+            SystemClosure.push({
+              table: 'SystemClosure',
+              action: 'CREATE',
+              ancestorId: pc.ancestorId,
+              descendantId: uid,
+              depth: pc.depth + 1,
+              systemId: 1
+            })
+          }
         }
       }
     }
 
-    // Summary
     const summary = {
-      users: mockUsers.length,
-      userClosures: mockUserClosures.length,
-      tcaMembers: mockTCAMembers.length,
-      systems: mockSystems.length,
-      systemClosures: mockSystemClosures.length
+      users: User.length,
+      userClosures: user_closure.length,
+      tcaMembers: TCAMember.length,
+      systems: System.length,
+      systemClosures: SystemClosure.length
     }
 
-    const allRecords = [
-      ...mockUsers,
-      ...mockUserClosures,
-      ...mockTCAMembers,
-      ...mockSystems,
-      ...mockSystemClosures
-    ]
+    const allRecords = [...User, ...user_closure, ...TCAMember, ...System, ...SystemClosure]
 
     return NextResponse.json({
       success: true,
       summary,
-      tables: {
-        User: mockUsers,
-        user_closure: mockUserClosures,
-        TCAMember: mockTCAMembers,
-        System: mockSystems,
-        SystemClosure: mockSystemClosures
-      },
+      tables: { User, user_closure, TCAMember, System, SystemClosure },
       allRecords
     }, { headers: CORS_HEADERS })
 
