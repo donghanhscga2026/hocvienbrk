@@ -89,6 +89,9 @@ model UserClosure {
     @@map("user_closure")
 }
 
+// Them relations vao User model
+// ... (tiep theo trong User model)
+
 model EmailSender {
   id              Int      @id @default(autoincrement())
   label           String                    // Tên gợi nhớ (VD: "Vệ tinh 01")
@@ -191,10 +194,12 @@ model UserRoadmap {
 }
 
 model RoadmapPoint {
-  id        Int      @id
-  label     String
-  description String?
-  color     String?
+  id        Int      @id @default(autoincrement())
+  pointId   Int      @unique // ID từ 1 đến 9
+  name      String   // Tên chặng đường
+  courseIds String   // Chuỗi ID khóa học tương đương, cách nhau dấu phẩy (vd: "1,2,3")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Post {
@@ -202,7 +207,8 @@ model Post {
   title     String
   content   String        @db.Text
   image     String?
-  published Boolean       @default(false)
+  published Boolean       @default(true)
+  pin       Boolean       @default(false)
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   authorId  Int
@@ -723,85 +729,538 @@ model TCASyncHistory {
 }
 
 // ==========================================
-// STAGING SYSTEM - Bảng đệm để Test dữ liệu
+// THEME SYSTEM - 2026-03-30
 // ==========================================
 
-model UserTest {
-  id              Int          @id
-  name            String?
-  email           String       @unique
-  phone           String?      @unique
-  password        String?
-  role            Role         @default(STUDENT)
-  referrerId      Int?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  
-  closureAsAncestor   UserClosureTest[] @relation("ClosureAncestorTest")
-  closureAsDescendant UserClosureTest[] @relation("ClosureDescendantTest")
-  systems             SystemTest[]
-  tcaMembers          TCAMemberTest[]
+model Theme {
+  id            String   @id
+  name          String
+  description   String?
+  colors        Json
+  typography    Json
+  layout        Json
+  animations    Json?
+  effects       Json?
+  isLocked      Boolean  @default(false)
+  isActive      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  siteSettings  SiteSettings?
+  siteProfiles  SiteProfile[]  // [SITE_PROFILE]
+
+  @@index([id])
 }
 
-model UserClosureTest {
-    ancestorId   Int @map("ancestor_id")
-    descendantId Int @map("descendant_id")
-    depth        Int @default(0)
+// ==========================================
+// LANDING PAGE MODULE - 2026-04-03
+// ==========================================
 
-    ancestor   UserTest @relation("ClosureAncestorTest", fields: [ancestorId], references: [id])
-    descendant UserTest @relation("ClosureDescendantTest", fields: [descendantId], references: [id])
-
-    @@id([ancestorId, descendantId])
-    @@map("user_closure_test")
+model LandingPage {
+  id            Int      @id @default(autoincrement())
+  slug          String   @unique  // URL slug: "hocxaykenh", "tiktok-2025"
+  
+  // Content
+  title         String
+  subtitle      String?
+  description   String?  @db.Text
+  heroImage     String?
+  ctaText       String   @default("Đăng ký ngay")
+  ctaLink       String?  // Custom CTA link (default: /register)
+  
+  // Template
+  template      String   @default("hero-cta")  // "hero-cta", "feature-grid", "video-intro", "webinar-reg", "testimonial"
+  config        Json?    // Template-specific settings: { backgroundColor, textColor, accentColor, features[], etc. }
+  
+  // Commission override per landing
+  customCommission Json?  // { f1: 15, f2: 7, f3: 3 } - override campaign commission
+  
+  // Relations
+  courseId      Int?
+  course        Course?  @relation(fields: [courseId], references: [id])
+  
+  // [SITE_PROFILE] Landing riêng cho SiteProfile nào (null = global)
+  profileId     Int?
+  profile       SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  // Stats
+  viewCount     Int      @default(0)
+  clickCount    Int      @default(0)
+  
+  // Status
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  clicks        AffiliateClick[]
+  conversions   AffiliateConversion[]
+  registrations RegistrationPoint[]
+  
+  @@index([slug])
+  @@index([isActive])
+  @@index([courseId])
 }
 
-model SystemTest {
-  autoId    Int       @id @default(autoincrement())
-  userId    Int       
-  onSystem  Int       
-  refSysId  Int       @default(0)
-  createdAt DateTime  @default(now())
+// ==========================================
+// AFFILIATE SYSTEM MODELS - Phase 1
+// ==========================================
+
+// Chiến dịch Affiliate (Campaign)
+model AffiliateCampaign {
+  id            Int       @id @default(autoincrement())
+  name          String
+  slug          String    @unique  // URL-friendly: "chuong-trinh-1"
+  description   String?
+  isActive      Boolean   @default(true)
+  isDefault     Boolean   @default(false)  // Campaign mac dinh
   
-  user       UserTest             @relation(fields: [userId], references: [id])
-  closuresAsAncestor   SystemClosureTest[] @relation("SystemClosureAncestorTest")
-  closuresAsDescendant SystemClosureTest[] @relation("SystemClosureDescendantTest")
+  // [SITE_PROFILE] Campaign riêng cho SiteProfile nào (null = campaign global)
+  profileId     Int?      @unique
+  profile       SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, onSystem])
-  @@map("system_test")
+  // Commission settings
+  maxLevels     Int       @default(3)  // Số tầng hoa hồng tối đa
+  pendingDays   Int       @default(30) // Ngày chờ pending trước khi available
+  
+  // Payout settings
+  minPayout     Float     @default(200000) // Số dư tối thiểu để rút
+  taxRate       Float     @default(0)      // % thuế (0 = miễn thuế)
+  feeAmount     Float     @default(3300)   // Phí chuyển khoản
+  
+  // Points settings
+  pointsPerRegistration  Float    @default(1.0)   // Điểm/đăng ký xác thực
+  pointsRequired        Float    @default(10.0)   // Điểm cần để đổi
+  pointRedemptionValue  Float    @default(386868) // Giá trị quy đổi (1 khóa L1)
+  autoRedeem           Boolean   @default(false)  // Tự động đổi hay manual
+  
+  // Redemption course
+  redemptionCourseId    Int?     // Khóa học được đổi (Level 1)
+  
+  // Landing page commission overrides
+  landingOverrides Json?  // { "hocxaykenh": { f1: 15, f2: 7, f3: 3 }, ... }
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  levels        AffiliateLevel[]
+  links         AffiliateLink[]
+  conversions   AffiliateConversion[]
+  registrations RegistrationPoint[]
+  
+  @@index([isActive])
 }
 
-model SystemClosureTest {
-  ancestorId   Int
-  descendantId Int
-  depth        Int     @default(0)
-  systemId     Int     
+// Cau hinh muc hoa hong theo tang
+model AffiliateLevel {
+  id          Int                @id @default(autoincrement())
+  campaignId  Int
+  campaign    AffiliateCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  level       Int                // 1 = F1, 2 = F2, 3 = F3...
+  percentage  Float              // % hoa hồng (VD: 10.0 = 10%)
+  minOrder    Float?             // Đơn hàng tối thiểu để nhận hoa hồng
   
-  ancestor   SystemTest @relation("SystemClosureAncestorTest", fields: [ancestorId], references: [autoId])
-  descendant SystemTest @relation("SystemClosureDescendantTest", fields: [descendantId], references: [autoId])
-  
-  @@id([ancestorId, descendantId, systemId])
-  @@map("system_closure_test")
+  @@unique([campaignId, level])
+  @@index([campaignId])
 }
 
-model TCAMemberTest {
+// Link affiliate cua CTV
+model AffiliateLink {
+  id          Int                @id @default(autoincrement())
+  userId      Int
+  campaignId  Int
+  campaign    AffiliateCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  code        String             @unique  // Mã: "ABC123XYZ"
+  name        String?            // Tên chiến dịch con: "Link Facebook", "Banner 1"
+  source      String?            // facebook, zalo, google, email, website...
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  
+  // Relations
+  user        User               @relation(fields: [userId], references: [id])
+  clicks      AffiliateClick[]
+  conversions AffiliateConversion[]
+  
+  @@unique([userId, campaignId, name])
+  @@index([userId])
+  @@index([campaignId])
+}
+
+// Lich su click
+model AffiliateClick {
+  id          Int           @id @default(autoincrement())
+  linkId      Int
+  link        AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  userAgent   String?
+  referer     String?
+  url         String?       // Trang đích
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  deviceType  String?      // desktop, mobile, tablet
+  country     String?
+  city        String?
+  
+  // Landing page tracking
+  landingSlug   String?      // LandingPage.slug (denormalized)
+  landingId     Int?
+  landing       LandingPage? @relation(fields: [landingId], references: [id])
+  
+  createdAt   DateTime      @default(now())
+  
+  @@index([linkId, createdAt])
+  @@index([ipAddress, createdAt])
+  @@index([landingSlug])
+  @@index([landingId])
+}
+
+// Custom ref mapping (nbcuong -> userId, video -> userId, etc)
+model AffiliateRef {
+  id          Int       @id @default(autoincrement())
+  refKey      String    @unique // max 10 chars, a-z0-9
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  type        RefType   @default(USER_ID)
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([userId])
+}
+
+// Conversion (khi co don hang)
+model AffiliateConversion {
+  id            Int                    @id @default(autoincrement())
+  linkId        Int
+  link          AffiliateLink          @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  campaignId    Int
+  campaign      AffiliateCampaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId    Int                    // User mua khóa học
+  enrollmentId Int?                   // Enrollment ID
+  orderId      String?                 // Mã đơn hàng
+  orderAmount  Float                  // Số tiền đơn hàng
+  productType  ProductType            @default(COURSE)
+  status        ConversionStatus       @default(PENDING)
+  fraudFlags   String[]               // ["SAME_IP", "SELF_REFERRAL"]
+  pendingUntil DateTime               // = createdAt + pendingDays
+  approvedAt   DateTime?
+  createdAt    DateTime               @default(now())
+  
+  // Landing page tracking
+  landingSlug   String?      // LandingPage.slug
+  landingId     Int?
+  landing       LandingPage? @relation(fields: [landingId], references: [id])
+  
+  // Relations
+  commissions  AffiliateCommission[]
+  
+  @@index([campaignId, status])
+  @@index([customerId])
+  @@index([pendingUntil])
+  @@index([landingSlug])
+  @@index([landingId])
+}
+
+// Diem dang ky - khi user moi xac thuc email
+model RegistrationPoint {
+  id              Int               @id @default(autoincrement())
+  referrerId      Int               // Nguoi gioi thieu (F1)
+  refereeId       Int               // Nguoi duoc gioi thieu
+  campaignId      Int
+  campaign        AffiliateCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  points          Float             @default(1.0)
+  status          PointStatus       @default(PENDING)
+  earnedAt        DateTime          @default(now())
+  confirmedAt     DateTime?         // Khi xac thuc email thanh cong
+  
+  // Landing page tracking
+  landingSlug     String?
+  landingId       Int?
+  landing         LandingPage?      @relation(fields: [landingId], references: [id])
+  
+  // Relations
+  referrer        User              @relation("ReferrerRegistration", fields: [referrerId], references: [id])
+  referee         User              @relation("RefereeRegistration", fields: [refereeId], references: [id])
+  
+  @@index([referrerId])
+  @@index([refereeId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([landingSlug])
+}
+
+// Hoa hong cua CTV
+model AffiliateCommission {
+  id            Int               @id @default(autoincrement())
+  conversionId  Int
+  conversion    AffiliateConversion @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+  affiliateId   Int
+  level         Int               // 1 = F1, 2 = F2, 3 = F3...
+  percentage    Float             // % duoc ap dung
+  grossAmount   Float             // So tien goc
+  taxAmount     Float             @default(0)
+  feeAmount     Float             @default(0)
+  netAmount     Float             // Thuc nhan = grossAmount - tax - fee
+  status        CommissionStatus  @default(PENDING)
+  availableAt   DateTime?         // Khi nao available de rut
+  paidAt        DateTime?
+  createdAt     DateTime          @default(now())
+  
+  // Relations
+  affiliate     User              @relation(fields: [affiliateId], references: [id])
+  
+  @@index([affiliateId, status])
+  @@index([availableAt])
+}
+
+// Vi cua CTV (chua diem + tien)
+model AffiliateWallet {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  user           User     @relation(fields: [userId], references: [id])
+  
+  // Points
+  points         Float    @default(0)     // Diem dang ky (khong het han)
+  
+  // Money
+  balance        Float    @default(0)      // Co the rut ngay
+  pendingBalance Float    @default(0)      // Dang cho pending
+  totalEarned    Float    @default(0)      // Tong da kiem
+  totalPaid      Float    @default(0)     // Tong da rut
+  
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  transactions    AffiliateTransaction[]
+  
+  @@index([userId])
+}
+
+// Lich su giao dich vi
+model AffiliateTransaction {
+  id              Int              @id @default(autoincrement())
+  walletId        Int
+  wallet          AffiliateWallet  @relation(fields: [walletId], references: [id])
+  amount          Float            // +/- so tien
+  type            TransactionType
+  description     String
+  refId           String?          // Lien ket: payout_id, commission_id
+  balanceBefore   Float
+  balanceAfter    Float
+  status          TransactionStatus @default(COMPLETED)
+  createdAt       DateTime         @default(now())
+  
+  @@index([walletId, createdAt])
+  @@index([type])
+}
+
+// Yeu cau rut tien
+model AffiliatePayout {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id])
+  amount        Float          // So tien yeu cau
+  taxAmount     Float          @default(0)
+  feeAmount     Float          @default(0)
+  netAmount     Float          // Thuc nhan
+  bankName      String
+  bankAccount   String
+  accountHolder String
+  qrCodeUrl     String?        // VietQR
+  status        PayoutStatus   @default(PENDING)
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  
+  @@index([status])
+  @@index([userId, status])
+}
+
+model SiteSettings {
+  id          String   @id @default("global")
+  themeId     String   @default("classic")
+  language    String   @default("vi")
+  updatedAt   DateTime @updatedAt
+  
+  theme       Theme    @relation(fields: [themeId], references: [id])
+
+  @@unique([themeId])
+}
+
+model CourseTestimonial {
+  id          Int       @id @default(autoincrement())
+  courseId    Int
+  name        String
+  role        String?
+  avatar      String?
+  content     String
+  rating      Int       @default(5)
+  courseName  String?
+  isFeatured  Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@index([courseId, isActive])
+  @@index([isFeatured])
+}
+
+model Tool {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  description String?
+  icon        String?
+  url         String
+  roles       Role[]
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+// ==========================================
+// TOOL HELP - Hướng dẫn sử dụng công cụ
+// ==========================================
+
+model ToolHelp {
+  id          Int       @id @default(autoincrement())
+  toolSlug    String    @unique // slug của tool: "genealogy", "affiliate", "courses",...
+  title       String    // tiêu đề modal
+  content     Json      // nội dung hướng dẫn (array of sections)
+  order       Int       @default(0) // thứ tự hiển thị
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([toolSlug])
+}
+
+// ==========================================
+// SITE_PROFILE SYSTEM - 2026-04-14
+// Hệ thống trang chủ động cho Teacher
+// ==========================================
+
+model SiteProfile {
   id              Int       @id @default(autoincrement())
-  tcaId          Int       @unique
-  userId         Int       
-  type           String    
-  groupName      String?
-  name           String
-  personalScore  Decimal?  @db.Decimal(10, 3)
-  totalScore     Decimal?  @db.Decimal(10, 3)
-  level          Int?
-  location       String?
-  phone          String?
-  email          String?
-  parentTcaId    Int?
-  lastSyncedAt   DateTime  @default(now())
-  createdAt      DateTime  @default(now())
   
-  user           UserTest  @relation(fields: [userId], references: [id])
-  @@map("tca_member_test")
-}
+  // ─────────────────────────────────────────────────────────
+  // IDENTITY
+  // 2 loại profile:
+  // 1. BRK gốc: userId = null, slug = "brk", isDefault = true
+  // 2. Teacher: userId = User.id, slug = tùy chỉnh
+  // ─────────────────────────────────────────────────────────
+  userId          Int?      @unique  // null = BRK gốc
+  user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug            String    @unique
+  
+  isActive        Boolean   @default(false)
+  isDefault       Boolean   @default(false)  // true = BRK gốc
+  
+  // ─────────────────────────────────────────────────────────
+  // HERO SECTION
+  // ─────────────────────────────────────────────────────────
+  heroImage       String?   // Ảnh nền hero
+  heroOverlay     Float?    @default(0.3)  // Độ mờ overlay (0-1)
+  
+  title           String?   // "NGÂN HÀNG PHƯỚC BÁU" → tùy biến
+  subtitle        String?   // "Tri thức là sức mạnh"
+  
+  // Custom message (thay Message.content)
+  messageContent  String?
+  messageDetail   String?
+  messageImage    String?   // Ảnh trong modal chi tiết
+  
+  // [GREETING] Lời chào động theo thời gian
+  // Cấu trúc: { morning: "...", afternoon: "...", evening: "..." }
+  greetingMessages Json?
+  
+  // ─────────────────────────────────────────────────────────
+  // SURVEY SECTION
+  // ─────────────────────────────────────────────────────────
+  surveyTitle     String?   // "Zero 2 Hero" → tùy biến
+  
+  // ─────────────────────────────────────────────────────────
+  // ROADMAP SECTION
+  // ─────────────────────────────────────────────────────────
+  customRoadmap   Json?     // { targetPointId, customPath, ... }
+  roadmapTitle    String?   // "Lộ trình Zero 2 Hero" → tùy biến
+  
+  // ─────────────────────────────────────────────────────────
+  // COURSES SECTION
+  // ─────────────────────────────────────────────────────────
+  // null = hiện tất cả khóa của teacher (hoặc tất cả nếu BRK)
+  // [] = ẩn section này
+  courseIds       Json?     // [1,2,3] - Danh sách cụ thể
+  courseCategoryFilter Json?  // [category1, category2] - Lọc theo categories
+  
+  coursesTitle    String?   // "Khóa học của tôi" → tùy biến
+  allCoursesTitle String?   // "Tất cả khóa học" → tùy biến
+  showAllCourses  Boolean   @default(true)  // Hiện "Tất cả khóa học"
+  
+  // ─────────────────────────────────────────────────────────
+  // COMMUNITY SECTION
+  // ─────────────────────────────────────────────────────────
+  showCommunity   Boolean   @default(true)
+  communityTitle  String?   // "Bảng tin" → tùy biến
+  
+  // [COMMUNITY_CUSTOMIZATION] Filter posts by category
+  communityCategoryId Int?
+  communityLimit      Int      @default(10)  // Số bài viết hiển thị
 
-// ... rest of your existing schema models (Theme, LandingPage, Affiliate, etc.)
+  // ─────────────────────────────────────────────────────────
+  // SURVEY SECTION
+  // ─────────────────────────────────────────────────────────
+  // [SURVEY_CUSTOMIZATION] Survey riêng được chọn
+  selectedSurveyId Int?
+  
+  // ─────────────────────────────────────────────────────────
+  // FOOTER SECTION
+  // ─────────────────────────────────────────────────────────
+  footerText      String?
+  footerLinks     Json?     // [{label, url}, ...]
+  
+  // ─────────────────────────────────────────────────────────
+  // SEO
+  // ─────────────────────────────────────────────────────────
+  metaTitle       String?
+  metaDescription String?
+  metaImage       String?
+  
+  // ─────────────────────────────────────────────────────────
+  // THEME (Full customization)
+  // ─────────────────────────────────────────────────────────
+  themeId         String?   // Theme riêng (null = dùng theme mặc định)
+  theme           Theme?     @relation(fields: [themeId], references: [id])
+  
+  // Override colors trực tiếp (ưu tiên hơn themeId)
+  accentColor     String?
+  backgroundColor String?
+  textColor      String?
+  
+  // ─────────────────────────────────────────────────────────
+  // STATS
+  // ─────────────────────────────────────────────────────────
+  viewCount       Int       @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // ─────────────────────────────────────────────────────────
+  // RELATIONS
+  // ─────────────────────────────────────────────────────────
+  surveys         Survey[]
+  landingPages    LandingPage[]    // Landing pages riêng
+  affiliateCampaign AffiliateCampaign?  // Campaign affiliate riêng (1-1 vì @unique)
+  
+  @@index([slug])
+  @@index([userId])
+  @@index([isActive])
+}

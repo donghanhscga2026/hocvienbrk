@@ -143,7 +143,7 @@ export default async function TeacherHomePage({ params }: PageProps) {
     
     // 8. Roadmap points
     const roadmapPoints = await prisma.roadmapPoint.findMany({
-        orderBy: { pointId: 'asc' }
+        orderBy: { id: 'asc' }
     })
     
     // 9. Reset survey action
