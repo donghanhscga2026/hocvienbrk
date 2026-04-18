@@ -226,6 +226,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, syncId, stats, staging: STAGING_MODE, message: STAGING_MODE ? 'GHI VÀO BẢNG TEST THÀNH CÔNG' : 'Sync completed' }, { headers: CORS_HEADERS })
 
   } catch (error) {
+    console.error('[TCA Sync] ERROR:', error)
     return NextResponse.json({ success: false, error: String(error) }, { status: 500, headers: CORS_HEADERS })
   }
 }
