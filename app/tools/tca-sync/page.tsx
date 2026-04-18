@@ -90,13 +90,25 @@ function TestPanel() {
       </div>
 
       {(testData?.users || 0) > 0 && (
-        <button
-          onClick={handlePromote}
-          disabled={promoting}
-          className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg disabled:opacity-50"
-        >
-          {promoting ? 'Đang đẩy...' : '🚀 ĐẨY LÊN PRODUCTION'}
-        </button>
+        <>
+          <button
+            onClick={handlePromote}
+            disabled={promoting}
+            className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg disabled:opacity-50"
+          >
+            {promoting ? 'Đang đẩy...' : '🚀 ĐẨY LÊN PRODUCTION'}
+          </button>
+          <button
+            onClick={async () => {
+              if (!confirm('XÓA toàn bộ dữ liệu Test?')) return;
+              await fetch('/api/sync-tca/clear-test', { method: 'DELETE' });
+              fetchTestData();
+            }}
+            className="w-full px-4 py-2 mt-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
+          >
+            🗑️ XÓA DỮ LIỆU TEST
+          </button>
+        </>
       )}
 
       {promoteResult && (
