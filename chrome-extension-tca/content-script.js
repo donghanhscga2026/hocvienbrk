@@ -280,15 +280,7 @@
           background:#1565c0; border:none; color:white; padding:10px 20px; border-radius:5px; 
           cursor:pointer; font-weight:bold; font-size:12px;
         ">🔄 Xem de xuat dong bo</button>
-        <button id="btn-demo-preview" style="
-          background:#7b1fa2; border:none; color:white; padding:10px 20px; border-radius:5px; 
-          cursor:pointer; font-weight:bold; font-size:12px;
-        ">🎯 DemoPreview</button>
-        <button id="btn-show-data" style="
-          background:#00897b; border:none; color:white; padding:10px 20px; border-radius:5px; 
-          cursor:pointer; font-weight:bold; font-size:12px;
-        ">📊 ShowData</button>
-        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v3.0.0</span>
+        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v3.0.1</span>
       </div>
     `;
 
@@ -299,8 +291,6 @@
     document.getElementById('btn-csv').addEventListener('click', window.downloadTCACSV);
     document.getElementById('btn-json').addEventListener('click', window.downloadTCAJSON);
     document.getElementById('btn-sync-preview').addEventListener('click', () => showSyncPreviewPanel());
-    document.getElementById('btn-demo-preview').addEventListener('click', () => callDemoPreview());
-    document.getElementById('btn-show-data').addEventListener('click', () => callShowData());
 
     // Fill table with parent info
     const tbody = document.getElementById('tca-nodes-body');
@@ -430,8 +420,11 @@
           <small style="color:#666;">Kiem tra chi tiet truoc khi dong bo</small>
         </div>
         <div style="display:flex; gap:10px;">
+          <button id="btn-demo-preview" style="background:#7b1fa2; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">🎯 DemoPreview</button>
+          <button id="btn-show-data" style="background:#00897b; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">📊 ShowData</button>
           <button id="btn-preview-select-all" style="background:#1565c0; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Chon tat ca</button>
           <button id="btn-preview-deselect-all" style="background:#666; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Bo chon tat ca</button>
+          <span id="panel-version" style="color:#666; font-size:10px; align-self:center;">v3.0.1</span>
           <button id="btn-preview-close" style="background:#d32f2f; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">X Dong</button>
         </div>
       </div>
@@ -519,6 +512,8 @@
 
     // Event listeners
     document.getElementById('btn-preview-close').addEventListener('click', closePreview);
+    document.getElementById('btn-demo-preview').addEventListener('click', window.callDemoPreview);
+    document.getElementById('btn-show-data').addEventListener('click', window.callShowData);
     document.getElementById('btn-preview-cancel').addEventListener('click', closePreview);
     overlay.addEventListener('click', closePreview);
 
