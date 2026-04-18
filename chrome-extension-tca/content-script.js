@@ -213,7 +213,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#999; font-weight:normal;">v4.2.2</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#999; font-weight:normal;">v4.2.3</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#e65100; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA DỮ LIỆU MẪU (LOCAL)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -568,10 +568,13 @@
       progressPanel.remove();
 
       if (result.success) {
-        addTcaLog(`ĐỒNG BỘ THÀNH CÔNG! Tạo: ${result.stats.usersCreated} User, ${result.stats.systemsCreated} System.`);
-        alert('CHÚC MỪNG! Dữ liệu đã được đồng bộ an toàn.');
+        const syncId = result.syncId || 'N/A';
+        addTcaLog(`✅ ĐỒNG BỘ THÀNH CÔNG! Phiên: ${syncId}`);
+        addTcaLog(`Sử dụng mã phiên trên tại /tools/tca-sync nếu cần Rollback.`);
+        
+        alert(`CHÚC MỪNG! Dữ liệu đã được đồng bộ an toàn.\n\nMã phiên (SyncID): ${syncId}\n\nLưu ý: Bạn có thể hoàn tác (Rollback) phiên này tại trang công cụ hệ thống.`);
       } else {
-        addTcaLog(`LỖI ĐỒNG BỘ: ${result.error}`);
+        addTcaLog(`❌ LỖI ĐỒNG BỘ: ${result.error}`);
         alert('Lỗi: ' + result.error);
       }
     } catch (err) {
