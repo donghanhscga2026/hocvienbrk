@@ -1,16 +1,10 @@
 'use server'
 
 import prisma from "@/lib/prisma"
+import { PayoutStatus } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
 // ==================== WALLET ====================
-
-// PayoutStatus enum (local vì không có model AffiliatePayout)
-const PayoutStatus = {
-    PENDING: 'PENDING',
-    COMPLETED: 'COMPLETED',
-    REJECTED: 'REJECTED'
-} as const
 
 export async function getAffiliateWallet(userId: number) {
     try {
