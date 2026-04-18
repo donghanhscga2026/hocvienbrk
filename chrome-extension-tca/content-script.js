@@ -13,6 +13,7 @@
   const SYNC_ENDPOINT = API_BASE + '/api/sync-tca';
   const PRECHECK_ENDPOINT = API_BASE + '/api/sync-tca/precheck';
   const SYNC_PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
+  const PREVIEW_RESULT_KEY = 'tca_preview_result';
 
   console.log('[TCA Sync] API Base:', API_BASE);
 
@@ -23,6 +24,7 @@
   let allNodesGlobal = []; // Lưu allNodes để dùng sau
   let precheckDone = false; // Flag để tránh gọi precheck nhiều lần
   let previewCache = {};   // Lưu preview response để dùng khi sync
+  let previewRows = [];   // Lưu kết quả preview từ /preview API
 
   function injectScript() {
     const script = document.createElement('script');
@@ -34,13 +36,15 @@
     (document.head || document.documentElement).appendChild(script);
   }
 
-  function callPrecheckAPI(nodes) {
+  // Bước 1: Gọi /preview API để lấy bảng tổng hợp (thay thế /precheck)
+  function callPreviewAPI(nodes) {
     return new Promise((resolve, reject) => {
       // Build allNodes format
       const allNodes = nodes.map(n => ({
         id: n.id,
         type: n.type,
-        name: n.name
+        name: n.name,
+        parentFolderId: n.parentFolderId
       }));
       
       // Build memberInfo format
@@ -53,22 +57,16 @@
       });
 
       if (allNodes.length === 0) {
-        console.log('[TCA Sync] No nodes to precheck');
+        console.log('[TCA Sync] No nodes to preview');
         resolve({});
         return;
       }
 
-      console.log('[TCA Sync] === PRECHECK START ===');
+      console.log('[TCA Sync] === PREVIEW START ===');
       console.log('[TCA Sync] Nodes:', allNodes.length);
-      console.log('[TCA Sync] API URL:', PRECHECK_ENDPOINT);
+      console.log('[TCA Sync] API URL:', SYNC_PREVIEW_ENDPOINT);
       
-      // Log first few nodes
-      const sampleNodes = allNodes.slice(0, 3);
-      sampleNodes.forEach(n => {
-        console.log(`[TCA Sync]   Node ${n.id}: ${n.name}, phone=${memberInfo[n.id]?.phone || 'none'}, email=${memberInfo[n.id]?.email || 'none'}`);
-      });
-      
-      fetch(PRECHECK_ENDPOINT, {
+      fetch(SYNC_PREVIEW_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allNodes, memberInfo })
@@ -76,40 +74,32 @@
       .then(res => {
         console.log('[TCA Sync] Response status:', res.status, res.statusText);
         if (!res.ok) {
-          throw new Error('Precheck failed: ' + res.status);
+          throw new Error('Preview failed: ' + res.status);
         }
         return res.json();
       })
       .then(data => {
-        console.log('[TCA Sync] === PRECHECK RESPONSE ===');
+        console.log('[TCA Sync] === PREVIEW RESPONSE ===');
         console.log('[TCA Sync] Success:', data.success);
-        console.log('[TCA Sync] Total members:', data.members?.length || 0);
+        console.log('[TCA Sync] Total rows:', data.rows?.length || 0);
         
-        // Build precheckCache from members array - MERGE instead of replace
-        if (data.members && Array.isArray(data.members)) {
-          data.members.forEach(m => {
-            precheckCache[m.tcaId] = {
-              exists: m.status === 'EXISTING_SYSTEM',
-              userFound: m.existingUserId !== null,
-              userId: m.existingUserId,
-              matchType: m.matchType,
-              emailMismatch: m.emailMismatch,
-              existingUserEmail: m.existingUserEmail,
-              referrerId: m.referrerId
-            };
-            if (m.existingUserId) {
-              console.log(`[TCA Sync]   Found: TCA ${m.tcaId} -> User ${m.existingUserId} (${m.name}), matchType=${m.matchType}, emailMismatch=${m.emailMismatch}`);
-            }
-          });
-          console.log('[TCA Sync] Cache entries:', Object.keys(precheckCache).length);
+        // Lưu kết quả vào localStorage để dùng sau
+        if (data.rows && data.rows.length > 0) {
+          previewRows = data.rows;
+          try {
+            localStorage.setItem(PREVIEW_RESULT_KEY, JSON.stringify(data));
+            console.log('[TCA Sync] Saved preview result to localStorage');
+          } catch (e) {
+            console.error('[TCA Sync] localStorage error:', e);
+          }
         }
         
-        console.log('[TCA Sync] === PRECHECK END ===');
-        resolve(precheckCache);
+        console.log('[TCA Sync] === PREVIEW END ===');
+        resolve(data);
       })
       .catch(err => {
-        console.error('[TCA Sync] Precheck ERROR:', err.message || err);
-        resolve({});
+        console.error('[TCA Sync] Preview ERROR:', err.message || err);
+        resolve(null);
       });
     });
   }
@@ -139,13 +129,15 @@
         }
       });
       
-      // Gọi precheck với dữ liệu đầy đủ
-      callPrecheckAPI(allNodesGlobal).then(() => {
-        console.log('[TCA Sync] === PRECHECK COMPLETE ===');
-        // Cập nhật panel nếu đang hiển thị
+      // Gọi preview với dữ liệu đầy đủ (Bước 1: Lấy bảng tổng hợp)
+      callPreviewAPI(allNodesGlobal).then((previewData) => {
+        console.log('[TCA Sync] === PREVIEW COMPLETE ===');
+        console.log('[TCA Sync] Preview rows:', previewData?.rows?.length || 0);
+        // Cập nhật panel nếu đang hiển thị (truyền cả previewRows)
         const panel = document.getElementById('tca-sync-panel');
         if (panel) {
           panel.remove();
+          // Gọi lại với previewRows đã lưu
           showDataPanel(allNodesGlobal, { total: allNodesGlobal.length, folders: 0, items: allNodesGlobal.filter(n => n.type === 'item').length }, memberInfoCache);
         }
       });
@@ -154,9 +146,21 @@
 
   function showDataPanel(allNodes, stats, memberInfo) {
     console.log('[TCA Sync] showDataPanel called with', allNodes.length, 'nodes');
-    console.log('[TCA Sync] precheckCache keys:', Object.keys(precheckCache));
-    console.log('[TCA Sync] precheckCache[60073]:', precheckCache[60073]);
-    console.log('[TCA Sync] precheckCache[61752]:', precheckCache[61752]);
+    console.log('[TCA Sync] previewRows:', previewRows.length);
+    
+    // Thử lấy từ localStorage nếu chưa có
+    if (previewRows.length === 0) {
+      try {
+        const saved = localStorage.getItem(PREVIEW_RESULT_KEY);
+        if (saved) {
+          const data = JSON.parse(saved);
+          previewRows = data.rows || [];
+          console.log('[TCA Sync] Loaded previewRows from localStorage:', previewRows.length);
+        }
+      } catch (e) {
+        console.error('[TCA Sync] Error loading previewRows:', e);
+      }
+    }
     
     // Remove existing panel
     const existing = document.getElementById('tca-sync-panel');
@@ -202,60 +206,72 @@
     const userOnlyCount = allNodes.filter(n => precheckCache[n.id]?.userFound && !precheckCache[n.id]?.exists).length;
     const newItems = allNodes.filter(n => !precheckCache[n.id]?.exists && !precheckCache[n.id]?.userFound).length;
 
-    // Header
+    // Header - Bảng tổng hợp với 14 columns từ /preview API
+    // Dùng previewRows nếu có, không thì dùng allNodes
+    const rows = previewRows.length > 0 ? previewRows : allNodes;
+    const stats = {
+      total: rows.length,
+      createAll: rows.filter(r => r.action === 'CREATE_ALL').length,
+      createSystem: rows.filter(r => r.action === 'CREATE_SYSTEM').length,
+      update: rows.filter(r => r.action === 'UPDATE').length,
+      skip: rows.filter(r => r.action === 'SKIP').length,
+      newUser: rows.filter(r => r.match === 'NEW').length,
+      phoneEmail: rows.filter(r => r.match === 'PHONE_EMAIL').length,
+      phoneOnly: rows.filter(r => r.match === 'PHONE_ONLY').length,
+      emailOnly: rows.filter(r => r.match === 'EMAIL_ONLY').length
+    };
+    
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
         <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data Extracted <span style="font-size:10px; color:#999;">v2.5.1</span></h2>
-          <small style="color:#666;">Auto-scanned from TCA Portal</small>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data (Bảng tổng hợp) <span style="font-size:10px; color:#999;">v4.0.0</span></h2>
+          <small style="color:#666;">Bước 1: Quét TCA → Xuất bảng đầy đủ</small>
         </div>
-        <button id="btn-close" style="
-          background:#d32f2f; border:none; color:white; padding:5px 12px; border-radius:5px; cursor:pointer; font-weight:bold;
-        ">X Close</button>
+        <div>
+          <span style="color:#666; font-size:10px; margin-right:10px;">Tổng: ${stats.total}</span>
+          <button id="btn-close" style="
+            background:#d32f2f; border:none; color:white; padding:5px 12px; border-radius:5px; cursor:pointer; font-weight:bold;
+          ">X</button>
+        </div>
       </div>
       
-      <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:15px;">
+      <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:15px;">
         <div style="background:#e8f5e9; padding:8px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-          <div style="font-size:18px; font-weight:bold; color:#2e7d32;">${allNodes.length}</div>
-          <div style="color:#555; font-size:9px;">Tong</div>
-        </div>
-        <div style="background:#fff3e0; padding:8px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
-          <div style="font-size:18px; font-weight:bold; color:#e65100;">${allNodes.filter(n => n.type === 'folder').length}</div>
-          <div style="color:#555; font-size:9px;">Folders</div>
-        </div>
-        <div style="background:#e3f2fd; padding:8px; border-radius:8px; text-align:center; border:1px solid #bbdefb;">
-          <div style="font-size:18px; font-weight:bold; color:#1565c0;">${allNodes.filter(n => n.type === 'item').length}</div>
-          <div style="color:#555; font-size:9px;">Items</div>
-        </div>
-        <div style="background:#fce4ec; padding:8px; border-radius:8px; text-align:center; border:1px solid #f48fb1;">
-          <div style="font-size:18px; font-weight:bold; color:#c2185b;">${withContact}</div>
-          <div style="color:#555; font-size:9px;">Email/Phone</div>
-        </div>
-        <div style="background:#c8e6c9; padding:8px; border-radius:8px; text-align:center; border:1px solid #a5d6a7;">
-          <div style="font-size:18px; font-weight:bold; color:#2e7d32;">${existsInDB}</div>
-          <div style="color:#555; font-size:9px;">EXISTS</div>
+          <div style="font-size:18px; font-weight:bold; color:#2e7d32;">${stats.createAll}</div>
+          <div style="color:#555; font-size:9px;">Tạo User</div>
         </div>
         <div style="background:#bbdefb; padding:8px; border-radius:8px; text-align:center; border:1px solid #90caf9;">
-          <div style="font-size:18px; font-weight:bold; color:#1565c0;">${userOnlyCount}</div>
-          <div style="color:#555; font-size:9px;">USER</div>
+          <div style="font-size:18px; font-weight:bold; color:#1565c0;">${stats.createSystem}</div>
+          <div style="color:#555; font-size:9px;">Tạo System</div>
+        </div>
+        <div style="background:#fff3e0; padding:8px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
+          <div style="font-size:18px; font-weight:bold; color:#e65100;">${stats.update}</div>
+          <div style="color:#555; font-size:9px;">Cập nhật</div>
+        </div>
+        <div style="background:#fce4ec; padding:8px; border-radius:8px; text-align:center; border:1px solid #f48fb1;">
+          <div style="font-size:18px; font-weight:bold; color:#c2185b;">${stats.phoneEmail}</div>
+          <div style="color:#555; font-size:9px;">P+E</div>
         </div>
         <div style="background:#fff9c4; padding:8px; border-radius:8px; text-align:center; border:1px solid #fff176;">
-          <div style="font-size:18px; font-weight:bold; color:#f57f17;">${newItems}</div>
+          <div style="font-size:18px; font-weight:bold; color:#f57f17;">${stats.newUser}</div>
           <div style="color:#555; font-size:9px;">NEW</div>
         </div>
       </div>
       
       <div style="max-height:400px; overflow-y:auto; border:1px solid #ddd; border-radius:8px;">
-        <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <table style="width:100%; border-collapse:collapse; font-size:10px; min-width:900px;">
           <thead style="position:sticky; top:0; background:#f5f5f5; z-index:1;">
             <tr>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:40px;">ID</th>
-              <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333;">Ten thanh vien</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:45px;">Match</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">DB</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:50px;">UserID</th>
-              <th style="padding:6px; text-align:left; border-bottom:2px solid #ddd; color:#333; width:110px;">Email</th>
-              <th style="padding:6px; text-align:center; border-bottom:2px solid #ddd; color:#333; width:80px;">Phone</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:30px;">#</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:40px;">ID</th>
+              <th style="padding:4px; text-align:left; border-bottom:2px solid #ddd; width:80px;">Tên</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Match</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:40px;">DB</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:45px;">UserID</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:50px;">refSysId</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:50px;">Parent</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:60px;">RefID</th>
+              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:60px;">Action</th>
             </tr>
           </thead>
           <tbody id="tca-nodes-body">
@@ -264,7 +280,7 @@
       </div>
       
       <div style="margin-top:10px; padding:8px; background:#e8f5e9; border-radius:6px; font-size:11px; color:#2e7d32;">
-        <strong>Da lay du lieu cho ${allNodes.length} thanh vien tu TCA Portal</strong>
+        <strong>Bước 1 hoàn thành:</strong> ${stats.total} thành viên | Tạo User: ${stats.createAll} | Tạo Sys: ${stats.createSystem} | Update: ${stats.update}
       </div>
       
       <div style="margin-top:15px; padding:10px; background:#f5f5f5; border-radius:8px; text-align:center;">
@@ -276,11 +292,7 @@
           background:#e65100; border:none; color:white; padding:10px 20px; border-radius:5px; 
           cursor:pointer; font-weight:bold; margin-right:10px; font-size:12px;
         ">📄 Download JSON</button>
-        <button id="btn-sync-preview" style="
-          background:#1565c0; border:none; color:white; padding:10px 20px; border-radius:5px; 
-          cursor:pointer; font-weight:bold; font-size:12px;
-        ">🔄 Xem de xuat dong bo</button>
-        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v3.1.1</span>
+        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v4.0.0</span>
       </div>
     `;
 
@@ -292,91 +304,89 @@
     document.getElementById('btn-json').addEventListener('click', window.downloadTCAJSON);
     document.getElementById('btn-sync-preview').addEventListener('click', () => showSyncPreviewPanel());
 
-    // Fill table with parent info
+    // Fill table - dùng previewRows nếu có (từ /preview API), không thì dùng allNodes
     const tbody = document.getElementById('tca-nodes-body');
-    allNodes.forEach((node, idx) => {
+    const displayRows = previewRows.length > 0 ? previewRows : allNodes;
+    
+    displayRows.forEach((row, idx) => {
       const tr = document.createElement('tr');
       
       // Alternating background
-      if (idx % 2 === 0) {
-        tr.style.background = '#ffffff';
-      } else {
-        tr.style.background = '#f9f9f9';
-      }
-      // Highlight folders
-      if (node.type === 'folder') {
-        tr.style.background = '#e8f5e9';
-        tr.style.fontWeight = 'bold';
-      }
+      tr.style.background = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
       tr.style.borderBottom = '1px solid #eee';
       
-      // Get contact info
-      const contact = memberInfoMap[node.id] || {};
-      const email = contact.email || '-';
-      const phone = contact.phone || '-';
+      // Lấy dữ liệu từ previewRows (mới) hoặc allNodes (cũ)
+      const id = row.id || row.tcaId;
+      const name = row.name || '-';
+      const match = row.match || null;
+      const userId = row.userId || null;
+      const refSysId = row.refSysId || null;
+      const parentTcaId = row.parentTcaId || null;
+      const parentUserId = row.parentUserId || row.referrerId || null;
+      const referrerId = row.referrerId || parentUserId;
+      const action = row.action || 'SKIP';
+      const changes = row.changes || [];
+      const email = row.email || '-';
+      const phone = row.phone || '-';
       
-      // Get precheck status & UserID - KHÔNG phân biệt folder/item
-      const precheckResult = precheckCache[node.id];
-      const isExisting = precheckResult?.exists;  // User + System both exist
-      const userFound = precheckResult?.userFound;  // User found (may not have System)
-      const userId = precheckResult?.userId;
-      const matchType = precheckResult?.matchType;
-      const emailMismatch = precheckResult?.emailMismatch;
-      const existingUserEmail = precheckResult?.existingUserEmail;
-      
-      // DB status: EXISTS = User+System, USER = User only, NEW = No user
-      let dbStatus = '-';
-      if (isExisting) {
-        dbStatus = '<span style="color:#2e7d32;font-weight:bold;">EXISTS</span>';
-      } else if (userFound) {
-        dbStatus = '<span style="color:#1565c0;font-weight:bold;">USER</span>';
-      } else {
-        dbStatus = '<span style="color:#e65100;font-weight:bold;">NEW</span>';
-      }
-      const userIdDisplay = userId ? `<span style="color:#1565c0;font-weight:bold;">${userId}</span>` : '-';
-      
-      // Match type display với tooltip chi tiết
+      // Match display
       let matchDisplay = '-';
-      let matchBgColor = '#999';
-      let matchTitle = '';
+      let matchColor = '#999';
+      if (match === 'PHONE_EMAIL') {
+        matchDisplay = 'P+E';
+        matchColor = '#2e7d32';
+      } else if (match === 'PHONE_ONLY') {
+        matchDisplay = 'P';
+        matchColor = '#1565c0';
+      } else if (match === 'EMAIL_ONLY') {
+        matchDisplay = 'E';
+        matchColor = '#d32f2f';
+      } else if (match === 'NEW') {
+        matchDisplay = 'NEW';
+        matchColor = '#999';
+      }
       
-      if (matchType === 'PHONE_EMAIL') {
-        matchDisplay = '<span style="background:#2e7d32;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">P+E</span>';
-        matchBgColor = '#2e7d32';
-        matchTitle = `Phone va Email cung trung - User ${userId} da xac nhan`;
-      } else if (matchType === 'PHONE_ONLY') {
-        if (emailMismatch) {
-          matchDisplay = '<span style="background:#f57c00;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">P! EMAIL</span>';
-          matchBgColor = '#f57c00';
-          matchTitle = `CANH BAO: Phone trung (User ${userId}) nhung Email khac!\n` +
-                       `  TCA email: ${email || '-'}\n` +
-                       `  DB email: ${existingUserEmail || '-'}\n` +
-                       `  => Se goi y cap nhat email`;
-        } else {
-          matchDisplay = '<span style="background:#1565c0;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">P</span>';
-          matchBgColor = '#1565c0';
-          matchTitle = `Phone trung - User ${userId}`;
-        }
-      } else if (matchType === 'EMAIL_ONLY') {
-        matchDisplay = '<span style="background:#d32f2f;color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:bold;">E</span>';
-        matchBgColor = '#d32f2f';
-        matchTitle = `CHI Email trung - User ${userId}. Phone khong trung!`;
+      // DB status từ row.db
+      let dbStatus = '-';
+      let dbColor = '#999';
+      if (row.db && row.db.userId) {
+        dbStatus = row.db.userId;
+        dbColor = '#2e7d32';
+      } else if (userId) {
+        dbStatus = userId;
+        dbColor = '#1565c0';
+      }
+      
+      // Action display
+      let actionDisplay = action;
+      let actionColor = '#999';
+      if (action === 'CREATE_ALL') {
+        actionColor = '#2e7d32';
+      } else if (action === 'CREATE_SYSTEM') {
+        actionColor = '#1565c0';
+      } else if (action === 'UPDATE') {
+        actionColor = '#f57c00';
+      } else if (action === 'SKIP') {
+        actionColor = '#999';
       }
       
       tr.innerHTML = `
-        <td style="padding:6px 4px; text-align:center; font-family:monospace; font-size:10px; color:#333;">${node.id}</td>
-        <td style="padding:6px 4px; color:#000; font-weight:${node.type === 'folder' ? 'bold' : 'normal'}; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${node.name || '-'}">${node.name || '-'}</td>
-        <td style="padding:6px 4px; text-align:center; font-size:10px;" title="${matchTitle}">${matchDisplay}</td>
-        <td style="padding:6px 4px; text-align:center; font-size:10px;">${dbStatus}</td>
-        <td style="padding:6px 4px; text-align:center; font-size:10px; color:#1565c0; font-weight:bold;">${userIdDisplay}</td>
-        <td style="padding:6px 4px; font-size:10px; color:${email === '-' ? '#999' : '#1565c0'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" data-member-email="${node.id}">${email}</td>
-        <td style="padding:6px 4px; text-align:center; font-size:10px; color:${phone === '-' ? '#999' : '#e65100'};" data-member-phone="${node.id}">${phone}</td>
+        <td style="padding:4px 2px; text-align:center; font-size:9px; color:#999;">${idx + 1}</td>
+        <td style="padding:4px 2px; text-align:center; font-family:monospace; font-size:9px; color:#333;">${id}</td>
+        <td style="padding:4px 2px; color:#000; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px;" title="${name}">${name}</td>
+        <td style="padding:4px 2px; text-align:center;"><span style="background:${matchColor};color:white;padding:1px 4px;border-radius:2px;font-size:8px;">${matchDisplay}</span></td>
+        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${dbColor}; font-weight:bold;">${dbStatus}</td>
+        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${userId && !row.db ? '#2e7d32' : '#1565c0'}; font-weight:bold;">${userId || '-'}</td>
+        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${refSysId ? '#1565c0' : '#ccc'};">${refSysId || '-'}</td>
+        <td style="padding:4px 2px; text-align:center; font-size:9px; color:#666;">${parentTcaId || '-'}</td>
+        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${referrerId ? '#2e7d32' : '#ccc'}; font-weight:bold;">${referrerId || '-'}</td>
+        <td style="padding:4px 2px; text-align:center;"><span style="background:${actionColor};color:white;padding:2px 6px;border-radius:3px;font-size:8px;">${actionDisplay}</span></td>
       `;
       tbody.appendChild(tr);
     });
 
     // Store data for download functions
-    window.tcaExtractedData = { allNodes, stats, memberInfo: memberInfoMap, precheckCache };
+    window.tcaExtractedData = { allNodes, stats, memberInfo: memberInfoMap, previewRows };
   }
 
   function showSyncPreviewPanel() {
@@ -467,21 +477,19 @@
       </div>
       
       <div id="preview-table-container" style="flex:1; overflow:auto; padding:0 20px;">
-        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1300px;">
+        <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:900px;">
           <thead style="position:sticky; top:0; background:#fafafa; z-index:1;">
             <tr>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:25px;">#</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:25px;">Chon</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">TCA ID</th>
-              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd; width:70px;">Ten</th>
+              <th style="padding:8px; text-align:left; border-bottom:2px solid #ddd; width:80px;">Ten</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">Match</th>
               <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:70px;">Hanh dong</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Cur User</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">New User</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">New Sys</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">RefID</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:45px;">RefSys</th>
-              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:30px;">#Cl</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">UserID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">RefID</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:50px;">refSysId</th>
+              <th style="padding:8px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Changes</th>
             </tr>
           </thead>
           <tbody id="preview-tbody">
@@ -572,17 +580,22 @@
         previewCache = result;
         console.log('[TCA Sync] Preview cached:', result.rows?.length, 'rows');
 
-        // Update stats
+        // Update stats - new format
+        const createAll = result.rows.filter(r => r.action === 'CREATE_ALL').length;
+        const createSystem = result.rows.filter(r => r.action === 'CREATE_SYSTEM').length;
+        const update = result.rows.filter(r => r.action === 'UPDATE').length;
+        const skip = result.rows.filter(r => r.action === 'SKIP').length;
+        
         document.getElementById('preview-total').textContent = result.total;
-        document.getElementById('preview-create-all').textContent = result.willCreate.users;
-        document.getElementById('preview-create-system').textContent = result.willCreate.systems;
-        document.getElementById('preview-update').textContent = result.willUpdate.tcaMembers;
-        document.getElementById('preview-skip').textContent = result.willSkip;
-        document.getElementById('preview-closures').textContent = result.willCreate.closures || 0;
+        document.getElementById('preview-create-all').textContent = createAll;
+        document.getElementById('preview-create-system').textContent = createSystem;
+        document.getElementById('preview-update').textContent = update;
+        document.getElementById('preview-skip').textContent = skip;
+        document.getElementById('preview-closures').textContent = createAll + createSystem;
         document.getElementById('next-user-id').textContent = result.nextAvailableUserId || '-';
         document.getElementById('next-system-id').textContent = result.nextAvailableSystemId || '-';
 
-        // Fill table
+        // Fill table - new format (1 bảng tổng hợp)
         const tbody = document.getElementById('preview-tbody');
         let selectedCount = 0;
 
@@ -596,57 +609,51 @@
           const isSelected = row.action !== 'SKIP';
           if (isSelected) selectedCount++;
 
-          // Color for new IDs
-          const newUserIdColor = row.expectedUserId ? '#2e7d32' : '#999';
-          const newSysIdColor = row.expectedSystemId ? '#1565c0' : '#999';
+          // UserID: existing (row.db?.userId) or new (row.userId for CREATE_ALL)
+          const existingUserId = row.db?.userId;
+          const userId = row.userId;
+          const userIdColor = userId && !existingUserId ? '#2e7d32' : (existingUserId ? '#1565c0' : '#999');
 
-          // RefID: hiển thị cho tất cả users (đã tồn tại hoặc mới)
-          // Với user đã tồn tại: lấy current referrerId
-          // Với user mới: lấy expectedReferrerId
-          const currentReferrerId = row.currentData?.referrerId;
-          const refId = row.expectedReferrerId ?? currentReferrerId;
-          const refIdColor = refId != null ? '#2e7d32' : '#ccc';
-
-          // RefSys tương tự
-          const currentRefSysId = row.currentData?.refSysId;
-          const refSysId = row.expectedRefSysId ?? currentRefSysId;
-          const refSysIdColor = refSysId != null ? '#1565c0' : '#ccc';
-          
-          // Get match type from API response
-          const matchType = row.matchType || null;
-          const emailMismatch = row.emailMismatch || false;
-          
           // Match type display
+          const matchType = row.match || null;
           let matchDisplay = '-';
           if (matchType === 'PHONE_EMAIL') {
             matchDisplay = '<span style="background:#2e7d32;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P+E</span>';
           } else if (matchType === 'PHONE_ONLY') {
-            if (emailMismatch) {
-              matchDisplay = '<span style="background:#f57c00;color:white;padding:1px 4px;border-radius:3px;font-size:9px;" title="Email khac">P!</span>';
-            } else {
-              matchDisplay = '<span style="background:#1565c0;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P</span>';
-            }
+            matchDisplay = '<span style="background:#1565c0;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">P</span>';
           } else if (matchType === 'EMAIL_ONLY') {
             matchDisplay = '<span style="background:#d32f2f;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">E</span>';
+          } else if (matchType === 'NEW') {
+            matchDisplay = '<span style="background:#666;color:white;padding:1px 4px;border-radius:3px;font-size:9px;">NEW</span>';
           }
-          
+
+          // Action label
+          let actionLabel = row.action;
+          if (row.action === 'CREATE_ALL') actionLabel = 'Tạo User+System';
+          else if (row.action === 'CREATE_SYSTEM') actionLabel = 'Tạo System';
+          else if (row.action === 'UPDATE') actionLabel = 'Cập nhật';
+          else if (row.action === 'SKIP') actionLabel = 'Bỏ qua';
+          const actionColor = row.action === 'CREATE_ALL' ? '#2e7d32' : (row.action === 'CREATE_SYSTEM' ? '#1565c0' : (row.action === 'UPDATE' ? '#f57c00' : '#999'));
+
+          // refSysId = parentUserId (UserID, not System autoId)
+          const refId = row.referrerId;
+          const refSysId = row.refSysId;
+
           tr.innerHTML = `
             <td style="padding:4px 2px; text-align:center; color:#999; font-size:9px;">${idx + 1}</td>
             <td style="padding:4px 2px; text-align:center;">
-              <input type="checkbox" class="preview-checkbox" data-tca-id="${row.tcaId}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
+              <input type="checkbox" class="preview-checkbox" data-tca-id="${row.id}" ${isSelected ? 'checked' : ''} ${row.action === 'SKIP' ? 'disabled' : ''}>
             </td>
-            <td style="padding:4px 2px; text-align:center; font-family:monospace; color:#333; font-size:10px;">${row.tcaId}</td>
+            <td style="padding:4px 2px; text-align:center; font-family:monospace; color:#333; font-size:10px;">${row.id}</td>
             <td style="padding:4px 2px; color:#000; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px;" title="${row.name}">${row.name}</td>
             <td style="padding:4px 2px; text-align:center; font-size:10px;">${matchDisplay}</td>
             <td style="padding:4px 2px; text-align:center;">
-              <span style="background:${row.actionColor}; color:white; padding:2px 6px; border-radius:3px; font-size:9px; white-space:nowrap;">${row.actionLabel}</span>
+              <span style="background:${actionColor}; color:white; padding:2px 6px; border-radius:3px; font-size:9px; white-space:nowrap;">${actionLabel}</span>
             </td>
-            <td style="padding:4px 2px; text-align:center; color:${row.currentData?.userId ? '#1565c0' : '#ccc'}; font-weight:bold; font-size:10px;">${row.currentData?.userId || '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:${newUserIdColor}; font-weight:bold; font-size:10px;">${row.expectedUserId || '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:${newSysIdColor}; font-weight:bold; font-size:10px;">${row.expectedSystemId || '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:${refIdColor}; font-weight:bold; font-size:10px;">${refId ?? '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:${refSysIdColor}; font-size:10px;">${refSysId ?? '-'}</td>
-            <td style="padding:4px 2px; text-align:center; color:#7b1fa2; font-size:9px;">${row.closuresToCreate || 0}</td>
+            <td style="padding:4px 2px; text-align:center; color:${userIdColor}; font-weight:bold; font-size:10px;">${userId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${refId ? '#2e7d32' : '#ccc'}; font-weight:bold; font-size:10px;">${refId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:${refSysId ? '#1565c0' : '#ccc'}; font-size:10px;">${refSysId || '-'}</td>
+            <td style="padding:4px 2px; text-align:center; color:#7b1fa2; font-size:9px;">${row.changes?.length || 0}</td>
           `;
           tbody.appendChild(tr);
         });
@@ -800,18 +807,18 @@
         updateStep(2, 'Dang gui yeu cau dong bo toi server...');
         console.log('[TCA Sync] Executing sync for', selectedNodes.length, 'nodes');
 
-        // Build expectedIds từ preview cache - filter chỉ lấy selected IDs
+        // Build expectedIds từ preview cache - filter chỉ lấy selected IDs (new format)
         const expectedIds = {};
         if (previewData.rows && previewData.rows.length > 0) {
           previewData.rows.forEach(row => {
             // Chỉ lấy những TCA ID nào được check để sync
-            if (selectedIds.includes(row.tcaId)) {
-              if (row.expectedUserId || row.expectedSystemId || row.expectedReferrerId || row.expectedRefSysId) {
-                expectedIds[row.tcaId] = {
-                  userId: row.expectedUserId || null,
-                  systemId: row.expectedSystemId || null,
-                  referrerId: row.expectedReferrerId || null,
-                  refSysId: row.expectedRefSysId || null
+            if (selectedIds.includes(row.id)) {
+              // userId: new format uses row.userId directly
+              if (row.userId || row.referrerId || row.refSysId) {
+                expectedIds[row.id] = {
+                  userId: row.userId || null,
+                  referrerId: row.referrerId || null,
+                  refSysId: row.refSysId || null
                 };
               }
             }
