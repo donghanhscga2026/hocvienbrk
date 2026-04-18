@@ -144,9 +144,9 @@ export async function POST(request: Request) {
         
         console.log('[TCA Sync] Processing node', node.id, '-> userId:', useUserId, '(auto:', !expected, ')');
 
-        const targetUserId = expected.userId;
-        const targetReferrerId = expected.referrerId; 
-        const targetRefSysId = expected.refSysId;
+        const targetUserId = useUserId;
+        const targetReferrerId = useReferrerId; 
+        const targetRefSysId = useRefSysId;
 
         // XÁC ĐỊNH MODEL DỰA TRÊN STAGING_MODE
         const userModel = STAGING_MODE ? (prisma as any).userTest : prisma.user;
