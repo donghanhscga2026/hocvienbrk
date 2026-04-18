@@ -213,7 +213,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.4.0 [STAGING]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.4.1 [STAGING]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -269,7 +269,7 @@
 
     document.body.appendChild(panel);
     updateLogDisplay();
-    addTcaLog('Đã sẵn sàng v4.2.1: Tạo dữ liệu mẫu Local giúp khớp 100% với Dashboard.');
+    addTcaLog('Đã sẵn sàng v4.4.1: CSV/JSON dùng previewRows khớp bảng TCA Dashboard.');
     
     // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
