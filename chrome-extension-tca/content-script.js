@@ -110,6 +110,11 @@
     fetchedCount++;
     console.log(`[TCA Sync] 📋 Member contact updated: ${memberId} (${fetchedCount}/${allNodesGlobal.length})`);
     
+    // Ghi log tiến trình
+    if (fetchedCount % 10 === 0 || fetchedCount === allNodesGlobal.length) {
+      addTcaLog(`Tiến độ lấy thông tin liên lạc: ${fetchedCount}/${allNodesGlobal.length}`);
+    }
+    
     // Update panel if exists
     const emailCell = document.querySelector(`[data-member-email="${memberId}"]`);
     const phoneCell = document.querySelector(`[data-member-phone="${memberId}"]`);
@@ -144,11 +149,21 @@
     }
   }
 
+  let tcaLogs = [];
+  function addTcaLog(msg) {
+    const timestamp = new Date().toLocaleTimeString();
+    tcaLogs.unshift(`[${timestamp}] ${msg}`);
+    if (tcaLogs.length > 50) tcaLogs.pop();
+    const logContainer = document.getElementById('tca-log-content');
+    if (logContainer) {
+      logContainer.innerHTML = tcaLogs.map(l => `<div style="border-bottom:1px solid #eee;padding:4px 0;word-break:break-all;">${l}</div>`).join('');
+    }
+  }
+
   function showDataPanel(allNodes, stats, memberInfo) {
     console.log('[TCA Sync] showDataPanel called with', allNodes.length, 'nodes');
-    console.log('[TCA Sync] previewRows:', previewRows.length);
+    addTcaLog(`Đã quét xong ${allNodes.length} thành viên từ TCA.`);
     
-    // Thử lấy từ localStorage nếu chưa có
     if (previewRows.length === 0) {
       try {
         const saved = localStorage.getItem(PREVIEW_RESULT_KEY);
@@ -156,230 +171,203 @@
           const data = JSON.parse(saved);
           previewRows = data.rows || [];
           console.log('[TCA Sync] Loaded previewRows from localStorage:', previewRows.length);
+          addTcaLog(`Đã tải ${previewRows.length} dòng dữ liệu so sánh từ bộ nhớ tạm.`);
         }
       } catch (e) {
         console.error('[TCA Sync] Error loading previewRows:', e);
       }
     }
     
-    // Remove existing panel
     const existing = document.getElementById('tca-sync-panel');
     if (existing) existing.remove();
     
-    // Build node map for parent lookup
-    const nodeMap = new Map();
-    allNodes.forEach(node => nodeMap.set(node.id, node));
-    
-    // Merge member info
-    const memberInfoMap = memberInfo || {};
-    
-    // Create panel
     const panel = document.createElement('div');
     panel.id = 'tca-sync-panel';
     panel.style.cssText = `
       position: fixed !important;
-      top: 10px !important;
-      right: 10px !important;
-      width: 800px !important;
-      max-height: 85vh !important;
-      max-width: 95vw !important;
+      top: 50% !important;
+      left: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      width: 90vw !important;
+      height: 80vh !important;
       background: #ffffff !important;
       color: #333 !important;
       border: 3px solid #2e7d32 !important;
       border-radius: 12px !important;
-      padding: 15px !important;
       z-index: 999999999 !important;
       font-family: 'Segoe UI', Arial, sans-serif !important;
       font-size: 12px !important;
-      overflow-y: auto !important;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
-      display: block !important;
-      visibility: visible !important;
-      opacity: 1 !important;
+      box-shadow: 0 10px 60px rgba(0,0,0,0.4) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
     `;
 
-    // Header - Bảng tổng hợp với 14 columns từ /preview API
-    // Dùng previewRows nếu có, không thì dùng allNodes
     const rows = previewRows.length > 0 ? previewRows : allNodes;
-    const withContact = rows.filter(r => r.email || r.phone).length;
-    const stats = {
+    const viewStats = {
       total: rows.length,
       createAll: rows.filter(r => r.action === 'CREATE_ALL').length,
       createSystem: rows.filter(r => r.action === 'CREATE_SYSTEM').length,
       update: rows.filter(r => r.action === 'UPDATE').length,
       skip: rows.filter(r => r.action === 'SKIP').length,
       newUser: rows.filter(r => r.match === 'NEW').length,
-      phoneEmail: rows.filter(r => r.match === 'PHONE_EMAIL').length,
-      phoneOnly: rows.filter(r => r.match === 'PHONE_ONLY').length,
-      emailOnly: rows.filter(r => r.match === 'EMAIL_ONLY').length
+      phoneEmail: rows.filter(r => r.match === 'PHONE_EMAIL').length
     };
     
     panel.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #e0e0e0; padding-bottom:10px;">
-        <div>
-          <h2 style="margin:0; color:#2e7d32; font-size:18px;"> TCA Data (Bảng tổng hợp) <span style="font-size:10px; color:#999;">v4.0.1</span></h2>
-          <small style="color:#666;">Bước 1: Quét TCA → Xuất bảng đầy đủ</small>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:15px;">
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Data Explorer <span style="font-size:10px; color:#999; font-weight:normal;">v4.1.2</span></h2>
+          <div style="display:flex; gap:8px;">
+            <button id="btn-sync-preview" style="background:#2e7d32; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🚀 ĐỒNG BỘ NGAY</button>
+            <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
+            <button id="btn-json" style="background:#7b1fa2; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📄 JSON</button>
+            <button id="btn-demo-preview-top" style="background:#e65100; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🎯 DEMO</button>
+          </div>
         </div>
-        <div>
-          <span style="color:#666; font-size:10px; margin-right:10px;">Tổng: ${stats.total}</span>
-          <button id="btn-close" style="
-            background:#d32f2f; border:none; color:white; padding:5px 12px; border-radius:5px; cursor:pointer; font-weight:bold;
-          ">X</button>
-        </div>
-      </div>
-      
-      <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:15px;">
-        <div style="background:#e8f5e9; padding:8px; border-radius:8px; text-align:center; border:1px solid #c8e6c9;">
-          <div style="font-size:18px; font-weight:bold; color:#2e7d32;">${stats.createAll}</div>
-          <div style="color:#555; font-size:9px;">Tạo User</div>
-        </div>
-        <div style="background:#bbdefb; padding:8px; border-radius:8px; text-align:center; border:1px solid #90caf9;">
-          <div style="font-size:18px; font-weight:bold; color:#1565c0;">${stats.createSystem}</div>
-          <div style="color:#555; font-size:9px;">Tạo System</div>
-        </div>
-        <div style="background:#fff3e0; padding:8px; border-radius:8px; text-align:center; border:1px solid #ffe0b2;">
-          <div style="font-size:18px; font-weight:bold; color:#e65100;">${stats.update}</div>
-          <div style="color:#555; font-size:9px;">Cập nhật</div>
-        </div>
-        <div style="background:#fce4ec; padding:8px; border-radius:8px; text-align:center; border:1px solid #f48fb1;">
-          <div style="font-size:18px; font-weight:bold; color:#c2185b;">${stats.phoneEmail}</div>
-          <div style="color:#555; font-size:9px;">P+E</div>
-        </div>
-        <div style="background:#fff9c4; padding:8px; border-radius:8px; text-align:center; border:1px solid #fff176;">
-          <div style="font-size:18px; font-weight:bold; color:#f57f17;">${stats.newUser}</div>
-          <div style="color:#555; font-size:9px;">NEW</div>
+        <div style="display:flex; align-items:center; gap:15px;">
+          <div style="font-size:11px; color:#666; background:#fff; padding:4px 8px; border-radius:4px; border:1px solid #ddd;">
+            <span style="color:#2e7d32; font-weight:bold;">Tạo: ${viewStats.createAll + viewStats.createSystem}</span> | 
+            <span style="color:#f57c00; font-weight:bold;">Sửa: ${viewStats.update}</span> | 
+            <span>Tổng: ${viewStats.total}</span>
+          </div>
+          <button id="btn-close" style="background:#d32f2f; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;">X</button>
         </div>
       </div>
       
-      <div style="max-height:400px; overflow-y:auto; border:1px solid #ddd; border-radius:8px;">
-        <table style="width:100%; border-collapse:collapse; font-size:10px; min-width:900px;">
-          <thead style="position:sticky; top:0; background:#f5f5f5; z-index:1;">
-            <tr>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:30px;">#</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:40px;">ID</th>
-              <th style="padding:4px; text-align:left; border-bottom:2px solid #ddd; width:80px;">Tên</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:40px;">Match</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:40px;">DB</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:45px;">UserID</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:50px;">refSysId</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:50px;">Parent</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:60px;">RefID</th>
-              <th style="padding:4px; text-align:center; border-bottom:2px solid #ddd; width:60px;">Action</th>
-            </tr>
-          </thead>
-          <tbody id="tca-nodes-body">
-          </tbody>
-        </table>
-      </div>
-      
-      <div style="margin-top:10px; padding:8px; background:#e8f5e9; border-radius:6px; font-size:11px; color:#2e7d32;">
-        <strong>Bước 1 hoàn thành:</strong> ${stats.total} thành viên | Tạo User: ${stats.createAll} | Tạo Sys: ${stats.createSystem} | Update: ${stats.update}
-      </div>
-      
-      <div style="margin-top:15px; padding:10px; background:#f5f5f5; border-radius:8px; text-align:center;">
-        <button id="btn-csv" style="
-          background:#2e7d32; border:none; color:white; padding:10px 20px; border-radius:5px; 
-          cursor:pointer; font-weight:bold; margin-right:10px; font-size:12px;
-        ">📥 Download CSV</button>
-        <button id="btn-json" style="
-          background:#e65100; border:none; color:white; padding:10px 20px; border-radius:5px; 
-          cursor:pointer; font-weight:bold; margin-right:10px; font-size:12px;
-        ">📄 Download JSON</button>
-        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v4.0.1</span>
+      <div style="display:flex; flex:1; overflow:hidden;">
+        <!-- Cột Bảng dữ liệu (Trái) -->
+        <div style="flex:1; display:flex; flex-direction:column; border-right:2px solid #e0e0e0; overflow:hidden;">
+          <div style="flex:1; overflow:auto; padding:0;">
+            <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1100px;">
+              <thead style="position:sticky; top:0; background:#eeeeee; z-index:10; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                <tr>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:35px;">#</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">TCAID</th>
+                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:150px;">Tên Thành Viên</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">P.TCAID</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">Match</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">UserID</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">RefID</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:100px;">Action</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">refSysId</th>
+                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:120px;">Email</th>
+                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:100px;">Phone</th>
+                </tr>
+              </thead>
+              <tbody id="tca-nodes-body"></tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Cột Log (Phải) -->
+        <div style="width:250px; background:#f9f9f9; display:flex; flex-direction:column; flex-shrink:0;">
+          <div style="padding:8px; background:#e0e0e0; font-weight:bold; font-size:11px; color:#555;">NHẬT KÝ HOẠT ĐỘNG</div>
+          <div id="tca-log-content" style="flex:1; overflow-y:auto; padding:8px; font-family:monospace; font-size:10px; line-height:1.4; color:#444;"></div>
+        </div>
       </div>
     `;
 
     document.body.appendChild(panel);
+    updateLogDisplay();
+    addTcaLog('Hệ thống đã áp dụng logic đối chiếu dữ liệu v4.1.2: Ưu tiên Referrer hiện tại từ DB (bao gồm ID 0).');
     
-    // Attach event listeners
+    // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
-    document.getElementById('btn-csv').addEventListener('click', window.downloadTCACSV);
-    document.getElementById('btn-json').addEventListener('click', window.downloadTCAJSON);
-    document.getElementById('btn-sync-preview').addEventListener('click', () => showSyncPreviewPanel());
+    document.getElementById('btn-csv').addEventListener('click', () => {
+      addTcaLog('Bắt đầu tải file CSV...');
+      window.downloadTCACSV();
+    });
+    document.getElementById('btn-json').addEventListener('click', () => {
+      addTcaLog('Bắt đầu tải file JSON...');
+      window.downloadTCAJSON();
+    });
+    document.getElementById('btn-sync-preview').addEventListener('click', () => {
+      addTcaLog('Mở bảng điều khiển đồng bộ...');
+      showSyncPreviewPanel();
+    });
+    document.getElementById('btn-demo-preview-top').addEventListener('click', () => {
+      addTcaLog('Đang chạy Demo Preview (Simulated)...');
+      window.callDemoPreview();
+    });
 
-    // Fill table - dùng previewRows nếu có (từ /preview API), không thì dùng allNodes
+    // Điền dữ liệu vào bảng
     const tbody = document.getElementById('tca-nodes-body');
     const displayRows = previewRows.length > 0 ? previewRows : allNodes;
     
     displayRows.forEach((row, idx) => {
       const tr = document.createElement('tr');
-      
-      // Alternating background
       tr.style.background = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
       tr.style.borderBottom = '1px solid #eee';
       
-      // Lấy dữ liệu từ previewRows (mới) hoặc allNodes (cũ)
-      const id = row.id || row.tcaId;
+      const tcaId = row.id || row.tcaId;
       const name = row.name || '-';
-      const match = row.match || null;
-      const userId = row.userId || null;
-      const refSysId = row.refSysId || null;
-      const parentTcaId = row.parentTcaId || null;
-      const parentUserId = row.parentUserId || row.referrerId || null;
-      const referrerId = row.referrerId || parentUserId;
+      const parentTcaId = row.parentTcaId || '-';
+      const match = row.match || '-';
       const action = row.action || 'SKIP';
-      const changes = row.changes || [];
       const email = row.email || '-';
       const phone = row.phone || '-';
+
+      // --- LOGIC ĐỐI CHIẾU DỮ LIỆU CHÍNH XÁC ---
       
+      // 1. UserID: Ưu tiên DB (Xanh), nếu mới thì lấy đề xuất (Đỏ)
+      const dbUserId = row.db?.userId;
+      const newUserId = row.userId;
+      const userIdVal = dbUserId || newUserId || '-';
+      const userIdColor = dbUserId ? '#1565c0' : (newUserId ? '#d32f2f' : '#999');
+
+      // 2. RefID (referrerId): 
+      // NẾU User đã tồn tại trong DB VÀ đã có referrerId (kể cả 0) => Hiện cái cũ (Xanh)
+      // NẾU CHƯA CÓ hoặc User MỚI => Theo TCA (Đỏ)
+      const hasDbReferrer = row.db && (row.db.referrerId !== null && row.db.referrerId !== undefined);
+      const refIdVal = hasDbReferrer ? row.db.referrerId : (row.referrerId !== undefined ? row.referrerId : '-');
+      const refIdColor = hasDbReferrer ? '#1565c0' : (row.referrerId !== undefined ? '#d32f2f' : '#999');
+
+      // 3. refSysId: Tuân thủ cấu trúc TCA (Đỏ nếu tạo mới, Xanh nếu trùng DB hiện tại)
+      const tcaRefSysId = row.refSysId; // Đây là parent theo TCA đã được Server tính toán
+      const dbRefSysId = row.db?.refSysId;
+      const refSysIdVal = tcaRefSysId !== undefined ? tcaRefSysId : (dbRefSysId || '-');
+      const refSysIdColor = (tcaRefSysId !== undefined && tcaRefSysId === dbRefSysId) ? '#1565c0' : '#d32f2f';
+
       // Match display
       let matchDisplay = '-';
       let matchColor = '#999';
-      if (match === 'PHONE_EMAIL') {
-        matchDisplay = 'P+E';
-        matchColor = '#2e7d32';
-      } else if (match === 'PHONE_ONLY') {
-        matchDisplay = 'P';
-        matchColor = '#1565c0';
-      } else if (match === 'EMAIL_ONLY') {
-        matchDisplay = 'E';
-        matchColor = '#d32f2f';
-      } else if (match === 'NEW') {
-        matchDisplay = 'NEW';
-        matchColor = '#999';
-      }
-      
-      // DB status từ row.db
-      let dbStatus = '-';
-      let dbColor = '#999';
-      if (row.db && row.db.userId) {
-        dbStatus = row.db.userId;
-        dbColor = '#2e7d32';
-      } else if (userId) {
-        dbStatus = userId;
-        dbColor = '#1565c0';
-      }
+      if (match === 'PHONE_EMAIL') { matchDisplay = 'P+E'; matchColor = '#2e7d32'; }
+      else if (match === 'PHONE_ONLY') { matchDisplay = 'P'; matchColor = '#1565c0'; }
+      else if (match === 'EMAIL_ONLY') { matchDisplay = 'E'; matchColor = '#c2185b'; }
+      else if (match === 'NEW') { matchDisplay = 'NEW'; matchColor = '#555'; }
       
       // Action display
-      let actionDisplay = action;
-      let actionColor = '#999';
-      if (action === 'CREATE_ALL') {
-        actionColor = '#2e7d32';
-      } else if (action === 'CREATE_SYSTEM') {
-        actionColor = '#1565c0';
-      } else if (action === 'UPDATE') {
-        actionColor = '#f57c00';
-      } else if (action === 'SKIP') {
-        actionColor = '#999';
-      }
-      
+      let actionLabel = action;
+      let actionBg = '#999';
+      if (action === 'CREATE_ALL') { actionLabel = 'Tạo All'; actionBg = '#2e7d32'; }
+      else if (action === 'CREATE_SYSTEM') { actionLabel = 'Tạo Sys'; actionBg = '#1565c0'; }
+      else if (action === 'UPDATE') { actionLabel = 'Cập nhật'; actionBg = '#f57c00'; }
+
       tr.innerHTML = `
-        <td style="padding:4px 2px; text-align:center; font-size:9px; color:#999;">${idx + 1}</td>
-        <td style="padding:4px 2px; text-align:center; font-family:monospace; font-size:9px; color:#333;">${id}</td>
-        <td style="padding:4px 2px; color:#000; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px;" title="${name}">${name}</td>
-        <td style="padding:4px 2px; text-align:center;"><span style="background:${matchColor};color:white;padding:1px 4px;border-radius:2px;font-size:8px;">${matchDisplay}</span></td>
-        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${dbColor}; font-weight:bold;">${dbStatus}</td>
-        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${userId && !row.db ? '#2e7d32' : '#1565c0'}; font-weight:bold;">${userId || '-'}</td>
-        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${refSysId ? '#1565c0' : '#ccc'};">${refSysId || '-'}</td>
-        <td style="padding:4px 2px; text-align:center; font-size:9px; color:#666;">${parentTcaId || '-'}</td>
-        <td style="padding:4px 2px; text-align:center; font-size:9px; color:${referrerId ? '#2e7d32' : '#ccc'}; font-weight:bold;">${referrerId || '-'}</td>
-        <td style="padding:4px 2px; text-align:center;"><span style="background:${actionColor};color:white;padding:2px 6px;border-radius:3px;font-size:8px;">${actionDisplay}</span></td>
+        <td style="padding:6px 2px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
+        <td style="padding:6px 2px; text-align:center; font-family:monospace; font-weight:bold;">${tcaId}</td>
+        <td style="padding:6px 4px; color:#000; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;" title="${name}">${name}</td>
+        <td style="padding:6px 2px; text-align:center; color:#666;">${parentTcaId}</td>
+        <td style="padding:6px 2px; text-align:center;"><span style="background:${matchColor};color:white;padding:1px 4px;border-radius:2px;font-size:9px;">${matchDisplay}</span></td>
+        <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userIdVal}</td>
+        <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${refIdVal}</td>
+        <td style="padding:6px 2px; text-align:center;"><span style="background:${actionBg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;">${actionLabel}</span></td>
+        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysIdVal}</td>
+        <td style="padding:6px 4px; color:#666; font-size:10px; max-width:120px; overflow:hidden; text-overflow:ellipsis;" title="${email}">${email}</td>
+        <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
       `;
       tbody.appendChild(tr);
     });
 
-    // Store data for download functions
-    window.tcaExtractedData = { allNodes, stats, memberInfo: memberInfoMap, previewRows };
+    window.tcaExtractedData = { allNodes, viewStats, memberInfo, previewRows };
+  }
+
+  function updateLogDisplay() {
+    const logContainer = document.getElementById('tca-log-content');
+    if (logContainer) {
+      logContainer.innerHTML = tcaLogs.map(l => `<div style="border-bottom:1px solid #eee;padding:4px 0;word-break:break-all;">${l}</div>`).join('');
+    }
   }
 
   function showSyncPreviewPanel() {
