@@ -751,9 +751,9 @@
     const previewMap = new Map();
     (data.previewRows || []).forEach(row => previewMap.set(row.id, row));
 
-    // Header với parent info - UTF-8 with BOM for Vietnamese
+    // Header khớp bảng TCA Dashboard: TCAID, Ten, P.TCAID, Match, UserID, RefID, Action, refSysId, Email, Phone
     const BOM = '\uFEFF';
-    let csv = BOM + 'ID,Ten,Ca nhan,Tong,Cap,Tinh,TL CN,TL DN,BH,TD,Type,Email,Phone,DB_Status,UserID\n';
+    let csv = BOM + 'TCAID,Ten,P.TCAID,Match,UserID,RefID,Action,refSysId,Email,Phone\n';
     data.allNodes.forEach(node => {
       // Get contact info
       const contact = data.memberInfo?.[node.id] || {};
@@ -761,11 +761,17 @@
       const phone = contact.phone || '';
       
       // Get từ previewRows (chính là data trên bảng TCA Dashboard)
-      const previewRow = previewMap.get(node.id);
-      const dbStatus = previewRow?.match || '-';
-      const userId = previewRow?.userId || '';
+      const previewRow = previewMap.get(node.id) || {};
+      const tcaId = node.id;
+      const ten = node.name || '';
+      const pTcaId = node.parentFolderId || '-';
+      const match = previewRow.match || '-';
+      const userId = previewRow.userId || '';
+      const refId = previewRow.referrerId || previewRow.parentUserId || '';
+      const action = previewRow.action || '-';
+      const refSys = previewRow.refSysId || previewRow.parentUserId || '';
       
-      csv += `${node.id},"${node.name || ''}",${node.personalScore || '0'},${node.totalScore || '0'},${node.level || '1'},"${node.location || ''}","${node.personalRate || '-'}","${node.teamRate || '-'}","${node.hasBH ? 'Yes' : 'No'}","${node.hasTD ? 'Yes' : 'No'}","${node.type}","${email}","${phone}","${dbStatus}",${userId}\n`;
+      csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${action},${refSys},"${email}","${phone}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
