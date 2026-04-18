@@ -219,7 +219,7 @@ export async function POST(request: Request) {
         }
 
         await tcaMemberModel.upsert({
-          where: { tcaId: node.id },
+          where: { tcaId: nodeId },
           update: tcaMemberData,
           create: tcaMemberData
         });
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
 
       } catch (error) {
         stats.failed++;
-        failedRecords.push({ tcaId: node.id, error: String(error) });
+        failedRecords.push({ tcaId: Number(node.id), error: String(error) });
       }
     }
 
