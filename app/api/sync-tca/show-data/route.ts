@@ -18,19 +18,7 @@ interface ShowDataPayload {
   memberInfo: Record<number, any>
 }
 
-async function getUsersWithPhoneMap() {
-  const users = await prisma.user.findMany({ 
-    where: { id: { lte: 900 }, phone: { not: null } } 
-  })
-  const phoneToUser = new Map<string, any>()
-  for (const user of users) {
-    if (user.phone) {
-      phoneToUser.set(user.phone.replace(/\D/g, ''), user)
-    }
-  }
-  return { users, phoneToUser }
-}
-
+// Sort: parents first
 function sortByHierarchy(nodes: any[]) {
   const nodeMap = new Map<number, any>()
   nodes.forEach(n => nodeMap.set(n.id, n))
@@ -38,112 +26,12 @@ function sortByHierarchy(nodes: any[]) {
   function getDepth(node: any): number {
     const pid = node.parentFolderId
     if (!pid || pid === 'root' || pid === '0') return 0
-    const parentId = Number(pid)
-    if (!parentId) return 0
-    const parent = nodeMap.get(parentId)
+    const parent = nodeMap.get(Number(pid))
     if (!parent) return 0
     return 1 + getDepth(parent)
   }
 
   return [...nodes].sort((a, b) => getDepth(a) - getDepth(b))
-}
-
-async function simulatePreview(nodes: any[], memberInfo: Record<number, any>) {
-  const { users, phoneToUser } = await getUsersWithPhoneMap()
-  
-  const tcaIdToUserId = new Map<number, number>()
-  const result = {
-    users: [] as any[],
-    userClosures: [] as any[],
-    tcaMembers: [] as any[],
-    systems: [] as any[],
-    systemClosures: [] as any[]
-  }
-
-  // Sort nodes
-  const sortedNodes = sortByHierarchy(nodes)
-
-  for (const node of sortedNodes) {
-    const info = memberInfo[node.id] || {}
-    const phone = info.phone || ''
-    const normalizedPhone = phone.replace(/\D/g, '')
-    const email = info.email || ''
-
-    // BƯỚC 1: USER
-    let existingUser = phoneToUser.get(normalizedPhone)
-    let existsUser = !!existingUser
-    let userId: number
-
-    if (!existingUser && email) {
-      existingUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase())
-      if (existingUser) existsUser = true
-    }
-
-    if (existsUser) {
-      userId = existingUser.id
-    } else {
-      userId = 9000 + node.id
-    }
-
-    tcaIdToUserId.set(node.id, userId)
-
-    // BƯỚC 2: USER_CLOSURE
-    const referrerId = existingUser?.referrerId ?? null
-    if (existsUser && referrerId) {
-      result.userClosures.push({
-        ancestorId: referrerId,
-        descendantId: userId,
-        depth: 1
-      })
-    }
-
-    // BƯỚC 3: TCAMEMBER
-    result.tcaMembers.push({
-      tcaId: node.id,
-      userId: userId,
-      name: node.name,
-      parentTcaId: node.parentFolderId,
-      phone: phone,
-      email: email
-    })
-
-    // BƯỚC 4: SYSTEM
-    let parentUserId: number | null = null
-    const parentTcaId = node.parentFolderId
-    if (parentTcaId && parentTcaId !== 'root' && parentTcaId !== '0') {
-      parentUserId = tcaIdToUserId.get(Number(parentTcaId)) ?? null
-    }
-    const refSysId = parentUserId ?? 0
-
-    result.systems.push({
-      userId: userId,
-      onSystem: 1,
-      refSysId: refSysId,
-      tcaId: node.id
-    })
-
-    // BƯỚC 5: SYSTEM_CLOSURE
-    result.systemClosures.push({
-      ancestorId: userId,
-      descendantId: userId,
-      depth: 0,
-      systemId: 1
-    })
-
-    if (parentUserId && parentUserId > 0) {
-      const parentClosures = result.systemClosures.filter(c => c.descendantId === parentUserId)
-      for (const closure of parentClosures) {
-        result.systemClosures.push({
-          ancestorId: closure.ancestorId,
-          descendantId: userId,
-          depth: closure.depth + 1,
-          systemId: 1
-        })
-      }
-    }
-  }
-
-  return result
 }
 
 export async function POST(request: Request) {
@@ -157,25 +45,157 @@ export async function POST(request: Request) {
       )
     }
 
-    // Simulate and get data
-    const simulated = await simulatePreview(body.allNodes, body.memberInfo || {})
+    // Lấy users từ DB để map phone/email -> user
+    const users = await prisma.user.findMany({ 
+      where: { phone: { not: null } },
+      select: { id: true, name: true, email: true, phone: true, referrerId: true }
+    })
+    
+    const phoneToUser = new Map<string, any>()
+    const emailToUser = new Map<string, any>()
+    for (const u of users) {
+      if (u.phone) phoneToUser.set(u.phone.replace(/\D/g, ''), u)
+      if (u.email) emailToUser.set(u.email.toLowerCase(), u)
+    }
+
+    // Sort nodes parents first
+    const sortedNodes = sortByHierarchy(body.allNodes)
+
+    // Mock data structures (NHƯ KHI INSERT THẬT)
+    let tcaIdToUserId = new Map<number, number>()
+    const mockUsers: any[] = []
+    const mockUserClosures: any[] = []
+    const mockTCAMembers: any[] = []
+    const mockSystems: any[] = []
+    const mockSystemClosures: any[] = []
+    
+    let nextUserId = 0
+    const maxUser = await prisma.user.findFirst({ orderBy: { id: 'desc' } })
+    nextUserId = (maxUser?.id || 0) + 1
+
+    const reserved = await prisma.reservedId.findMany({ select: { id: true } })
+    const reservedIds = new Set(reserved.map(r => r.id))
+    const reservedIdList = Array.from(reservedIds)
+
+    for (const node of sortedNodes) {
+      const info = body.memberInfo?.[node.id] || {}
+      const phone = info.phone || ''
+      const normalizedPhone = phone.replace(/\D/g, '')
+      const email = info.email || ''
+      
+      // === BƯỚC 1: USER ===
+      let userId: number
+      let action: string
+      let existingUser = null
+      
+      if (normalizedPhone) existingUser = phoneToUser.get(normalizedPhone)
+      if (!existingUser && email) existingUser = emailToUser.get(email.toLowerCase())
+      
+      if (existingUser) {
+        userId = existingUser.id
+        action = 'EXISTS'
+      } else {
+        while (reservedIdList.includes(nextUserId) || users.find(u => u.id === nextUserId)) {
+          nextUserId++
+        }
+        userId = nextUserId++
+        action = 'CREATE'
+      }
+
+      tcaIdToUserId.set(node.id, userId)
+
+      // Parent lookup cho closure
+      let parentUserId: number | null = null
+      if (node.parentFolderId && node.parentFolderId !== 'root' && node.parentFolderId !== '0') {
+        parentUserId = tcaIdToUserId.get(Number(node.parentFolderId)) ?? null
+      }
+      const referrerId = existingUser?.referrerId ?? parentUserId
+
+      // === BƯỚC 2: USER_CLOSURE ===
+      if (referrerId) {
+        mockUserClosures.push({
+          table: 'user_closure',
+          action: 'CREATE',
+          ancestorId: referrerId,
+          descendantId: userId,
+          depth: 1
+        })
+      }
+
+      // === BƯỚC 3: TCAMEMBER ===
+      mockTCAMembers.push({
+        table: 'TCAMember',
+        action: action === 'EXISTS' ? 'UPDATE' : 'CREATE',
+        tcaId: node.id,
+        userId: userId,
+        name: node.name,
+        parentTcaId: (node.parentFolderId === 'root' || !node.parentFolderId) ? null : Number(node.parentFolderId),
+        phone: phone,
+        email: email
+      })
+
+      // === BƯỚC 4: SYSTEM ===
+      mockSystems.push({
+        table: 'System',
+        action: action === 'EXISTS' ? 'UPDATE' : 'CREATE',
+        userId: userId,
+        onSystem: 1,
+        refSysId: parentUserId || 0
+      })
+
+      // === BƯỚC 5: SYSTEM_CLOSURE ===
+      mockSystemClosures.push({
+        table: 'SystemClosure',
+        action: 'CREATE',
+        ancestorId: userId,
+        descendantId: userId,
+        depth: 0,
+        systemId: 1
+      })
+      
+      if (parentUserId && parentUserId > 0) {
+        const parentClosures = mockSystemClosures.filter((c: any) => c.descendantId === parentUserId)
+        for (const pc of parentClosures) {
+          mockSystemClosures.push({
+            table: 'SystemClosure',
+            action: 'CREATE',
+            ancestorId: pc.ancestorId,
+            descendantId: userId,
+            depth: pc.depth + 1,
+            systemId: 1
+          })
+        }
+      }
+    }
+
+    // Summary
+    const summary = {
+      users: mockUsers.length,
+      userClosures: mockUserClosures.length,
+      tcaMembers: mockTCAMembers.length,
+      systems: mockSystems.length,
+      systemClosures: mockSystemClosures.length
+    }
+
+    const allRecords = [
+      ...mockUsers,
+      ...mockUserClosures,
+      ...mockTCAMembers,
+      ...mockSystems,
+      ...mockSystemClosures
+    ]
 
     return NextResponse.json({
       success: true,
+      summary,
       tables: {
-        User: simulated.users,
-        user_closure: simulated.userClosures,
-        TCAMember: simulated.tcaMembers,
-        System: simulated.systems,
-        SystemClosure: simulated.systemClosures
+        User: mockUsers,
+        user_closure: mockUserClosures,
+        TCAMember: mockTCAMembers,
+        System: mockSystems,
+        SystemClosure: mockSystemClosures
       },
-      summary: {
-        users: simulated.users.length,
-        userClosures: simulated.userClosures.length,
-        tcaMembers: simulated.tcaMembers.length,
-        systems: simulated.systems.length,
-        systemClosures: simulated.systemClosures.length
-      }
+      allRecords
     }, { headers: CORS_HEADERS })
 
   } catch (error) {
