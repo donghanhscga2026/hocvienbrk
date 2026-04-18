@@ -234,6 +234,7 @@ export async function POST(request: Request) {
           console.log(`[TCA Sync]   Updated existing User ${targetUserId}`);
         } else {
           // Tạo User mới
+          const hashedPassword = await bcrypt.hash('Brk#3773', 10);
           await prisma.user.create({
             data: {
               id: targetUserId,
