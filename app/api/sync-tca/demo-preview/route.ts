@@ -23,154 +23,131 @@ interface TCANode {
 interface MemberInfo {
   phone?: string
   email?: string
-  address?: string
-}
-
-interface PreviewPayload {
-  allNodes: TCANode[]
-  memberInfo: Record<number, MemberInfo>
 }
 
 export async function POST(request: Request) {
   try {
-    const body: PreviewPayload = await request.json()
+    const body = await request.json()
+    const { allNodes, memberInfo } = body
 
-    console.log('[API/tca-demo-preview] Called, gọi Preview để lấy dữ liệu')
-
-    if (!body.allNodes || !Array.isArray(body.allNodes)) {
-      return NextResponse.json(
-        { error: 'Invalid payload: allNodes required' },
-        { status: 400, headers: CORS_HEADERS }
-      )
+    if (!allNodes || !Array.isArray(allNodes)) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400, headers: CORS_HEADERS })
     }
 
-    // GỌI API PREVIEW ĐỂ LẤY DỮ LIỆU ĐÚNG!
-    const previewUrl = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://giautoandien.io.vn')
-    console.log('[DemoPreview] Calling:', previewUrl + '/api/sync-tca/preview')
+    // Gọi API preview ĐỂ LẤY DATA (đã test OK)
+    const previewUrl = process.env.VERCEL_URL 
+      ? 'https://' + process.env.VERCEL_URL 
+      : 'http://localhost:3000'
     
-    const previewResponse = await fetch(previewUrl + '/api/sync-tca/preview', {
+    const previewRes = await fetch(previewUrl + '/api/sync-tca/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        allNodes: body.allNodes,
-        memberInfo: body.memberInfo
-      })
+      body: JSON.stringify({ allNodes, memberInfo: memberInfo || {} })
     })
 
-    if (!previewResponse.ok) {
+    const preview = await previewRes.json()
+
+    if (!preview.success || !preview.rows) {
       return NextResponse.json(
-        { error: 'Preview API HTTP error: ' + previewResponse.status },
+        { error: 'Preview API failed: ' + preview.error },
         { status: 500, headers: CORS_HEADERS }
       )
     }
 
-    const previewResult = await previewResponse.json()
-    console.log('[DemoPreview] Preview result:', previewResult.success)
-
-    if (!previewResult?.rows) {
-      return NextResponse.json(
-        { error: 'Preview API failed: ' + previewResult?.error },
-        { status: 500, headers: CORS_HEADERS }
-      )
-    }
-
-    // Format lại từ Preview result - TÁI SỬ DỤNG DỮ LIỆU!
-    const rows = previewResult.rows
-
-    // Build tables từ preview data
+    // Format từ preview.rows -> 5 tables
     const User: any[] = []
     const user_closure: any[] = []
     const TCAMember: any[] = []
     const System: any[] = []
     const SystemClosure: any[] = []
 
-    // Sort theo parent để build closure đúng
-    const nodeMap = new Map<number, any>()
-    rows.forEach((r: any) => nodeMap.set(r.tcaId, r))
-
-    function getDepth(tcaId: number): number {
-      const r = nodeMap.get(tcaId)
-      if (!r || !r.parentTcaId) return 0
-      return 1 + getDepth(r.parentTcaId)
-    }
-
-    const sortedRows = [...rows].sort((a, b) => getDepth(a.tcaId) - getDepth(b.tcaId))
-
     // Map tcaId -> userId cho closure
     const tcaIdToUserId = new Map<number, number>()
 
+    // Sort theo depth de build closure
+    const rowMap = new Map<number, any>()
+    preview.rows.forEach((r: any) => rowMap.set(r.tcaId, r))
+
+    function getDepth(r: any): number {
+      if (!r.parentTcaId) return 0
+      const parent = rowMap.get(r.parentTcaId)
+      return parent ? 1 + getDepth(parent) : 0
+    }
+
+    const sortedRows = [...preview.rows].sort((a, b) => getDepth(a) - getDepth(b))
+
+    // Build tables
     for (const row of sortedRows) {
-      const uid = row.expectedUserId || row.userId
-      const action = row.expectedUserId ? 'CREATE' : 'EXISTS'
+      const userId = row.expectedUserId || (row.currentData?.userId ?? 0)
+      if (!userId) continue
 
-      tcaIdToUserId.set(row.tcaId, uid)
+      tcaIdToUserId.set(row.tcaId, userId)
+      const isCreate = !!row.expectedUserId
 
-      // User table
+      // === User ===
       User.push({
         table: 'User',
-        action: action,
-        id: uid,
+        action: isCreate ? 'CREATE' : 'EXISTS',
+        id: userId,
         name: row.name,
         email: row.email,
         phone: row.phone,
-        referrerId: row.expectedReferrerId || row.referrerId || 0
+        referrerId: row.expectedReferrerId || row.currentData?.referrerId || 0
       })
 
-      // user_closure (từ referrerId trong preview)
-      if (row.referrerId && row.expectedUserId) {
+      // === user_closure ===
+      if (row.expectedReferrerId && isCreate) {
         user_closure.push({
           table: 'user_closure',
           action: 'CREATE',
-          ancestorId: row.referrerId,
-          descendantId: uid,
+          ancestorId: row.expectedReferrerId,
+          descendantId: userId,
           depth: 1
         })
       }
 
-      // TCAMember
+      // === TCAMember ===
       TCAMember.push({
         table: 'TCAMember',
-        action: row.expectedUserId ? 'CREATE' : 'UPDATE',
+        action: isCreate ? 'CREATE' : 'UPDATE',
         tcaId: row.tcaId,
-        userId: uid,
+        userId: userId,
         name: row.name,
         parentTcaId: row.parentTcaId,
         phone: row.phone,
         email: row.email
       })
 
-      // System
+      // === System ===
       System.push({
         table: 'System',
-        action: row.expectedUserId ? 'CREATE' : 'UPDATE',
-        userId: uid,
+        action: isCreate ? 'CREATE' : 'UPDATE',
+        userId: userId,
         onSystem: 1,
         refSysId: row.expectedReferrerId || 0
       })
 
-      // SystemClosure - self
+      // === SystemClosure (self) ===
       SystemClosure.push({
         table: 'SystemClosure',
         action: 'CREATE',
-        ancestorId: uid,
-        descendantId: uid,
+        ancestorId: userId,
+        descendantId: userId,
         depth: 0,
         systemId: 1
       })
 
-      // SystemClosure - copy từ parent
-      const parentTcaId = row.parentTcaId
-      if (parentTcaId) {
-        const parentUserId = tcaIdToUserId.get(parentTcaId)
+      // === SystemClosure (copy from parent) ===
+      if (row.parentTcaId) {
+        const parentUserId = tcaIdToUserId.get(row.parentTcaId)
         if (parentUserId) {
-          // Copy closures của parent
           const parentClosures = SystemClosure.filter(sc => sc.descendantId === parentUserId)
           for (const pc of parentClosures) {
             SystemClosure.push({
               table: 'SystemClosure',
               action: 'CREATE',
               ancestorId: pc.ancestorId,
-              descendantId: uid,
+              descendantId: userId,
               depth: pc.depth + 1,
               systemId: 1
             })
@@ -180,33 +157,23 @@ export async function POST(request: Request) {
     }
 
     const summary = {
-      totalTCA: rows.length,
-      usersToCreate: rows.filter((r: any) => r.expectedUserId).length,
-      usersExists: rows.filter((r: any) => !r.expectedUserId && r.userId).length,
+      totalTCA: preview.total,
+      usersToCreate: User.filter(u => u.action === 'CREATE').length,
+      usersExists: User.filter(u => u.action === 'EXISTS').length,
       userClosures: user_closure.length,
       tcaMembers: TCAMember.length,
       systems: System.length,
       systemClosures: SystemClosure.length
     }
 
-    const allRecords = [...User, ...user_closure, ...TCAMember, ...System, ...SystemClosure]
-
-    console.log('[API/tca-demo-preview] Done:', summary)
-
     return NextResponse.json({
       success: true,
       summary,
-      tables: { User, user_closure, TCAMember, System, SystemClosure },
-      allRecords
+      tables: { User, user_closure, TCAMember, System, SystemClosure }
     }, { headers: CORS_HEADERS })
 
   } catch (error) {
-    console.error('[API/tca-demo-preview] Error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers: CORS_HEADERS }
-    )
-  } finally {
-    await prisma.$disconnect()
+    console.error('[DemoPreview] Error:', error)
+    return NextResponse.json({ error: String(error) }, { status: 500, headers: CORS_HEADERS })
   }
 }

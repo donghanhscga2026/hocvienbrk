@@ -280,7 +280,7 @@
           background:#1565c0; border:none; color:white; padding:10px 20px; border-radius:5px; 
           cursor:pointer; font-weight:bold; font-size:12px;
         ">🔄 Xem de xuat dong bo</button>
-        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v3.0.8</span>
+        <span id="version-info" style="color:#666; font-size:10px; margin-left:10px;">v3.1.1</span>
       </div>
     `;
 
@@ -424,7 +424,7 @@
           <button id="btn-show-data" style="background:#00897b; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">📊 ShowData</button>
           <button id="btn-preview-select-all" style="background:#1565c0; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Chon tat ca</button>
           <button id="btn-preview-deselect-all" style="background:#666; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">Bo chon tat ca</button>
-          <span id="panel-version" style="color:#666; font-size:10px; align-self:center;">v3.0.8</span>
+          <span id="panel-version" style="color:#666; font-size:10px; align-self:center;">v3.1.1</span>
           <button id="btn-preview-close" style="background:#d32f2f; border:none; color:white; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">X Dong</button>
         </div>
       </div>
