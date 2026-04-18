@@ -129,19 +129,20 @@ export async function POST(request: Request) {
 
     for (const node of sortedNodes) {
       try {
-        const memberInfo = body.memberInfo?.[node.id] || {}
+        const nodeId = Number(node.id);
+        const memberInfo = body.memberInfo?.[nodeId] || body.memberInfo?.[node.id] || {}
         const phone = memberInfo.phone || null
         const email = memberInfo.email || null
-        const expected = body.expectedIds?.[node.id];
+        const expected = body.expectedIds?.[nodeId] || body.expectedIds?.[node.id];
         
         // Auto-generate userId nếu không có expectedIds (dự phòng)
-        // Fix: Kiểm tra cả null và 0
-        const useUserId = (expected?.userId != null) ? expected.userId : (900000 + node.id);
+        // Fix: Chuyển node.id thành số
+        const useUserId = (expected?.userId != null) ? expected.userId : (900000 + nodeId);
         const useReferrerId = (expected?.referrerId != null && expected?.referrerId !== 0) 
           ? expected.referrerId 
           : ((!node.parentFolderId || node.parentFolderId === 'root' || node.parentFolderId === '0') 
             ? 861 
-            : 900000 + Number(node.parentFolderId));
+            : 900000 + Number(node.parentFolderId || nodeId));
         const useRefSysId = (expected?.refSysId != null && expected?.refSysId !== 0) 
           ? expected.refSysId 
           : useReferrerId;
@@ -183,7 +184,7 @@ export async function POST(request: Request) {
             }
           });
           stats.usersCreated++;
-          createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: node.id });
+          createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: nodeId });
           console.log('[TCA Sync] Created', STAGING_MODE ? 'UserTest' : 'User', 'id:', targetUserId);
 
           // Closure (dùng helper tương ứng với mode)
@@ -207,13 +208,13 @@ export async function POST(request: Request) {
 
         // 3. Xử lý TCAMember
         const tcaMemberData = {
-          tcaId: node.id, userId: targetUserId, type: node.type || 'item',
+          tcaId: nodeId, userId: targetUserId, type: node.type || 'item',
           groupName: node.groupName || null, name: node.name || '',
           personalScore: node.personalScore ? new Prisma.Decimal(parseFloat(node.personalScore)) : null,
           totalScore: node.totalScore ? new Prisma.Decimal(parseFloat(node.totalScore)) : null,
           level: node.level ? parseInt(node.level) : null,
           location: node.location || null, phone: phone, email: email,
-          parentTcaId: (node.parentFolderId && node.parentFolderId !== 'root' && node.parentFolderId !== '0') ? Number(node.parentFolderId) : null,
+          parentTcaId: (node.parentFolderId && node.parentFolderId !== 'root' && node.parentFolderId !== '0') ? Number(node.parentFolderId || nodeId) : null,
           lastSyncedAt: new Date()
         }
 
