@@ -30,7 +30,9 @@ export async function POST(request: Request) {
     }
 
     // GỌI API PREVIEW ĐỂ LẤY DỮ LIỆU ĐÚNG!
-    const previewUrl = process.env.API_BASE_URL || 'http://localhost:3000'
+    const previewUrl = (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://giautoandien.io.vn')
+    console.log('[ShowData] Calling:', previewUrl + '/api/sync-tca/preview')
+    
     const previewResponse = await fetch(previewUrl + '/api/sync-tca/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,7 +42,15 @@ export async function POST(request: Request) {
       })
     })
 
+    if (!previewResponse.ok) {
+      return NextResponse.json(
+        { error: 'Preview API HTTP error: ' + previewResponse.status },
+        { status: 500, headers: CORS_HEADERS }
+      )
+    }
+
     const previewResult = await previewResponse.json()
+    console.log('[ShowData] Preview result:', previewResult.success)
 
     if (!previewResult?.rows) {
       return NextResponse.json(
