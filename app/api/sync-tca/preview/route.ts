@@ -102,46 +102,44 @@ export async function POST(request: Request) {
 
     const preview = {
       total: allNodes.length,
-      willCreate: { users: 0, systems: 0, tcaMembers: 0, closures: 0 },
-      willUpdate: { users: 0, systems: 0, tcaMembers: 0 },
-      willSkip: 0,
       nextAvailableUserId,
       nextAvailableSystemId,
       rows: [] as {
-        tcaId: number
-        name: string
-        type: string
-        email: string | null
-        phone: string | null
-        action: 'CREATE_ALL' | 'CREATE_SYSTEM' | 'UPDATE' | 'SKIP'
-        actionLabel: string
-        actionColor: string
-        matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null
-        emailMismatch: boolean
-        currentData: {
+        // Column 1: TCA info
+        id: number              // tcaId - TCA ID
+        name: string           // Ten thanh vien
+        type: string           // Type
+        
+        // Column 4: Match type from DB
+        match: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | 'NEW'
+        
+        // Column 5: Existing DB data
+        db: {
           userId: number | null
-          systemId: number | null
           name: string | null
           email: string | null
           phone: string | null
           referrerId: number | null
-          refSysId: number | null
         } | null
-        newData: {
-          name: string
-          email: string | null
-          phone: string | null
-          hasChanges: boolean
-        }
-        changes: string[]
-        expectedUserId: number | null
-        expectedSystemId: number | null
+        
+        // Column 6: UserID (existing or expected)
+        userId: number | null
+        
+        // Column 7-8: TCA info
+        email: string | null
+        phone: string | null
+        
+        // Column 9-10: Parent info
         parentTcaId: number | null
-        parentUserId: number | null  // Resolved từ DB hoặc batch
-        parentSource: 'DB' | 'BATCH' | 'FOLDER' | 'ROOT' | null
-        expectedReferrerId: number | null
-        expectedRefSysId: number | null
-        closuresToCreate: number
+        parentUserId: number | null
+        
+        // Column 11-12: Referrer info (UserID of parent F1)
+        referrerId: number | null
+        refSysId: number | null   // = ParentUserId (UserID, not System.autoId)
+        
+        // Column 13-14: Action
+        action: 'CREATE_ALL' | 'CREATE_SYSTEM' | 'UPDATE' | 'SKIP'
+        changes: string[]
       }[]
     }
 
@@ -244,69 +242,38 @@ export async function POST(request: Request) {
       }
 
       let action: 'CREATE_ALL' | 'CREATE_SYSTEM' | 'UPDATE' | 'SKIP'
-      let actionLabel: string
-      let actionColor: string
       const changes: string[] = []
       let expectedUserId: number | null = null
       let expectedSystemId: number | null = null
-      let closuresToCreate = 0
       let matchInfo = ''
 
       if (!existingUser) {
         action = 'CREATE_ALL'
-        actionLabel = 'Tao User + System + TCA'
-        actionColor = '#2e7d32'
         expectedUserId = nextAvailableUserId++
         expectedSystemId = nextAvailableSystemId++
-        closuresToCreate = calculateClosures(node, parentMap)
-        preview.willCreate.users++
-        preview.willCreate.systems++
-        preview.willCreate.tcaMembers++
-        preview.willCreate.closures += closuresToCreate
         matchInfo = 'USER_MOI'
       } else if (matchType === 'PHONE_ONLY' && needEmailUpdate) {
-        // Phone trùng nhưng email không - gợi ý cập nhật email
         action = 'CREATE_SYSTEM'
-        actionLabel = 'Goi y cap nhat email'
-        actionColor = '#f57c00'
         expectedSystemId = nextAvailableSystemId++
-        closuresToCreate = calculateClosures(node, parentMap)
-        preview.willCreate.systems++
-        preview.willCreate.tcaMembers++
-        preview.willCreate.closures += closuresToCreate
         matchInfo = 'PHONE_TRUNG_EMAIL_KHONG'
       } else if (matchType === 'EMAIL_ONLY') {
-        // Chỉ email trùng - cảnh báo
         action = 'CREATE_SYSTEM'
-        actionLabel = 'CANH BAO: chi email trung'
-        actionColor = '#d32f2f'
         expectedSystemId = nextAvailableSystemId++
-        closuresToCreate = calculateClosures(node, parentMap)
-        preview.willCreate.systems++
-        preview.willCreate.tcaMembers++
-        preview.willCreate.closures += closuresToCreate
         matchInfo = 'EMAIL_TRUNG_PHONE_KHONG'
       } else if (!existingSystem) {
         action = 'CREATE_SYSTEM'
-        actionLabel = 'Tao System + TCA'
-        actionColor = '#1565c0'
         expectedSystemId = nextAvailableSystemId++
-        closuresToCreate = calculateClosures(node, parentMap)
-        preview.willCreate.systems++
-        preview.willCreate.tcaMembers++
-        preview.willCreate.closures += closuresToCreate
         matchInfo = 'PHONE_EMAIL_TRUNG'
       } else {
         action = 'UPDATE'
-        actionLabel = 'Cap nhat TCA'
-        actionColor = '#e65100'
         matchInfo = matchType === 'PHONE_EMAIL' ? 'USER_TON_TAI' : 'PHONE_EMAIL_TRUNG'
 
-        if (existingTCAMember) {
-          const newPersonalScore = node.personalScore ? parseFloat(node.personalScore) : null
-          const newTotalScore = node.totalScore ? parseFloat(node.totalScore) : null
-          const newLevel = node.level ? parseInt(node.level) : null
+        // Tìm existing TCAMember để check changes
+        const existingTCAMember = await (prisma as any).tCAMember.findUnique({
+          where: { tcaId: node.id }
+        })
 
+        if (existingTCAMember) {
           if (existingTCAMember.name !== node.name) {
             changes.push(`Ten: "${existingTCAMember.name}" -> "${node.name}"`)
           }
@@ -316,24 +283,10 @@ export async function POST(request: Request) {
           if (existingTCAMember.phone !== phone) {
             changes.push(`Phone: "${existingTCAMember.phone}" -> "${phone}"`)
           }
-          if (newPersonalScore !== null && existingTCAMember.personalScore?.toString() !== newPersonalScore.toString()) {
-            changes.push(`Diem CN: ${existingTCAMember.personalScore} -> ${newPersonalScore}`)
-          }
-          if (newTotalScore !== null && existingTCAMember.totalScore?.toString() !== newTotalScore.toString()) {
-            changes.push(`Diem Tong: ${existingTCAMember.totalScore} -> ${newTotalScore}`)
-          }
-          if (newLevel !== null && existingTCAMember.level !== newLevel) {
-            changes.push(`Cap: ${existingTCAMember.level} -> ${newLevel}`)
-          }
         }
 
         if (changes.length === 0) {
           action = 'SKIP'
-          actionLabel = 'Khong doi'
-          actionColor = '#999'
-          preview.willSkip++
-        } else {
-          preview.willUpdate.tcaMembers++
         }
       }
 
@@ -352,10 +305,9 @@ export async function POST(request: Request) {
         const batchNode = allNodes.find(n => n.id === parentTcaId);
         if (batchNode) {
           // Parent có trong batch - tìm userId của parent trong batch
-          const parentInfo = preview.rows.find(r => r.tcaId === parentTcaId);
+          const parentInfo = preview.rows.find(r => r.id === parentTcaId);
           if (parentInfo) {
-            parentUserId = parentInfo.currentData?.userId || parentInfo.expectedUserId;
-            parentSystemId = parentInfo.currentData?.systemId || parentInfo.expectedSystemId;
+            parentUserId = parentInfo.db?.userId || parentInfo.userId;
             if (parentUserId) parentSource = 'BATCH';
           }
         } else {
@@ -437,49 +389,57 @@ export async function POST(request: Request) {
         parentSource = 'ROOT';
       }
 
+      // Convert matchType to new format
+      const newMatchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | 'NEW' = 
+        matchType || (existingUser ? (matchType as any) : 'NEW')
+
+      // UserID = existing OR expected
+      const finalUserId = existingUser?.id || expectedUserId
+
+      // refSysId = ParentUserId (UserID of F1, NOT System.autoId)
+      const finalRefSysId = parentUserId
+
       preview.rows.push({
-        tcaId: node.id,
+        // Column 1: TCA info
+        id: node.id,
         name: node.name,
         type: node.type,
-        email,
-        phone,
-        action,
-        actionLabel,
-        actionColor,
-        matchType,
-        emailMismatch,
-        currentData: existingUser ? {
+        
+        // Column 4: Match
+        match: newMatchType || 'NEW',
+        
+        // Column 5: DB data
+        db: existingUser ? {
           userId: existingUser.id,
-          systemId: existingSystem?.autoId || null,
           name: existingUser.name,
           email: existingUser.email,
           phone: existingUser.phone,
-          referrerId: existingUser.referrerId,
-          refSysId: existingSystem?.refSysId || null
+          referrerId: existingUser.referrerId
         } : null,
-        newData: {
-          name: node.name,
-          email,
-          phone,
-          hasChanges: changes.length > 0
-        },
-        changes,
-        expectedUserId,
-        expectedSystemId,
+        
+        // Column 6: UserID
+        userId: finalUserId,
+        
+        // Column 7-8: TCA info
+        email,
+        phone,
+        
+        // Column 9-10: Parent
         parentTcaId,
         parentUserId,
-        parentSource,
-        expectedReferrerId: parentUserId,  // referrerId = parentUserId
-        expectedRefSysId: parentSystemId,
-        closuresToCreate
+        
+        // Column 11-12: Referrer (UserID)
+        referrerId: parentUserId,
+        refSysId: finalRefSysId,
+        
+        // Column 13-14: Action
+        action,
+        changes
       })
     }
 
     console.log('[API/sync-tca/preview] Preview:', {
       total: preview.total,
-      willCreate: preview.willCreate,
-      willUpdate: preview.willUpdate,
-      willSkip: preview.willSkip,
       nextAvailableUserId: preview.nextAvailableUserId,
       nextAvailableSystemId: preview.nextAvailableSystemId
     })
@@ -501,8 +461,8 @@ export async function POST(request: Request) {
 export async function GET() {
   return NextResponse.json({
     status: 'TCA Sync Preview API',
-    version: '2.0.0',
-    description: 'Preview sync plan with detailed actions per member',
+    version: '3.0.0',
+    description: 'Bảng tổng hợp TCA - 1 bảng duy nhất với tất cả thông tin',
     usage: {
       method: 'POST',
       body: {
@@ -510,14 +470,23 @@ export async function GET() {
         memberInfo: 'Object of member details by TCA ID'
       }
     },
-    response: {
-      total: 'Tong so thanh vien',
-      willCreate: 'So user/system/tcamember/closures se tao moi',
-      willUpdate: 'So user/system/tcamember se cap nhat',
-      willSkip: 'So dong khong thay doi',
-      nextAvailableUserId: 'User ID tiep theo se duoc gan',
-      nextAvailableSystemId: 'System autoId tiep theo se duoc gan',
-      rows: 'Array chi tiet tung dong voi expectedUserId, expectedSystemId, closuresToCreate'
-    }
+    columns: [
+      'id: TCA ID',
+      'name: Tên thành viên',
+      'type: Loại (member/folder)',
+      'match: PHONE_EMAIL | PHONE_ONLY | EMAIL_ONLY | NEW',
+      'db: Dữ liệu hiện có trong DB (nếu có)',
+      'userId: User ID (hiện có hoặc sẽ tạo)',
+      'email: Email từ TCA',
+      'phone: Phone từ TCA',
+      'parentTcaId: Parent TCA ID',
+      'parentUserId: UserID của parent',
+      'referrerId: Referrer (F1) - UserID',
+      'refSysId: refSysId trong System - UserID của parent',
+      'action: CREATE_ALL | CREATE_SYSTEM | UPDATE | SKIP',
+      'changes: Các thay đổi (nếu UPDATE)'
+    ],
+    nextAvailableUserId: 'User ID tiếp theo sẽ được tạo',
+    nextAvailableSystemId: 'System autoId tiếp theo sẽ được tạo'
   }, { headers: CORS_HEADERS })
 }
