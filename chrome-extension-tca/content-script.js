@@ -213,7 +213,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.4.1 [STAGING]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.4.2 [DEBUG]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -447,6 +447,8 @@
           };
         }
       });
+      console.log('[BUILD] expectedIdsMap created:', Object.keys(expectedIdsMap).length, 'entries');
+      console.log('[BUILD] sample:', JSON.stringify(expectedIdsMap).slice(0, 300));
       addTcaLog('Expected IDs prepared: ' + previewRows.length + ' rows');
     }
     
@@ -569,6 +571,8 @@
     
     // Nút Xác nhận - Ghi vào bảng Test (Staging)
     document.getElementById('btn-final-sync').addEventListener('click', () => {
+      console.log('[DEBUG] expectedIds keys:', Object.keys(expectedIds || {}).length);
+      console.log('[DEBUG] expectedIds sample:', JSON.stringify(expectedIds).slice(0, 300));
       if (confirm('BẠN CÓ CHẮC CHẮN? Dữ liệu sẽ được ghi thật vào Database ngay bây giờ.')) {
         panel.remove();
         executeFinalSync(selectedNodes, selectedMemberInfo, expectedIds, tables);
@@ -592,6 +596,8 @@
     `;
     document.body.appendChild(progressPanel);
     addTcaLog('Bắt đầu đẩy dữ liệu thật vào DB...');
+    console.log('[SYNC] Payload expectedIds count:', Object.keys(expectedIds || {}).length);
+    console.log('[SYNC] Payload sample:', JSON.stringify(expectedIds).slice(0, 300));
 
     try {
       const response = await fetch(SYNC_ENDPOINT, {
