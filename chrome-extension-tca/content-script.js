@@ -228,7 +228,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.7.0 [FIX]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v6.5.0 [N/PE/Pe/pE/TCA/S]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -284,7 +284,7 @@
 
     document.body.appendChild(panel);
     updateLogDisplay();
-    addTcaLog('Đã sẵn sàng v4.4.1: CSV/JSON dùng previewRows khớp bảng TCA Dashboard.');
+    addTcaLog('Đã sẵn sàng v6.5.0: Match logic mới N/PE/Pe/pE/TCA/S.');
     
     // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
@@ -332,10 +332,18 @@
 
       let matchDisplay = '-';
       let matchColor = '#999';
-      if (match === 'PHONE_EMAIL') { matchDisplay = 'P+E'; matchColor = '#2e7d32'; }
-      else if (match === 'PHONE_ONLY') { matchDisplay = 'P'; matchColor = '#1565c0'; }
-      else if (match === 'EMAIL_ONLY') { matchDisplay = 'E'; matchColor = '#c2185b'; }
-      else if (match === 'NEW') { matchDisplay = 'NEW'; matchColor = '#555'; }
+      // N: Chua ton tai trong User
+      if (match === 'N') { matchDisplay = 'N'; matchColor = '#555'; }
+      // PE: Trung ca P va E (cung 1 user)
+      else if (match === 'PE') { matchDisplay = 'PE'; matchColor = '#2e7d32'; }
+      // Pe: Trung P, khac E
+      else if (match === 'Pe') { matchDisplay = 'Pe'; matchColor = '#1565c0'; }
+      // pE: Khac P, trung E
+      else if (match === 'pE') { matchDisplay = 'pE'; matchColor = '#c2185b'; }
+      // TCA: Da ton tai trong TCAMember
+      else if (match === 'TCA') { matchDisplay = 'TCA'; matchColor = '#ff9800'; }
+      // S: Da ton tai trong System
+      else if (match === 'S') { matchDisplay = 'S'; matchColor = '#9c27b0'; }
       
       let actionLabel = action;
       let actionBg = '#999';
@@ -552,8 +560,6 @@
     
     // Nút Xác nhận - Ghi vào bảng Test (Staging)
     document.getElementById('btn-final-sync').addEventListener('click', () => {
-      console.log('[DEBUG] expectedIds keys:', Object.keys(expectedIds || {}).length);
-      console.log('[DEBUG] expectedIds sample:', JSON.stringify(expectedIds).slice(0, 300));
       if (confirm('BẠN CÓ CHẮC CHẮN? Dữ liệu sẽ được ghi thật vào Database ngay bây giờ.')) {
         panel.remove();
         executeFinalSync(previewRows, selectedMemberInfo);
@@ -562,12 +568,31 @@
   }
 
   async function executeFinalSync(sourceRows, memberInfo) {
-    // DÙNG TRỰC TIẾP previewRows (sourceRows) - KHÔNG transform
-    // sourceRows = previewRows từ table display
+    // Transform same as Table Display before sending to API
+    const syncRows = (sourceRows || []).map(row => {
+      // referrerId: DB trước, fallback TCA (như table display)
+      const hasDbReferrer = row.db && row.db.referrerId != null;
+      const referrerId = hasDbReferrer ? Number(row.db.referrerId) : Number(row.referrerId || 0);
+      // refSysId: TCA trước, fallback DB (như table display)
+      const refSysId = row.refSysId != null ? Number(row.refSysId) : (row.db?.refSysId != null ? Number(row.db.refSysId) : 0);
+      
+      return {
+        id: row.id,
+        name: row.name,
+        userId: row.userId,
+        referrerId: referrerId,
+        refSysId: refSysId,
+        action: row.action,
+        match: row.match,
+        parentTcaId: row.parentTcaId,
+        email: row.email,
+        phone: row.phone
+      };
+    });
     
-    console.log('[SYNC] === SOURCE ROWS (first 3) ===');
-    (sourceRows || []).slice(0, 3).forEach((r, i) => {
-      console.log(`[SYNC] Row ${i+1}: id=${r.id}, name=${r.name}, userId=${r.userId}, action=${r.action}, referrerId=${r.referrerId}`);
+    console.log('[SYNC] === SYNC ROWS (first 3) ===');
+    syncRows.slice(0, 3).forEach((r, i) => {
+      console.log(`[SYNC] Row ${i+1}: id=${r.id}, userId=${r.userId}, referrerId=${r.referrerId}, refSysId=${r.refSysId}, action=${r.action}`);
     });
     console.log('[SYNC] === END ===');
     
@@ -588,14 +613,14 @@
     addTcaLog('Bắt đầu đẩy dữ liệu thật vào DB...');
 
     try {
-      // GỬI TRỰC TIẾP sourceRows (previewRows) lên API
+      // GỬI syncRows (đã transform giống table display) lên API
       const response = await fetch(SYNC_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: 'TCA_EXT_PREVIEW_ROWS',
           timestamp: Date.now(),
-          previewRows: sourceRows,
+          previewRows: syncRows,
           memberInfo: memberInfo
         })
       });

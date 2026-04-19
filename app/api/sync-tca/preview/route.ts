@@ -111,7 +111,13 @@ export async function POST(request: Request) {
         type: string           // Type
         
         // Column 4: Match type from DB
-        match: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | 'NEW'
+        // N: Chua ton tai trong User (khong co phone/email)
+        // PE: Trung ca phone va email (cung 1 user)
+        // Pe: Trung phone, khac email
+        // pE: Khac phone, trung email
+        // TCA: Da ton tai trong TCAMember table
+        // S: Da ton tai trong System table
+        match: 'N' | 'PE' | 'Pe' | 'pE' | 'TCA' | 'S'
         
         // Column 5: Existing DB data
         db: {
@@ -149,11 +155,12 @@ export async function POST(request: Request) {
       const phone = info.phone || null
       const normalizedPhone = normalizePhone(phone)
 
-      // ====== LOGIC XÁC ĐỊNH USER TỒN TẠI ======
-      // QUY TẮC: Cùng 1 User phải match CẢ phone VÀ email mới là P+E
-      // Ưu tiên: Phone → Email
+      // ====== LOGIC XÁC ĐỊNH MATCH MỚI ======
+      // Quy tắc ưu tiên:
+      // 1. Nếu không tìm thấy trong User → check TCA → check System → N
+      // 2. Nếu tìm thấy trong User → PE, Pe, pE
       let existingUser: any = null
-      let matchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | null = null
+      let matchType: 'N' | 'PE' | 'Pe' | 'pE' | 'TCA' | 'S' | null = null
       let emailMismatch = false
       let needEmailUpdate = false
       let matchDetails = ''
@@ -191,28 +198,51 @@ export async function POST(request: Request) {
       )
       
       if (phoneAndEmailMatch) {
+        // Bước 2a: Tìm thấy trong User - trùng cả phone và email
         existingUser = phoneAndEmailMatch
-        matchType = 'PHONE_EMAIL'
-        matchDetails = `User ${existingUser.id} match P+E`
+        matchType = 'PE'
+        matchDetails = `User ${existingUser.id} match P+E (trung P va E)`
       } else if (phoneMatches.length > 0) {
+        // Bước 2b: Trùng phone, khác email
         existingUser = phoneMatches[0]
-        matchType = 'PHONE_ONLY'
+        matchType = 'Pe'
         
         if (email && existingUser.email && existingUser.email.toLowerCase() !== email.toLowerCase()) {
           emailMismatch = true
           needEmailUpdate = true
-          matchDetails = `User ${existingUser.id} match P, email khac (${existingUser.email} vs ${email})`
+          matchDetails = `User ${existingUser.id} match Pe (trung P, khac E: ${existingUser.email} vs ${email})`
         } else if (!email) {
-          matchDetails = `User ${existingUser.id} match P (TCA khong co email)`
+          matchDetails = `User ${existingUser.id} match Pe (TCA khong co email)`
         } else if (!existingUser.email) {
-          matchDetails = `User ${existingUser.id} match P (DB khong co email)`
+          matchDetails = `User ${existingUser.id} match Pe (DB khong co email)`
         } else {
-          matchDetails = `User ${existingUser.id} match P`
+          matchDetails = `User ${existingUser.id} match Pe`
         }
       } else if (emailMatches.length > 0) {
+        // Bước 2c: Khác phone, trùng email
         existingUser = emailMatches[0]
-        matchType = 'EMAIL_ONLY'
-        matchDetails = `User ${existingUser.id} match E (khong co P)`
+        matchType = 'pE'
+        matchDetails = `User ${existingUser.id} match pE (khong co P)`
+      }
+
+      // ====== BƯỚC 3: KIỂM TRA TCA/SYSTEM NẾU KHÔNG TÌM THẤY TRONG USER ======
+      const foundInUser = !!existingUser
+      if (!foundInUser) {
+        // Bước 3a: Check TCA Member table (qua tcaId)
+        const existingTCAMember = await (prisma as any).tCAMember.findUnique({
+          where: { tcaId: node.id }
+        })
+        
+        if (existingTCAMember) {
+          matchType = 'TCA'
+          matchDetails = `TCA ${node.id} da ton tai trong TCAMember`
+        } else {
+          // Bước 3b: Check System table (không có TCA Member nhưng có thể có user đã sync trước đó)
+          // System không có tcaId riêng nên không check trực tiếp được
+          // Mặc định là N nếu không có gì
+          matchType = 'N'
+          matchDetails = `TCA ${node.id} chua ton tai`
+        }
       }
 
       // Debug log
@@ -252,11 +282,11 @@ export async function POST(request: Request) {
         expectedUserId = nextAvailableUserId++
         expectedSystemId = nextAvailableSystemId++
         matchInfo = 'USER_MOI'
-      } else if (matchType === 'PHONE_ONLY' && needEmailUpdate) {
+      } else if (matchType === 'Pe' && needEmailUpdate) {
         action = 'CREATE_SYSTEM'
         expectedSystemId = nextAvailableSystemId++
         matchInfo = 'PHONE_TRUNG_EMAIL_KHONG'
-      } else if (matchType === 'EMAIL_ONLY') {
+      } else if (matchType === 'pE') {
         action = 'CREATE_SYSTEM'
         expectedSystemId = nextAvailableSystemId++
         matchInfo = 'EMAIL_TRUNG_PHONE_KHONG'
@@ -266,7 +296,7 @@ export async function POST(request: Request) {
         matchInfo = 'PHONE_EMAIL_TRUNG'
       } else {
         action = 'UPDATE'
-        matchInfo = matchType === 'PHONE_EMAIL' ? 'USER_TON_TAI' : 'PHONE_EMAIL_TRUNG'
+        matchInfo = matchType === 'PE' ? 'USER_TON_TAI' : 'PHONE_EMAIL_TRUNG'
 
         // Tìm existing TCAMember để check changes
         const existingTCAMember = await (prisma as any).tCAMember.findUnique({
@@ -389,10 +419,7 @@ export async function POST(request: Request) {
         parentSource = 'ROOT';
       }
 
-      // Convert matchType to new format
-      const newMatchType: 'PHONE_EMAIL' | 'PHONE_ONLY' | 'EMAIL_ONLY' | 'NEW' = 
-        matchType || (existingUser ? (matchType as any) : 'NEW')
-
+      // matchType đã được xác định ở trên theo logic mới
       // UserID = existing OR expected
       const finalUserId = existingUser?.id || expectedUserId
 
@@ -405,8 +432,8 @@ export async function POST(request: Request) {
         name: node.name,
         type: node.type,
         
-        // Column 4: Match
-        match: newMatchType || 'NEW',
+        // Column 4: Match (matchType đã được gán đúng giá trị N/PE/Pe/pE/TCA/S)
+        match: matchType || 'N',
         
         // Column 5: DB data
         db: existingUser ? {
@@ -474,7 +501,7 @@ export async function GET() {
       'id: TCA ID',
       'name: Tên thành viên',
       'type: Loại (member/folder)',
-      'match: PHONE_EMAIL | PHONE_ONLY | EMAIL_ONLY | NEW',
+      'match: N | PE | Pe | pE | TCA | S',
       'db: Dữ liệu hiện có trong DB (nếu có)',
       'userId: User ID (hiện có hoặc sẽ tạo)',
       'email: Email từ TCA',
