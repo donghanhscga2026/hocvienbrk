@@ -3,16 +3,9 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
 
-// ==========================================
-// CẤU HÌNH CHẾ ĐỘ THỰC THI (BRAIN CONTROL)
-// ==========================================
-const STAGING_MODE = true; // TRUE: Chỉ ghi vào bảng Test | FALSE: Ghi vào bảng thật
-
-// Helper để duy trì phả hệ Closure (su dung tuy theo mode)
+// Helper để duy trì phả hệ Closure
 import { addUserToClosure } from '@/lib/closure-helpers'
-import { addUserToClosureTest } from '@/lib/closure-helpers-test'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
-import { addUserToSystemClosureTest } from '@/lib/system-closure-helpers-test'
 
 const prisma = new PrismaClient()
 
@@ -29,51 +22,23 @@ export async function OPTIONS() {
 interface TCANode {
   id: number
   type: string
-  groupName?: string
   name: string
-  personalScore?: string
-  totalScore?: string
-  level?: string
-  location?: string
-  personalRate?: string
-  teamRate?: string
-  hasBH?: boolean
-  hasTD?: boolean
   parentFolderId?: number | string
-  parentFolderName?: string
 }
 
 interface MemberInfo {
   phone?: string
   email?: string
   address?: string
-  joinDate?: string
-  contractDate?: string
-  promotionDate?: string
-}
-
-interface ExpectedIds {
-  [tcaId: number]: {
-    userId: number | null
-    systemId: number | null
-    referrerId: number | null
-    refSysId: number | null
-  }
 }
 
 interface SyncPayload {
   source: string
   timestamp: number
+  previewRows?: PreviewRow[]
   allNodes?: TCANode[]
   memberInfo: Record<number, MemberInfo>
-  stats?: {
-    total: number
-    folders: number
-    items: number
-  }
-  expectedIds?: ExpectedIds
-  // New: TRỰC TIẾP từ previewRows (Plan A)
-  previewRows?: PreviewRow[]
+  expectedIds?: Record<number, any>
 }
 
 interface PreviewRow {
@@ -89,37 +54,26 @@ interface PreviewRow {
   phone?: string
 }
 
-async function sendTelegramNotification(message: string) {
-  try {
-    const token = process.env.TELEGRAM_BOT_TOKEN
-    const chatId = process.env.TELEGRAM_CHAT_ID_EMAIL
-    if (!token || !chatId) return;
-    const url = `https://api.telegram.org/bot${token}/sendMessage`
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' })
-    })
-  } catch (error) {
-    console.error('[TCA Sync] Telegram error:', error)
-  }
+const normalizePhone = (phone: string | null): string | null => {
+  if (!phone) return null
+  const digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('84') && digits.length === 11) return '0' + digits.substring(2)
+  if (digits.startsWith('0')) return digits
+  return phone
 }
 
-function parseDate(dateStr?: string): Date | null {
-  if (!dateStr) return null
-  const date = new Date(dateStr)
-  return isNaN(date.getTime()) ? null : date
-}
-
-function sortNodesByHierarchy(nodes: TCANode[]): TCANode[] {
-  const roots: TCANode[] = []
-  const children: TCANode[] = []
-  nodes.forEach(n => {
-    const pid = n.parentFolderId
-    if (!pid || pid === 'root' || pid === '0') roots.push(n)
-    else children.push(n)
+// Hàm lưu SyncLog
+async function logSyncChange(syncId: string, tableName: string, recordId: number, action: string, oldData: any, newData: any) {
+  await prisma.syncLog.create({
+    data: {
+      syncId,
+      tableName,
+      recordId,
+      action,
+      oldData: oldData ? JSON.stringify(oldData) : null,
+      newData: newData ? JSON.stringify(newData) : null
+    }
   })
-  return [...roots, ...children]
 }
 
 export async function POST(request: Request) {
@@ -127,57 +81,47 @@ export async function POST(request: Request) {
   const startTime = Date.now()
   let stats = { usersCreated: 0, usersUpdated: 0, systemsCreated: 0, systemsUpdated: 0, tcaMembersCreated: 0, tcaMembersUpdated: 0, failed: 0, totalRecords: 0, skipped: 0 }
   const failedRecords: { tcaId: number; error: string }[] = []
-  const createdRecords: { table: string; id: number; tcaId: number }[] = []
 
   try {
-    let body: SyncPayload;
+    let body: SyncPayload
     try {
-      body = await request.json();
+      body = await request.json()
     } catch (parseError) {
-      console.error('[TCA Sync] Failed to parse JSON:', parseError);
-      return NextResponse.json({ error: 'Invalid JSON payload', details: String(parseError) }, { status: 400, headers: CORS_HEADERS });
+      return NextResponse.json({ error: 'Invalid JSON payload', details: String(parseError) }, { status: 400, headers: CORS_HEADERS })
     }
 
-    console.log('[TCA Sync] Request body keys:', Object.keys(body));
-    console.log('[TCA Sync] Has previewRows:', !!body.previewRows, Array.isArray(body.previewRows) ? `(${body.previewRows.length})` : '');
-    console.log('[TCA Sync] Has allNodes:', !!body.allNodes, Array.isArray(body.allNodes) ? `(${body.allNodes.length})` : '');
-    
-    // ===== PLAN A: DÙNG TRỰC TIẾP previewRows =====
+    console.log('[TCA Sync] Sync starting, syncId:', syncId)
+
+    // DÙNG TRỰC TIẾP previewRows
     if (body.previewRows && Array.isArray(body.previewRows)) {
-      console.log('[TCA Sync] PLAN A: Using previewRows directly');
-      console.log('[TCA Sync] previewRows count:', body.previewRows.length);
-      if (body.previewRows.length > 0) {
-        console.log('[TCA Sync] previewRows sample:', JSON.stringify(body.previewRows.slice(0, 3)));
-      }
-      
-      stats.totalRecords = body.previewRows.length;
-      
-      // Duyệt từng row và xử lý theo action (chuỗi ký tự)
+      console.log('[TCA Sync] Using previewRows:', body.previewRows.length)
+      stats.totalRecords = body.previewRows.length
+
       for (const row of body.previewRows) {
         try {
-          const tcaId = Number(row.id) || 0;
-          const targetUserId = Number(row.userId) || 0;
-          const action = row.action || '';
-          const referrerId = Number(row.referrerId) || 0;
-          const refSysId = Number(row.refSysId) || 0;
-          
-          console.log('[TCA Sync] Row:', tcaId, 'userId:', targetUserId, 'action:', action);
-          
-          // Skip nếu userId = 0 hoặc action = SKIP
+          const tcaId = Number(row.id) || 0
+          const targetUserId = Number(row.userId) || 0
+          const action = row.action || ''
+          const referrerId = Number(row.referrerId) || 0
+          const refSysId = Number(row.refSysId) || 0
+
           if (!targetUserId || action === 'SKIP' || !action) {
-            stats.skipped = (stats.skipped || 0) + 1;
-            continue;
+            stats.skipped = (stats.skipped || 0) + 1
+            continue
           }
-          
-          const userModel = STAGING_MODE ? (prisma as any).userTest : prisma.user;
-          const systemModel = STAGING_MODE ? (prisma as any).systemTest : prisma.system;
-          const tcaMemberModel = STAGING_MODE ? (prisma as any).tCAMemberTest : (prisma as any).tCAMember;
-          const systemParentId = refSysId || 0;
-          
-          // Xử lý theo chuỗi action
+
+          const userModel = prisma.user
+          const systemModel = prisma.system
+          const tcaMemberModel = (prisma as any).tCAMember
+          const systemParentId = refSysId || 0
+
           // PE = tạo User + closure
           if (action.includes('PE')) {
-            const hashedPassword = await bcrypt.hash('Brk#3773', 10);
+            const hashedPassword = await bcrypt.hash('Brk#3773', 10)
+            
+            // Lưu oldData trước khi tạo
+            const existingUser = await userModel.findUnique({ where: { id: targetUserId } })
+            
             await userModel.create({
               data: {
                 id: targetUserId,
@@ -188,60 +132,59 @@ export async function POST(request: Request) {
                 role: 'STUDENT',
                 referrerId: referrerId || null
               }
-            });
-            stats.usersCreated++;
-            // Chỉ tạo closure khi referrerId hợp lệ (> 0)
+            })
+            stats.usersCreated++
+            
+            // Log tạo user
+            await logSyncChange(syncId, 'User', targetUserId, 'CREATE', existingUser, { name: row.name, email: row.email })
+
+            // Closure
             if (referrerId && referrerId > 0) {
-              if (STAGING_MODE) {
-                await addUserToClosureTest(targetUserId, referrerId);
-              } else {
-                await addUserToClosure(targetUserId, referrerId);
-              }
-            } else {
-              console.log('[TCA Sync] SKIP closure - referrerId', referrerId, 'invalid');
+              await addUserToClosure(targetUserId, referrerId)
             }
           }
-          
-          // P = cập nhật phone - chỉ khi user đã tồn tại
+
+          // P = cập nhật phone
           if (action.includes('P') && action.includes('PE') === false && targetUserId) {
-            const existingUser = await userModel.findUnique({ where: { id: targetUserId } });
+            const existingUser = await userModel.findUnique({ where: { id: targetUserId } })
             if (existingUser) {
+              const oldData = { phone: existingUser.phone }
               await userModel.update({
                 where: { id: targetUserId },
-                data: { phone: row.phone || null }
-              });
-              stats.usersUpdated++;
-            } else {
-              console.log('[TCA Sync] SKIP P update - user', targetUserId, 'not found');
+                data: { phone: row.phone || undefined }
+              })
+              stats.usersUpdated++
+              await logSyncChange(syncId, 'User', targetUserId, 'UPDATE', oldData, { phone: row.phone })
             }
           }
-          
-          // E = cập nhật email - chỉ khi user đã tồn tại
+
+          // E = cập nhật email
           if (action.includes('E') && action.includes('PE') === false && targetUserId) {
-            const existingUser = await userModel.findUnique({ where: { id: targetUserId } });
+            const existingUser = await userModel.findUnique({ where: { id: targetUserId } })
             if (existingUser) {
+              const oldData = { email: existingUser.email }
               await userModel.update({
                 where: { id: targetUserId },
-                data: { email: row.email || null }
-              });
-              stats.usersUpdated++;
-            } else {
-              console.log('[TCA Sync] SKIP E update - user', targetUserId, 'not found');
+                data: { email: row.email || undefined }
+              })
+              stats.usersUpdated++
+              await logSyncChange(syncId, 'User', targetUserId, 'UPDATE', oldData, { email: row.email })
             }
           }
-          
+
           // S = tạo System + closure
           if (action.includes('S')) {
-            if (STAGING_MODE) {
-              await addUserToSystemClosureTest(targetUserId, systemParentId, 1);
-            } else {
-              await addUserToSystemClosure(targetUserId, systemParentId, 1);
-            }
-            stats.systemsCreated++;
+            await addUserToSystemClosure(targetUserId, systemParentId, 1)
+            stats.systemsCreated++
+            
+            // Log tạo system
+            await logSyncChange(syncId, 'System', targetUserId, 'CREATE', null, { autoId: systemParentId })
           }
-          
+
           // TCA = tạo TCAMember
           if (action.includes('TCA')) {
+            const existingTCA = await tcaMemberModel.findUnique({ where: { tcaId } })
+            
             await tcaMemberModel.upsert({
               where: { tcaId },
               update: {
@@ -258,185 +201,30 @@ export async function POST(request: Request) {
                 email: row.email || null,
                 lastSyncedAt: new Date()
               }
-            });
-            stats.tcaMembersCreated++;
+            })
+            stats.tcaMembersCreated++
+            
+            // Log tạo/cập nhật TCAMember
+            await logSyncChange(syncId, 'TCAMember', tcaId, existingTCA ? 'UPDATE' : 'CREATE', existingTCA, { name: row.name })
           }
-          
+
         } catch (rowError) {
-          stats.failed++;
-          failedRecords.push({ tcaId: Number(row.id), error: String(rowError) });
+          stats.failed++
+          failedRecords.push({ tcaId: Number(row.id), error: String(rowError) })
         }
       }
-      
-      const duration = Date.now() - startTime;
+
+      const duration = Date.now() - startTime
       return NextResponse.json({ 
         success: true, 
         syncId, 
         stats, 
         failedRecords: failedRecords.slice(0, 5), 
-        staging: STAGING_MODE, 
-        message: STAGING_MODE ? 'GHI VÀO BẢNG TEST THÀNH CÔNG' : 'Sync completed' 
+        message: 'Sync completed - dữ liệu đã được đẩy vào Production'
       }, { headers: CORS_HEADERS })
     }
-    
-    // ===== OLD LOGIC (Fallback): Dùng allNodes + expectedIds =====
-    if (!body.allNodes || !Array.isArray(body.allNodes)) {
-      return NextResponse.json({ error: 'Invalid payload - need previewRows or allNodes' }, { status: 400, headers: CORS_HEADERS })
-    }
 
-    stats.totalRecords = body.allNodes.length
-    const sortedNodes = sortNodesByHierarchy(body.allNodes)
-    
-    console.log('[TCA Sync] STAGING_MODE:', STAGING_MODE)
-    console.log('[TCA Sync] allNodes sample:', JSON.stringify(body.allNodes?.slice(0, 2)))
-    console.log('[TCA Sync] expectedIds keys:', Object.keys(body.expectedIds || {}))
-    console.log('[TCA Sync] expectedIds type sample:', typeof Object.keys(body.expectedIds || {})[0])
-
-    for (const node of sortedNodes) {
-      try {
-        // ========== GIẢI PHÁP #3: XỬ LÝ MỌI DẠNG ==========
-        // Lấy id - ưu tiên number, fallback string
-        let nodeIdRaw = node.id;
-        // Nếu id là dạng khác (object, array) thì log để biết
-        if (typeof nodeIdRaw !== 'number' && typeof nodeIdRaw !== 'string') {
-          console.log('[DEBUG] Strange node.id:', typeof nodeIdRaw, nodeIdRaw);
-        }
-        
-        // Convert sang number - dùng ParseInt với fallback an toàn
-        let nodeId = 0;
-        if (typeof nodeIdRaw === 'number') nodeId = nodeIdRaw;
-        else if (typeof nodeIdRaw === 'string') nodeId = parseInt(nodeIdRaw, 10);
-        
-        // Fallback cuối cùng: dùng index trong mảng + offset
-        if (!nodeId || isNaN(nodeId)) {
-          // Thử indexOf để lấy
-          const idx = sortedNodes.indexOf(node);
-          nodeId = 60000 + idx; // Offset để tránh trùng
-        }
-        
-        const nodeIdStr = String(nodeId);
-        const memberInfo = ((body.memberInfo as any) || {})[nodeIdStr] || {};
-        const phone = memberInfo.phone || null;
-        const email = memberInfo.email || null;
-        const expected = ((body.expectedIds as any) || {})[nodeIdStr];
-        
-        // Định nghĩa userId trước để dùng cho SKIP
-let targetUserId = expected?.userId || 0;
-        
-        // ========== LOGIC: SKIP / Tạo Sys / Tạo All ==========
-        // Nhận cả display label (Tạo Sys, Tạo All) và internal (CREATE_SYSTEM, CREATE_ALL)
-        let action = expected?.action || (targetUserId ? 'Tạo All' : 'SKIP');
-        // Normalize action để so sánh
-        if (action === 'CREATE_SYSTEM') action = 'Tạo Sys';
-        else if (action === 'CREATE_ALL') action = 'Tạo All';
-        
-        // SKIP: Bỏ qua hoàn toàn - đã có User và System rồi
-        if (action === 'SKIP' || targetUserId === 0) {
-          stats.skipped = (stats.skipped || 0) + 1;
-          console.log('[TCA Sync] SKIP node', nodeId);
-          continue;
-        }
-        
-        // Dùng trực tiếp referrerId từ expectedIds - không auto-generate
-        const useReferrerId = (expected?.referrerId != null) ? expected.referrerId : 0;
-        const useRefSysId = (expected?.refSysId != null) ? expected.refSysId : 0;
-        
-        console.log('[TCA Sync] Processing node', node.id, '-> userId:', targetUserId, 'action:', action);
-
-        const targetReferrerId = useReferrerId; 
-        const targetRefSysId = useRefSysId;
-
-        // XÁC ĐỊNH MODEL DỰA TRÊN STAGING_MODE
-        const userModel = STAGING_MODE ? (prisma as any).userTest : prisma.user;
-        const systemModel = STAGING_MODE ? (prisma as any).systemTest : prisma.system;
-        const tcaMemberModel = STAGING_MODE ? (prisma as any).tCAMemberTest : (prisma as any).tCAMember;
-
-        // 1. Xử lý User
-        // Tạo Sys: User đã có, chỉ cần tạo System
-        // Tạo All: Cần tạo mới User
-        let existingUser = await userModel.findUnique({ where: { id: targetUserId } });
-        
-        // Nếu action = "Tạo Sys" và User đã tồn tại → bỏ qua tạo User
-        const isTaoSys = (action === 'Tạo Sys');
-
-        if (existingUser) {
-          // User đã tồn tại - update nếu cần
-          const updates: any = {};
-          if (node.name && existingUser.name !== node.name) updates.name = node.name;
-          if (phone && !existingUser.phone) updates.phone = phone;
-          if (email && !existingUser.email) updates.email = email;
-          if (Object.keys(updates).length > 0) {
-            await userModel.update({ where: { id: targetUserId }, data: updates });
-            stats.usersUpdated++;
-          }
-        } else {
-          // Chỉ tạo User khi là Tạo All (không phải Tạo Sys)
-          if (!isTaoSys) {
-            const hashedPassword = await bcrypt.hash('Brk#3773', 10);
-            await userModel.create({
-              data: {
-                id: targetUserId,
-                name: node.name || `TCA User ${node.id}`,
-                email: email || `tca_${node.id}@placeholder.local`,
-                phone: phone,
-                password: hashedPassword,
-                role: 'STUDENT',
-                referrerId: targetReferrerId
-              }
-            });
-            stats.usersCreated++;
-            createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: nodeId });
-            console.log('[TCA Sync] Created', STAGING_MODE ? 'UserTest' : 'User', 'id:', targetUserId);
-
-            // Closure (dùng helper tương ứng với mode)
-            if (STAGING_MODE) {
-              await addUserToClosureTest(targetUserId, targetReferrerId);
-            } else {
-              await addUserToClosure(targetUserId, targetReferrerId);
-            }
-          } else {
-            console.log('[TCA Sync] SKIP User creation - action is Tạo Sys, user exists');
-          }
-        }
-
-        // 2. Xử lý System
-        const systemParentId = targetRefSysId || 0;
-        if (STAGING_MODE) {
-          await addUserToSystemClosureTest(targetUserId, systemParentId, 1);
-        } else {
-          await addUserToSystemClosure(targetUserId, systemParentId, 1);
-        }
-        
-        const systemRecord = await systemModel.findFirst({ where: { userId: targetUserId, onSystem: 1 } });
-        if (systemRecord) stats.systemsCreated++;
-
-        // 3. Xử lý TCAMember
-        const tcaMemberData = {
-          tcaId: nodeId, userId: targetUserId, type: node.type || 'item',
-          groupName: node.groupName || null, name: node.name || '',
-          personalScore: node.personalScore ? new Prisma.Decimal(parseFloat(node.personalScore)) : null,
-          totalScore: node.totalScore ? new Prisma.Decimal(parseFloat(node.totalScore)) : null,
-          level: node.level ? parseInt(node.level) : null,
-          location: node.location || null, phone: phone, email: email,
-          parentTcaId: (node.parentFolderId && node.parentFolderId !== 'root' && node.parentFolderId !== '0') ? Number(node.parentFolderId || nodeId) : null,
-          lastSyncedAt: new Date()
-        }
-
-        await tcaMemberModel.upsert({
-          where: { tcaId: nodeId },
-          update: tcaMemberData,
-          create: tcaMemberData
-        });
-        stats.tcaMembersCreated++;
-
-      } catch (error) {
-        stats.failed++;
-        failedRecords.push({ tcaId: Number(node.id), error: String(error) });
-      }
-    }
-
-    const duration = Date.now() - startTime;
-    return NextResponse.json({ success: true, syncId, stats, failedRecords: failedRecords.slice(0, 5), staging: STAGING_MODE, message: STAGING_MODE ? 'GHI VÀO BẢNG TEST THÀNH CÔNG' : 'Sync completed' }, { headers: CORS_HEADERS })
+    return NextResponse.json({ error: 'Invalid payload - need previewRows or allNodes' }, { status: 400, headers: CORS_HEADERS })
 
   } catch (error) {
     console.error('[TCA Sync] ERROR:', error)
@@ -445,5 +233,5 @@ let targetUserId = expected?.userId || 0;
 }
 
 export async function GET() {
-  return NextResponse.json({ status: 'TCA Sync API', version: '3.2.0', stagingMode: STAGING_MODE }, { headers: CORS_HEADERS })
+  return NextResponse.json({ status: 'TCA Sync API', version: '7.0.0', description: 'Direct sync to Production with SyncLog for rollback' }, { headers: CORS_HEADERS })
 }

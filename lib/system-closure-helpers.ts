@@ -45,21 +45,22 @@ export async function addUserToSystemClosure(
         })
 
         if (uplineSystem) {
-            // Lay tat ca closure cua upline
-            const uplineClosures = await prisma.systemClosure.findMany({
+            // Lấy TẤT CẢ ancestors của upline (từ root đến upline)
+            const ancestors = await prisma.systemClosure.findMany({
                 where: {
-                    ancestorId: uplineSystem.autoId,
-                    systemId
-                }
+                    systemId,
+                    descendantId: uplineSystem.autoId
+                },
+                orderBy: { depth: 'desc' }
             })
 
-            // Chen closure moi cho user (copy tu upline + 1)
-            for (const closure of uplineClosures) {
+            // Tạo closure cho user - copy từ mỗi ancestor + 1 depth
+            for (const ancestor of ancestors) {
                 await prisma.systemClosure.create({
                     data: {
-                        ancestorId: closure.ancestorId,
+                        ancestorId: ancestor.ancestorId,
                         descendantId: autoId,
-                        depth: closure.depth + 1,
+                        depth: ancestor.depth + 1,
                         systemId
                     }
                 }).catch(() => { }) // Ignore duplicates
@@ -135,20 +136,22 @@ export async function buildSystemClosuresFromData(
         }).catch(() => { })
         closureCount++
 
-        // Neu co upline, copy closures tu upline
+        // Neu co upline, copy closures tu upline (tất cả ancestors)
         if (row.refSysId > 0) {
             const uplineAutoId = systemRecords.get(row.refSysId)
             if (uplineAutoId) {
-                const uplineClosures = await prisma.systemClosure.findMany({
-                    where: { ancestorId: uplineAutoId, systemId }
+                // Lấy TẤT CẢ ancestors của upline (từ root đến upline)
+                const ancestors = await prisma.systemClosure.findMany({
+                    where: { systemId, descendantId: uplineAutoId },
+                    orderBy: { depth: 'desc' }
                 })
 
-                for (const closure of uplineClosures) {
+                for (const ancestor of ancestors) {
                     await prisma.systemClosure.create({
                         data: {
-                            ancestorId: closure.ancestorId,
+                            ancestorId: ancestor.ancestorId,
                             descendantId: autoId,
-                            depth: closure.depth + 1,
+                            depth: ancestor.depth + 1,
                             systemId
                         }
                     }).catch(() => { })

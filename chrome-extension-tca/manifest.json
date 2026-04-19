@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "6.8.0",
-  "description": "Sync TCA to BRK v6.8.0 - Match chuoi: N/PE/Pe/pE/S/TCA, Action: PE S TCA...",
+  "version": "7.0.0",
+  "description": "Sync TCA to BRK v7.0.0 - Direct to Production with SyncLog for rollback",
   "permissions": [
     "activeTab",
     "scripting",
