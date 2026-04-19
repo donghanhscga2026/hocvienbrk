@@ -90,12 +90,12 @@
             console.log(`[TCA Sync] Row ${i+1}:`, {
               id: row.id,
               name: row.name,
+              match: row.match,
               userId: row.userId,
               parentUserId: row.parentUserId,
               referrerId: row.referrerId,
               refSysId: row.refSysId,
-              action: row.action,
-              match: row.match
+              action: row.action
             });
           });
           console.log('[TCA Sync] === PREVIEW SAMPLE END ===');
@@ -228,7 +228,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v6.5.0 [N/PE/Pe/pE/TCA/S]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v6.6.0 [S=coSystem, PE/Pe/pE=coUser]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -284,7 +284,7 @@
 
     document.body.appendChild(panel);
     updateLogDisplay();
-    addTcaLog('Đã sẵn sàng v6.5.0: Match logic mới N/PE/Pe/pE/TCA/S.');
+    addTcaLog('Đã sẵn sàng v6.6.0: Match S=coSystem, PE/Pe/pE=coUser, TCA, N=moi.');
     
     // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
@@ -332,18 +332,18 @@
 
       let matchDisplay = '-';
       let matchColor = '#999';
-      // N: Chua ton tai trong User
-      if (match === 'N') { matchDisplay = 'N'; matchColor = '#555'; }
-      // PE: Trung ca P va E (cung 1 user)
-      else if (match === 'PE') { matchDisplay = 'PE'; matchColor = '#2e7d32'; }
-      // Pe: Trung P, khac E
-      else if (match === 'Pe') { matchDisplay = 'Pe'; matchColor = '#1565c0'; }
-      // pE: Khac P, trung E
-      else if (match === 'pE') { matchDisplay = 'pE'; matchColor = '#c2185b'; }
-      // TCA: Da ton tai trong TCAMember
+      // S: Da co System (da sync roi) - MAU XANH
+      if (match === 'S') { matchDisplay = 'S'; matchColor = '#2e7d32'; }
+      // PE: Co User trung P+E, chua co System - MAU CAM
+      else if (match === 'PE') { matchDisplay = 'PE'; matchColor = '#ff9800'; }
+      // Pe: Co User trung P, chua co System - MAU CAM
+      else if (match === 'Pe') { matchDisplay = 'Pe'; matchColor = '#ff9800'; }
+      // pE: Co User trung E, chua co System - MAU CAM
+      else if (match === 'pE') { matchDisplay = 'pE'; matchColor = '#ff9800'; }
+      // TCA: Da ton tai trong TCAMember - MAU CAM
       else if (match === 'TCA') { matchDisplay = 'TCA'; matchColor = '#ff9800'; }
-      // S: Da ton tai trong System
-      else if (match === 'S') { matchDisplay = 'S'; matchColor = '#9c27b0'; }
+      // N: Moi hoan toan - MAU XAM
+      else if (match === 'N') { matchDisplay = 'N'; matchColor = '#555'; }
       
       let actionLabel = action;
       let actionBg = '#999';

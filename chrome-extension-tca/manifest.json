@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "6.5.0",
-  "description": "Sync group_tree data from TCA portal to BRK system - Match logic v6 (N/PE/Pe/pE/TCA/S)",
+  "version": "6.6.0",
+  "description": "Sync TCA to BRK - Match: S=coSystem, PE/Pe/pE=coUser-chuaSystem, TCA, N=moi",
   "permissions": [
     "activeTab",
     "scripting",

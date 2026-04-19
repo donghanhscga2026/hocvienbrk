@@ -111,12 +111,12 @@ export async function POST(request: Request) {
         type: string           // Type
         
         // Column 4: Match type from DB
-        // N: Chua ton tai trong User (khong co phone/email)
-        // PE: Trung ca phone va email (cung 1 user)
-        // Pe: Trung phone, khac email
-        // pE: Khac phone, trung email
-        // TCA: Da ton tai trong TCAMember table
-        // S: Da ton tai trong System table
+        // N: Chua ton tai trong User (moi hoan toan)
+        // PE: Trung ca phone va email (cung 1 user) - chua co System
+        // Pe: Trung phone, khac email - chua co System
+        // pE: Khac phone, trung email - chua co System
+        // S: Da co trong User va System (da sync roi)
+        // TCA: Da co trong TCAMember (da sync roi)
         match: 'N' | 'PE' | 'Pe' | 'pE' | 'TCA' | 'S'
         
         // Column 5: Existing DB data
@@ -155,10 +155,9 @@ export async function POST(request: Request) {
       const phone = info.phone || null
       const normalizedPhone = normalizePhone(phone)
 
-      // ====== LOGIC XÁC ĐỊNH MATCH MỚI ======
-      // Quy tắc ưu tiên:
-      // 1. Nếu không tìm thấy trong User → check TCA → check System → N
-      // 2. Nếu tìm thấy trong User → PE, Pe, pE
+      // ====== LOGIC XÁC ĐỊNH USER TỒN TẠI ======
+      // QUY TẮC: Cùng 1 User phải match CẢ phone VÀ email mới là P+E
+      // Ưu tiên: Phone → Email
       let existingUser: any = null
       let matchType: 'N' | 'PE' | 'Pe' | 'pE' | 'TCA' | 'S' | null = null
       let emailMismatch = false
@@ -197,20 +196,24 @@ export async function POST(request: Request) {
         emailMatches.some((eu: any) => eu.id === pu.id)
       )
       
+      // ====== BƯỚC 2: Xác định match type trong User ======
+      let foundInUser = false
+      
       if (phoneAndEmailMatch) {
-        // Bước 2a: Tìm thấy trong User - trùng cả phone và email
+        // Trùng cả phone và email (cùng 1 user)
         existingUser = phoneAndEmailMatch
         matchType = 'PE'
-        matchDetails = `User ${existingUser.id} match P+E (trung P va E)`
+        matchDetails = `User ${existingUser.id} match P+E`
+        foundInUser = true
       } else if (phoneMatches.length > 0) {
-        // Bước 2b: Trùng phone, khác email
+        // Trùng phone, khác email
         existingUser = phoneMatches[0]
         matchType = 'Pe'
         
         if (email && existingUser.email && existingUser.email.toLowerCase() !== email.toLowerCase()) {
           emailMismatch = true
           needEmailUpdate = true
-          matchDetails = `User ${existingUser.id} match Pe (trung P, khac E: ${existingUser.email} vs ${email})`
+          matchDetails = `User ${existingUser.id} match Pe, email khac (${existingUser.email} vs ${email})`
         } else if (!email) {
           matchDetails = `User ${existingUser.id} match Pe (TCA khong co email)`
         } else if (!existingUser.email) {
@@ -218,28 +221,44 @@ export async function POST(request: Request) {
         } else {
           matchDetails = `User ${existingUser.id} match Pe`
         }
+        foundInUser = true
       } else if (emailMatches.length > 0) {
-        // Bước 2c: Khác phone, trùng email
+        // Khác phone, trùng email
         existingUser = emailMatches[0]
         matchType = 'pE'
         matchDetails = `User ${existingUser.id} match pE (khong co P)`
+        foundInUser = true
       }
 
-      // ====== BƯỚC 3: KIỂM TRA TCA/SYSTEM NẾU KHÔNG TÌM THẤY TRONG USER ======
-      const foundInUser = !!existingUser
-      if (!foundInUser) {
-        // Bước 3a: Check TCA Member table (qua tcaId)
+      // ====== BƯỚC 3: CHECK SYSTEM NẾU CÓ TRONG USER ======
+      let existingSystem: any = null
+      
+      if (foundInUser && existingUser) {
+        // Đã có trong User - check xem đã có System chưa
+        existingSystem = await prisma.system.findFirst({
+          where: { userId: existingUser.id, onSystem: 1 }
+        })
+        
+        if (existingSystem) {
+          // Đã có System → S (đã sync rồi, refSysId đã có)
+          matchType = 'S'
+          matchDetails = `User ${existingUser.id} co User va System`
+        } else {
+          // Có trong User nhưng chưa có System → giữ nguyên PE/Pe/pE
+          matchDetails = matchDetails + `, chua co System`
+        }
+      } else {
+        // ====== BƯỚC 4: KHÔNG CÓ TRONG USER → CHECK TCA ======
         const existingTCAMember = await (prisma as any).tCAMember.findUnique({
           where: { tcaId: node.id }
         })
         
         if (existingTCAMember) {
+          // Đã có trong TCAMember
           matchType = 'TCA'
           matchDetails = `TCA ${node.id} da ton tai trong TCAMember`
         } else {
-          // Bước 3b: Check System table (không có TCA Member nhưng có thể có user đã sync trước đó)
-          // System không có tcaId riêng nên không check trực tiếp được
-          // Mặc định là N nếu không có gì
+          // Không có gì cả
           matchType = 'N'
           matchDetails = `TCA ${node.id} chua ton tai`
         }
@@ -256,19 +275,13 @@ export async function POST(request: Request) {
         }
       }
 
-      let existingSystem = null
-      let existingTCAMember = null
-
-      if (existingUser) {
-        existingSystem = await prisma.system.findFirst({
-          where: { userId: existingUser.id, onSystem: 1 }
+      // existingSystem đã được khai báo ở trên
+      // Lấy existingTCAMember để check changes nếu có UPDATE
+      let existingTCAMember: any = null
+      if (existingSystem) {
+        existingTCAMember = await (prisma as any).tCAMember.findUnique({
+          where: { tcaId: node.id }
         })
-
-        if (existingSystem) {
-          existingTCAMember = await (prisma as any).tCAMember.findUnique({
-            where: { tcaId: node.id }
-          })
-        }
       }
 
       let action: 'CREATE_ALL' | 'CREATE_SYSTEM' | 'UPDATE' | 'SKIP'
@@ -277,32 +290,19 @@ export async function POST(request: Request) {
       let expectedSystemId: number | null = null
       let matchInfo = ''
 
-      if (!existingUser) {
+      // Xác định action dựa trên matchType mới
+      if (matchType === 'N') {
+        // Mới hoàn toàn - tạo cả User và System
         action = 'CREATE_ALL'
         expectedUserId = nextAvailableUserId++
         expectedSystemId = nextAvailableSystemId++
         matchInfo = 'USER_MOI'
-      } else if (matchType === 'Pe' && needEmailUpdate) {
-        action = 'CREATE_SYSTEM'
-        expectedSystemId = nextAvailableSystemId++
-        matchInfo = 'PHONE_TRUNG_EMAIL_KHONG'
-      } else if (matchType === 'pE') {
-        action = 'CREATE_SYSTEM'
-        expectedSystemId = nextAvailableSystemId++
-        matchInfo = 'EMAIL_TRUNG_PHONE_KHONG'
-      } else if (!existingSystem) {
-        action = 'CREATE_SYSTEM'
-        expectedSystemId = nextAvailableSystemId++
-        matchInfo = 'PHONE_EMAIL_TRUNG'
-      } else {
+      } else if (matchType === 'S' || matchType === 'TCA') {
+        // Đã có đầy đủ → UPDATE
         action = 'UPDATE'
-        matchInfo = matchType === 'PE' ? 'USER_TON_TAI' : 'PHONE_EMAIL_TRUNG'
+        matchInfo = matchType === 'S' ? 'DA_CO_SYSTEM' : 'DA_CO_TCA'
 
-        // Tìm existing TCAMember để check changes
-        const existingTCAMember = await (prisma as any).tCAMember.findUnique({
-          where: { tcaId: node.id }
-        })
-
+        // Check changes
         if (existingTCAMember) {
           if (existingTCAMember.name !== node.name) {
             changes.push(`Ten: "${existingTCAMember.name}" -> "${node.name}"`)
@@ -318,6 +318,22 @@ export async function POST(request: Request) {
         if (changes.length === 0) {
           action = 'SKIP'
         }
+      } else if (matchType === 'Pe' && needEmailUpdate) {
+        // Có User trùng P nhưng khác E → tạo System mới
+        action = 'CREATE_SYSTEM'
+        expectedSystemId = nextAvailableSystemId++
+        matchInfo = 'PHONE_TRUNG_EMAIL_KHONG'
+      } else if (matchType === 'pE' || matchType === 'PE') {
+        // Có User nhưng chưa có System → tạo System
+        action = 'CREATE_SYSTEM'
+        expectedSystemId = nextAvailableSystemId++
+        matchInfo = matchType === 'PE' ? 'PE_CHUA_CO_SYSTEM' : 'EMAIL_TRUNG_PHONE_KHONG'
+      } else {
+        // Fallback
+        action = 'CREATE_ALL'
+        expectedUserId = nextAvailableUserId++
+        expectedSystemId = nextAvailableSystemId++
+        matchInfo = 'FALLBACK'
       }
 
       // Resolve parent info
@@ -419,7 +435,7 @@ export async function POST(request: Request) {
         parentSource = 'ROOT';
       }
 
-      // matchType đã được xác định ở trên theo logic mới
+      // matchType đã được xác định ở trên (N/PE/Pe/pE/TCA/S)
       // UserID = existing OR expected
       const finalUserId = existingUser?.id || expectedUserId
 
@@ -432,7 +448,7 @@ export async function POST(request: Request) {
         name: node.name,
         type: node.type,
         
-        // Column 4: Match (matchType đã được gán đúng giá trị N/PE/Pe/pE/TCA/S)
+        // Column 4: Match (matchType đã là N/PE/Pe/pE/TCA/S)
         match: matchType || 'N',
         
         // Column 5: DB data
