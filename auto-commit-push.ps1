@@ -1,9 +1,9 @@
 # ================================================================================
-# Script: auto-commit-push.ps1 (Version Ultimate V2 - Flex Backup + Git Sync)
+# Script: auto-commit-push.ps1 (Version Ultimate V3 - Auto Branch Detection)
 # ================================================================================
 
 param(
-    [string]$Branch = "master",
+    [string]$Branch = "",
     [switch]$NoDeploy = $false,
     [switch]$SkipBackup = $false
 )
@@ -11,17 +11,22 @@ param(
 $ErrorActionPreference = "Continue"
 $ProjectRoot = Get-Location
 
+# Tu dong xac dinh nhanh chinh (main hoac master)
+$MainBranch = "master"
+$allBranches = git branch --list
+if ($allBranches -match "main") { $MainBranch = "main" }
+
 function Write-Green { param($msg) Write-Host "`n[OK] $msg" -ForegroundColor Green }
 function Write-Yellow { param($msg) Write-Host "`n[WAIT] $msg" -ForegroundColor Yellow }
 function Write-Red { param($msg) Write-Host "`n[ERROR] $msg" -ForegroundColor Red }
 function Write-Cyan { param($msg) Write-Host "`n[INFO] $msg" -ForegroundColor Cyan }
 
 # ── BUOC 1: MENU CHON CHE DO PUSH ──────────────────────────────────────────────
-if ($PSBoundParameters.Count -eq 0) {
+if ($Branch -eq "") {
     Write-Host "==============================================" -ForegroundColor Cyan
     Write-Host "   HE THONG TU DONG BACKUP & DAY CODE        " -ForegroundColor Cyan
     Write-Host "==============================================" -ForegroundColor Cyan
-    Write-Host "1. Day len Master (Vercel tu dong PROD)" -ForegroundColor Green
+    Write-Host "1. Day len $MainBranch (Vercel tu dong PROD)" -ForegroundColor Green
     Write-Host "2. Day len Staging (CHI LUU GIT - NO DEPLOY)" -ForegroundColor Yellow
     Write-Host "3. Day len Staging (Vercel tu dong TEST)" -ForegroundColor Cyan
     Write-Host "==============================================" -ForegroundColor Cyan
@@ -29,7 +34,7 @@ if ($PSBoundParameters.Count -eq 0) {
     $choice = Read-Host "Nhap lua chon cua ban (1, 2 hoac 3)"
     
     if ($choice -eq "1") {
-        $Branch = "master"; $NoDeploy = $false; Write-Green "Che do: Master (PROD)"
+        $Branch = $MainBranch; $NoDeploy = $false; Write-Green "Che do: $MainBranch (PROD)"
     } elseif ($choice -eq "2") {
         $Branch = "staging"; $NoDeploy = $true; Write-Yellow "Che do: Staging (SAVE ONLY)"
     } elseif ($choice -eq "3") {
@@ -38,13 +43,12 @@ if ($PSBoundParameters.Count -eq 0) {
         Write-Red "Lua chon khong hop le!"; exit 1
     }
 
-    # Hỏi về việc Backup
     Write-Host ""
     $doBackup = Read-Host "Ban co muon Backup ZIP du an truoc khi Push? (y/n - Mac dinh: n)"
     if ($doBackup -eq "y") { $SkipBackup = $false } else { $SkipBackup = $true }
 }
 
-# ── BUOC 2: BACKUP DU AN (.ZIP) - CHI CHAY NEU CHON 'y' ────────────────────────
+# ── BUOC 2: BACKUP DU AN (.ZIP) ────────────────────────────────────────────────
 if (-not $SkipBackup) {
     $Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
     $BackupDir = "$ProjectRoot\backups"
@@ -53,7 +57,7 @@ if (-not $SkipBackup) {
     $TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "BRK_Backup_$Timestamp"
 
     Write-Cyan "[1/2] Dang tien hanh Backup du an..."
-
+    
     $IncludePaths = @(
         "app", "components", "lib", "types", "public", "prisma", "scripts", "docs", "hooks",
         "auth.ts", "auth.config.ts", "middleware.ts", ".env", ".env.local", "next.config.ts",
@@ -91,15 +95,11 @@ if (-not $SkipBackup) {
         Compress-Archive -Path "$TempDir\*" -DestinationPath $ZipPath -Force
         $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
         Write-Green "Backup thanh cong: $ZipName ($sizeMB MB)"
-    } catch {
-        Write-Red "Loi khi tao file ZIP: $($_.Exception.Message)"
-    }
+    } catch { Write-Red "Loi khi tao file ZIP: $($_.Exception.Message)" }
     if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
     $oldBackups = Get-ChildItem -Path $BackupDir -Filter "backup_*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -Skip 5
     if ($oldBackups) { $oldBackups | Remove-Item -Force }
-} else {
-    Write-Cyan "[1/2] Bo qua buoc Backup ZIP (Skip Backup)."
-}
+} else { Write-Cyan "[1/2] Bo qua buoc Backup ZIP." }
 
 # ── BUOC 3: DAY CODE LEN GITHUB ────────────────────────────────────────────────
 Write-Cyan "[2/2] Dang day code len GitHub (Branch: $Branch)..."
@@ -113,8 +113,6 @@ if ($status) {
     $commitMsg = if ($NoDeploy) { "[skip ci] $baseMsg" } else { $baseMsg }
     git commit -m $commitMsg
     Write-Green "Da Commit: $commitMsg"
-} else {
-    Write-Yellow "Khong co thay doi moi de commit."
 }
 
 Write-Yellow "Dang kiem tra code moi tu GitHub..."
@@ -126,9 +124,5 @@ if ($LASTEXITCODE -eq 0) {
     if ($LASTEXITCODE -eq 0) {
         Write-Green "=== HOAN THANH! Code da len GitHub ($Branch) ==="
         if (-not $NoDeploy) { Write-Cyan "Vercel se tu dong Deploy trong giay lat..." }
-    } else {
-        Write-Red "Push that bai!"
-    }
-} else {
-    Write-Red "Xung dot khi Pull! Hay xu ly xung dot thu cong."
-}
+    } else { Write-Red "Push that bai!" }
+} else { Write-Red "Xung dot khi Pull! Hay xu ly xung dot thu cong." }
