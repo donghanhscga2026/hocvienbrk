@@ -157,10 +157,14 @@ export async function POST(request: Request) {
         const expected = ((body.expectedIds as any) || {})[nodeIdStr];
         
         // Định nghĩa userId trước để dùng cho SKIP
-        let targetUserId = expected?.userId || 0;
+let targetUserId = expected?.userId || 0;
         
         // ========== LOGIC: SKIP / Tạo Sys / Tạo All ==========
-        const action = expected?.action || (targetUserId ? 'Tạo All' : 'SKIP');
+        // Nhận cả display label (Tạo Sys, Tạo All) và internal (CREATE_SYSTEM, CREATE_ALL)
+        let action = expected?.action || (targetUserId ? 'Tạo All' : 'SKIP');
+        // Normalize action để so sánh
+        if (action === 'CREATE_SYSTEM') action = 'Tạo Sys';
+        else if (action === 'CREATE_ALL') action = 'Tạo All';
         
         // SKIP: Bỏ qua hoàn toàn - đã có User và System rồi
         if (action === 'SKIP' || targetUserId === 0) {
@@ -168,17 +172,10 @@ export async function POST(request: Request) {
           console.log('[TCA Sync] SKIP node', nodeId);
           continue;
         }
-
-        // Auto-generate userId nếu không có expectedIds (dự phòng)
-        // Fix: Chuyển node.id thành số
-        const useReferrerId = (expected?.referrerId != null && expected?.referrerId !== 0) 
-          ? expected.referrerId 
-          : ((!node.parentFolderId || node.parentFolderId === 'root' || node.parentFolderId === '0') 
-            ? 861 
-            : 900000 + Number(node.parentFolderId || nodeId));
-        const useRefSysId = (expected?.refSysId != null && expected?.refSysId !== 0) 
-          ? expected.refSysId 
-          : useReferrerId;
+        
+        // Dùng trực tiếp referrerId từ expectedIds - không auto-generate
+        const useReferrerId = (expected?.referrerId != null) ? expected.referrerId : 0;
+        const useRefSysId = (expected?.refSysId != null) ? expected.refSysId : 0;
         
         console.log('[TCA Sync] Processing node', node.id, '-> userId:', targetUserId, 'action:', action);
 
