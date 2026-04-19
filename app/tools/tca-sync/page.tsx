@@ -89,27 +89,34 @@ function TestPanel() {
         </div>
       </div>
 
-      {(testData?.users || 0) > 0 && (
-        <>
-          <button
-            onClick={handlePromote}
-            disabled={promoting}
-            className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg disabled:opacity-50"
-          >
-            {promoting ? 'Đang đẩy...' : '🚀 ĐẨY LÊN PRODUCTION'}
-          </button>
-          <button
-            onClick={async () => {
-              if (!confirm('XÓA toàn bộ dữ liệu Test?')) return;
-              await fetch('/api/sync-tca/clear-test', { method: 'DELETE' });
-              fetchTestData();
-            }}
-            className="w-full px-4 py-2 mt-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
-          >
-            🗑️ XÓA DỮ LIỆU TEST
-          </button>
-        </>
-      )}
+      <div className="space-y-2">
+        {testData && (testData.users > 0 || testData.systems > 0 || testData.tcaMembers > 0 || testData.closures > 0) ? (
+          <>
+            <button
+              onClick={handlePromote}
+              disabled={promoting}
+              className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg disabled:opacity-50"
+            >
+              {promoting ? 'Đang đẩy...' : '🚀 ĐẨY LÊN PRODUCTION'}
+            </button>
+            <button
+              onClick={async () => {
+                if (!confirm('XÓA toàn bộ dữ liệu Test?')) return;
+                await fetch('/api/sync-tca/clear-test', { method: 'DELETE' });
+                fetchTestData();
+              }}
+              className="w-full px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
+            >
+              🗑️ XÓA DỮ LIỆU TEST
+            </button>
+          </>
+        ) : (
+          <div className="p-4 bg-gray-100 rounded-lg text-center text-gray-500">
+            <p>Chưa có dữ liệu Test</p>
+            <p className="text-xs mt-1">Sử dụng Chrome Extension để sync dữ liệu TCA</p>
+          </div>
+        )}
+      </div>
 
       {promoteResult && (
         <div className={`p-4 rounded-lg ${promoteResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>

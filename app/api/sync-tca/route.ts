@@ -130,40 +130,53 @@ export async function POST(request: Request) {
   const createdRecords: { table: string; id: number; tcaId: number }[] = []
 
   try {
-    const body: SyncPayload = await request.json()
+    let body: SyncPayload;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error('[TCA Sync] Failed to parse JSON:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON payload', details: String(parseError) }, { status: 400, headers: CORS_HEADERS });
+    }
+
+    console.log('[TCA Sync] Request body keys:', Object.keys(body));
+    console.log('[TCA Sync] Has previewRows:', !!body.previewRows, Array.isArray(body.previewRows) ? `(${body.previewRows.length})` : '');
+    console.log('[TCA Sync] Has allNodes:', !!body.allNodes, Array.isArray(body.allNodes) ? `(${body.allNodes.length})` : '');
     
     // ===== PLAN A: DÙNG TRỰC TIẾP previewRows =====
     if (body.previewRows && Array.isArray(body.previewRows)) {
       console.log('[TCA Sync] PLAN A: Using previewRows directly');
       console.log('[TCA Sync] previewRows count:', body.previewRows.length);
-      console.log('[TCA Sync] previewRows sample:', JSON.stringify(body.previewRows.slice(0, 3)));
+      if (body.previewRows.length > 0) {
+        console.log('[TCA Sync] previewRows sample:', JSON.stringify(body.previewRows.slice(0, 3)));
+      }
       
       stats.totalRecords = body.previewRows.length;
       
-      // Duyệt từng row và xử lý theo action
+      // Duyệt từng row và xử lý theo action (chuỗi ký tự)
       for (const row of body.previewRows) {
         try {
           const tcaId = Number(row.id) || 0;
           const targetUserId = Number(row.userId) || 0;
-          const action = row.action || 'SKIP';
+          const action = row.action || '';
           const referrerId = Number(row.referrerId) || 0;
           const refSysId = Number(row.refSysId) || 0;
           
-          console.log('[TCA Sync] Row:', tcaId, 'userId:', targetUserId, 'action:', action, 'ref:', referrerId);
+          console.log('[TCA Sync] Row:', tcaId, 'userId:', targetUserId, 'action:', action);
           
           // Skip nếu userId = 0 hoặc action = SKIP
-          if (!targetUserId || action === 'SKIP') {
+          if (!targetUserId || action === 'SKIP' || !action) {
             stats.skipped = (stats.skipped || 0) + 1;
             continue;
           }
           
-          // Xử lý theo action
           const userModel = STAGING_MODE ? (prisma as any).userTest : prisma.user;
           const systemModel = STAGING_MODE ? (prisma as any).systemTest : prisma.system;
           const tcaMemberModel = STAGING_MODE ? (prisma as any).tCAMemberTest : (prisma as any).tCAMember;
+          const systemParentId = refSysId || 0;
           
-          if (action === 'CREATE_ALL' || action === 'Tạo All') {
-            // Tạo mới User + System
+          // Xử lý theo chuỗi action
+          // PE = tạo User + closure
+          if (action.includes('PE')) {
             const hashedPassword = await bcrypt.hash('Brk#3773', 10);
             await userModel.create({
               data: {
@@ -173,41 +186,81 @@ export async function POST(request: Request) {
                 phone: row.phone || null,
                 password: hashedPassword,
                 role: 'STUDENT',
-                referrerId: referrerId
+                referrerId: referrerId || null
               }
             });
             stats.usersCreated++;
-            
-            // Add to closure
-            if (STAGING_MODE) {
-              await addUserToClosureTest(targetUserId, referrerId);
+            // Chỉ tạo closure khi referrerId hợp lệ (> 0)
+            if (referrerId && referrerId > 0) {
+              if (STAGING_MODE) {
+                await addUserToClosureTest(targetUserId, referrerId);
+              } else {
+                await addUserToClosure(targetUserId, referrerId);
+              }
             } else {
-              await addUserToClosure(targetUserId, referrerId);
+              console.log('[TCA Sync] SKIP closure - referrerId', referrerId, 'invalid');
             }
           }
           
-          // Luôn tạo System + TCAMember (cho cả CREATE_ALL và CREATE_SYSTEM)
-          const systemParentId = refSysId || 0;
-          if (STAGING_MODE) {
-            await addUserToSystemClosureTest(targetUserId, systemParentId, 1);
-          } else {
-            await addUserToSystemClosure(targetUserId, systemParentId, 1);
+          // P = cập nhật phone - chỉ khi user đã tồn tại
+          if (action.includes('P') && action.includes('PE') === false && targetUserId) {
+            const existingUser = await userModel.findUnique({ where: { id: targetUserId } });
+            if (existingUser) {
+              await userModel.update({
+                where: { id: targetUserId },
+                data: { phone: row.phone || null }
+              });
+              stats.usersUpdated++;
+            } else {
+              console.log('[TCA Sync] SKIP P update - user', targetUserId, 'not found');
+            }
           }
           
-          await tcaMemberModel.upsert({
-            where: { tcaId },
-            update: {
-              tcaId, userId: targetUserId, name: row.name || '', type: 'item',
-              parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
-              lastSyncedAt: new Date()
-            },
-            create: {
-              tcaId, userId: targetUserId, name: row.name || '', type: 'item',
-              parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
-              lastSyncedAt: new Date()
+          // E = cập nhật email - chỉ khi user đã tồn tại
+          if (action.includes('E') && action.includes('PE') === false && targetUserId) {
+            const existingUser = await userModel.findUnique({ where: { id: targetUserId } });
+            if (existingUser) {
+              await userModel.update({
+                where: { id: targetUserId },
+                data: { email: row.email || null }
+              });
+              stats.usersUpdated++;
+            } else {
+              console.log('[TCA Sync] SKIP E update - user', targetUserId, 'not found');
             }
-          });
-          stats.tcaMembersCreated++;
+          }
+          
+          // S = tạo System + closure
+          if (action.includes('S')) {
+            if (STAGING_MODE) {
+              await addUserToSystemClosureTest(targetUserId, systemParentId, 1);
+            } else {
+              await addUserToSystemClosure(targetUserId, systemParentId, 1);
+            }
+            stats.systemsCreated++;
+          }
+          
+          // TCA = tạo TCAMember
+          if (action.includes('TCA')) {
+            await tcaMemberModel.upsert({
+              where: { tcaId },
+              update: {
+                tcaId, userId: targetUserId, name: row.name || '', type: 'item',
+                parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
+                phone: row.phone || null,
+                email: row.email || null,
+                lastSyncedAt: new Date()
+              },
+              create: {
+                tcaId, userId: targetUserId, name: row.name || '', type: 'item',
+                parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
+                phone: row.phone || null,
+                email: row.email || null,
+                lastSyncedAt: new Date()
+              }
+            });
+            stats.tcaMembersCreated++;
+          }
           
         } catch (rowError) {
           stats.failed++;
