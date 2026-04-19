@@ -213,7 +213,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.6.0 [FINAL]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.7.0 [FIX]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -584,10 +584,13 @@
 
   async function executeFinalSync(nodes, memberInfo, expectedIds, confirmedData) {
     // ========== GIẢI PHÁP #2: Fix tại nguồn ==========
-    // Đảm bảo allNodes có id là Number
+    // Đảm bảo allNodes có id là Number - ƯU TIÊN tcaId thay vì id
     const fixedNodes = (nodes || []).map(function(n) {
+      // Lấy tcaId ưu tiên, fallback id, fallback 0
+      const nodeId = Number(n.tcaId) || Number(n.id) || 0;
       return Object.assign({}, n, {
-        id: Number(n.id) || parseInt(n.id, 10) || 0,
+        id: nodeId,
+        tcaId: nodeId,  // Thêm trường tcaId để đối chiếu
         parentFolderId: n.parentFolderId === 'root' ? 'root' : (Number(n.parentFolderId) || parseInt(n.parentFolderId, 10) || n.parentFolderId)
       });
     });
@@ -599,11 +602,14 @@
       fixedExpectedIds[k] = {
         userId: Number(v?.userId) || 0,
         referrerId: Number(v?.referrerId) || 0,
-        refSysId: Number(v?.refSysId) || 0
+        refSysId: Number(v?.refSysId) || 0,
+        action: v?.action || 'Tạo All',  // Thêm action
+        parentUserId: Number(v?.parentUserId) || 0  // Thêm parentUserId
       };
     });
     
     console.log('[FIXED] Nodes sample:', JSON.stringify(fixedNodes.slice(0, 1)));
+    console.log('[FIXED] Node ID:', fixedNodes[0]?.id, 'tcaId:', fixedNodes[0]?.tcaId);
     console.log('[FIXED] ExpectedIds keys:', Object.keys(fixedExpectedIds));
     
     // Thay thế data gốc
@@ -803,9 +809,10 @@
       const pTcaId = node.parentFolderId || '-';
       const match = previewRow.match || '-';
       const userId = previewRow.userId || '';
-      const refId = previewRow.referrerId || previewRow.parentUserId || '';
+      // Fix: Dùng parentUserId trước (đúng như bảng hiển thị), fallback referrerId
+      const refId = previewRow.parentUserId || previewRow.referrerId || '0';
       const action = previewRow.action || '-';
-      const refSys = previewRow.refSysId || previewRow.parentUserId || '';
+      const refSys = previewRow.refSysId || previewRow.parentUserId || '0';
       
       csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${action},${refSys},"${email}","${phone}"\n`;
     });
