@@ -450,22 +450,20 @@
 
     addTcaLog('Bảng mẫu Local đã được xây dựng thành công.');
     
-    // Build expectedIds từ previewRows để truyền sang executeFinalSync
+    // Build expectedIds TRỰC TIẾP từ previewRows (không xử lý thêm)
     const expectedIdsMap = {};
     if (previewRows && previewRows.length > 0) {
       previewRows.forEach(row => {
-        // Fix: userId > 0 mới sync (bỏ SKIP)
+        // Chỉ lấy userId > 0 để sync (bỏ SKIP records)
         const targetUserId = Number(row.userId) || 0;
         if (targetUserId) {
           const rowId = Number(row.id) || parseInt(row.id) || row.id;
-          // Dùng parentUserId cho đúng với bảng hiển thị, referrerId cho F1
-          const pUserId = Number(row.parentUserId) || 0;
-          const refId = Number(row.referrerId) || pUserId || 0;
+          // TRỰC TIẾP từ previewRows - không transform
           expectedIdsMap[rowId] = {
             userId: targetUserId,
-            referrerId: refId,
-            refSysId: Number(row.refSysId) || pUserId || 0,
-            parentUserId: pUserId,
+            referrerId: row.referrerId,      // TRỰC TIẾP từ API
+            refSysId: row.refSysId,         // TRỰC TIẾP từ API
+            parentUserId: row.parentUserId, // TRỰC TIẾP từ API
             action: row.action || 'SKIP'
           };
         }
@@ -605,40 +603,18 @@
 
   async function executeFinalSync(nodes, memberInfo, expectedIds, confirmedData) {
     // ========== GIẢI PHÁP #2: Fix tại nguồn ==========
-    // Đảm bảo allNodes có id là Number - ƯU TIÊN tcaId thay vì id
-    const fixedNodes = (nodes || []).map(function(n) {
-      // Lấy tcaId ưu tiên, fallback id, fallback 0
-      const nodeId = Number(n.tcaId) || Number(n.id) || 0;
-      // Lấy action từ expectedIds nếu có
-      const exp = (expectedIds || {})[nodeId];
-      return Object.assign({}, n, {
-        id: nodeId,
-        tcaId: nodeId,  // Thêm trường tcaId để đối chiếu
-        parentFolderId: n.parentFolderId === 'root' ? 'root' : (Number(n.parentFolderId) || parseInt(n.parentFolderId, 10) || n.parentFolderId),
-        action: exp?.action || 'SKIP'
-      });
-    });
+    // KHÔNG transform - dùng trực tiếp expectedIds từ previewRows
+    // Chỉ thêm action vào nodes để API xử lý
     
-    // Đảm bảo expectedIds có key là string (cho JSON map) và giá trị là number
-    const fixedExpectedIds = {};
-    Object.keys(expectedIds || {}).forEach(function(k) {
-      const v = expectedIds[k];
-      fixedExpectedIds[k] = {
-        userId: Number(v?.userId) || 0,
-        referrerId: Number(v?.referrerId) || 0,
-        refSysId: Number(v?.refSysId) || 0,
-        action: v?.action || 'Tạo All',  // Thêm action
-        parentUserId: Number(v?.parentUserId) || 0  // Thêm parentUserId
-      };
+    console.log('[SYNC] === EXPECTEDIDS TRỰC TIẾP TỪ PREVIEW (first 3) ===');
+    Object.keys(expectedIds || {}).slice(0, 3).forEach(k => {
+      console.log('[SYNC] Key=' + k + ':', JSON.stringify(expectedIds[k]));
     });
-    
-    console.log('[FIXED] Nodes sample:', JSON.stringify(fixedNodes.slice(0, 1)));
-    console.log('[FIXED] Node ID:', fixedNodes[0]?.id, 'tcaId:', fixedNodes[0]?.tcaId);
-    console.log('[FIXED] ExpectedIds keys:', Object.keys(fixedExpectedIds));
+    console.log('[SYNC] === END ===');
     
     // Thay thế data gốc
-    nodes = fixedNodes;
-    expectedIds = fixedExpectedIds;
+    nodes = nodes;
+    expectedIds = expectedIds;
 
     const progressPanel = document.createElement('div');
     progressPanel.style.cssText = `
@@ -852,12 +828,13 @@
       const pTcaId = node.parentFolderId || '-';
       const match = previewRow.match || '-';
       const userId = previewRow.userId || '';
-      // Fix: Dùng parentUserId trước (đúng như bảng hiển thị), fallback referrerId
-      const refId = previewRow.parentUserId || previewRow.referrerId || '0';
-      const action = previewRow.action || '-';
-      const refSys = previewRow.refSysId || previewRow.parentUserId || '0';
+      // TRỰC TIẾP từ previewRow - không transform
+      const refId = previewRow.referrerId != null ? previewRow.referrerId : 0;
+      // TRỰC TIẾP action - không translate
+      const actionVal = previewRow.action || '-';
+      const refSysId = previewRow.refSysId != null ? previewRow.refSysId : 0;
       
-      csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${action},${refSys},"${email}","${phone}"\n`;
+      csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${actionVal},${refSysId},"${email}","${phone}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
