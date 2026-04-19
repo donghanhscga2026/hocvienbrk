@@ -1,93 +1,134 @@
 # ================================================================================
-# Script: auto-commit-push.ps1 (Version Pro - Auto Sync PC & Mac)
-# ================================================================================
-# Parameters:
-#   -Branch <master|staging>  : Branch to push (default: master)
-#   -Deploy                   : Deploy to Vercel after push (default: false)
-# Examples:
-#   .\auto-commit-push.ps1                           -> Push to master, no deploy
-#   .\auto-commit-push.ps1 -Branch staging             -> Push to staging, no deploy
-#   .\auto-commit-push.ps1 -Deploy                  -> Push to master and deploy
-#   .\auto-commit-push.ps1 -Branch staging -Deploy   -> Push to staging and deploy
+# Script: auto-commit-push.ps1 (Version Ultimate V2 - Flex Backup + Git Sync)
 # ================================================================================
 
 param(
     [string]$Branch = "master",
-    [switch]$Deploy = $false
+    [switch]$NoDeploy = $false,
+    [switch]$SkipBackup = $false
 )
 
 $ErrorActionPreference = "Continue"
+$ProjectRoot = Get-Location
 
 function Write-Green { param($msg) Write-Host "`n[OK] $msg" -ForegroundColor Green }
 function Write-Yellow { param($msg) Write-Host "`n[WAIT] $msg" -ForegroundColor Yellow }
 function Write-Red { param($msg) Write-Host "`n[ERROR] $msg" -ForegroundColor Red }
+function Write-Cyan { param($msg) Write-Host "`n[INFO] $msg" -ForegroundColor Cyan }
 
-# Validate branch
-$Branch = $Branch.ToLower()
-if ($Branch -ne "master" -and $Branch -ne "staging") {
-    Write-Red "Branch must be 'master' or 'staging'. Got: $Branch"
-    exit 1
-}
-
-Write-Yellow "=== Bat dau quy trinh dong bo GitHub - Branch: $Branch ==="
-
-# Bước 1: Kiểm tra thay đổi nội bộ
-$status = git status --porcelain
-
-if (-not $status) {
-    Write-Red "Khong co thay doi nao de commit. Dang kiem tra code moi tu GitHub..."
-} else {
-    # Bước 2: Commit các thay đổi hiện tại
-    Write-Yellow "Dang luu lai cac thay doi cua ban..."
+# ── BUOC 1: MENU CHON CHE DO PUSH ──────────────────────────────────────────────
+if ($PSBoundParameters.Count -eq 0) {
+    Write-Host "==============================================" -ForegroundColor Cyan
+    Write-Host "   HE THONG TU DONG BACKUP & DAY CODE        " -ForegroundColor Cyan
+    Write-Host "==============================================" -ForegroundColor Cyan
+    Write-Host "1. Day len Master (Vercel tu dong PROD)" -ForegroundColor Green
+    Write-Host "2. Day len Staging (CHI LUU GIT - NO DEPLOY)" -ForegroundColor Yellow
+    Write-Host "3. Day len Staging (Vercel tu dong TEST)" -ForegroundColor Cyan
+    Write-Host "==============================================" -ForegroundColor Cyan
     
-    git add .
+    $choice = Read-Host "Nhap lua chon cua ban (1, 2 hoac 3)"
     
-    $changedFiles = git diff --cached --name-only
-    if (-not $changedFiles) {
-        Write-Yellow "Tat ca thay doi deu thuoc danh sach bo qua (.gitignore). Khong co gi de commit."
+    if ($choice -eq "1") {
+        $Branch = "master"; $NoDeploy = $false; Write-Green "Che do: Master (PROD)"
+    } elseif ($choice -eq "2") {
+        $Branch = "staging"; $NoDeploy = $true; Write-Yellow "Che do: Staging (SAVE ONLY)"
+    } elseif ($choice -eq "3") {
+        $Branch = "staging"; $NoDeploy = $false; Write-Green "Che do: Staging (TEST)"
     } else {
-        $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
-        $commitMsg = if ($fileNames.Length -gt 80) { $fileNames.Substring(0, 77) + "..." } else { "cap nhat: $fileNames" }
-        
-        git commit -m $commitMsg
-        Write-Green "Da Commit: $commitMsg"
+        Write-Red "Lua chon khong hop le!"; exit 1
     }
+
+    # Hỏi về việc Backup
+    Write-Host ""
+    $doBackup = Read-Host "Ban co muon Backup ZIP du an truoc khi Push? (y/n - Mac dinh: n)"
+    if ($doBackup -eq "y") { $SkipBackup = $false } else { $SkipBackup = $true }
 }
 
-# Bước 3: QUAN TRỌNG - Kéo code mới về trước khi đẩy lên
-Write-Yellow "Dang keo code moi tu GitHub (Pull) de tranh xung dot..."
+# ── BUOC 2: BACKUP DU AN (.ZIP) - CHI CHAY NEU CHON 'y' ────────────────────────
+if (-not $SkipBackup) {
+    $Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm"
+    $BackupDir = "$ProjectRoot\backups"
+    $ZipName = "backup_$Timestamp.zip"
+    $ZipPath = "$BackupDir\$ZipName"
+    $TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "BRK_Backup_$Timestamp"
+
+    Write-Cyan "[1/2] Dang tien hanh Backup du an..."
+
+    $IncludePaths = @(
+        "app", "components", "lib", "types", "public", "prisma", "scripts", "docs", "hooks",
+        "auth.ts", "auth.config.ts", "middleware.ts", ".env", ".env.local", "next.config.ts",
+        "package.json", "tsconfig.json", "postcss.config.mjs", "eslint.config.mjs", "README.md", "GEMINI.md"
+    )
+    $ExcludePatterns = @("*.log", "*.tsbuildinfo", ".next", "node_modules", ".git", "backups")
+
+    if (-not (Test-Path $BackupDir)) { New-Item -ItemType Directory -Path $BackupDir | Out-Null }
+    if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
+    New-Item -ItemType Directory -Path $TempDir | Out-Null
+
+    foreach ($rel in $IncludePaths) {
+        $full = Join-Path $ProjectRoot $rel
+        if (Test-Path $full -PathType Leaf) {
+            $dest = Join-Path $TempDir $rel
+            $parent = Split-Path -Parent $dest
+            if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+            Copy-Item -Path $full -Destination $dest -Force
+        } elseif (Test-Path $full -PathType Container) {
+            Get-ChildItem -Path $full -File -Recurse | ForEach-Object {
+                $skip = $false
+                foreach ($p in $ExcludePatterns) { if ($_.FullName -like "*\$p\*" -or $_.Name -like $p) { $skip = $true; break } }
+                if (-not $skip) {
+                    $relPath = $_.FullName.Substring($ProjectRoot.ToString().Length).TrimStart('\', '/')
+                    $dest = Join-Path $TempDir $relPath
+                    $parent = Split-Path -Parent $dest
+                    if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+                    Copy-Item -Path $_.FullName -Destination $dest -Force
+                }
+            }
+        }
+    }
+
+    try {
+        Compress-Archive -Path "$TempDir\*" -DestinationPath $ZipPath -Force
+        $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
+        Write-Green "Backup thanh cong: $ZipName ($sizeMB MB)"
+    } catch {
+        Write-Red "Loi khi tao file ZIP: $($_.Exception.Message)"
+    }
+    if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force | Out-Null }
+    $oldBackups = Get-ChildItem -Path $BackupDir -Filter "backup_*.zip" | Sort-Object LastWriteTime -Descending | Select-Object -Skip 5
+    if ($oldBackups) { $oldBackups | Remove-Item -Force }
+} else {
+    Write-Cyan "[1/2] Bo qua buoc Backup ZIP (Skip Backup)."
+}
+
+# ── BUOC 3: DAY CODE LEN GITHUB ────────────────────────────────────────────────
+Write-Cyan "[2/2] Dang day code len GitHub (Branch: $Branch)..."
+
+$status = git status --porcelain
+if ($status) {
+    git add .
+    $changedFiles = git diff --cached --name-only
+    $fileNames = ($changedFiles | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
+    $baseMsg = if ($fileNames.Length -gt 60) { $fileNames.Substring(0, 57) + "..." } else { "cap nhat: $fileNames" }
+    $commitMsg = if ($NoDeploy) { "[skip ci] $baseMsg" } else { $baseMsg }
+    git commit -m $commitMsg
+    Write-Green "Da Commit: $commitMsg"
+} else {
+    Write-Yellow "Khong co thay doi moi de commit."
+}
+
+Write-Yellow "Dang kiem tra code moi tu GitHub..."
 git pull origin $Branch --rebase
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Red "PHAT HIEN XUNG DOT (CONFLICT)!"
-    Write-Host "Hay mo VS Code de giai quyet Conflict thu cong, sau do chay lai script." -ForegroundColor Cyan
-    exit 1
-}
-
-# Bước 4: Đẩy code lên GitHub
-Write-Yellow "Dang day code len GitHub (Push to $Branch)..."
-git push origin $Branch
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Red "Push that bai!"
-    exit 1
-}
-
-Write-Green "=== PUSH THANH CONG! Code da len GitHub branch: $Branch ==="
-
-# Bước 5: Deploy to Vercel (nếu có tham số -Deploy)
-if ($Deploy) {
-    Write-Yellow "Dang deploy len Vercel production..."
-    
-    # Kill any existing vercel processes
-    Get-Process -Name "vercel" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    
-    # Deploy to Vercel
-    npx vercel --prod --yes 2>&1 | ForEach-Object { Write-Host $_ }
-    
+if ($LASTEXITCODE -eq 0) {
+    Write-Yellow "Dang day code len $Branch..."
+    git push origin $Branch
     if ($LASTEXITCODE -eq 0) {
-        Write-Green "=== DEPLOY THANH CONG! Da tren Vercel ==="
+        Write-Green "=== HOAN THANH! Code da len GitHub ($Branch) ==="
+        if (-not $NoDeploy) { Write-Cyan "Vercel se tu dong Deploy trong giay lat..." }
     } else {
-        Write-Red "Deploy that bai! Vui long deploy thu cong qua Vercel dashboard."
+        Write-Red "Push that bai!"
     }
+} else {
+    Write-Red "Xung dot khi Pull! Hay xu ly xung dot thu cong."
 }
