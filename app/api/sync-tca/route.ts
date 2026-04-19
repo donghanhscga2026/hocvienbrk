@@ -124,14 +124,32 @@ export async function POST(request: Request) {
     const sortedNodes = sortNodesByHierarchy(body.allNodes)
     
     console.log('[TCA Sync] STAGING_MODE:', STAGING_MODE)
-    console.log('[TCA Sync] Received expectedIds count:', Object.keys(body.expectedIds || {}).length)
-    console.log('[TCA Sync] First node:', JSON.stringify(sortedNodes[0]))
-    console.log('[TCA Sync] ExpectedIds sample:', JSON.stringify(body.expectedIds).slice(0, 500))
+    console.log('[TCA Sync] allNodes sample:', JSON.stringify(body.allNodes?.slice(0, 2)))
+    console.log('[TCA Sync] expectedIds keys:', Object.keys(body.expectedIds || {}))
+    console.log('[TCA Sync] expectedIds type sample:', typeof Object.keys(body.expectedIds || {})[0])
 
     for (const node of sortedNodes) {
       try {
-        // Fix: Also convert allNodes id to number
-        const nodeId = Number(node.id);
+        // ========== GIẢI PHÁP #3: XỬ LÝ MỌI DẠNG ==========
+        // Lấy id - ưu tiên number, fallback string
+        let nodeIdRaw = node.id;
+        // Nếu id là dạng khác (object, array) thì log để biết
+        if (typeof nodeIdRaw !== 'number' && typeof nodeIdRaw !== 'string') {
+          console.log('[DEBUG] Strange node.id:', typeof nodeIdRaw, nodeIdRaw);
+        }
+        
+        // Convert sang number - dùng ParseInt với fallback an toàn
+        let nodeId = 0;
+        if (typeof nodeIdRaw === 'number') nodeId = nodeIdRaw;
+        else if (typeof nodeIdRaw === 'string') nodeId = parseInt(nodeIdRaw, 10);
+        
+        // Fallback cuối cùng: dùng index trong mảng + offset
+        if (!nodeId || isNaN(nodeId)) {
+          // Thử indexOf để lấy
+          const idx = sortedNodes.indexOf(node);
+          nodeId = 60000 + idx; // Offset để tránh trùng
+        }
+        
         const nodeIdStr = String(nodeId);
         const memberInfo = ((body.memberInfo as any) || {})[nodeIdStr] || {};
         const phone = memberInfo.phone || null;

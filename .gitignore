@@ -55,3 +55,6 @@ nul
 *.md
 !README.md # Giữ lại README.md nếu bạn muốn, nếu không thì bỏ dòng này
 
+
+.vercel
+.env*.local
