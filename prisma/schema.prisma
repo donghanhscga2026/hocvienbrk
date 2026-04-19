@@ -1373,3 +1373,18 @@ model SiteProfile {
   @@index([userId])
   @@index([isActive])
 }
+
+// SyncLog: Lưu lịch sử thay đổi khi đồng bộ TCA → để Rollback
+model SyncLog {
+  id          Int       @id @default(autoincrement())
+  syncId      String
+  tableName  String    @db.VarChar(50)
+  recordId   Int
+  action     String    @db.VarChar(20)
+  oldData    String?   @db.Text
+  newData    String?   @db.Text
+  createdAt  DateTime  @default(now())
+
+  @@unique([syncId, tableName, recordId])
+  @@index([syncId])
+}

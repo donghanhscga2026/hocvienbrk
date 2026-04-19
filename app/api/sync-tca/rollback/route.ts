@@ -90,6 +90,61 @@ export async function POST(request: Request) {
       const { syncId: targetSyncId } = body as RollbackBySyncId
       syncId = targetSyncId
 
+      // Ưu tiên dùng SyncLog (mới) - trả về lịch sử chi tiết hơn
+      const syncLogs = await prisma.syncLog.findMany({
+        where: { syncId: targetSyncId }
+      })
+
+      if (syncLogs.length > 0) {
+        console.log('[TCA Rollback] Using new SyncLog:', syncLogs.length, 'records')
+        
+        // Rollback theo SyncLog
+        for (const log of syncLogs) {
+          try {
+            if (log.action === 'CREATE') {
+              // Xóa bản ghi đã tạo
+              if (log.tableName === 'User') {
+                await prisma.user.delete({ where: { id: log.recordId } }).catch(() => {})
+                recordsToDelete.users.push({ id: log.recordId, tcaId: null })
+              } else if (log.tableName === 'System') {
+                // System rollback - xóa theo userId
+                await prisma.system.deleteMany({ where: { userId: log.recordId } }).catch(() => {})
+                recordsToDelete.systems.push({ autoId: log.recordId, tcaId: null })
+              } else if (log.tableName === 'TCAMember') {
+                await (prisma as any).tCAMember.delete({ where: { tcaId: log.recordId } }).catch(() => {})
+                recordsToDelete.tcaMembers.push({ id: log.recordId, tcaId: log.recordId })
+              }
+            } else if (log.action === 'UPDATE' && log.oldData) {
+              // Khôi phục dữ liệu cũ
+              const oldData = JSON.parse(log.oldData)
+              if (log.tableName === 'User') {
+                await prisma.user.update({
+                  where: { id: log.recordId },
+                  data: oldData
+                })
+              }
+            }
+          } catch (e) {
+            console.log('[TCA Rollback] Error:', e)
+          }
+        }
+
+        const deleted = {
+          users: recordsToDelete.users.length,
+          systems: recordsToDelete.systems.length,
+          tcaMembers: recordsToDelete.tcaMembers.length,
+          closures: recordsToDelete.closures.length
+        }
+
+        return NextResponse.json({
+          success: true,
+          syncId,
+          deleted,
+          message: `Đã rollback ${syncLogs.length} thay đổi bằng SyncLog`
+        }, { headers: CORS_HEADERS })
+      }
+
+      // Fallback dùng TCASyncHistory (cũ)
       const history = await (prisma as any).tCASyncHistory.findMany({
         where: { syncId: targetSyncId },
         orderBy: { id: 'asc' }
@@ -397,6 +452,21 @@ export async function GET(request: Request) {
   const syncId = searchParams.get('syncId')
   const limit = parseInt(searchParams.get('limit') || '20')
 
+  // Lấy từ SyncLog (mới - ưu tiên)
+  let syncLogs: any[] = []
+  if (syncId) {
+    syncLogs = await prisma.syncLog.findMany({
+      where: { syncId },
+      orderBy: { createdAt: 'desc' }
+    })
+  } else {
+    syncLogs = await prisma.syncLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    })
+  }
+
+  // Lấy từ TCASyncHistory (cũ)
   let where = {}
   if (syncId) {
     where = { syncId }
@@ -417,21 +487,56 @@ export async function GET(request: Request) {
   }
 
   const uniqueSyncIds = new Set<string>()
+  
+  // Tính từ SyncLog (mới)
+  syncLogs.forEach((log: { syncId: string; tableName: string; action: string }) => {
+    uniqueSyncIds.add(log.syncId)
+    if (log.action === 'CREATE' && log.tableName === 'User') stats.totalUsers++
+    if (log.action === 'CREATE' && log.tableName === 'System') stats.totalSystems++
+    if (log.action === 'CREATE' && log.tableName === 'TCAMember') stats.totalTCAMembers++
+  })
+  
+  // Tính từ TCASyncHistory (cũ)
   history.forEach((h: { syncId: string; action: string }) => {
     uniqueSyncIds.add(h.syncId)
   })
+
   stats.totalSyncs = uniqueSyncIds.size
 
-  history.forEach((h: { action: string }) => {
-    if (h.action === 'CREATE_USER') stats.totalUsers++
-    if (h.action === 'CREATE_SYSTEM') stats.totalSystems++
-    if (h.action === 'CREATE_TCA_MEMBER') stats.totalTCAMembers++
-    if (h.action === 'CREATE_CLOSURE') stats.totalClosures++
-  })
+  // Format history từ SyncLog
+  const syncLogHistory = syncLogs.map((log: { id: number; syncId: string; tableName: string; recordId: number; action: string; createdAt: Date }) => ({
+    id: log.id,
+    syncId: log.syncId,
+    action: log.action,
+    tableName: log.tableName,
+    recordId: log.recordId,
+    tcaId: log.tableName === 'TCAMember' ? log.recordId : null,
+    status: 'COMPLETED',
+    source: 'SyncLog',
+    createdAt: log.createdAt
+  }))
+
+  // Format history từ TCASyncHistory (cũ)
+  const oldHistory = history.map((h: { id: number; syncId: string; action: string; tableName: string; recordId: number | null; tcaId: number | null; status: string; createdAt: Date }) => ({
+    id: h.id,
+    syncId: h.syncId,
+    action: h.action,
+    tableName: h.tableName,
+    recordId: h.recordId,
+    tcaId: h.tcaId,
+    status: h.status,
+    source: 'TCASyncHistory',
+    createdAt: h.createdAt
+  }))
+
+  // Gộp lại - SyncLog lên trước
+  const allHistory = [...syncLogHistory, ...oldHistory].sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  ).slice(0, limit * 2)
 
   return NextResponse.json({
     status: 'TCA Rollback API',
-    version: '3.0.0',
+    version: '3.1.0',
     usage: {
       method: 'POST',
       body: {
@@ -444,15 +549,6 @@ export async function GET(request: Request) {
       }
     },
     stats,
-    history: history.map((h: { id: number; syncId: string; action: string; tableName: string; recordId: number | null; tcaId: number | null; status: string; createdAt: Date }) => ({
-      id: h.id,
-      syncId: h.syncId,
-      action: h.action,
-      tableName: h.tableName,
-      recordId: h.recordId,
-      tcaId: h.tcaId,
-      status: h.status,
-      createdAt: h.createdAt
-    }))
+    history: allHistory
   }, { headers: CORS_HEADERS })
 }

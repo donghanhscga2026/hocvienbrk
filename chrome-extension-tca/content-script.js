@@ -5,15 +5,13 @@
   const FULL_TREE_TYPE = 'TCA_FULL_TREE';
   const MEMBER_INFO_TYPE = 'TCA_MEMBER_INFO';
 
-// Auto-detect API base URL based on current environment - Force localhost for testing
+// Auto-detect API base URL based on current environment
   const isLocalDev = window.location.hostname === 'localhost' || 
                        window.location.hostname === '127.0.0.1' ||
                        window.location.hostname.includes('ngrok');
-const API_BASE = 'http://localhost:3000'; // Force localhost
+  const API_BASE = isLocalDev ? 'http://localhost:3000' : 'https://giautoandien.io.vn';
   const SYNC_ENDPOINT = API_BASE + '/api/sync-tca';
-  const PRECHECK_ENDPOINT = API_BASE + '/api/sync-tca/precheck';
-  const SYNC_PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
-  const STAGING_SYNC_ENDPOINT = API_BASE + '/api/sync-tca/staging-sync';
+  const PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
   const PREVIEW_RESULT_KEY = 'tca_preview_result';
 
   console.log('[TCA Sync] API Base:', API_BASE);
@@ -63,9 +61,9 @@ const API_BASE = 'http://localhost:3000'; // Force localhost
         return;
       }
 
-      // Luôn dùng staging-sync để sync dữ liệu từ Prod sang Test trước
-      const endpoint = STAGING_SYNC_ENDPOINT;
-      console.log('[TCA Sync] === STAGING SYNC START ===');
+      // Dùng /preview để lấy bảng tổng hợp (dựa trên Production DB)
+      const endpoint = PREVIEW_ENDPOINT;
+      console.log('[TCA Sync] === PREVIEW START ===');
       console.log('[TCA Sync] Nodes:', allNodes.length);
       console.log('[TCA Sync] API URL:', endpoint);
       
@@ -82,9 +80,8 @@ const API_BASE = 'http://localhost:3000'; // Force localhost
         return res.json();
       })
       .then(data => {
-        console.log('[TCA Sync] === STAGING SYNC RESPONSE ===');
+        console.log('[TCA Sync] === PREVIEW RESPONSE ===');
         console.log('[TCA Sync] Success:', data.success);
-        console.log('[TCA Sync] Copied from Prod:', data.stagingSync);
         console.log('[TCA Sync] Total rows:', data.rows?.length || 0);
         
         // LOG CHI TIẾT: Show first 3 rows để verify fields
