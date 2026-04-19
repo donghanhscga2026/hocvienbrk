@@ -213,7 +213,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.4.2 [DEBUG]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.5.0 [FIX]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -292,7 +292,7 @@
     window.tcaFinalizedNodes = [];
 
     displayRows.forEach((row, idx) => {
-      const tcaId = row.id || row.tcaId;
+      const tcaId = Number(row.id) || Number(row.tcaId) || row.id || row.tcaId;
       const name = row.name || '-';
       const parentTcaId = row.parentTcaId || '-';
       const match = row.match || '-';
@@ -305,14 +305,14 @@
       // 1. UserID
       const dbUserId = row.db?.userId;
       const newUserId = row.userId;
-      const userIdVal = dbUserId || newUserId || null;
+      const userIdVal = Number(dbUserId) || Number(newUserId) || null;
 
       // 2. RefID (referrerId): Ưu tiên DB (kể cả 0), nếu không có mới lấy đề xuất TCA
       const hasDbReferrer = row.db && (row.db.referrerId !== null && row.db.referrerId !== undefined);
-      const referrerIdVal = hasDbReferrer ? row.db.referrerId : (row.referrerId !== undefined ? row.referrerId : null);
+      const referrerIdVal = hasDbReferrer ? Number(row.db.referrerId) : (row.referrerId !== undefined ? Number(row.referrerId) : 0);
 
       // 3. refSysId: Tuyệt đối tuân thủ cấu trúc cây TCA
-      const refSysIdVal = row.refSysId !== undefined ? row.refSysId : (row.db?.refSysId || null);
+      const refSysIdVal = Number(row.refSysId) || Number(row.db?.refSysId) || 0;
 
       // Lưu vào mảng finalized để gửi đi
       window.tcaFinalizedNodes.push({
@@ -440,10 +440,12 @@
     if (previewRows && previewRows.length > 0) {
       previewRows.forEach(row => {
         if (row.userId) {
-          expectedIdsMap[row.id] = {
-            userId: row.userId,
-            referrerId: row.referrerId || row.parentUserId || null,
-            refSysId: row.refSysId || row.parentUserId || null
+          // Fix: Ensure id is number
+          const rowId = Number(row.id) || parseInt(row.id) || row.id;
+          expectedIdsMap[rowId] = {
+            userId: Number(row.userId),
+            referrerId: Number(row.referrerId || row.parentUserId) || 0,
+            refSysId: Number(row.refSysId || row.parentUserId) || 0
           };
         }
       });
