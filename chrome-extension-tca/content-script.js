@@ -121,10 +121,11 @@
   }
 
   function handleMemberInfo(data) {
-    const { memberId, email, phone } = data;
-    memberInfoCache[memberId] = { email, phone };
+    // Nhận đầy đủ 6 trường từ injected-script: email, phone, address, joinDate, contractDate, promotionDate
+    const { memberId, email, phone, address, joinDate, contractDate, promotionDate } = data;
+    memberInfoCache[memberId] = { email, phone, address, joinDate, contractDate, promotionDate };
     fetchedCount++;
-    console.log(`[TCA Sync] 📋 Member contact updated: ${memberId} (${fetchedCount}/${allNodesGlobal.length})`);
+    console.log(`[TCA Sync] 📋 Member contact updated: ${memberId} (${fetchedCount}/${allNodesGlobal.length}) - joinDate: ${joinDate}, contractDate: ${contractDate}`);
     
     // Ghi log tiến trình
     if (fetchedCount % 10 === 0 || fetchedCount === allNodesGlobal.length) {
@@ -229,7 +230,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v6.8.0 [N/PE/Pe/pE/S/TCA -> Action: PE S TCA...]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v7.2.0 [Mở rộng 10 cột: Điểm CN, Điểm Đội, Ngày Gia Nhập, Ngày Nộp HĐ, Ngày Thăng Hạng, BH, TD, % CN, % Đội, Cấp TV]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -251,7 +252,7 @@
         <!-- Cột Bảng dữ liệu (Trái) -->
         <div style="flex:1; display:flex; flex-direction:column; border-right:2px solid #e0e0e0; overflow:hidden;">
           <div style="flex:1; overflow:auto; padding:0;">
-            <table style="width:100%; border-collapse:collapse; font-size:11px; min-width:1100px;">
+            <table style="width:100%; border-collapse:collapse; font-size:11px; table-layout:auto;">
               <thead style="position:sticky; top:0; background:#eeeeee; z-index:10; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
                 <tr>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:30px;">
@@ -259,15 +260,26 @@
                   </th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:35px;">#</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">TCAID</th>
-                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:150px;">Tên Thành Viên</th>
+                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; min-width:200px;">Tên Thành Viên</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">P.TCAID</th>
-                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">Match</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; min-width:80px;">Match</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">UserID</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">RefID</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:100px;">Action</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">refSysId</th>
-                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:120px;">Email</th>
+                  <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; min-width:180px;">Email</th>
                   <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:100px;">Phone</th>
+                  <!-- 10 cột mới bổ sung (không có Địa Chỉ, không trùng Cấp) -->
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Điểm CN</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Điểm Đội</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Ngày Gia Nhập</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Ngày Nộp HĐ</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Ngày Thăng Hạng</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">BH</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">TD</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">% CN</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">% Đội</th>
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Cấp TV</th>
                 </tr>
               </thead>
               <tbody id="tca-nodes-body"></tbody>
@@ -285,7 +297,7 @@
 
     document.body.appendChild(panel);
     updateLogDisplay();
-    addTcaLog('Đã sẵn sàng v6.8.0: Match -> Action (PE S TCA...)');
+    addTcaLog('Đã sẵn sàng v7.2.0: Mở rộng 10 cột (Điểm CN, Điểm Đội, Ngày Gia Nhập, Ngày Nộp HĐ, Ngày Thăng Hạng, BH, TD, % CN, % Đội, Cấp TV)');
     
     // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
@@ -304,6 +316,31 @@
     const tbody = document.getElementById('tca-nodes-body');
     const displayRows = previewRows.length > 0 ? previewRows : allNodes;
     
+    // Lấy thông tin chi tiết từ allNodes và memberInfoCache cho 12 cột mới
+    // Xử lý "Không có thông tin" -> "-"
+    const cleanDate = (val) => {
+      if (!val || val === 'null' || val === 'undefined' || val.includes('Không có thông tin')) return '-';
+      return val;
+    };
+    const getNodeExtra = (id) => {
+      const node = allNodes.find(n => n.id === id);
+      const info = memberInfoCache[id] || {};
+      return {
+        personalScore: node?.personalScore || '-',
+        totalScore: node?.totalScore || '-',
+        level: node?.level || '1',
+        location: node?.location || '-',
+        personalRate: node?.personalRate || '-',
+        teamRate: node?.teamRate || '-',
+        hasBH: node?.hasBH ? '✓' : '-',
+        hasTD: node?.hasTD ? '✓' : '-',
+        address: info?.address || '-',
+        joinDate: cleanDate(info?.joinDate),
+        contractDate: cleanDate(info?.contractDate),
+        promotionDate: cleanDate(info?.promotionDate)
+      };
+    };
+    
     displayRows.forEach((row, idx) => {
       const tcaId = Number(row.id) || 0;
       const name = row.name || '-';
@@ -312,6 +349,9 @@
       const action = row.action || 'SKIP';
       const email = row.email || '-';
       const phone = row.phone || '-';
+
+      // Lấy 12 trường bổ sung
+      const extra = getNodeExtra(tcaId);
 
       // --- DÙNG TRỰC TIẾP previewRows (không transform) ---
       // Chỉ render row ra bảng, KHÔNG tạo mảng riêng
@@ -356,15 +396,26 @@
         </td>
         <td style="padding:6px 2px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
         <td style="padding:6px 2px; text-align:center; font-family:monospace; font-weight:bold;">${tcaId}</td>
-        <td style="padding:6px 4px; color:#000; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;" title="${name}">${name}</td>
+        <td style="padding:6px 4px; color:#000; min-width:200px; font-weight:500;" title="${name}">${name}</td>
         <td style="padding:6px 2px; text-align:center; color:#666;">${parentTcaId}</td>
-        <td style="padding:6px 2px; text-align:center;"><span style="background:${matchColor};color:white;padding:1px 4px;border-radius:2px;font-size:9px;">${matchDisplay}</span></td>
+        <td style="padding:6px 2px; text-align:center; min-width:80px;"><span style="background:${matchColor};color:white;padding:2px 6px;border-radius:2px;font-size:9px;white-space:nowrap;">${matchDisplay}</span></td>
         <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userId || '-'}</td>
         <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${referrerId != null ? referrerId : '-'}</td>
         <td style="padding:6px 2px; text-align:center;"><span style="background:${actionBg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;">${actionLabel}</span></td>
         <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysId || '-'}</td>
-        <td style="padding:6px 4px; color:#666; font-size:10px; max-width:120px; overflow:hidden; text-overflow:ellipsis;" title="${email}">${email}</td>
+        <td style="padding:6px 4px; color:#666; font-size:10px; min-width:180px;" title="${email}">${email}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
+        <!-- 10 cột mới bổ sung (không có Địa Chỉ, không trùng Cấp) -->
+        <td style="padding:6px 2px; text-align:center; color:#2e7d32; font-weight:bold;">${extra.personalScore}</td>
+        <td style="padding:6px 2px; text-align:center; color:#1565c0; font-weight:bold;">${extra.totalScore}</td>
+        <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.joinDate}</td>
+        <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.contractDate}</td>
+        <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.promotionDate}</td>
+        <td style="padding:6px 2px; text-align:center; color:#2e7d32; font-weight:bold;">${extra.hasBH}</td>
+        <td style="padding:6px 2px; text-align:center; color:#1565c0; font-weight:bold;">${extra.hasTD}</td>
+        <td style="padding:6px 2px; text-align:center; color:#666;">${extra.personalRate}</td>
+        <td style="padding:6px 2px; text-align:center; color:#666;">${extra.teamRate}</td>
+        <td style="padding:6px 2px; text-align:center; color:#7b1fa2; font-weight:bold;">${extra.level}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -766,8 +817,29 @@ window.downloadTCACSV = function() {
     }
 
     // TRỰC TIẾP từ previewRows (giống y hệt bảng đang hiển thị)
+    // Bổ sung 11 cột mới: Điểm CN, Điểm Đội, Địa Chỉ, Ngày Gia Nhập, Ngày Nộp HĐ, Ngày Thăng Hạng, BH, TD, % CN, % Đội, Cấp TV (Địa Chỉ luôn có trong file export dù ẩn ở bảng)
     const BOM = '\uFEFF';
-    let csv = BOM + 'TCAID,Ten,P.TCAID,Match,UserID,RefID,Action,refSysId,Email,Phone\n';
+    let csv = BOM + 'TCAID,Ten,P.TCAID,Match,UserID,RefID,Action,refSysId,Email,Phone,DiemCN,DiemDo,DiaChi,NgayGiaNhap,NgayNopHD,NgayThangHang,BH,TD,PCN,PDoi,CapTV\n';
+    
+    // Lấy thông tin chi tiết từ allNodes và memberInfoCache cho 11 cột mới (có Địa Chỉ)
+    const getNodeExtra = (id) => {
+      const node = (data.allNodes || []).find(n => n.id === id);
+      const info = (data.memberInfo || {})[id] || {};
+      return {
+        personalScore: node?.personalScore || '-',
+        totalScore: node?.totalScore || '-',
+        level: node?.level || '1',
+        location: node?.location || '-',
+        personalRate: node?.personalRate || '-',
+        teamRate: node?.teamRate || '-',
+        hasBH: node?.hasBH ? '✓' : '-',
+        hasTD: node?.hasTD ? '✓' : '-',
+        address: info?.address || '-',
+        joinDate: info?.joinDate || '-',
+        contractDate: info?.contractDate || '-',
+        promotionDate: info?.promotionDate || '-'
+      };
+    };
     
     data.previewRows.forEach(row => {
       const tcaId = row.id || '';
@@ -784,7 +856,10 @@ window.downloadTCACSV = function() {
       const email = row.email || '';
       const phone = row.phone || '';
       
-      csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${actionVal},${refSysId},"${email}","${phone}"\n`;
+      // Lấy 11 trường bổ sung (có Địa Chỉ)
+      const extra = getNodeExtra(Number(tcaId));
+      
+      csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${actionVal},${refSysId},"${email}","${phone}",${extra.personalScore},${extra.totalScore},"${extra.address}","${extra.joinDate}","${extra.contractDate}","${extra.promotionDate}",${extra.hasBH},${extra.hasTD},${extra.personalRate},${extra.teamRate},${extra.level}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -811,16 +886,30 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     const previewMap = new Map();
     (data.previewRows || []).forEach(row => previewMap.set(row.id, row));
     
-    // Enrich data với previewRows (UserID từ bảng đang hiển thị)
+    // Enrich data với previewRows (UserID từ bảng đang hiển thị) + 11 cột mới (có Địa Chỉ trong file export dù ẩn ở bảng)
     const enrichedData = data.allNodes.map(node => {
       const previewRow = previewMap.get(node.id);
+      const memberInfo = (data.memberInfo || {})[node.id] || {};
       return {
         ...node,
         match: previewRow?.match || '-',
         action: previewRow?.action || '-',
         userId: previewRow?.userId || null,
         referrerId: previewRow?.referrerId || null,
-        refSysId: previewRow?.refSysId || null
+        refSysId: previewRow?.refSysId || null,
+        // 11 cột mới bổ sung (có Địa Chỉ: location + address)
+        personalScore: node.personalScore || '-',
+        totalScore: node.totalScore || '-',
+        level: node.level || '1',
+        location: node.location || '-',
+        address: memberInfo.address || '-',
+        personalRate: node.personalRate || '-',
+        teamRate: node.teamRate || '-',
+        hasBH: node.hasBH || false,
+        hasTD: node.hasTD || false,
+        joinDate: memberInfo.joinDate || '-',
+        contractDate: memberInfo.contractDate || '-',
+        promotionDate: memberInfo.promotionDate || '-'
       };
     });
 
