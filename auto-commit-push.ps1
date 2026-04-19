@@ -119,8 +119,8 @@ Write-Yellow "Dang kiem tra code moi tu GitHub..."
 git pull origin $Branch --rebase
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Yellow "Dang day code len $Branch..."
-    git push origin $Branch
+    Write-Yellow "Dang day code HEAD len $Branch..."
+    git push origin HEAD:$Branch -f
     if ($LASTEXITCODE -eq 0) {
         Write-Green "=== HOAN THANH! Code da len GitHub ($Branch) ==="
         if (-not $NoDeploy) { Write-Cyan "Vercel se tu dong Deploy trong giay lat..." }

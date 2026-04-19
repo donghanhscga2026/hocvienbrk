@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "7.0.0",
-  "description": "Sync TCA to BRK v7.0.0 - Direct to Production with SyncLog for rollback",
+  "version": "7.1.0",
+  "description": "Sync TCA to BRK v7.1.0 - Fix system closure, auto-detect prod server",
   "permissions": [
     "activeTab",
     "scripting",
