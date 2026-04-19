@@ -399,7 +399,7 @@
           results.set(memberId, info);
           fetched++;
           
-          // Send update to content script
+          // Send update to content script - Bổ sung đầy đủ thông tin cho Table Display mở rộng
           window.postMessage({
             type: MEMBER_INFO_TYPE,
             memberId: memberId,
@@ -410,6 +410,7 @@
             contractDate: info.contractDate,
             promotionDate: info.promotionDate
           }, '*');
+          console.log('[TCA AutoFetch] 📋 Full member info:', { memberId, email: info.email, phone: info.phone, joinDate: info.joinDate, contractDate: info.contractDate, promotionDate: info.promotionDate });
         }
       } catch (e) {
         // Silently continue
