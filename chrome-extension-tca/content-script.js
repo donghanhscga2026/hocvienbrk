@@ -213,7 +213,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.5.0 [FIX]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v4.6.0 [FINAL]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -583,6 +583,33 @@
   }
 
   async function executeFinalSync(nodes, memberInfo, expectedIds, confirmedData) {
+    // ========== GIẢI PHÁP #2: Fix tại nguồn ==========
+    // Đảm bảo allNodes có id là Number
+    const fixedNodes = (nodes || []).map(function(n) {
+      return Object.assign({}, n, {
+        id: Number(n.id) || parseInt(n.id, 10) || 0,
+        parentFolderId: n.parentFolderId === 'root' ? 'root' : (Number(n.parentFolderId) || parseInt(n.parentFolderId, 10) || n.parentFolderId)
+      });
+    });
+    
+    // Đảm bảo expectedIds có key là string (cho JSON map) và giá trị là number
+    const fixedExpectedIds = {};
+    Object.keys(expectedIds || {}).forEach(function(k) {
+      const v = expectedIds[k];
+      fixedExpectedIds[k] = {
+        userId: Number(v?.userId) || 0,
+        referrerId: Number(v?.referrerId) || 0,
+        refSysId: Number(v?.refSysId) || 0
+      };
+    });
+    
+    console.log('[FIXED] Nodes sample:', JSON.stringify(fixedNodes.slice(0, 1)));
+    console.log('[FIXED] ExpectedIds keys:', Object.keys(fixedExpectedIds));
+    
+    // Thay thế data gốc
+    nodes = fixedNodes;
+    expectedIds = fixedExpectedIds;
+
     const progressPanel = document.createElement('div');
     progressPanel.style.cssText = `
       position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
