@@ -130,11 +130,13 @@ export async function POST(request: Request) {
 
     for (const node of sortedNodes) {
       try {
+        // Fix: Also convert allNodes id to number
         const nodeId = Number(node.id);
-        const memberInfo = body.memberInfo?.[nodeId] || body.memberInfo?.[node.id] || {}
-        const phone = memberInfo.phone || null
-        const email = memberInfo.email || null
-        const expected = body.expectedIds?.[nodeId] || body.expectedIds?.[node.id];
+        const nodeIdStr = String(nodeId);
+        const memberInfo = ((body.memberInfo as any) || {})[nodeIdStr] || {};
+        const phone = memberInfo.phone || null;
+        const email = memberInfo.email || null;
+        const expected = ((body.expectedIds as any) || {})[nodeIdStr];
         
         // Auto-generate userId nếu không có expectedIds (dự phòng)
         // Fix: Chuyển node.id thành số
