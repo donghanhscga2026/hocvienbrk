@@ -5,14 +5,15 @@
   const FULL_TREE_TYPE = 'TCA_FULL_TREE';
   const MEMBER_INFO_TYPE = 'TCA_MEMBER_INFO';
 
-  // Auto-detect API base URL based on current environment
+// Auto-detect API base URL based on current environment - Force localhost for testing
   const isLocalDev = window.location.hostname === 'localhost' || 
-                     window.location.hostname === '127.0.0.1' ||
-                     window.location.hostname.includes('ngrok');
-  const API_BASE = isLocalDev ? 'http://localhost:3000' : 'https://giautoandien.io.vn';
+                       window.location.hostname === '127.0.0.1' ||
+                       window.location.hostname.includes('ngrok');
+const API_BASE = 'http://localhost:3000'; // Force localhost
   const SYNC_ENDPOINT = API_BASE + '/api/sync-tca';
   const PRECHECK_ENDPOINT = API_BASE + '/api/sync-tca/precheck';
   const SYNC_PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
+  const STAGING_SYNC_ENDPOINT = API_BASE + '/api/sync-tca/staging-sync';
   const PREVIEW_RESULT_KEY = 'tca_preview_result';
 
   console.log('[TCA Sync] API Base:', API_BASE);
@@ -36,7 +37,7 @@
     (document.head || document.documentElement).appendChild(script);
   }
 
-  // Bước 1: Gọi /preview API để lấy bảng tổng hợp (thay thế /precheck)
+  // Bước 1: Gọi /staging-sync (sync Prod→Test trước) hoặc /preview API để lấy bảng tổng hợp
   function callPreviewAPI(nodes) {
     return new Promise((resolve, reject) => {
       // Build allNodes format
@@ -62,11 +63,13 @@
         return;
       }
 
-      console.log('[TCA Sync] === PREVIEW START ===');
+      // Luôn dùng staging-sync để sync dữ liệu từ Prod sang Test trước
+      const endpoint = STAGING_SYNC_ENDPOINT;
+      console.log('[TCA Sync] === STAGING SYNC START ===');
       console.log('[TCA Sync] Nodes:', allNodes.length);
-      console.log('[TCA Sync] API URL:', SYNC_PREVIEW_ENDPOINT);
+      console.log('[TCA Sync] API URL:', endpoint);
       
-      fetch(SYNC_PREVIEW_ENDPOINT, {
+      fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allNodes, memberInfo })
@@ -79,8 +82,9 @@
         return res.json();
       })
       .then(data => {
-        console.log('[TCA Sync] === PREVIEW RESPONSE ===');
+        console.log('[TCA Sync] === STAGING SYNC RESPONSE ===');
         console.log('[TCA Sync] Success:', data.success);
+        console.log('[TCA Sync] Copied from Prod:', data.stagingSync);
         console.log('[TCA Sync] Total rows:', data.rows?.length || 0);
         
         // LOG CHI TIẾT: Show first 3 rows để verify fields
@@ -109,11 +113,11 @@
           }
         }
         
-        console.log('[TCA Sync] === PREVIEW END ===');
+        console.log('[TCA Sync] === STAGING SYNC END ===');
         resolve(data);
       })
       .catch(err => {
-        console.error('[TCA Sync] Preview ERROR:', err.message || err);
+        console.error('[TCA Sync] Staging Sync ERROR:', err.message || err);
         resolve(null);
       });
     });
@@ -228,7 +232,7 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v6.6.0 [S=coSystem, PE/Pe/pE=coUser]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v6.8.0 [N/PE/Pe/pE/S/TCA -> Action: PE S TCA...]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
@@ -284,7 +288,7 @@
 
     document.body.appendChild(panel);
     updateLogDisplay();
-    addTcaLog('Đã sẵn sàng v6.6.0: Match S=coSystem, PE/Pe/pE=coUser, TCA, N=moi.');
+    addTcaLog('Đã sẵn sàng v6.8.0: Match -> Action (PE S TCA...)');
     
     // Gán sự kiện
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
@@ -330,20 +334,18 @@
       const refIdColor = (row.db?.referrerId != null) ? '#1565c0' : (referrerId != null ? '#d32f2f' : '#999');
       const refSysIdColor = (row.db?.refSysId != null) ? '#1565c0' : '#d32f2f';
 
-      let matchDisplay = '-';
+      let matchDisplay = match;
       let matchColor = '#999';
-      // S: Da co System (da sync roi) - MAU XANH
-      if (match === 'S') { matchDisplay = 'S'; matchColor = '#2e7d32'; }
-      // PE: Co User trung P+E, chua co System - MAU CAM
-      else if (match === 'PE') { matchDisplay = 'PE'; matchColor = '#ff9800'; }
-      // Pe: Co User trung P, chua co System - MAU CAM
-      else if (match === 'Pe') { matchDisplay = 'Pe'; matchColor = '#ff9800'; }
-      // pE: Co User trung E, chua co System - MAU CAM
-      else if (match === 'pE') { matchDisplay = 'pE'; matchColor = '#ff9800'; }
-      // TCA: Da ton tai trong TCAMember - MAU CAM
-      else if (match === 'TCA') { matchDisplay = 'TCA'; matchColor = '#ff9800'; }
+      // S: Da co System - MAU XANH
+      if (match?.includes('S')) { matchColor = '#2e7d32'; }
+      // TCA: Da co trong TCAMember - MAU CAM
+      else if (match?.includes('TCA')) { matchColor = '#ff9800'; }
+      // PE/Pe/pE: Co trong User - MAU HONG
+      else if (match?.match(/PE|Pe|pE/)) { matchColor = '#c2185b'; }
       // N: Moi hoan toan - MAU XAM
-      else if (match === 'N') { matchDisplay = 'N'; matchColor = '#555'; }
+      else if (match === 'N') { matchColor = '#555'; }
+      // Default
+      else { matchColor = '#999'; }
       
       let actionLabel = action;
       let actionBg = '#999';
