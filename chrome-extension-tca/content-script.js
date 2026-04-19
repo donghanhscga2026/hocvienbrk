@@ -315,32 +315,10 @@
       const email = row.email || '-';
       const phone = row.phone || '-';
 
-      // --- BỘ NÃO LOGIC TẬP TRUNG (Frontend Master) ---
+      // --- DÙNG TRỰC TIẾP previewRows (không transform) ---
+      // Chỉ render row ra bảng, KHÔNG tạo mảng riêng
       
-      // 1. UserID
-      const dbUserId = row.db?.userId;
-      const newUserId = row.userId;
-      const userIdVal = Number(dbUserId) || Number(newUserId) || null;
-
-      // 2. RefID (referrerId): Ưu tiên DB (kể cả 0), nếu không có mới lấy đề xuất TCA
-      const hasDbReferrer = row.db && (row.db.referrerId !== null && row.db.referrerId !== undefined);
-      const referrerIdVal = hasDbReferrer ? Number(row.db.referrerId) : (row.referrerId !== undefined ? Number(row.referrerId) : 0);
-
-      // 3. refSysId: Tuyệt đối tuân thủ cấu trúc cây TCA
-      const refSysIdVal = Number(row.refSysId) || Number(row.db?.refSysId) || 0;
-
-      // Lưu vào mảng finalized để gửi đi
-      window.tcaFinalizedNodes.push({
-        tcaId, name, email, phone,
-        userId: userIdVal,
-        referrerId: referrerIdVal,
-        refSysId: refSysIdVal,
-        action,
-        match,
-        parentTcaId
-      });
-
-      // --- RENDER GIAO DIỆN DỰA TRÊN DỮ LIỆU ĐÃ CHỐT ---
+      // --- RENDER GIAO DIỆN ---
       const tr = document.createElement('tr');
       tr.style.background = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
       tr.style.borderBottom = '1px solid #eee';
@@ -408,24 +386,24 @@
     }
 
     addTcaLog(`Đang tạo dữ liệu mẫu Local cho ${selectedIds.length} thành viên...`);
-    const finalizedSource = window.tcaFinalizedNodes || [];
-    const selectedNodes = finalizedSource.filter(n => selectedIds.includes(n.tcaId));
-
+    // DÙNG TRỰC TIẾP previewRows (không tạo mảng riêng)
+    const selectedRows = previewRows.filter(r => selectedIds.includes(Number(r.id)));
+    
     // --- THUẬT TOÁN TẠO BẢNG DỮ LIỆU MÔ PHỎNG (LOCAL) ---
     const tables = {
-      User: selectedNodes.map(n => ({
+      User: selectedRows.map(n => ({
         id: n.userId,
         name: n.name,
         email: n.email,
         phone: n.phone,
-        referrerId: n.referrerId
+        referrerId: n.referrerId || 0
       })),
-      System: selectedNodes.map(n => ({
+      System: selectedRows.map(n => ({
         userId: n.userId,
-        refSysId: n.refSysId
+        refSysId: n.refSysId || 0
       })),
-      TCAMember: selectedNodes.map(n => ({
-        tcaId: n.tcaId,
+      TCAMember: selectedRows.map(n => ({
+        tcaId: n.id,
         userId: n.userId,
         name: n.name,
         email: n.email,
@@ -437,46 +415,25 @@
     };
 
     // Tạo closure cơ bản (tự tham chiếu depth 0 và cha trực tiếp depth 1)
-    selectedNodes.forEach(n => {
-      tables.user_closure.push({ ancestor: n.userId, descendant: n.userId, depth: 0 });
-      if (n.referrerId !== null) {
-        tables.user_closure.push({ ancestor: n.referrerId, descendant: n.userId, depth: 1 });
-      }
-      tables.system_closure.push({ ancestor: n.userId, descendant: n.userId, depth: 0 });
-      if (n.refSysId !== null) {
-        tables.system_closure.push({ ancestor: n.refSysId, descendant: n.userId, depth: 1 });
+    selectedRows.forEach(n => {
+      const uid = Number(n.userId) || 0;
+      const ref = Number(n.referrerId) || 0;
+      const sys = Number(n.refSysId) || 0;
+      if (uid) {
+        tables.user_closure.push({ ancestor: uid, descendant: uid, depth: 0 });
+        if (ref) tables.user_closure.push({ ancestor: ref, descendant: uid, depth: 1 });
+        tables.system_closure.push({ ancestor: uid, descendant: uid, depth: 0 });
+        if (sys) tables.system_closure.push({ ancestor: sys, descendant: uid, depth: 1 });
       }
     });
 
     addTcaLog('Bảng mẫu Local đã được xây dựng thành công.');
     
-    // Build expectedIds TRỰC TIẾP từ previewRows (không xử lý thêm)
-    const expectedIdsMap = {};
-    if (previewRows && previewRows.length > 0) {
-      previewRows.forEach(row => {
-        // Chỉ lấy userId > 0 để sync (bỏ SKIP records)
-        const targetUserId = Number(row.userId) || 0;
-        if (targetUserId) {
-          const rowId = Number(row.id) || parseInt(row.id) || row.id;
-          // TRỰC TIẾP từ previewRows - không transform
-          expectedIdsMap[rowId] = {
-            userId: targetUserId,
-            referrerId: row.referrerId,      // TRỰC TIẾP từ API
-            refSysId: row.refSysId,         // TRỰC TIẾP từ API
-            parentUserId: row.parentUserId, // TRỰC TIẾP từ API
-            action: row.action || 'SKIP'
-          };
-        }
-      });
-      console.log('[BUILD] expectedIdsMap created:', Object.keys(expectedIdsMap).length, 'entries');
-      console.log('[BUILD] sample:', JSON.stringify(expectedIdsMap).slice(0, 300));
-      addTcaLog('Expected IDs prepared: ' + previewRows.length + ' rows');
-    }
-    
-    showDemoResultPanel(tables, selectedNodes, memberInfoCache, expectedIdsMap);
+    // Gửi previewRows TRỰC TIẾP cho table display (không cần expectedIdsMap riêng)
+    showDemoResultPanel(tables, selectedRows, memberInfoCache, previewRows);
   }
 
-  function showDemoResultPanel(tables, selectedNodes, selectedMemberInfo, expectedIds) {
+  function showDemoResultPanel(tables, selectedNodes, selectedMemberInfo, sourceRows) {
     const existing = document.getElementById('tca-demo-panel');
     if (existing) existing.remove();
 
@@ -596,26 +553,21 @@
       console.log('[DEBUG] expectedIds sample:', JSON.stringify(expectedIds).slice(0, 300));
       if (confirm('BẠN CÓ CHẮC CHẮN? Dữ liệu sẽ được ghi thật vào Database ngay bây giờ.')) {
         panel.remove();
-        executeFinalSync(selectedNodes, selectedMemberInfo, expectedIds, tables);
+        executeFinalSync(previewRows, selectedMemberInfo);
       }
     });
   }
 
-  async function executeFinalSync(nodes, memberInfo, expectedIds, confirmedData) {
-    // ========== GIẢI PHÁP #2: Fix tại nguồn ==========
-    // KHÔNG transform - dùng trực tiếp expectedIds từ previewRows
-    // Chỉ thêm action vào nodes để API xử lý
+  async function executeFinalSync(sourceRows, memberInfo) {
+    // DÙNG TRỰC TIẾP previewRows (sourceRows) - KHÔNG transform
+    // sourceRows = previewRows từ table display
     
-    console.log('[SYNC] === EXPECTEDIDS TRỰC TIẾP TỪ PREVIEW (first 3) ===');
-    Object.keys(expectedIds || {}).slice(0, 3).forEach(k => {
-      console.log('[SYNC] Key=' + k + ':', JSON.stringify(expectedIds[k]));
+    console.log('[SYNC] === SOURCE ROWS (first 3) ===');
+    (sourceRows || []).slice(0, 3).forEach((r, i) => {
+      console.log(`[SYNC] Row ${i+1}: id=${r.id}, name=${r.name}, userId=${r.userId}, action=${r.action}, referrerId=${r.referrerId}`);
     });
     console.log('[SYNC] === END ===');
     
-    // Thay thế data gốc
-    nodes = nodes;
-    expectedIds = expectedIds;
-
     const progressPanel = document.createElement('div');
     progressPanel.style.cssText = `
       position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -631,39 +583,17 @@
     `;
     document.body.appendChild(progressPanel);
     addTcaLog('Bắt đầu đẩy dữ liệu thật vào DB...');
-    
-    // LOG CHI TIẾT: Show first 3 nodes và expectedIds để verify
-    console.log('[SYNC] === NODE DATA SAMPLE (first 3) ===');
-    (nodes || []).slice(0, 3).forEach((n, i) => {
-      console.log(`[SYNC] Node ${i+1}: id=${n.id}, tcaId=${n.tcaId}, name=${n.name}, parentFolderId=${n.parentFolderId}, action=${n.action}`);
-    });
-    console.log('[SYNC] === NODE DATA END ===');
-    
-    console.log('[SYNC] === EXPECTEDIDS SAMPLE (first 3) ===');
-    Object.keys(expectedIds || {}).slice(0, 3).forEach(k => {
-      const v = expectedIds[k];
-      console.log(`[SYNC] Key=${k}: userId=${v.userId}, parentUserId=${v.parentUserId}, referrerId=${v.referrerId}, refSysId=${v.refSysId}, action=${v.action}`);
-    });
-    console.log('[SYNC] === EXPECTEDIDS END ===');
-    
-    console.log('[SYNC] === MEMBERINFO SAMPLE ===');
-    const sampleNodeId = nodes?.[0]?.id;
-    if (sampleNodeId) {
-      console.log('[SYNC] memberInfo for node', sampleNodeId, ':', JSON.stringify(memberInfo[sampleNodeId] || {}).slice(0, 200));
-    }
-    console.log('[SYNC] === MEMBERINFO END ===');
 
     try {
+      // GỬI TRỰC TIẾP sourceRows (previewRows) lên API
       const response = await fetch(SYNC_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          source: 'TCA_EXT_FINAL_CONFIRMED',
+          source: 'TCA_EXT_PREVIEW_ROWS',
           timestamp: Date.now(),
-          allNodes: nodes,
-          memberInfo: memberInfo,
-          expectedIds: expectedIds,
-          confirmedData: confirmedData // Gửi kèm dữ liệu đã confirm để server thực thi
+          previewRows: sourceRows,
+          memberInfo: memberInfo
         })
       });
 
