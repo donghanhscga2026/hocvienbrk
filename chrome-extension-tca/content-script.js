@@ -83,9 +83,24 @@
         console.log('[TCA Sync] Success:', data.success);
         console.log('[TCA Sync] Total rows:', data.rows?.length || 0);
         
-        // Lưu kết quả vào localStorage để dùng sau
+        // LOG CHI TIẾT: Show first 3 rows để verify fields
         if (data.rows && data.rows.length > 0) {
-          previewRows = data.rows;
+          console.log('[TCA Sync] === PREVIEW SAMPLE (first 3) ===');
+          data.rows.slice(0, 3).forEach((row, i) => {
+            console.log(`[TCA Sync] Row ${i+1}:`, {
+              id: row.id,
+              name: row.name,
+              userId: row.userId,
+              parentUserId: row.parentUserId,
+              referrerId: row.referrerId,
+              refSysId: row.refSysId,
+              action: row.action,
+              match: row.match
+            });
+          });
+          console.log('[TCA Sync] === PREVIEW SAMPLE END ===');
+          
+          // Lưu kết quả vào localStorage để dùng sau
           try {
             localStorage.setItem(PREVIEW_RESULT_KEY, JSON.stringify(data));
             console.log('[TCA Sync] Saved preview result to localStorage');
@@ -439,13 +454,19 @@
     const expectedIdsMap = {};
     if (previewRows && previewRows.length > 0) {
       previewRows.forEach(row => {
-        if (row.userId) {
-          // Fix: Ensure id is number
+        // Fix: userId > 0 mới sync (bỏ SKIP)
+        const targetUserId = Number(row.userId) || 0;
+        if (targetUserId) {
           const rowId = Number(row.id) || parseInt(row.id) || row.id;
+          // Dùng parentUserId cho đúng với bảng hiển thị, referrerId cho F1
+          const pUserId = Number(row.parentUserId) || 0;
+          const refId = Number(row.referrerId) || pUserId || 0;
           expectedIdsMap[rowId] = {
-            userId: Number(row.userId),
-            referrerId: Number(row.referrerId || row.parentUserId) || 0,
-            refSysId: Number(row.refSysId || row.parentUserId) || 0
+            userId: targetUserId,
+            referrerId: refId,
+            refSysId: Number(row.refSysId) || pUserId || 0,
+            parentUserId: pUserId,
+            action: row.action || 'SKIP'
           };
         }
       });
@@ -588,10 +609,13 @@
     const fixedNodes = (nodes || []).map(function(n) {
       // Lấy tcaId ưu tiên, fallback id, fallback 0
       const nodeId = Number(n.tcaId) || Number(n.id) || 0;
+      // Lấy action từ expectedIds nếu có
+      const exp = (expectedIds || {})[nodeId];
       return Object.assign({}, n, {
         id: nodeId,
         tcaId: nodeId,  // Thêm trường tcaId để đối chiếu
-        parentFolderId: n.parentFolderId === 'root' ? 'root' : (Number(n.parentFolderId) || parseInt(n.parentFolderId, 10) || n.parentFolderId)
+        parentFolderId: n.parentFolderId === 'root' ? 'root' : (Number(n.parentFolderId) || parseInt(n.parentFolderId, 10) || n.parentFolderId),
+        action: exp?.action || 'SKIP'
       });
     });
     
@@ -631,8 +655,27 @@
     `;
     document.body.appendChild(progressPanel);
     addTcaLog('Bắt đầu đẩy dữ liệu thật vào DB...');
-    console.log('[SYNC] Payload expectedIds count:', Object.keys(expectedIds || {}).length);
-    console.log('[SYNC] Payload sample:', JSON.stringify(expectedIds).slice(0, 300));
+    
+    // LOG CHI TIẾT: Show first 3 nodes và expectedIds để verify
+    console.log('[SYNC] === NODE DATA SAMPLE (first 3) ===');
+    (nodes || []).slice(0, 3).forEach((n, i) => {
+      console.log(`[SYNC] Node ${i+1}: id=${n.id}, tcaId=${n.tcaId}, name=${n.name}, parentFolderId=${n.parentFolderId}, action=${n.action}`);
+    });
+    console.log('[SYNC] === NODE DATA END ===');
+    
+    console.log('[SYNC] === EXPECTEDIDS SAMPLE (first 3) ===');
+    Object.keys(expectedIds || {}).slice(0, 3).forEach(k => {
+      const v = expectedIds[k];
+      console.log(`[SYNC] Key=${k}: userId=${v.userId}, parentUserId=${v.parentUserId}, referrerId=${v.referrerId}, refSysId=${v.refSysId}, action=${v.action}`);
+    });
+    console.log('[SYNC] === EXPECTEDIDS END ===');
+    
+    console.log('[SYNC] === MEMBERINFO SAMPLE ===');
+    const sampleNodeId = nodes?.[0]?.id;
+    if (sampleNodeId) {
+      console.log('[SYNC] memberInfo for node', sampleNodeId, ':', JSON.stringify(memberInfo[sampleNodeId] || {}).slice(0, 200));
+    }
+    console.log('[SYNC] === MEMBERINFO END ===');
 
     try {
       const response = await fetch(SYNC_ENDPOINT, {
