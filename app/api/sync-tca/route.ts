@@ -125,6 +125,7 @@ export async function POST(request: Request) {
     
     console.log('[TCA Sync] STAGING_MODE:', STAGING_MODE)
     console.log('[TCA Sync] Received expectedIds count:', Object.keys(body.expectedIds || {}).length)
+    console.log('[TCA Sync] First node:', JSON.stringify(sortedNodes[0]))
     console.log('[TCA Sync] ExpectedIds sample:', JSON.stringify(body.expectedIds).slice(0, 500))
 
     for (const node of sortedNodes) {
