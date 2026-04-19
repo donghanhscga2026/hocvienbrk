@@ -110,7 +110,7 @@ function sortNodesByHierarchy(nodes: TCANode[]): TCANode[] {
 export async function POST(request: Request) {
   const syncId = uuidv4()
   const startTime = Date.now()
-  let stats = { usersCreated: 0, usersUpdated: 0, systemsCreated: 0, systemsUpdated: 0, tcaMembersCreated: 0, tcaMembersUpdated: 0, failed: 0, totalRecords: 0 }
+  let stats = { usersCreated: 0, usersUpdated: 0, systemsCreated: 0, systemsUpdated: 0, tcaMembersCreated: 0, tcaMembersUpdated: 0, failed: 0, totalRecords: 0, skipped: 0 }
   const failedRecords: { tcaId: number; error: string }[] = []
   const createdRecords: { table: string; id: number; tcaId: number }[] = []
 
@@ -156,9 +156,21 @@ export async function POST(request: Request) {
         const email = memberInfo.email || null;
         const expected = ((body.expectedIds as any) || {})[nodeIdStr];
         
+        // Định nghĩa userId trước để dùng cho SKIP
+        let targetUserId = expected?.userId || 0;
+        
+        // ========== LOGIC: SKIP / Tạo Sys / Tạo All ==========
+        const action = expected?.action || (targetUserId ? 'Tạo All' : 'SKIP');
+        
+        // SKIP: Bỏ qua hoàn toàn - đã có User và System rồi
+        if (action === 'SKIP' || targetUserId === 0) {
+          stats.skipped = (stats.skipped || 0) + 1;
+          console.log('[TCA Sync] SKIP node', nodeId);
+          continue;
+        }
+
         // Auto-generate userId nếu không có expectedIds (dự phòng)
         // Fix: Chuyển node.id thành số
-        const useUserId = (expected?.userId != null) ? expected.userId : (900000 + nodeId);
         const useReferrerId = (expected?.referrerId != null && expected?.referrerId !== 0) 
           ? expected.referrerId 
           : ((!node.parentFolderId || node.parentFolderId === 'root' || node.parentFolderId === '0') 
@@ -168,9 +180,8 @@ export async function POST(request: Request) {
           ? expected.refSysId 
           : useReferrerId;
         
-        console.log('[TCA Sync] Processing node', node.id, '-> userId:', useUserId, '(auto:', !expected, ')');
+        console.log('[TCA Sync] Processing node', node.id, '-> userId:', targetUserId, 'action:', action);
 
-        const targetUserId = useUserId;
         const targetReferrerId = useReferrerId; 
         const targetRefSysId = useRefSysId;
 
@@ -180,9 +191,15 @@ export async function POST(request: Request) {
         const tcaMemberModel = STAGING_MODE ? (prisma as any).tCAMemberTest : (prisma as any).tCAMember;
 
         // 1. Xử lý User
+        // Tạo Sys: User đã có, chỉ cần tạo System
+        // Tạo All: Cần tạo mới User
         let existingUser = await userModel.findUnique({ where: { id: targetUserId } });
+        
+        // Nếu action = "Tạo Sys" và User đã tồn tại → bỏ qua tạo User
+        const isTaoSys = (action === 'Tạo Sys');
 
         if (existingUser) {
+          // User đã tồn tại - update nếu cần
           const updates: any = {};
           if (node.name && existingUser.name !== node.name) updates.name = node.name;
           if (phone && !existingUser.phone) updates.phone = phone;
@@ -192,27 +209,32 @@ export async function POST(request: Request) {
             stats.usersUpdated++;
           }
         } else {
-          const hashedPassword = await bcrypt.hash('Brk#3773', 10);
-          await userModel.create({
-            data: {
-              id: targetUserId,
-              name: node.name || `TCA User ${node.id}`,
-              email: email || `tca_${node.id}@placeholder.local`,
-              phone: phone,
-              password: hashedPassword,
-              role: 'STUDENT',
-              referrerId: targetReferrerId
-            }
-          });
-          stats.usersCreated++;
-          createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: nodeId });
-          console.log('[TCA Sync] Created', STAGING_MODE ? 'UserTest' : 'User', 'id:', targetUserId);
+          // Chỉ tạo User khi là Tạo All (không phải Tạo Sys)
+          if (!isTaoSys) {
+            const hashedPassword = await bcrypt.hash('Brk#3773', 10);
+            await userModel.create({
+              data: {
+                id: targetUserId,
+                name: node.name || `TCA User ${node.id}`,
+                email: email || `tca_${node.id}@placeholder.local`,
+                phone: phone,
+                password: hashedPassword,
+                role: 'STUDENT',
+                referrerId: targetReferrerId
+              }
+            });
+            stats.usersCreated++;
+            createdRecords.push({ table: STAGING_MODE ? 'UserTest' : 'User', id: targetUserId, tcaId: nodeId });
+            console.log('[TCA Sync] Created', STAGING_MODE ? 'UserTest' : 'User', 'id:', targetUserId);
 
-          // Closure (dùng helper tương ứng với mode)
-          if (STAGING_MODE) {
-            await addUserToClosureTest(targetUserId, targetReferrerId);
+            // Closure (dùng helper tương ứng với mode)
+            if (STAGING_MODE) {
+              await addUserToClosureTest(targetUserId, targetReferrerId);
+            } else {
+              await addUserToClosure(targetUserId, targetReferrerId);
+            }
           } else {
-            await addUserToClosure(targetUserId, targetReferrerId);
+            console.log('[TCA Sync] SKIP User creation - action is Tạo Sys, user exists');
           }
         }
 
