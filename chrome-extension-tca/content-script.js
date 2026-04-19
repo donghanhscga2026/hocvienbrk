@@ -303,11 +303,8 @@
     const tbody = document.getElementById('tca-nodes-body');
     const displayRows = previewRows.length > 0 ? previewRows : allNodes;
     
-    // Lưu trữ dữ liệu đã chốt logic để gửi đi Demo/Sync
-    window.tcaFinalizedNodes = [];
-
     displayRows.forEach((row, idx) => {
-      const tcaId = Number(row.id) || Number(row.tcaId) || row.id || row.tcaId;
+      const tcaId = Number(row.id) || 0;
       const name = row.name || '-';
       const parentTcaId = row.parentTcaId || '-';
       const match = row.match || '-';
@@ -317,15 +314,21 @@
 
       // --- DÙNG TRỰC TIẾP previewRows (không transform) ---
       // Chỉ render row ra bảng, KHÔNG tạo mảng riêng
+      const userId = row.userId;
+      // Transform: Ưu tiên DB referrerId (đúng), fallback TCA proposal
+      const hasDbReferrer = row.db && (row.db.referrerId !== null && row.db.referrerId !== undefined);
+      const referrerId = hasDbReferrer ? Number(row.db.referrerId) : Number(row.referrerId || 0);
+      // refSysId: Dùng trực tiếp từ TCA hoặc DB (khác với referrerId!)
+      const refSysId = row.refSysId != null ? Number(row.refSysId) : (row.db?.refSysId != null ? Number(row.db.refSysId) : 0);
       
       // --- RENDER GIAO DIỆN ---
       const tr = document.createElement('tr');
       tr.style.background = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
       tr.style.borderBottom = '1px solid #eee';
 
-      const userIdColor = dbUserId ? '#1565c0' : (newUserId ? '#d32f2f' : '#999');
-      const refIdColor = hasDbReferrer ? '#1565c0' : (referrerIdVal !== null ? '#d32f2f' : '#999');
-      const refSysIdColor = (refSysIdVal !== null && refSysIdVal === row.db?.refSysId) ? '#1565c0' : '#d32f2f';
+      const userIdColor = (row.db?.userId) ? '#1565c0' : (userId ? '#d32f2f' : '#999');
+      const refIdColor = (row.db?.referrerId != null) ? '#1565c0' : (referrerId != null ? '#d32f2f' : '#999');
+      const refSysIdColor = (row.db?.refSysId != null) ? '#1565c0' : '#d32f2f';
 
       let matchDisplay = '-';
       let matchColor = '#999';
@@ -349,10 +352,10 @@
         <td style="padding:6px 4px; color:#000; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;" title="${name}">${name}</td>
         <td style="padding:6px 2px; text-align:center; color:#666;">${parentTcaId}</td>
         <td style="padding:6px 2px; text-align:center;"><span style="background:${matchColor};color:white;padding:1px 4px;border-radius:2px;font-size:9px;">${matchDisplay}</span></td>
-        <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userIdVal || '-'}</td>
-        <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${referrerIdVal !== null ? referrerIdVal : '-'}</td>
+        <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userId || '-'}</td>
+        <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${referrerId != null ? referrerId : '-'}</td>
         <td style="padding:6px 2px; text-align:center;"><span style="background:${actionBg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;">${actionLabel}</span></td>
-        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysIdVal || '-'}</td>
+        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysId || '-'}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px; max-width:120px; overflow:hidden; text-overflow:ellipsis;" title="${email}">${email}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
       `;
@@ -731,54 +734,47 @@
     }
   };
 
-  window.downloadTCACSV = function() {
+window.downloadTCACSV = function() {
     const data = window.tcaExtractedData;
-    if (!data) {
+    if (!data || !data.previewRows) {
       alert('Chưa có dữ liệu để tải!');
       return;
     }
 
-    // Build previewRows map for UserID lookup (từ bảng TCA Dashboard đang hiển thị)
-    const previewMap = new Map();
-    (data.previewRows || []).forEach(row => previewMap.set(row.id, row));
-
-    // Header khớp bảng TCA Dashboard: TCAID, Ten, P.TCAID, Match, UserID, RefID, Action, refSysId, Email, Phone
+    // TRỰC TIẾP từ previewRows (giống y hệt bảng đang hiển thị)
     const BOM = '\uFEFF';
     let csv = BOM + 'TCAID,Ten,P.TCAID,Match,UserID,RefID,Action,refSysId,Email,Phone\n';
-    data.allNodes.forEach(node => {
-      // Get contact info
-      const contact = data.memberInfo?.[node.id] || {};
-      const email = contact.email || '';
-      const phone = contact.phone || '';
-      
-      // Get từ previewRows (chính là data trên bảng TCA Dashboard)
-      const previewRow = previewMap.get(node.id) || {};
-      const tcaId = node.id;
-      const ten = node.name || '';
-      const pTcaId = node.parentFolderId || '-';
-      const match = previewRow.match || '-';
-      const userId = previewRow.userId || '';
-      // TRỰC TIẾP từ previewRow - không transform
-      const refId = previewRow.referrerId != null ? previewRow.referrerId : 0;
-      // TRỰC TIẾP action - không translate
-      const actionVal = previewRow.action || '-';
-      const refSysId = previewRow.refSysId != null ? previewRow.refSysId : 0;
+    
+    data.previewRows.forEach(row => {
+      const tcaId = row.id || '';
+      const ten = row.name || '';
+      const pTcaId = row.parentTcaId || '-';
+      const match = row.match || '-';
+      const userId = row.userId || '';
+      // Transform: Ưu tiên DB referrerId (đúng với table), fallback TCA
+      const hasDbRef = row.db && (row.db.referrerId !== null && row.db.referrerId !== undefined);
+      const refId = hasDbRef ? Number(row.db.referrerId) : Number(row.referrerId || 0);
+      const actionVal = row.action || '-';
+      // refSysId: Dùng trực tiếp từ TCA hoặc DB
+      const refSysId = row.refSysId != null ? Number(row.refSysId) : (row.db?.refSysId != null ? Number(row.db.refSysId) : 0);
+      const email = row.email || '';
+      const phone = row.phone || '';
       
       csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${actionVal},${refSysId},"${email}","${phone}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = blobUrl;
     a.download = `tca_data_${Date.now()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
     
-    console.log('[TCA Sync] CSV downloaded!');
-  };
+console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
+  }
 
   window.downloadTCAJSON = function() {
     const data = window.tcaExtractedData;
