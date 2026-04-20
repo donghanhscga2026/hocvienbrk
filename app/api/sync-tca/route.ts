@@ -62,7 +62,7 @@ const normalizePhone = (phone: string | null): string | null => {
   return phone
 }
 
-// Hàm lưu SyncLog
+// Hàm lưu SyncLog chi tiết (giữ nguyên để rollback chi tiết khi cần)
 async function logSyncChange(syncId: string, tableName: string, recordId: number, action: string, oldData: any, newData: any) {
   await prisma.syncLog.create({
     data: {
@@ -76,11 +76,36 @@ async function logSyncChange(syncId: string, tableName: string, recordId: number
   })
 }
 
+// Hàm lưu SyncLog tổng hợp - CHỈ TẠO 1 BẢN GHI cho 1 lần sync
+async function logSyncSummary(syncId: string, summary: {
+  usersCreated: number
+  usersUpdated: number
+  systemsCreated: number
+  systemsUpdated: number
+  tcaMembersCreated: number
+  tcaMembersUpdated: number
+  totalProcessed: number
+  tcaIds: number[]
+}) {
+  await prisma.syncLog.create({
+    data: {
+      syncId,
+      tableName: 'SYNC_SESSION',
+      recordId: 0,
+      action: 'SYNC_SESSION',
+      oldData: null,
+      newData: JSON.stringify(summary)
+    }
+  })
+  console.log('[TCA Sync] Summary logged:', summary)
+}
+
 export async function POST(request: Request) {
   const syncId = uuidv4()
   const startTime = Date.now()
   let stats = { usersCreated: 0, usersUpdated: 0, systemsCreated: 0, systemsUpdated: 0, tcaMembersCreated: 0, tcaMembersUpdated: 0, failed: 0, totalRecords: 0, skipped: 0 }
   const failedRecords: { tcaId: number; error: string }[] = []
+  const processedTcaIds: number[] = []  // Thu thập tcaIds để rollback
 
   try {
     let body: SyncPayload
@@ -109,6 +134,9 @@ export async function POST(request: Request) {
             stats.skipped = (stats.skipped || 0) + 1
             continue
           }
+          
+          // Thu thập tcaId để rollback
+          processedTcaIds.push(tcaId)
 
           const userModel = prisma.user
           const systemModel = prisma.system
@@ -132,12 +160,9 @@ export async function POST(request: Request) {
                 role: 'STUDENT',
                 referrerId: referrerId || null
               }
-            })
+})
             stats.usersCreated++
             
-            // Log tạo user
-            await logSyncChange(syncId, 'User', targetUserId, 'CREATE', existingUser, { name: row.name, email: row.email })
-
             // Closure
             if (referrerId && referrerId > 0) {
               await addUserToClosure(targetUserId, referrerId)
@@ -154,7 +179,6 @@ export async function POST(request: Request) {
                 data: { phone: row.phone || undefined }
               })
               stats.usersUpdated++
-              await logSyncChange(syncId, 'User', targetUserId, 'UPDATE', oldData, { phone: row.phone })
             }
           }
 
@@ -162,13 +186,11 @@ export async function POST(request: Request) {
           if (action.includes('E') && action.includes('PE') === false && targetUserId) {
             const existingUser = await userModel.findUnique({ where: { id: targetUserId } })
             if (existingUser) {
-              const oldData = { email: existingUser.email }
               await userModel.update({
                 where: { id: targetUserId },
                 data: { email: row.email || undefined }
               })
               stats.usersUpdated++
-              await logSyncChange(syncId, 'User', targetUserId, 'UPDATE', oldData, { email: row.email })
             }
           }
 
@@ -176,9 +198,6 @@ export async function POST(request: Request) {
           if (action.includes('S')) {
             await addUserToSystemClosure(targetUserId, systemParentId, 1)
             stats.systemsCreated++
-            
-            // Log tạo system
-            await logSyncChange(syncId, 'System', targetUserId, 'CREATE', null, { autoId: systemParentId })
           }
 
           // TCA = tạo TCAMember
@@ -202,10 +221,11 @@ export async function POST(request: Request) {
                 lastSyncedAt: new Date()
               }
             })
-            stats.tcaMembersCreated++
-            
-            // Log tạo/cập nhật TCAMember
-            await logSyncChange(syncId, 'TCAMember', tcaId, existingTCA ? 'UPDATE' : 'CREATE', existingTCA, { name: row.name })
+            if (existingTCA) {
+              stats.tcaMembersUpdated++
+            } else {
+              stats.tcaMembersCreated++
+            }
           }
 
         } catch (rowError) {
@@ -215,6 +235,19 @@ export async function POST(request: Request) {
       }
 
       const duration = Date.now() - startTime
+      
+      // Ghi log tổng hợp - CHỈ 1 BẢN GHI cho 1 lần sync
+      await logSyncSummary(syncId, {
+        usersCreated: stats.usersCreated,
+        usersUpdated: stats.usersUpdated,
+        systemsCreated: stats.systemsCreated,
+        systemsUpdated: stats.systemsUpdated,
+        tcaMembersCreated: stats.tcaMembersCreated,
+        tcaMembersUpdated: stats.tcaMembersUpdated,
+        totalProcessed: stats.totalRecords - stats.skipped,
+        tcaIds: processedTcaIds
+      })
+      
       return NextResponse.json({ 
         success: true, 
         syncId, 

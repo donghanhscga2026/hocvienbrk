@@ -98,34 +98,66 @@ export async function POST(request: Request) {
       if (syncLogs.length > 0) {
         console.log('[TCA Rollback] Using new SyncLog:', syncLogs.length, 'records')
         
-        // Rollback theo SyncLog
-        for (const log of syncLogs) {
-          try {
-            if (log.action === 'CREATE') {
-              // Xóa bản ghi đã tạo
-              if (log.tableName === 'User') {
-                await prisma.user.delete({ where: { id: log.recordId } }).catch(() => {})
-                recordsToDelete.users.push({ id: log.recordId, tcaId: null })
-              } else if (log.tableName === 'System') {
-                // System rollback - xóa theo userId
-                await prisma.system.deleteMany({ where: { userId: log.recordId } }).catch(() => {})
-                recordsToDelete.systems.push({ autoId: log.recordId, tcaId: null })
-              } else if (log.tableName === 'TCAMember') {
-                await (prisma as any).tCAMember.delete({ where: { tcaId: log.recordId } }).catch(() => {})
-                recordsToDelete.tcaMembers.push({ id: log.recordId, tcaId: log.recordId })
-              }
-            } else if (log.action === 'UPDATE' && log.oldData) {
-              // Khôi phục dữ liệu cũ
-              const oldData = JSON.parse(log.oldData)
-              if (log.tableName === 'User') {
-                await prisma.user.update({
-                  where: { id: log.recordId },
-                  data: oldData
+        // Kiểm tra xem có SYNC_SESSION không (rollback mới)
+        const syncSessionLog = syncLogs.find(l => l.action === 'SYNC_SESSION')
+        if (syncSessionLog && syncSessionLog.newData) {
+          // Rollback mới - dùng tcaIds từ summary
+          const summary = JSON.parse(syncSessionLog.newData)
+          const tcaIdsFromSync = summary.tcaIds || []
+          console.log('[TCA Rollback] Using SYNC_SESSION summary, tcaIds:', tcaIdsFromSync.length)
+          
+          for (const tcaId of tcaIdsFromSync) {
+            try {
+              const tcaMember = await (prisma as any).tCAMember?.findUnique({
+                where: { tcaId }
+              })
+              if (tcaMember) {
+                recordsToDelete.tcaMembers.push({ id: tcaMember.id, tcaId })
+                
+                const system = await prisma.system.findFirst({
+                  where: { userId: tcaMember.userId, onSystem: 1 }
                 })
+                if (system) {
+                  recordsToDelete.systems.push({ autoId: system.autoId, tcaId })
+                  recordsToDelete.closures.push({ systemId: system.autoId })
+                }
+                
+                recordsToDelete.users.push({ id: tcaMember.userId, tcaId })
               }
+            } catch (e) {
+              console.log('[TCA Rollback] Error processing tcaId:', tcaId, e)
             }
-          } catch (e) {
-            console.log('[TCA Rollback] Error:', e)
+          }
+        } else {
+          // Rollback cũ - dùng chi tiết từng record
+          for (const log of syncLogs) {
+            try {
+              if (log.action === 'CREATE') {
+                // Xóa bản ghi đã tạo
+                if (log.tableName === 'User') {
+                  await prisma.user.delete({ where: { id: log.recordId } }).catch(() => {})
+                  recordsToDelete.users.push({ id: log.recordId, tcaId: null })
+                } else if (log.tableName === 'System') {
+                  // System rollback - xóa theo userId
+                  await prisma.system.deleteMany({ where: { userId: log.recordId } }).catch(() => {})
+                  recordsToDelete.systems.push({ autoId: log.recordId, tcaId: null })
+                } else if (log.tableName === 'TCAMember') {
+                  await (prisma as any).tCAMember.delete({ where: { tcaId: log.recordId } }).catch(() => {})
+                  recordsToDelete.tcaMembers.push({ id: log.recordId, tcaId: log.recordId })
+                }
+              } else if (log.action === 'UPDATE' && log.oldData) {
+                // Khôi phục dữ liệu cũ
+                const oldData = JSON.parse(log.oldData)
+                if (log.tableName === 'User') {
+                  await prisma.user.update({
+                    where: { id: log.recordId },
+                    data: oldData
+                  })
+                }
+              }
+            } catch (e) {
+              console.log('[TCA Rollback] Error:', e)
+            }
           }
         }
 
