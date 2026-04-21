@@ -24,6 +24,10 @@ interface TCANode {
   type: string
   name: string
   parentFolderId?: number | string
+  // Dữ liệu điểm số và cấp bậc từ Extension (trích xuất qua injected-script.js)
+  personalScore?: string
+  totalScore?: string
+  level?: string
 }
 
 interface MemberInfo {
@@ -143,29 +147,33 @@ export async function POST(request: Request) {
           const tcaMemberModel = (prisma as any).tCAMember
           const systemParentId = refSysId || 0
 
-          // PE = tạo User + closure
+          // PE = tạo User (nếu chưa tồn tại) + closure
           if (action.includes('PE')) {
             const hashedPassword = await bcrypt.hash('Brk#3773', 10)
-            
-            // Lưu oldData trước khi tạo
             const existingUser = await userModel.findUnique({ where: { id: targetUserId } })
             
-            await userModel.create({
-              data: {
-                id: targetUserId,
-                name: row.name || `TCA ${tcaId}`,
-                email: row.email || `tca_${tcaId}@placeholder.local`,
-                phone: row.phone || null,
-                password: hashedPassword,
-                role: 'STUDENT',
-                referrerId: referrerId || null
+            if (!existingUser) {
+              // Chỉ tạo mới khi user chưa tồn tại
+              await userModel.create({
+                data: {
+                  id: targetUserId,
+                  name: row.name || `TCA ${tcaId}`,
+                  email: row.email || `tca_${tcaId}@placeholder.local`,
+                  phone: row.phone || null,
+                  password: hashedPassword,
+                  role: 'STUDENT',
+                  referrerId: referrerId || null
+                }
+              })
+              stats.usersCreated++
+              
+              // Tạo closure chỉ khi user thực sự mới
+              if (referrerId && referrerId > 0) {
+                await addUserToClosure(targetUserId, referrerId)
               }
-})
-            stats.usersCreated++
-            
-            // Closure
-            if (referrerId && referrerId > 0) {
-              await addUserToClosure(targetUserId, referrerId)
+            } else {
+              // User đã tồn tại → bỏ qua create, không lỗi
+              console.log(`[TCA Sync] User #${targetUserId} already exists, skipping create (tcaId=${tcaId})`)
             }
           }
 
@@ -204,22 +212,29 @@ export async function POST(request: Request) {
           if (action.includes('TCA')) {
             const existingTCA = await tcaMemberModel.findUnique({ where: { tcaId } })
             
+            // Tìm thông tin chi tiết từ allNodes
+            const nodeInfo = body.allNodes?.find(n => Number(n.id) === tcaId)
+            const personalScoreStr = nodeInfo?.personalScore?.replace(/\./g, '').replace(',', '.')
+            const totalScoreStr = nodeInfo?.totalScore?.replace(/\./g, '').replace(',', '.')
+            const pScore = parseFloat(personalScoreStr || '0') || 0
+            const tScore = parseFloat(totalScoreStr || '0') || 0
+            const levelVal = nodeInfo?.level ? parseInt(nodeInfo.level) : null
+
+            const memberData = {
+                tcaId, userId: targetUserId, name: row.name || '', type: 'item',
+                parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
+                phone: row.phone || null,
+                email: row.email || null,
+                personalScore: pScore,
+                totalScore: tScore,
+                level: levelVal,
+                lastSyncedAt: new Date()
+            }
+
             await tcaMemberModel.upsert({
               where: { tcaId },
-              update: {
-                tcaId, userId: targetUserId, name: row.name || '', type: 'item',
-                parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
-                phone: row.phone || null,
-                email: row.email || null,
-                lastSyncedAt: new Date()
-              },
-              create: {
-                tcaId, userId: targetUserId, name: row.name || '', type: 'item',
-                parentTcaId: row.parentTcaId ? Number(row.parentTcaId) : null,
-                phone: row.phone || null,
-                email: row.email || null,
-                lastSyncedAt: new Date()
-              }
+              update: memberData,
+              create: memberData
             })
             if (existingTCA) {
               stats.tcaMembersUpdated++

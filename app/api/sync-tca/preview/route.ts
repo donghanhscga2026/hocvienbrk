@@ -327,7 +327,7 @@ export async function POST(request: Request) {
           changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
         }
       } else if (matchType === 'PE S') {
-        // PE S: Có User + System, thiếu TCA
+        // PE S: Có User + System, thiếu TCA → tạo TCAMember
         action = 'TCA'
       } else if (matchType === 'Pe S') {
         // Pe S: Có User + System, cập nhật Email + tạo TCA
@@ -359,11 +359,31 @@ export async function POST(request: Request) {
         if (phone && existingUser?.phone && existingUser.phone !== phone) {
           changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
         }
-      } else if (matchType === 'PE S TCA' || matchType === 'S TCA' || matchType === 'S TCA PE' || matchType === 'PE TCA S') {
-        // PE S TCA: Đã đầy đủ - Skip
-        action = 'SKIP'
+      } else if (matchType === 'PE S TCA' || matchType === 'S TCA PE' || matchType === 'PE TCA S') {
+        // PE S TCA: Đầy đủ User+System+TCA - chỉ cập nhật điểm/level trong TCAMember
+        action = 'TCA'
+        changes.push('Cập nhật điểm số và level TCAMember')
+      } else if (matchType === 'Pe S TCA' || matchType === 'Pe TCA S' || matchType === 'S TCA Pe') {
+        // Pe S TCA: Đủ hết, nhưng email khác → cập nhật email + cập nhật TCAMember điểm
+        action = 'E TCA'
+        if (email && existingUser?.email && existingUser.email !== email) {
+          changes.push(`Email: "${existingUser.email}" -> "${email}"`)
+        }
+        changes.push('Cập nhật điểm số và level TCAMember')
+      } else if (matchType === 'pE S TCA' || matchType === 'pE TCA S' || matchType === 'S TCA pE') {
+        // pE S TCA: Đủ hết, nhưng phone khác → cập nhật phone + cập nhật TCAMember điểm
+        action = 'P TCA'
+        if (phone && existingUser?.phone && existingUser.phone !== phone) {
+          changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
+        }
+        changes.push('Cập nhật điểm số và level TCAMember')
+      } else if (matchType === 'S TCA') {
+        // S TCA: Có System + TCA nhưng không tìm thấy User qua phone/email
+        // → Chỉ cập nhật điểm số TCAMember
+        action = 'TCA'
+        changes.push('Cập nhật điểm số và level TCAMember')
       } else {
-        // Fallback - tạo mới tất cả
+        // Fallback - tạo mới tất cả (chỉ khi không khớp bất kỳ case nào)
         action = 'PE S TCA'
         expectedUserId = nextAvailableUserId++
         expectedSystemId = nextAvailableSystemId++

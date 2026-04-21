@@ -32,6 +32,10 @@ export interface GenealogyNode {
     groupB: any[]
     children: GenealogyNode[]
     isRoot?: boolean
+    // Thông tin TCA Member (chỉ có khi thuộc hệ thống TCA)
+    level?: number | null
+    personalScore?: number | null
+    totalScore?: number | null
 }
 
 // Helper: Lay thong tin System cua user (tim theo onSystem dau tien)
@@ -138,6 +142,28 @@ async function buildStandardTree(
 
     // 4. Build map
     const closureByAncestor = new Map<number, any[]>()
+    // Thu thập tất cả userId trong cây để batch fetch TCAMember một lần
+    const allUserIds = new Set<number>([rootUser.id])
+    for (const c of allClosures) {
+        const desc = isSystem ? c.descendant.user : c.descendant
+        if (desc?.id) allUserIds.add(desc.id)
+    }
+    // Batch fetch TCAMember scores cho toàn bộ node trong cây
+    const tcaMembers = isSystem
+        ? await (prisma as any).tCAMember.findMany({
+            where: { userId: { in: [...allUserIds] } },
+            select: { userId: true, level: true, personalScore: true, totalScore: true }
+          })
+        : []
+    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>()
+    for (const m of tcaMembers) {
+        tcaMemberMap.set(m.userId, {
+            level: m.level ?? null,
+            personalScore: m.personalScore != null ? Number(m.personalScore) : null,
+            totalScore: m.totalScore != null ? Number(m.totalScore) : null
+        })
+    }
+
     for (const c of allClosures) {
         if (!closureByAncestor.has(c.ancestorId)) closureByAncestor.set(c.ancestorId, [])
         const desc = isSystem ? c.descendant.user : c.descendant
@@ -184,7 +210,7 @@ async function buildStandardTree(
             const grandchildren = child.autoId && child.autoId !== ancestorAutoId 
                 ? buildFullSubtree(child.autoId, maxDepth - 1) 
                 : []
-            
+            const tcaData = tcaMemberMap.get(child.userId)
             return {
                 id: child.userId,
                 name: child.name,
@@ -193,7 +219,10 @@ async function buildStandardTree(
                 f1aCount: 0, f1bCount: 0, f1cCount: 0,
                 groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
                 groupA: [], groupB: [],
-                children: grandchildren
+                children: grandchildren,
+                level: tcaData?.level ?? null,
+                personalScore: tcaData?.personalScore ?? null,
+                totalScore: tcaData?.totalScore ?? null,
             }
         })
     }
@@ -208,6 +237,7 @@ async function buildStandardTree(
         const f2Subtrees = f2s.map(f2 => {
             // Build đệ quy subtree cho mỗi F2
             const grandchildren = buildFullSubtree(f2.autoId, 5)
+            const f2tca = tcaMemberMap.get(f2.userId)
             return {
                 id: f2.userId,
                 name: f2.name,
@@ -216,7 +246,10 @@ async function buildStandardTree(
                 f1aCount: 0, f1bCount: 0, f1cCount: 0,
                 groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
                 groupA: [], groupB: [],
-                children: grandchildren
+                children: grandchildren,
+                level: f2tca?.level ?? null,
+                personalScore: f2tca?.personalScore ?? null,
+                totalScore: f2tca?.totalScore ?? null,
             }
         })
 
@@ -244,6 +277,7 @@ async function buildStandardTree(
             }
         }
 
+        const f1tca = tcaMemberMap.get(f1Info.id)
         return {
             id: f1Info.id, name: f1Info.name, referrerId: null,
             totalSubCount: f1Closures.length, 
@@ -251,10 +285,15 @@ async function buildStandardTree(
             groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
             groupA: gA, groupB: gB,
             // Sửa: Dùng f2Subtrees thay vì gC.map với children rỗng - để hiển thị đầy đủ cây
-            children: f2Subtrees
+            children: f2Subtrees,
+            level: f1tca?.level ?? null,
+            personalScore: f1tca?.personalScore ?? null,
+            totalScore: f1tca?.totalScore ?? null,
         }
     })
 
+    // Gắn TCA data cho root node
+    const rootTca = tcaMemberMap.get(rootUser.id)
     return {
         id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
         totalSubCount: totalCount,
@@ -267,7 +306,10 @@ async function buildStandardTree(
         groupA,
         groupB,
         children,
-        isRoot: true
+        isRoot: true,
+        level: rootTca?.level ?? null,
+        personalScore: rootTca?.personalScore ?? null,
+        totalScore: rootTca?.totalScore ?? null,
     }
     }
 

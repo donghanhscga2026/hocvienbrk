@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "7.2.0",
-  "description": "Sync TCA to BRK v7.2.0 - Mở rộng 10 cột mới (Điểm CN, Điểm Đội, Ngày Gia Nhập, Ngày Nộp HĐ, Ngày Thăng Hạng, BH, TD, % CN, % Đội, Cấp TV)",
+  "version": "7.3.0",
+  "description": "Sync TCA to BRK v7.3.0 - Auto-detect localhost/production, fix score update",
   "permissions": [
     "activeTab",
     "scripting",
@@ -10,7 +10,9 @@
   ],
   "host_permissions": [
     "*://portal.tca.com.vn/*",
-    "*://giautoandien.io.vn/*"
+    "*://giautoandien.io.vn/*",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*"
   ],
   "action": {
     "default_title": "TCA Sync"

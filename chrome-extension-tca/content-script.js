@@ -5,16 +5,43 @@
   const FULL_TREE_TYPE = 'TCA_FULL_TREE';
   const MEMBER_INFO_TYPE = 'TCA_MEMBER_INFO';
 
-// Auto-detect API base URL based on current environment
-  const isLocalDev = window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1' ||
-                       window.location.hostname.includes('ngrok');
-  const API_BASE = isLocalDev ? 'http://localhost:3000' : 'https://giautoandien.io.vn';
-  const SYNC_ENDPOINT = API_BASE + '/api/sync-tca';
-  const PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
+// Auto-detect API: thử localhost:3000 trước, nếu không phản hồi → dùng production
+  const LOCAL_API = 'http://localhost:3000';
+  const PROD_API = 'https://giautoandien.io.vn';
+  
+  // Biến động, sẽ được set sau khi ping xong
+  let API_BASE = PROD_API; // Default là production
+  let SYNC_ENDPOINT = API_BASE + '/api/sync-tca';
+  let PREVIEW_ENDPOINT = API_BASE + '/api/sync-tca/preview';
   const PREVIEW_RESULT_KEY = 'tca_preview_result';
 
-  console.log('[TCA Sync] API Base:', API_BASE);
+  // Ping localhost để kiểm tra server local có đang chạy không
+  async function detectApiBase() {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1500); // Timeout 1.5s
+      const res = await fetch(LOCAL_API + '/api/sync-tca', {
+        method: 'GET',
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (res.ok || res.status < 500) {
+        API_BASE = LOCAL_API;
+        SYNC_ENDPOINT = LOCAL_API + '/api/sync-tca';
+        PREVIEW_ENDPOINT = LOCAL_API + '/api/sync-tca/preview';
+        console.log('[TCA Sync] 🟢 Dùng LOCAL server:', LOCAL_API);
+        addTcaLog(`✅ Kết nối LOCAL server: ${LOCAL_API}`);
+        return;
+      }
+    } catch (e) {
+      // localhost không phản hồi → dùng production
+    }
+    console.log('[TCA Sync] 🔵 Dùng PRODUCTION server:', PROD_API);
+    addTcaLog(`🌐 Kết nối PRODUCTION server: ${PROD_API}`);
+  }
+
+  console.log('[TCA Sync] API Base (default):', API_BASE);
+
 
   let memberInfoCache = {};
   let precheckCache = {};  // Store precheck results: { tcaId: { exists: boolean, userId: number } }
@@ -38,12 +65,22 @@
   // Bước 1: Gọi /staging-sync (sync Prod→Test trước) hoặc /preview API để lấy bảng tổng hợp
   function callPreviewAPI(nodes) {
     return new Promise((resolve, reject) => {
-      // Build allNodes format
+      // Build allNodes format - gửi đầy đủ thông tin điểm số và cấp bậc
       const allNodes = nodes.map(n => ({
         id: n.id,
         type: n.type,
         name: n.name,
-        parentFolderId: n.parentFolderId
+        parentFolderId: n.parentFolderId,
+        // Điểm số và cấp bậc TCA (đã parse bởi injected-script.js)
+        personalScore: n.personalScore || '0',
+        totalScore: n.totalScore || '0',
+        level: n.level || '1',
+        hasBH: n.hasBH || false,
+        hasTD: n.hasTD || false,
+        groupName: n.groupName || '',
+        location: n.location || '',
+        personalRate: n.personalRate || '-',
+        teamRate: n.teamRate || '-'
       }));
       
       // Build memberInfo format
@@ -101,7 +138,11 @@
           });
           console.log('[TCA Sync] === PREVIEW SAMPLE END ===');
           
-          // Lưu kết quả vào localStorage để dùng sau
+          // Cập nhật previewRows NGAY LẬP TỨC (không qua localStorage)
+          previewRows = data.rows;
+          console.log('[TCA Sync] previewRows updated directly:', previewRows.length, 'rows');
+          
+          // Lưu kết quả vào localStorage để backup
           try {
             localStorage.setItem(PREVIEW_RESULT_KEY, JSON.stringify(data));
             console.log('[TCA Sync] Saved preview result to localStorage');
@@ -151,17 +192,20 @@
         }
       });
       
-      // Gọi preview với dữ liệu đầy đủ (Bước 1: Lấy bảng tổng hợp)
-      callPreviewAPI(allNodesGlobal).then((previewData) => {
-        console.log('[TCA Sync] === PREVIEW COMPLETE ===');
-        console.log('[TCA Sync] Preview rows:', previewData?.rows?.length || 0);
-        // Cập nhật panel nếu đang hiển thị (truyền cả previewRows)
-        const panel = document.getElementById('tca-sync-panel');
-        if (panel) {
-          panel.remove();
-          // Gọi lại với previewRows đã lưu
-          showDataPanel(allNodesGlobal, { total: allNodesGlobal.length, folders: 0, items: allNodesGlobal.filter(n => n.type === 'item').length }, memberInfoCache);
-        }
+      // Detect API base (localhost ưu tiên, fallback production)
+      detectApiBase().then(() => {
+        // Gọi preview với dữ liệu đầy đủ (Bước 1: Lấy bảng tổng hợp)
+        callPreviewAPI(allNodesGlobal).then((previewData) => {
+          console.log('[TCA Sync] === PREVIEW COMPLETE ===');
+          console.log('[TCA Sync] Preview rows:', previewData?.rows?.length || 0);
+          // Cập nhật panel nếu đang hiển thị (truyền cả previewRows)
+          const panel = document.getElementById('tca-sync-panel');
+          if (panel) {
+            panel.remove();
+            // Gọi lại với previewRows đã lưu
+            showDataPanel(allNodesGlobal, { total: allNodesGlobal.length, folders: 0, items: allNodesGlobal.filter(n => n.type === 'item').length }, memberInfoCache);
+          }
+        });
       });
     }
   }
@@ -178,7 +222,7 @@
   }
 
   function showDataPanel(allNodes, stats, memberInfo) {
-    console.log('[TCA Sync] showDataPanel called with', allNodes.length, 'nodes');
+    console.log('[TCA Sync] showDataPanel called with', allNodes.length, 'nodes, previewRows:', previewRows.length);
     addTcaLog(`Đã quét xong ${allNodes.length} thành viên từ TCA.`);
     
     if (previewRows.length === 0) {
@@ -626,14 +670,33 @@
       // refSysId: TCA trước, fallback DB (như table display)
       const refSysId = row.refSysId != null ? Number(row.refSysId) : (row.db?.refSysId != null ? Number(row.db.refSysId) : 0);
       
+      // === FIX CLIENT-SIDE: Override action dựa trên match ===
+      // Production server có thể trả SKIP nhưng ta vẫn cần update điểm/email/phone
+      let action = row.action || 'SKIP';
+      const match = row.match || '';
+      
+      if (action === 'SKIP' || action === '') {
+        // Phân tích lại match type để xác định đúng action
+        if (match === 'PE S TCA' || match === 'S TCA PE' || match === 'PE TCA S') {
+          action = 'TCA';           // Đủ hết → chỉ cập nhật điểm TCAMember
+        } else if (match === 'Pe S TCA' || match === 'Pe TCA S' || match === 'S TCA Pe') {
+          action = 'E TCA';         // Đủ hết + email khác → update email + điểm
+        } else if (match === 'pE S TCA' || match === 'pE TCA S' || match === 'S TCA pE') {
+          action = 'P TCA';         // Đủ hết + phone khác → update phone + điểm
+        } else if (match === 'S TCA') {
+          action = 'TCA';           // Có System+TCA → chỉ cập nhật điểm
+        }
+        // Các trường hợp khác giữ SKIP (N, chưa có đủ thông tin)
+      }
+      
       return {
         id: row.id,
         name: row.name,
         userId: row.userId,
         referrerId: referrerId,
         refSysId: refSysId,
-        action: row.action,
-        match: row.match,
+        action: action,             // Dùng action đã override
+        match: match,
         parentTcaId: row.parentTcaId,
         email: row.email,
         phone: row.phone
@@ -664,6 +727,7 @@
 
     try {
       // GỬI syncRows (đã transform giống table display) lên API
+      // Gửi kèm allNodesGlobal để server lấy personalScore, totalScore, level
       const response = await fetch(SYNC_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -671,7 +735,19 @@
           source: 'TCA_EXT_PREVIEW_ROWS',
           timestamp: Date.now(),
           previewRows: syncRows,
-          memberInfo: memberInfo
+          memberInfo: memberInfo,
+          // Gửi allNodes để server đọc điểm số khi upsert TCAMember
+          allNodes: allNodesGlobal.map(n => ({
+            id: n.id,
+            personalScore: n.personalScore || '0',
+            totalScore: n.totalScore || '0',
+            level: n.level || '1',
+            groupName: n.groupName || '',
+            hasBH: n.hasBH || false,
+            hasTD: n.hasTD || false,
+            personalRate: n.personalRate || '-',
+            teamRate: n.teamRate || '-'
+          }))
         })
       });
 
