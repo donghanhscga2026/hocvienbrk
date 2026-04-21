@@ -21,76 +21,82 @@ import {
 import '@xyflow/react/dist/style.css'
 import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import MainHeader from '@/components/layout/MainHeader'
+import * as d3 from 'd3-hierarchy'
 
 // Constants cho tree layout
-const NODE_WIDTH = 160
-const NODE_HEIGHT = 100  // Chiều cao ước tính của node (bao gồm padding)
-const HORIZONTAL_SPACING = 200  // Khoảng cách horizontal tối thiểu giữa các node cùng hàng
-const VERTICAL_SPACING = 300    // Khoảng cách vertical = 3 × node height (3 × 100 = 300)
+const NODE_WIDTH = 250
+const NODE_HEIGHT = 160
+const HORIZONTAL_SPACING = 50
+const VERTICAL_SPACING = 350
 
 // Đếm số con trực tiếp của node
-const countDirectChildren = (node: GenealogyNode, isFullMode: boolean): number => {
-  if (isFullMode) {
-    return (node.groupA?.length || 0) + (node.groupB?.length || 0) + (node.children?.length || 0)
+// Hàm đệ quy build D3 Tree object
+type D3Node = { id: number; data: GenealogyNode; children: D3Node[] };
+
+const buildD3Tree = (node: GenealogyNode, isFullMode: boolean, currentFocusMap?: Map<number, number>, isParentVisibleAndExpanded: boolean = true): D3Node | null => {
+  const isFocusNode = isFullMode || isParentVisibleAndExpanded;
+  if (!isFocusNode) return { id: node.id, data: node, children: [] };
+  
+  let childrenToRender = isFullMode
+    ? [...(node.groupA || []), ...(node.groupB || []), ...(node.children || [])]
+    : node.children || []
+    
+  if (childrenToRender) {
+    childrenToRender = Array.from(new Map(childrenToRender.map(c => [c.id, c])).values())
   }
-  return node.children?.length || 0
+  
+  const d3Children: D3Node[] = [];
+  if (childrenToRender && childrenToRender.length > 0) {
+    childrenToRender.forEach(child => {
+      const subIsExpanded = isFullMode || (currentFocusMap?.get(node.id) === child.id);
+      const childD3Node = buildD3Tree(child as GenealogyNode, isFullMode, currentFocusMap, subIsExpanded);
+      if (childD3Node) d3Children.push(childD3Node);
+    });
+  }
+  
+  return { id: node.id, data: node, children: d3Children };
 }
 
-// Tính chiều rộng của subtree (ước tính an toàn)
-const getSubtreeWidth = (node: GenealogyNode, isFullMode: boolean): number => {
-  if (isFullMode) {
-    const directChildren = (node.groupA?.length || 0) + (node.groupB?.length || 0) + (node.children?.length || 0)
-    if (directChildren === 0) return NODE_WIDTH
-    // Recurse cho children
-    let totalChildWidth = 0
-    if (node.groupA) totalChildWidth += node.groupA.length * NODE_WIDTH
-    if (node.groupB) totalChildWidth += node.groupB.length * NODE_WIDTH
-    if (node.children) {
-      for (const child of node.children) {
-        totalChildWidth += getSubtreeWidth(child, isFullMode)
-      }
-    }
-    return Math.max(NODE_WIDTH, totalChildWidth + HORIZONTAL_SPACING * Math.max(0, directChildren - 1))
-  }
-  if (!node.children?.length) return NODE_WIDTH
-  let w = node.children.reduce((sum, c) => sum + getSubtreeWidth(c, isFullMode), 0)
-  w += HORIZONTAL_SPACING * Math.max(0, node.children.length - 1)
-  return Math.max(NODE_WIDTH, w)
-}
-
-// Build position map với thuật toán đơn giản
-const calculateNodePositions = (root: GenealogyNode, isFullMode: boolean): Map<number, { x: number; y: number }> => {
+// Build position map với thuật toán d3-hierarchy chuẩn xác
+const calculateNodePositions = (root: GenealogyNode, isFullMode: boolean, currentFocusMap?: Map<number, number>): Map<number, { x: number; y: number }> => {
   const positions = new Map<number, { x: number; y: number }>()
   
-  // BFS để tính positions - tránh infinite recursion
-  const queue: { node: GenealogyNode; x: number; y: number }[] = [{ node: root, x: 0, y: 0 }]
-  
-  while (queue.length > 0) {
-    const { node, x, y } = queue.shift()!
-    if (positions.has(node.id)) continue // Tránh duplicate
-    positions.set(node.id, { x, y })
-    
-    const children = isFullMode && (node.groupA?.length || node.groupB?.length)
-      ? [...(node.groupA || []), ...(node.groupB || []), ...(node.children || [])]
-      : node.children || []
-    
-    if (children.length === 0) continue
-    
-    // Tính total width của các children
-    const childWidths = children.map(c => getSubtreeWidth(c as GenealogyNode, isFullMode))
-    const totalWidth = childWidths.reduce((sum, w) => sum + w, 0) + HORIZONTAL_SPACING * Math.max(0, children.length - 1)
-    
-    // Đặt children từ trái sang phải
-    let currentX = x - totalWidth / 2
-    for (let i = 0; i < children.length; i++) {
-      const childX = currentX + childWidths[i] / 2
-      const childY = y + VERTICAL_SPACING
-      queue.push({ node: children[i] as GenealogyNode, x: childX, y: childY })
-      currentX += childWidths[i] + HORIZONTAL_SPACING
-    }
-  }
-  
-  return positions
+  const hierarchyRootObj = buildD3Tree(root, isFullMode, currentFocusMap, true);
+  if (!hierarchyRootObj) return positions;
+
+  const rootHierarchy = d3.hierarchy(hierarchyRootObj, d => d.children);
+  const treeLayout = d3.tree<D3Node>().nodeSize([NODE_WIDTH + HORIZONTAL_SPACING, VERTICAL_SPACING]);
+  treeLayout(rootHierarchy);
+
+  const rootX = rootHierarchy.x || 0;
+
+  rootHierarchy.each(node => {
+     positions.set(node.data.id, { x: (node.x || 0) - rootX, y: node.y || 0 });
+  });
+
+  return positions;
+}
+
+const getLevelColor = (level?: number) => {
+  const colors = [
+    'from-amber-400 to-orange-500 ring-amber-200 border-amber-600', // Root - Gold/Yellow
+    'from-emerald-400 to-teal-500 ring-emerald-200 border-emerald-600', // F1 - Green
+    'from-blue-400 to-indigo-500 ring-blue-200 border-blue-600', // F2 - Blue
+    'from-violet-400 to-purple-500 ring-violet-200 border-violet-600', // F3 - Purple
+    'from-rose-400 to-pink-500 ring-rose-200 border-rose-600' // F4+ - Pink
+  ]
+  return colors[Math.min(level || 0, colors.length - 1)]
+}
+
+const getLevelBadgeColor = (level?: number) => {
+  const colors = [
+    'bg-amber-500 text-white',
+    'bg-emerald-500 text-white',
+    'bg-blue-500 text-white',
+    'bg-violet-500 text-white',
+    'bg-rose-500 text-white'
+  ]
+  return colors[Math.min(level || 0, colors.length - 1)]
 }
 
 const GenealogyCard = (props: NodeProps) => {
@@ -98,74 +104,105 @@ const GenealogyCard = (props: NodeProps) => {
     isRoot?: boolean;
     isSearchTarget?: boolean;
     editMode?: boolean;
+    displayMode?: 'default' | 'full';
+    level?: number;
     onToggleExpand?: (id: number) => void;
     onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
     onAddChild?: (parentId: number) => void;
     onDeleteNode?: (nodeId: number) => void;
   }
+  
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
   const isTarget = data.isSearchTarget
+  const isFullMode = data.displayMode === 'full'
+
+  const levelStr = data.level === 0 ? 'ROOT' : `F${data.level || 0}`;
 
   return (
     <div className={`
-      bg-white rounded-2xl p-0 min-w-[160px] shadow-xl hover:shadow-indigo-180 transition-all overflow-visible 
+      relative flex flex-col items-center justify-center w-[180px]
       ${hasChildren ? 'cursor-pointer' : 'cursor-default'}
-      ${isTarget ? 'border-4 border-amber-400 ring-4 ring-amber-200' : 'border-2 border-slate-200'}
+      transition-all duration-300 transform group hover:-translate-y-1
     `}>
-      {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!bg-slate-400 !w-2 !h-2" />}
-      <div className="p-4 flex flex-col gap-2">
-        <div className="flex justify-between items-center text-slate-900 font-black text-[12px]">
-          <span>#{data.id}</span>
-          <span>TS: {data.totalSubCount || 0}</span>
+      {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!opacity-0 !w-2 !h-2" style={{ top: -8 }} />}
+
+      {/* Avatar Circle Container */}
+      <div className={`
+        relative z-10 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg border-2
+        bg-gradient-to-br ${getLevelColor(data.level)}
+        ${isTarget ? 'ring-4 ring-offset-2 animate-pulse' : ''}
+      `}>
+        <User className="w-8 h-8 opacity-90" />
+        
+        {/* Level Badge */}
+        <div className={`absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider border-2 border-white shadow-sm whitespace-nowrap ${getLevelBadgeColor(data.level)}`}>
+          {levelStr}
         </div>
-        <div className="text-slate-800 font-bold text-[13px] text-center border-y border-slate-50 uppercase tracking-tighter line-clamp-2 min-h-[2.5rem] flex items-center justify-center">
+      </div>
+      
+      {/* Information Box */}
+      <div className="bg-white px-3 pb-3 pt-6 -mt-5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center">
+        <div className="font-bold text-[13px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1">
           {data.name || 'Học viên'}
         </div>
-        {/* Edit buttons - chỉ hiện khi editMode = true */}
+        <div className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-md mb-2 flex items-center gap-1 w-fit">
+          <span>#{data.id}</span>
+          <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+          <span className="text-emerald-500">TS: {data.totalSubCount || 0}</span>
+        </div>
+
+        {/* Edit buttons */}
         {data.editMode && (
-          <div className="flex gap-1">
+          <div className="flex gap-2 w-full justify-center mb-2">
             <button
               onClick={(e) => { e.stopPropagation(); data.onAddChild?.(data.id); }}
-              className="flex-1 py-1 rounded-lg bg-indigo-500 text-white text-[10px] font-bold hover:bg-indigo-600"
+              className="flex-1 max-w-[60px] py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-bold hover:bg-indigo-500 hover:text-white transition-colors"
             >
               +F1
             </button>
             {!data.isRoot && (
               <button
                 onClick={(e) => { e.stopPropagation(); data.onDeleteNode?.(data.id); }}
-                className="px-2 py-1 rounded-lg bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
+                className="w-7 py-1 rounded-full bg-rose-50 text-rose-600 text-[10px] font-bold hover:bg-rose-500 hover:text-white transition-colors flex items-center justify-center"
               >
                 X
               </button>
             )}
           </div>
         )}
-        <div className="flex justify-between items-center mt-1 relative h-10 px-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA, data.groupATotalSub); }}
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -ml-2 ${data.f1aCount > 0 ? 'bg-emerald-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
-          >
-            {data.f1aCount}
-          </button>
-          <div className="relative">
+
+        {/* Action groups (chỉ hiện khi default mode) */}
+        {!isFullMode && (
+           <div className="flex justify-between items-center w-full mt-1 gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA || [], data.groupATotalSub || 0); }}
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border border-white shadow-sm transition-transform ${data.f1aCount > 0 ? 'bg-emerald-100 text-emerald-700 hover:scale-110 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
+              title="F1 Trống (Đã duyệt)"
+            >
+              {data.f1aCount}
+            </button>
+            
             <button
               onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onToggleExpand?.(data.id); }}
-              className={`w-11 h-11 rounded-full flex items-center justify-center gap-0.5 text-[11px] font-black border-4 border-white shadow-md transition-transform ${data.f1cCount > 0 ? 'bg-rose-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
+              className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-0 text-[10px] h-auto py-1 font-black shadow-sm transition-all ${data.f1cCount > 0 ? (props.selected ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 cursor-pointer') : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
             >
-              <User className="w-4 h-4" />
+              <User className="w-3 h-3 mb-0" />
               <span>{data.f1cCount}</span>
             </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); if (data.f1bCount > 0) data.onOpenGroup?.('B', data.groupB || [], data.groupBTotalSub || 0); }}
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border border-white shadow-sm transition-transform ${data.f1bCount > 0 ? 'bg-sky-100 text-sky-700 hover:scale-110 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
+              title="F1 Cạn (Chưa duyệt)"
+            >
+              {data.f1bCount}
+            </button>
           </div>
-          <Handle type="source" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !-bottom-1" />
-          <button
-            onClick={(e) => { e.stopPropagation(); if (data.f1bCount > 0) data.onOpenGroup?.('B', data.groupB, data.groupBTotalSub); }}
-            className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-sm transition-transform -mr-2 ${data.f1bCount > 0 ? 'bg-sky-500 text-white hover:scale-110 cursor-pointer' : 'bg-slate-180 text-slate-300 cursor-default pointer-events-none'}`}
-          >
-            {data.f1bCount}
-          </button>
-        </div>
+        )}
       </div>
+
+      <Handle type="source" position={Position.Bottom} className="!opacity-0 !w-2 !h-2" style={{ bottom: -8 }} />
     </div>
   )
 }
@@ -320,7 +357,8 @@ function GenealogyFlow() {
     isParentVisibleAndExpanded: boolean = true,
     nodeEditMode?: boolean,
     nodeDisplayMode?: 'default' | 'full',
-    positionMap?: Map<number, { x: number; y: number }>
+    positionMap?: Map<number, { x: number; y: number }>,
+    level: number = 0
   ) => {
     const resNodes: Node[] = []
     const resEdges: Edge[] = []
@@ -348,6 +386,8 @@ function GenealogyFlow() {
         data: {
           ...parent,
           editMode: nodeEditMode ?? editMode,
+          displayMode: nodeDisplayMode ?? displayMode,
+          level,
           onToggleExpand: actions.onToggleExpand,
           onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
@@ -391,7 +431,7 @@ function GenealogyFlow() {
 
         const subIsExpanded = currentFocusMap.get(parent.id) === child.id
 
-        const sub = generateGraphNodes(child, childX, childY, actions, currentFocusMap, subIsExpanded, nodeEditMode, nodeDisplayMode, positionMap)
+        const sub = generateGraphNodes(child, childX, childY, actions, currentFocusMap, subIsExpanded, nodeEditMode, nodeDisplayMode, positionMap, level + 1)
         resNodes.push(...sub.resNodes); resEdges.push(...sub.resEdges)
 
         // Tránh duplicate edge keys
@@ -401,7 +441,7 @@ function GenealogyFlow() {
             id: edgeId,
             source: nodeId,
             target: `node-${child.id}`,
-            style: { stroke: '#f43f5e', strokeWidth: 3 },
+            style: { stroke: '#0ea5e9', strokeWidth: 2 },
             type: 'smoothstep'
           })
         }
@@ -497,8 +537,10 @@ function GenealogyFlow() {
           alert('Chưa có dữ liệu nhân mạch. Hãy bắt đầu giới thiệu thành viên để xây dựng cây.')
         }
       } else {
-        // Hệ thống TCA/KTC
-        const result = await getSystemTreeAction(systemId)
+        // Hệ thống TCA/KTC - Sửa bug: gọi đúng function theo displayMode
+        const result = displayMode === 'full' 
+          ? await getFullSystemTreeAction(systemId)
+          : await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
           setFullTree(result.tree)
           setIsTreeEmpty(false)
@@ -539,7 +581,10 @@ function GenealogyFlow() {
     } else if (selectedSystem === 0) {
       result = await getGenealogyTreeAction(rootId)
     } else {
-      result = await getSystemTreeAction(selectedSystem)
+      // Sửa bug: gọi đúng function theo displayMode
+      result = displayMode === 'full'
+        ? await getFullSystemTreeAction(selectedSystem)
+        : await getSystemTreeAction(selectedSystem)
     }
 
     if (result && result.success && result.tree) {
@@ -552,7 +597,7 @@ function GenealogyFlow() {
       setError(null)
     }
     setLoading(false)
-  }, [selectedSystem])
+  }, [selectedSystem, displayMode])
 
   const handleSearch = useCallback(async () => {
     const id = parseInt(searchInput.replace('#', ''))
@@ -632,8 +677,12 @@ function GenealogyFlow() {
       // Tính position map (Reingold-Tilford) cho full mode
       const isFullMode = displayMode === 'full'
       if (isFullMode || editMode) {
-        try {
-          const newMap = calculateNodePositions(fullTree, isFullMode)
+// Version log - Cập nhật ngày 2026-04-20: Sửa lỗi hiển thị Group C - đệ quy hiển thị đầy đủ cây (F1, F2, F3...)
+    // Version log: Đã khôi phục về phiên bản gốc, giữ nguyên 2 bug fixes (displayMode + initTree)
+console.log('[Genealogy] Version 2.0.1 - Restored from backup, kept displayMode fixes')
+    
+    try {
+          const newMap = calculateNodePositions(fullTree, isFullMode, activeFocusMapRef.current)
           positionMapRef.current = newMap
           setPositionVersion(v => v + 1)
         } catch (e) {
