@@ -214,10 +214,19 @@ export async function POST(request: Request) {
             
             // Tìm thông tin chi tiết từ allNodes
             const nodeInfo = body.allNodes?.find(n => Number(n.id) === tcaId)
-            const personalScoreStr = nodeInfo?.personalScore?.replace(/\./g, '').replace(',', '.')
-            const totalScoreStr = nodeInfo?.totalScore?.replace(/\./g, '').replace(',', '.')
-            const pScore = parseFloat(personalScoreStr || '0') || 0
-            const tScore = parseFloat(totalScoreStr || '0') || 0
+            
+            // TCA dùng '.' làm dấu thập phân (Western style): '17.463' = 17.463 điểm
+            // Chỉ cần replace ',' → '.' để hỗ trợ cả định dạng '17,463' nếu có
+            // KHÔNG xóa '.' vì đó là dấu thập phân, không phải phân cách ngàn
+            const parseScore = (raw?: string): number => {
+              if (!raw || raw === '-' || raw === '0') return 0
+              // Xử lý trường hợp '17,463' (dấu phẩy thập phân) → '17.463'
+              const normalized = raw.trim().replace(',', '.')
+              return parseFloat(normalized) || 0
+            }
+            
+            const pScore = parseScore(nodeInfo?.personalScore)
+            const tScore = parseScore(nodeInfo?.totalScore)
             const levelVal = nodeInfo?.level ? parseInt(nodeInfo.level) : null
 
             const memberData = {
