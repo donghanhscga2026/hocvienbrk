@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Home, User, ChevronRight, X, Zap, ChevronDown, Search } from 'lucide-react'
+import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search } from 'lucide-react'
 import {
   ReactFlow,
   Node,
@@ -105,7 +105,8 @@ const GenealogyCard = (props: NodeProps) => {
     isSearchTarget?: boolean;
     editMode?: boolean;
     displayMode?: 'default' | 'full';
-    level?: number;
+    // depth level trong cây (từ role root) - dùng cho màu sắc avatar
+    treeDepth?: number;
     onToggleExpand?: (id: number) => void;
     onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
     onAddChild?: (parentId: number) => void;
@@ -117,39 +118,73 @@ const GenealogyCard = (props: NodeProps) => {
   const isTarget = data.isSearchTarget
   const isFullMode = data.displayMode === 'full'
 
-  const levelStr = data.level === 0 ? 'ROOT' : `F${data.level || 0}`;
+  // Hiển thị Level thực từ TCA (ưu tiên data.level từ tca_member, fallback về treeDepth)
+  const tcaLevel = data.level   // Giá trị thực từ bảng tca_member (Cấp 1, Cấp 2...)
+  const treeDepth = data.treeDepth ?? 0  // Depth trong cây (0=root, 1=F1...)
+  const colorDepth = treeDepth  // Dùng depth cây để tô màu avatar
+
+  // Badge: Nếu có Level TCA thực → hiển thị "Cấp X", nếu không → ẩn
+  const levelBadgeText = tcaLevel != null ? `Cấp ${tcaLevel}` : (treeDepth === 0 ? 'ROOT' : null)
+
+  // Số liệu điểm (chỉ có khi TCA member data tồn tại)
+  const hasTcaData = data.personalScore != null || data.totalScore != null
+  const pScore = data.personalScore ?? 0
+  const tScore = data.totalScore ?? 0
 
   return (
     <div className={`
-      relative flex flex-col items-center justify-center w-[180px]
+      relative flex flex-col items-center justify-center w-[190px]
       ${hasChildren ? 'cursor-pointer' : 'cursor-default'}
       transition-all duration-300 transform group hover:-translate-y-1
     `}>
       {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!opacity-0 !w-2 !h-2" style={{ top: -8 }} />}
 
-      {/* Avatar Circle Container */}
+      {/* Avatar Circle - hiển thị #UserID thay vì icon người */}
       <div className={`
         relative z-10 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg border-2
-        bg-gradient-to-br ${getLevelColor(data.level)}
+        bg-gradient-to-br ${getLevelColor(colorDepth)}
         ${isTarget ? 'ring-4 ring-offset-2 animate-pulse' : ''}
       `}>
-        <User className="w-8 h-8 opacity-90" />
+        {/* #UserID thay thế User icon */}
+        <span className="text-[11px] font-black leading-tight text-center px-1">#{data.id}</span>
         
-        {/* Level Badge */}
-        <div className={`absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider border-2 border-white shadow-sm whitespace-nowrap ${getLevelBadgeColor(data.level)}`}>
-          {levelStr}
-        </div>
+        {/* Level Badge - chỉ hiện nếu có thông tin */}
+        {levelBadgeText && (
+          <div className={`absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider border-2 border-white shadow-sm whitespace-nowrap ${getLevelBadgeColor(colorDepth)}`}>
+            {levelBadgeText}
+          </div>
+        )}
       </div>
       
       {/* Information Box */}
-      <div className="bg-white px-3 pb-3 pt-6 -mt-5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center">
-        <div className="font-bold text-[13px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1">
+      <div className="bg-white px-2 pb-2 pt-6 -mt-5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center">
+        {/* Tên thành viên */}
+        <div className="font-bold text-[12px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px-1">
           {data.name || 'Học viên'}
         </div>
-        <div className="text-[10px] font-black text-slate-400 bg-slate-50 px-2 py-1 rounded-md mb-2 flex items-center gap-1 w-fit">
-          <span>#{data.id}</span>
-          <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-          <span className="text-emerald-500">TS: {data.totalSubCount || 0}</span>
+
+        {/* 3 chỉ số: Điểm cá nhân | Tổng thành viên | Điểm đội */}
+        <div className="flex items-center justify-between w-full gap-1 mb-2">
+          {/* Điểm cá nhân (personalScore) - xanh nếu >0, xám nếu =0 */}
+          <div className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black leading-tight ${hasTcaData ? (pScore > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400') : 'bg-slate-50 text-slate-300'}`}
+            title="Điểm cá nhân">
+            <span className="text-[8px] font-medium opacity-70">CÁ NHÂN</span>
+            <span>{hasTcaData ? pScore.toLocaleString('vi') : '—'}</span>
+          </div>
+
+          {/* Tổng số thành viên - luôn tím */}
+          <div className="flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black bg-violet-50 text-violet-600 leading-tight"
+            title="Tổng thành viên đội nhóm">
+            <span className="text-[8px] font-medium opacity-70">ĐỘI NHÓM</span>
+            <span>{data.totalSubCount || 0}</span>
+          </div>
+
+          {/* Điểm đội nhóm (totalScore) - đỏ nếu >0, xám nếu =0 */}
+          <div className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black leading-tight ${hasTcaData ? (tScore > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400') : 'bg-slate-50 text-slate-300'}`}
+            title="Điểm đội nhóm">
+            <span className="text-[8px] font-medium opacity-70">ĐIỂM ĐỘI</span>
+            <span>{hasTcaData ? tScore.toLocaleString('vi') : '—'}</span>
+          </div>
         </div>
 
         {/* Edit buttons */}
@@ -174,7 +209,7 @@ const GenealogyCard = (props: NodeProps) => {
 
         {/* Action groups (chỉ hiện khi default mode) */}
         {!isFullMode && (
-           <div className="flex justify-between items-center w-full mt-1 gap-1">
+           <div className="flex justify-between items-center w-full mt-0.5 gap-1">
             <button
               onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA || [], data.groupATotalSub || 0); }}
               className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border border-white shadow-sm transition-transform ${data.f1aCount > 0 ? 'bg-emerald-100 text-emerald-700 hover:scale-110 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
@@ -187,7 +222,7 @@ const GenealogyCard = (props: NodeProps) => {
               onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onToggleExpand?.(data.id); }}
               className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-0 text-[10px] h-auto py-1 font-black shadow-sm transition-all ${data.f1cCount > 0 ? (props.selected ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 cursor-pointer') : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
             >
-              <User className="w-3 h-3 mb-0" />
+              <Users className="w-3 h-3 mb-0" />
               <span>{data.f1cCount}</span>
             </button>
 
@@ -387,7 +422,7 @@ function GenealogyFlow() {
           ...parent,
           editMode: nodeEditMode ?? editMode,
           displayMode: nodeDisplayMode ?? displayMode,
-          level,
+          treeDepth: level,   // depth trong cây (0=root) - dùng cho màu avatar
           onToggleExpand: actions.onToggleExpand,
           onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
