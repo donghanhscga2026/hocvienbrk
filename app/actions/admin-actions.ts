@@ -172,10 +172,55 @@ async function buildStandardTree(
         }
     }
 
-    // 6. Build Children (Group C)
+    // 6. Build Children (Group C) - Sửa lỗi: hiển thị đầy đủ cây (bao gồm cả F3, F4...)
+    // Hàm helper đệ quy để build cây con đầy đủ từ closures
+    const buildFullSubtree = (ancestorAutoId: number, maxDepth: number = 10): GenealogyNode[] => {
+        const ancestorClosures = closureByAncestor.get(ancestorAutoId) || []
+        // Lấy children trực tiếp (depth = 1)
+        const directChildren = ancestorClosures.filter(c => c.depth === 1)
+        
+        return directChildren.map(child => {
+            // Đệ quy lấy grandchildren
+            const grandchildren = child.autoId && child.autoId !== ancestorAutoId 
+                ? buildFullSubtree(child.autoId, maxDepth - 1) 
+                : []
+            
+            return {
+                id: child.userId,
+                name: child.name,
+                referrerId: null,
+                totalSubCount: ancestorClosures.filter(c => c.depth >= 1 && c.userId === child.userId).length || 1,
+                f1aCount: 0, f1bCount: 0, f1cCount: 0,
+                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                groupA: [], groupB: [],
+                children: grandchildren
+            }
+        })
+    }
+
+    // Build children cho Group C với đầy đủ các level
     const children: GenealogyNode[] = groupC.map(f1Info => {
         const f1Record = f1Data.find(f => f.user.id === f1Info.id)
         const f1Closures = closureByAncestor.get(f1Record.autoId) || []
+        
+        // Lấy F2s (depth = 1) và build đầy đủ subtree
+        const f2s = f1Closures.filter(c => c.depth === 1)
+        const f2Subtrees = f2s.map(f2 => {
+            // Build đệ quy subtree cho mỗi F2
+            const grandchildren = buildFullSubtree(f2.autoId, 5)
+            return {
+                id: f2.userId,
+                name: f2.name,
+                referrerId: null,
+                totalSubCount: f1Closures.filter(c => c.depth >= 1 && c.userId === f2.userId).length || 1,
+                f1aCount: 0, f1bCount: 0, f1cCount: 0,
+                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                groupA: [], groupB: [],
+                children: grandchildren
+            }
+        })
+
+        // Group A/B/C vẫn giữ nguyên cho default mode
         const grandF1s = f1Closures.filter(c => c.depth === 1)
         let gA: any[] = [], gB: any[] = [], gC: any[] = []
         let gATotal = 0, gBTotal = 0, gCTotal = 0
@@ -184,8 +229,8 @@ async function buildStandardTree(
             const gf1Closures = closureByAncestor.get(gf1.autoId) || []
             const gHasF2 = gf1Closures.some(c => c.depth === 1)
             const gHasF3 = gf1Closures.some(c => c.depth === 2)
-            const gf2s = gf1Closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
-            const gfData = { id: gf1.userId, name: gf1.name, totalSubCount: gf1Closures.length, children: gf2s }
+            const gf2sOld = gf1Closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
+            const gfData = { id: gf1.userId, name: gf1.name, totalSubCount: gf1Closures.length, children: gf2sOld }
 
             if (!gHasF2) {
                 gA.push(gfData)
@@ -205,12 +250,8 @@ async function buildStandardTree(
             f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
             groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
             groupA: gA, groupB: gB,
-            children: gC.map(cf => ({
-                id: cf.id, name: cf.name, referrerId: null, totalSubCount: cf.totalSubCount,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0, 
-                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                groupA: [], groupB: [], children: []
-            }))
+            // Sửa: Dùng f2Subtrees thay vì gC.map với children rỗng - để hiển thị đầy đủ cây
+            children: f2Subtrees
         }
     })
 
