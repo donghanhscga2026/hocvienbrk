@@ -24,10 +24,10 @@ import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
 
 // Constants cho tree layout
-const NODE_WIDTH = 250
-const NODE_HEIGHT = 160
-const HORIZONTAL_SPACING = 50
-const VERTICAL_SPACING = 350
+const NODE_WIDTH = 200
+const NODE_HEIGHT = 130
+const HORIZONTAL_SPACING = 20
+const VERTICAL_SPACING = 220
 
 // Đếm số con trực tiếp của node
 // Hàm đệ quy build D3 Tree object
@@ -163,29 +163,39 @@ const GenealogyCard = (props: NodeProps) => {
           {data.name || 'Học viên'}
         </div>
 
-        {/* 3 chỉ số: Điểm cá nhân | Tổng thành viên | Điểm đội */}
-        <div className="flex items-center justify-between w-full gap-1 mb-2">
-          {/* Điểm cá nhân (personalScore) - xanh nếu >0, xám nếu =0 */}
-          <div className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black leading-tight ${hasTcaData ? (pScore > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400') : 'bg-slate-50 text-slate-300'}`}
-            title="Điểm cá nhân">
-            <span className="text-[8px] font-medium opacity-70">CÁ NHÂN</span>
-            <span>{hasTcaData ? pScore.toLocaleString('vi') : '—'}</span>
+        {/* --- CHẾ ĐỘ CÓ TCA DATA: hiện đầy đủ 3 chỉ số --- */}
+        {hasTcaData ? (
+          <div className="flex items-center justify-between w-full gap-1 mb-2">
+            {/* Điểm cá nhân */}
+            <div className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black leading-tight ${pScore > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}
+              title="Điểm cá nhân">
+              <span className="text-[8px] font-medium opacity-70">CÁ NHÂN</span>
+              <span>{pScore.toLocaleString('vi')}</span>
+            </div>
+            {/* Tổng thành viên */}
+            <div className="flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black bg-violet-50 text-violet-600 leading-tight"
+              title="Tổng thành viên đội nhóm">
+              <span className="text-[8px] font-medium opacity-70">ĐỘI NHÓM</span>
+              <span>{data.totalSubCount || 0}</span>
+            </div>
+            {/* Điểm đội */}
+            <div className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black leading-tight ${tScore > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'}`}
+              title="Điểm đội nhóm">
+              <span className="text-[8px] font-medium opacity-70">ĐIỂM ĐỘI</span>
+              <span>{tScore.toLocaleString('vi')}</span>
+            </div>
           </div>
-
-          {/* Tổng số thành viên - luôn tím */}
-          <div className="flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black bg-violet-50 text-violet-600 leading-tight"
-            title="Tổng thành viên đội nhóm">
-            <span className="text-[8px] font-medium opacity-70">ĐỘI NHÓM</span>
-            <span>{data.totalSubCount || 0}</span>
-          </div>
-
-          {/* Điểm đội nhóm (totalScore) - đỏ nếu >0, xám nếu =0 */}
-          <div className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black leading-tight ${hasTcaData ? (tScore > 0 ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400') : 'bg-slate-50 text-slate-300'}`}
-            title="Điểm đội nhóm">
-            <span className="text-[8px] font-medium opacity-70">ĐIỂM ĐỘI</span>
-            <span>{hasTcaData ? tScore.toLocaleString('vi') : '—'}</span>
-          </div>
-        </div>
+        ) : (
+          /* --- CHẾ ĐỘ KHÔNG CÓ TCA DATA (Học viên): chỉ hiện tổng thành viên gọn nhẹ --- */
+          (data.totalSubCount || 0) > 0 ? (
+            <div className="flex items-center justify-center w-full mb-1.5">
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black">
+                <Users className="w-2.5 h-2.5" />
+                <span>{data.totalSubCount} thành viên</span>
+              </div>
+            </div>
+          ) : null
+        )}
 
         {/* Edit buttons */}
         {data.editMode && (
@@ -207,31 +217,46 @@ const GenealogyCard = (props: NodeProps) => {
           </div>
         )}
 
-        {/* Action groups (chỉ hiện khi default mode) */}
-        {!isFullMode && (
-           <div className="flex justify-between items-center w-full mt-0.5 gap-1">
+        {/* --- NHÓM A / NHÁNH CHÍNH / NHÓM B (chỉ compact mode) --- */}
+        {!isFullMode && (data.f1aCount > 0 || data.f1bCount > 0 || data.f1cCount > 0) && (
+          <div className="flex justify-between items-center w-full mt-0.5 gap-1">
+            {/* Nhóm A: F1 không có ai bên dưới (lá) */}
             <button
               onClick={(e) => { e.stopPropagation(); if (data.f1aCount > 0) data.onOpenGroup?.('A', data.groupA || [], data.groupATotalSub || 0); }}
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border border-white shadow-sm transition-transform ${data.f1aCount > 0 ? 'bg-emerald-100 text-emerald-700 hover:scale-110 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
-              title="F1 Trống (Đã duyệt)"
+              className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black border border-white shadow-sm transition-all
+                ${data.f1aCount > 0
+                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer'
+                  : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-40'}`}
+              title="F1 Lá — chưa có F2"
             >
-              {data.f1aCount}
-            </button>
-            
-            <button
-              onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onToggleExpand?.(data.id); }}
-              className={`flex-1 rounded-2xl flex flex-col items-center justify-center gap-0 text-[10px] h-auto py-1 font-black shadow-sm transition-all ${data.f1cCount > 0 ? (props.selected ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 cursor-pointer') : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
-            >
-              <Users className="w-3 h-3 mb-0" />
-              <span>{data.f1cCount}</span>
+              <span className="text-[7.5px] font-medium opacity-60 leading-tight">LÁ</span>
+              <span>{data.f1aCount}</span>
             </button>
 
+            {/* Nhánh chính C: F1 có F3+ → expand subtree */}
+            <button
+              onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onToggleExpand?.(data.id); }}
+              className={`flex-[2] rounded-xl flex flex-col items-center justify-center gap-0 text-[9px] py-0.5 font-black shadow-sm transition-all
+                ${data.f1cCount > 0
+                  ? (props.selected ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 cursor-pointer')
+                  : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-40'}`}
+              title="Mở nhánh sâu"
+            >
+              <Users className="w-3 h-3" />
+              <span>{data.f1cCount} nhánh</span>
+            </button>
+
+            {/* Nhóm B: F1 có F2 nhưng chưa có F3 (cạn) */}
             <button
               onClick={(e) => { e.stopPropagation(); if (data.f1bCount > 0) data.onOpenGroup?.('B', data.groupB || [], data.groupBTotalSub || 0); }}
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border border-white shadow-sm transition-transform ${data.f1bCount > 0 ? 'bg-sky-100 text-sky-700 hover:scale-110 cursor-pointer' : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-50'}`}
-              title="F1 Cạn (Chưa duyệt)"
+              className={`flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black border border-white shadow-sm transition-all
+                ${data.f1bCount > 0
+                  ? 'bg-sky-50 text-sky-700 hover:bg-sky-100 cursor-pointer'
+                  : 'bg-slate-50 text-slate-300 cursor-default pointer-events-none opacity-40'}`}
+              title="F1 Cạn — có F2 nhưng chưa có F3"
             >
-              {data.f1bCount}
+              <span className="text-[7.5px] font-medium opacity-60 leading-tight">CẠN</span>
+              <span>{data.f1bCount}</span>
             </button>
           </div>
         )}
@@ -290,6 +315,8 @@ function GenealogyFlow() {
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
   const [displayMode, setDisplayMode] = useState<'default' | 'full'>('default')
   const focusMapSizeRef = useRef<number>(0)
+  // Lưu nodeId vừa được expand để auto-center sau render
+  const pendingCenterNodeIdRef = useRef<number | null>(null)
   
   // Load available systems from database
   useEffect(() => {
@@ -524,9 +551,11 @@ function GenealogyFlow() {
           if (activeFocusMapRef.current.get(pId) === id) {
             console.log(`[Focus] Collapsing Node #${id}`);
             activeFocusMapRef.current.delete(pId);
+            pendingCenterNodeIdRef.current = null  // Collapse → không center
           } else {
             console.log(`[Focus] Expanding Node #${id}, auto-collapsing siblings`);
             activeFocusMapRef.current.set(pId, id);
+            pendingCenterNodeIdRef.current = id  // Đánh dấu center vào node này
           }
           focusMapSizeRef.current = activeFocusMapRef.current.size;
           setFocusMapVersion(v => v + 1);
@@ -709,20 +738,15 @@ function GenealogyFlow() {
 
   useEffect(() => {
     if (fullTree) {
-      // Tính position map (Reingold-Tilford) cho full mode
+      // Tính position map (Reingold-Tilford) cho tất cả chế độ
+      // (cần thiết để auto-center hoạt động khi expand node ở compact mode)
       const isFullMode = displayMode === 'full'
-      if (isFullMode || editMode) {
-// Version log - Cập nhật ngày 2026-04-20: Sửa lỗi hiển thị Group C - đệ quy hiển thị đầy đủ cây (F1, F2, F3...)
-    // Version log: Đã khôi phục về phiên bản gốc, giữ nguyên 2 bug fixes (displayMode + initTree)
-console.log('[Genealogy] Version 2.0.1 - Restored from backup, kept displayMode fixes')
-    
-    try {
-          const newMap = calculateNodePositions(fullTree, isFullMode, activeFocusMapRef.current)
-          positionMapRef.current = newMap
-          setPositionVersion(v => v + 1)
-        } catch (e) {
-          console.error('[Tree] Position map error:', e)
-        }
+      try {
+        const newMap = calculateNodePositions(fullTree, isFullMode, activeFocusMapRef.current)
+        positionMapRef.current = newMap
+        setPositionVersion(v => v + 1)
+      } catch (e) {
+        console.error('[Tree] Position map error:', e)
       }
 
       const { resNodes, resEdges } = generateGraphNodes(fullTree, 0, 0, { onToggleExpand: handleToggleExpand }, activeFocusMapRef.current, true, editMode, displayMode, positionMapRef.current)
@@ -732,8 +756,19 @@ console.log('[Genealogy] Version 2.0.1 - Restored from backup, kept displayMode 
       
       setNodes(uniqueNodes); setEdges(uniqueEdges)
 
-      // Fit view after render
-      setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100)
+      // Auto-center: nếu vừa expand 1 node → center vào đó; nếu load lần đầu → fitView
+      const centerNodeId = pendingCenterNodeIdRef.current
+      if (centerNodeId !== null && positionMapRef.current.has(centerNodeId)) {
+        const pos = positionMapRef.current.get(centerNodeId)!
+        // Center vào node subtree: lùi lên 1 tầng để thấy cả nhánh con
+        setTimeout(() => {
+          setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT * 2, { zoom: 1.2, duration: 600 })
+        }, 120)
+        pendingCenterNodeIdRef.current = null  // Reset sau khi đã center
+      } else {
+        // Fit toàn bộ cây khi load lần đầu hoặc đổi hệ thống
+        setTimeout(() => fitView({ padding: 0.15, duration: 700 }), 100)
+      }
     }
   }, [fullTree, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
 
