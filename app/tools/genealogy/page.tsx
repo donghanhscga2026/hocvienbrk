@@ -27,7 +27,7 @@ import * as d3 from 'd3-hierarchy'
 const NODE_WIDTH = 200
 const NODE_HEIGHT = 130
 const HORIZONTAL_SPACING = 20
-const VERTICAL_SPACING = 220
+const VERTICAL_SPACING = 270
 
 // Đếm số con trực tiếp của node
 // Hàm đệ quy build D3 Tree object
@@ -88,13 +88,15 @@ const getLevelColor = (level?: number) => {
   return colors[Math.min(level || 0, colors.length - 1)]
 }
 
+// Màu badge cấp bổ trợ với getLevelColor (màu nguyên, khác tône để nổi bật)
+// Root=teal, F1=amber, F2=rose, F3=emerald, F4+=sky
 const getLevelBadgeColor = (level?: number) => {
   const colors = [
-    'bg-amber-500 text-white',
-    'bg-emerald-500 text-white',
-    'bg-blue-500 text-white',
-    'bg-violet-500 text-white',
-    'bg-rose-500 text-white'
+    'bg-teal-500 text-white',    // Root   - amber semi → teal badge
+    'bg-amber-500 text-white',   // F1     - teal semi  → amber badge
+    'bg-rose-500 text-white',    // F2     - blue semi  → rose badge
+    'bg-emerald-500 text-white', // F3     - purple semi→ emerald badge
+    'bg-sky-500 text-white'      // F4+    - pink semi  → sky badge
   ]
   return colors[Math.min(level || 0, colors.length - 1)]
 }
@@ -108,6 +110,7 @@ const GenealogyCard = (props: NodeProps) => {
     // depth level trong cây (từ role root) - dùng cho màu sắc avatar
     treeDepth?: number;
     onToggleExpand?: (id: number) => void;
+    onFocusSubtree?: (id: number, name?: string | null) => void;
     onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
     onAddChild?: (parentId: number) => void;
     onDeleteNode?: (nodeId: number) => void;
@@ -139,25 +142,27 @@ const GenealogyCard = (props: NodeProps) => {
     `}>
       {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!opacity-0 !w-2 !h-2" style={{ top: -8 }} />}
 
-      {/* Avatar Circle - hiển thị #UserID thay vì icon người */}
-      <div className={`
-        relative z-10 w-16 h-16 rounded-full flex items-center justify-center text-white shadow-lg border-2
-        bg-gradient-to-br ${getLevelColor(colorDepth)}
-        ${isTarget ? 'ring-4 ring-offset-2 animate-pulse' : ''}
-      `}>
-        {/* #UserID thay thế User icon */}
-        <span className="text-[11px] font-black leading-tight text-center px-1">#{data.id}</span>
-        
-        {/* Level Badge - chỉ hiện nếu có thông tin */}
+      {/* Avatar Semicircle - chỉ hiện nửa trên để tiết kiệm chiều cao */}
+      <div className="relative z-10 w-16 mx-auto">
+        {/* Level Badge hình tròn - nằm ngoài vùng clip, tône màu khác semicircle */}
         {levelBadgeText && (
-          <div className={`absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider border-2 border-white shadow-sm whitespace-nowrap ${getLevelBadgeColor(colorDepth)}`}>
-            {levelBadgeText}
+          <div className={`absolute -top-4 left-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-md ${getLevelBadgeColor(colorDepth)}`}>
+            {tcaLevel != null ? tcaLevel : '★'}
           </div>
         )}
+        {/* Clip container: h-9 = 36px → chỉ hiện phần trên của vòng tròn 64px */}
+        <div className={`overflow-hidden h-9 ${isTarget ? 'ring-2 ring-offset-1 ring-amber-400 rounded-t-full' : ''}`}>
+          <div className={`
+            w-16 h-16 rounded-full flex items-start pt-4 justify-center text-white shadow-md border-2
+            bg-gradient-to-br ${getLevelColor(colorDepth)}
+          `}>
+            <span className="text-[11px] font-black leading-tight text-center px-1">#{data.id}</span>
+          </div>
+        </div>
       </div>
-      
-      {/* Information Box */}
-      <div className="bg-white px-2 pb-2 pt-6 -mt-5 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center">
+
+      {/* Information Box - tiếp ngay dưới semicircle, padding top nhỏ lại */}
+      <div className="bg-white px-2 pb-2 pt-2 -mt-0.5 rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-t-0 border-slate-100 w-full text-center relative z-0 flex flex-col items-center">
         {/* Tên thành viên */}
         <div className="font-bold text-[12px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px-1">
           {data.name || 'Học viên'}
@@ -235,7 +240,7 @@ const GenealogyCard = (props: NodeProps) => {
 
             {/* Nhánh chính C: F1 có F3+ → expand subtree */}
             <button
-              onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onToggleExpand?.(data.id); }}
+              onClick={(e) => { e.stopPropagation(); if (data.f1cCount > 0) data.onFocusSubtree?.(data.id, data.name); }}
               className={`flex-[2] rounded-xl flex flex-col items-center justify-center gap-0 text-[9px] py-0.5 font-black shadow-sm transition-all
                 ${data.f1cCount > 0
                   ? (props.selected ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 cursor-pointer')
@@ -317,6 +322,9 @@ function GenealogyFlow() {
   const focusMapSizeRef = useRef<number>(0)
   // Lưu nodeId vừa được expand để auto-center sau render
   const pendingCenterNodeIdRef = useRef<number | null>(null)
+  // Focus Subtree Mode: tạm dùng 1 node làm root, hiển thị toàn bộ cây con
+  const [focusedSubtreeNode, setFocusedSubtreeNode] = useState<GenealogyNode | null>(null)
+  const [focusedNodeName, setFocusedNodeName] = useState<string | null>(null)
   
   // Load available systems from database
   useEffect(() => {
@@ -451,6 +459,7 @@ function GenealogyFlow() {
           displayMode: nodeDisplayMode ?? displayMode,
           treeDepth: level,   // depth trong cây (0=root) - dùng cho màu avatar
           onToggleExpand: actions.onToggleExpand,
+          onFocusSubtree: actions.onFocusSubtree,
           onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
           onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true })
@@ -511,6 +520,45 @@ function GenealogyFlow() {
     }
     return { resNodes, resEdges }
   }, [editMode, displayMode, setAddF1Modal, setDeleteNodeModal, setModalData])
+
+  // Focus Subtree: lấy node đó làm root, expand toàn bộ cây con
+  const handleFocusSubtree = useCallback(async (nodeId: number, nodeName?: string | null) => {
+    console.log(`[FocusSubtree] Focusing on node #${nodeId}`);
+    setLoading(true)
+    try {
+      let result;
+      if (selectedSystem === null || selectedSystem === 0) {
+        result = await getGenealogyChildrenAction(nodeId)
+      } else {
+        result = await getSystemChildrenAction(nodeId, selectedSystem)
+      }
+      if (result.success && result.tree) {
+        const subtreeRoot: GenealogyNode = {
+          ...result.tree,
+          isRoot: true,  // Đánh dấu là root của focus mode
+          name: result.tree.name || nodeName || null,
+        }
+        setFocusedSubtreeNode(subtreeRoot)
+        setFocusedNodeName(nodeName || `#${nodeId}`)
+        pendingCenterNodeIdRef.current = null  // Reset center, sẽ dùng fitView
+        setFocusMapVersion(v => v + 1)
+        console.log(`[FocusSubtree] Loaded subtree for #${nodeId}, children: ${result.tree.children?.length}`);
+      } else {
+        console.log(`[FocusSubtree] Failed:`, result.error)
+      }
+    } catch (e) {
+      console.error('[FocusSubtree] Error:', e)
+    }
+    setLoading(false)
+  }, [selectedSystem])
+
+  // Thoát Focus Subtree Mode, quay về cây đầy đủ
+  const handleExitFocusSubtree = useCallback(() => {
+    setFocusedSubtreeNode(null)
+    setFocusedNodeName(null)
+    pendingCenterNodeIdRef.current = null
+    setFocusMapVersion(v => v + 1)
+  }, [])
 
   const handleToggleExpand = useCallback(async (id: number) => {
     console.log(`[Action] Trigger Toggle Expand for Node #${id}`);
@@ -738,18 +786,23 @@ function GenealogyFlow() {
 
   useEffect(() => {
     if (fullTree) {
+      // Ưu tiên focusedSubtreeNode nếu đang ở focus mode; ngược lại dùng fullTree
+      const treeToRender = focusedSubtreeNode ?? fullTree
+      if (!treeToRender) return
+
       // Tính position map (Reingold-Tilford) cho tất cả chế độ
-      // (cần thiết để auto-center hoạt động khi expand node ở compact mode)
-      const isFullMode = displayMode === 'full'
+      // Focus mode = luôn full (tất cả branches mở)
+      const isFocusMode = focusedSubtreeNode !== null
+      const isFullMode = isFocusMode || displayMode === 'full'
       try {
-        const newMap = calculateNodePositions(fullTree, isFullMode, activeFocusMapRef.current)
+        const newMap = calculateNodePositions(treeToRender, isFullMode, activeFocusMapRef.current)
         positionMapRef.current = newMap
         setPositionVersion(v => v + 1)
       } catch (e) {
         console.error('[Tree] Position map error:', e)
       }
 
-      const { resNodes, resEdges } = generateGraphNodes(fullTree, 0, 0, { onToggleExpand: handleToggleExpand }, activeFocusMapRef.current, true, editMode, displayMode, positionMapRef.current)
+      const { resNodes, resEdges } = generateGraphNodes(treeToRender, 0, 0, { onToggleExpand: handleToggleExpand, onFocusSubtree: handleFocusSubtree }, activeFocusMapRef.current, true, editMode, isFocusMode ? 'full' : displayMode, positionMapRef.current)
       
       const uniqueNodes = Array.from(new Map(resNodes.map(item => [item.id, item])).values())
       const uniqueEdges = Array.from(new Map(resEdges.map(item => [item.id, item])).values())
@@ -770,7 +823,7 @@ function GenealogyFlow() {
         setTimeout(() => fitView({ padding: 0.15, duration: 700 }), 100)
       }
     }
-  }, [fullTree, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
+  }, [fullTree, focusedSubtreeNode, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
 
   // Fetch users when Add F1 modal opens
   useEffect(() => {
@@ -893,6 +946,19 @@ function GenealogyFlow() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
+
+        {/* Nút ← Quay về (chỉ hiện khi đang ở Focus Subtree Mode) */}
+        {focusedSubtreeNode && (
+          <button
+            onClick={handleExitFocusSubtree}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold hover:bg-amber-100 transition-all shrink-0"
+            title="Quay về cây toàn bộ"
+          >
+            <ArrowLeft className="w-3 h-3" />
+            <span className="hidden sm:inline">Quay về</span>
+            {focusedNodeName && <span className="text-amber-500 truncate max-w-[80px]">{focusedNodeName}</span>}
+          </button>
+        )}
 
         {/* Dropdown chế độ hiển thị */}
         <select
