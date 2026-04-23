@@ -148,20 +148,45 @@ async function buildStandardTree(
         const desc = isSystem ? c.descendant.user : c.descendant
         if (desc?.id) allUserIds.add(desc.id)
     }
-    // Batch fetch TCAMember scores cho toàn bộ node trong cây
+// Batch fetch TCAMember scores cho toàn bộ node trong cây
+    // Query theo cả userId (thành viên thường) và tcaId (root TCA)
     const tcaMembers = isSystem
         ? await (prisma as any).tCAMember.findMany({
-            where: { userId: { in: [...allUserIds] } },
-            select: { userId: true, level: true, personalScore: true, totalScore: true }
-          })
+            where: { 
+                OR: [
+                    { userId: { in: [...allUserIds] } },
+                    { tcaId: { in: [...allUserIds] } }  // Thêm tìm theo tcaId cho root
+                ]
+            },
+            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true }
+        })
         : []
     const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>()
     for (const m of tcaMembers) {
-        tcaMemberMap.set(m.userId, {
-            level: m.level ?? null,
-            personalScore: m.personalScore != null ? Number(m.personalScore) : null,
-            totalScore: m.totalScore != null ? Number(m.totalScore) : null
-        })
+        const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
+        const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
+        
+        // Map theo userId - ưu tiên giá trị có điểm cao hơn
+        const existing = tcaMemberMap.get(m.userId)
+        if (!existing || (newPersonalScore && newPersonalScore > (existing.personalScore ?? 0))) {
+            tcaMemberMap.set(m.userId, {
+                level: m.level ?? null,
+                personalScore: newPersonalScore,
+                totalScore: newTotalScore
+            })
+        }
+        
+        // Map theo tcaId cho root TCA (nếu khác userId)
+        if (m.tcaId && m.tcaId !== m.userId) {
+            const existingTcaId = tcaMemberMap.get(m.tcaId)
+            if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
+                tcaMemberMap.set(m.tcaId, {
+                    level: m.level ?? null,
+                    personalScore: newPersonalScore,
+                    totalScore: newTotalScore
+                })
+            }
+        }
     }
 
     for (const c of allClosures) {

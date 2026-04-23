@@ -332,6 +332,14 @@ export async function updateSiteProfile(id: number, data: {
     data: data as any
   })
 
+  // Xóa cache để hiển thị dữ liệu mới
+  const { revalidatePath } = await import('next/cache')
+  revalidatePath(`/tools/site-profiles/${id}/edit`)
+  revalidatePath(`/${profile.slug}`)
+  revalidatePath('/')
+
+  console.log(`[OK] Updated SiteProfile #${id}:`, { slug: profile.slug })
+
   return { success: true, profile }
 }
 

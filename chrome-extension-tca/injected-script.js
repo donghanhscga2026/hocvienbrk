@@ -37,8 +37,11 @@
     tempDiv.innerHTML = rawName;
     const nameText = tempDiv.textContent || tempDiv.innerText || '';
     
+    // Kiểm tra nếu là node "Tổ chức phân nhánh" - đây là node ROOT của hệ thống TCA
+    const isRootNode = nameText.includes('Tổ chức phân nhánh') || nameText.includes('Tổ chức') && nameText.includes('phân nhánh');
+    
     // Parse text thuần: tìm pattern SCORE / SCORE để xác định vị trí
-    // Format: "NHÓM - TÊN - 17.463 / 52.161 - Cấp X" hoặc "TÊN - 17.463 / 52.161 - Cấp X"
+    // Format: "NHÓM - TÊN - 17.463 / 52.161 - Cấp X" hoặc "Tổ chức phân nhánh - 17.006 / 194.305 - Cấp 2"
     
     let groupName = '';
     let fullName = nameText.trim();
@@ -113,6 +116,7 @@
     return {
       id: id,
       type: item.type,
+      isRootNode: isRootNode || false,
       groupName: groupName,
       name: fullName,
       personalScore: personalScore,
@@ -625,6 +629,96 @@
         }
       }
     });
+
+    // =====================================================
+    // EXTRACT OVERVIEW DATA - Lấy điểm tổng hệ thống từ dòng "Tổ chức phân nhánh"
+    // =====================================================
+    function extractOverviewData() {
+      console.log('[TCA Overview] 🔎 ========== BẮT ĐẦU TÌM ROOT DATA ==========');
+      
+      try {
+        // DEBUG: Liệt kê tất cả elements có thể chứa text
+        const allElements = Array.from(document.querySelectorAll('*'));
+        const candidateElements = allElements.filter(el => {
+          const text = el.innerText || '';
+          return text.includes('Tổ chức') || text.includes('phân nhánh');
+        });
+        
+        console.log('[TCA Overview] 🔍 Tìm thấy', candidateElements.length, 'elements chứa "Tổ chức" hoặc "phân nhánh"');
+        
+        if (candidateElements.length > 0) {
+          // In chi tiết từng element
+          candidateElements.forEach((el, i) => {
+            if (i < 5) {
+              console.log(`[TCA Overview] [${i}] ${el.tagName}: "${el.innerText.substring(0, 100)}..."`);
+            }
+          });
+        }
+        
+        // Tìm element có đủ cả "Tổ chức" và "phân nhánh"
+        const targetEl = candidateElements.find(el => {
+          const text = el.innerText || '';
+          return text.includes('Tổ chức') && text.includes('phân nhánh');
+        });
+
+        console.log('[TCA Overview] TargetEl:', targetEl ? `${targetEl.tagName} - TÌM THẤY` : 'KHÔNG TÌM THẤY');
+
+        if (targetEl) {
+          const text = targetEl.innerText;
+          const cleanText = text.replace(/\s+/g, ' ').trim();
+          console.log('[TCA Overview] Full text:', cleanText);
+
+          // Regex: with trailing content
+          const regex = /Tổ chức\s*phân\s*nhánh.*?([\d.]+).*?\/.*?([\d.]+).*?Cấp\s*(\d+)/i;
+          const match = cleanText.match(regex);
+          console.log('[TCA Overview] Regex match:', match);
+
+          // Portal dùng '.' là dấu thập phân: '17.006' = 17.006 điểm
+          const personalPoints = parseFloat(match[1]) || 0;
+          const teamPoints = parseFloat(match[2]) || 0;
+          const level = parseInt(match[3]) || 1;
+
+          console.log('[TCA Overview] ✅ SUCCESS - personalPoints:', personalPoints, 'teamPoints:', teamPoints, 'level:', level);
+
+          const overviewData = {
+            type: 'OVERVIEW_REPORT',
+            personal_points: personalPoints,
+            team_points: teamPoints,
+            level: level,
+            timestamp: new Date().toISOString(),
+            raw_text: cleanText
+          };
+
+          try {
+            localStorage.setItem('tcaOverviewData', JSON.stringify(overviewData));
+            console.log('[TCA Overview] 💾 Saved to localStorage');
+          } catch (e) {}
+
+          return overviewData;
+        } else {
+          console.log('[TCA Overview] ⚠️ KHÔNG tìm thấy element với cả "Tổ chức" và "phân nhánh"');
+        }
+      } catch (e) {
+        console.log('[TCA Overview] ❌ LỖI:', e.message);
+      }
+      return null;
+    }
+
+    // Gọi extractOverviewData sau khi DOM load xong
+    window.extractTcaOverview = extractOverviewData;
+
+    // THỬ GỌI NGAY SAU 2s (DOM đã render xong)
+    setTimeout(() => {
+      if (typeof window.extractTcaOverview === 'function') {
+        const result = window.extractTcaOverview();
+        if (!result) {
+          // Thử lại sau 3s nữa
+          setTimeout(() => {
+            window.extractTcaOverview();
+          }, 3000);
+        }
+      }
+    }, 2000);
 
     console.log('[TCA Sync] XHR interceptor initialized');
     console.log('[TCA Sync] Auto-scan enabled - will automatically scan full tree');

@@ -25,6 +25,7 @@ interface TCANode {
   name: string
   parentFolderId?: number | string
   // Dữ liệu điểm số và cấp bậc từ Extension (trích xuất qua injected-script.js)
+  isRootNode?: boolean
   personalScore?: string
   totalScore?: string
   level?: string
@@ -43,6 +44,16 @@ interface SyncPayload {
   allNodes?: TCANode[]
   memberInfo: Record<number, MemberInfo>
   expectedIds?: Record<number, any>
+  overviewData?: OverviewData | null
+}
+
+interface OverviewData {
+  type: string
+  personal_points: number
+  team_points: number
+  level: number
+  timestamp: string
+  raw_text?: string
 }
 
 interface PreviewRow {
@@ -111,6 +122,9 @@ export async function POST(request: Request) {
   const failedRecords: { tcaId: number; error: string }[] = []
   const processedTcaIds: number[] = []  // Thu thập tcaIds để rollback
 
+  // Khởi tạo TCAMember model
+  const tcaMemberModel = (prisma as any).tCAMember
+
   try {
     let body: SyncPayload
     try {
@@ -144,7 +158,6 @@ export async function POST(request: Request) {
 
           const userModel = prisma.user
           const systemModel = prisma.system
-          const tcaMemberModel = (prisma as any).tCAMember
           const systemParentId = refSysId || 0
 
           // PE = tạo User (nếu chưa tồn tại) + closure
@@ -215,14 +228,10 @@ export async function POST(request: Request) {
             // Tìm thông tin chi tiết từ allNodes
             const nodeInfo = body.allNodes?.find(n => Number(n.id) === tcaId)
             
-            // TCA dùng '.' làm dấu thập phân (Western style): '17.463' = 17.463 điểm
-            // Chỉ cần replace ',' → '.' để hỗ trợ cả định dạng '17,463' nếu có
-            // KHÔNG xóa '.' vì đó là dấu thập phân, không phải phân cách ngàn
+            // TCA Portal dùng '.' là dấu thập phân: '17.006' = 17.006 điểm
             const parseScore = (raw?: string): number => {
               if (!raw || raw === '-' || raw === '0') return 0
-              // Xử lý trường hợp '17,463' (dấu phẩy thập phân) → '17.463'
-              const normalized = raw.trim().replace(',', '.')
-              return parseFloat(normalized) || 0
+              return parseFloat(raw.trim()) || 0
             }
             
             const pScore = parseScore(nodeInfo?.personalScore)
@@ -251,14 +260,49 @@ export async function POST(request: Request) {
               stats.tcaMembersCreated++
             }
           }
-
         } catch (rowError) {
           stats.failed++
           failedRecords.push({ tcaId: Number(row.id), error: String(rowError) })
         }
       }
 
-      const duration = Date.now() - startTime
+// XỬ LÝ ROOT NODE - UPDATE cho userId=861 (tcaId=60861)
+      const ROOT_USER_ID = 861
+      const ROOT_TCA_ID = 60861
+      console.log('[TCA Sync] Checking overviewData:', body.overviewData ? 'YES' : 'NO', body.overviewData?.type)
+      const overview = body.overviewData
+      if (overview && overview.type === 'OVERVIEW_REPORT') {
+        console.log('[TCA Sync] Root update - personal_points:', overview.personal_points, 'team_points:', overview.team_points)
+        const pScore = overview.personal_points || 0
+        const tScore = overview.team_points || 0
+        const levelVal = overview.level || 1
+        
+        // Tìm bản ghi root - Ưu tiên userId=861, fallback tcaId=60861
+        let existingRoot = await tcaMemberModel.findFirst({ where: { userId: ROOT_USER_ID } })
+        if (!existingRoot) {
+          existingRoot = await tcaMemberModel.findUnique({ where: { tcaId: ROOT_TCA_ID } })
+        }
+        
+        if (existingRoot) {
+          console.log('[TCA Sync] Root found in DB (id=' + existingRoot.id + ', tcaId=' + existingRoot.tcaId + '), updating...')
+          await tcaMemberModel.update({
+            where: { id: existingRoot.id },
+            data: {
+              personalScore: pScore,
+              totalScore: tScore,
+              level: levelVal,
+              lastSyncedAt: new Date()
+            }
+          })
+          console.log(`[TCA Sync] ✅ Root #${ROOT_USER_ID} updated: CN=${pScore}, ĐỘI=${tScore}, Cấp=${levelVal}`)
+        } else {
+          console.log(`[TCA Sync] ⚠️ Root with userId=${ROOT_USER_ID} or tcaId=${ROOT_TCA_ID} not found, skipping`)
+        }
+      } else {
+        console.log('[TCA Sync] ⚠️ No overviewData or wrong type, root NOT updated')
+      }
+
+const duration = Date.now() - startTime
       
       // Ghi log tổng hợp - CHỈ 1 BẢN GHI cho 1 lần sync
       await logSyncSummary(syncId, {

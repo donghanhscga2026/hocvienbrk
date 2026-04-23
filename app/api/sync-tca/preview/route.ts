@@ -111,13 +111,6 @@ export async function POST(request: Request) {
         type: string           // Type
         
         // Column 4: Match type from DB
-        // N: Chua ton tai (moi hoan toan) - chi hien khi khong co gi
-        // PE: Trung ca P+E trong User
-        // Pe: Trung P, khac E trong User
-        // pE: Khac P, trung E trong User
-        // S: Da co trong System
-        // TCA: Da co trong TCAMember
-        // Co the la chuoi hop nhu "PE S", "Pe TCA", "pE S", chi khong co N thi se co it nhat 1 trong cac loai tren
         match: string
         
         // Column 5: Existing DB data
@@ -140,17 +133,30 @@ export async function POST(request: Request) {
         parentTcaId: number | null
         parentUserId: number | null
         
-        // Column 11-12: Referrer info (UserID of parent F1)
+        // Column 11-12: Referrer info
         referrerId: number | null
-        refSysId: number | null   // = ParentUserId (UserID, not System.autoId)
+        refSysId: number | null
         
-        // Column 13-14: Action - chuỗi ký tự cần tạo/cập nhật
-        // PE S TCA = tạo User + closure, System + system closure, TCA Member
-        // E S TCA = cập nhật Email, tạo System + TCA
-        // P S TCA = cập nhật Phone, tạo System + TCA
-        // TCA = tạo TCA Member, v.v.
+        // Column 13-14: Action
         action: string
         changes: string[]
+        
+        // Điểm số TCA (từ Portal)
+        tcaScores: {
+          personalScore: number | null
+          totalScore: number | null
+          level: number | null
+        } | null
+        
+        // Điểm số hiện tại trong DB
+        dbScores: {
+          personalScore: number | null
+          totalScore: number | null
+          level: number | null
+        } | null
+        
+        // Cờ: có thay đổi điểm số cần update không
+        hasScoreChange: boolean
       }[]
     }
 
@@ -296,6 +302,26 @@ export async function POST(request: Request) {
         })
       }
 
+      // So sánh điểm số TCA với DB
+      const parseScore = (raw?: string): number => {
+        if (!raw || raw === '-') return 0
+        return parseFloat(raw.replace(',', '.')) || 0
+      }
+      const tcaPersonalScore = parseScore(node.personalScore)
+      const tcaTotalScore = parseScore(node.totalScore)
+      const tcaLevel = node.level ? parseInt(node.level) : null
+      
+      const dbPersonalScore = existingTCAMember?.personalScore ? Number(existingTCAMember.personalScore) : null
+      const dbTotalScore = existingTCAMember?.totalScore ? Number(existingTCAMember.totalScore) : null
+      const dbLevel = existingTCAMember?.level || null
+      
+      // Kiểm tra có thay đổi điểm số không
+      const hasScoreChange = existingTCAMember && (
+        tcaPersonalScore !== dbPersonalScore ||
+        tcaTotalScore !== dbTotalScore ||
+        tcaLevel !== dbLevel
+      )
+
       // Xác định action dựa trên matchType theo quy tắc mới
       // Match chỉ ra thiếu gì, Action chỉ ra cần tạo/cập nhật đó
       let action = ''
@@ -360,28 +386,69 @@ export async function POST(request: Request) {
           changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
         }
       } else if (matchType === 'PE S TCA' || matchType === 'S TCA PE' || matchType === 'PE TCA S') {
-        // PE S TCA: Đầy đủ User+System+TCA - chỉ cập nhật điểm/level trong TCAMember
-        action = 'TCA'
-        changes.push('Cập nhật điểm số và level TCAMember')
+        // PE S TCA: Đầy đủ User+System+TCA
+        // Chỉ cập nhật TCA nếu có thay đổi điểm số
+        if (hasScoreChange) {
+          action = 'TCA'
+          if (dbPersonalScore !== tcaPersonalScore) {
+            changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+          }
+          if (dbTotalScore !== tcaTotalScore) {
+            changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+          }
+          if (dbLevel !== tcaLevel) {
+            changes.push(`Cấp: ${dbLevel || '-'} -> ${tcaLevel}`)
+          }
+        } else {
+          action = 'SKIP'
+          changes.push('Không có thay đổi')
+        }
       } else if (matchType === 'Pe S TCA' || matchType === 'Pe TCA S' || matchType === 'S TCA Pe') {
         // Pe S TCA: Đủ hết, nhưng email khác → cập nhật email + cập nhật TCAMember điểm
-        action = 'E TCA'
+        action = hasScoreChange ? 'E TCA' : 'E'
         if (email && existingUser?.email && existingUser.email !== email) {
           changes.push(`Email: "${existingUser.email}" -> "${email}"`)
         }
-        changes.push('Cập nhật điểm số và level TCAMember')
+        if (hasScoreChange) {
+          if (dbPersonalScore !== tcaPersonalScore) {
+            changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+          }
+          if (dbTotalScore !== tcaTotalScore) {
+            changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+          }
+        }
       } else if (matchType === 'pE S TCA' || matchType === 'pE TCA S' || matchType === 'S TCA pE') {
         // pE S TCA: Đủ hết, nhưng phone khác → cập nhật phone + cập nhật TCAMember điểm
-        action = 'P TCA'
+        action = hasScoreChange ? 'P TCA' : 'P'
         if (phone && existingUser?.phone && existingUser.phone !== phone) {
           changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
         }
-        changes.push('Cập nhật điểm số và level TCAMember')
+        if (hasScoreChange) {
+          if (dbPersonalScore !== tcaPersonalScore) {
+            changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+          }
+          if (dbTotalScore !== tcaTotalScore) {
+            changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+          }
+        }
       } else if (matchType === 'S TCA') {
         // S TCA: Có System + TCA nhưng không tìm thấy User qua phone/email
-        // → Chỉ cập nhật điểm số TCAMember
-        action = 'TCA'
-        changes.push('Cập nhật điểm số và level TCAMember')
+        // → Chỉ cập nhật điểm số TCAMember nếu có thay đổi
+        if (hasScoreChange) {
+          action = 'TCA'
+          if (dbPersonalScore !== tcaPersonalScore) {
+            changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+          }
+          if (dbTotalScore !== tcaTotalScore) {
+            changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+          }
+          if (dbLevel !== tcaLevel) {
+            changes.push(`Cấp: ${dbLevel || '-'} -> ${tcaLevel}`)
+          }
+        } else {
+          action = 'SKIP'
+          changes.push('Không có thay đổi')
+        }
       } else {
         // Fallback - tạo mới tất cả (chỉ khi không khớp bất kỳ case nào)
         action = 'PE S TCA'
@@ -530,7 +597,24 @@ export async function POST(request: Request) {
         
         // Column 13-14: Action
         action,
-        changes
+        changes,
+        
+        // Điểm số TCA (từ Portal)
+        tcaScores: {
+          personalScore: tcaPersonalScore,
+          totalScore: tcaTotalScore,
+          level: tcaLevel
+        },
+        
+        // Điểm số hiện tại trong DB
+        dbScores: {
+          personalScore: dbPersonalScore,
+          totalScore: dbTotalScore,
+          level: dbLevel
+        },
+        
+        // Cờ: có thay đổi điểm số cần update không
+        hasScoreChange: !!hasScoreChange
       })
     }
 

@@ -152,6 +152,7 @@ export default function EditSiteProfilePage({ params }: PageProps) {
       setMessage({ type: 'error', text: result.error })
     } else {
       setMessage({ type: 'success', text: 'Đã lưu thay đổi!' })
+      router.refresh() // Làm mới dữ liệu từ server
       setTimeout(() => setMessage(null), 3000)
     }
     setSaving(false)

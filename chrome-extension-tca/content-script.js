@@ -72,6 +72,7 @@
         name: n.name,
         parentFolderId: n.parentFolderId,
         // Điểm số và cấp bậc TCA (đã parse bởi injected-script.js)
+        isRootNode: n.isRootNode || false,
         personalScore: n.personalScore || '0',
         totalScore: n.totalScore || '0',
         level: n.level || '1',
@@ -274,14 +275,14 @@
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v7.2.0 [Mở rộng 10 cột: Điểm CN, Điểm Đội, Ngày Gia Nhập, Ngày Nộp HĐ, Ngày Thăng Hạng, BH, TD, % CN, % Đội, Cấp TV]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v7.6.0 [Root Sync: Auto]</span></h2>
           <div style="display:flex; gap:8px;">
-            <button id="btn-check-sample" style="background:#c2185b; border:none; color:white; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">🔍 KIỂM TRA BẢNG TEST (STAGING)</button>
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
             <button id="btn-json" style="background:#7b1fa2; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📄 JSON</button>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:15px;">
+          <button id="btn-final-sync-header" style="background:#ff9800; border:none; color:white; padding:8px 20px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:13px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">✅ XÁC NHẬN ĐỒNG BỘ</button>
           <div style="font-size:11px; color:#666; background:#fff; padding:4px 8px; border-radius:4px; border:1px solid #ddd;">
             <span style="color:#2e7d32; font-weight:bold;">Tạo: ${viewStats.createAll + viewStats.createSystem}</span> | 
             <span style="color:#f57c00; font-weight:bold;">Sửa: ${viewStats.update}</span> | 
@@ -347,7 +348,7 @@
     document.getElementById('btn-close').addEventListener('click', () => panel.remove());
     document.getElementById('btn-csv').addEventListener('click', () => window.downloadTCACSV());
     document.getElementById('btn-json').addEventListener('click', () => window.downloadTCAJSON());
-    document.getElementById('btn-check-sample').addEventListener('click', () => prepareAndShowDemo());
+    document.getElementById('btn-final-sync-header').addEventListener('click', () => executeSyncFromHeader());
     
     const checkAll = document.getElementById('check-all-nodes');
     checkAll.addEventListener('change', (e) => {
@@ -396,6 +397,26 @@
 
       // Lấy 12 trường bổ sung
       const extra = getNodeExtra(tcaId);
+      
+      // So sánh điểm số TCA với DB để tô màu
+      const tcaScores = row.tcaScores || {};
+      const dbScores = row.dbScores || {};
+      const hasScoreChange = row.hasScoreChange || false;
+      const needSync = action && action !== 'SKIP' && action !== '-';
+      
+      // Màu điểm số: đỏ nếu khác nhau, xanh nếu giống hoặc chưa có DB
+      const pScoreChanged = hasScoreChange && (tcaScores.personalScore !== dbScores.personalScore);
+      const tScoreChanged = hasScoreChange && (tcaScores.totalScore !== dbScores.totalScore);
+      const personalScoreColor = pScoreChanged ? '#d32f2f' : (dbScores.personalScore ? '#2e7d32' : '#999');
+      const totalScoreColor = tScoreChanged ? '#d32f2f' : (dbScores.totalScore ? '#1565c0' : '#999');
+      
+      // Hiển thị: "TCA -> DB" nếu khác nhau
+      const displayPersonalScore = dbScores.personalScore != null 
+        ? `${tcaScores.personalScore || 0} → ${dbScores.personalScore}`
+        : (tcaScores.personalScore || '-');
+      const displayTotalScore = dbScores.totalScore != null 
+        ? `${tcaScores.totalScore || 0} → ${dbScores.totalScore}`
+        : (tcaScores.totalScore || '-');
 
       // --- DÙNG TRỰC TIẾP previewRows (không transform) ---
       // Chỉ render row ra bảng, KHÔNG tạo mảng riêng
@@ -433,10 +454,14 @@
       if (action === 'CREATE_ALL') { actionLabel = 'Tạo All'; actionBg = '#2e7d32'; }
       else if (action === 'CREATE_SYSTEM') { actionLabel = 'Tạo Sys'; actionBg = '#1565c0'; }
       else if (action === 'UPDATE') { actionLabel = 'Cập nhật'; actionBg = '#f57c00'; }
+      else if (action === 'SKIP') { actionLabel = 'Bỏ qua'; actionBg = '#999'; }
+
+      // Checkbox: chỉ check nếu cần sync
+      const checkboxChecked = needSync ? 'checked' : '';
 
       tr.innerHTML = `
         <td style="padding:6px 2px; text-align:center;">
-          <input type="checkbox" class="node-checkbox" data-tca-id="${tcaId}" checked>
+          <input type="checkbox" class="node-checkbox" data-tca-id="${tcaId}" ${checkboxChecked}>
         </td>
         <td style="padding:6px 2px; text-align:center; color:#999; font-size:10px;">${idx + 1}</td>
         <td style="padding:6px 2px; text-align:center; font-family:monospace; font-weight:bold;">${tcaId}</td>
@@ -450,8 +475,8 @@
         <td style="padding:6px 4px; color:#666; font-size:10px; min-width:180px;" title="${email}">${email}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
         <!-- 10 cột mới bổ sung (không có Địa Chỉ, không trùng Cấp) -->
-        <td style="padding:6px 2px; text-align:center; color:#2e7d32; font-weight:bold;">${extra.personalScore}</td>
-        <td style="padding:6px 2px; text-align:center; color:#1565c0; font-weight:bold;">${extra.totalScore}</td>
+        <td style="padding:6px 2px; text-align:center; color:${personalScoreColor}; font-weight:bold;" ${pScoreChanged ? 'title="Điểm thay đổi"' : ''}>${displayPersonalScore}</td>
+        <td style="padding:6px 2px; text-align:center; color:${totalScoreColor}; font-weight:bold;" ${tScoreChanged ? 'title="Điểm thay đổi"' : ''}>${displayTotalScore}</td>
         <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.joinDate}</td>
         <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.contractDate}</td>
         <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.promotionDate}</td>
@@ -661,6 +686,50 @@
     });
   }
 
+  async function executeSyncFromHeader() {
+    // Lấy các checkbox được chọn
+    const selectedCheckboxes = document.querySelectorAll('.node-checkbox:checked');
+    const selectedIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.dataset.tcaId));
+    
+    // Lấy thông tin root từ overviewData (đã parse đúng format decimal từ injected-script)
+    const overview = window.tcaOverviewData;
+    const rootPersonal = overview ? Number(overview.personal_points).toFixed(3) : '0';
+    const rootTeam = overview ? Number(overview.team_points).toFixed(3) : '0';
+    const rootLevel = overview?.level || '?';
+    const hasRootData = overview && (overview.personal_points > 0 || overview.team_points > 0);
+    
+    if (selectedIds.length === 0 && !hasRootData) {
+      alert('Không có thành viên nào được chọn và root không có dữ liệu!');
+      return;
+    }
+    
+    // Lọc previewRows chỉ lấy các member được chọn (nếu có)
+    let syncRows = previewRows;
+    if (selectedIds.length > 0) {
+      syncRows = previewRows.filter(r => selectedIds.includes(Number(r.id)));
+    } else {
+      syncRows = [];
+    }
+    
+    // Thông báo chi tiết
+    const msg = `XÁC NHẬN ĐỒNG BỘ\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📊 ROOT #861:\n` +
+      `   • Điểm CN: ${rootPersonal}\n` +
+      `   • Điểm Đội: ${rootTeam}\n` +
+      `   • Cấp: ${rootLevel}\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 Members được chọn: ${selectedIds.length}\n` +
+      `   (Dòng sẽ sync: ${syncRows.length})`;
+    
+    if (!confirm(msg)) {
+      return;
+    }
+    
+    addTcaLog(`🚀 Bắt đầu đồng bộ - Root CN:${rootPersonal} Đội:${rootTeam}...`);
+    executeFinalSync(syncRows, memberInfoCache);
+  }
+
   async function executeFinalSync(sourceRows, memberInfo) {
     // Transform same as Table Display before sending to API
     const syncRows = (sourceRows || []).map(row => {
@@ -739,6 +808,7 @@
           // Gửi allNodes để server đọc điểm số khi upsert TCAMember
           allNodes: allNodesGlobal.map(n => ({
             id: n.id,
+            isRootNode: n.isRootNode || false,
             personalScore: n.personalScore || '0',
             totalScore: n.totalScore || '0',
             level: n.level || '1',
@@ -747,7 +817,9 @@
             hasTD: n.hasTD || false,
             personalRate: n.personalRate || '-',
             teamRate: n.teamRate || '-'
-          }))
+          })),
+          // Overview data - điểm tổng hệ thống từ dòng "Tổ chức phân nhánh"
+          overviewData: window.tcaOverviewData || null
         })
       });
 
@@ -1051,6 +1123,46 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     if (allNodes.length > 0) {
       showDataPanel(allNodes, data.stats || { total: allNodes.length, folders: 0, items: allNodes.length }, memberInfoCache);
     }
+
+    // Gọi extractOverviewData để lấy điểm tổng hệ thống
+    // Thử đọc từ localStorage trước, nếu không có thì gọi function
+    const tryExtractOverview = () => {
+      // THỬ ĐỌC từ localStorage trước
+      let overview = null;
+      try {
+        const stored = localStorage.getItem('tcaOverviewData');
+        if (stored) {
+          overview = JSON.parse(stored);
+          console.log('[TCA Sync] 📊 Đọc overview từ localStorage:', overview);
+        }
+      } catch (e) {}
+      
+      // Nếu không có trong localStorage, thử gọi function
+      if (!overview && typeof window.extractTcaOverview === 'function') {
+        overview = window.extractTcaOverview();
+      }
+      
+      if (overview) {
+        window.tcaOverviewData = overview;
+        
+        // Chỉ lấy phần quan trọng từ raw_text - tìm dòng "Tổ chức phân nhánh"
+        const rootLine = (overview.raw_text || '').split('\n').find(l => l.includes('Tổ chức phân nhánh')) || overview.raw_text || '';
+        
+        const cn = Number(overview.personal_points).toFixed(3);
+        const dd = Number(overview.team_points).toFixed(3);
+        
+        addTcaLog(`📊 ROOT: ${rootLine.substring(0, 60)}...`);
+        addTcaLog(`   ▸ CN: ${cn} | ĐỘI: ${dd} | Cấp: ${overview.level}`);
+        
+        window.tcaRootFormatted = { cn, dd, level: overview.level };
+      } else {
+        addTcaLog('⚠️ Chưa có overview data - thử lại sau...');
+        setTimeout(tryExtractOverview, 2000);
+      }
+    };
+    
+    // Bắt đầu thử sau 2s
+    setTimeout(tryExtractOverview, 2000);
 
     console.log('==========================================');
     console.log('[TCA Sync] ✅ DATA EXTRACTED SUCCESS!');
