@@ -402,21 +402,16 @@
       const tcaScores = row.tcaScores || {};
       const dbScores = row.dbScores || {};
       const hasScoreChange = row.hasScoreChange || false;
-      const needSync = action && action !== 'SKIP' && action !== '-';
       
-      // Màu điểm số: đỏ nếu khác nhau, xanh nếu giống hoặc chưa có DB
+      // Màu điểm số: đỏ nếu khác nhau (thay đổi), xanh nếu trùng (không thay đổi)
       const pScoreChanged = hasScoreChange && (tcaScores.personalScore !== dbScores.personalScore);
       const tScoreChanged = hasScoreChange && (tcaScores.totalScore !== dbScores.totalScore);
-      const personalScoreColor = pScoreChanged ? '#d32f2f' : (dbScores.personalScore ? '#2e7d32' : '#999');
-      const totalScoreColor = tScoreChanged ? '#d32f2f' : (dbScores.totalScore ? '#1565c0' : '#999');
+      const personalScoreColor = pScoreChanged ? '#d32f2f' : '#2e7d32';  // Đỏ: khác, Xanh: trùng
+      const totalScoreColor = tScoreChanged ? '#d32f2f' : '#1565c0';      // Đỏ: khác, Xanh: trùng
       
-      // Hiển thị: "TCA -> DB" nếu khác nhau
-      const displayPersonalScore = dbScores.personalScore != null 
-        ? `${tcaScores.personalScore || 0} → ${dbScores.personalScore}`
-        : (tcaScores.personalScore || '-');
-      const displayTotalScore = dbScores.totalScore != null 
-        ? `${tcaScores.totalScore || 0} → ${dbScores.totalScore}`
-        : (tcaScores.totalScore || '-');
+      // Hiển thị: chỉ hiện điểm mới nhất (TCA)
+      const displayPersonalScore = tcaScores.personalScore || '-';
+      const displayTotalScore = tcaScores.totalScore || '-';
 
       // --- DÙNG TRỰC TIẾP previewRows (không transform) ---
       // Chỉ render row ra bảng, KHÔNG tạo mảng riêng
@@ -456,7 +451,8 @@
       else if (action === 'UPDATE') { actionLabel = 'Cập nhật'; actionBg = '#f57c00'; }
       else if (action === 'SKIP') { actionLabel = 'Bỏ qua'; actionBg = '#999'; }
 
-      // Checkbox: chỉ check nếu cần sync
+      // Checkbox: chỉ check nếu cần sync (action != SKIP)
+      const needSync = action && action !== 'SKIP' && action !== '-';
       const checkboxChecked = needSync ? 'checked' : '';
 
       tr.innerHTML = `
