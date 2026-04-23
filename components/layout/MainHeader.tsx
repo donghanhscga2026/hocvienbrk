@@ -55,19 +55,33 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
         }
     }, [showHelp, toolSlug, helpData])
 
-    const handleBackClick = () => {
-        if (isHomePage || isToolsRoot) {
-            router.push('/')
+    // Tính path quay lại dựa trên pathname hiện tại
+    const getBackPath = () => {
+        const paths = pathname.split('/').filter(Boolean) // ['tools', 'affiliate', '3', 'edit']
+        if (paths.length === 0 || (paths.length === 1 && paths[0] === 'tools')) {
+            return '/' // /tools → về /
+        } else if (paths.length === 1) {
+            return '/tools' // /xxx (không phải tools) → về /tools
+        } else if (paths.length === 2) {
+            return '/tools' // /tools/xxx → về /tools
         } else {
-            router.push('/tools')
+            // /tools/xxx/yyy hoặc sâu hơn → về /tools/xxx
+            return '/tools/' + paths[1]
         }
     }
+
+    const handleBackClick = () => {
+        router.push(getBackPath())
+    }
+
+    // Hiện nút quay lại khi KHÔNG phải trang chủ hoặc /tools
+    const showBackButton = !isHomePage && !isToolsRoot
 
     return (
         <>
             <header className="sticky top-0 z-50 w-full bg-brk-surface text-brk-on-surface shadow-xl">
                 <div className="flex items-center justify-between h-14 px-2 sm:px-4">
-                    {/* LEFT: Logo BRK + Home icon */}
+                    {/* LEFT: Logo BRK + Home icon + Back icon */}
                     <div className="flex items-center gap-2 shrink-0">
                         {/* Logo BRK - Luôn về / */}
                         <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
@@ -98,6 +112,17 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                                 style={{ width: 'auto', height: '36px' }}
                             />
                         </button>
+                        
+                        {/* Back Button - Quay lại trang phía trước (thứ 3) */}
+                        {showBackButton && (
+                            <button
+                                onClick={handleBackClick}
+                                className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
+                                title={`Quay về ${getBackPath()}`}
+                            >
+                                <ArrowLeft className="w-5 h-5 text-brk-accent" />
+                            </button>
+                        )}
                     </div>
 
                     {/* CENTER: Page Title */}
