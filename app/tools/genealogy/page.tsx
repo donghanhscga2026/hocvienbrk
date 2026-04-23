@@ -314,7 +314,7 @@ function GenealogyFlow() {
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
   const activeFocusMapRef = useRef<Map<number, number>>(new Map())
-  const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
+  const [selectedSystem, setSelectedSystem] = useState<number | null>(null) // Mặc định: TCA (system 1)
   const [availableSystems, setAvailableSystems] = useState<SystemTreeInfo[]>([])
   const [isTreeEmpty, setIsTreeEmpty] = useState<boolean>(false)
   const [isAdmin, setIsAdmin] = useState<boolean>(false)

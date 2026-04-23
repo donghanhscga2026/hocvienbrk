@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "7.6.0",
-  "description": "Sync TCA to BRK v7.6.0 - Intelligent sync: only update changed records",
+  "version": "7.6.1",
+  "description": "Sync TCA to BRK v7.6.1 - Hiển thị điểm mới, màu đỏ nếu khác DB, xanh nếu trùng",
   "permissions": [
     "activeTab",
     "scripting",
