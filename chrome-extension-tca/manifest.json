@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "7.3.0",
-  "description": "Sync TCA to BRK v7.3.0 - Auto-detect localhost/production, fix score update",
+  "version": "7.6.0",
+  "description": "Sync TCA to BRK v7.6.0 - Intelligent sync: only update changed records",
   "permissions": [
     "activeTab",
     "scripting",
