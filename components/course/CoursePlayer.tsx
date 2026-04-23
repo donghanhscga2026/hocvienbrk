@@ -20,6 +20,15 @@ import {
     updateLastLessonAction
 } from "@/app/actions/course-actions"
 
+// Chuyển URL thành link clickable
+const makeLinksClickable = (text: string): string => {
+    if (!text) return ''
+    const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
+    return text.replace(urlRegex, (match) => {
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="text-orange-400 hover:underline font-bold">${match}</a>`
+    })
+}
+
 interface CoursePlayerProps {
     course: any
     enrollment: any
@@ -289,7 +298,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             <div className="shrink-0">
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
                                 {currentLesson?.content && !currentLesson.content.includes('docs.google.com') && (
-                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all">{currentLesson.content}</div>
+                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
                                 )}
                             </div>
                             <div className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden">
@@ -402,9 +411,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             <h2 className="text-white font-bold text-sm truncate pr-4">{currentLesson?.title}</h2>
                             <button onClick={() => setShowContentModal(false)}><X className="w-5 h-5 text-zinc-400" /></button>
                         </div>
-                        <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
-                            {currentLesson?.content}
-                        </div>
+                        <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson?.content || '') }} />
                     </div>
                 </div>
             )}

@@ -8,6 +8,16 @@ import { enrollInCourseAction } from '@/app/actions/course-actions'
 import ShareModal from '@/components/share/ShareModal'
 import { Share2 } from 'lucide-react'
 
+// Chuyển URL thành link clickable (cho phần mô tả khóa học)
+const makeLinksClickable = (html: string): string => {
+    if (!html) return ''
+    // Regex match URL: http/https, bao gồm cả zalo.me, facebook.com, etc.
+    const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
+    return html.replace(urlRegex, (match) => {
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="text-brk-accent hover:underline font-bold">${match}</a>`
+    })
+}
+
 interface CourseCardProps {
     course: any
     isLoggedIn: boolean
@@ -164,10 +174,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                         )}
                     </div>
 
-                    {/* Mô tả */}
+                    {/* Mô tả - URL trong text sẽ được chuyển thành link clickable */}
                     <div
-                        className="mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words text-brk-on-surface"
-                        dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || '' }}
+                        className="mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words text-brk-on-surface [&_a]:text-brk-accent [&_a]:hover:underline [&_a]:font-bold"
+                        dangerouslySetInnerHTML={{ __html: makeLinksClickable(course.mo_ta_ngan || '') }}
                     />
 
                     {/* Button */}
