@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, RefreshCw, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 import { getEmailConfig } from "@/lib/email-config"
 
@@ -102,7 +102,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader title="CẤU HÌNH EMAIL" backUrl="/admin" />
+      <MainHeader title="CẤU HÌNH EMAIL" toolSlug="email-settings" />
 
       {/* Sub Navigation */}
       <div className="flex gap-1 px-4 py-2 bg-white border-b overflow-x-auto">

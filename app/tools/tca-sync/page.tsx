@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import ToolHeader from '@/components/tools/ToolHeader'
+import MainHeader from '@/components/layout/MainHeader'
 
 interface TestData {
   users: number
@@ -286,7 +286,7 @@ export default function TCASyncAdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <ToolHeader title="TCA Sync" backUrl="/tools" toolSlug="tca-sync" />
+      <MainHeader title="TCA Sync" toolSlug="tca-sync" />
       <div className="max-w-7xl mx-auto px-4">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">TCA Sync Tools</h1>

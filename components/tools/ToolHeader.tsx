@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, HelpCircle, X } from 'lucide-react'
+import { HelpCircle, X } from 'lucide-react'
 import { getToolHelpAction, ToolHelpData } from '@/app/actions/help-actions'
 
 interface ToolHeaderProps {
@@ -48,7 +49,14 @@ export default function ToolHeader({ title, backUrl, toolSlug }: ToolHeaderProps
               href={effectiveBackUrl} 
               className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <Image
+                src="/icon Back.png"
+                alt="Quay lại"
+                width={36}
+                height={36}
+                className="object-contain"
+                style={{ width: 'auto', height: '28px' }}
+              />
               <span className="text-xs font-medium uppercase hidden sm:inline">{isHome ? 'TRANG CHỦ' : 'QUAY LẠI'}</span>
             </Link>
           </div>
