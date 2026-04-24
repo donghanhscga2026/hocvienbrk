@@ -235,7 +235,8 @@ async function buildStandardTree(
             const grandchildren = child.autoId && child.autoId !== ancestorAutoId 
                 ? buildFullSubtree(child.autoId, maxDepth - 1) 
                 : []
-            const tcaData = tcaMemberMap.get(child.userId)
+            // Ưu tiên lookup theo userId, fallback theo tcaId (cho TCA members không link user)
+            const tcaData = tcaMemberMap.get(child.userId) ?? tcaMemberMap.get(child.autoId)
             return {
                 id: child.userId,
                 name: child.name,
@@ -262,7 +263,7 @@ async function buildStandardTree(
         const f2Subtrees = f2s.map(f2 => {
             // Build đệ quy subtree cho mỗi F2
             const grandchildren = buildFullSubtree(f2.autoId, 5)
-            const f2tca = tcaMemberMap.get(f2.userId)
+            const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
             return {
                 id: f2.userId,
                 name: f2.name,
@@ -302,7 +303,7 @@ async function buildStandardTree(
             }
         }
 
-        const f1tca = tcaMemberMap.get(f1Info.id)
+        const f1tca = tcaMemberMap.get(f1Info.id) ?? tcaMemberMap.get(f1Record?.autoId)
         return {
             id: f1Info.id, name: f1Info.name, referrerId: null,
             totalSubCount: f1Closures.length, 

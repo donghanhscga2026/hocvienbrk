@@ -1,12 +1,14 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "7.6.1",
-  "description": "Sync TCA to BRK v7.6.1 - Hiển thị điểm mới, màu đỏ nếu khác DB, xanh nếu trùng",
+  "version": "8.1.0",
+  "description": "Sync TCA to BRK v8.1.0 - Fix: disable XHR capture và overview extraction khi chưa bật",
   "permissions": [
     "activeTab",
     "scripting",
-    "notifications"
+    "notifications",
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "*://portal.tca.com.vn/*",
@@ -15,7 +17,8 @@
     "http://127.0.0.1:3000/*"
   ],
   "action": {
-    "default_title": "TCA Sync"
+    "default_title": "TCA Auto-Sync",
+    "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "background.js",
