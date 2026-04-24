@@ -325,6 +325,89 @@ const duration = Date.now() - startTime
       }, { headers: CORS_HEADERS })
     }
 
+    // Xử lý allNodes trực tiếp (từ Extension auto-sync)
+    if (body.allNodes && Array.isArray(body.allNodes) && !body.previewRows) {
+      console.log('[TCA Sync] Processing allNodes directly:', body.allNodes.length)
+      stats.totalRecords = body.allNodes.length
+
+      for (const node of body.allNodes) {
+        try {
+          const tcaId = Number(node.id)
+          if (!tcaId) {
+            stats.skipped++
+            continue
+          }
+
+          // Tìm userId từ user table (user.id = tcaId theo import script)
+          const user = await prisma.user.findUnique({ where: { id: tcaId } })
+          const linkedUserId = user?.id || 0
+
+          // Parse scores
+          const parseScore = (raw?: string): number => {
+            if (!raw || raw === '-' || raw === '0') return 0
+            return parseFloat(raw.trim()) || 0
+          }
+
+          const pScore = parseScore(node.personalScore)
+          const tScore = parseScore(node.totalScore)
+          const levelVal = node.level ? parseInt(node.level) : null
+
+          // Get member info if available
+          const info = body.memberInfo?.[tcaId] || {}
+
+          const memberData = {
+            tcaId,
+            userId: linkedUserId,
+            name: node.name || '',
+            type: node.type || 'item',
+            parentTcaId: node.parentFolderId ? Number(node.parentFolderId) : null,
+            phone: normalizePhone(info.phone || null) || null,
+            email: info.email || null,
+            personalScore: pScore,
+            totalScore: tScore,
+            level: levelVal,
+            lastSyncedAt: new Date()
+          }
+
+          await tcaMemberModel.upsert({
+            where: { tcaId },
+            update: memberData,
+            create: memberData
+          })
+
+          const existingTCA = await tcaMemberModel.findUnique({ where: { tcaId } })
+          if (existingTCA) {
+            stats.tcaMembersUpdated++
+          } else {
+            stats.tcaMembersCreated++
+          }
+          processedTcaIds.push(tcaId)
+
+        } catch (error) {
+          console.error('[TCA Sync] Error processing node:', error)
+          stats.failed++
+        }
+      }
+
+      await logSyncSummary(syncId, {
+        usersCreated: stats.usersCreated,
+        usersUpdated: stats.usersUpdated,
+        systemsCreated: stats.systemsCreated,
+        systemsUpdated: stats.systemsUpdated,
+        tcaMembersCreated: stats.tcaMembersCreated,
+        tcaMembersUpdated: stats.tcaMembersUpdated,
+        totalProcessed: stats.totalRecords - stats.skipped,
+        tcaIds: processedTcaIds
+      })
+
+      return NextResponse.json({
+        success: true,
+        syncId,
+        stats,
+        message: `Synced ${stats.totalRecords} nodes directly`
+      }, { headers: CORS_HEADERS })
+    }
+
     return NextResponse.json({ error: 'Invalid payload - need previewRows or allNodes' }, { status: 400, headers: CORS_HEADERS })
 
   } catch (error) {

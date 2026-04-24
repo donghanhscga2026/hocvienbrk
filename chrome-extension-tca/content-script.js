@@ -1178,6 +1178,14 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     if (event.data.type === MEMBER_INFO_TYPE) {
       handleMemberInfo(event.data);
     }
+    
+    // Handle TCA_CONTROL messages from autoSyncTrigger
+    if (event.data.type === 'TCA_CONTROL') {
+      console.log('[TCA Sync] Received TCA_CONTROL command:', event.data.command);
+      if (event.data.command === 'startScan' && typeof window.extractTcaOverview === 'function') {
+        window.extractTcaOverview();
+      }
+    }
   }
 
   function init() {
@@ -1191,8 +1199,224 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     
     injectScript();
     window.addEventListener('message', handleMessage);
+    
+    // Listen for messages from background script (Chrome messaging)
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      console.log('[TCA Sync] Received message from background:', message.action);
+      
+      if (message.action === 'AUTO_SYNC_TRIGGER') {
+        console.log('[TCA Sync] AUTO_SYNC_TRIGGER received');
+        autoSyncTrigger(message.credentials, sendResponse);
+        return true; // Keep channel open for async response
+      }
+      
+      return false;
+    });
+    
     console.log('[TCA Sync] Content script initialized - RESET all state');
     console.log('[TCA Sync] Auto-scan enabled - will capture full tree');
+  }
+
+  // ==========================================
+  // AUTO SYNC TRIGGER (for background sync)
+  // ==========================================
+  
+async function autoSyncTrigger(credentials, sendResponse) {
+    console.log('[TCA Sync] === AUTO_SYNC_TRIGGER START ===');
+    console.log('[TCA Sync] Received credentials:', !!credentials);
+    
+    try {
+      console.log('[TCA Sync] Starting auto-sync trigger...');
+      
+      // Step 1: Wait for page to be ready
+      console.log('[TCA Sync] Waiting for page to be ready...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      console.log('[TCA Sync] Page ready, checking login state...');
+      console.log('[TCA Sync] Current URL:', window.location.href);
+      console.log('[TCA Sync] Current path:', window.location.pathname);
+      
+      // Step 2: Check if already logged in
+      const loginButton = document.querySelector('.btn-red, button.btn-red, [class*="btn-red"], a[href*="login"], button[class*="red"]');
+      console.log('[TCA Sync] Login button check - found:', !!loginButton);
+      const isLoggedIn = !loginButton && window.location.pathname.includes('group_management');
+      console.log('[TCA Sync] isLoggedIn:', isLoggedIn);
+      
+      if (loginButton) {
+        console.log('[TCA Sync] Login button found, clicking...');
+        loginButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        try { 
+          loginButton.click(); 
+          console.log('[TCA Sync] Button clicked successfully');
+        } catch(e) { 
+          console.log('[TCA Sync] Click error:', e);
+          try {
+            loginButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          } catch(e2) {}
+        }
+        
+        console.log('[TCA Sync] Waiting for login redirect...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      } else {
+        console.log('[TCA Sync] No login button found');
+      }
+      
+      // Step 3: Navigate to group page if needed
+      if (!window.location.pathname.includes('group_management')) {
+        console.log('[TCA Sync] Not on group page, navigating...');
+        window.location.href = 'https://portal.tca.com.vn/group_management/group';
+        console.log('[TCA Sync] Navigating, waiting...');
+        await new Promise(resolve => setTimeout(resolve, 8000));
+      } else {
+        console.log('[TCA Sync] Already on group page');
+      }
+      
+      // Step 4: Wait for tree to load
+      console.log('[TCA Sync] Waiting for tree to load...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Step 4.5: Trigger manual scan if no data yet
+      const storedBefore = localStorage.getItem('tca_full_tree');
+      console.log('[TCA Sync] Data before trigger:', !!storedBefore);
+      
+      if (!storedBefore) {
+        console.log('[TCA Sync] No data yet, triggering manual scan...');
+        window.postMessage({ type: 'TCA_CONTROL', command: 'startScan' }, '*');
+      }
+      
+      // Step 5: Wait for full tree data to be captured
+      console.log('[TCA Sync] Waiting for scan to complete...');
+      let waitCount = 0;
+      const maxWait = 180;
+      
+      while (waitCount < maxWait) {
+        const stored = localStorage.getItem('tca_full_tree');
+        if (stored) {
+          try {
+            const data = JSON.parse(stored);
+            if (data.allNodes && data.allNodes.length > 0) {
+              console.log('[TCA Sync] Scan complete, found', data.allNodes.length, 'nodes');
+              break;
+            }
+          } catch(e) {}
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        waitCount++;
+        if (waitCount % 30 === 0) {
+          console.log('[TCA Sync] Still waiting...', waitCount, '/', maxWait);
+        }
+      }
+      
+      if (waitCount >= maxWait) {
+        console.log('[TCA Sync] Timeout waiting for scan data');
+      }
+      
+      // Step 6: Call sync API
+      console.log('[TCA Sync] Calling sync API...');
+      const syncResult = await callSyncAPI();
+      console.log('[TCA Sync] Sync API result:', syncResult.success);
+      
+      // Step 7: Send Telegram notification if there are changes
+      if (syncResult.stats && syncResult.stats.totalRecords > 0) {
+        console.log('[TCA Sync] Sending Telegram notification...');
+        await sendTelegramNotification(syncResult);
+      }
+      
+      // Respond to background
+      console.log('[TCA Sync] === AUTO_SYNC_TRIGGER COMPLETE ===');
+      sendResponse({
+        success: true,
+        stats: `Synced ${syncResult.stats?.totalRecords || 0} records`
+      });
+      
+    } catch (error) {
+      console.error('[TCA Sync] Auto-sync error:', error);
+      console.error('[TCA Sync] Error stack:', error.stack);
+      try {
+        sendResponse({
+          success: false,
+          error: error.message
+        });
+      } catch(e) {
+        console.error('[TCA Sync] Failed to send error response:', e);
+      }
+    }
+  }
+  
+  async function callSyncAPI() {
+    // Get data from localStorage
+    const stored = localStorage.getItem('tca_full_tree');
+    if (!stored) {
+      throw new Error('No data to sync');
+    }
+    
+    const data = JSON.parse(stored);
+    
+    // Call sync API
+    const response = await fetch('https://giautoandien.io.vn/api/sync-tca', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'TCA_EXT_FULL',
+        timestamp: Date.now(),
+        allNodes: data.allNodes,
+        memberInfo: data.memberInfo || {},
+        stats: data.stats || { total: data.allNodes?.length || 0 }
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Sync failed: ${response.status}`);
+    }
+    
+    return response.json();
+  }
+  
+  async function sendTelegramNotification(syncResult) {
+    // Format message for Telegram
+    const message = formatTelegramMessage(syncResult);
+    
+    // Call API endpoint to send notification
+    try {
+      await fetch('https://giautoandien.io.vn/api/notify/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      console.log('[TCA Sync] Telegram notification sent');
+    } catch (error) {
+      console.error('[TCA Sync] Telegram notification failed:', error);
+    }
+  }
+  
+  function formatTelegramMessage(syncResult) {
+    const time = new Date().toLocaleString('vi-VN');
+    let msg = `🔄 TCA Auto-Sync Complete\n\n`;
+    msg += `⏰ Thời gian: ${time}\n\n`;
+    
+    if (syncResult.stats) {
+      msg += `📊 THỐNG KÊ:\n`;
+      msg += `• Tổng records: ${syncResult.stats.totalRecords || 0}\n`;
+      msg += `• Tạo mới: ${syncResult.stats.created || 0}\n`;
+      msg += `• Cập nhật: ${syncResult.stats.updated || 0}\n`;
+      msg += `• Bỏ qua: ${syncResult.stats.skipped || 0}\n`;
+    }
+    
+    if (syncResult.changes && syncResult.changes.length > 0) {
+      msg += `\n📝 THAY ĐỔI:\n`;
+      syncResult.changes.slice(0, 10).forEach(change => {
+        msg += `• ${change.name}: ${change.change}\n`;
+      });
+      if (syncResult.changes.length > 10) {
+        msg += `• ... và ${syncResult.changes.length - 10} thay đổi khác\n`;
+      }
+    }
+    
+    msg += `\n⚡ Next sync: Tự động sau 12 tiếng`;
+    
+    return msg;
   }
 
   init();
