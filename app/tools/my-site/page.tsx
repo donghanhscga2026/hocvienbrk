@@ -46,7 +46,7 @@ export default function MySitePage() {
   if (!session?.user) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <MainHeader title="TRANG CỦA TÔI" />
+<MainHeader title="TRANG CỦA TÔI" />
         <div className="p-4 max-w-lg mx-auto">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
@@ -74,11 +74,11 @@ export default function MySitePage() {
     )
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <MainHeader title="TRANG CỦA TÔI" />
+return (
+      <div className="min-h-screen bg-gray-50">
+        <MainHeader title="TRANG CỦA TÔI" />
 
-      <div className="p-4 max-w-lg mx-auto">
+        <div className="p-4 max-w-lg mx-auto">
         <div className="bg-gradient-to-br from-brk-accent to-orange-600 rounded-3xl p-6 text-white mb-6">
           <h1 className="text-xl font-bold mb-1">Trang chủ cá nhân</h1>
           <p className="text-white/80 text-sm">

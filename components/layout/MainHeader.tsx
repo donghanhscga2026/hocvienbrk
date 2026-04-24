@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { HelpCircle, X, ArrowLeft } from 'lucide-react'
+import { HelpCircle, X } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { getToolHelpAction, ToolHelpData } from '@/app/actions/help-actions'
 import { useHomeSlug } from '@/hooks/useHomeSlug'
@@ -120,7 +120,14 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                                 className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
                                 title={`Quay về ${getBackPath()}`}
                             >
-                                <ArrowLeft className="w-5 h-5 text-brk-accent" />
+                                <Image
+                                    src="/Icon LeftBack.png"
+                                    alt="Quay lại"
+                                    width={36}
+                                    height={36}
+                                    className="object-contain"
+                                    style={{ width: 'auto', height: '28px' }}
+                                />
                             </button>
                         )}
                     </div>

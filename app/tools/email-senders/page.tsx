@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, CheckCircle, XCircle, RefreshCw, Loader2 } from "lucide-react";
-import ToolHeader from "@/components/tools/ToolHeader";
+import MainHeader from "@/components/layout/MainHeader";
 
 interface SenderValidation {
   id: number;
@@ -92,7 +92,7 @@ export default function EmailSendersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <ToolHeader title="TÀI KHOẢN EMAIL" backUrl="/admin" />
+      <MainHeader title="TÀI KHOẢN EMAIL" toolSlug="email-senders" />
 
       {/* Sub Navigation */}
       <div className="flex gap-1 px-4 py-2 bg-white border-b overflow-x-auto">
