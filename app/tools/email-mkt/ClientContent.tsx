@@ -78,7 +78,7 @@ function CampaignsList({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
             )}
           </div>
           <div className="flex gap-2 mt-3">
-            <Link href={`/admin/campaigns/${campaign.id}`}>
+            <Link href={`/tools/email-mkt/${campaign.id}`}>
               <Button className="bg-gray-100 text-gray-700 font-bold text-xs py-1.5 px-3 rounded-lg">
                 Xem chi tiết
               </Button>

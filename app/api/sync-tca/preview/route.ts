@@ -157,6 +157,10 @@ export async function POST(request: Request) {
         
         // Cờ: có thay đổi điểm số cần update không
         hasScoreChange: boolean
+        
+        // refSysId comparison (NEW)
+        dbRefSysId: number | null
+        hasRefSysIdChange: boolean
       }[]
     }
 
@@ -456,7 +460,7 @@ export async function POST(request: Request) {
         expectedSystemId = nextAvailableSystemId++
       }
 
-      // Resolve parent info
+// Resolve parent info
       const parentId = node.parentFolderId;
       const parentTcaId = (!parentId || parentId === 'root' || parentId === '0') ? null : Number(parentId);
       const TCA_ROOT_USER_ID = 861;
@@ -475,6 +479,8 @@ export async function POST(request: Request) {
           if (parentInfo) {
             parentUserId = parentInfo.db?.userId || parentInfo.userId;
             if (parentUserId) parentSource = 'BATCH';
+            // parentSystemId = parentInfo.db?.userId (User ID = System refSysId)
+            parentSystemId = parentUserId;
           }
         } else {
           // Parent không có trong batch - resolve từ DB
@@ -486,15 +492,8 @@ export async function POST(request: Request) {
             // Parent có TCAMember trong DB
             parentUserId = parentTCAMember.userId;
             parentSource = 'DB';
-            
-            if (parentUserId != null) {
-              const parentSystem = await prisma.system.findFirst({
-                where: { userId: parentUserId, onSystem: 1 }
-              });
-              if (parentSystem) {
-                parentSystemId = parentSystem.autoId;
-              }
-            }
+            // parentSystemId = parentTCAMember.userId (UserID = refSysId trong System)
+            parentSystemId = parentUserId;
           } else {
             // Parent là FOLDER - tìm memberInfo của folder parent
             const parentFolderInfo = memberInfo?.[parentTcaId];
@@ -511,13 +510,7 @@ export async function POST(request: Request) {
                   if (user.phone && normalizePhone(user.phone) === parentFolderPhone) {
                     parentUserId = user.id;
                     parentSource = 'FOLDER';
-                    
-                    const parentSystem = await prisma.system.findFirst({
-                      where: { userId: parentUserId, onSystem: 1 }
-                    });
-                    if (parentSystem) {
-                      parentSystemId = parentSystem.autoId;
-                    }
+                    parentSystemId = user.id; // UserID = refSysId
                     break;
                   }
                 }
@@ -531,28 +524,43 @@ export async function POST(request: Request) {
                 if (userByEmail) {
                   parentUserId = userByEmail.id;
                   parentSource = 'FOLDER';
-                  
-                  const parentSystem = await prisma.system.findFirst({
-                    where: { userId: parentUserId, onSystem: 1 }
-                  });
-                  if (parentSystem) {
-                    parentSystemId = parentSystem.autoId;
-                  }
+                  parentSystemId = userByEmail.id; // UserID = refSysId
                 }
               }
-            }
-            
-            // Debug
-            if (node.id === 61928) {
-              console.log(`[Preview] TCA 61928 parent: folderInfo=${JSON.stringify(memberInfo?.[parentTcaId])}, parentUserId=${parentUserId}`);
             }
           }
         }
       } else {
         // Root TCA - referrerId = 861, systemId = 13807
         parentUserId = TCA_ROOT_USER_ID;
-        parentSystemId = TCA_ROOT_SYSTEM_ID;
+        parentSystemId = TCA_ROOT_USER_ID; // refSysId = root user id
         parentSource = 'ROOT';
+      }
+
+      // ====== NEW: KIỂM TRA refSysId SO VỚI HIỆN TẠI TRONG DB ======
+      let hasRefSysIdChange = false;
+      let dbRefSysId: number | null = null;
+      
+      if (existingSystem && parentSystemId !== null) {
+        // Lấy refSysId hiện tại từ System
+        dbRefSysId = existingSystem.refSysId || null;
+        
+        // So sánh với parentSystemId (refSysId mong đợi từ TCA)
+        if (dbRefSysId !== parentSystemId) {
+          hasRefSysIdChange = true;
+          // Thêm vào changes
+          changes.push(`refSysId: ${dbRefSysId || 0} -> ${parentSystemId}`);
+        }
+      }
+      
+      // Nếu refSysId thay đổi và matchType có S (đã có System)
+      if (matchType && matchType.includes('S') && hasRefSysIdChange) {
+        // Thêm action để cập nhật System + closure
+        if (action === 'SKIP' || action === '') {
+          action = 'S';
+        } else if (!action.includes('S')) {
+          action = action + ' S';
+        }
       }
 
       // matchType đã được xác định ở trên (N/PE/Pe/pE/TCA/S)
@@ -579,6 +587,12 @@ export async function POST(request: Request) {
           phone: existingUser.phone,
           referrerId: existingUser.referrerId
         } : null,
+        
+        // Column 5b: DB refSysId để compare (trong System.refSysId)
+        dbRefSysId: dbRefSysId,
+        
+        // Column 5c: refSysId thay đổi
+        hasRefSysIdChange: hasRefSysIdChange,
         
         // Column 6: UserID
         userId: finalUserId,

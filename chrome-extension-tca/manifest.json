@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "8.1.0",
-  "description": "Sync TCA to BRK v8.1.0 - Fix: disable XHR capture và overview extraction khi chưa bật",
+  "version": "8.8.0",
+  "description": "Sync TCA to BRK v8.8.0 - Auto-scan on page load, preview+sync via buttons",
   "permissions": [
     "activeTab",
     "scripting",
@@ -18,7 +18,8 @@
   ],
   "action": {
     "default_title": "TCA Auto-Sync",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_width": 350
   },
   "background": {
     "service_worker": "background.js",

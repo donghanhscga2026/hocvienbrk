@@ -42,7 +42,7 @@ export async function addLibAccessEmail(courseId: number, email: string) {
         await prisma.courseLibAccess.create({
             data: { courseId, email: cleanEmail }
         })
-        revalidatePath(`/admin/courses/${courseId}/lib-access`)
+        revalidatePath(`/tools/courses/${courseId}/lib-access`)
         return { success: true }
     } catch (error: any) {
         if (error.code === 'P2002') {
@@ -64,7 +64,7 @@ export async function removeLibAccessEmail(courseId: number, email: string) {
                 }
             }
         })
-        revalidatePath(`/admin/courses/${courseId}/lib-access`)
+        revalidatePath(`/tools/courses/${courseId}/lib-access`)
         return { success: true }
     } catch (error) {
         return { success: false, message: "Lỗi xoá email" }
@@ -93,6 +93,6 @@ export async function importLibAccessCsvAction(courseId: number, emails: string[
         }
     }
     
-    revalidatePath(`/admin/courses/${courseId}/lib-access`)
+    revalidatePath(`/tools/courses/${courseId}/lib-access`)
     return { success: true, addedCount, skippedCount: skippedEmails.length, skippedEmails }
 }

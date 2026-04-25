@@ -3,11 +3,14 @@
 const ELEMENTS = {
   autoSyncEnabled: document.getElementById('autoSyncEnabled'),
   intervalHours: document.getElementById('intervalHours'),
+  intervalMinutes: document.getElementById('intervalMinutes'),
   tcaEmail: document.getElementById('tcaEmail'),
   tcaPassword: document.getElementById('tcaPassword'),
   saveCredentials: document.getElementById('saveCredentials'),
   syncNow: document.getElementById('syncNow'),
   syncBtnText: document.getElementById('syncBtnText'),
+  syncPreview: document.getElementById('syncPreview'),
+  previewBtnText: document.getElementById('previewBtnText'),
   statusAutoSync: document.getElementById('statusAutoSync'),
   statusTimer: document.getElementById('statusTimer'),
   statusLastSync: document.getElementById('statusLastSync'),
@@ -40,7 +43,8 @@ function addLog(message, type = 'info') {
 // ==========================================
 const DEFAULT_SETTINGS = {
   autoSyncEnabled: false,
-  intervalHours: 0.083, // 5 minutes = 0.083 hours
+  intervalHours: 12,
+  intervalMinutes: 0,
   tcaEmail: '',
   tcaPassword: '',
   lastSyncTime: null,
@@ -73,9 +77,14 @@ async function updateUI() {
   
   // Update inputs
   ELEMENTS.autoSyncEnabled.checked = settings.autoSyncEnabled;
-  ELEMENTS.intervalHours.value = settings.intervalHours;
+  ELEMENTS.intervalHours.value = settings.intervalHours || 12;
+  ELEMENTS.intervalMinutes.value = settings.intervalMinutes || 0;
   ELEMENTS.tcaEmail.value = settings.tcaEmail;
   ELEMENTS.tcaPassword.value = settings.tcaPassword;
+  
+  // Update button text - keep as click button
+  ELEMENTS.syncBtnText.textContent = '⚡ Auto Sync';
+  ELEMENTS.syncBtnText.parentElement.classList.add('btn-success');
   
   // Update status
   ELEMENTS.statusAutoSync.textContent = settings.autoSyncEnabled ? 'Bật' : 'Tắt';
@@ -88,9 +97,9 @@ async function updateUI() {
     ELEMENTS.statusLastSync.textContent = 'Chưa sync';
   }
   
-  const intervalMins = Math.round(settings.intervalHours * 60);
+  const totalMins = (settings.intervalHours || 12) * 60 + (settings.intervalMinutes || 0);
   ELEMENTS.statusTimer.textContent = settings.autoSyncEnabled 
-    ? (intervalMins < 60 ? `${intervalMins} phút` : `${settings.intervalHours}h`) 
+    ? (totalMins >= 60 ? `${Math.floor(totalMins/60)}h${totalMins%60 > 0 ? totalMins%60 + 'p' : ''}` : `${totalMins} phút`)
     : 'Tắt';
   
   // Check TCA tab status
@@ -123,37 +132,66 @@ function getTcaTabs() {
 // Toggle Auto-Sync
 ELEMENTS.autoSyncEnabled.addEventListener('change', async () => {
   const enabled = ELEMENTS.autoSyncEnabled.checked;
-  await saveSettings({ autoSyncEnabled: enabled });
+  const hours = parseFloat(ELEMENTS.intervalHours.value) || 12;
+  const mins = parseInt(ELEMENTS.intervalMinutes.value) || 0;
+  const totalHours = hours + mins / 60;
+  
+  await saveSettings({ 
+    autoSyncEnabled: enabled,
+    intervalHours: hours,
+    intervalMinutes: mins
+  });
   
   if (enabled) {
-    // Start timer in background
-    const intervalHours = parseFloat(ELEMENTS.intervalHours.value) || 0.083;
     chrome.runtime.sendMessage({ 
       action: 'START_AUTO_SYNC',
-      intervalHours 
+      intervalHours: totalHours
     });
-    const mins = Math.round(intervalHours * 60);
-    addLog(`Bật Auto-Sync mỗi ${mins < 60 ? mins + ' phút' : intervalHours + ' tiếng'}`, 'success');
+    addLog(`Bật Auto-Sync: ${hours}h ${mins}p`, 'success');
   } else {
-    // Stop timer
     chrome.runtime.sendMessage({ action: 'STOP_AUTO_SYNC' });
     addLog('Tắt Auto-Sync', 'info');
   }
   
-  await updateUI();
+  updateUI();
 });
 
 // Change Interval
 ELEMENTS.intervalHours.addEventListener('change', async () => {
-  const hours = parseFloat(ELEMENTS.intervalHours.value) || 0.083;
-  await saveSettings({ intervalHours: hours });
+  const hours = parseFloat(ELEMENTS.intervalHours.value) || 12;
+  const mins = parseInt(ELEMENTS.intervalMinutes.value) || 0;
+  const totalHours = hours + mins / 60;
+  
+  await saveSettings({ 
+    intervalHours: hours,
+    intervalMinutes: mins
+  });
   
   if (ELEMENTS.autoSyncEnabled.checked) {
     chrome.runtime.sendMessage({ 
       action: 'START_AUTO_SYNC',
-      intervalHours: hours 
+      intervalHours: totalHours
     });
-    addLog(`Đổi interval thành ${hours} tiếng`, 'info');
+    addLog(`Đổi interval: ${hours}h ${mins}p`, 'info');
+  }
+});
+
+ELEMENTS.intervalMinutes.addEventListener('change', async () => {
+  const hours = parseFloat(ELEMENTS.intervalHours.value) || 12;
+  const mins = parseInt(ELEMENTS.intervalMinutes.value) || 0;
+  const totalHours = hours + mins / 60;
+  
+  await saveSettings({ 
+    intervalHours: hours,
+    intervalMinutes: mins
+  });
+  
+  if (ELEMENTS.autoSyncEnabled.checked) {
+    chrome.runtime.sendMessage({ 
+      action: 'START_AUTO_SYNC',
+      intervalHours: totalHours
+    });
+    addLog(`Đổi interval: ${hours}h ${mins}p`, 'info');
   }
 });
 
@@ -171,7 +209,7 @@ ELEMENTS.saveCredentials.addEventListener('click', async () => {
   addLog('Đã lưu thông tin đăng nhập', 'success');
 });
 
-// Sync Now Button
+// Sync Now Button - Run Immediate Sync
 ELEMENTS.syncNow.addEventListener('click', async () => {
   if (isSyncing) return;
   
@@ -182,22 +220,48 @@ ELEMENTS.syncNow.addEventListener('click', async () => {
   }
   
   isSyncing = true;
-  ELEMENTS.syncBtnText.innerHTML = '<span class="spinner"></span> Đang xử lý...';
-  addLog('📌 Bắt đầu sync thủ công...', 'info');
+  ELEMENTS.syncBtnText.innerHTML = '<span class="spinner"></span> Đang sync...';
+  addLog('⚡ Bắt đầu sync ngay...', 'info');
   
-  // Send START_CAPTURE command to content script via background
   chrome.runtime.sendMessage({ action: 'START_CAPTURE' }, (response) => {
     if (response && response.success) {
-      addLog('Đã gửi lệnh capture - đợi kết quả...', 'info');
+      addLog('Đã gửi lệnh - đợi kết quả...', 'info');
     } else {
-      addLog('Lỗi gửi lệnh capture', 'error');
+      addLog('Lỗi gửi lệnh', 'error');
     }
   });
   
-  // Update UI after short delay
   setTimeout(() => {
     isSyncing = false;
-    ELEMENTS.syncBtnText.textContent = '🔄 Sync Now';
+    ELEMENTS.syncBtnText.textContent = '⚡ Auto Sync';
+  }, 3000);
+  
+  updateUI();
+});
+
+// Preview + Sync Button
+ELEMENTS.syncPreview.addEventListener('click', async () => {
+  if (isSyncing) return;
+  
+  const settings = await loadSettings();
+  if (!settings.tcaEmail || !settings.tcaPassword) {
+    addLog('Chưa có thông tin đăng nhập!', 'error');
+    return;
+  }
+  
+  isSyncing = true;
+  ELEMENTS.previewBtnText.innerHTML = '<span class="spinner"></span> Đang xử lý...';
+  addLog('📋 Preview + Sync...', 'info');
+  
+  // Mở TCA Portal để chạy preview (người dùng tự thao tác)
+  chrome.tabs.create({ url: 'https://portal.tca.com.vn/group_management/group' }, (tab) => {
+    addLog('Đã mở TCA Portal - tự quét và sync', 'info');
+    addLog('Nếu cần xem trước dữ liệu, dùng nút trên trang web', 'info');
+  });
+  
+  setTimeout(() => {
+    isSyncing = false;
+    ELEMENTS.previewBtnText.textContent = '📋 Preview + Sync';
   }, 3000);
   
   updateUI();
@@ -234,9 +298,10 @@ async function init() {
   chrome.runtime.sendMessage({ action: 'GET_STATUS' }, (status) => {
     if (status) {
       if (status.autoSyncRunning) {
-        const mins = Math.round(status.intervalHours * 60);
-        ELEMENTS.statusTimer.textContent = mins < 60 ? `${mins} phút` : `${status.intervalHours}h`;
-        addLog(`Auto-Sync đang chạy mỗi ${mins < 60 ? mins + ' phút' : status.intervalHours + ' tiếng'}`, 'success');
+        const hours = Math.floor(status.intervalHours);
+        const mins = Math.round((status.intervalHours % 1) * 60);
+        ELEMENTS.statusTimer.textContent = `${hours}h${mins > 0 ? mins + 'p' : ''}`;
+        addLog(`Auto-Sync: ${hours}h ${mins}p`, 'success');
       }
     }
   });

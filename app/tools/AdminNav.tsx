@@ -7,24 +7,24 @@ import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Setti
 const menuItems = [
   { label: 'Trang Chủ', href: '/', icon: ArrowLeft },
   { label: 'Site Profiles', href: '/tools/site-profiles', icon: Layout },
-  { label: 'Affiliate', href: '/admin/affiliate', icon: DollarSign },
-  { label: 'Thanh Toán', href: '/admin/payments', icon: CreditCard },
-  { label: 'Bảng Tin', href: '/admin/posts', icon: FileText },
-  { label: 'Số Đẹp', href: '/admin/reserved-ids', icon: Gem },
-  { label: 'Thành Viên', href: '/admin/students', icon: Users },
-  { label: 'Khóa Học', href: '/admin/courses', icon: BookOpen },
-  { label: 'YouTube', href: '/admin/youtube-tools', icon: Youtube },
-  { label: 'Cài Đặt', href: '/admin/settings', icon: Settings },
-  { label: 'Lộ Trình', href: '/admin/roadmap', icon: Map },
-  { label: 'Chiến Dịch Email', href: '/admin/campaigns', icon: Mail },
-  { label: 'Nhân Mạch', href: '/admin/genealogy', icon: Users },
+  { label: 'Affiliate', href: '/tools/affiliate', icon: DollarSign },
+  { label: 'Thanh Toán', href: '/tools/payments', icon: CreditCard },
+  { label: 'Bảng Tin', href: '/tools/posts', icon: FileText },
+  { label: 'Số Đẹp', href: '/tools/reserved-ids', icon: Gem },
+  { label: 'Thành Viên', href: '/tools/students', icon: Users },
+  { label: 'Khóa Học', href: '/tools/courses', icon: BookOpen },
+  { label: 'YouTube', href: '/tools/youtube-tools', icon: Youtube },
+  { label: 'Cài Đặt', href: '/tools/settings', icon: Settings },
+  { label: 'Lộ Trình', href: '/tools/roadmap', icon: Map },
+  { label: 'Chiến Dịch Email', href: '/tools/email-mkt', icon: Mail },
+  { label: 'Nhân Mạch', href: '/tools/genealogy', icon: Users },
 ]
 
 export default function AdminNav() {
   const pathname = usePathname()
   
   const isActive = (href: string) => {
-    if (href === '/admin') return pathname === '/admin'
+    if (href === '/tools') return pathname === '/tools'
     return pathname === href || pathname.startsWith(href + '/')
   }
 
@@ -84,12 +84,12 @@ export function AdminSubNav({ title, items }: { title: string; items: { label: s
 }
 
 export const campaignSubNav = [
-  { label: 'Danh Sách', href: '/admin/campaigns', icon: Mail },
-  { label: 'Kết Nối Vệ Tinh', href: '/admin/email-senders', icon: Radio },
-  { label: 'Cài Đặt', href: '/admin/email-settings', icon: Bell },
+  { label: 'Danh Sách', href: '/tools/email-mkt', icon: Mail },
+  { label: 'Kết Nối Vệ Tinh', href: '/tools/email-senders', icon: Radio },
+  { label: 'Cài Đặt', href: '/tools/email-settings', icon: Bell },
 ]
 
 export const affiliateSubNav = [
-  { label: 'Dashboard', href: '/admin/affiliate', icon: DollarSign },
-  { label: 'Duyệt Rút Tiền', href: '/admin/affiliate/payouts', icon: CreditCard },
+  { label: 'Dashboard', href: '/tools/affiliate', icon: DollarSign },
+  { label: 'Duyệt Rút Tiền', href: '/tools/affiliate/payouts', icon: CreditCard },
 ]

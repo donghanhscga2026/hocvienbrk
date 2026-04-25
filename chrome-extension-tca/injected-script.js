@@ -10,7 +10,7 @@
   let isIntercepting = false;
   let capturedUrls = new Set();
   let capturedMembers = new Map();  // Lưu thông tin members đã capture
-  let autoScanEnabled = true;
+  let autoScanEnabled = true; // MẶC ĐỊNH BẬT - quét tự động khi trang được load
   let scannedIds = new Set();
   let pendingFolders = [];
   let isScanning = false;
@@ -577,32 +577,16 @@
                 window.postMessage({
                   type: MESSAGE_TYPE,
                   url: this._xhrUrl,
-                  data: data,
+data: data,
                   folderId: folderId,
                   timestamp: Date.now()
                 }, '*');
                 
-              // Trigger auto-scan on first capture
+              // CHẠY AUTO-SCAN KHI autoScanEnabled = true (mặc định = true)
               if (isFirstCapture && autoScanEnabled && !isScanning) {
-                isFirstCapture = false;
-                const folders = extractFolderIds(data);
-                console.log('==========================================');
-                console.log('[TCA AutoScan] 🔍 Initial data captured!');
-                console.log(`[TCA AutoScan] Found ${data.data.length} items, ${folders.length} folders`);
-                console.log('[TCA AutoScan] 🚀 Starting auto-scan in 0.5s...');
-                console.log('==========================================');
-                
-                if (folders.length > 0) {
-                  setTimeout(() => autoScanTree(data), 500);
-                } else {
-                  console.log('[TCA AutoScan] No folders to scan, sending single capture...');
-                  window.postMessage({
-                    type: 'TCA_FULL_TREE',
-                    tree: [],
-                    stats: { total: data.data.length, folders: 0, items: data.data.length },
-                    timestamp: Date.now()
-                  }, '*');
-                }
+                // Trigger full tree download
+                console.log('[TCA AutoScan] 🚀 First capture detected, starting auto-scan...');
+                autoScanTree(data).catch(e => console.error('[TCA AutoScan] Error:', e));
               }
               }
             }
@@ -707,21 +691,19 @@
     // Gọi extractOverviewData sau khi DOM load xong
     window.extractTcaOverview = extractOverviewData;
 
-    // THỬ GỌI NGAY SAU 2s (DOM đã render xong)
-    setTimeout(() => {
-      if (typeof window.extractTcaOverview === 'function') {
-        const result = window.extractTcaOverview();
-        if (!result) {
-          // Thử lại sau 3s nữa
-          setTimeout(() => {
-            window.extractTcaOverview();
-          }, 3000);
+    // CHỈ GỌI KHI CÓ LỆNH (không tự động)
+    // Lắng nghe TCA_CONTROL messages
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'TCA_CONTROL') {
+        if (event.data.command === 'startScan' && typeof window.extractTcaOverview === 'function') {
+          console.log('[TCA Sync] ▶️ startScan command received');
+          window.extractTcaOverview();
         }
       }
-    }, 2000);
+    });
 
     console.log('[TCA Sync] XHR interceptor initialized');
-    console.log('[TCA Sync] Auto-scan enabled - will automatically scan full tree');
+    console.log('[TCA Sync] Waiting for startScan command...');
   }
 
   if (document.readyState === 'loading') {

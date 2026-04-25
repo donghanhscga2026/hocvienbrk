@@ -106,13 +106,13 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
 
       {/* Sub Navigation */}
       <div className="flex gap-1 px-4 py-2 bg-white border-b overflow-x-auto">
-        <Link href="/admin/campaigns" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
+        <Link href="/tools/email-mkt" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
           📋 Chiến dịch
         </Link>
-        <Link href="/admin/email-senders" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
+        <Link href="/tools/email-senders" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
           📡 Tài Khoản
         </Link>
-        <Link href="/admin/email-settings" className="px-3 py-1.5 rounded-full text-xs font-bold bg-orange-500 text-white">
+        <Link href="/tools/email-settings" className="px-3 py-1.5 rounded-full text-xs font-bold bg-orange-500 text-white">
           ⚙️ Cấu Hình
         </Link>
       </div>
