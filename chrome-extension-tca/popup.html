@@ -2,113 +2,222 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1e293b; color: #fff; }
-    .header { background: linear-gradient(135deg, #dc2626, #b91c1c); padding: 12px 16px; display: flex; align-items: center; gap: 8px; }
-    .header img { width: 28px; height: 28px; }
-    .header h1 { font-size: 14px; font-weight: 600; }
+    :root {
+      --primary: #dc2626;
+      --primary-dark: #b91c1c;
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --bg-input: #0f172a;
+      --border: #334155;
+      --text: #fff;
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    html {
+      width: 350px;
+      overflow: hidden;
+    }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+      background: var(--bg-dark); 
+      color: var(--text);
+      width: 350px;
+      overflow-y: auto;
+    }
     
-    .section { padding: 12px 16px; border-bottom: 1px solid #334155; }
-    .section-title { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; }
+    .header { 
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark)); 
+      padding: 12px 16px; 
+      display: flex; 
+      align-items: center; 
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header img { width: 36px; height: 36px; }
+    .header h1 { font-size: 18px; font-weight: 700; flex: 1; }
     
-    .toggle-row { display: flex; justify-content: space-between; align-items: center; }
-    .toggle-label { font-size: 13px; }
-    .toggle { position: relative; width: 44px; height: 24px; }
-    .toggle input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: #475569; border-radius: 24px; transition: 0.3s; }
-    .toggle-slider:before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
-    .toggle input:checked + .toggle-slider { background: #22c55e; }
-    .toggle input:checked + .toggle-slider:before { transform: translateX(20px); }
+    .section { 
+      padding: 12px 16px; 
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title { 
+      font-size: 11px; 
+      font-weight: 600; 
+      color: var(--text-muted); 
+      text-transform: uppercase; 
+      margin-bottom: 10px; 
+    }
     
-    .input-group { margin-bottom: 8px; }
-    .input-group label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
-    .input-group input { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 13px; }
+    /* Row layouts */
+    .row { display: flex; align-items: center; gap: 10px; }
+    .flex-1 { flex: 1; }
+    
+    .input-group { margin-bottom: 10px; }
+    .input-group label { 
+      display: block; 
+      font-size: 11px; 
+      color: var(--text-muted); 
+      margin-bottom: 4px; 
+    }
+    .input-group input { 
+      width: 100%; 
+      padding: 10px 12px; 
+      background: var(--bg-input); 
+      border: 1px solid var(--border); 
+      border-radius: 6px; 
+      color: var(--text); 
+      font-size: 13px; 
+    }
     .input-group input:focus { outline: none; border-color: #3b82f6; }
-    .input-row { display: flex; align-items: center; gap: 8px; }
-    .input-row input { flex: 1; }
-    .input-row span { font-size: 12px; color: #94a3b8; }
+    .input-narrow { width: 70px; text-align: center; }
     
-    .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    /* Toggle */
+    .toggle { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { 
+      position: absolute; 
+      cursor: pointer; 
+      inset: 0; 
+      background: #475569; 
+      border-radius: 26px; 
+      transition: 0.3s; 
+    }
+    .toggle-slider:before { 
+      content: ''; 
+      position: absolute; 
+      width: 20px; 
+      height: 20px; 
+      left: 3px; 
+      bottom: 3px; 
+      background: white; 
+      border-radius: 50%; 
+      transition: 0.3s; 
+    }
+    .toggle input:checked + .toggle-slider { background: var(--success); }
+    .toggle input:checked + .toggle-slider:before { transform: translateX(22px); }
+    
+    /* Buttons */
+    .btn { 
+      padding: 12px 16px; 
+      border: none; 
+      border-radius: 6px; 
+      font-size: 13px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      transition: all 0.2s; 
+    }
+    .btn-full { width: 100%; }
     .btn-primary { background: #3b82f6; color: white; }
     .btn-primary:hover { background: #2563eb; }
-    .btn-secondary { background: #475569; color: white; margin-top: 8px; }
+    .btn-secondary { background: #475569; color: white; }
     .btn-secondary:hover { background: #64748b; }
-    .btn-success { background: #22c55e; color: white; }
+    .btn-success { background: var(--success); color: white; }
     .btn-success:hover { background: #16a34a; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: #dc2626; }
     
-    .status-box { background: #0f172a; border-radius: 6px; padding: 10px; font-size: 12px; }
-    .status-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    /* Status box */
+    .status-box { 
+      background: var(--bg-input); 
+      border-radius: 6px; 
+      padding: 12px; 
+      font-size: 12px; 
+    }
+    .status-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
     .status-row:last-child { margin-bottom: 0; }
-    .status-label { color: #94a3b8; }
+    .status-label { color: var(--text-muted); }
     .status-value { font-weight: 600; }
-    .status-value.success { color: #22c55e; }
-    .status-value.error { color: #ef4444; }
-    .status-value.warning { color: #f59e0b; }
+    .status-value.success { color: var(--success); }
+    .status-value.error { color: var(--danger); }
+    .status-value.warning { color: var(--warning); }
     
-    .log-box { background: #0f172a; border-radius: 6px; padding: 8px; font-size: 11px; max-height: 80px; overflow-y: auto; font-family: monospace; }
-    .log-entry { color: #94a3b8; margin-bottom: 2px; }
-    .log-entry.success { color: #22c55e; }
-    .log-entry.error { color: #ef4444; }
+    /* Log box */
+    .log-box { 
+      background: var(--bg-input); 
+      border-radius: 6px; 
+      padding: 10px; 
+      font-size: 11px; 
+      font-family: monospace;
+      max-height: none;
+      overflow-y: auto; 
+    }
+    .log-entry { color: var(--text-muted); margin-bottom: 3px; }
+    .log-entry.success { color: var(--success); }
+    .log-entry.error { color: var(--danger); }
+    .log-entry.warning { color: var(--warning); }
     
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner { 
+      display: inline-block; 
+      width: 14px; 
+      height: 14px; 
+      border: 2px solid #fff; 
+      border-top-color: transparent; 
+      border-radius: 50%; 
+      animation: spin 1s linear infinite; 
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
-    
-    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="header">
-    <img src="/logobrk-50px.png" alt="BRK" onerror="this.style.display='none'">
-    <h1>TCA Auto-Sync</h1>
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23dc2626'/%3E%3Ctext x='50' y='65' font-size='40' font-weight='bold' text-anchor='middle' fill='white'%3EBRK%3C/text%3E%3C/svg%3E" alt="BRK">
+    <h1>TCA Sync Pro</h1>
   </div>
   
-  <!-- Settings Section -->
+  <!-- Settings: Time + Toggle -->
   <div class="section">
-    <div class="section-title">Cài đặt</div>
-    <div class="toggle-row">
-      <span class="toggle-label">Bật Auto-Sync</span>
-      <label class="toggle">
+    <div class="row">
+      <div class="input-group" style="margin:0; flex:1;">
+        <label>Giờ</label>
+        <input type="number" id="intervalHours" min="1" max="168" value="12" step="1" class="input-narrow">
+      </div>
+      <div class="input-group" style="margin:0; flex:1;">
+        <label>Phút</label>
+        <input type="number" id="intervalMinutes" min="0" max="59" value="0" step="1" class="input-narrow">
+      </div>
+      <label class="toggle" style="margin-top:auto;">
         <input type="checkbox" id="autoSyncEnabled">
         <span class="toggle-slider"></span>
       </label>
     </div>
   </div>
   
-  <!-- Interval Section -->
+  <!-- Credentials -->
   <div class="section">
-    <div class="section-title">Khoảng thời gian</div>
-    <div class="input-row">
-      <input type="number" id="intervalHours" min="0.01" max="168" value="0.083" step="0.001" style="width: 70px; text-align: center;" placeholder="0.083">
-      <span>giờ</span>
-    </div>
-  </div>
-  
-  <!-- Credentials Section -->
-  <div class="section">
-    <div class="section-title">Thông tin đăng nhập TCA</div>
     <div class="input-group">
       <label>Email</label>
       <input type="email" id="tcaEmail" placeholder="email@tca.com.vn">
     </div>
-    <div class="input-group">
-      <label>Mật khẩu</label>
-      <input type="password" id="tcaPassword" placeholder="••••••••">
+    <div class="row">
+      <div class="input-group flex-1" style="margin:0;">
+        <label>Mật khẩu</label>
+        <input type="password" id="tcaPassword" placeholder="••••••••">
+      </div>
+      <button class="btn btn-secondary" id="saveCredentials" style="margin-top:auto;">Lưu</button>
     </div>
-    <button class="btn btn-secondary" id="saveCredentials">Lưu thông tin</button>
   </div>
   
-  <!-- Sync Now Section -->
+  <!-- Sync Buttons -->
   <div class="section">
-    <div class="section-title">Đồng bộ</div>
-    <button class="btn btn-success" id="syncNow">
-      <span id="syncBtnText">🔄 Sync Now</span>
-    </button>
+    <div class="row">
+      <button class="btn btn-success flex-1" id="syncNow">
+        <span id="syncBtnText">⚡ Auto Sync</span>
+      </button>
+      <button class="btn btn-primary flex-1" id="syncPreview">
+        <span id="previewBtnText">📋 Preview</span>
+      </button>
+    </div>
   </div>
   
-  <!-- Status Section -->
+  <!-- Status -->
   <div class="section">
-    <div class="section-title">Trạng thái</div>
     <div class="status-box">
       <div class="status-row">
         <span class="status-label">Auto-Sync:</span>
@@ -129,9 +238,8 @@
     </div>
   </div>
   
-  <!-- Log Section -->
+  <!-- Log -->
   <div class="section">
-    <div class="section-title">Nhật ký</div>
     <div class="log-box" id="logBox">
       <div class="log-entry">Extension khởi động...</div>
     </div>

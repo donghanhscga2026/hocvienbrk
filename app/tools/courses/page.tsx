@@ -67,7 +67,7 @@ export default function ToolsCoursesPage() {
                                                 #{course.id}
                                             </div>
                                             <Link 
-                                                href={`/admin/courses/${course.id}`} 
+                                                href={`/tools/courses/${course.id}`} 
                                                 className="inline-flex items-center justify-center w-8 h-8 bg-black text-yellow-400 rounded-full hover:bg-zinc-800 active:scale-90 transition-all shadow-md"
                                             >
                                                 <Settings className="w-4 h-4" />

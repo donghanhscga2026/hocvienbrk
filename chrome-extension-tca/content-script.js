@@ -429,7 +429,8 @@
 
       const userIdColor = (row.db?.userId) ? '#1565c0' : (userId ? '#d32f2f' : '#999');
       const refIdColor = (row.db?.referrerId != null) ? '#1565c0' : (referrerId != null ? '#d32f2f' : '#999');
-      const refSysIdColor = (row.db?.refSysId != null) ? '#1565c0' : '#d32f2f';
+      // refSysId: hiển màu đỏ nếu có thay đổi (hasRefSysIdChange), xanh nếu không đổi
+      const refSysIdColor = row.hasRefSysIdChange ? '#d32f2f' : '#1565c0';
 
       let matchDisplay = match;
       let matchColor = '#999';
@@ -450,6 +451,10 @@
       else if (action === 'CREATE_SYSTEM') { actionLabel = 'Tạo Sys'; actionBg = '#1565c0'; }
       else if (action === 'UPDATE') { actionLabel = 'Cập nhật'; actionBg = '#f57c00'; }
       else if (action === 'SKIP') { actionLabel = 'Bỏ qua'; actionBg = '#999'; }
+      else if (action?.includes('S') && !action?.includes('PE')) { 
+        // Action có S nhưng không phải CREATE_ALL → Cập nhật System
+        actionLabel = action + ' (Sys)'; actionBg = '#7b1fa2'; 
+      }
 
       // Checkbox: chỉ check nếu cần sync (action != SKIP)
       const needSync = action && action !== 'SKIP' && action !== '-';
@@ -467,7 +472,7 @@
         <td style="padding:6px 2px; text-align:center; color:${userIdColor}; font-weight:bold;">${userId || '-'}</td>
         <td style="padding:6px 2px; text-align:center; color:${refIdColor}; font-weight:bold;">${referrerId != null ? referrerId : '-'}</td>
         <td style="padding:6px 2px; text-align:center;"><span style="background:${actionBg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;">${actionLabel}</span></td>
-        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;">${refSysId || '-'}</td>
+        <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;" ${row.hasRefSysIdChange ? `title="refSysId thay đổi: ${row.dbRefSysId || 0} -> ${refSysId}"` : ''}>${refSysId || '-'}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px; min-width:180px;" title="${email}">${email}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
         <!-- 10 cột mới bổ sung (không có Địa Chỉ, không trùng Cấp) -->
@@ -1208,6 +1213,97 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
         console.log('[TCA Sync] AUTO_SYNC_TRIGGER received');
         autoSyncTrigger(message.credentials, sendResponse);
         return true; // Keep channel open for async response
+      }
+      
+// Manual capture trigger (từ popup Sync Now)
+      if (message.action === 'START_MANUAL_CAPTURE') {
+        console.log('[TCA Sync] START_MANUAL_CAPTURE received');
+        
+        addTcaLog('📡 Gửi lệnh quét...');
+        
+        // Send startScan command to injected script
+        window.postMessage({ type: 'TCA_CONTROL', command: 'startScan' }, '*');
+        
+        // Wait for scan to complete, then call sync API
+        const waitForSync = async () => {
+          let attempts = 0;
+          const maxAttempts = 60; // 60 seconds max for full scan
+          
+          addTcaLog('🔍 Đang chờ quét dữ liệu (có thể mất 30-60s)...');
+          
+          // Check if data is ready - wait for full tree with member info
+          while (attempts < maxAttempts) {
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // Method 1: Check allNodesGlobal has significant data (more than just root folder)
+            const hasTreeData = allNodesGlobal && allNodesGlobal.length >= 5;
+            const hasMembers = memberInfoCache && Object.keys(memberInfoCache).length >= 5;
+            
+            if (hasTreeData || hasMembers) {
+              console.log('[TCA Sync] Data ready:', { nodes: allNodesGlobal?.length, members: Object.keys(memberInfoCache).length });
+              addTcaLog(`📊 Có ${allNodesGlobal?.length || 0} nodes, ${Object.keys(memberInfoCache).length || 0} members`);
+              
+              try {
+                // Get data to sync
+                const nodesToSync = allNodesGlobal || [];
+                const membersToSync = memberInfoCache || {};
+                
+                // Get overview if available
+                let overviewData = null;
+                if (window.tcaOverviewData) {
+                  overviewData = window.tcaOverviewData;
+                } else {
+                  // Try to extract from page
+                  try {
+                    const stored = localStorage.getItem('tcaOverviewData');
+                    if (stored) overviewData = JSON.parse(stored);
+                  } catch(e) {}
+                }
+                
+                addTcaLog('📤 Đang gửi sync...');
+                
+                const response = await fetch(SYNC_ENDPOINT, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    source: 'TCA_EXT_FULL',
+                    timestamp: Date.now(),
+                    allNodes: nodesToSync,
+                    memberInfo: membersToSync,
+                    overviewData: overviewData,
+                    stats: { total: nodesToSync.length }
+                  })
+                });
+                
+                const result = await response.json();
+                console.log('[TCA Sync] Sync result:', result);
+                
+                chrome.runtime.sendMessage({ 
+                  action: 'SYNC_COMPLETE', 
+                  stats: result.stats,
+                  result: result
+                }).catch(() => {});
+                
+                addTcaLog(`✅ Hoàn tất: ${result.stats?.tcaMembersCreated || 0} tạo, ${result.stats?.tcaMembersUpdated || 0} cập nhật`);
+                return;
+              } catch(e) {
+                console.log('[TCA Sync] Sync error:', e);
+                addTcaLog(`❌ Lỗi: ${e.message}`);
+              }
+            }
+            attempts++;
+            if (attempts % 15 === 0) {
+              addTcaLog(`⏳ Đang quét... ${attempts}s`);
+            }
+          }
+          
+          addTcaLog('⚠️ Timeout');
+        };
+        
+        waitForSync();
+        
+        sendResponse({ success: true });
+        return true;
       }
       
       return false;

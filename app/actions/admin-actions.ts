@@ -208,8 +208,30 @@ async function buildStandardTree(
         const closures = closureByAncestor.get(f1.autoId) || []
         const hasF2 = closures.some(c => c.depth === 1)
         const hasF3 = closures.some(c => c.depth === 2)
-        const f2s = closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
-        const fData = { id: f1.user.id, name: f1.user.name, totalSubCount: closures.length, children: f2s }
+        
+        // SỬA: Lấy đầy đủ dữ liệu TCA cho F2s của nhóm B
+        const f2s = closures.filter(c => c.depth === 1).map(c => {
+            const f2tca = tcaMemberMap.get(c.userId) ?? tcaMemberMap.get(c.autoId)
+            return { 
+                id: c.userId, 
+                name: c.name,
+                level: f2tca?.level ?? null,
+                personalScore: f2tca?.personalScore ?? null,
+                totalScore: f2tca?.totalScore ?? null
+            }
+        })
+
+        // SỬA: Lấy dữ liệu TCA cho chính F1 (cha của nhóm A/B)
+        const f1tca = tcaMemberMap.get(f1.user.id) ?? tcaMemberMap.get(f1.autoId)
+        const fData = { 
+            id: f1.user.id, 
+            name: f1.user.name, 
+            totalSubCount: closures.length, 
+            children: f2s,
+            level: f1tca?.level ?? null,
+            personalScore: f1tca?.personalScore ?? null,
+            totalScore: f1tca?.totalScore ?? null
+        }
 
         if (!hasF2) {
             groupA.push(fData)
@@ -602,7 +624,7 @@ export async function updateCourseAction(courseId: number, data: any) {
     await checkAdmin()
     try {
         const updatedCourse = await prisma.course.update({ where: { id: courseId }, data })
-        revalidatePath('/admin/courses'); revalidatePath('/')
+        revalidatePath('/tools/courses'); revalidatePath('/')
         return { success: true, course: updatedCourse }
     } catch (error: any) { return { success: false, error: error.message } }
 }
@@ -628,7 +650,8 @@ function buildFullTreeFromClosures(
     rootUserName: string | null,
     allClosures: { ancestorAutoId: number; descendantAutoId: number; depth: number; userId: number; name: string | null }[],
     sysAutoToUserId: Map<number, number>,
-    userMap: Map<number, string | null>
+    userMap: Map<number, string | null>,
+    tcaMemberMap: Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>
 ): GenealogyNode {
     // Build parent -> children map (tất cả các depth)
     const parentToChildren = new Map<number, { autoId: number; userId: number }[]>()
@@ -667,6 +690,9 @@ function buildFullTreeFromClosures(
         // Name
         const name = sysAutoId === rootSysAutoId ? rootUserName : (userMap.get(userId) || null)
         
+        // TCA Data
+        const tcaData = tcaMemberMap.get(userId)
+        
         // Sắp xếp children theo name
         children.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         
@@ -678,7 +704,10 @@ function buildFullTreeFromClosures(
             f1aCount: 0, f1bCount: 0, f1cCount: 0,
             groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
             groupA: [], groupB: [],
-            children: children
+            children: children,
+            level: tcaData?.level ?? null,
+            personalScore: tcaData?.personalScore ?? null,
+            totalScore: tcaData?.totalScore ?? null
         }
     }
     
@@ -745,6 +774,20 @@ export async function getFullSystemTreeAction(systemId: number) {
             userId: autoToUser.get(c.descendantId) || 0,
             name: userMap.get(autoToUser.get(c.descendantId) || 0) || null
         })).filter((c: any) => c.userId > 0)
+
+        // BỔ SUNG: Batch fetch TCAMember scores
+        const tcaMembers = await (prisma as any).tCAMember.findMany({
+            where: { userId: { in: [...userIdSet] } },
+            select: { userId: true, level: true, personalScore: true, totalScore: true }
+        })
+        const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>()
+        for (const m of tcaMembers) {
+            tcaMemberMap.set(m.userId, {
+                level: m.level ?? null,
+                personalScore: m.personalScore != null ? Number(m.personalScore) : null,
+                totalScore: m.totalScore != null ? Number(m.totalScore) : null
+            })
+        }
         
         // Build tree với rootSysAutoId và autoToUser map
         const tree = buildFullTreeFromClosures(
@@ -753,7 +796,8 @@ export async function getFullSystemTreeAction(systemId: number) {
             rootUser?.name || null, 
             closureData, 
             autoToUser,
-            userMap
+            userMap,
+            tcaMemberMap
         )
         return { success: true, tree: { ...tree, isRoot: true } }
     } catch (error: any) { return { success: false, error: error.message } }
@@ -797,6 +841,20 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
         for (const [, uid] of autoToUser) userIds.add(uid)
         const users = await prisma.user.findMany({ where: { id: { in: [...userIds] } } })
         const userMap = new Map(users.map(u => [u.id, u.name]))
+
+        // BỔ SUNG: Batch fetch TCAMember scores cho children
+        const tcaMembers = await (prisma as any).tCAMember.findMany({
+            where: { userId: { in: [...userIds] } },
+            select: { userId: true, level: true, personalScore: true, totalScore: true }
+        })
+        const tcaMemberMap = new Map()
+        for (const m of tcaMembers) {
+            tcaMemberMap.set(m.userId, {
+                level: m.level ?? null,
+                personalScore: m.personalScore != null ? Number(m.personalScore) : null,
+                totalScore: m.totalScore != null ? Number(m.totalScore) : null
+            })
+        }
         
         // Group by depth - lấy depth nhỏ nhất (children trực tiếp)
         const minDepth = Math.min(...closures.map(c => c.depth))
@@ -813,6 +871,8 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
             if (childSys) {
                 subCount = closures.filter(c => c.ancestorId === childSys.autoId && c.depth > 0).length
             }
+
+            const tcaData = tcaMemberMap.get(userId)
             
             directChildren.push({
                 id: userId,
@@ -822,7 +882,10 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
                 f1aCount: 0, f1bCount: 0, f1cCount: 0,
                 groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
                 groupA: [], groupB: [],
-                children: []
+                children: [],
+                level: tcaData?.level ?? null,
+                personalScore: tcaData?.personalScore ?? null,
+                totalScore: tcaData?.totalScore ?? null
             })
         }
         

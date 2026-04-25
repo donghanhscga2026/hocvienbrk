@@ -111,6 +111,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }),
     ],
     callbacks: {
+        async redirect({ url, baseUrl }) {
+            // Ép buộc dùng domain chính nếu phát hiện đang ở domain vercel
+            const mainDomain = "https://giautoandien.io.vn";
+            if (url.includes("vercel.app")) {
+                return url.replace(/https:\/\/.*\.vercel\.app/, mainDomain);
+            }
+            // Cho phép chuyển hướng nếu cùng domain chính
+            if (url.startsWith(mainDomain)) return url;
+            // Mặc định về trang chủ của domain chính
+            if (url.startsWith("/")) return `${mainDomain}${url}`;
+            return mainDomain;
+        },
         async jwt({ token, user, trigger, session }) {
             if (user) {
                 token.sub = user.id;

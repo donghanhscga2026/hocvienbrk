@@ -330,6 +330,36 @@ const duration = Date.now() - startTime
       console.log('[TCA Sync] Processing allNodes directly:', body.allNodes.length)
       stats.totalRecords = body.allNodes.length
 
+      // Build TCA ID -> parent TCA ID map để xác định referrerId
+      const tcaIdToParentTcaId = new Map<number, number | null>()
+      for (const node of body.allNodes) {
+        const tid = Number(node.id)
+        const parentId = node.parentFolderId ? Number(node.parentFolderId) : null
+        tcaIdToParentTcaId.set(tid, parentId)
+      }
+
+      // ===== XÁC ĐỊNH USERID NHƯ PREVIEW API =====
+      // Tìm user bằng phone hoặc email trước, fallback tạo mới
+      const allUsers = await prisma.user.findMany({
+        select: { id: true, phone: true, email: true }
+      })
+      
+      // Build maps cho lookup nhanh
+      const phoneToUserId = new Map<string, number>()
+      const emailToUserId = new Map<string, number>()
+      for (const u of allUsers) {
+        if (u.phone) {
+          const normPhone = normalizePhone(u.phone)
+          if (normPhone) phoneToUserId.set(normPhone, u.id)
+        }
+        if (u.email) {
+          emailToUserId.set(u.email.toLowerCase(), u.id)
+        }
+      }
+
+      // Map TCA ID -> User ID (từ DB)
+      const tcaIdToDbUserId = new Map<number, number>()
+      
       for (const node of body.allNodes) {
         try {
           const tcaId = Number(node.id)
@@ -338,10 +368,57 @@ const duration = Date.now() - startTime
             continue
           }
 
-          // Tìm userId từ user table (user.id = tcaId theo import script)
-          const user = await prisma.user.findUnique({ where: { id: tcaId } })
-          const linkedUserId = user?.id || 0
+          const info = body.memberInfo?.[tcaId] || {}
+          const email = info.email || null
+          const normalizedPhone = normalizePhone(info.phone || null)
+          
+          // ===== XÁC ĐỊNH USER NHƯ PREVIEW API =====
+          let targetUserId: number | null = null
+          let action = ''
+          
+          // 1. Tìm theo phone
+          if (normalizedPhone && phoneToUserId.has(normalizedPhone)) {
+            targetUserId = phoneToUserId.get(normalizedPhone)!
+            action = 'P'
+          }
+          // 2. Tìm theo email
+          if (!targetUserId && email && emailToUserId.has(email.toLowerCase())) {
+            targetUserId = emailToUserId.get(email.toLowerCase())!
+            action = 'E'
+          }
+          // 3. Tìm user đã link TCA trước đó
+          if (!targetUserId) {
+            const existingTca = await tcaMemberModel.findUnique({ where: { tcaId } })
+            if (existingTca?.userId && existingTca.userId > 0) {
+              targetUserId = existingTca.userId
+              action = 'TCA'
+            }
+          }
+          
+          // ===== XÁC ĐỊNH PARENT/REFERER =====
+          const parentTcaId = tcaIdToParentTcaId.get(tcaId) || null
+          let referrerId = 0
+          if (parentTcaId) {
+            // Tìm parent user
+            const parentInfo = body.memberInfo?.[parentTcaId] || {}
+            const parentPhone = normalizePhone(parentInfo.phone || null)
+            if (parentPhone && phoneToUserId.has(parentPhone)) {
+              referrerId = phoneToUserId.get(parentPhone)!
+            } else if (parentInfo.email && emailToUserId.has(parentInfo.email.toLowerCase())) {
+              referrerId = emailToUserId.get(parentInfo.email.toLowerCase())!
+            } else {
+              // Fallback: tìm parent TCA đã link
+              const parentTca = await tcaMemberModel.findUnique({ where: { tcaId: parentTcaId } })
+              referrerId = parentTca?.userId || 0
+            }
+          }
 
+          // Map để sử dụng cho child nodes
+          if (targetUserId) {
+            tcaIdToDbUserId.set(tcaId, targetUserId)
+          }
+
+          // ===== TIẾP TỤC XỬ LÝ (PE, P, E, S, TCA) =====
           // Parse scores
           const parseScore = (raw?: string): number => {
             if (!raw || raw === '-' || raw === '0') return 0
@@ -350,17 +427,78 @@ const duration = Date.now() - startTime
 
           const pScore = parseScore(node.personalScore)
           const tScore = parseScore(node.totalScore)
-          const levelVal = node.level ? parseInt(node.level) : null
+          const levelVal = node.level ? parseInt(node.level) : 1
 
-          // Get member info if available
-          const info = body.memberInfo?.[tcaId] || {}
+          // ===== PE: Tạo User nếu chưa tìm thấy =====
+          if (!targetUserId) {
+            // Tạo user mới với ID = tiếp theo
+            const maxUserId = Math.max(...allUsers.map(u => u.id), 0)
+            targetUserId = maxUserId + 1
+            
+            const hashedPassword = await bcrypt.hash('Brk#3773', 10)
+            try {
+              await prisma.user.create({
+                data: {
+                  id: targetUserId,
+                  name: node.name?.substring(0, 100) || `TCA ${tcaId}`,
+                  email: info.email || `tca_${tcaId}@placeholder.local`,
+                  phone: normalizePhone(info.phone || null) || null,
+                  password: hashedPassword,
+                  role: 'STUDENT',
+                  referrerId: referrerId || null
+                }
+              })
+              stats.usersCreated++
+              action = 'PE'
+              console.log(`[TCA Sync] Created user ${targetUserId} for tcaId ${tcaId}`)
+            } catch (userError: any) {
+              if (userError.code === 'P2002') {
+                console.log(`[TCA Sync] User ${targetUserId} already exists`)
+              } else {
+                throw userError
+              }
+            }
+          } else if (!action) {
+            action = 'TCA' // Đã tìm thấy user, chỉ cần update TCA
+          }
 
+          // ===== P: Cập nhật phone =====
+          if (action !== 'PE' && info.phone) {
+            await prisma.user.update({
+              where: { id: targetUserId },
+              data: { phone: normalizePhone(info.phone) || null }
+            })
+            stats.usersUpdated++
+          }
+
+          // ===== E: Cập nhật email =====
+          if (action !== 'PE' && info.email) {
+            await prisma.user.update({
+              where: { id: targetUserId },
+              data: { email: info.email }
+            })
+            stats.usersUpdated++
+          }
+
+          // ===== S: Tạo System + Closure =====
+          if (targetUserId && referrerId > 0) {
+            try {
+              await addUserToSystemClosure(targetUserId, referrerId, 1)
+              stats.systemsCreated++
+            } catch (sysError: any) {
+              if (sysError.code !== 'P2002') {
+                console.log(`[TCA Sync] System error:`, sysError.message)
+              }
+            }
+          }
+
+          // ===== TCA: Upsert TCAMember =====
           const memberData = {
             tcaId,
-            userId: linkedUserId,
+            userId: targetUserId,
             name: node.name || '',
             type: node.type || 'item',
-            parentTcaId: node.parentFolderId ? Number(node.parentFolderId) : null,
+            parentTcaId,
             phone: normalizePhone(info.phone || null) || null,
             email: info.email || null,
             personalScore: pScore,
@@ -369,13 +507,13 @@ const duration = Date.now() - startTime
             lastSyncedAt: new Date()
           }
 
+          const existingTCA = await tcaMemberModel.findUnique({ where: { tcaId } })
           await tcaMemberModel.upsert({
             where: { tcaId },
             update: memberData,
             create: memberData
           })
 
-          const existingTCA = await tcaMemberModel.findUnique({ where: { tcaId } })
           if (existingTCA) {
             stats.tcaMembersUpdated++
           } else {
@@ -386,6 +524,34 @@ const duration = Date.now() - startTime
         } catch (error) {
           console.error('[TCA Sync] Error processing node:', error)
           stats.failed++
+        }
+      }
+
+      // ===== ROOT NODE UPDATE =====
+      const overview = body.overviewData
+      if (overview && overview.type === 'OVERVIEW_REPORT') {
+        const ROOT_USER_ID = 861
+        const ROOT_TCA_ID = 60861
+        const pScore = overview.personal_points || 0
+        const tScore = overview.team_points || 0
+        const levelVal = overview.level || 1
+        
+        let existingRoot = await tcaMemberModel.findFirst({ where: { userId: ROOT_USER_ID } })
+        if (!existingRoot) {
+          existingRoot = await tcaMemberModel.findUnique({ where: { tcaId: ROOT_TCA_ID } })
+        }
+        
+        if (existingRoot) {
+          console.log(`[TCA Sync] ✅ Root #${ROOT_USER_ID} updated: CN=${pScore}, ĐỘI=${tScore}, Cấp=${levelVal}`)
+          await tcaMemberModel.update({
+            where: { id: existingRoot.id },
+            data: {
+              personalScore: pScore,
+              totalScore: tScore,
+              level: levelVal,
+              lastSyncedAt: new Date()
+            }
+          })
         }
       }
 

@@ -18,6 +18,102 @@ interface PromoteResult {
   error?: string
 }
 
+function DeleteByUserSection() {
+  const [deleteMode, setDeleteMode] = useState<'gte' | 'between' | 'in'>('gte')
+  const [val, setVal] = useState('')
+  const [valA, setValA] = useState('')
+  const [valB, setValB] = useState('')
+  const [vals, setVals] = useState('')
+  const [preview, setPreview] = useState<any>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [result, setResult] = useState<any>(null)
+
+  const handlePreview = async () => {
+    setResult(null)
+    setPreview(null)
+    let cond: any = { type: deleteMode }
+    if (deleteMode === 'gte') cond.value = parseInt(val) || 0
+    if (deleteMode === 'between') { cond.valueA = parseInt(valA) || 0; cond.valueB = parseInt(valB) || 999999 }
+    if (deleteMode === 'in') cond.values = vals.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+    try {
+      const res = await fetch('/api/sync-tca/delete-by-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'preview', userIdCondition: cond }) })
+      setPreview(await res.json())
+    } catch (e) { console.error(e) }
+  }
+
+  const handleDelete = async () => {
+    if (!preview) return
+    if (!confirm('⚠️ CẢNH BÁO: Xóa VĨNH VIỄN dữ liệu!')) return
+    if (confirmText !== 'XACNHANXOA') {
+      alert('Gõ "XACNHANXOA" vào ô xác nhận để xóa.')
+      return
+    }
+    let cond: any = { type: deleteMode }
+    if (deleteMode === 'gte') cond.value = parseInt(val) || 0
+    if (deleteMode === 'between') { cond.valueA = parseInt(valA) || 0; cond.valueB = parseInt(valB) || 999999 }
+    if (deleteMode === 'in') cond.values = vals.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+    setDeleting(true)
+    setResult(null)
+    try {
+      const res = await fetch('/api/sync-tca/delete-by-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', userIdCondition: cond, confirmation: 'XACNHANXOA' }) })
+      setResult(await res.json())
+      setPreview(null)
+      setConfirmText('')
+    } catch (e) { setResult({ success: false, error: String(e) }) } finally { setDeleting(false) }
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex gap-4 mb-3">
+        <label className="flex items-center"><input type="radio" checked={deleteMode==='gte'} onChange={()=>setDeleteMode('gte')}/> ID ≥</label>
+        <label className="flex items-center"><input type="radio" checked={deleteMode==='between'} onChange={()=>setDeleteMode('between')}/> ID từ...đến...</label>
+        <label className="flex items-center"><input type="radio" checked={deleteMode==='in'} onChange={()=>setDeleteMode('in')}/> ID trong (A,B...)</label>
+      </div>
+      {deleteMode==='gte' && <input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="58681" className="w-full border rounded p-2 mb-3"/>}
+      {deleteMode==='between' && <div className="flex gap-2 mb-3"><input type="number" value={valA} onChange={e=>setValA(e.target.value)} placeholder="Từ ID" className="flex-1 border rounded p-2"/><input type="number" value={valB} onChange={e=>setValB(e.target.value)} placeholder="Đến ID" className="flex-1 border rounded p-2"/></div>}
+      {deleteMode==='in' && <textarea value={vals} onChange={e=>setVals(e.target.value)} placeholder="58681, 58682, 58690" className="w-full border rounded p-2 mb-3 h-20"/>}
+      <div className="mb-2">
+        <input type="text" value={confirmText} onChange={e=>setConfirmText(e.target.value)} placeholder='Gõ "XACNHANXOA" để xóa' className="w-full border-2 border-red-300 rounded p-2 text-center font-mono"/>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={handlePreview} className="px-4 py-2 bg-blue-500 text-white rounded">Preview</button>
+        <button onClick={handleDelete} disabled={deleting || !preview} className="px-4 py-2 bg-red-500 text-white rounded disabled:opacity-50">{deleting ? 'Đang xóa...' : 'Xóa'}</button>
+      </div>
+      {preview && (
+        <div className="mt-3 p-3 bg-blue-50 rounded">
+          <p className="font-medium">{preview.message}</p>
+          {preview.users && preview.users.length > 0 && (
+            <div className="mt-2">
+              <p className="font-semibold text-sm">Users ({preview.users.length}):</p>
+              <div className="max-h-40 overflow-y-auto text-sm">
+                {preview.users.map((u: any) => <span key={u.id} className="mr-2 text-blue-700">{u.id}: {u.name}</span>)}
+              </div>
+            </div>
+          )}
+          {preview.systems && preview.systems.length > 0 && (
+            <div className="mt-2">
+              <p className="font-semibold text-sm">Systems ({preview.systems.length}):</p>
+              <div className="max-h-40 overflow-y-auto text-sm">
+                {preview.systems.map((s: any) => <span key={s.autoId} className="mr-2 text-green-700">{s.autoId}: {s.user?.name}</span>)}
+              </div>
+            </div>
+          )}
+          {preview.tcaMembers && preview.tcaMembers.length > 0 && (
+            <div className="mt-2">
+              <p className="font-semibold text-sm">TCAMembers ({preview.tcaMembers.length}):</p>
+              <div className="max-h-40 overflow-y-auto text-sm">
+                {preview.tcaMembers.map((m: any) => <span key={m.id} className="mr-2 text-purple-700">{m.tcaId}: {m.name}</span>)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {result && <div className={`mt-3 p-3 rounded ${result.success ? 'bg-green-50' : 'bg-red-50'}`}><p>{result.message}</p></div>}
+    </div>
+  )
+}
+
 function TestPanel() {
   const [testData, setTestData] = useState<TestData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -496,6 +592,14 @@ export default function TCASyncAdminPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow mt-6">
+            <div className="p-4 border-b border-red-200 bg-red-50">
+              <h2 className="text-xl font-bold text-red-600">Xóa theo User ID</h2>
+              <p className="text-sm text-red-500 mt-1">⚠️ Cảnh báo: Xóa vĩnh viễn dữ liệu!</p>
+            </div>
+            <DeleteByUserSection />
           </div>
         </div>
           </>

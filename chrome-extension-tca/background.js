@@ -91,6 +91,15 @@ const autoSyncInTab = async function(email, password) {
             if (hasAllMemberInfo || i > 60) {
               console.log('[TCA AutoSync] Calling sync API...');
               
+              // Lấy overviewData nếu có
+              let overviewData = null;
+              try {
+                const overviewStr = localStorage.getItem('tcaOverviewData');
+                if (overviewStr) {
+                  overviewData = JSON.parse(overviewStr);
+                }
+              } catch(e) { console.log('[TCA AutoSync] No overviewData'); }
+              
               const response = await fetch(SYNC_API, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -99,6 +108,7 @@ const autoSyncInTab = async function(email, password) {
                   timestamp: Date.now(),
                   allNodes: parsed.allNodes,
                   memberInfo: parsed.memberInfo || {},
+                  overviewData: overviewData,
                   stats: { total: parsed.allNodes.length }
                 })
               });
@@ -419,12 +429,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'TCA_SCAN_START') {
     chrome.action.setBadgeText({ text: '...' });
     chrome.action.setBadgeBackgroundColor({ color: '#FFA500' });
+    // Forward to popup
+    chrome.runtime.sendMessage({ action: 'LOG', message: '🔍 Bắt đầu quét...', type: 'info' }).catch(() => {});
     return false;
   }
 
   if (message.type === 'TCA_SCAN_COMPLETE') {
     chrome.action.setBadgeText({ text: '✓' });
     chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+    // Forward to popup
+    chrome.runtime.sendMessage({ action: 'LOG', message: '✅ Quét xong - đang sync...', type: 'success' }).catch(() => {});
+    return false;
+  }
+  
+  // Forward any LOG messages from content scripts
+  if (message.type === 'LOG') {
+    chrome.runtime.sendMessage({ action: 'LOG', message: message.message, type: message.logType || 'info' }).catch(() => {});
     return false;
   }
 });
@@ -501,13 +521,15 @@ async function init() {
   console.log('[TCA Background] Settings loaded:', settings);
   console.log('[TCA Background] autoSyncEnabled:', settings.autoSyncEnabled);
   
-  if (settings.autoSyncEnabled) {
-    console.log('[TCA Background] Auto-sync was enabled, restoring...');
-    log('Restoring auto-sync from previous session');
-    startAutoSync(settings.intervalHours);
-  } else {
-    console.log('[TCA Background] Auto-sync was NOT enabled');
-  }
+  // TEMP DISABLED: Ngăn auto-start kể cả khi đã bật trước đó
+  // if (settings.autoSyncEnabled) {
+  //   console.log('[TCA Background] Auto-sync was enabled, restoring...');
+  //   log('Restoring auto-sync from previous session');
+  //   startAutoSync(settings.intervalHours);
+  // } else {
+  //   console.log('[TCA Background] Auto-sync was NOT enabled');
+  // }
+  console.log('[TCA Background] Auto-sync TẠM TẮT - chỉ bật thủ công');
 }
 
 init();
