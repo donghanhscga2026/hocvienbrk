@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { action, userIdCondition } = body
+    
+    console.log('[TCA-Delete] Request:', { action, userIdCondition })
 
     if (!userIdCondition) {
       return NextResponse.json({ error: 'Thieu dieu kien' }, { status: 400, headers: CORS_HEADERS })
@@ -112,14 +114,11 @@ export async function POST(request: NextRequest) {
       }, { headers: CORS_HEADERS })
     }
 
-    // Delete mode
-    if (body.confirmation !== 'XACNHANXOA') {
-      return NextResponse.json({ error: 'Go "XACNHANXOA" de xoa' }, { status: 400, headers: CORS_HEADERS })
-    }
+    // Delete mode - không cần xác nhận vì đã confirm ở UI
+    const deleted = { userClosures: 0, systemClosures: 0, tcaMembers: 0, systems: 0, users: 0, registrationPoints: 0, total: 0 }
 
-    // Delete with transaction
-    const deleted = { userClosures: 0, systemClosures: 0, tcaMembers: 0, systems: 0, users: 0, total: 0 }
-
+    console.log('[TCA-Delete] Starting transaction with ids:', ids.length, 'systemIds:', systemIds.length)
+    
     await prisma.$transaction(async (tx) => {
       const uc = await tx.userClosure.deleteMany({ where: { descendantId: { in: ids } } })
       deleted.userClosures = uc.count || 0
@@ -147,6 +146,10 @@ export async function POST(request: NextRequest) {
       const sy = await tx.system.deleteMany({ where: { userId: { in: ids } } })
       deleted.systems = sy.count || 0
 
+      // Xóa RegistrationPoint trước khi xóa user (foreign key constraint)
+      const rp = await tx.registrationPoint.deleteMany({ where: { refereeId: { in: ids } } })
+      deleted.registrationPoints = rp.count || 0
+
       const safeIds = ids.filter((id: number) => id > 100)
       if (safeIds.length > 0) {
         const u = await tx.user.deleteMany({ where: { id: { in: safeIds } } })
@@ -154,15 +157,16 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    deleted.total = deleted.userClosures + deleted.systemClosures + deleted.tcaMembers + deleted.systems + deleted.users
+    deleted.total = deleted.userClosures + deleted.systemClosures + deleted.tcaMembers + deleted.systems + deleted.users + deleted.registrationPoints
 
     return NextResponse.json({
       success: true,
       deleted,
-      message: `Da xoa: ${deleted.users} users, ${deleted.systems} systems, ${deleted.tcaMembers} tcaMembers, ${deleted.systemClosures} closures, ${deleted.userClosures} userClosures`
+      message: `Da xoa: ${deleted.users} users, ${deleted.systems} systems, ${deleted.tcaMembers} tcaMembers, ${deleted.registrationPoints} regPoints, ${deleted.systemClosures} closures, ${deleted.userClosures} userClosures`
     }, { headers: CORS_HEADERS })
 
   } catch (e) {
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500, headers: CORS_HEADERS })
+    console.error('[TCA-Sync Delete] Error:', e)
+    return NextResponse.json({ success: false, error: String(e), stack: e instanceof Error ? e.stack : null }, { status: 500, headers: CORS_HEADERS })
   }
 }
