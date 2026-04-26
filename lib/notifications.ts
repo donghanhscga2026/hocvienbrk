@@ -80,8 +80,9 @@ function getGmailClient() {
 
 /**
  * Hàm chung để gửi Email qua Gmail API
+ * @returns { success: boolean, message: string }
  */
-async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string) {
+async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string): Promise<{ success: boolean; message: string }> {
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
@@ -99,9 +100,20 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
       htmlBody,
     ].filter(line => line !== '').join('\n');
     const encodedMessage = Buffer.from(messageParts).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encodedMessage } });
-  } catch (error) {
-    console.error(`❌ Email Error:`, error);
+    
+    const result = await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encodedMessage } });
+    console.log(`✅ Email sent to ${to}: ${result.data.id}`);
+    
+    return { success: true, message: 'Email sent successfully' };
+  } catch (error: any) {
+    const errorMsg = error?.response?.data?.error?.message || error?.message || error?.toString() || 'Unknown error';
+    console.error(`❌ Email Error sending to ${to}:`, errorMsg);
+    
+    // Notify admin via Telegram when email fails
+    const msgFail = `⚠️ <b>LỖI GỬI EMAIL</b>\n\n📧 To: ${to}\n📝 Subject: ${subject}\n❌ Error: ${errorMsg}`;
+    await sendTelegram(msgFail, 'ACTIVATE');
+    
+    return { success: false, message: errorMsg };
   }
 }
 
@@ -128,7 +140,8 @@ export async function sendVerificationEmail(to: string, studentName: string, tok
       <p style="font-size: 12px; color: #9ca3af; text-align: center;">Đây là email tự động, vui lòng không trả lời email này.</p>
     </div>
   `;
-  await sendGmail(to, subject, htmlBody);
+  const result = await sendGmail(to, subject, htmlBody);
+  return result;
 }
 
 export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
