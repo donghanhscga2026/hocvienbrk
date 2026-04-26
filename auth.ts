@@ -170,7 +170,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     console.log(`📡 Đang gửi thông báo đăng nhập cho #${user.id} từ IP: ${ip}`);
                     const { sendLoginNotification, sendVerificationEmail } = await import("@/lib/notifications");
                     
-                    await sendLoginNotification(user, ip, userAgent);
+                    // Convert user id từ string sang number cho sendLoginNotification
+                    const userIdNum = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+                    const userName = user.name || 'User';
+                    await sendLoginNotification({ id: userIdNum, name: userName }, ip, userAgent);
 
                     // GỬI THÔNG BÁO XÁC MINH CHO HỌC VIÊN CŨ CHƯA XÁC MINH
                     if ((user as any).isUnverifiedLegacy) {
