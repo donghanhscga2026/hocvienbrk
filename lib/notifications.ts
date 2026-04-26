@@ -1,9 +1,62 @@
-
 import { google } from 'googleapis';
 
 /**
  * ─── HỆ THỐNG THÔNG BÁO BACKEND (TELEGRAM & EMAIL) ──────────────────────────
  * File này chỉ chạy phía Server. Tuyệt đối không import vào Client Component.
+ * Version: 2.0.0 - Nâng cấp ngày 2026-04-26
+ * - Randomize subject line và HTML template
+ * - Telegram notification chi tiết khi gửi email thành công/thất bại
+ * - Fallback sang Resend khi Gmail lỗi
+ */
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * RANDOMIZATION HELPERS
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+// Random subject lines cho verification email (7 biến thể)
+const verificationSubjects = [
+  '[Học Viện BRK] Xác minh tài khoản của bạn',
+  '[Học Viện BRK] Kích hoạt tài khoản ngay',
+  '[Học Viện BRK] Hoàn tất đăng ký - Xác nhận email của bạn',
+  '[Học Viện BRK] Verify your account để bắt đầu học',
+  'Xác nhận đăng ký thành công - Học Viện BRK',
+  '[Học Viện BRK] Chào mừng! Xác minh email để tiếp tục',
+  'Kích hoạt tài khoản Học Viện BRK của bạn',
+];
+
+// Random greeting styles
+const greetings = ['Chào bạn,', 'Chào', 'Xin chào,', 'Chào buổi sáng tốt lành,', 'Hey,'];
+
+// Motivational quotes ngẫu nhiên
+const quotes = [
+  'Hành trình nghìn dặm bắt đầu từ một bước nhỏ.',
+  'Thành công không đến từ may mắn, mà từ sự kiên trì.',
+  'Học hỏ�i là chìa khóa của mọi thành công.',
+  'Đừng chờ đợi cơ hội, hãy tạo ra nó.',
+  'Mỗi ngày là một cơ hội để trở nên tốt hơn.',
+];
+
+// Random timestamp cho unique tracking
+function getTimestamp(): string {
+  return new Date().toISOString();
+}
+
+// Random ID cho tracking
+function generateEmailId(): string {
+  return `HV${Date.now().toString(36)}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+}
+
+// Random array picker
+function randomPick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * TELEGRAM NOTIFICATIONS
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 /**
@@ -33,6 +86,56 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
   } catch (error) {
     console.error(`❌ Telegram Error:`, error);
   }
+}
+
+/**
+ * Gửi notification chi tiết khi email được gửi thành công
+ */
+async function notifyEmailSuccess(to: string, subject: string, emailId: string, provider: string) {
+  const time = new Date().toLocaleString('vi-VN', { 
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const msg = `📧 <b>EMAIL ĐƯỢC GỬI THÀNH CÔNG</b>\n\n` +
+    `━━━━━━━━━━━━━━\n` +
+    `📧 To: <code>${to}</code>\n` +
+    `📝 Subject: ${subject}\n` +
+    `🆔 Email ID: <code>${emailId}</code>\n` +
+    `📡 Provider: <code>${provider}</code>\n` +
+    `⏰ Time: ${time}`;
+  
+  await sendTelegram(msg, 'ACTIVATE');
+}
+
+/**
+ * Gửi notification chi tiết khi email gửi thất bại
+ */
+async function notifyEmailError(to: string, subject: string, errorMsg: string, provider: string, attemptFallback: boolean) {
+  const time = new Date().toLocaleString('vi-VN', { 
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const fallbackMsg = attemptFallback ? '\n🔄 Fallback: <b>Đang thử provider khác...</b>' : '';
+  
+  const msg = `⚠️ <b>LỖI GỬI EMAIL</b>\n\n` +
+    `━━━━━━━━━━━━━━\n` +
+    `📧 To: <code>${to}</code>\n` +
+    `📝 Subject: ${subject}\n` +
+    `📡 Provider: <code>${provider}</code>\n` +
+    `❌ Error: ${errorMsg}${fallbackMsg}\n` +
+    `⏰ Time: ${time}`;
+  
+  await sendTelegram(msg, 'ACTIVATE');
 }
 
 export async function sendToolShareClickNotification(data: {
@@ -66,6 +169,12 @@ export async function sendToolShareClickNotification(data: {
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════════════════
+ * GMAIL CLIENT
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+/**
  * Cấu hình OAuth2 Client cho Gmail
  */
 function getGmailClient() {
@@ -77,6 +186,55 @@ function getGmailClient() {
   oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
   return google.gmail({ version: 'v1', auth: oAuth2Client });
 }
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════��════
+ * RESEND (FALLBACK PROVIDER)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+/**
+ * Gửi email qua Resend API
+ */
+async function sendViaResend(to: string, subject: string, htmlBody: string): Promise<{ success: boolean; message: string; emailId?: string }> {
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      return { success: false, message: 'RESEND_API_KEY not configured' };
+    }
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: 'Học Viện BRK <onboarding@resend.dev>',
+        to: to,
+        subject: subject,
+        html: htmlBody,
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, message: data.message || 'Resend API error' };
+    }
+
+    return { success: true, message: 'Email sent via Resend', emailId: data.id };
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : 'Resend error';
+    return { success: false, message: errMsg };
+  }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * CORE EMAIL FUNCTIONS
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * Hàm chung để gửi Email qua Gmail API
@@ -102,55 +260,155 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
     const encodedMessage = Buffer.from(messageParts).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     
     const result = await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encodedMessage } });
-    console.log(`✅ Email sent to ${to}: ${result.data.id}`);
+    const emailId = result.data.id as string;
+    console.log(`✅ Email sent to ${to}: ${emailId}`);
+    
+    // Notify success via Telegram
+    await notifyEmailSuccess(to, subject, emailId, 'Gmail API');
     
     return { success: true, message: 'Email sent successfully' };
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.error?.message || error?.message || error?.toString() || 'Unknown error';
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`❌ Email Error sending to ${to}:`, errorMsg);
     
-    // Notify admin via Telegram when email fails
-    const msgFail = `⚠️ <b>LỖI GỬI EMAIL</b>\n\n📧 To: ${to}\n📝 Subject: ${subject}\n❌ Error: ${errorMsg}`;
-    await sendTelegram(msgFail, 'ACTIVATE');
+    // Notify error via Telegram - Try fallback
+    const hasResendKey = !!process.env.RESEND_API_KEY;
+    await notifyEmailError(to, subject, errorMsg, 'Gmail API', hasResendKey);
+    
+    // Try fallback to Resend if available
+    if (hasResendKey) {
+      console.log(`🔄 Trying fallback to Resend for ${to}...`);
+      const resendResult = await sendViaResend(to, subject, htmlBody);
+      
+      if (resendResult.success) {
+        await notifyEmailSuccess(to, subject, resendResult.emailId || 'N/A', 'Resend (fallback)');
+        return { success: true, message: 'Email sent via Resend fallback' };
+      } else {
+        await notifyEmailError(to, subject, resendResult.message, 'Resend (fallback)', false);
+        return { success: false, message: `Gmail failed, Resend also failed: ${resendResult.message}` };
+      }
+    }
     
     return { success: false, message: errorMsg };
   }
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * EMAIL TEMPLATES
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+// Template 1: Simple Clean
+function getVerificationTemplate1(name: string, verifyUrl: string, emailId: string): string {
+  return `
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+  <div style="background: white; border-radius: 12px; padding: 30px; text-align: center;">
+    <h2 style="color: #4f46e5; margin-bottom: 20px;">Xác Minh Email</h2>
+    <p style="color: #374151; font-size: 16px;">Chào <b>${name}</b>,</p>
+    <p style="color: #6b7280;">Cảm ơn bạn đã đăng ký. Nhấn nút below để kích hoạt tài khoản:</p>
+    <div style="margin: 30px 0;">
+      <a href="${verifyUrl}" style="background: #4f46e5; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Kích Hoạt Tài Khoản</a>
+    </div>
+    <p style="font-size: 12px; color: #9ca3af;">Link: ${verifyUrl}</p>
+    <p style="font-size: 11px; color: #d1d5db; margin-top: 20px;">ID: ${emailId}</p>
+  </div>
+</div>`;
+}
+
+// Template 2: Modern Card
+function getVerificationTemplate2(name: string, verifyUrl: string, emailId: string, greeting: string): string {
+  const quote = randomPick(quotes);
+  return `
+<div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden;">
+    <div style="background: linear-gradient(90deg, #4f46e5, #7c3aed); padding: 40px 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 28px;">Xác Nhận Tài Khoản</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #1f2937; font-size: 16px;">${greeting} <span style="font-weight: 600;">${name}</span></p>
+      <p style="color: #4b5563; line-height: 1.6;">Bạn đã đăng ký thành công! Hãy xác nhận email để bắt đầu hành trình học tập.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verifyUrl}" style="background: #4f46e5; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(79,70,229,0.3);">Xác Nhận Ngay</a>
+      </div>
+      <p style="color: #6b7280; font-size: 13px; font-style: italic;">"${quote}"</p>
+      <p style="color: #9ca3af; font-size: 11px; margin-top: 20px; text-align: center;">ID: ${emailId}</p>
+    </div>
+  </div>
+</div>`;
+}
+
+// Template 3: Minimal
+function getVerificationTemplate3(name: string, verifyUrl: string, emailId: string): string {
+  return `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+  <h1 style="color: #111827; font-size: 24px; margin-bottom: 24px;">Xác minh tài khoản</h1>
+  <p style="color: #374151; font-size: 16px; line-height: 1.6;">Xin chào <b>${name}</b>,</p>
+  <p style="color: #4b5563; line-height: 1.6;">Cảm ơn bạn đã đăng ký. Nhấn nút bên dưới để kích hoạt:</p>
+  <div style="margin: 28px 0;">
+    <a href="${verifyUrl}" style="background: #111827; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; display: inline-block;">Kích hoạt</a>
+  </div>
+  <p style="color: #6b7280; font-size: 13px;">Hoặc dùng link: <span style="color: #4f46e5;">${verifyUrl}</span></p>
+  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+  <p style="color: #9ca3af; font-size: 11px;">Email ID: ${emailId}</p>
+</div>`;
+}
+
+/**
+ * Get random verification template
+ */
+function getRandomVerificationTemplate(name: string, token: string): { subject: string; html: string } {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
+  const verifyUrl = `${baseUrl}/api/auth/verify?token=${token}`;
+  const emailId = generateEmailId();
+  const greeting = randomPick(greetings);
+  
+  // Random subject
+  const subject = randomPick(verificationSubjects);
+  
+  // Random template (1, 2, or 3)
+  const templateNum = Math.floor(Math.random() * 3) + 1;
+  let html = '';
+  
+  if (templateNum === 1) {
+    html = getVerificationTemplate1(name, verifyUrl, emailId);
+  } else if (templateNum === 2) {
+    html = getVerificationTemplate2(name, verifyUrl, emailId, greeting);
+  } else {
+    html = getVerificationTemplate3(name, verifyUrl, emailId);
+  }
+  
+  return { subject, html };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * EXPORTED EMAIL FUNCTIONS
+ * ═════════════════════════════════════���═���═══════════════════════════════════════
+ */
+
 export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
   const subject = `[Học Viện BRK] Chào mừng bạn gia nhập học viện - Mã học tập của bạn là #${studentId}`;
   const htmlBody = `Chào mừng <b>${studentName}</b> đến với Học Viện BRK,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
-  await sendGmail(to, subject, htmlBody);
-}
-
-export async function sendVerificationEmail(to: string, studentName: string, token: string) {
-  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'}/api/auth/verify?token=${token}`;
-  const subject = `[Học Viện BRK] Xác minh tài khoản của bạn`;
-  const htmlBody = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; rounded: 8px;">
-      <h2 style="color: #4f46e5; text-align: center;">Xác minh Email</h2>
-      <p>Chào <b>${studentName}</b>,</p>
-      <p>Cảm ơn bạn đã đăng ký gia nhập Học Viện BRK. Để hoàn tất quá trình đăng ký và kích hoạt tài khoản, vui lòng nhấn vào nút bên dưới:</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${verifyUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Kích hoạt tài khoản</a>
-      </div>
-      <p style="font-size: 12px; color: #6b7280;">Nếu nút trên không hoạt động, bạn có thể sao chép và dán liên kết này vào trình duyệt:</p>
-      <p style="font-size: 12px; color: #4f46e5; word-break: break-all;">${verifyUrl}</p>
-      <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-      <p style="font-size: 12px; color: #9ca3af; text-align: center;">Đây là email tự động, vui lòng không trả lời email này.</p>
-    </div>
-  `;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
 
-export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, customContent: string | null) {
-  const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
-  const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
-  await sendGmail(to, subject, htmlBody);
+export async function sendVerificationEmail(to: string, studentName: string, token: string) {
+  // Sử dụng template ngẫu nhiên với random subject và HTML
+  const { subject, html } = getRandomVerificationTemplate(studentName, token);
+  const result = await sendGmail(to, subject, html);
+  return result;
 }
 
-export async function sendLoginNotification(user: any, ip: string, userAgent: string) {
+export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, _customContent: string | null) {
+  const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
+  const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
+  const result = await sendGmail(to, subject, htmlBody);
+  return result;
+}
+
+export async function sendLoginNotification(user: { id: number; name: string }, _ip: string, _userAgent: string) {
   const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})`;
   await sendTelegram(msg, 'LESSON');
 }
@@ -160,26 +418,34 @@ export async function sendPasswordChangedNotification(user: { id: number; name: 
   await sendTelegram(msg, 'LESSON');
 }
 
+interface GoalConfig {
+  videoPerDay?: number;
+  days?: number;
+  isLivestream?: boolean;
+  livePerDay?: number;
+  liveDays?: number;
+  moneyGoal?: number;
+  targetVal?: number;
+}
+
 export async function sendSurveyNotification(data: {
   studentName: string,
   studentId: number,
   goal: string,
   targetPointName: string,
   courses: string[],
-  answers: Record<string, any>
+  answers: Record<string, unknown>
 }) {
   const coursesList = data.courses.length > 0 
     ? data.courses.map((c, i) => `${i + 1}. ${c}`).join('\n')
     : 'Chưa xác định';
 
-  // 1. Phân loại các câu trả lời
   const inputs: string[] = [];
   const selections: string[] = [];
 
   Object.entries(data.answers).forEach(([key, value]) => {
     if (key === 'goal_config') return;
 
-    // Nhận diện các input văn bản (tên kênh, link, free text)
     if (key.endsWith('_name') || key.endsWith('_id') || key.endsWith('_url') || key === 'free_text_submit') {
       const label = key.endsWith('_name') ? 'Kênh' : key.endsWith('_id') ? 'Link/ID' : 'Nhập liệu';
       inputs.push(`<b>${label}:</b> ${value}`);
@@ -188,10 +454,9 @@ export async function sendSurveyNotification(data: {
     }
   });
 
-  // 2. Xử lý thông tin chi tiết từ cấu hình mục tiêu (goal_config)
-  const config = data.answers['goal_config'];
+  const config = data.answers['goal_config'] as GoalConfig | undefined;
   let configDetails = '';
-  if (config) {
+  if (config && typeof config === 'object') {
     configDetails = `📝 <b>CHI TIẾT CAM KẾT:</b>\n` +
       `• Đăng bài: ${config.videoPerDay} video/ngày trong ${config.days} ngày\n`;
     
@@ -209,7 +474,7 @@ export async function sendSurveyNotification(data: {
     `🏆 Mục tiêu: <b>${data.goal}</b>\n\n` +
     (inputs.length > 0 ? `<b>⌨️ THÔNG TIN NHẬP:</b>\n${inputs.join('\n')}\n\n` : '') +
     `<b>📊 LỰA CHỌN KHẢO SÁT:</b>\n${selections.join('\n')}\n\n` +
-    `${configDetails}\n` +
+    `${configDetails}` +
     `<b>📚 LỘ TRÌNH KHÓA HỌC:</b>\n${coursesList}\n\n` +
     `#Survey #Roadmap #HocVienBRK`;
 
