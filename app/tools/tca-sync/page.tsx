@@ -26,7 +26,6 @@ function DeleteByUserSection() {
   const [vals, setVals] = useState('')
   const [preview, setPreview] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
-  const [confirmText, setConfirmText] = useState('')
   const [result, setResult] = useState<any>(null)
 
   const handlePreview = async () => {
@@ -44,11 +43,7 @@ function DeleteByUserSection() {
 
   const handleDelete = async () => {
     if (!preview) return
-    if (!confirm('⚠️ CẢNH BÁO: Xóa VĨNH VIỄN dữ liệu!')) return
-    if (confirmText !== 'XACNHANXOA') {
-      alert('Gõ "XACNHANXOA" vào ô xác nhận để xóa.')
-      return
-    }
+    if (!confirm('⚠️ CẢNH BÁO: Xóa VĨNH VIỄN dữ liệu! Bạn có chắc chắn?')) return
     let cond: any = { type: deleteMode }
     if (deleteMode === 'gte') cond.value = parseInt(val) || 0
     if (deleteMode === 'between') { cond.valueA = parseInt(valA) || 0; cond.valueB = parseInt(valB) || 999999 }
@@ -56,10 +51,9 @@ function DeleteByUserSection() {
     setDeleting(true)
     setResult(null)
     try {
-      const res = await fetch('/api/sync-tca/delete-by-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', userIdCondition: cond, confirmation: 'XACNHANXOA' }) })
+      const res = await fetch('/api/sync-tca/delete-by-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', userIdCondition: cond }) })
       setResult(await res.json())
       setPreview(null)
-      setConfirmText('')
     } catch (e) { setResult({ success: false, error: String(e) }) } finally { setDeleting(false) }
   }
 
@@ -73,9 +67,6 @@ function DeleteByUserSection() {
       {deleteMode==='gte' && <input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="58681" className="w-full border rounded p-2 mb-3"/>}
       {deleteMode==='between' && <div className="flex gap-2 mb-3"><input type="number" value={valA} onChange={e=>setValA(e.target.value)} placeholder="Từ ID" className="flex-1 border rounded p-2"/><input type="number" value={valB} onChange={e=>setValB(e.target.value)} placeholder="Đến ID" className="flex-1 border rounded p-2"/></div>}
       {deleteMode==='in' && <textarea value={vals} onChange={e=>setVals(e.target.value)} placeholder="58681, 58682, 58690" className="w-full border rounded p-2 mb-3 h-20"/>}
-      <div className="mb-2">
-        <input type="text" value={confirmText} onChange={e=>setConfirmText(e.target.value)} placeholder='Gõ "XACNHANXOA" để xóa' className="w-full border-2 border-red-300 rounded p-2 text-center font-mono"/>
-      </div>
       <div className="flex gap-2">
         <button onClick={handlePreview} className="px-4 py-2 bg-blue-500 text-white rounded">Preview</button>
         <button onClick={handleDelete} disabled={deleting || !preview} className="px-4 py-2 bg-red-500 text-white rounded disabled:opacity-50">{deleting ? 'Đang xóa...' : 'Xóa'}</button>
