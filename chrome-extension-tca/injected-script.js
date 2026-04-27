@@ -621,48 +621,28 @@ data: data,
       console.log('[TCA Overview] 🔎 ========== BẮT ĐẦU TÌM ROOT DATA ==========');
       
       try {
-        // DEBUG: Liệt kê tất cả elements có thể chứa text
-        const allElements = Array.from(document.querySelectorAll('*'));
-        const candidateElements = allElements.filter(el => {
-          const text = el.innerText || '';
-          return text.includes('Tổ chức') || text.includes('phân nhánh');
-        });
-        
-        console.log('[TCA Overview] 🔍 Tìm thấy', candidateElements.length, 'elements chứa "Tổ chức" hoặc "phân nhánh"');
-        
-        if (candidateElements.length > 0) {
-          // In chi tiết từng element
-          candidateElements.forEach((el, i) => {
-            if (i < 5) {
-              console.log(`[TCA Overview] [${i}] ${el.tagName}: "${el.innerText.substring(0, 100)}..."`);
-            }
-          });
+        // 1. Tìm dòng văn bản trên giao diện - chi query 1 số thẻ cụ thể
+        const elements = Array.from(document.querySelectorAll('b, h4, h5, div, p'));
+        const targetEl = elements.find(el => el.innerText.includes("Tổ chức phân nhánh") && el.innerText.includes("/"));
+
+        if (!targetEl) {
+          console.log('[TCA Overview] ❌ Không tìm thấy dòng dữ liệu trên giao diện');
+          return null;
         }
-        
-        // Tìm element có đủ cả "Tổ chức" và "phân nhánh"
-        const targetEl = candidateElements.find(el => {
-          const text = el.innerText || '';
-          return text.includes('Tổ chức') && text.includes('phân nhánh');
-        });
 
-        console.log('[TCA Overview] TargetEl:', targetEl ? `${targetEl.tagName} - TÌM THẤY` : 'KHÔNG TÌM THẤY');
+        console.log('[TCA Overview] Tìm thấy element:', targetEl.tagName);
 
-        if (targetEl) {
-          const text = targetEl.innerText;
-          const cleanText = text.replace(/\s+/g, ' ').trim();
-          console.log('[TCA Overview] Full text:', cleanText);
+        // 2. Dùng Regex để bóc tách 3 giá trị
+        const text = targetEl.innerText;
+        const regex = /Tổ chức phân nhánh\s*-\s*([\d.]+)\s*\/\s*([\d.]+)\s*-\s*Cấp\s*(\d+)/;
+        const match = text.match(regex);
 
-          // Regex: with trailing content
-          const regex = /Tổ chức\s*phân\s*nhánh.*?([\d.]+).*?\/.*?([\d.]+).*?Cấp\s*(\d+)/i;
-          const match = cleanText.match(regex);
-          console.log('[TCA Overview] Regex match:', match);
-
-          // Portal dùng '.' là dấu thập phân: '17.006' = 17.006 điểm
+        if (match) {
           const personalPoints = parseFloat(match[1]) || 0;
           const teamPoints = parseFloat(match[2]) || 0;
           const level = parseInt(match[3]) || 1;
 
-          console.log('[TCA Overview] ✅ SUCCESS - personalPoints:', personalPoints, 'teamPoints:', teamPoints, 'level:', level);
+          console.log('[TCA Overview] ✅ SUCCESS - CN:', personalPoints, 'ĐỘI:', teamPoints, 'Cấp:', level);
 
           const overviewData = {
             type: 'OVERVIEW_REPORT',
@@ -670,7 +650,7 @@ data: data,
             team_points: teamPoints,
             level: level,
             timestamp: new Date().toISOString(),
-            raw_text: cleanText
+            raw_text: text
           };
 
           try {
@@ -680,7 +660,7 @@ data: data,
 
           return overviewData;
         } else {
-          console.log('[TCA Overview] ⚠️ KHÔNG tìm thấy element với cả "Tổ chức" và "phân nhánh"');
+          console.log('[TCA Overview] ⚠️ Tìm thấy dòng chữ nhưng không khớp định dạng. Text:', text.substring(0, 100));
         }
       } catch (e) {
         console.log('[TCA Overview] ❌ LỖI:', e.message);
@@ -697,6 +677,13 @@ data: data,
       if (event.data && event.data.type === 'TCA_CONTROL') {
         if (event.data.command === 'startScan' && typeof window.extractTcaOverview === 'function') {
           console.log('[TCA Sync] ▶️ startScan command received');
+          window.extractTcaOverview();
+        }
+      }
+      // Lắng nghe TCA_GET_OVERVIEW để lấy overview
+      if (event.data && event.data.type === 'TCA_GET_OVERVIEW') {
+        console.log('[TCA Sync] 📊 TCA_GET_OVERVIEW received');
+        if (typeof window.extractTcaOverview === 'function') {
           window.extractTcaOverview();
         }
       }

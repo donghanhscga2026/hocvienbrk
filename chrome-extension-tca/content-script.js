@@ -1126,44 +1126,67 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     }
 
     // Gọi extractOverviewData để lấy điểm tổng hệ thống
-    // Thử đọc từ localStorage trước, nếu không có thì gọi function
+    // Content-script tự query DOM - giống như chạy trong console
+    let overviewRetryCount = 0;
+    const maxRetries = 10;
+    
     const tryExtractOverview = () => {
-      // THỬ ĐỌC từ localStorage trước
-      let overview = null;
       try {
-        const stored = localStorage.getItem('tcaOverviewData');
-        if (stored) {
-          overview = JSON.parse(stored);
-          console.log('[TCA Sync] 📊 Đọc overview từ localStorage:', overview);
+        // 1. Tìm dòng văn bản trên giao diện - giống code console
+        const elements = Array.from(document.querySelectorAll('b, h4, h5, div, p'));
+        const targetEl = elements.find(el => 
+          el.innerText.includes("Tổ chức phân nhánh") && el.innerText.includes("/")
+        );
+
+        if (!targetEl) {
+          console.log('[TCA Overview] ❌ Không tìm thấy dòng dữ liệu trên giao diện');
+        } else {
+          // 2. Dùng Regex để bóc tách 3 giá trị
+          const text = targetEl.innerText;
+          const regex = /Tổ chức phân nhánh\s*-\s*([\d.]+)\s*\/\s*([\d.]+)\s*-\s*Cấp\s*(\d+)/;
+          const match = text.match(regex);
+
+          if (match) {
+            const personalPoints = parseFloat(match[1]) || 0;
+            const teamPoints = parseFloat(match[2]) || 0;
+            const level = parseInt(match[3]) || 1;
+
+            console.log('[TCA Overview] ✅ SUCCESS - CN:', personalPoints, 'ĐỘI:', teamPoints, 'Cấp:', level);
+
+            const overview = {
+              type: 'OVERVIEW_REPORT',
+              personal_points: personalPoints,
+              team_points: teamPoints,
+              level: level,
+              raw_text: text
+            };
+
+            window.tcaOverviewData = overview;
+            const cn = Number(overview.personal_points).toFixed(3);
+            const dd = Number(overview.team_points).toFixed(3);
+            addTcaLog(`📊 ROOT: CN=${cn} | ĐỘI=${dd} | Cấp=${level}`);
+            window.tcaRootFormatted = { cn, dd, level };
+            return; // Thành công, không cần retry
+          } else {
+            console.log('[TCA Overview] ⚠️ Tìm thấy dòng chữ nhưng không khớp định dạng. Text:', text.substring(0, 100));
+          }
         }
-      } catch (e) {}
-      
-      // Nếu không có trong localStorage, thử gọi function
-      if (!overview && typeof window.extractTcaOverview === 'function') {
-        overview = window.extractTcaOverview();
+      } catch (e) {
+        console.log('[TCA Overview] ❌ LỖI:', e.message);
       }
-      
-      if (overview) {
-        window.tcaOverviewData = overview;
-        
-        // Chỉ lấy phần quan trọng từ raw_text - tìm dòng "Tổ chức phân nhánh"
-        const rootLine = (overview.raw_text || '').split('\n').find(l => l.includes('Tổ chức phân nhánh')) || overview.raw_text || '';
-        
-        const cn = Number(overview.personal_points).toFixed(3);
-        const dd = Number(overview.team_points).toFixed(3);
-        
-        addTcaLog(`📊 ROOT: ${rootLine.substring(0, 60)}...`);
-        addTcaLog(`   ▸ CN: ${cn} | ĐỘI: ${dd} | Cấp: ${overview.level}`);
-        
-        window.tcaRootFormatted = { cn, dd, level: overview.level };
+
+      // Retry nếu không lấy được
+      overviewRetryCount++;
+      if (overviewRetryCount >= maxRetries) {
+        addTcaLog('⚠️ Overview: Hết retry (' + maxRetries + ')');
       } else {
-        addTcaLog('⚠️ Chưa có overview data - thử lại sau...');
+        addTcaLog('⚠️ Chưa có overview data... (' + overviewRetryCount + '/' + maxRetries + ')');
         setTimeout(tryExtractOverview, 2000);
       }
     };
     
-    // Bắt đầu thử sau 2s
-    setTimeout(tryExtractOverview, 2000);
+    // Bat dau thu sau 3s
+    setTimeout(tryExtractOverview, 3000);
 
     console.log('==========================================');
     console.log('[TCA Sync] ✅ DATA EXTRACTED SUCCESS!');

@@ -251,9 +251,10 @@ export async function POST(request: Request) {
       
       // Chỉ khi nào tìm thấy User (foundInUser = true) mới vào đây
       if (foundInUser) {
-        // Check System cho User đã tìm thấy (query tất cả thay vì chỉ onSystem: 1)
+        // Check System cho User đã tìm thấy (chỉ lấy TCA system = onSystem: 1, order by createdAt desc)
         existingSystem = await prisma.system.findFirst({
-          where: { userId: existingUser.id }
+          where: { userId: existingUser.id, onSystem: 1 },
+          orderBy: { createdAt: 'desc' }
         })
         
         if (existingSystem) {
