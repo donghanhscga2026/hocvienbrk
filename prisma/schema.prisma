@@ -695,6 +695,8 @@ model TCAMember {
 
   user           User      @relation(fields: [userId], references: [id])
 
+  chuc_danh      String?   // Trường chức danh đặc biệt (C5, C20, DHTT)
+
   @@index([tcaId])
   @@index([userId])
   @@index([parentTcaId])

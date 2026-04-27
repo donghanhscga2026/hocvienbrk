@@ -137,6 +137,17 @@ const getLevelBadgeColor = (level?: number) => {
   return colors[Math.min(level || 0, colors.length - 1)]
 }
 
+// v8.5.0: Helper lấy style màu nền dựa trên chucDanh đặc biệt
+const getChucDanhStyle = (chucDanh?: string | null) => {
+  if (!chucDanh) return 'bg-white'
+  switch (chucDanh.toUpperCase()) {
+    case 'C5': return 'bg-orange-400'    // Thành viên chiến lược - Da cam
+    case 'C20': return 'bg-yellow-100'  // Thành viên core - Vàng nhạt
+    case 'DHTT': return 'bg-pink-300'    // Tướng kinh doanh - Hồng
+    default: return 'bg-white'
+  }
+}
+
 const GenealogyCard = (props: NodeProps) => {
   const data = props.data as unknown as GenealogyNode & {
     isRoot?: boolean;
@@ -198,7 +209,7 @@ const GenealogyCard = (props: NodeProps) => {
       </div>
 
       {/* Information Box - tiếp ngay dưới semicircle, padding top nhỏ lại */}
-      <div className="bg-white px-2 pb-2 pt-2 -mt-0.5 rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-t-0 border-slate-100 w-full text-center relative z-0 flex flex-col items-center">
+      <div className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-2 -mt-0.5 rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-t-0 border-slate-100 w-full text-center relative z-0 flex flex-col items-center`}>
         {/* Tên thành viên */}
         <div className="font-bold text-[12px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px-1">
           {data.name || 'Học viên'}

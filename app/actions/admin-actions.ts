@@ -40,6 +40,8 @@ export interface GenealogyNode {
     tcaName?: string | null
     // GroupName TCA (THÁI SƠN = Active, null/rỗng = chưa active)
     groupName?: string | null
+    // Chức danh đặc biệt (C5, C20, DHTT)
+    chucDanh?: string | null
 }
 
 // Helper: Lay thong tin System cua user (tim theo onSystem dau tien)
@@ -154,18 +156,20 @@ async function buildStandardTree(
     }
 // Batch fetch TCAMember scores cho toàn bộ node trong cây
     // Query theo cả userId (thành viên thường) và tcaId (root TCA)
-const tcaMembers = isSystem
-        ? await (prisma as any).tCAMember.findMany({
+    // Đã đồng bộ schema prisma nên có thể dùng prisma.tCAMember.findMany
+    const tcaMembers = isSystem
+        ? await prisma.tCAMember.findMany({
             where: { 
                 OR: [
                     { userId: { in: [...allUserIds] } },
-                    { tcaId: { in: [...allUserIds] } }  // Thêm tìm theo tcaId cho root
+                    { tcaId: { in: [...allUserIds] } }
                 ]
             },
-            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true, groupName: true }
+            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true, groupName: true, chuc_danh: true }
         })
         : []
-    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null; groupName: string | null }>()
+
+    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null; groupName: string | null; chucDanh: string | null }>()
     for (const m of tcaMembers) {
         const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
         const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
@@ -178,7 +182,8 @@ const tcaMembers = isSystem
                 personalScore: newPersonalScore,
                 totalScore: newTotalScore,
                 name: m.name ?? null,
-                groupName: m.groupName ?? null
+                groupName: m.groupName ?? null,
+                chucDanh: (m as any).chuc_danh ?? null
             })
         }
         
@@ -191,10 +196,12 @@ const tcaMembers = isSystem
                     personalScore: newPersonalScore,
                     totalScore: newTotalScore,
                     name: m.name ?? null,
-                    groupName: m.groupName ?? null
+                    groupName: m.groupName ?? null,
+                    chucDanh: (m as any).chuc_danh ?? null
                 })
             }
         }
+    }
         
         // Map theo tcaId cho root TCA (nếu khác userId)
         if (m.tcaId && m.tcaId !== m.userId) {
@@ -299,6 +306,7 @@ const tcaMembers = isSystem
                 totalScore: tcaData?.totalScore ?? null,
                 tcaName: tcaData?.name ?? null,
                 groupName: tcaData?.groupName ?? null,
+                chucDanh: tcaData?.chucDanh ?? null,
             }
         })
     }
@@ -327,6 +335,7 @@ const tcaMembers = isSystem
                 personalScore: f2tca?.personalScore ?? null,
                 totalScore: f2tca?.totalScore ?? null,
                 groupName: f2tca?.groupName ?? null,  // v8.4.1: Thêm groupName
+                chucDanh: f2tca?.chucDanh ?? null,
             }
         })
 
@@ -346,7 +355,8 @@ const tcaMembers = isSystem
                 name: gf1.name, 
                 totalSubCount: gf1Closures.length, 
                 children: gf2sOld,
-                groupName: gf1tca?.groupName ?? null  // v8.4.1: Thêm groupName
+                groupName: gf1tca?.groupName ?? null,  // v8.4.1: Thêm groupName
+                chucDanh: gf1tca?.chucDanh ?? null
             }
 
             if (!gHasF2) {
@@ -373,6 +383,7 @@ const tcaMembers = isSystem
             level: f1tca?.level ?? null,
             personalScore: f1tca?.personalScore ?? null,
             totalScore: f1tca?.totalScore ?? null,
+            chucDanh: f1tca?.chucDanh ?? null,
         }
     })
 
@@ -395,7 +406,8 @@ const tcaMembers = isSystem
         personalScore: rootTca?.personalScore ?? null,
         totalScore: rootTca?.totalScore ?? null,
         tcaName: rootTca?.name ?? null,
-        groupName: rootTca?.groupName ?? null
+        groupName: rootTca?.groupName ?? null,
+        chucDanh: rootTca?.chucDanh ?? null
     }
     }
 
