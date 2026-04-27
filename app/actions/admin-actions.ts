@@ -440,24 +440,28 @@ export async function getGenealogyChildrenAction(parentId: number) {
 export async function getSystemTreeAction(systemId: number) {
     const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
-    const isRootAdmin = userId === 0
+    const isRootAdmin = userId === 0 || isAdmin
     try {
-        let rootUserId = userId // Mặc định lấy chính mình làm gốc
+        let rootUserId = userId 
+
+        // v8.9.0: Kiểm tra quyền xem toàn bộ cho thành viên chiến lược C5
+        const userTca = await prisma.tCAMember.findFirst({
+            where: { userId },
+            select: { chuc_danh: true }
+        })
+        const isC5 = userTca?.chuc_danh === 'C5'
         
         const systemInfo = await getUserSystemInfo(userId)
-        // Nếu không thuộc hệ thống này
-        if (!systemInfo || systemInfo.onSystem !== systemId) {
-            if (isRootAdmin) {
-                // Admin id=0 được xem tất cả
+        // Nếu không thuộc hệ thống này HOẶC là C5/Admin -> Cố gắng lấy root của hệ thống
+        if (!systemInfo || systemInfo.onSystem !== systemId || isC5 || isRootAdmin) {
+            if (isRootAdmin || isC5) {
                 const root = await getSystemRootUser(systemId)
-                if (!root) return { success: false, error: "Không tìm thấy root" }
-                rootUserId = root.id
+                if (root) rootUserId = root.id
+                else if (!isRootAdmin) return { success: false, error: "Hệ thống chưa có dữ liệu" }
             } else {
-                // Admin id!=0 hoặc user thường không thuộc hệ thống
                 return { success: false, error: "Bạn chưa tham gia hệ thống này" }
             }
         }
-        // Nếu thuộc hệ thống (bao gồm cả admin id!=0), xem từ vị trí mình trở xuống
         
         const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId)
         return { success: true, tree }
