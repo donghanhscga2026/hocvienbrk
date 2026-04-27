@@ -38,6 +38,8 @@ export interface GenealogyNode {
     totalScore?: number | null
     // Tên TCA (nếu có = đã active, null = chưa active)
     tcaName?: string | null
+    // GroupName TCA (THÁI SƠN = Active, null/rỗng = chưa active)
+    groupName?: string | null
 }
 
 // Helper: Lay thong tin System cua user (tim theo onSystem dau tien)
@@ -160,10 +162,10 @@ const tcaMembers = isSystem
                     { tcaId: { in: [...allUserIds] } }  // Thêm tìm theo tcaId cho root
                 ]
             },
-            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true }
+            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true, groupName: true }
         })
         : []
-    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null }>()
+    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null; groupName: string | null }>()
     for (const m of tcaMembers) {
         const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
         const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
@@ -175,7 +177,8 @@ const tcaMembers = isSystem
                 level: m.level ?? null,
                 personalScore: newPersonalScore,
                 totalScore: newTotalScore,
-                name: m.name ?? null
+                name: m.name ?? null,
+                groupName: m.groupName ?? null
             })
         }
         
@@ -187,7 +190,8 @@ const tcaMembers = isSystem
                     level: m.level ?? null,
                     personalScore: newPersonalScore,
                     totalScore: newTotalScore,
-                    name: m.name ?? null
+                    name: m.name ?? null,
+                    groupName: m.groupName ?? null
                 })
             }
         }
@@ -200,7 +204,8 @@ const tcaMembers = isSystem
                     level: m.level ?? null,
                     personalScore: newPersonalScore,
                     totalScore: newTotalScore,
-                    name: m.name ?? null
+                    name: m.name ?? null,
+                    groupName: m.groupName ?? null
                 })
             }
         }
@@ -235,7 +240,8 @@ const tcaMembers = isSystem
                 level: f2tca?.level ?? null,
                 personalScore: f2tca?.personalScore ?? null,
                 totalScore: f2tca?.totalScore ?? null,
-                tcaName: f2tca?.name ?? null
+                tcaName: f2tca?.name ?? null,
+                groupName: f2tca?.groupName ?? null
             }
         })
 
@@ -249,7 +255,8 @@ const tcaMembers = isSystem
             level: f1tca?.level ?? null,
             personalScore: f1tca?.personalScore ?? null,
             totalScore: f1tca?.totalScore ?? null,
-            tcaName: f1tca?.name ?? null
+            tcaName: f1tca?.name ?? null,
+            groupName: f1tca?.groupName ?? null
         }
 
         if (!hasF2) {
@@ -291,6 +298,7 @@ const tcaMembers = isSystem
                 personalScore: tcaData?.personalScore ?? null,
                 totalScore: tcaData?.totalScore ?? null,
                 tcaName: tcaData?.name ?? null,
+                groupName: tcaData?.groupName ?? null,
             }
         })
     }
@@ -318,6 +326,7 @@ const tcaMembers = isSystem
                 level: f2tca?.level ?? null,
                 personalScore: f2tca?.personalScore ?? null,
                 totalScore: f2tca?.totalScore ?? null,
+                groupName: f2tca?.groupName ?? null,  // v8.4.1: Thêm groupName
             }
         })
 
@@ -331,7 +340,14 @@ const tcaMembers = isSystem
             const gHasF2 = gf1Closures.some(c => c.depth === 1)
             const gHasF3 = gf1Closures.some(c => c.depth === 2)
             const gf2sOld = gf1Closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
-            const gfData = { id: gf1.userId, name: gf1.name, totalSubCount: gf1Closures.length, children: gf2sOld }
+            const gf1tca = tcaMemberMap.get(gf1.userId) ?? tcaMemberMap.get(gf1.autoId)
+            const gfData = { 
+                id: gf1.userId, 
+                name: gf1.name, 
+                totalSubCount: gf1Closures.length, 
+                children: gf2sOld,
+                groupName: gf1tca?.groupName ?? null  // v8.4.1: Thêm groupName
+            }
 
             if (!gHasF2) {
                 gA.push(gfData)
@@ -378,6 +394,8 @@ const tcaMembers = isSystem
         level: rootTca?.level ?? null,
         personalScore: rootTca?.personalScore ?? null,
         totalScore: rootTca?.totalScore ?? null,
+        tcaName: rootTca?.name ?? null,
+        groupName: rootTca?.groupName ?? null
     }
     }
 

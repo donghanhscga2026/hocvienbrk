@@ -265,17 +265,19 @@
     `;
 
     const rows = previewRows.length > 0 ? previewRows : allNodes;
+    // v8.9.0: Thống kê bao gồm TCA+ (new fields update)
     const viewStats = {
       total: rows.length,
       createAll: rows.filter(r => r.action === 'CREATE_ALL').length,
       createSystem: rows.filter(r => r.action === 'CREATE_SYSTEM').length,
-      update: rows.filter(r => r.action === 'UPDATE').length
+      update: rows.filter(r => r.action === 'UPDATE').length,
+      tcaPlus: rows.filter(r => r.action?.includes('TCA+')).length  // v8.9.0: Đếm TCA+
     };
     
     panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 15px; background:#f5f5f5; border-bottom:2px solid #e0e0e0; flex-shrink:0;">
         <div style="display:flex; align-items:center; gap:15px;">
-          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v7.6.0 [Root Sync: Auto]</span></h2>
+          <h2 style="margin:0; color:#2e7d32; font-size:18px; font-weight:bold;">TCA Dashboard <span style="font-size:10px; color:#c2185b; font-weight:normal;">v8.9.0 [Root Sync: Auto]</span></h2>
           <div style="display:flex; gap:8px;">
             <button id="btn-csv" style="background:#1565c0; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📥 CSV</button>
             <button id="btn-json" style="background:#7b1fa2; border:none; color:white; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px;">📄 JSON</button>
@@ -286,6 +288,7 @@
           <div style="font-size:11px; color:#666; background:#fff; padding:4px 8px; border-radius:4px; border:1px solid #ddd;">
             <span style="color:#2e7d32; font-weight:bold;">Tạo: ${viewStats.createAll + viewStats.createSystem}</span> | 
             <span style="color:#f57c00; font-weight:bold;">Sửa: ${viewStats.update}</span> | 
+            <span style="color:#c2185b; font-weight:bold;">New Fields: ${viewStats.tcaPlus}</span> |  <!-- v8.9.0 -->
             <span>Tổng: ${viewStats.total}</span> |
             <span id="selected-count-label" style="color:#1565c0; font-weight:bold;">Đã chọn: 0</span>
           </div>
@@ -314,7 +317,8 @@
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc; width:60px;">refSysId</th>
                   <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; min-width:180px;">Email</th>
                   <th style="padding:10px 4px; text-align:left; border-bottom:2px solid #ccc; width:100px;">Phone</th>
-                  <!-- 10 cột mới bổ sung (không có Địa Chỉ, không trùng Cấp) -->
+                  <!-- 11 cột mới bổ sung (v8.9.0: có Location) -->
+                  <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Khu vực</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Điểm CN</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Điểm Đội</th>
                   <th style="padding:10px 4px; text-align:center; border-bottom:2px solid #ccc;">Ngày Gia Nhập</th>
@@ -362,27 +366,45 @@
     const displayRows = previewRows.length > 0 ? previewRows : allNodes;
     
     // Lấy thông tin chi tiết từ allNodes và memberInfoCache cho 12 cột mới
-    // Xử lý "Không có thông tin" -> "-"
+    // v8.9.0: Xử lý "Không có thông tin" -> "-" và hiển thị thay đổi new fields
     const cleanDate = (val) => {
       if (!val || val === 'null' || val === 'undefined' || val.includes('Không có thông tin')) return '-';
       return val;
     };
-    const getNodeExtra = (id) => {
+    const getNodeExtra = (id, row) => {
       const node = allNodes.find(n => n.id === id);
       const info = memberInfoCache[id] || {};
+      
+      // v8.9.0: Lấy dữ liệu so sánh new fields từ row
+      const dbNewFields = row.dbNewFields || {};
+      const tcaNewFields = row.tcaNewFields || {};
+      const hasNewFieldsChange = row.hasNewFieldsChange || false;
+      
+      // Màu sắc cho new fields: đỏ nếu thay đổi, xám nếu không
+      const getNewFieldColor = (field, dbVal, tcaVal) => {
+        if (hasNewFieldsChange && dbVal !== tcaVal) return '#d32f2f'; // Đỏ: thay đổi
+        return '#666'; // Xám: không đổi
+      };
+      
       return {
         personalScore: node?.personalScore || '-',
         totalScore: node?.totalScore || '-',
         level: node?.level || '1',
-        location: node?.location || '-',
-        personalRate: node?.personalRate || '-',
-        teamRate: node?.teamRate || '-',
-        hasBH: node?.hasBH ? '✓' : '-',
-        hasTD: node?.hasTD ? '✓' : '-',
+        location: tcaNewFields.location || node?.location || '-',
+        locationColor: getNewFieldColor('location', dbNewFields.location, tcaNewFields.location),
+        personalRate: tcaNewFields.personalRate || node?.personalRate || '-',
+        personalRateColor: getNewFieldColor('personalRate', dbNewFields.personalRate, tcaNewFields.personalRate),
+        teamRate: tcaNewFields.teamRate || node?.teamRate || '-',
+        teamRateColor: getNewFieldColor('teamRate', dbNewFields.teamRate, tcaNewFields.teamRate),
+        hasBH: (tcaNewFields.hasBH || node?.hasBH) ? '✓' : '-',
+        hasBHColor: getNewFieldColor('hasBH', dbNewFields.hasBH, tcaNewFields.hasBH),
+        hasTD: (tcaNewFields.hasTD || node?.hasTD) ? '✓' : '-',
+        hasTDColor: getNewFieldColor('hasTD', dbNewFields.hasTD, tcaNewFields.hasTD),
         address: info?.address || '-',
         joinDate: cleanDate(info?.joinDate),
         contractDate: cleanDate(info?.contractDate),
-        promotionDate: cleanDate(info?.promotionDate)
+        promotionDate: cleanDate(info?.promotionDate),
+        hasNewFieldsChange: hasNewFieldsChange  // Để hiển thị tooltip
       };
     };
     
@@ -396,7 +418,7 @@
       const phone = row.phone || '-';
 
       // Lấy 12 trường bổ sung
-      const extra = getNodeExtra(tcaId);
+      const extra = getNodeExtra(tcaId, row);
       
       // So sánh điểm số TCA với DB để tô màu
       const tcaScores = row.tcaScores || {};
@@ -451,13 +473,16 @@
       else if (action === 'CREATE_SYSTEM') { actionLabel = 'Tạo Sys'; actionBg = '#1565c0'; }
       else if (action === 'UPDATE') { actionLabel = 'Cập nhật'; actionBg = '#f57c00'; }
       else if (action === 'SKIP') { actionLabel = 'Bỏ qua'; actionBg = '#999'; }
+      else if (action === 'TCA+') { actionLabel = 'TCA+'; actionBg = '#c2185b'; }  // v8.9.0: New fields update
+      else if (action?.includes('E TCA+')) { actionLabel = 'E TCA+'; actionBg = '#c2185b'; }  // v8.9.0
+      else if (action?.includes('P TCA+')) { actionLabel = 'P TCA+'; actionBg = '#c2185b'; }  // v8.9.0
       else if (action?.includes('S') && !action?.includes('PE')) { 
         // Action có S nhưng không phải CREATE_ALL → Cập nhật System
         actionLabel = action + ' (Sys)'; actionBg = '#7b1fa2'; 
       }
 
-      // Checkbox: chỉ check nếu cần sync (action != SKIP)
-      const needSync = action && action !== 'SKIP' && action !== '-';
+      // v8.9.0: Checkbox - check nếu cần sync (bao gồm TCA+)
+      const needSync = action && action !== 'SKIP' && action !== '-' && action !== '';
       const checkboxChecked = needSync ? 'checked' : '';
 
       tr.innerHTML = `
@@ -475,16 +500,17 @@
         <td style="padding:6px 2px; text-align:center; color:${refSysIdColor}; font-weight:bold;" ${row.hasRefSysIdChange ? `title="refSysId thay đổi: ${row.dbRefSysId || 0} -> ${refSysId}"` : ''}>${refSysId || '-'}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px; min-width:180px;" title="${email}">${email}</td>
         <td style="padding:6px 4px; color:#666; font-size:10px;">${phone}</td>
-        <!-- 10 cột mới bổ sung (không có Địa Chỉ, không trùng Cấp) -->
+        <!-- 11 cột mới bổ sung (v8.9.0: có Location và màu sắc cho biết thay đổi) -->
+        <td style="padding:6px 2px; text-align:center; color:${extra.locationColor}; font-weight:bold;" ${extra.hasNewFieldsChange && extra.locationColor === '#d32f2f' ? 'title="Khu vực thay đổi"' : ''}>${extra.location}</td>
         <td style="padding:6px 2px; text-align:center; color:${personalScoreColor}; font-weight:bold;" ${pScoreChanged ? 'title="Điểm thay đổi"' : ''}>${displayPersonalScore}</td>
         <td style="padding:6px 2px; text-align:center; color:${totalScoreColor}; font-weight:bold;" ${tScoreChanged ? 'title="Điểm thay đổi"' : ''}>${displayTotalScore}</td>
         <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.joinDate}</td>
         <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.contractDate}</td>
         <td style="padding:6px 2px; text-align:center; color:#666; font-size:10px;">${extra.promotionDate}</td>
-        <td style="padding:6px 2px; text-align:center; color:#2e7d32; font-weight:bold;">${extra.hasBH}</td>
-        <td style="padding:6px 2px; text-align:center; color:#1565c0; font-weight:bold;">${extra.hasTD}</td>
-        <td style="padding:6px 2px; text-align:center; color:#666;">${extra.personalRate}</td>
-        <td style="padding:6px 2px; text-align:center; color:#666;">${extra.teamRate}</td>
+        <td style="padding:6px 2px; text-align:center; color:${extra.hasBHColor}; font-weight:bold;" ${extra.hasNewFieldsChange && extra.hasBHColor === '#d32f2f' ? 'title="BH thay đổi"' : ''}>${extra.hasBH}</td>
+        <td style="padding:6px 2px; text-align:center; color:${extra.hasTDColor}; font-weight:bold;" ${extra.hasNewFieldsChange && extra.hasTDColor === '#d32f2f' ? 'title="TD thay đổi"' : ''}>${extra.hasTD}</td>
+        <td style="padding:6px 2px; text-align:center; color:${extra.personalRateColor}; font-weight:bold;" ${extra.hasNewFieldsChange && extra.personalRateColor === '#d32f2f' ? 'title="%CN thay đổi"' : ''}>${extra.personalRate}</td>
+        <td style="padding:6px 2px; text-align:center; color:${extra.teamRateColor}; font-weight:bold;" ${extra.hasNewFieldsChange && extra.teamRateColor === '#d32f2f' ? 'title="%Đội thay đổi"' : ''}>${extra.teamRate}</td>
         <td style="padding:6px 2px; text-align:center; color:#7b1fa2; font-weight:bold;">${extra.level}</td>
       `;
       tbody.appendChild(tr);
@@ -814,6 +840,7 @@
             totalScore: n.totalScore || '0',
             level: n.level || '1',
             groupName: n.groupName || '',
+            location: n.location || '',  // v8.9.0: Thêm location
             hasBH: n.hasBH || false,
             hasTD: n.hasTD || false,
             personalRate: n.personalRate || '-',
@@ -1006,7 +1033,7 @@ window.downloadTCACSV = function() {
       const phone = row.phone || '';
       
       // Lấy 11 trường bổ sung (có Địa Chỉ)
-      const extra = getNodeExtra(Number(tcaId));
+      const extra = getNodeExtra(Number(tcaId), row);
       
       csv += `${tcaId},"${ten}",${pTcaId},${match},${userId},${refId},${actionVal},${refSysId},"${email}","${phone}",${extra.personalScore},${extra.totalScore},"${extra.address}","${extra.joinDate}","${extra.contractDate}","${extra.promotionDate}",${extra.hasBH},${extra.hasTD},${extra.personalRate},${extra.teamRate},${extra.level}\n`;
     });

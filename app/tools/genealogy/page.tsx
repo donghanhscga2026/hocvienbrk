@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search } from 'lucide-react'
 import {
@@ -75,6 +75,42 @@ const calculateNodePositions = (root: GenealogyNode, isFullMode: boolean, curren
   });
 
   return positions;
+}
+
+// v8.4.0: Helper filter Active tree - đặt ngoài component để không tạo lại mỗi render
+// Logic: Chỉ giữ node có groupName = "THÁI SƠN" và các node cha của nó
+// Lọc cả children, groupA, groupB
+const filterToActiveTree = (node: GenealogyNode): GenealogyNode | null => {
+  // Lọc children trước - chỉ giữ children đã được filter
+  const filteredChildren = (node.children || [])
+    .map(c => filterToActiveTree(c))
+    .filter(Boolean) as GenealogyNode[]
+  
+  // Lọc groupA
+  const filteredGroupA = (node.groupA || [])
+    .map(c => filterToActiveTree(c))
+    .filter(Boolean) as GenealogyNode[]
+  
+  // Lọc groupB
+  const filteredGroupB = (node.groupB || [])
+    .map(c => filterToActiveTree(c))
+    .filter(Boolean) as GenealogyNode[]
+  
+  // Gộp tất cả children đã lọc để kiểm tra
+  const allFilteredChildren = [...filteredChildren, ...filteredGroupA, ...filteredGroupB]
+  
+  // Nếu node là Active → giữ lại với tất cả children đã lọc
+  if (node.groupName === "THÁI SƠN") {
+    return { ...node, children: filteredChildren, groupA: filteredGroupA, groupB: filteredGroupB }
+  }
+  
+  // Nếu có active children → giữ lại node cha với tất cả children đã lọc
+  if (allFilteredChildren.length > 0) {
+    return { ...node, children: filteredChildren, groupA: filteredGroupA, groupB: filteredGroupB }
+  }
+  
+  // Không active và không có active children → bỏ
+  return null
 }
 
 const getLevelColor = (level?: number) => {
@@ -310,6 +346,15 @@ function GenealogyFlow() {
   const [error, setError] = useState<string | null>(null)
 
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
+  // v8.4.0: State cho filter Active
+  const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false)
+  
+  // v8.4.0: Computed tree - lọc tại nguồn data khi showActiveOnly thay đổi
+  const filteredTree = useMemo(() => {
+    if (!fullTree) return null
+    if (!showActiveOnly) return fullTree
+    return filterToActiveTree(fullTree)
+  }, [fullTree, showActiveOnly])
   const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B', totalSub: number } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
@@ -785,13 +830,10 @@ function GenealogyFlow() {
   }, [initTree])
 
   useEffect(() => {
-    if (fullTree) {
-      // Ưu tiên focusedSubtreeNode nếu đang ở focus mode; ngược lại dùng fullTree
-      const treeToRender = focusedSubtreeNode ?? fullTree
+    if (filteredTree) {
+      const treeToRender = focusedSubtreeNode ?? filteredTree
       if (!treeToRender) return
 
-      // Tính position map (Reingold-Tilford) cho tất cả chế độ
-      // Focus mode = luôn full (tất cả branches mở)
       const isFocusMode = focusedSubtreeNode !== null
       const isFullMode = isFocusMode || displayMode === 'full'
       try {
@@ -809,21 +851,18 @@ function GenealogyFlow() {
       
       setNodes(uniqueNodes); setEdges(uniqueEdges)
 
-      // Auto-center: nếu vừa expand 1 node → center vào đó; nếu load lần đầu → fitView
       const centerNodeId = pendingCenterNodeIdRef.current
       if (centerNodeId !== null && positionMapRef.current.has(centerNodeId)) {
         const pos = positionMapRef.current.get(centerNodeId)!
-        // Center vào node subtree: lùi lên 1 tầng để thấy cả nhánh con
         setTimeout(() => {
           setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT * 2, { zoom: 1.2, duration: 600 })
         }, 120)
-        pendingCenterNodeIdRef.current = null  // Reset sau khi đã center
+        pendingCenterNodeIdRef.current = null
       } else {
-        // Fit toàn bộ cây khi load lần đầu hoặc đổi hệ thống
         setTimeout(() => fitView({ padding: 0.15, duration: 700 }), 100)
       }
     }
-  }, [fullTree, focusedSubtreeNode, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
+  }, [filteredTree, focusedSubtreeNode, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
 
   // Fetch users when Add F1 modal opens
   useEffect(() => {
@@ -969,6 +1008,17 @@ function GenealogyFlow() {
           <option value="default">Gọn</option>
           <option value="full">Full</option>
         </select>
+
+        {/* v8.4.0: Checkbox Active filter */}
+        <label className="flex items-center gap-1 cursor-pointer shrink-0">
+          <input
+            type="checkbox"
+            checked={showActiveOnly}
+            onChange={(e) => setShowActiveOnly(e.target.checked)}
+            className="w-3.5 h-3.5"
+          />
+          <span className="text-[10px] font-bold text-slate-700">Active</span>
+        </label>
 
         {/* Nút Tạo cây/Sửa */}
         {isTreeEmpty && selectedSystem !== null && selectedSystem !== 0 ? (
