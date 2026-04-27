@@ -202,21 +202,6 @@ async function buildStandardTree(
             }
         }
     }
-        
-        // Map theo tcaId cho root TCA (nếu khác userId)
-        if (m.tcaId && m.tcaId !== m.userId) {
-            const existingTcaId = tcaMemberMap.get(m.tcaId)
-            if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
-                tcaMemberMap.set(m.tcaId, {
-                    level: m.level ?? null,
-                    personalScore: newPersonalScore,
-                    totalScore: newTotalScore,
-                    name: m.name ?? null,
-                    groupName: m.groupName ?? null
-                })
-            }
-        }
-    }
 
     for (const c of allClosures) {
         if (!closureByAncestor.has(c.ancestorId)) closureByAncestor.set(c.ancestorId, [])
@@ -409,7 +394,7 @@ async function buildStandardTree(
         groupName: rootTca?.groupName ?? null,
         chucDanh: rootTca?.chucDanh ?? null
     }
-    }
+}
 
 
 // --- Public Actions ---
