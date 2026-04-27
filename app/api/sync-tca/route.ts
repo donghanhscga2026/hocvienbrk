@@ -29,6 +29,13 @@ interface TCANode {
   personalScore?: string
   totalScore?: string
   level?: string
+  // v8.9.0: Các trường mới từ TCA Portal
+  groupName?: string
+  location?: string
+  personalRate?: string
+  teamRate?: string
+  hasBH?: boolean
+  hasTD?: boolean
 }
 
 interface MemberInfo {
@@ -67,6 +74,13 @@ interface PreviewRow {
   parentTcaId: string | null
   email?: string
   phone?: string
+  // v8.8.1: Các trường mới từ TCA Portal
+  groupName?: string | null
+  location?: string | null
+  personalRate?: string | null
+  teamRate?: string | null
+  hasBH?: boolean
+  hasTD?: boolean
 }
 
 const normalizePhone = (phone: string | null): string | null => {
@@ -246,6 +260,13 @@ export async function POST(request: Request) {
                 personalScore: pScore,
                 totalScore: tScore,
                 level: levelVal,
+                // v8.9.0: Lấy các trường mới từ nodeInfo (allNodes) thay vì row (previewRows)
+                groupName: nodeInfo?.groupName || row.groupName || null,
+                location: nodeInfo?.location || row.location || null,
+                personalRate: nodeInfo?.personalRate || row.personalRate || null,
+                teamRate: nodeInfo?.teamRate || row.teamRate || null,
+                hasBH: nodeInfo?.hasBH ?? row.hasBH ?? false,
+                hasTD: nodeInfo?.hasTD ?? row.hasTD ?? false,
                 lastSyncedAt: new Date()
             }
 

@@ -21,6 +21,13 @@ interface TCANode {
   personalScore?: string
   totalScore?: string
   level?: string
+  // v8.8.1: Thêm các trường mới từ TCA Portal
+  groupName?: string
+  location?: string
+  personalRate?: string
+  teamRate?: string
+  hasBH?: boolean
+  hasTD?: boolean
 }
 
 interface MemberInfo {
@@ -161,6 +168,33 @@ export async function POST(request: Request) {
         // refSysId comparison (NEW)
         dbRefSysId: number | null
         hasRefSysIdChange: boolean
+        
+        // v8.8.1: Các trường mới từ TCA Portal
+        groupName?: string | null
+        location?: string | null
+        personalRate?: string | null
+        teamRate?: string | null
+        hasBH?: boolean
+        hasTD?: boolean
+        
+        // v8.9.0: So sánh new fields với DB
+        hasNewFieldsChange: boolean
+        dbNewFields?: {
+          groupName: string | null
+          location: string | null
+          personalRate: string | null
+          teamRate: string | null
+          hasBH: boolean
+          hasTD: boolean
+        } | null
+        tcaNewFields?: {
+          groupName: string | null
+          location: string | null
+          personalRate: string | null
+          teamRate: string | null
+          hasBH: boolean
+          hasTD: boolean
+        } | null
       }[]
     }
 
@@ -327,6 +361,44 @@ export async function POST(request: Request) {
         tcaLevel !== dbLevel
       )
 
+      // v8.9.0: So sánh các trường mới từ TCA Portal (groupName, location, personalRate, teamRate, hasBH, hasTD)
+      const tcaGroupName = node.groupName || null
+      const tcaLocation = node.location || null
+      const tcaPersonalRate = node.personalRate || null
+      const tcaTeamRate = node.teamRate || null
+      const tcaHasBH = node.hasBH || false
+      const tcaHasTD = node.hasTD || false
+      
+      const dbGroupName = existingTCAMember?.groupName || null
+      const dbLocation = existingTCAMember?.location || null
+      const dbPersonalRate = existingTCAMember?.personalRate || null
+      const dbTeamRate = existingTCAMember?.teamRate || null
+      const dbHasBH = existingTCAMember?.hasBH || false
+      const dbHasTD = existingTCAMember?.hasTD || false
+      
+      // So sánh từng trường
+      const groupNameChanged = existingTCAMember && tcaGroupName !== dbGroupName
+      const locationChanged = existingTCAMember && tcaLocation !== dbLocation
+      const personalRateChanged = existingTCAMember && tcaPersonalRate !== dbPersonalRate
+      const teamRateChanged = existingTCAMember && tcaTeamRate !== dbTeamRate
+      const hasBHChanged = existingTCAMember && tcaHasBH !== dbHasBH
+      const hasTDChanged = existingTCAMember && tcaHasTD !== dbHasTD
+      
+      // Tổng hợp có thay đổi new fields không
+      const hasNewFieldsChange = existingTCAMember && (
+        groupNameChanged || locationChanged || personalRateChanged || 
+        teamRateChanged || hasBHChanged || hasTDChanged
+      )
+      
+      // Tạo mảng chi tiết thay đổi new fields
+      const newFieldsChanges: string[] = []
+      if (groupNameChanged) newFieldsChanges.push(`Group: "${dbGroupName || '-'}" -> "${tcaGroupName || '-'}"`)
+      if (locationChanged) newFieldsChanges.push(`Location: "${dbLocation || '-'}" -> "${tcaLocation || '-'}"`)
+      if (personalRateChanged) newFieldsChanges.push(`%CN: "${dbPersonalRate || '-'}" -> "${tcaPersonalRate || '-'}"`)
+      if (teamRateChanged) newFieldsChanges.push(`%Đội: "${dbTeamRate || '-'}" -> "${tcaTeamRate || '-'}"`)
+      if (hasBHChanged) newFieldsChanges.push(`BH: ${dbHasBH ? 'Có' : 'Không'} -> ${tcaHasBH ? 'Có' : 'Không'}`)
+      if (hasTDChanged) newFieldsChanges.push(`TD: ${dbHasTD ? 'Có' : 'Không'} -> ${tcaHasTD ? 'Có' : 'Không'}`)
+
       // Xác định action dựa trên matchType theo quy tắc mới
       // Match chỉ ra thiếu gì, Action chỉ ra cần tạo/cập nhật đó
       let action = ''
@@ -392,9 +464,11 @@ export async function POST(request: Request) {
         }
       } else if (matchType === 'PE S TCA' || matchType === 'S TCA PE' || matchType === 'PE TCA S') {
         // PE S TCA: Đầy đủ User+System+TCA
-        // Chỉ cập nhật TCA nếu có thay đổi điểm số
-        if (hasScoreChange) {
-          action = 'TCA'
+        // v8.9.0: Cập nhật TCA nếu có thay đổi điểm số HOẶC new fields
+        if (hasScoreChange || hasNewFieldsChange) {
+          // Nếu chỉ có new fields thay đổi → action = TCA+ (update new fields)
+          // Nếu có cả score và new fields → action = TCA (update cả 2)
+          action = hasNewFieldsChange && !hasScoreChange ? 'TCA+' : 'TCA'
           if (dbPersonalScore !== tcaPersonalScore) {
             changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
           }
@@ -404,43 +478,57 @@ export async function POST(request: Request) {
           if (dbLevel !== tcaLevel) {
             changes.push(`Cấp: ${dbLevel || '-'} -> ${tcaLevel}`)
           }
+          // Thêm các thay đổi new fields vào changes
+          changes.push(...newFieldsChanges)
         } else {
           action = 'SKIP'
           changes.push('Không có thay đổi')
         }
       } else if (matchType === 'Pe S TCA' || matchType === 'Pe TCA S' || matchType === 'S TCA Pe') {
         // Pe S TCA: Đủ hết, nhưng email khác → cập nhật email + cập nhật TCAMember điểm
-        action = hasScoreChange ? 'E TCA' : 'E'
-        if (email && existingUser?.email && existingUser.email !== email) {
-          changes.push(`Email: "${existingUser.email}" -> "${email}"`)
-        }
-        if (hasScoreChange) {
-          if (dbPersonalScore !== tcaPersonalScore) {
-            changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+        // v8.9.0: Cập nhật TCA nếu có thay đổi điểm số HOẶC new fields
+        if (hasScoreChange || hasNewFieldsChange) {
+          action = hasNewFieldsChange && !hasScoreChange ? 'E TCA+' : (hasScoreChange ? 'E TCA' : 'E')
+          if (email && existingUser?.email && existingUser.email !== email) {
+            changes.push(`Email: "${existingUser.email}" -> "${email}"`)
           }
-          if (dbTotalScore !== tcaTotalScore) {
-            changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+          if (hasScoreChange) {
+            if (dbPersonalScore !== tcaPersonalScore) {
+              changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+            }
+            if (dbTotalScore !== tcaTotalScore) {
+              changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+            }
           }
+          changes.push(...newFieldsChanges)
+        } else {
+          action = 'E'
         }
       } else if (matchType === 'pE S TCA' || matchType === 'pE TCA S' || matchType === 'S TCA pE') {
         // pE S TCA: Đủ hết, nhưng phone khác → cập nhật phone + cập nhật TCAMember điểm
-        action = hasScoreChange ? 'P TCA' : 'P'
-        if (phone && existingUser?.phone && existingUser.phone !== phone) {
-          changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
-        }
-        if (hasScoreChange) {
-          if (dbPersonalScore !== tcaPersonalScore) {
-            changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+        // v8.9.0: Cập nhật TCA nếu có thay đổi điểm số HOẶC new fields
+        if (hasScoreChange || hasNewFieldsChange) {
+          action = hasNewFieldsChange && !hasScoreChange ? 'P TCA+' : (hasScoreChange ? 'P TCA' : 'P')
+          if (phone && existingUser?.phone && existingUser.phone !== phone) {
+            changes.push(`Phone: "${existingUser.phone}" -> "${phone}"`)
           }
-          if (dbTotalScore !== tcaTotalScore) {
-            changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+          if (hasScoreChange) {
+            if (dbPersonalScore !== tcaPersonalScore) {
+              changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
+            }
+            if (dbTotalScore !== tcaTotalScore) {
+              changes.push(`Điểm ĐỘI: ${dbTotalScore || 0} -> ${tcaTotalScore}`)
+            }
           }
+          changes.push(...newFieldsChanges)
+        } else {
+          action = 'P'
         }
       } else if (matchType === 'S TCA') {
         // S TCA: Có System + TCA nhưng không tìm thấy User qua phone/email
-        // → Chỉ cập nhật điểm số TCAMember nếu có thay đổi
-        if (hasScoreChange) {
-          action = 'TCA'
+        // v8.9.0: Cập nhật TCAMember nếu có thay đổi điểm số HOẶC new fields
+        if (hasScoreChange || hasNewFieldsChange) {
+          action = hasNewFieldsChange && !hasScoreChange ? 'TCA+' : 'TCA'
           if (dbPersonalScore !== tcaPersonalScore) {
             changes.push(`Điểm CN: ${dbPersonalScore || 0} -> ${tcaPersonalScore}`)
           }
@@ -629,7 +717,34 @@ export async function POST(request: Request) {
         },
         
         // Cờ: có thay đổi điểm số cần update không
-        hasScoreChange: !!hasScoreChange
+        hasScoreChange: !!hasScoreChange,
+        
+        // v8.9.0: Các trường mới từ TCA Portal + so sánh với DB
+        groupName: node.groupName || null,
+        location: node.location || null,
+        personalRate: node.personalRate || null,
+        teamRate: node.teamRate || null,
+        hasBH: node.hasBH || false,
+        hasTD: node.hasTD || false,
+        
+        // v8.9.0: So sánh new fields với DB
+        hasNewFieldsChange: !!hasNewFieldsChange,
+        dbNewFields: existingTCAMember ? {
+          groupName: dbGroupName,
+          location: dbLocation,
+          personalRate: dbPersonalRate,
+          teamRate: dbTeamRate,
+          hasBH: dbHasBH,
+          hasTD: dbHasTD
+        } : null,
+        tcaNewFields: {
+          groupName: tcaGroupName,
+          location: tcaLocation,
+          personalRate: tcaPersonalRate,
+          teamRate: tcaTeamRate,
+          hasBH: tcaHasBH,
+          hasTD: tcaHasTD
+        }
       })
     }
 

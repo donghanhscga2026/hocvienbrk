@@ -91,27 +91,52 @@
       }
     }
     
-    // Extract location từ rawHtml
+    // Extract location từ rawHtml - v8.8.1: Sửa regex
     let location = item.location || '';
-    if (!location) {
-      const locMatch = item.rawHtml?.match(/class='hidden-xs'[^>]*>\s*-\s*([^<]+)/);
+    if (!location && item.rawHtml) {
+      // Format: <span class='hidden-xs'> - Hà Nội</span>
+      const locMatch = item.rawHtml.match(/<span class=['"]hidden-xs['"][^>]*>\s*-\s*([^<]+)<\/span>/);
       if (locMatch) location = locMatch[1].trim();
     }
     
-    // Parse rates từ rawHtml
+    // Parse rates từ rawHtml - v8.8.1: Sửa regex
     let personalRate = '-';
     let teamRate = '-';
     
     if (item.rawHtml) {
-      const rateMatch = item.rawHtml.match(/>([\d.]+%)\s*\/\s*([^<]+?)</);
+      // Format: <span> - 0.0% / Not Applicable</span>
+      const rateMatch = item.rawHtml.match(/<span[^>]*>\s*-\s*([\d.]+%)\s*\/\s*([^<]+?)\s*<\/span>/);
       if (rateMatch) {
         personalRate = rateMatch[1];
         teamRate = rateMatch[2].trim();
       }
     }
     
-    const hasBH = item.rawHtml?.includes('(BH)') || false;
-    const hasTD = item.rawHtml?.includes('(TD)') || false;
+    // Parse BH/TD - v8.8.1: Kiểm tra color để xác định active/inactive
+    // color:#d3d3d3 = gray = inactive, other color = active
+    let hasBH = false;
+    let hasTD = false;
+    
+    if (item.rawHtml) {
+      // BH: Tìm span chứa (BH) và kiểm tra color
+      const bhMatch = item.rawHtml.match(/<span[^>]*>(?:<strong>)?\(BH\)(?:<\/strong>)?<\/span>/);
+      if (bhMatch) {
+        // Kiểm tra span cha có color:#d3d3d3 không
+        const bhSpanMatch = item.rawHtml.match(/<span[^>]*color:([^;"'\s]+)[^>]*>.*?\(BH\).*?<\/span>/);
+        if (!bhSpanMatch || bhSpanMatch[1] !== '#d3d3d3') {
+          hasBH = true; // Không phải màu xám = active
+        }
+      }
+      
+      // TD: Tìm span chứa (TD) và kiểm tra color
+      const tdMatch = item.rawHtml.match(/<span[^>]*>(?:<strong>)?\(TD\)(?:<\/strong>)?<\/span>/);
+      if (tdMatch) {
+        const tdSpanMatch = item.rawHtml.match(/<span[^>]*color:([^;"'\s]+)[^>]*>.*?\(TD\).*?<\/span>/);
+        if (!tdSpanMatch || tdSpanMatch[1] !== '#d3d3d3') {
+          hasTD = true; // Không phải màu xám = active
+        }
+      }
+    }
 
     return {
       id: id,

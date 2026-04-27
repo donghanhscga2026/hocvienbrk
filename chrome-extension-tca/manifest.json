@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TCA to BRK Sync",
-  "version": "8.8.0",
-  "description": "Sync TCA to BRK v8.8.0 - Auto-scan on page load, preview+sync via buttons",
+  "version": "8.9.0",
+  "description": "Sync TCA to BRK v8.9.0 - Thêm phát hiện new fields thay đổi, action TCA+, auto-select",
   "permissions": [
     "activeTab",
     "scripting",
