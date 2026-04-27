@@ -1101,6 +1101,36 @@ function GenealogyFlow() {
             </svg>
           </button>
         </div>
+
+        {/* v8.8.1: Khối thống kê từ Server (đính kèm trong Root Node) */}
+        {fullTree?.stats && (
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 ml-1 border-l border-slate-200 pl-2 shrink-0">
+            <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-1 rounded-md border border-slate-200 shadow-sm">
+              <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tighter">
+                {showActiveOnly ? 'Tổng Active:' : 'Tổng:'}
+              </span>
+              <span className="text-[10px] font-black text-slate-900">
+                {showActiveOnly ? fullTree.stats.active : fullTree.stats.total}
+              </span>
+            </div>
+            
+            {!showActiveOnly && (
+              <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-1 rounded-md border border-emerald-100">
+                <span className="text-[9px] font-medium text-emerald-600 uppercase tracking-tighter">Active:</span>
+                <span className="text-[10px] font-black text-emerald-700">{fullTree.stats.active}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1 bg-orange-50 px-1.5 py-1 rounded-md border border-orange-100">
+              <span className="text-[9px] font-medium text-orange-500 uppercase tracking-tighter">BĐH:</span>
+              <span className="text-[10px] font-black text-orange-700">{fullTree.stats.bdh}</span>
+            </div>
+            <div className="flex items-center gap-1 bg-pink-50 px-1.5 py-1 rounded-md border border-pink-100">
+              <span className="text-[9px] font-medium text-pink-500 uppercase tracking-tighter">TT:</span>
+              <span className="text-[10px] font-black text-pink-700">{fullTree.stats.dhtt}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (

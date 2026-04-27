@@ -42,6 +42,8 @@ export interface GenealogyNode {
     groupName?: string | null
     // Chức danh đặc biệt (C5, C20, DHTT)
     chucDanh?: string | null
+    // Thống kê (chỉ đính kèm tại node Root)
+    stats?: { total: number, active: number, bdh: number, dhtt: number } | null
 }
 
 // Helper: Lay thong tin System cua user (tim theo onSystem dau tien)
@@ -233,7 +235,8 @@ async function buildStandardTree(
                 personalScore: f2tca?.personalScore ?? null,
                 totalScore: f2tca?.totalScore ?? null,
                 tcaName: f2tca?.name ?? null,
-                groupName: f2tca?.groupName ?? null
+                groupName: f2tca?.groupName ?? null,
+                chucDanh: f2tca?.chucDanh ?? null
             }
         })
 
@@ -248,7 +251,8 @@ async function buildStandardTree(
             personalScore: f1tca?.personalScore ?? null,
             totalScore: f1tca?.totalScore ?? null,
             tcaName: f1tca?.name ?? null,
-            groupName: f1tca?.groupName ?? null
+            groupName: f1tca?.groupName ?? null,
+            chucDanh: f1tca?.chucDanh ?? null
         }
 
         if (!hasF2) {
@@ -374,6 +378,15 @@ async function buildStandardTree(
 
     // Gắn TCA data cho root node
     const rootTca = tcaMemberMap.get(rootUser.id)
+    
+    // v8.8.1: Tính toán thống kê dựa trên dữ liệu thực tế
+    const statsData = isSystem ? {
+        total: totalCount,
+        active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
+        bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
+        dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
+    } : null
+
     return {
         id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
         totalSubCount: totalCount,
@@ -392,7 +405,8 @@ async function buildStandardTree(
         totalScore: rootTca?.totalScore ?? null,
         tcaName: rootTca?.name ?? null,
         groupName: rootTca?.groupName ?? null,
-        chucDanh: rootTca?.chucDanh ?? null
+        chucDanh: rootTca?.chucDanh ?? null,
+        stats: statsData // Đính kèm thống kê vào Root
     }
 }
 
@@ -810,17 +824,19 @@ export async function getFullSystemTreeAction(systemId: number) {
             name: userMap.get(autoToUser.get(c.descendantId) || 0) || null
         })).filter((c: any) => c.userId > 0)
 
-        // BỔ SUNG: Batch fetch TCAMember scores
+        // v8.8.1: Lấy dữ liệu TCA cho chế độ Full để thống kê và tô màu
         const tcaMembers = await (prisma as any).tCAMember.findMany({
             where: { userId: { in: [...userIdSet] } },
-            select: { userId: true, level: true, personalScore: true, totalScore: true }
+            select: { userId: true, level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true }
         })
-        const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>()
+        const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; groupName: string | null; chucDanh: string | null }>()
         for (const m of tcaMembers) {
             tcaMemberMap.set(m.userId, {
                 level: m.level ?? null,
                 personalScore: m.personalScore != null ? Number(m.personalScore) : null,
-                totalScore: m.totalScore != null ? Number(m.totalScore) : null
+                totalScore: m.totalScore != null ? Number(m.totalScore) : null,
+                groupName: m.groupName ?? null,
+                chucDanh: m.chuc_danh ?? null
             })
         }
         
@@ -834,7 +850,16 @@ export async function getFullSystemTreeAction(systemId: number) {
             userMap,
             tcaMemberMap
         )
-        return { success: true, tree: { ...tree, isRoot: true } }
+
+        // v8.8.1: Thống kê cho chế độ Full
+        const stats = {
+            total: userIdSet.size,
+            active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
+            bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
+            dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
+        }
+
+        return { success: true, tree: { ...tree, isRoot: true, stats } }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
