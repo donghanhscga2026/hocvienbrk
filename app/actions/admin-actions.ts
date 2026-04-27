@@ -36,6 +36,8 @@ export interface GenealogyNode {
     level?: number | null
     personalScore?: number | null
     totalScore?: number | null
+    // Tên TCA (nếu có = đã active, null = chưa active)
+    tcaName?: string | null
 }
 
 // Helper: Lay thong tin System cua user (tim theo onSystem dau tien)
@@ -150,7 +152,7 @@ async function buildStandardTree(
     }
 // Batch fetch TCAMember scores cho toàn bộ node trong cây
     // Query theo cả userId (thành viên thường) và tcaId (root TCA)
-    const tcaMembers = isSystem
+const tcaMembers = isSystem
         ? await (prisma as any).tCAMember.findMany({
             where: { 
                 OR: [
@@ -158,10 +160,10 @@ async function buildStandardTree(
                     { tcaId: { in: [...allUserIds] } }  // Thêm tìm theo tcaId cho root
                 ]
             },
-            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true }
+            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true }
         })
         : []
-    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>()
+    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null }>()
     for (const m of tcaMembers) {
         const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
         const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
@@ -172,7 +174,8 @@ async function buildStandardTree(
             tcaMemberMap.set(m.userId, {
                 level: m.level ?? null,
                 personalScore: newPersonalScore,
-                totalScore: newTotalScore
+                totalScore: newTotalScore,
+                name: m.name ?? null
             })
         }
         
@@ -183,7 +186,21 @@ async function buildStandardTree(
                 tcaMemberMap.set(m.tcaId, {
                     level: m.level ?? null,
                     personalScore: newPersonalScore,
-                    totalScore: newTotalScore
+                    totalScore: newTotalScore,
+                    name: m.name ?? null
+                })
+            }
+        }
+        
+        // Map theo tcaId cho root TCA (nếu khác userId)
+        if (m.tcaId && m.tcaId !== m.userId) {
+            const existingTcaId = tcaMemberMap.get(m.tcaId)
+            if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
+                tcaMemberMap.set(m.tcaId, {
+                    level: m.level ?? null,
+                    personalScore: newPersonalScore,
+                    totalScore: newTotalScore,
+                    name: m.name ?? null
                 })
             }
         }
@@ -217,7 +234,8 @@ async function buildStandardTree(
                 name: c.name,
                 level: f2tca?.level ?? null,
                 personalScore: f2tca?.personalScore ?? null,
-                totalScore: f2tca?.totalScore ?? null
+                totalScore: f2tca?.totalScore ?? null,
+                tcaName: f2tca?.name ?? null
             }
         })
 
@@ -230,7 +248,8 @@ async function buildStandardTree(
             children: f2s,
             level: f1tca?.level ?? null,
             personalScore: f1tca?.personalScore ?? null,
-            totalScore: f1tca?.totalScore ?? null
+            totalScore: f1tca?.totalScore ?? null,
+            tcaName: f1tca?.name ?? null
         }
 
         if (!hasF2) {
@@ -271,6 +290,7 @@ async function buildStandardTree(
                 level: tcaData?.level ?? null,
                 personalScore: tcaData?.personalScore ?? null,
                 totalScore: tcaData?.totalScore ?? null,
+                tcaName: tcaData?.name ?? null,
             }
         })
     }
