@@ -239,7 +239,7 @@ export async function POST(request: Request) {
           }
         }
       }
-
+      
       // Bước 3: Xác định match type theo quy tắc
       // Ưu tiên 1: Tìm user vừa trùng phone VỪA trùng email (cùng 1 user)
       const phoneAndEmailMatch = phoneMatches.find((pu: any) => 

@@ -167,7 +167,7 @@
     const { memberId, email, phone, address, joinDate, contractDate, promotionDate } = data;
     memberInfoCache[memberId] = { email, phone, address, joinDate, contractDate, promotionDate };
     fetchedCount++;
-    console.log(`[TCA Sync] 📋 Member contact updated: ${memberId} (${fetchedCount}/${allNodesGlobal.length}) - joinDate: ${joinDate}, contractDate: ${contractDate}`);
+    console.log(`[TCA Sync] DEBUG: handleMemberInfo called - memberId: ${memberId}, fetchedCount: ${fetchedCount}/${allNodesGlobal.length}`);
     
     // Ghi log tiến trình
     if (fetchedCount % 10 === 0 || fetchedCount === allNodesGlobal.length) {
@@ -180,7 +180,11 @@
     if (emailCell) emailCell.textContent = email || '-';
     if (phoneCell) phoneCell.textContent = phone || '-';
     
-    // Gọi precheck khi TẤT CẢ members đã được fetch
+    // DEBUG: Log every time we check the condition
+    console.log(`[TCA Sync] DEBUG: Checking precheck condition - precheckDone: ${precheckDone}, fetchedCount: ${fetchedCount}, allNodesGlobal.length: ${allNodesGlobal.length}`);
+    
+    // Gọi precheck khi TẤT CẢ members đã được fetch (100%)
+    // Sửa: đổi từ 80% sang 100% để đảm bảo tất cả memberInfo đã được fetch trước khi gọi preview
     if (!precheckDone && fetchedCount >= allNodesGlobal.length) {
       precheckDone = true;
       console.log(`[TCA Sync] === ALL MEMBER INFO FETCHED === (${fetchedCount}/${allNodesGlobal.length})`);
