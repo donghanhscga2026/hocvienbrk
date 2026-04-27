@@ -402,8 +402,15 @@
         });
       }
     });
+    
+    // DEBUG: Show all IDs from the tree
+    const uniqueAllIds = [...new Set(allMemberIds)].sort((a,b) => a-b);
+    console.log('[TCA AutoScan] DEBUG: allMemberIds from tree:', uniqueAllIds);
+    console.log('[TCA AutoScan] DEBUG: unique count:', uniqueAllIds.length);
+    
     console.log('[TCA AutoScan] 📊 Collecting IDs for member info fetch:', allMemberIds.length, 'total IDs');
     const memberIds = allMemberIds.filter(id => !capturedMembers.has(id));
+    console.log('[TCA AutoScan] DEBUG: memberIds to fetch (after filtering captured):', memberIds.sort((a,b) => a-b));
     if (memberIds.length > 0) {
       console.log('[TCA AutoScan] 🔍 Starting auto-fetch member info for', memberIds.length, 'members...');
       autoFetchMemberInfo(memberIds);
@@ -414,16 +421,21 @@
 
   async function autoFetchMemberInfo(memberIds) {
     console.log('[TCA AutoFetch] Starting to fetch member info for', memberIds.length, 'members...');
+    console.log('[TCA AutoFetch] DEBUG: memberIds:', memberIds);
     
     const results = new Map();
     let fetched = 0;
+    let skipped = 0;
     
     for (const memberId of memberIds) {
-      if (capturedMembers.has(memberId)) continue; // Already have info
+      if (capturedMembers.has(memberId)) {
+        skipped++;
+        continue; // Already have info
+      }
       
       try {
         const info = await tryFetchMemberInfo(memberId);
-        if (info) {
+        if (info) {  // info is now always returned (even if phone/email is null)
           capturedMembers.set(memberId, info);
           results.set(memberId, info);
           fetched++;
@@ -454,16 +466,19 @@
       }
     }
     
-    console.log('[TCA AutoFetch] ✅ Complete! Fetched info for', fetched, 'members');
+    console.log('[TCA AutoFetch] ✅ Complete! Fetched info for', fetched, 'members, skipped:', skipped);
+    console.log('[TCA AutoFetch] DEBUG: Final capturedMembers:', Array.from(capturedMembers.keys()).sort((a,b) => a-b));
     return results;
   }
 
   async function tryFetchMemberInfo(memberId) {
     // Sử dụng endpoint chính xác: ajax_get_member_info
     const endpoint = `${BASE_URL}/group_management/ajax_get_member_info?id=${memberId}`;
+    console.log('[TCA AutoFetch] DEBUG: Fetching memberId:', memberId, 'endpoint:', endpoint);
     
     try {
       const response = await fetch(endpoint, { credentials: 'include' });
+      console.log('[TCA AutoFetch] DEBUG: Response status for', memberId, ':', response.status, response.ok);
       if (!response.ok) return null;
       
       const responseText = await response.text();
@@ -498,7 +513,10 @@
         return result;
       }
       
-      return null;
+      console.log('[TCA AutoFetch] ❌ No phone/email for memberId:', memberId, 'phone:', phone, 'email:', email);
+      
+      // Vẫn return result để caller biết đã xử lý member này
+      return { phone: null, email: null, address: null, joinDate: null, contractDate: null, promotionDate: null };
     } catch (e) {
       console.log('[TCA AutoFetch] ❌ Error:', e.message);
       return null;
