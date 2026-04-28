@@ -59,6 +59,14 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
 
     const isActive = enrollment?.status === 'ACTIVE'
     const isPending = enrollment?.status === 'PENDING'
+    
+    // Sửa lỗi hydration: Format ngày chỉ ở client side
+    const [formattedStartDate, setFormattedStartDate] = useState('')
+    useEffect(() => {
+        if (enrollment?.startedAt) {
+            setFormattedStartDate(new Date(enrollment.startedAt).toLocaleDateString('vi-VN'))
+        }
+    }, [enrollment?.startedAt])
 
     const handleAction = async (e: React.MouseEvent) => {
         e.preventDefault()
@@ -160,8 +168,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                                 <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
                                 Đã kích hoạt
                                 {enrollment?.startedAt && (
-                                    <span className="opacity-80 font-normal" suppressHydrationWarning>
-                                        · Từ {new Date(enrollment.startedAt).toLocaleDateString('vi-VN')}
+                                    <span className="opacity-80 font-normal">
+                                        · Từ {formattedStartDate || '...'}
                                     </span>
                                 )}
                             </span>
