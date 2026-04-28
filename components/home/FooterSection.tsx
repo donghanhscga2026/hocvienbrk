@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 
 interface FooterSectionProps {
     profile: {
@@ -11,8 +12,14 @@ interface FooterSectionProps {
 }
 
 export default function FooterSection({ profile }: FooterSectionProps) {
-    const footerText = profile.footerText || `© ${new Date().getFullYear()} ${profile.title || 'BRK'}. All rights reserved.`
+    const [year, setYear] = useState(new Date().getFullYear()) // Sửa lỗi hydration - tính năm ở client
+    const footerText = profile.footerText || `© ${year} ${profile.title || 'BRK'}. All rights reserved.`
     const footerLinks = profile.footerLinks || []
+    
+    // Sửa lỗi hydration: Chỉ cập nhật năm sau khi mount ở client
+    useEffect(() => {
+        setYear(new Date().getFullYear())
+    }, [])
     
     return (
         <footer className="bg-brk-background py-12 border-t border-brk-outline">

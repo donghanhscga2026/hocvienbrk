@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { Lightbulb } from 'lucide-react'
@@ -36,6 +36,8 @@ export default function MessageCard({
     messageImageUrl = null
 }: MessageCardProps) {
     const [isOpen, setIsOpen] = useState(false)
+    const [greetingMessage, setGreetingMessage] = useState('') // Sửa lỗi hydration - chỉ tính greeting ở client
+    const [greetingPrefix, setGreetingPrefix] = useState('') // Sửa lỗi hydration - chỉ tính prefix ở client
     
     const heroImage = profile.heroImage || profile.messageImage || messageImageUrl || null
     const heroOverlay = profile.heroOverlay ?? 0.3
@@ -71,10 +73,17 @@ export default function MessageCard({
     // Tách greeting thành 2 phần: prefix (lời chào) + message (lời chúc)
     // Chú ý: userId có thể = 0, nên dùng String(userId) !== '' để check
     const userIdStr = String(userId)
-    const greetingPrefix = session?.user && userIdStr !== ''
-      ? `Mến chào ${userName || 'Học viên'} [${userIdStr}]`
-      : ''
-    const greetingMessage = getGreeting()
+
+    // Sửa lỗi hydration: Chỉ tính toán greeting ở client side sau khi mount
+    useEffect(() => {
+        // Tính toán greeting message
+        setGreetingMessage(getGreeting())
+        // Tính toán greeting prefix
+        const prefix = session?.user && userIdStr !== ''
+            ? `Mến chào ${userName || 'Học viên'} [${userIdStr}]`
+            : ''
+        setGreetingPrefix(prefix)
+    }, [session?.user, userName, userId, userIdStr])
 
     return (
         <>
