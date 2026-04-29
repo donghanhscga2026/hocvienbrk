@@ -46,7 +46,7 @@ export default async function EditLandingPage({ params }: EditPageProps) {
 
                 <div className="mb-8">
                     <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Chỉnh sửa Landing Page</h1>
-                    <p className="text-sm text-gray-500 mt-1 font-mono font-bold text-purple-600">URL: giautoandien.io.vn/landing/{landing.slug}</p>
+                    <p className="text-sm text-gray-500 mt-1 font-mono font-bold text-purple-600">URL: giautoandien.io.vn/{landing.slug}</p>
                 </div>
 
                 <div className="bg-white rounded-[2.5rem] p-6 lg:p-10 shadow-xl border border-gray-100">

@@ -111,7 +111,7 @@ export function NewLandingForm({ courses }: NewLandingFormProps) {
                             </label>
                             <div className="flex items-center">
                                 <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l-lg text-gray-500 text-sm">
-                                    /landing/
+                                    giautoandien.io.vn/
                                 </span>
                                 <input
                                     type="text"
@@ -119,11 +119,11 @@ export function NewLandingForm({ courses }: NewLandingFormProps) {
                                     value={formData.slug}
                                     onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
                                     className="flex-1 px-3 py-2 border rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                                    placeholder="-hocxaykenh"
+                                    placeholder="hocxaykenh"
                                 />
                             </div>
                             <p className="text-xs text-gray-500 mt-1 font-mono">
-                                URL: giautoandien.io.vn/landing/{formData.slug || '{slug}'}
+                                URL: giautoandien.io.vn/{formData.slug || '{slug}'}
                             </p>
                         </div>
                         

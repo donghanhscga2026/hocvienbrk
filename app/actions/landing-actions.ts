@@ -144,7 +144,7 @@ export async function updateLandingPage(id: number, data: {
         })
         
         revalidatePath('/admin/landings')
-        revalidatePath(`/landing/${landing.slug}`)
+        revalidatePath(`/${landing.slug}`)
         
         return { success: true, landing }
     } catch (error) {
@@ -184,7 +184,7 @@ export async function toggleLandingStatus(id: number) {
         })
         
         revalidatePath('/admin/landings')
-        revalidatePath(`/landing/${landing.slug}`)
+        revalidatePath(`/${landing.slug}`)
         
         return { success: true }
     } catch (error) {

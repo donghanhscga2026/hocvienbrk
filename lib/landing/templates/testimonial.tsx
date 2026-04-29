@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { Quote, Star, ArrowRight } from 'lucide-react'
 import { useAffiliateCookie } from '@/hooks/useAffiliateCookie'

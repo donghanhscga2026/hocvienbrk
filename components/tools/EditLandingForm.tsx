@@ -132,7 +132,7 @@ export function EditLandingForm({ landing, courses }: EditLandingFormProps) {
                             </label>
                             <div className="flex items-center">
                                 <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l-lg text-gray-500 text-sm">
-                                    /landing/
+                                    /
                                 </span>
                                 <input
                                     type="text"
@@ -396,7 +396,7 @@ export function EditLandingForm({ landing, courses }: EditLandingFormProps) {
             {/* Actions */}
             <div className="flex items-center justify-between mt-6">
                 <a
-                    href={`/landing/${landing.slug}`}
+                    href={`/${landing.slug}`}
                     target="_blank"
                     className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 font-medium"
                 >
