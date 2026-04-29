@@ -56,7 +56,7 @@ export default auth(async function middleware(request: NextRequest & { auth: any
         return response
     }
     
-    // Không phải SiteProfile → xử lý như cũ (course/landing)
+    // Không phải SiteProfile → xử lý affiliate ref
     const session = request.auth
     
     // Kiểm tra course/landing slug
@@ -66,16 +66,17 @@ export default auth(async function middleware(request: NextRequest & { auth: any
     saveRefCookie(response, refCode || '', landingSlug, courseSlug, null)
     
     if (!session?.user) {
+        // Chưa đăng nhập → redirect tới trang register
         const redirectUrl = new URL('/register', request.url)
         redirectUrl.searchParams.set('redirect', potentialSlug)
         if (refCode) {
             redirectUrl.searchParams.set('ref', refCode)
         }
         return NextResponse.redirect(redirectUrl)
-    } else {
-        const redirectUrl = new URL(`/${potentialSlug}`, request.url)
-        return NextResponse.redirect(redirectUrl)
     }
+    
+    // Đã đăng nhập → cho phép truy cập trang (không redirect)
+    return response
 })
 
 // Cache để tránh query database quá nhiều
