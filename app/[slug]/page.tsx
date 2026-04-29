@@ -12,14 +12,52 @@ import prisma from '@/lib/prisma'
 import { getSiteProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getHeroMessageForProfile } from '@/app/actions/message-actions'
 
+// Import client components for landing pages
+import { LandingPageClient, CourseLandingClient } from '@/components/landing/LandingPageClient'
+
 interface PageProps {
     params: Promise<{ slug: string }>
 }
 
-// SEO Metadata
+// SEO Metadata - Kiểm tra landing page trước, sau đó đến site profile
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params
     
+    // Kiểm tra landing page trước
+    const landing = await (prisma as any).landingPage.findUnique({
+        where: { slug }
+    })
+    
+    if (landing) {
+        return {
+            title: landing.title,
+            description: landing.subtitle || landing.description || undefined,
+            openGraph: {
+                title: landing.title,
+                description: landing.subtitle || undefined,
+                images: landing.heroImage ? [landing.heroImage] : undefined,
+            },
+        }
+    }
+    
+    // Kiểm tra course
+    const course = await prisma.course.findUnique({
+        where: { id_khoa: slug }
+    })
+    
+    if (course) {
+        return {
+            title: course.name_lop,
+            description: course.mo_ta_ngan || undefined,
+            openGraph: {
+                title: course.name_lop,
+                description: course.mo_ta_ngan || undefined,
+                images: course.link_anh_bia ? [course.link_anh_bia] : undefined,
+            },
+        }
+    }
+    
+    // Kiểm tra site profile
     const profile = await getSiteProfile(slug)
     
     if (!profile) return { title: 'Không tìm thấy' }
@@ -36,21 +74,97 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
 }
 
-export default async function TeacherHomePage({ params }: PageProps) {
+export default async function DynamicSlugPage({ params }: PageProps) {
     const { slug } = await params
     const session = await auth()
     
-    // 1. Lấy profile
+    // 1. Kiểm tra Landing Page trước (ưu tiên nhất)
+    const landing = await (prisma as any).landingPage.findUnique({
+        where: { 
+            slug,
+            isActive: true 
+        },
+        include: {
+            course: true
+        }
+    })
+    
+    // 2. Nếu là landing page → render bằng client component
+    if (landing) {
+        return <LandingPageClient landing={landing} />
+    }
+    
+    // 3. Kiểm tra Course (id_khoa)
+    const course = await prisma.course.findUnique({
+        where: { id_khoa: slug }
+    })
+    
+    // 4. Nếu là course → render CourseLandingClient
+    if (course) {
+        // Lấy thêm data cần thiết cho course
+        const courseId = course.id
+        let userId: number | null = null
+        let userPhone: string | null = null
+        
+        if (session?.user?.id) {
+            userId = parseInt(session.user.id)
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { phone: true }
+            })
+            userPhone = user?.phone || null
+        }
+        
+        const enrollment = userId 
+            ? await prisma.enrollment.findFirst({
+                where: { userId, courseId }
+            })
+            : null
+        
+        const courseOneEnrollment = userId
+            ? await prisma.enrollment.findFirst({
+                where: { userId, courseId: 1 }
+            })
+            : null
+        const isCourseOneActive = courseOneEnrollment?.status === 'ACTIVE'
+        
+        const lessons = await prisma.lesson.findMany({
+            where: { courseId },
+            orderBy: { order: 'asc' },
+            select: { id: true, title: true, order: true }
+        })
+        
+        const testimonials = await (prisma as any).courseTestimonial.findMany({
+            where: { courseId, isActive: true },
+            take: 3,
+            orderBy: { isFeatured: 'desc' }
+        })
+        
+        return (
+            <CourseLandingClient
+                course={course}
+                lessons={lessons}
+                testimonials={testimonials}
+                enrollment={enrollment}
+                isCourseOneActive={isCourseOneActive}
+                userPhone={userPhone}
+                userId={userId}
+                session={session}
+            />
+        )
+    }
+    
+    // 5. Nếu không phải landing page hoặc course → xử lý như SiteProfile
     const profile = await getSiteProfile(slug)
     
     if (!profile) {
         notFound()
     }
     
-    // 2. Tăng view count (async, không block render)
+    // 6. Tăng view count (async, không block render)
     incrementProfileView(slug).catch(console.error)
     
-    // 3. Lấy các data cần thiết (parallel)
+    // 7. Lấy các data cần thiết (parallel)
     const [
         courses,
         survey,
@@ -87,7 +201,7 @@ export default async function TeacherHomePage({ params }: PageProps) {
         getPostsForProfile(profile)
     ])
     
-    // 4. Xử lý enrollments map
+    // 8. Xử lý enrollments map
     const myCourseIds = new Set<number>()
     const enrollmentsMap: Record<number, {
         status: string
@@ -116,11 +230,11 @@ export default async function TeacherHomePage({ params }: PageProps) {
         }
     })
     
-    // 5. Phân loại courses
+    // 9. Phân loại courses
     const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
     const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
     
-    // 6. Group courses theo category
+    // 10. Group courses theo category
     const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
         const category = course.category || "Khác"
         const existingGroup = acc.find(g => g.category === category)
@@ -132,7 +246,7 @@ export default async function TeacherHomePage({ params }: PageProps) {
         return acc
     }, [])
     
-    // 7. User data
+    // 11. User data
     const userName = userRecord?.name ?? null
     const userId = userRecord?.id ?? null
     const userPhone = userRecord?.phone ?? null
@@ -141,12 +255,12 @@ export default async function TeacherHomePage({ params }: PageProps) {
     const userGoal = userRoadmap?.goal ?? null
     const targetPointId = userRoadmap?.targetPointId ?? 1
     
-    // 8. Roadmap points
+    // 12. Roadmap points
     const roadmapPoints = await prisma.roadmapPoint.findMany({
         orderBy: { id: 'asc' }
     })
     
-    // 9. Reset survey action
+    // 13. Reset survey action
     const { resetSurveyAction } = await import('@/app/actions/survey-actions')
     
     return (

@@ -182,7 +182,7 @@ function RegisterForm() {
                 // Auto redirect to course landing page after 2 seconds
                 if (redirectSlug) {
                     setTimeout(() => {
-                        router.push(`/landing/${redirectSlug}`)
+                        router.push(`/${redirectSlug}`)
                     }, 2000)
                 }
             } else if (result?.message || result?.errors) {

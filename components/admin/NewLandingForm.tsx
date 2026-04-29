@@ -111,7 +111,7 @@ export function NewLandingForm({ courses }: NewLandingFormProps) {
                             </label>
                             <div className="flex items-center">
                                 <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l-lg text-gray-500 text-sm">
-                                    /landing/
+                                    /
                                 </span>
                                 <input
                                     type="text"
@@ -123,7 +123,7 @@ export function NewLandingForm({ courses }: NewLandingFormProps) {
                                 />
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                                URL: /landing/{formData.slug || '{slug}'}
+                                URL: /{formData.slug || '{slug}'}
                             </p>
                         </div>
                         

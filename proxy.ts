@@ -73,7 +73,7 @@ export default auth(async function middleware(request: NextRequest & { auth: any
         }
         return NextResponse.redirect(redirectUrl)
     } else {
-        const redirectUrl = new URL(`/landing/${potentialSlug}`, request.url)
+        const redirectUrl = new URL(`/${potentialSlug}`, request.url)
         return NextResponse.redirect(redirectUrl)
     }
 })

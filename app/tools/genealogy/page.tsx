@@ -27,7 +27,7 @@ import * as d3 from 'd3-hierarchy'
 const NODE_WIDTH = 200
 const NODE_HEIGHT = 130
 const HORIZONTAL_SPACING = 20
-const VERTICAL_SPACING = 270
+const VERTICAL_SPACING = 320 // Sửa: tăng khoảng cách các hàng từ 270 lên 320
 
 // Đếm số con trực tiếp của node
 // Hàm đệ quy build D3 Tree object
@@ -36,15 +36,15 @@ type D3Node = { id: number; data: GenealogyNode; children: D3Node[] };
 const buildD3Tree = (node: GenealogyNode, isFullMode: boolean, currentFocusMap?: Map<number, number>, isParentVisibleAndExpanded: boolean = true): D3Node | null => {
   const isFocusNode = isFullMode || isParentVisibleAndExpanded;
   if (!isFocusNode) return { id: node.id, data: node, children: [] };
-  
+
   let childrenToRender = isFullMode
     ? [...(node.groupA || []), ...(node.groupB || []), ...(node.children || [])]
     : node.children || []
-    
+
   if (childrenToRender) {
     childrenToRender = Array.from(new Map(childrenToRender.map(c => [c.id, c])).values())
   }
-  
+
   const d3Children: D3Node[] = [];
   if (childrenToRender && childrenToRender.length > 0) {
     childrenToRender.forEach(child => {
@@ -53,14 +53,14 @@ const buildD3Tree = (node: GenealogyNode, isFullMode: boolean, currentFocusMap?:
       if (childD3Node) d3Children.push(childD3Node);
     });
   }
-  
+
   return { id: node.id, data: node, children: d3Children };
 }
 
 // Build position map với thuật toán d3-hierarchy chuẩn xác
 const calculateNodePositions = (root: GenealogyNode, isFullMode: boolean, currentFocusMap?: Map<number, number>): Map<number, { x: number; y: number }> => {
   const positions = new Map<number, { x: number; y: number }>()
-  
+
   const hierarchyRootObj = buildD3Tree(root, isFullMode, currentFocusMap, true);
   if (!hierarchyRootObj) return positions;
 
@@ -71,7 +71,7 @@ const calculateNodePositions = (root: GenealogyNode, isFullMode: boolean, curren
   const rootX = rootHierarchy.x || 0;
 
   rootHierarchy.each(node => {
-     positions.set(node.data.id, { x: (node.x || 0) - rootX, y: node.y || 0 });
+    positions.set(node.data.id, { x: (node.x || 0) - rootX, y: node.y || 0 });
   });
 
   return positions;
@@ -85,35 +85,37 @@ const filterToActiveTree = (node: GenealogyNode): GenealogyNode | null => {
   const filteredChildren = (node.children || [])
     .map(c => filterToActiveTree(c))
     .filter(Boolean) as GenealogyNode[]
-  
+
   // Lọc groupA
   const filteredGroupA = (node.groupA || [])
     .map(c => filterToActiveTree(c))
     .filter(Boolean) as GenealogyNode[]
-  
+
   // Lọc groupB
   const filteredGroupB = (node.groupB || [])
     .map(c => filterToActiveTree(c))
     .filter(Boolean) as GenealogyNode[]
-  
+
   // Gộp tất cả children đã lọc để kiểm tra
   const allFilteredChildren = [...filteredChildren, ...filteredGroupA, ...filteredGroupB]
-  
+
   // Nếu node là Active → giữ lại với tất cả children đã lọc
   if (node.groupName === "THÁI SƠN") {
     return { ...node, children: filteredChildren, groupA: filteredGroupA, groupB: filteredGroupB }
   }
-  
+
   // Nếu có active children → giữ lại node cha với tất cả children đã lọc
   if (allFilteredChildren.length > 0) {
     return { ...node, children: filteredChildren, groupA: filteredGroupA, groupB: filteredGroupB }
   }
-  
+
   // Không active và không có active children → bỏ
   return null
 }
 
-const getLevelColor = (level?: number) => {
+const getLevelColor = (level?: number, isRoot?: boolean) => {
+  // Sửa: Node root màu đỏ đậm đặc biệt
+  if (isRoot) return 'from-red-600 to-red-800 ring-red-300 border-red-900'
   const colors = [
     'from-amber-400 to-orange-500 ring-amber-200 border-amber-600', // Root - Gold/Yellow
     'from-emerald-400 to-teal-500 ring-emerald-200 border-emerald-600', // F1 - Green
@@ -162,7 +164,7 @@ const GenealogyCard = (props: NodeProps) => {
     onAddChild?: (parentId: number) => void;
     onDeleteNode?: (nodeId: number) => void;
   }
-  
+
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
   const isTarget = data.isSearchTarget
@@ -189,29 +191,26 @@ const GenealogyCard = (props: NodeProps) => {
     `}>
       {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!opacity-0 !w-2 !h-2" style={{ top: -8 }} />}
 
-      {/* Avatar Semicircle - chỉ hiện nửa trên để tiết kiệm chiều cao */}
-      <div className="relative z-10 w-16 mx-auto">
-        {/* Level Badge hình tròn - nằm ngoài vùng clip, tône màu khác semicircle */}
+      {/* Avatar Semicircle - hình bán nguyệt, đường kính = 86% chiều ngang box (Sửa: 190px * 86% = 164px) */}
+      <div className="relative z-10 w-[164px] mx-auto -mt-6">
+        {/* Level Badge hình tròn - tăng kích thước to hơn (Sửa: tăng từ w-16 h-16 lên w-20 h-20 để chữ không bị giới hạn) */}
         {levelBadgeText && (
-          <div className={`absolute -top-4 left-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black border-2 border-white shadow-md ${getLevelBadgeColor(colorDepth)}`}>
+          <div className={`absolute -top-10 left-1/2 -translate-x-1/2 z-20 w-18 h-18 rounded-full flex items-center justify-center text-[35px] font-black border-4 border-white shadow-lg ${getLevelBadgeColor(colorDepth)}`}>
             {tcaLevel != null ? tcaLevel : '★'}
           </div>
         )}
-        {/* Clip container: h-9 = 36px → chỉ hiện phần trên của vòng tròn 64px */}
-        <div className={`overflow-hidden h-9 ${isTarget ? 'ring-2 ring-offset-1 ring-amber-400 rounded-t-full' : ''}`}>
-          <div className={`
-            w-16 h-16 rounded-full flex items-start pt-4 justify-center text-white shadow-md border-2
-            bg-gradient-to-br ${getLevelColor(colorDepth)}
-          `}>
-            <span className="text-[11px] font-black leading-tight text-center px-1">#{data.id}</span>
+        {/* Clip container: chỉ hiện nửa trên của hình tròn 164px (Sửa: h-[82px] = nửa của 164px) */}
+        <div className={`overflow-hidden h-[82px] ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400 rounded-t-full' : ''}`}>
+          <div className={`w-[164px] h-[164px] rounded-full flex items-start pt-9 justify-center text-white shadow-lg border-4 bg-gradient-to-br ${getLevelColor(colorDepth, isActuallyRoot)}`}>
+            <span className="text-[28px] font-black leading-tight text-center px-2">#{data.id}</span>
           </div>
         </div>
       </div>
 
       {/* Information Box - tiếp ngay dưới semicircle, padding top nhỏ lại */}
-      <div className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-2 -mt-0.5 rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-t-0 border-slate-100 w-full text-center relative z-0 flex flex-col items-center`}>
-        {/* Tên thành viên */}
-        <div className="font-bold text-[12px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px-1">
+      <div className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-2 -mt rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-t-0 border-slate-100 w-full text-center relative z-0 flex flex-col items-center`}>
+        {/* Tên thành viên - Chuyển sang font Inter (Sửa: dùng inline style như các component khác trong dự án) */}
+        <div className="font-bold text-[20px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px font-sans">
           {data.name || 'Học viên'}
         </div>
 
@@ -359,7 +358,7 @@ function GenealogyFlow() {
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
   // v8.4.0: State cho filter Active
   const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false)
-  
+
   // v8.4.0: Computed tree - lọc tại nguồn data khi showActiveOnly thay đổi
   const filteredTree = useMemo(() => {
     if (!fullTree) return null
@@ -381,7 +380,7 @@ function GenealogyFlow() {
   // Focus Subtree Mode: tạm dùng 1 node làm root, hiển thị toàn bộ cây con
   const [focusedSubtreeNode, setFocusedSubtreeNode] = useState<GenealogyNode | null>(null)
   const [focusedNodeName, setFocusedNodeName] = useState<string | null>(null)
-  
+
   // Load available systems from database
   useEffect(() => {
     async function loadSystems() {
@@ -400,7 +399,7 @@ function GenealogyFlow() {
       }
     }
     loadSystems()
-    
+
     // Load current user role
     async function loadUserRole() {
       const result = await getCurrentUserRoleAction()
@@ -412,7 +411,7 @@ function GenealogyFlow() {
     }
     loadUserRole()
   }, [])
-  
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
@@ -544,7 +543,7 @@ function GenealogyFlow() {
       // Sử dụng positionMap nếu có (Reingold-Tilford)
       childrenToRender.forEach((child, index) => {
         let childX: number, childY: number
-        
+
         if (positionMap && positionMap.has(child.id)) {
           const pos = positionMap.get(child.id)!
           childX = pos.x
@@ -632,7 +631,7 @@ function GenealogyFlow() {
 
       if (result.success && result.tree && fullTree) {
         console.log(`[Tree] FullTree root:`, fullTree.id);
-        
+
         setFullTree(prev => {
           const updatedTree = mergeSubtree(prev!, result.tree!);
           console.log(`[Tree] Merged, root children count:`, updatedTree.children?.length);
@@ -706,7 +705,7 @@ function GenealogyFlow() {
         }
       } else {
         // Hệ thống TCA/KTC - Sửa bug: gọi đúng function theo displayMode
-        const result = displayMode === 'full' 
+        const result = displayMode === 'full'
           ? await getFullSystemTreeAction(systemId)
           : await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
@@ -716,7 +715,7 @@ function GenealogyFlow() {
           const errMsg = result.error || ''
           // Nếu lỗi là "không tìm thấy root" hoặc "không thuộc hệ thống"
           const isNoRootError = errMsg.includes('root') || errMsg.includes('thuộc')
-          
+
           if (isAdminNow && isNoRootError) {
             // Admin + hệ thống chưa có root
             setFullTree(null)
@@ -785,7 +784,7 @@ function GenealogyFlow() {
       if (selectedSystem === 0 || selectedSystem === null) {
         const childrenResult = await getGenealogyChildrenAction(id)
         console.log('[SEARCH] Fetch children result:', childrenResult.success ? 'Success' : 'Failed')
-        
+
         if (childrenResult.success && childrenResult.tree) {
           const treeResult = await getGenealogyTreeAction(0)
           if (treeResult.success && treeResult.tree) {
@@ -807,7 +806,7 @@ function GenealogyFlow() {
           targetId: result.targetId
         })
         console.log('[SEARCH] searchResult set with', result.path.length, 'nodes')
-        
+
         const targetId = result.targetId
         activeFocusMapRef.current = new Map()
         for (let i = 0; i < result.path.length - 1; i++) {
@@ -815,7 +814,7 @@ function GenealogyFlow() {
         }
         focusMapSizeRef.current = activeFocusMapRef.current.size
         setFocusMapVersion(v => v + 1)
-        
+
         setError(null)
       } else {
         console.log('[SEARCH] Not found:', result.error)
@@ -856,10 +855,10 @@ function GenealogyFlow() {
       }
 
       const { resNodes, resEdges } = generateGraphNodes(treeToRender, 0, 0, { onToggleExpand: handleToggleExpand, onFocusSubtree: handleFocusSubtree }, activeFocusMapRef.current, true, editMode, isFocusMode ? 'full' : displayMode, positionMapRef.current)
-      
+
       const uniqueNodes = Array.from(new Map(resNodes.map(item => [item.id, item])).values())
       const uniqueEdges = Array.from(new Map(resEdges.map(item => [item.id, item])).values())
-      
+
       setNodes(uniqueNodes); setEdges(uniqueEdges)
 
       const centerNodeId = pendingCenterNodeIdRef.current
@@ -905,11 +904,11 @@ function GenealogyFlow() {
 
   // Filtered users based on search
   const filteredUsers = userSearch.trim()
-    ? usersList.filter(u => 
-        u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-        u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-        String(u.id).includes(userSearch)
-      )
+    ? usersList.filter(u =>
+      u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      String(u.id).includes(userSearch)
+    )
     : usersList.slice(0, 50)
 
   // Handle add child
@@ -1033,7 +1032,7 @@ function GenealogyFlow() {
 
         {/* Nút Tạo cây/Sửa */}
         {isTreeEmpty && selectedSystem !== null && selectedSystem !== 0 ? (
-          <button 
+          <button
             type="button"
             onClick={async (e) => {
               e.preventDefault()
@@ -1065,11 +1064,10 @@ function GenealogyFlow() {
         ) : (
           <button
             onClick={() => setEditMode(!editMode)}
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
-              editMode 
-                ? 'bg-orange-500 text-white hover:bg-orange-600' 
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            }`}
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all shrink-0 ${editMode
+              ? 'bg-orange-500 text-white hover:bg-orange-600'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
           >
             {editMode ? 'HỦY' : 'SỬA'}
           </button>
@@ -1113,7 +1111,7 @@ function GenealogyFlow() {
                 {showActiveOnly ? fullTree.stats.active : fullTree.stats.total}
               </span>
             </div>
-            
+
             {!showActiveOnly && (
               <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-1 rounded-md border border-emerald-100">
                 <span className="text-[9px] font-medium text-emerald-600 uppercase tracking-tighter">Active:</span>

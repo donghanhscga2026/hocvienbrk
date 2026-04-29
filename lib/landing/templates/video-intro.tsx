@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { Play, CheckCircle } from 'lucide-react'
 import { useAffiliateCookie } from '@/hooks/useAffiliateCookie'

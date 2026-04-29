@@ -53,7 +53,7 @@ function LoginForm() {
             } else {
                 // Redirect về course landing page nếu có redirect param
                 if (redirectSlug) {
-                    router.push(`/landing/${redirectSlug}`)
+                    router.push(`/${redirectSlug}`)
                 } else {
                     router.push("/")
                 }

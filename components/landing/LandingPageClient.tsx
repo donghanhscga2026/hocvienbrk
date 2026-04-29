@@ -1,8 +1,5 @@
-import { notFound } from 'next/navigation'
-import { Metadata } from 'next'
-import { auth } from '@/auth'
-import { cookies } from 'next/headers'
-import prisma from '@/lib/prisma'
+'use client'
+
 import {
     HeroCTATemplate,
     FeatureGridTemplate,
@@ -11,140 +8,12 @@ import {
     TestimonialTemplate,
 } from '@/lib/landing/templates'
 import CourseLandingTemplate from '@/components/landing/CourseLandingTemplate'
-import type { 
-    HeroCTATemplateProps,
-    FeatureGridTemplateProps,
-    VideoIntroTemplateProps,
-    WebinarRegTemplateProps,
-    TestimonialTemplateProps
-} from '@/lib/landing/templates'
 
-interface LandingPageProps {
-    params: Promise<{ slug: string }>
+interface LandingPageClientProps {
+    landing: any
 }
 
-export async function generateMetadata({ params }: LandingPageProps): Promise<Metadata> {
-    const { slug } = await params
-    
-    const landing = await (prisma as any).landingPage.findUnique({
-        where: { slug }
-    })
-    
-    if (landing) {
-        return {
-            title: landing.title,
-            description: landing.subtitle || landing.description || undefined,
-            openGraph: {
-                title: landing.title,
-                description: landing.subtitle || undefined,
-                images: landing.heroImage ? [landing.heroImage] : undefined,
-            },
-        }
-    }
-    
-    const course = await prisma.course.findUnique({
-        where: { id_khoa: slug }
-    })
-    
-    if (course) {
-        return {
-            title: course.name_lop,
-            description: course.mo_ta_ngan || undefined,
-            openGraph: {
-                title: course.name_lop,
-                description: course.mo_ta_ngan || undefined,
-                images: course.link_anh_bia ? [course.link_anh_bia] : undefined,
-            },
-        }
-    }
-    
-    return { title: 'Không tìm thấy' }
-}
-
-export default async function LandingPage({ params }: LandingPageProps) {
-    const { slug } = await params
-    
-    const landing = await (prisma as any).landingPage.findUnique({
-        where: { 
-            slug,
-            isActive: true 
-        },
-        include: {
-            course: true
-        }
-    })
-    
-    if (landing) {
-        return renderLandingPage(landing, slug)
-    }
-    
-    const course = await prisma.course.findUnique({
-        where: { id_khoa: slug }
-    })
-    
-    if (!course) {
-        notFound()
-    }
-    
-    return renderCourseLanding(slug, course)
-}
-
-async function renderCourseLanding(slug: string, courseData: any) {
-    const courseId = courseData.id
-    const session = await auth()
-    
-    let userId: number | null = null
-    let userPhone: string | null = null
-    
-    if (session?.user?.id) {
-        userId = parseInt(session.user.id)
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { phone: true }
-        })
-        userPhone = user?.phone || null
-    }
-    
-    const enrollment = userId 
-        ? await prisma.enrollment.findFirst({
-            where: { userId, courseId }
-        })
-        : null
-    
-    const courseOneEnrollment = userId
-        ? await prisma.enrollment.findFirst({
-            where: { userId, courseId: 1 }
-        })
-        : null
-    const isCourseOneActive = courseOneEnrollment?.status === 'ACTIVE'
-    
-    const lessons = await prisma.lesson.findMany({
-        where: { courseId },
-        orderBy: { order: 'asc' },
-        select: { id: true, title: true, order: true }
-    })
-    
-    const testimonials = await (prisma as any).courseTestimonial.findMany({
-        where: { courseId, isActive: true },
-        take: 3,
-        orderBy: { isFeatured: 'desc' }
-    })
-    
-    return (
-        <CourseLandingTemplate
-            course={courseData}
-            lessons={lessons}
-            testimonials={testimonials}
-            enrollment={enrollment}
-            isCourseOneActive={isCourseOneActive}
-            userPhone={userPhone}
-            userId={userId}
-            session={session}
-        />
-    )
-}
-
-async function renderLandingPage(landing: any, slug: string) {
+export function LandingPageClient({ landing }: LandingPageClientProps) {
     const config = typeof landing.config === 'object' && landing.config !== null
         ? landing.config as Record<string, unknown>
         : {}
@@ -153,10 +22,8 @@ async function renderLandingPage(landing: any, slug: string) {
         ? config.features as string[] 
         : []
     
-    ;(prisma as any).landingPage.update({
-        where: { id: landing.id },
-        data: { viewCount: { increment: 1 } }
-    }).catch(console.error)
+    // Tăng view count (client-side)
+    fetch(`/api/landing/view?id=${landing.id}`, { method: 'POST' }).catch(console.error)
     
     switch (landing.template) {
         case 'hero-cta':
@@ -253,7 +120,7 @@ async function renderLandingPage(landing: any, slug: string) {
             
         case 'testimonial':
             const testimonialItems = Array.isArray(config.testimonials)
-                ? config.testimonials as TestimonialItem[]
+                ? config.testimonials as any[]
                 : []
             const statsData = config.stats as { students?: string; rating?: string; courses?: string } | undefined
             
@@ -280,7 +147,6 @@ async function renderLandingPage(landing: any, slug: string) {
             )
             
         default:
-            // Fallback to hero-cta
             return (
                 <HeroCTATemplate
                     title={landing.title}
@@ -295,11 +161,37 @@ async function renderLandingPage(landing: any, slug: string) {
     }
 }
 
-interface TestimonialItem {
-    name: string
-    role?: string
-    avatar?: string
-    content: string
-    rating?: number
-    courseName?: string
+interface CourseLandingClientProps {
+    course: any
+    lessons: any[]
+    testimonials: any[]
+    enrollment: any
+    isCourseOneActive: boolean
+    userPhone: string | null
+    userId: number | null
+    session: any
+}
+
+export function CourseLandingClient({
+    course,
+    lessons,
+    testimonials,
+    enrollment,
+    isCourseOneActive,
+    userPhone,
+    userId,
+    session
+}: CourseLandingClientProps) {
+    return (
+        <CourseLandingTemplate
+            course={course}
+            lessons={lessons}
+            testimonials={testimonials}
+            enrollment={enrollment}
+            isCourseOneActive={isCourseOneActive}
+            userPhone={userPhone}
+            userId={userId}
+            session={session}
+        />
+    )
 }
