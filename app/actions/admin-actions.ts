@@ -665,12 +665,32 @@ export async function getStudentDetailsAction(userId: number) {
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function getAdminCoursesAction() {
-    await checkAdmin()
+export async function getCoursesAction() {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+    if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
+    
     try {
-        const courses = await prisma.course.findMany({ include: { _count: { select: { lessons: true, enrollments: true } } }, orderBy: { id: 'asc' } })
+        const userId = Number(session.user.id)
+        const courses = isAdmin 
+            ? await prisma.course.findMany({ 
+                include: { _count: { select: { lessons: true, enrollments: true } } }, 
+                orderBy: { id: 'asc' } 
+            })
+            : await prisma.course.findMany({ 
+                where: { teacherId: userId },
+                include: { _count: { select: { lessons: true, enrollments: true } } }, 
+                orderBy: { id: 'asc' } 
+            })
         return { success: true, courses }
     } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function getAdminCoursesAction() {
+    return getCoursesAction()
 }
 
 export async function updateCourseAction(courseId: number, data: any) {

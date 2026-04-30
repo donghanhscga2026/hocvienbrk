@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
+import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { createPaymentQR } from "@/lib/vietqr"
 
@@ -474,4 +475,130 @@ export async function updateLastLessonAction(enrollmentId: number, lessonId: str
             data: { lastLessonId: lessonId }
         })
     } catch (error) {}
+}
+
+// ==========================================
+// CREATE COURSE - Tạo khóa học mới (ADMIN + TEACHER)
+// ==========================================
+export async function createCourseAction(formData: FormData) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+    
+    // ✅ Validate required fields
+    const id_khoa = formData.get('id_khoa') as string
+    const name_lop = formData.get('name_lop') as string
+    
+    if (!id_khoa?.trim()) return { success: false, error: "Mã khóa học là bắt buộc" }
+    if (!name_lop?.trim()) return { success: false, error: "Tên lớp học là bắt buộc" }
+    
+    // ✅ Xác định teacherId: ADMIN được chọn, TEACHER tự động lấy session.id
+    let teacherId: number | null = null
+    if (isAdmin) {
+        const teacherIdStr = formData.get('teacherId') as string
+        teacherId = teacherIdStr ? parseInt(teacherIdStr) : null
+    } else if (session.user.role === Role.TEACHER) {
+        teacherId = userId
+    }
+    
+    try {
+        // ✅ Check unique id_khoa
+        const existing = await prisma.course.findUnique({ where: { id_khoa } })
+        if (existing) return { success: false, error: `Mã khóa "${id_khoa}" đã tồn tại` }
+        
+        // ✅ Parse all 21 fields từ FormData
+        const courseData: any = {
+            id_khoa: id_khoa.toUpperCase(),
+            name_lop,
+            name_khoa: formData.get('name_khoa') as string || null,
+            category: formData.get('category') as string || 'Khác',
+            type: (formData.get('type') as any) || 'NORMAL',
+            status: formData.get('status') === 'true',
+            pin: parseInt(formData.get('pin') as string) || 0,
+            date_join: formData.get('date_join') as string || null,
+            mo_ta_ngan: formData.get('mo_ta_ngan') as string || null,
+            mo_ta_dai: formData.get('mo_ta_dai') as string || null,
+            link_anh_bia: formData.get('link_anh_bia') as string || null,
+            phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
+            stk: formData.get('stk') as string || null,
+            name_stk: formData.get('name_stk') as string || null,
+            bank_stk: formData.get('bank_stk') as string || null,
+            noidung_stk: formData.get('noidung_stk') as string || null,
+            link_qrcode: formData.get('link_qrcode') as string || null,
+            link_zalo: formData.get('link_zalo') as string || null,
+            file_email: formData.get('file_email') as string || null,
+            noidung_email: formData.get('noidung_email') as string || null,
+        }
+        
+        // ✅ Gán teacherId nếu có
+        if (teacherId) {
+            courseData.teacherId = teacherId
+        }
+        
+        const newCourse = await prisma.course.create({
+            data: courseData
+        })
+        
+        revalidatePath('/tools/courses')
+        return { success: true, course: newCourse, message: 'Đã tạo khóa học thành công!' }
+    } catch (error: any) {
+        return { success: false, error: error.message || 'Lỗi khi tạo khóa học' }
+    }
+}
+
+// ==========================================
+// DELETE COURSE - Xóa khóa học (Check quyền)
+// ==========================================
+export async function deleteCourseAction(courseId: number) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+    
+    try {
+        // ✅ Check course tồn tại + quyền xóa
+        const course = await prisma.course.findUnique({ 
+            where: { id: courseId },
+            select: { teacherId: true, name_lop: true }
+        })
+        
+        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
+        
+        // ✅ TEACHER chỉ được xóa course của mình
+        if (!isAdmin && course.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền xóa khóa học này" }
+        }
+        
+        // ✅ Xóa course (cascade xóa lessons, enrollments...)
+        await prisma.course.delete({ where: { id: courseId } })
+        
+        revalidatePath('/tools/courses')
+        return { success: true, message: `Đã xóa khóa học "${course.name_lop}"` }
+    } catch (error: any) {
+        return { success: false, error: error.message || 'Lỗi khi xóa khóa học' }
+    }
+}
+
+// ==========================================
+// GET TEACHERS - Lấy danh sách TEACHER (cho ADMIN chọn)
+// ==========================================
+export async function getTeachersAction() {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    if (!isAdmin) return { success: false, error: "Unauthorized" }
+    
+    try {
+        const teachers = await prisma.user.findMany({
+            where: { role: Role.TEACHER },
+            select: { id: true, name: true, email: true }
+        })
+        return { success: true, teachers }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
 }
