@@ -225,19 +225,83 @@ function CreateCourseContent() {
     const [fileEmail, setFileEmail] = useState('')
     const [noidungEmail, setNoidungEmail] = useState('')
     
+    // ✅ NEW: Categories & Upload state
+    const [categories, setCategories] = useState<string[]>([])
+    const [uploadingImage, setUploadingImage] = useState(false)
+    
+    // ✅ NEW: Handle image upload
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        
+        setUploadingImage(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            
+            const res = await fetch('/api/upload/course', {
+                method: 'POST',
+                body: formData
+            })
+            const data = await res.json()
+            
+            if (data.url) {
+                setLinkAnhBia(data.url)
+            } else {
+                setMessage({ type: 'error', text: data.error || 'Lỗi upload ảnh' })
+            }
+        } catch (err: any) {
+            setMessage({ type: 'error', text: 'Lỗi upload: ' + err.message })
+        }
+        setUploadingImage(false)
+    }
+    
+    // ✅ NEW: Handle Enter key in textarea to insert <br>
+    const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            const textarea = e.target as HTMLTextAreaElement
+            const start = textarea.selectionStart
+            const end = textarea.selectionEnd
+            const value = textarea.value
+            const newValue = value.substring(0, start) + '<br>' + value.substring(end)
+            setter(newValue)
+            // Restore cursor position
+            setTimeout(() => {
+                textarea.selectionStart = textarea.selectionEnd = start + 4
+            }, 0)
+        }
+    }
+    
+    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc courseId)
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const catRes = await fetch('/api/courses/categories').then(r => r.json())
+                if (catRes.categories) {
+                    console.log('Categories loaded:', catRes.categories)
+                    setCategories(catRes.categories)
+                }
+            } catch (err) {
+                console.error("Fetch categories error:", err)
+            }
+        }
+        fetchCategories()
+    }, [])
+    
     useEffect(() => {
         const fetchData = async () => {
             const res = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = res?.user?.role === 'ADMIN'
             setIsAdmin(isAdminUser)
-            
+             
             if (isAdminUser) {
                 const teachersRes = await getTeachersAction()
                 if (teachersRes.success) {
                     setTeachers(teachersRes.teachers || [])
                 }
             }
-            
+             
             // ✅ EDIT MODE: Fetch course data if courseId exists (THÊM MỚI)
             if (courseId) {
                 setLoading(true)
@@ -433,18 +497,23 @@ function CreateCourseContent() {
                     
                     <div className="grid grid-cols-3 gap-4 mt-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
-                            <select 
-                                value={category} 
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                            >
-                                <option value="Khác">Khác</option>
-                                <option value="Lập trình">Lập trình</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Kinh doanh">Kinh doanh</option>
-                                <option value="Ngoại ngữ">Ngoại ngữ</option>
-                            </select>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục (chọn hoặc nhập mới)</label>
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    value={category} 
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    list="category-list"
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                                    placeholder="Chọn hoặc nhập danh mục..."
+                                />
+                                <datalist id="category-list">
+                                    <option value="Khác" />
+                                    {categories.map((cat: string) => (
+                                        <option key={cat} value={cat} />
+                                    ))}
+                                </datalist>
+                            </div>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
@@ -518,38 +587,57 @@ function CreateCourseContent() {
                     </h2>
                     
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars)</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
                         <textarea 
                             value={moTaNgan} 
-                            onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} 
-                            rows={2}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" 
-                            placeholder="Mô tả ngắn gọn..." 
+                            onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))}
+                            onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)}
+                            rows={6}
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
+                            placeholder="Mô tả ngắn gọn... (Enter để xuống dòng sẽ tự thêm <br>)" 
                         />
                         <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>
                         <textarea 
                             value={moTaDai} 
-                            onChange={(e) => setMoTaDai(e.target.value)} 
-                            rows={4}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" 
-                            placeholder="Mô tả chi tiết khóa học..." 
+                            onChange={(e) => setMoTaDai(e.target.value)}
+                            onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)}
+                            rows={10}
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
+                            placeholder="Mô tả chi tiết khóa học... (Enter để xuống dòng sẽ tự thêm <br>)" 
                         />
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
-                        <input 
-                            type="url" 
-                            value={linkAnhBia} 
-                            onChange={(e) => setLinkAnhBia(e.target.value)} 
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            placeholder="https://..." 
-                        />
-                        {linkAnhBia && <img src={linkAnhBia} alt="Preview" className="w-full h-40 object-cover rounded-2xl mt-2" />}
+                        <div className="flex gap-2">
+                            <input 
+                                type="url" 
+                                value={linkAnhBia} 
+                                onChange={(e) => setLinkAnhBia(e.target.value)} 
+                                className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                                placeholder="https://... hoặc upload từ thiết bị" 
+                            />
+                            <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
+                                <Upload className="w-4 h-4" />
+                                {uploadingImage ? 'Đang tải...' : 'Upload'}
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleImageUpload} 
+                                    className="hidden" 
+                                    disabled={uploadingImage}
+                                />
+                            </label>
+                        </div>
+                        {linkAnhBia && (
+                            <div className="mt-2 bg-gray-50 rounded-2xl p-4 flex justify-center">
+                                <img src={linkAnhBia} alt="Preview" className="max-w-full max-h-96 object-contain rounded-xl" />
+                            </div>
+                        )}
                     </div>
                 </div>
                 

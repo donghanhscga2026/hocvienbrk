@@ -207,6 +207,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [moTaNgan, setMoTaNgan] = useState('')
     const [moTaDai, setMoTaDai] = useState('')
     const [linkAnhBia, setLinkAnhBia] = useState('')
+    const [categories, setCategories] = useState<string[]>([])
+    const [uploadingImage, setUploadingImage] = useState(false)
     
     // ✅ NEW: Section 3 - Fee & Payment
     const [stk, setStk] = useState('')
@@ -218,6 +220,65 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     // ✅ NEW: Section 4 - Email & Zalo
     const [linkZalo, setLinkZalo] = useState('')
     const [fileEmail, setFileEmail] = useState('')
+    
+    // ✅ NEW: Fetch categories independently (chạy ngay khi mount)
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const catRes = await fetch('/api/courses/categories').then(r => r.json())
+                if (catRes.categories) {
+                    console.log('Categories loaded:', catRes.categories)
+                    setCategories(catRes.categories)
+                }
+            } catch (err) {
+                console.error("Fetch categories error:", err)
+            }
+        }
+        fetchCategories()
+    }, [])
+    
+    // ✅ NEW: Handle image upload
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        
+        setUploadingImage(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            
+            const res = await fetch('/api/upload/course', {
+                method: 'POST',
+                body: formData
+            })
+            const data = await res.json()
+            
+            if (data.url) {
+                setLinkAnhBia(data.url)
+            } else {
+                setMessage({ type: 'error', text: data.error || 'Lỗi upload ảnh' })
+            }
+        } catch (err: any) {
+            setMessage({ type: 'error', text: 'Lỗi upload: ' + err.message })
+        }
+        setUploadingImage(false)
+    }
+    
+    // ✅ NEW: Handle Enter key in textarea to insert <br>
+    const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            const textarea = e.target as HTMLTextAreaElement
+            const start = textarea.selectionStart
+            const end = textarea.selectionEnd
+            const value = textarea.value
+            const newValue = value.substring(0, start) + '<br>' + value.substring(end)
+            setter(newValue)
+            setTimeout(() => {
+                textarea.selectionStart = textarea.selectionEnd = start + 4
+            }, 0)
+        }
+    }
     
     const fetchData = async () => {
         setLoading(true)
@@ -342,8 +403,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học *</label>
-                                <input type="text" value={idKhoa} onChange={(e) => setIdKhoa(e.target.value.toUpperCase())} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học (Không thể sửa - ảnh hưởng DB)</label>
+                                 <input 
+                                     type="text" 
+                                     value={idKhoa} 
+                                     readOnly 
+                                     disabled 
+                                     className="w-full bg-gray-200 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none opacity-40 cursor-not-allowed text-gray-500" 
+                                 />
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
@@ -358,15 +425,24 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         
                         <div className="grid grid-cols-3 gap-4 mt-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
-                                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                                    <option value="Khác">Khác</option>
-                                    <option value="Lập trình">Lập trình</option>
-                                    <option value="Marketing">Marketing</option>
-                                    <option value="Kinh doanh">Kinh doanh</option>
-                                    <option value="Ngoại ngữ">Ngoại ngữ</option>
-                                </select>
-                            </div>
+                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục (chọn hoặc nhập mới)</label>
+                                 <div className="relative">
+                                     <input 
+                                         type="text" 
+                                         value={category} 
+                                         onChange={(e) => setCategory(e.target.value)}
+                                         list="category-list-edit"
+                                         className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                                         placeholder="Chọn hoặc nhập danh mục..." 
+                                     />
+                                     <datalist id="category-list-edit">
+                                         <option value="Khác" />
+                                         {categories.map((cat: string) => (
+                                             <option key={cat} value={cat} />
+                                         ))}
+                                     </datalist>
+                                 </div>
+                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
                                 <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
@@ -415,22 +491,45 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
                         </h2>
                         
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars)</label>
-                            <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} rows={2} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
-                            <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
-                        </div>
-                        
-                        <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài</label>
-                            <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} rows={4} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
-                        </div>
-                        
-                        <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
-                            <input type="url" value={linkAnhBia} onChange={(e) => setLinkAnhBia(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                            {linkAnhBia && <img src={linkAnhBia} alt="Preview" className="w-full h-40 object-cover rounded-2xl mt-2" />}
-                        </div>
+                         <div className="space-y-1.5">
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
+                              <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
+                              <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
+                          </div>
+                         
+                         <div className="space-y-1.5 mt-4">
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>
+                              <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
+                          </div>
+                         
+                         <div className="space-y-1.5 mt-4">
+                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
+                             <div className="flex gap-2">
+                                 <input 
+                                     type="url" 
+                                     value={linkAnhBia} 
+                                     onChange={(e) => setLinkAnhBia(e.target.value)} 
+                                     className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                                     placeholder="https://... hoặc upload từ thiết bị" 
+                                 />
+                                 <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
+                                     <Upload className="w-4 h-4" />
+                                     {uploadingImage ? 'Đang tải...' : 'Upload'}
+                                     <input 
+                                         type="file" 
+                                         accept="image/*" 
+                                         onChange={handleImageUpload} 
+                                         className="hidden" 
+                                         disabled={uploadingImage}
+                                     />
+                                 </label>
+                             </div>
+                             {linkAnhBia && (
+                                 <div className="mt-2 bg-gray-50 rounded-2xl p-4 flex justify-center">
+                                     <img src={linkAnhBia} alt="Preview" className="max-w-full max-h-96 object-contain rounded-xl" />
+                                 </div>
+                             )}
+                         </div>
                     </div>
 
                     {/* PHẦN 3: HỌC PHÍ & THANH TOÁN */}
