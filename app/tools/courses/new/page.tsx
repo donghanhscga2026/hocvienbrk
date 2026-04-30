@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle } from 'lucide-react'
+import { updateCourseAction } from '@/app/actions/admin-actions'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -13,6 +14,16 @@ export default function CreateCoursePage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
+    
+    // ✅ NEW: Edit mode states (Thêm mới, giữ nguyên 21 states cũ)
+    const searchParams = useSearchParams()
+    const courseId = searchParams.get('id')
+    const isEditMode = !!courseId
+    
+    const [activeTab, setActiveTab] = useState<'info' | 'lessons'>('info')
+    const [lessons, setLessons] = useState<any[]>([])
+    const [showImport, setShowImport] = useState(false)
+    const [selectedLesson, setSelectedLesson] = useState<any>(null)
     
     // Section1: Thông tin cơ bản
     const [idKhoa, setIdKhoa] = useState('')
@@ -55,59 +66,159 @@ export default function CreateCoursePage() {
                     setTeachers(teachersRes.teachers || [])
                 }
             }
+            
+            // ✅ EDIT MODE: Fetch course data if courseId exists (THÊM MỚI)
+            if (courseId) {
+                setLoading(true)
+                try {
+                    const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
+                    if (courseRes && !courseRes.error) {
+                        // Pre-fill 21 fields
+                        setIdKhoa(courseRes.id_khoa || '')
+                        setNameLop(courseRes.name_lop || '')
+                        setNameKhoa(courseRes.name_khoa || '')
+                        setCategory(courseRes.category || 'Khác')
+                        setType(courseRes.type || 'NORMAL')
+                        setStatus(courseRes.status ?? true)
+                        setPin(courseRes.pin || 0)
+                        setDateJoin(courseRes.date_join || '')
+                        setTeacherId(courseRes.teacherId?.toString() || '')
+                        
+                        setMoTaNgan(courseRes.mo_ta_ngan || '')
+                        setMoTaDai(courseRes.mo_ta_dai || '')
+                        setLinkAnhBia(courseRes.link_anh_bia || '')
+                        
+                        setPhiCoc(courseRes.phi_coc || 0)
+                        setStk(courseRes.stk || '')
+                        setNameStk(courseRes.name_stk || '')
+                        setBankStk(courseRes.bank_stk || '')
+                        setNoidungStk(courseRes.noidung_stk || '')
+                        setLinkQrcode(courseRes.link_qrcode || '')
+                        
+                        setLinkZalo(courseRes.link_zalo || '')
+                        setFileEmail(courseRes.file_email || '')
+                        setNoidungEmail(courseRes.noidung_email || '')
+                        
+                        // Set lessons
+                        setLessons(courseRes.lessons || [])
+                    } else {
+                        setMessage({ type: 'error', text: courseRes.error || 'Không tìm thấy khóa học' })
+                    }
+                } catch (err) {
+                    console.error("Fetch course error:", err)
+                    setMessage({ type: 'error', text: 'Lỗi khi tải thông tin khóa học' })
+                } finally {
+                    setLoading(false)
+                }
+            }
         }
         fetchData()
-    }, [])
+    }, [courseId])
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setMessage(null)
         
-        const formData = new FormData()
-        formData.append('id_khoa', idKhoa)
-        formData.append('name_lop', nameLop)
-        if (nameKhoa) formData.append('name_khoa', nameKhoa)
-        formData.append('category', category)
-        formData.append('type', type)
-        formData.append('status', status.toString())
-        formData.append('pin', pin.toString())
-        if (dateJoin) formData.append('date_join', dateJoin)
-        if (moTaNgan) formData.append('mo_ta_ngan', moTaNgan)
-        if (moTaDai) formData.append('mo_ta_dai', moTaDai)
-        if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
-        formData.append('phi_coc', phiCoc.toString())
-        if (stk) formData.append('stk', stk)
-        if (nameStk) formData.append('name_stk', nameStk)
-        if (bankStk) formData.append('bank_stk', bankStk)
-        if (noidungStk) formData.append('noidung_stk', noidungStk)
-        if (linkQrcode) formData.append('link_qrcode', linkQrcode)
-        if (linkZalo) formData.append('link_zalo', linkZalo)
-        if (fileEmail) formData.append('file_email', fileEmail)
-        if (noidungEmail) formData.append('noidung_email', noidungEmail)
-        if (isAdmin && teacherId) formData.append('teacherId', teacherId)
-        
-        const res = await createCourseAction(formData)
-        
-        if (res.success) {
-            setMessage({ type: 'success', text: res.message || 'Đã tạo khóa học thành công!' })
-            setTimeout(() => router.push('/tools/courses'), 1500)
+        if (isEditMode && courseId) {
+            // ✅ EDIT MODE: Gọi updateCourseAction (THÊM MỚI)
+            const res = await updateCourseAction(parseInt(courseId), {
+                id_khoa: idKhoa,
+                name_lop: nameLop,
+                name_khoa: nameKhoa || null,
+                category,
+                type,
+                status,
+                pin,
+                date_join: dateJoin || null,
+                teacherId: (isAdmin && teacherId) ? parseInt(teacherId) : null,
+                mo_ta_ngan: moTaNgan || null,
+                mo_ta_dai: moTaDai || null,
+                link_anh_bia: linkAnhBia || null,
+                phi_coc: phiCoc,
+                stk: stk || null,
+                name_stk: nameStk || null,
+                bank_stk: bankStk || null,
+                noidung_stk: noidungStk || null,
+                link_qrcode: linkQrcode || null,
+                link_zalo: linkZalo || null,
+                file_email: fileEmail || null,
+                noidung_email: noidungEmail || null,
+            })
+            
+            if (res.success) {
+                setMessage({ type: 'success', text: 'Đã cập nhật khóa học thành công!' })
+                setTimeout(() => router.push('/tools/courses'), 1500)
+            } else {
+                setMessage({ type: 'error', text: res.error || 'Lỗi khi cập nhật.' })
+            }
         } else {
-            setMessage({ type: 'error', text: res.error || 'Lỗi khi tạo khóa học' })
+            // ✅ CREATE MODE: Giữ nguyên code cũ
+            const formData = new FormData()
+            formData.append('id_khoa', idKhoa)
+            formData.append('name_lop', nameLop)
+            if (nameKhoa) formData.append('name_khoa', nameKhoa)
+            formData.append('category', category)
+            formData.append('type', type)
+            formData.append('status', status.toString())
+            formData.append('pin', pin.toString())
+            if (dateJoin) formData.append('date_join', dateJoin)
+            if (moTaNgan) formData.append('mo_ta_ngan', moTaNgan)
+            if (moTaDai) formData.append('mo_ta_dai', moTaDai)
+            if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
+            formData.append('phi_coc', phiCoc.toString())
+            if (stk) formData.append('stk', stk)
+            if (nameStk) formData.append('name_stk', nameStk)
+            if (bankStk) formData.append('bank_stk', bankStk)
+            if (noidungStk) formData.append('noidung_stk', noidungStk)
+            if (linkQrcode) formData.append('link_qrcode', linkQrcode)
+            if (linkZalo) formData.append('link_zalo', linkZalo)
+            if (fileEmail) formData.append('file_email', fileEmail)
+            if (noidungEmail) formData.append('noidung_email', noidungEmail)
+            if (isAdmin && teacherId) formData.append('teacherId', teacherId)
+            
+            const res = await createCourseAction(formData)
+            
+            if (res.success) {
+                setMessage({ type: 'success', text: res.message || 'Đã tạo khóa học thành công!' })
+                setTimeout(() => router.push('/tools/courses'), 1500)
+            } else {
+                setMessage({ type: 'error', text: res.error || 'Lỗi khi tạo khóa học' })
+            }
         }
         
         setLoading(false)
     }
     
     return (
+        <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>}>
         <div className="min-h-screen bg-gray-50">
-            <MainHeader title="TẠO KHÓA HỌC MỚI" toolSlug="courses" />
+            <MainHeader title={isEditMode ? "SỬA KHÓA HỌC" : "TẠO KHÓA HỌC MỚI"} toolSlug="courses" />
+            
+            {isEditMode && (
+                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mx-4 mb-6">
+                    <button 
+                        onClick={() => setActiveTab('info')} 
+                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <Settings className="w-4 h-4 inline mr-2" /> Thông tin
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('lessons')} 
+                        className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'lessons' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <List className="w-4 h-4 inline mr-2" /> Bài giảng ({lessons.length})
+                    </button>
+                </div>
+            )}
             
             <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
                 </Link>
                 
+                {( !isEditMode || activeTab === 'info' ) && (
+                <>
                 {/* SECTION 1: THÔNG TIN CƠ BẢN */}
                 <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
@@ -399,9 +510,56 @@ export default function CreateCoursePage() {
                     className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BookOpen className="w-5 h-5" />}
-                    Tạo Khóa học
+                    {isEditMode ? 'Lưu Khóa học' : 'Tạo Khóa học'}
                 </button>
+                </>
+                )}
+
+                {isEditMode && activeTab === 'lessons' && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
+                                <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({lessons.length})
+                            </h2>
+                            <button
+                                onClick={() => setShowImport(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl hover:bg-green-700 transition-all"
+                            >
+                                <Upload className="w-4 h-4" /> Import
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            {lessons.map((lesson: any) => (
+                                <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex items-center justify-between group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black font-mono">
+                                            #{lesson.order}
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <h4 className="text-sm font-black text-gray-800 leading-tight">{lesson.title}</h4>
+                                            <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
+                                                <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setSelectedLesson(lesson)}
+                                        className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all active:scale-90"
+                                    >
+                                        <Settings className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            {lessons.length === 0 && (
+                                <div className="text-center py-8 text-gray-400 text-xs font-black uppercase">
+                                    Chưa có bài giảng nào. Hãy import bài học!
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
+        </Suspense>
     )
 }

@@ -668,24 +668,18 @@ export async function getStudentDetailsAction(userId: number) {
 export async function getCoursesAction() {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
-    const isTeacher = session.user.role === Role.TEACHER
-    if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
-    
+    const userId = parseInt(session.user.id)
+
     try {
-        const userId = Number(session.user.id)
-        const courses = isAdmin 
-            ? await prisma.course.findMany({ 
-                include: { _count: { select: { lessons: true, enrollments: true } } }, 
-                orderBy: { id: 'asc' } 
-            })
-            : await prisma.course.findMany({ 
-                where: { teacherId: userId },
-                include: { _count: { select: { lessons: true, enrollments: true } } }, 
-                orderBy: { id: 'asc' } 
-            })
-        return { success: true, courses }
+        const where = isAdmin ? {} : { teacherId: userId }  // ✅ TEACHER chỉ thấy course của mình
+        const courses = await prisma.course.findMany({
+            where,
+            include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true },
+            orderBy: { id: 'asc' }
+        })
+        return { success: true, courses, isAdmin }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
@@ -694,8 +688,31 @@ export async function getAdminCoursesAction() {
 }
 
 export async function updateCourseAction(courseId: number, data: any) {
-    await checkAdmin()
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+
     try {
+        // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
+        const course = await prisma.course.findUnique({
+            where: { id: courseId },
+            select: { teacherId: true }
+        })
+
+        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
+
+        // ✅ TEACHER chỉ được sửa course có teacherId = userId
+        if (!isAdmin && course.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền sửa khóa học này" }
+        }
+
+        // ✅ Nếu là TEACHER, không cho phép thay đổi teacherId
+        if (!isAdmin && data.teacherId != null) {
+            delete data.teacherId
+        }
+
         const updatedCourse = await prisma.course.update({ where: { id: courseId }, data })
         revalidatePath('/tools/courses'); revalidatePath('/')
         return { success: true, course: updatedCourse }
@@ -703,10 +720,26 @@ export async function updateCourseAction(courseId: number, data: any) {
 }
 
 export async function updateLessonAction(lessonId: string, data: any) {
-    await checkAdmin()
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+
     try {
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            include: { course: { select: { teacherId: true, id_khoa: true } } }
+        })
+
+        if (!lesson) return { success: false, error: "Không tìm thấy bài học." }
+
+        // ✅ TEACHER chỉ được sửa lesson của course mình dạy
+        if (!isAdmin && lesson.course?.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền sửa bài học này" }
+        }
+
         const updatedLesson = await prisma.lesson.update({ where: { id: lessonId }, data })
-        const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { course: { select: { id_khoa: true } } } })
         if (lesson?.course?.id_khoa) revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
         return { success: true, lesson: updatedLesson }
     } catch (error: any) { return { success: false, error: error.message } }

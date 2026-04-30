@@ -2,7 +2,8 @@
 
 import { useState, useEffect, use } from 'react'
 import { updateCourseAction, updateLessonAction } from '@/app/actions/admin-actions'
-import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, List, Settings, Upload, FileSpreadsheet, Download } from 'lucide-react'
+import { getTeachersAction } from '@/app/actions/course-actions'
+import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, List, Settings, Upload, FileSpreadsheet, Download, DollarSign, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -221,6 +222,19 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const fetchData = async () => {
         setLoading(true)
         try {
+            // ✅ Fetch Session & Teachers if Admin
+            const sessionRes = await fetch('/api/auth/session').then(r => r.json())
+            const isAdminUser = sessionRes?.user?.role === 'ADMIN'
+            setIsAdmin(isAdminUser)
+            
+            if (isAdminUser) {
+                const { getTeachersAction } = await import('@/app/actions/course-actions')
+                const teachersRes = await getTeachersAction()
+                if (teachersRes.success) {
+                    setTeachers(teachersRes.teachers || [])
+                }
+            }
+
             const res = await fetch(`/api/courses/${id}`).then(r => r.json())
             if (res && !res.error) {
                 setCourse(res)
@@ -266,22 +280,19 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         setMessage(null)
         // ✅ Send all 21 fields to updateCourseAction
         const res = await updateCourseAction(parseInt(id), {
-            // Original 5 fields
-            name_lop: nameLop,
-            phi_coc: phiCoc,
             id_khoa: idKhoa,
-            noidung_email: noidungEmail,
-            type,
-            // ✅ NEW: All 21 fields
+            name_lop: nameLop,
             name_khoa: nameKhoa || null,
             category,
+            type,
             status,
             pin,
             date_join: dateJoin || null,
-            teacherId: teacherId || null,
+            teacherId: (isAdmin && teacherId) ? teacherId : null,
             mo_ta_ngan: moTaNgan || null,
             mo_ta_dai: moTaDai || null,
             link_anh_bia: linkAnhBia || null,
+            phi_coc: phiCoc,
             stk: stk || null,
             name_stk: nameStk || null,
             bank_stk: bankStk || null,
@@ -289,6 +300,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             link_qrcode: linkQrcode || null,
             link_zalo: linkZalo || null,
             file_email: fileEmail || null,
+            noidung_email: noidungEmail || null,
         })
         if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học (21 trường)!' })
         else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
@@ -316,59 +328,185 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         <div className="min-h-screen bg-gray-50">
             <MainHeader title="CẤU HÌNH KHÓA HỌC" toolSlug="courses" />
             
-            <div className="max-w-md mx-auto space-y-8 p-4 pb-32">
+            <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
                 </Link>
 
-                {/* PHẦN 1: THÔNG TIN KHÓA HỌC */}
-                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
-                    <h1 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                        <Edit2 className="w-5 h-5 text-purple-500" /> Sửa Khóa học
-                    </h1>
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học</label>
-                            <input type="text" value={nameLop} onChange={(e) => setNameLop(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />   
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    {/* PHẦN 1: THÔNG TIN CƠ BẢN */}
+                    <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                        <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+                            <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
+                        </h2>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học *</label>
+                                <input type="text" value={idKhoa} onChange={(e) => setIdKhoa(e.target.value.toUpperCase())} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
+                                <input type="text" value={nameLop} onChange={(e) => setNameLop(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                            </div>
                         </div>
-                        <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
-                            <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                                <option value="NORMAL">Bình thường</option>
-                                <option value="CHALLENGE">Thử thách</option>
-                                <option value="LIB">Tài liệu (LIB)</option>
-                            </select>
-                            {type === 'LIB' && <p className="text-xs text-blue-600 mt-1 pl-1 font-bold">⚠️ Cần cấu hình whitelist email trong Admin để truy cập LIB.</p>}
-                            {type === 'LIB' && (
-                                <div className="mt-2 pl-1">
-                                    <Link href={`/tools/courses/${id}/lib-access`} className="inline-flex items-center gap-1 text-xs text-purple-600 hover:underline font-bold bg-purple-50 px-3 py-1.5 rounded-lg transition-colors">
-                                        → Quản lý danh sách truy cập tài liệu
-                                    </Link>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên khóa học (khác tên lớp)</label>
+                            <input type="text" value={nameKhoa} onChange={(e) => setNameKhoa(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
+                                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                    <option value="Khác">Khác</option>
+                                    <option value="Lập trình">Lập trình</option>
+                                    <option value="Marketing">Marketing</option>
+                                    <option value="Kinh doanh">Kinh doanh</option>
+                                    <option value="Ngoại ngữ">Ngoại ngữ</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
+                                <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                    <option value="NORMAL">Bình thường</option>
+                                    <option value="CHALLENGE">Thử thách</option>
+                                    <option value="LIB">Tài liệu (LIB)</option>
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
+                                <div className="flex items-center gap-3 h-full px-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={status} onChange={(e) => setStatus(e.target.checked)} className="w-5 h-5 rounded" />
+                                        <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
+                                <input type="number" value={pin} onChange={(e) => setPin(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
+                                <input type="date" value={dateJoin} onChange={(e) => setDateJoin(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            </div>
+                            {isAdmin && (
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
+                                    <select value={teacherId || ''} onChange={(e) => setTeacherId(parseInt(e.target.value) || null)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                        <option value="">Chọn giáo viên...</option>
+                                        {teachers.map((t: any) => (
+                                            <option key={t.id} value={t.id}>{t.name || t.email}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* PHẦN 2: MÔ TẢ & HÌNH ẢNH */}
+                    <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                        <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+                            <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
+                        </h2>
+                        
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars)</label>
+                            <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} rows={2} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
+                            <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
+                        </div>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài</label>
+                            <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} rows={4} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
+                        </div>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
+                            <input type="url" value={linkAnhBia} onChange={(e) => setLinkAnhBia(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            {linkAnhBia && <img src={linkAnhBia} alt="Preview" className="w-full h-40 object-cover rounded-2xl mt-2" />}
+                        </div>
+                    </div>
+
+                    {/* PHẦN 3: HỌC PHÍ & THANH TOÁN */}
+                    <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                        <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+                            <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
+                        </h2>
+                        
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí</label>
-                                <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
+                                <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
-                            <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa</label>
-                                <input type="text" value={idKhoa} onChange={(e) => setIdKhoa(e.target.value.toUpperCase())} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản</label>
+                                <input type="text" value={stk} onChange={(e) => setStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                         </div>
-                        <div className="space-y-1.5"><label className="text-[10px] font-black uppercase text-gray-400 ml-1">Email kích hoạt</label>
+                        
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên chủ TK</label>
+                                <input type="text" value={nameStk} onChange={(e) => setNameStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
+                                <input type="text" value={bankStk} onChange={(e) => setBankStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chuyển khoản</label>
+                            <input type="text" value={noidungStk} onChange={(e) => setNoidungStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                        </div>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link QR code</label>
+                            <input type="url" value={linkQrcode} onChange={(e) => setLinkQrcode(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                        </div>
+                    </div>
+
+                    {/* PHẦN 4: EMAIL & ZALO */}
+                    <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
+                        <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
+                            <Upload className="w-5 h-5 text-purple-500" /> Email & Zalo
+                        </h2>
+                        
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhóm Zalo</label>
+                            <input type="url" value={linkZalo} onChange={(e) => setLinkZalo(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                        </div>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email đính kèm</label>
+                            <input type="text" value={fileEmail} onChange={(e) => setFileEmail(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                        </div>
+                        
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung email kích hoạt</label>
                             <textarea value={noidungEmail} onChange={(e) => setNoidungEmail(e.target.value)} rows={4} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
                         </div>
-                        {message && (
-                            <div className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                                {message.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                                {message.text}
-                            </div>
-                        )}
-                        <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Khóa học
-                        </button>
-                    </form>
-                </div>
+                    </div>
 
-                {/* PHẦN 2: DANH SÁCH BÀI HỌC */}
+                    {message && (
+                        <div className={`p-4 rounded-2xl flex items-center gap-3 text-xs font-bold ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                            {message.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                            {message.text}
+                        </div>
+                    )}
+
+                    <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Khóa học
+                    </button>
+                </form>
+
+                {/* PHẦN 5: DANH SÁCH BÀI HỌC */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
