@@ -191,18 +191,66 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [idKhoa, setIdKhoa] = useState('')
     const [noidungEmail, setNoidungEmail] = useState('')
     const [type, setType] = useState('NORMAL')
-
+    
+    // ✅ NEW: Section 1 - Basic info (16 more fields to have 21 total)
+    const [nameKhoa, setNameKhoa] = useState('')
+    const [category, setCategory] = useState('Khác')
+    const [status, setStatus] = useState(true)
+    const [pin, setPin] = useState(0)
+    const [dateJoin, setDateJoin] = useState('')
+    const [teacherId, setTeacherId] = useState<number | null>(null)
+    const [isAdmin, setIsAdmin] = useState(false)
+    const [teachers, setTeachers] = useState<any[]>([])
+    
+    // ✅ NEW: Section 2 - Description & Image
+    const [moTaNgan, setMoTaNgan] = useState('')
+    const [moTaDai, setMoTaDai] = useState('')
+    const [linkAnhBia, setLinkAnhBia] = useState('')
+    
+    // ✅ NEW: Section 3 - Fee & Payment
+    const [stk, setStk] = useState('')
+    const [nameStk, setNameStk] = useState('')
+    const [bankStk, setBankStk] = useState('')
+    const [noidungStk, setNoidungStk] = useState('')
+    const [linkQrcode, setLinkQrcode] = useState('')
+    
+    // ✅ NEW: Section 4 - Email & Zalo
+    const [linkZalo, setLinkZalo] = useState('')
+    const [fileEmail, setFileEmail] = useState('')
+    
     const fetchData = async () => {
         setLoading(true)
         try {
             const res = await fetch(`/api/courses/${id}`).then(r => r.json())
             if (res && !res.error) {
                 setCourse(res)
+                // Original 5 fields
                 setNameLop(res.name_lop || '')
                 setPhiCoc(res.phi_coc || 0)
                 setIdKhoa(res.id_khoa || '')
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
+                
+                // ✅ NEW: Populate all 21 fields
+                setNameKhoa(res.name_khoa || '')
+                setCategory(res.category || 'Khác')
+                setStatus(res.status ?? true)
+                setPin(res.pin || 0)
+                setDateJoin(res.date_join || '')
+                setTeacherId(res.teacherId || null)
+                
+                setMoTaNgan(res.mo_ta_ngan || '')
+                setMoTaDai(res.mo_ta_dai || '')
+                setLinkAnhBia(res.link_anh_bia || '')
+                
+                setStk(res.stk || '')
+                setNameStk(res.name_stk || '')
+                setBankStk(res.bank_stk || '')
+                setNoidungStk(res.noidung_stk || '')
+                setLinkQrcode(res.link_qrcode || '')
+                
+                setLinkZalo(res.link_zalo || '')
+                setFileEmail(res.file_email || '')
             }
         } catch (err) {
             console.error("Fetch error:", err)
@@ -216,10 +264,33 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         e.preventDefault()
         setSaving(true)
         setMessage(null)
+        // ✅ Send all 21 fields to updateCourseAction
         const res = await updateCourseAction(parseInt(id), {
-            name_lop: nameLop, phi_coc: phiCoc, id_khoa: idKhoa, noidung_email: noidungEmail, type
+            // Original 5 fields
+            name_lop: nameLop,
+            phi_coc: phiCoc,
+            id_khoa: idKhoa,
+            noidung_email: noidungEmail,
+            type,
+            // ✅ NEW: All 21 fields
+            name_khoa: nameKhoa || null,
+            category,
+            status,
+            pin,
+            date_join: dateJoin || null,
+            teacherId: teacherId || null,
+            mo_ta_ngan: moTaNgan || null,
+            mo_ta_dai: moTaDai || null,
+            link_anh_bia: linkAnhBia || null,
+            stk: stk || null,
+            name_stk: nameStk || null,
+            bank_stk: bankStk || null,
+            noidung_stk: noidungStk || null,
+            link_qrcode: linkQrcode || null,
+            link_zalo: linkZalo || null,
+            file_email: fileEmail || null,
         })
-        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học!' })
+        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học (21 trường)!' })
         else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
         setSaving(false)
     }

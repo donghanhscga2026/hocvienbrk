@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getAdminCoursesAction } from '@/app/actions/admin-actions'
+import { getCoursesAction } from '@/app/actions/admin-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
@@ -13,7 +13,7 @@ export default function ToolsCoursesPage() {
     useEffect(() => {
         const fetchCourses = async () => {
             setLoading(true)
-            const res = await getAdminCoursesAction()
+            const res = await getCoursesAction()
             if (res.success) {
                 setCourses(res.courses || [])
             }
@@ -31,9 +31,9 @@ export default function ToolsCoursesPage() {
                     <div>
                         <p className="text-gray-600 text-sm">Quản lý nội dung & học phí</p>
                     </div>
-                    <button className="bg-yellow-400 text-black p-2 rounded-xl">
+                    <Link href="/tools/courses/new" className="bg-yellow-400 text-black p-2 rounded-xl inline-flex">
                         <Plus className="w-4 h-4" />
-                    </button>
+                    </Link>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
