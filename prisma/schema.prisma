@@ -362,14 +362,21 @@ model Course {
   @@index([teacherId])
 }
 
+enum LessonType {
+  VIDEO
+  DOCS
+  TEXT
+}
+
 model Lesson {
   id               String           @id @default(cuid())
   courseId         Int
   title            String
-  videoUrl         String?
-  content          String?
+  videoUrl         String?           
+  content          String?           
   order            Int
   isDailyChallenge Boolean          @default(false)
+  type             LessonType       @default(VIDEO)
   course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   progress         LessonProgress[]
   comments         LessonComment[]

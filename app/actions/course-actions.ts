@@ -542,6 +542,40 @@ export async function createCourseAction(formData: FormData) {
         })
         
         revalidatePath('/tools/courses')
+        
+        // ✅ Auto-create first lesson (TEXT type with course info template)
+        try {
+            const defaultContent = `📌 THÔNG TIN KHAI GIẢNG & LỊU Ý
+
+🗓 Ngày khai giảng: [Điền ngày]
+⏰ Giờ học: [Điền giờ]
+📍 Địa điểm: [Điền địa điểm]
+
+⚠️ NHỮNG ĐIỂM CẦN CHÚ Ý TRƯỚC KHI HỌC:
+1. Chuẩn bị [tài liệu/giấy bút...]
+2. Đọc kỹ [quy định/hướng dẫn...]
+3. Liên hệ [Zalo/Email] nếu có thắc mắc
+
+📜 QUY TẮC HỌC:
+- [Quy tắc 1]
+- [Quy tắc 2]
+- [Quy tắc 3]`
+
+            await prisma.lesson.create({
+                data: {
+                    courseId: newCourse.id,
+                    title: 'Bài 1: Thông tin khai giảng',
+                    order: 1,
+                    type: 'TEXT' as any,
+                    content: defaultContent
+                }
+            })
+            console.log('✅ Auto-created first lesson for course:', newCourse.id_khoa)
+        } catch (lessonError: any) {
+            console.error('Failed to create default lesson:', lessonError.message)
+            // Don't fail course creation if lesson creation fails
+        }
+        
         return { success: true, course: newCourse, message: 'Đã tạo khóa học thành công!' }
     } catch (error: any) {
         return { success: false, error: error.message || 'Lỗi khi tạo khóa học' }

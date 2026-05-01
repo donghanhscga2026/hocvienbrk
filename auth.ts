@@ -44,17 +44,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const isNumeric = /^\d+$/.test(identifier);
                 const isEmail = identifier.includes("@");
 
+                console.log(`🔍 [Auth] Đang kiểm tra đăng nhập cho: ${identifier.replace(/^(...).*(...)$/, "$1***$2")} (Numeric: ${isNumeric}, Email: ${isEmail})`);
+
+                // GIỚI HẠN INT4: 2,147,483,647. Nếu identifier là số quá lớn (như SĐT), không parse sang ID.
+                const potentialId = isNumeric ? parseInt(identifier) : -1;
+                const isValidId = potentialId > 0 && potentialId < 2147483647;
+
                 const user = await prisma.user.findFirst({
                     where: {
                         OR: [
-                            ...(isNumeric ? [{ id: parseInt(identifier) }, { phone: identifier }] : []),
-                            ...(isEmail ? [{ email: identifier }] : []),
-                            ...(!isNumeric && !isEmail ? [{ phone: identifier }] : [])
+                            ...(isValidId ? [{ id: potentialId }] : []),
+                            { email: identifier },
+                            { phone: identifier }
                         ]
                     }
                 });
 
-                if (!user || !user.password) return null;
+                if (!user) {
+                    console.log(`❌ [Auth] Không tìm thấy người dùng với identifier: ${identifier}`);
+                    throw new Error("Tài khoản không tồn tại trên hệ thống.");
+                }
+
+                if (!user.password) {
+                    console.log(`❌ [Auth] Người dùng #${user.id} (${user.email}) chưa có mật khẩu (có thể dùng Google).`);
+                    throw new Error("Tài khoản này chưa thiết lập mật khẩu. Vui lòng đăng nhập bằng Google.");
+                }
 
                 // CHẶN ĐĂNG NHẬP NẾU CHƯA XÁC MINH EMAIL (Chỉ áp dụng cho tài khoản mới từ ngày 29/03/2026)
                 const featureDate = new Date("2026-03-29T00:00:00Z");
@@ -62,7 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 
                 if (!user.emailVerified) {
                     if (!isLegacy) {
-                        // Tài khoản mới: Chặn tuyệt đối
+                        console.log(`❌ [Auth] Chặn user mới #${user.id} chưa xác minh email.`);
                         throw new Error("Vui lòng xác minh email trước khi đăng nhập.");
                     } else {
                         // Tài khoản cũ: Kiểm tra xem đã được gửi mã chưa
@@ -72,10 +86,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                         if (existingToken) {
                             if (existingToken.expires > new Date()) {
-                                // Đã gửi mã và mã còn hạn: Buộc phải xác minh mới được vào tiếp
+                                console.log(`❌ [Auth] Chặn user cũ #${user.id} vì mã xác minh còn hạn.`);
                                 throw new Error("Tài khoản của bạn cần được xác minh. Vui lòng kiểm tra email đã gửi.");
                             } else {
-                                // Mã hết hạn: Xóa mã cũ để lần đăng nhập này đóng vai trò "Gửi lại mã mới"
+                                console.log(`ℹ️ [Auth] Xóa mã xác minh hết hạn cho user cũ #${user.id}.`);
                                 await prisma.verificationToken.delete({
                                     where: { 
                                         identifier_token: { 
@@ -86,27 +100,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                                 });
                             }
                         }
-                        // Nếu chưa có mã hoặc mã vừa bị xóa (do hết hạn), cho phép đăng nhập để kích hoạt gửi mã mới ở sự kiện signIn
                     }
                 }
 
                 const passwordsMatch = await bcrypt.compare(password, user.password);
-                if (passwordsMatch) {
-                    // Kiểm tra nếu dùng mật khẩu mặc định
-                    const isDefault = await isDefaultPassword(user.password);
-                    const userAny = user as any;
-                    
-                    return {
-                        id: user.id.toString(),
-                        name: user.name,
-                        email: user.email,
-                        role: user.role,
-                        image: user.image,
-                        needsPasswordChange: isDefault && !userAny.passwordChanged,
-                        isUnverifiedLegacy: !user.emailVerified && isLegacy, // Gắn cờ để gửi mail ở event signIn
-                    };
+                
+                if (!passwordsMatch) {
+                    console.log(`❌ [Auth] Sai mật khẩu cho user #${user.id}.`);
+                    throw new Error("Mật khẩu không chính xác.");
                 }
-                return null;
+
+                console.log(`✅ [Auth] Đăng nhập thành công: #${user.id} (${user.email})`);
+
+                // Kiểm tra nếu dùng mật khẩu mặc định
+                const isDefault = await isDefaultPassword(user.password);
+                const userAny = user as any;
+                
+                return {
+                    id: user.id.toString(),
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    image: user.image,
+                    needsPasswordChange: isDefault && !userAny.passwordChanged,
+                    isUnverifiedLegacy: !user.emailVerified && isLegacy, 
+                };
             },
         }),
     ],

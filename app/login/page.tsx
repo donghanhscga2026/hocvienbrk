@@ -49,7 +49,12 @@ function LoginForm() {
             })
 
             if (result?.error) {
-                setError("Thông tin đăng nhập không chính xác. Vui lòng thử lại.")
+                // NextAuth v5 thường trả về error type. Chúng ta có thể ánh xạ hoặc hiển thị nếu nó không phải là type mặc định.
+                if (result.error === "CredentialsSignin") {
+                    setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại Email/SĐT hoặc Mật khẩu.")
+                } else {
+                    setError(result.error)
+                }
             } else {
                 // Redirect về course landing page nếu có redirect param
                 if (redirectSlug) {
