@@ -84,15 +84,16 @@ export default async function CourseLearnPage({
           id: true,
           id_khoa: true,
           name_lop: true,
-          lessons: {
-            select: {
-              id: true,
-              title: true,
-              order: true,
-              videoUrl: true,
-              content: true,
-              isDailyChallenge: true,
-            },
+              lessons: {
+             select: {
+               id: true,
+               title: true,
+               order: true,
+               type: true, // [FIX] Cần field type để check TEXT type
+               videoUrl: true,
+               content: true,
+               isDailyChallenge: true,
+             },
             orderBy: { order: "asc" },
           },
         },

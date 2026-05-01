@@ -298,9 +298,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         <div className="p-5 flex-1 flex flex-col gap-4 min-h-0 overflow-hidden w-full max-w-5xl">
                             <div className="shrink-0">
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
-                                {currentLesson?.content && !currentLesson.content.includes('docs.google.com') && (
-                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
-                                )}
+                                {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
+                                 {currentLesson?.content && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
+                                     <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
+                                  )}
                             </div>
                             <div className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden">
                                 <ChatSection lessonId={currentLessonId!} session={session} />
@@ -412,7 +413,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             <h2 className="text-white font-bold text-sm truncate pr-4">{currentLesson?.title}</h2>
                             <button onClick={() => setShowContentModal(false)}><X className="w-5 h-5 text-zinc-400" /></button>
                         </div>
-                        <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson?.content || '') }} />
+                        {/* [FIX] Ẩn content trong modal khi là TEXT (đã hiển thị trong Player) */}
+                        {currentLesson?.type !== 'TEXT' && (
+                            <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson?.content || '') }} />
+                        )}
                     </div>
                 </div>
             )}
