@@ -503,11 +503,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
                              <div className="flex gap-2">
                                  <input 
-                                     type="url" 
+                                     type="text" 
                                      value={linkAnhBia} 
                                      onChange={(e) => setLinkAnhBia(e.target.value)} 
                                      className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                     placeholder="https://... hoặc upload từ thiết bị" 
+                                     placeholder="https://... hoặc /uploads/courses/..." 
                                  />
                                  <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
                                      <Upload className="w-4 h-4" />
