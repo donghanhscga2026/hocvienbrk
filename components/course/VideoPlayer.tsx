@@ -18,15 +18,16 @@ interface VideoPlayerProps {
     onPercentChange: (percent: number) => void
     playlistData?: any 
     lastVideoIndex?: number 
-    serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client
+    serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client - now includes TEXT type
     courseType?: string
 }
 
 type PlaylistItem = {
-    type: 'video' | 'doc'
+    type: 'video' | 'doc' | 'text'
     title: string
     url: string
     id?: string | null
+    content?: string
 }
 
 function extractVideoId(url: string): string | null {
@@ -55,7 +56,16 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
     // [OPTIMIZE] Ưu tiên playlist từ Server, fallback sang parse từ videoUrl (backward compatible)
     const playlist = useMemo(() => {
-        if (serverPlaylist) return serverPlaylist // [OPTIMIZE] Server đã parse sẵn
+        if (serverPlaylist) {
+            // [OPTIMIZE] Server already parsed - map types from Prisma LessonType to internal PlaylistItem
+            return serverPlaylist.map((item: any) => ({
+                type: item.type === 'TEXT' ? 'text' : item.type === 'DOCS' ? 'doc' : 'video',
+                title: item.title,
+                url: item.videoUrl || item.content || '',
+                id: item.id,
+                content: item.content || null
+            }))
+        }
         if (!videoUrl) return []
         return videoUrl.split('|').map((item, index) => {
             const videoMatch = item.match(/^\[(.*?)\](.*)$/)
@@ -254,6 +264,10 @@ const toggleFullScreen = () => {
                                 onContextMenu={(e) => e.preventDefault()}
                             />
                         )}
+                    </div>
+                ) : (currentItem?.type === 'text') ? (
+                    <div className="w-full h-full bg-white p-6 overflow-y-auto">
+                        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: currentItem.content?.replace(/\n/g, '<br>') || '' }} />
                     </div>
                 ) : (
                     <div className="w-full h-full bg-white relative flex flex-col">
