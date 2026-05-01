@@ -75,7 +75,7 @@ export default function ToolsCoursesPage() {
                                         </td>
                                         <td className="px-3 py-4 space-y-1 overflow-hidden">
                                             <div className="font-black text-orange-600 text-sm truncate leading-tight uppercase tracking-tight">
-                                                {course.name_lop}
+                                                {course.name_khoa || course.name_lop}
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold">

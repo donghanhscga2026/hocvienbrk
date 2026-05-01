@@ -75,9 +75,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden: You can only edit your own courses' }, { status: 403 });
     }
 
-    // ✅ TEACHER không được thay đổi teacherId
-    if (!isAdmin && body.teacherId != null) {
-      delete body.teacherId;
+    // ✅ Sửa lỗi 2026-05-01: TEACHER sửa khóa học bị mất teacherId  
+    // Lỗi cũ: if (!isAdmin && body.teacherId != null) - khi teacherId=null thì không xóa được
+    // Sửa: Luôn xóa teacherId cho TEACHER để bảo vệ dữ liệu
+    if (!isAdmin) {
+      delete body.teacherId;  // TEACHER không được thay đổi teacherId
     }
 
     const updatedCourse = await prisma.course.update({
