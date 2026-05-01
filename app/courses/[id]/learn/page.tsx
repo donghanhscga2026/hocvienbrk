@@ -128,17 +128,13 @@ export default async function CourseLearnPage({
     content: lesson.content || null
   }))
   
-  const lessonsWithPlaylist = enrollment.course.lessons.map((lesson: any) => ({
-    ...lesson,
-    playlist: serverPlaylist
-  }))
-
   return (
     <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
       <CoursePlayer
-        course={{ ...enrollment.course, type: course.type, lessons: lessonsWithPlaylist }}
+        course={{ ...enrollment.course, type: course.type }}
         enrollment={enrollment}
         session={session}
+        serverPlaylist={serverPlaylist}
       />
     </div>
   )
