@@ -121,12 +121,12 @@ export async function registerUser(prevState: any, formData: FormData) {
             },
         })
 
-        // Tao verification token (24h)
-        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        // Tao verification token (OTP 6 số - 24h)
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         await prisma.verificationToken.create({
             data: {
                 identifier: normalizedEmail,
-                token: token,
+                token: otpCode,
                 expires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
             }
         })
@@ -172,7 +172,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         revalidatePath('/admin/genealogy')
 
         // Gui email xac minh
-        await sendVerificationEmail(normalizedEmail, name, token)
+        await sendVerificationEmail(normalizedEmail, name, otpCode)
 
         const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}` : ''
         const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
@@ -184,8 +184,10 @@ export async function registerUser(prevState: any, formData: FormData) {
         await sendTelegram(msgAdmin, 'REGISTER');
 
         return {
-            message: "Đăng ký thành công! Vui lòng kiểm tra Email để xác minh tài khoản trước khi đăng nhập.",
-            success: true
+            message: "Đăng ký thành công! Vui lòng kiểm tra Email để lấy mã xác minh (OTP) và hoàn tất kích hoạt tài khoản.",
+            success: true,
+            email: normalizedEmail,
+            userId: user.id
         }
 
     } catch (error) {

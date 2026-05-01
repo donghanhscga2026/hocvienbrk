@@ -1,4 +1,4 @@
-import NextAuth from "next-auth"
+import NextAuth, { AuthError, CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { z } from "zod"
@@ -7,6 +7,13 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
+
+class CustomLoginError extends CredentialsSignin {
+  constructor(message: string, code: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MẬT KHẨU MẶC ĐỊNH - CẤU HÌNH
@@ -44,7 +51,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const isNumeric = /^\d+$/.test(identifier);
                 const isEmail = identifier.includes("@");
 
-                console.log(`🔍 [Auth] Đang kiểm tra đăng nhập cho: ${identifier.replace(/^(...).*(...)$/, "$1***$2")} (Numeric: ${isNumeric}, Email: ${isEmail})`);
+                let identifierType = "thông tin đăng nhập";
+                if (isEmail) identifierType = "Email";
+                else if (isNumeric && identifier.length < 10) identifierType = "Mã học viên";
+                else if (isNumeric) identifierType = "Số điện thoại";
+
+                console.log(`🔍 [Auth] Đang kiểm tra đăng nhập cho: ${identifier.replace(/^(...).*(...)$/, "$1***$2")} (Loại: ${identifierType})`);
 
                 // GIỚI HẠN INT4: 2,147,483,647. Nếu identifier là số quá lớn (như SĐT), không parse sang ID.
                 const potentialId = isNumeric ? parseInt(identifier) : -1;
@@ -62,12 +74,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 if (!user) {
                     console.log(`❌ [Auth] Không tìm thấy người dùng với identifier: ${identifier}`);
-                    throw new Error("Tài khoản không tồn tại trên hệ thống.");
+                    throw new CustomLoginError(`Sai ${identifierType}`, `USER_NOT_FOUND:${identifierType}`);
                 }
 
                 if (!user.password) {
                     console.log(`❌ [Auth] Người dùng #${user.id} (${user.email}) chưa có mật khẩu (có thể dùng Google).`);
-                    throw new Error("Tài khoản này chưa thiết lập mật khẩu. Vui lòng đăng nhập bằng Google.");
+                    throw new CustomLoginError("Tài khoản này chưa thiết lập mật khẩu.", "NO_PASSWORD");
                 }
 
                 // CHẶN ĐĂNG NHẬP NẾU CHƯA XÁC MINH EMAIL (Chỉ áp dụng cho tài khoản mới từ ngày 29/03/2026)
@@ -77,7 +89,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (!user.emailVerified) {
                     if (!isLegacy) {
                         console.log(`❌ [Auth] Chặn user mới #${user.id} chưa xác minh email.`);
-                        throw new Error("Vui lòng xác minh email trước khi đăng nhập.");
+                        throw new CustomLoginError("Vui lòng xác minh email trước khi đăng nhập.", "EMAIL_NOT_VERIFIED");
                     } else {
                         // Tài khoản cũ: Kiểm tra xem đã được gửi mã chưa
                         const existingToken = await prisma.verificationToken.findFirst({
@@ -87,7 +99,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         if (existingToken) {
                             if (existingToken.expires > new Date()) {
                                 console.log(`❌ [Auth] Chặn user cũ #${user.id} vì mã xác minh còn hạn.`);
-                                throw new Error("Tài khoản của bạn cần được xác minh. Vui lòng kiểm tra email đã gửi.");
+                                throw new CustomLoginError("Tài khoản của bạn cần được xác minh.", "EMAIL_VERIFICATION_PENDING");
                             } else {
                                 console.log(`ℹ️ [Auth] Xóa mã xác minh hết hạn cho user cũ #${user.id}.`);
                                 await prisma.verificationToken.delete({
@@ -107,7 +119,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 
                 if (!passwordsMatch) {
                     console.log(`❌ [Auth] Sai mật khẩu cho user #${user.id}.`);
-                    throw new Error("Mật khẩu không chính xác.");
+                    throw new CustomLoginError("Mật khẩu không chính xác", "INVALID_PASSWORD");
                 }
 
                 console.log(`✅ [Auth] Đăng nhập thành công: #${user.id} (${user.email})`);
@@ -122,9 +134,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     email: user.email,
                     role: user.role,
                     image: user.image,
+                    affiliateCode: user.affiliateCode ?? undefined, // Chuyển null thành undefined cho TS
                     needsPasswordChange: isDefault && !userAny.passwordChanged,
                     isUnverifiedLegacy: !user.emailVerified && isLegacy, 
-                };
+                } as any; // Cast as any để tránh lỗi type hẹp của NextAuth User
             },
         }),
     ],

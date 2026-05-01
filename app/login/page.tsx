@@ -49,9 +49,21 @@ function LoginForm() {
             })
 
             if (result?.error) {
-                // NextAuth v5 thường trả về error type. Chúng ta có thể ánh xạ hoặc hiển thị nếu nó không phải là type mặc định.
+                console.error("Login error:", result.error)
+                
                 if (result.error === "CredentialsSignin") {
-                    setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại Email/SĐT hoặc Mật khẩu.")
+                    setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại.")
+                } else if (result.error.includes("USER_NOT_FOUND")) {
+                    const type = result.error.split(":")[1] || "thông tin đăng nhập"
+                    setError(`Không tìm thấy tài khoản với ${type} này. Vui lòng kiểm tra lại.`)
+                } else if (result.error.includes("INVALID_PASSWORD")) {
+                    setError("Mật khẩu không chính xác. Vui lòng thử lại.")
+                } else if (result.error.includes("NO_PASSWORD")) {
+                    setError("Tài khoản này chưa thiết lập mật khẩu. Vui lòng đăng nhập bằng Google.")
+                } else if (result.error.includes("EMAIL_NOT_VERIFIED")) {
+                    setError("Vui lòng xác minh email trước khi đăng nhập.")
+                } else if (result.error.includes("EMAIL_VERIFICATION_PENDING")) {
+                    setError("Tài khoản của bạn cần được xác minh. Vui lòng kiểm tra email đã gửi.")
                 } else {
                     setError(result.error)
                 }
