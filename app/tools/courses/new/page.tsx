@@ -278,7 +278,7 @@ function CreateCourseContent() {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
-                if (catRes.categories) {
+                if (catRes.categories && Array.isArray(catRes.categories)) {
                     console.log('Categories loaded:', catRes.categories)
                     setCategories(catRes.categories)
                 }
@@ -312,8 +312,13 @@ function CreateCourseContent() {
                         setIdKhoa(courseRes.id_khoa || '')
                         setNameLop(courseRes.name_lop || '')
                         setNameKhoa(courseRes.name_khoa || '')
-                        setCategory(courseRes.category || 'Khác')
-                        setType(courseRes.type || 'NORMAL')
+                         const currentCategory = courseRes.category || 'Khác'
+                         setCategory(currentCategory)
+                         // Đảm bảo category hiện tại có trong danh sách để select hiển thị đúng
+                         if (currentCategory !== 'Khác' && !categories.includes(currentCategory)) {
+                             setCategories(prev => [...prev, currentCategory])
+                         }
+                         setType(courseRes.type || 'NORMAL')
                         setStatus(courseRes.status ?? true)
                         setPin(courseRes.pin || 0)
                         setDateJoin(courseRes.date_join || '')
@@ -495,26 +500,20 @@ function CreateCourseContent() {
                         />
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục (chọn hoặc nhập mới)</label>
-                            <div className="relative">
-                                <input 
-                                    type="text" 
-                                    value={category} 
-                                    onChange={(e) => setCategory(e.target.value)}
-                                    list="category-list"
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                    placeholder="Chọn hoặc nhập danh mục..."
-                                />
-                                <datalist id="category-list">
-                                    <option value="Khác" />
-                                    {categories.map((cat: string) => (
-                                        <option key={cat} value={cat} />
-                                    ))}
-                                </datalist>
-                            </div>
-                        </div>
+                        <div className="grid grid-cols-3 gap-4 mt-4">
+                         <div className="space-y-1.5">
+                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
+                             <select 
+                                 value={category} 
+                                 onChange={(e) => setCategory(e.target.value)}
+                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                             >
+                                 <option value="Khác">Khác</option>
+                                 {categories.map((cat: string) => (
+                                     <option key={cat} value={cat}>{cat}</option>
+                                 ))}
+                             </select>
+                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
                             <select 
