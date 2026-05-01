@@ -32,8 +32,12 @@ const COUNTRY_CODES = [
 
 function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false)
+    const [isVerifying, setIsVerifying] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
+    const [registeredUserId, setRegisteredUserId] = useState<number | null>(null)
+    const [otp, setOtp] = useState("")
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null)
     const [showPassword, setShowPassword] = useState(false)
     const [referrerName, setReferrerName] = useState<string | null>(null)
@@ -126,6 +130,7 @@ function RegisterForm() {
 
     const countryCode = watch("countryCode")
     const formReferrerId = watch("referrerId")
+    const userName = watch("name")
     const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0]
 
     // Close dropdown when clicking outside
@@ -177,14 +182,9 @@ function RegisterForm() {
 
             if (result?.success) {
                 setSuccess(result.message)
+                setRegisteredEmail(result.email)
+                setRegisteredUserId(result.userId)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
-                
-                // Auto redirect to course landing page after 2 seconds
-                if (redirectSlug) {
-                    setTimeout(() => {
-                        router.push(`/${redirectSlug}`)
-                    }, 2000)
-                }
             } else if (result?.message || result?.errors) {
                 if (result.errors) {
                     setFieldErrors(result.errors)
@@ -201,39 +201,134 @@ function RegisterForm() {
         }
     }
 
+    async function handleVerifyOtp() {
+        if (!otp || otp.length !== 6) {
+            setError("Vui lòng nhập mã OTP 6 số")
+            return
+        }
+
+        setIsVerifying(true)
+        setError(null)
+
+        try {
+            const res = await fetch('/api/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: registeredEmail, otp })
+            })
+
+            const result = await res.json()
+
+            if (res.ok) {
+                setSuccess("Xác minh thành công! Đang chuyển đến trang đăng nhập...")
+                setTimeout(() => {
+                    router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
+                }, 2000)
+            } else {
+                setError(result.error || "Mã xác minh không chính xác")
+            }
+        } catch {
+            setError("Đã xảy ra lỗi khi xác minh")
+        } finally {
+            setIsVerifying(false)
+        }
+    }
+
+    const openZalo = () => {
+        const msg = `Chào Admin, tôi là ${userName}, mã #${registeredUserId}, vừa đăng ký bằng email ${registeredEmail}. Nhờ Admin xác minh tài khoản giúp tôi.`
+        window.open(`https://zalo.me/0388625868?text=${encodeURIComponent(msg)}`, '_blank')
+    }
+
+    const openTelegram = () => {
+        const msg = `Chào Admin, tôi là ${userName}, mã #${registeredUserId}, vừa đăng ký bằng email ${registeredEmail}. Nhờ Admin xác minh tài khoản giúp tôi.`
+        window.open(`https://t.me/hocvienbrk?text=${encodeURIComponent(msg)}`, '_blank')
+    }
+
     return (
         <div className="w-full max-w-md space-y-8 rounded-xl bg-brk-surface p-6 sm:p-8 shadow-lg">
             <div className="text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-brk-on-surface">Tạo tài khoản mới</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-brk-on-surface">
+                    {success && registeredEmail ? "Xác minh tài khoản" : "Tạo tài khoản mới"}
+                </h2>
                 <p className="mt-2 text-sm text-brk-muted">
-                    Chào mừng tham gia Học viện BRK
+                    {success && registeredEmail ? "Nhập mã OTP đã gửi đến email của bạn" : "Chào mừng tham gia Học viện BRK"}
                 </p>
             </div>
 
             <div className="space-y-4">
-                {success ? (
+                {success && registeredEmail ? (
+                    <div className="space-y-6">
+                        <div className="rounded-lg bg-brk-accent/10 p-5 border border-brk-accent/30 text-center">
+                            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-brk-accent/20 mb-3">
+                                <CheckCircle2 className="h-5 w-5 text-brk-accent" />
+                            </div>
+                            <p className="text-xs text-brk-accent leading-relaxed">
+                                {success}
+                            </p>
+                            <p className="mt-2 text-sm font-bold text-brk-on-surface">{registeredEmail}</p>
+                        </div>
+
+                        {error && (
+                            <div className="rounded-md bg-brk-accent/10 p-3 text-sm text-brk-accent border border-brk-accent/30">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="space-y-3">
+                            <label className="block text-center text-sm font-medium text-brk-muted">Nhập mã OTP (6 số)</label>
+                            <input
+                                type="text"
+                                maxLength={6}
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                                placeholder="000000"
+                                className="block w-full text-center text-2xl font-mono tracking-[0.5em] rounded-md border border-brk-outline bg-brk-background px-3 py-3 shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary"
+                            />
+                            <button
+                                onClick={handleVerifyOtp}
+                                disabled={isVerifying || otp.length !== 6}
+                                className="flex w-full justify-center rounded-lg bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary hover:bg-brk-primary-hover focus:outline-none focus:ring-2 focus:ring-brk-primary disabled:opacity-50"
+                            >
+                                {isVerifying ? <Loader2 className="animate-spin h-5 w-5" /> : "Xác minh ngay"}
+                            </button>
+                        </div>
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
+                            <div className="relative flex justify-center text-xs"><span className="bg-brk-surface px-2 text-brk-muted uppercase tracking-wider">Hoặc xác minh qua</span></div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={openZalo}
+                                className="flex items-center justify-center gap-2 rounded-lg bg-[#0068ff] px-4 py-2.5 text-[10px] min-[400px]:text-xs font-bold text-white hover:opacity-90 transition-opacity"
+                            >
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Icon_of_Zalo.svg" alt="Zalo" className="h-4 w-4" />
+                                Zalo Admin
+                            </button>
+                            <button
+                                onClick={openTelegram}
+                                className="flex items-center justify-center gap-2 rounded-lg bg-[#229ED9] px-4 py-2.5 text-[10px] min-[400px]:text-xs font-bold text-white hover:opacity-90 transition-opacity"
+                            >
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="Telegram" className="h-4 w-4" />
+                                Telegram
+                            </button>
+                        </div>
+
+                        <p className="text-center text-xs text-brk-muted">
+                            Bạn gặp khó khăn khi xác minh? Liên hệ Admin để được hỗ trợ kích hoạt ngay lập tức.
+                        </p>
+                    </div>
+                ) : success ? (
+                    // This is the fallback for manual success message without OTP flow (if any)
                     <div className="rounded-lg bg-brk-accent/10 p-6 text-center border border-brk-accent/30">
                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brk-accent/20 mb-4">
                             <CheckCircle2 className="h-6 w-6 text-brk-accent" />
                         </div>
                         <h3 className="text-lg font-bold text-brk-accent mb-2">Đăng ký thành công!</h3>
-                        <p className="text-sm text-brk-accent leading-relaxed mb-6">
+                        <p className="text-sm text-brk-accent leading-relaxed">
                             {success}
                         </p>
-                        {redirectSlug ? (
-                            <div className="pt-4 border-t border-brk-accent/30">
-                                <p className="text-sm text-brk-accent mb-2">Đang chuyển đến khóa học...</p>
-                                <div className="w-full bg-brk-accent/20 rounded-full h-2 mb-2">
-                                    <div className="bg-brk-accent h-2 rounded-full w-full animate-pulse" />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="pt-4 border-t border-brk-accent/30">
-                                <Link href="/login" className="text-sm font-semibold text-brk-primary hover:text-brk-primary-hover">
-                                    Quay lại trang đăng nhập &rarr;
-                                </Link>
-                            </div>
-                        )}
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

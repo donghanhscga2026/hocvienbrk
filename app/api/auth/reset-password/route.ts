@@ -36,10 +36,22 @@ export async function POST(request: Request) {
 
         await prisma.user.update({
             where: { id: user.id },
-            data: { password: hashedPassword }
+            data: { 
+                password: hashedPassword,
+                passwordChanged: true // Đánh dấu đã đổi mật khẩu
+            }
         })
 
         await prisma.passwordReset.deleteMany({ where: { userId: user.id } })
+
+        // Gửi thông báo Telegram
+        try {
+            const { sendTelegram } = await import("@/lib/notifications")
+            const msg = `🔐 <b>ĐẶT LẠI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đặt lại mật khẩu thành công qua chức năng Quên mật khẩu.`
+            await sendTelegram(msg, 'LESSON')
+        } catch (error) {
+            console.error("Telegram notification error:", error)
+        }
 
         return NextResponse.json({ success: true, message: "Đặt lại mật khẩu thành công" })
     } catch (error: any) {

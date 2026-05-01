@@ -300,24 +300,27 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
  */
 
 // Template 1: Simple Clean
-function getVerificationTemplate1(name: string, verifyUrl: string, emailId: string): string {
+function getVerificationTemplate1(name: string, verifyUrl: string, emailId: string, code: string): string {
   return `
 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
   <div style="background: white; border-radius: 12px; padding: 30px; text-align: center;">
     <h2 style="color: #4f46e5; margin-bottom: 20px;">Xác Minh Email</h2>
     <p style="color: #374151; font-size: 16px;">Chào <b>${name}</b>,</p>
-    <p style="color: #6b7280;">Cảm ơn bạn đã đăng ký. Nhấn nút below để kích hoạt tài khoản:</p>
-    <div style="margin: 30px 0;">
+    <p style="color: #6b7280;">Mã xác minh của bạn là:</p>
+    <div style="background: #f3f4f6; padding: 20px; border-radius: 12px; margin: 20px 0;">
+      <h1 style="color: #4f46e5; font-size: 32px; margin: 0; letter-spacing: 8px;">${code}</h1>
+    </div>
+    <p style="color: #6b7280; font-size: 14px;">Hoặc nhấn nút below để kích hoạt tài khoản:</p>
+    <div style="margin: 20px 0;">
       <a href="${verifyUrl}" style="background: #4f46e5; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Kích Hoạt Tài Khoản</a>
     </div>
-    <p style="font-size: 12px; color: #9ca3af;">Link: ${verifyUrl}</p>
     <p style="font-size: 11px; color: #d1d5db; margin-top: 20px;">ID: ${emailId}</p>
   </div>
 </div>`;
 }
 
 // Template 2: Modern Card
-function getVerificationTemplate2(name: string, verifyUrl: string, emailId: string, greeting: string): string {
+function getVerificationTemplate2(name: string, verifyUrl: string, emailId: string, greeting: string, code: string): string {
   const quote = randomPick(quotes);
   return `
 <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -327,8 +330,12 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
     </div>
     <div style="padding: 30px;">
       <p style="color: #1f2937; font-size: 16px;">${greeting} <span style="font-weight: 600;">${name}</span></p>
-      <p style="color: #4b5563; line-height: 1.6;">Bạn đã đăng ký thành công! Hãy xác nhận email để bắt đầu hành trình học tập.</p>
+      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Học Viện BRK. Nhập mã này để xác nhận:</p>
+      <div style="background: #f9fafb; border: 2px dashed #4f46e5; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0;">
+        <h1 style="color: #4f46e5; font-size: 40px; margin: 0; letter-spacing: 10px;">${code}</h1>
+      </div>
       <div style="text-align: center; margin: 30px 0;">
+        <p style="color: #6b7280; font-size: 14px; margin-bottom: 15px;">Hoặc click vào link:</p>
         <a href="${verifyUrl}" style="background: #4f46e5; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(79,70,229,0.3);">Xác Nhận Ngay</a>
       </div>
       <p style="color: #6b7280; font-size: 13px; font-style: italic;">"${quote}"</p>
@@ -339,16 +346,19 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
 }
 
 // Template 3: Minimal
-function getVerificationTemplate3(name: string, verifyUrl: string, emailId: string): string {
+function getVerificationTemplate3(name: string, verifyUrl: string, emailId: string, code: string): string {
   return `
 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
   <h1 style="color: #111827; font-size: 24px; margin-bottom: 24px;">Xác minh tài khoản</h1>
   <p style="color: #374151; font-size: 16px; line-height: 1.6;">Xin chào <b>${name}</b>,</p>
-  <p style="color: #4b5563; line-height: 1.6;">Cảm ơn bạn đã đăng ký. Nhấn nút bên dưới để kích hoạt:</p>
+  <p style="color: #4b5563;">Mã xác minh của bạn:</p>
+  <div style="background: #f3f4f6; border-radius: 8px; padding: 15px; text-align: center; margin: 15px 0;">
+    <span style="font-size: 28px; font-weight: 700; color: #111827; letter-spacing: 5px;">${code}</span>
+  </div>
+  <p style="color: #4b5563; line-height: 1.6;">Hoặc nhấn nút bên dưới để kích hoạt:</p>
   <div style="margin: 28px 0;">
     <a href="${verifyUrl}" style="background: #111827; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; display: inline-block;">Kích hoạt</a>
   </div>
-  <p style="color: #6b7280; font-size: 13px;">Hoặc dùng link: <span style="color: #4f46e5;">${verifyUrl}</span></p>
   <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
   <p style="color: #9ca3af; font-size: 11px;">Email ID: ${emailId}</p>
 </div>`;
@@ -363,6 +373,9 @@ function getRandomVerificationTemplate(name: string, token: string): { subject: 
   const emailId = generateEmailId();
   const greeting = randomPick(greetings);
   
+  // Extract numeric code if token is a 6-digit number
+  const code = /^\d{6}$/.test(token) ? token : "Mã link";
+  
   // Random subject
   const subject = randomPick(verificationSubjects);
   
@@ -371,11 +384,11 @@ function getRandomVerificationTemplate(name: string, token: string): { subject: 
   let html = '';
   
   if (templateNum === 1) {
-    html = getVerificationTemplate1(name, verifyUrl, emailId);
+    html = getVerificationTemplate1(name, verifyUrl, emailId, code);
   } else if (templateNum === 2) {
-    html = getVerificationTemplate2(name, verifyUrl, emailId, greeting);
+    html = getVerificationTemplate2(name, verifyUrl, emailId, greeting, code);
   } else {
-    html = getVerificationTemplate3(name, verifyUrl, emailId);
+    html = getVerificationTemplate3(name, verifyUrl, emailId, code);
   }
   
   return { subject, html };
