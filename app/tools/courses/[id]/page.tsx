@@ -221,14 +221,16 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [linkZalo, setLinkZalo] = useState('')
     const [fileEmail, setFileEmail] = useState('')
     
-    // ✅ NEW: Fetch categories independently (chạy ngay khi mount)
+    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc category)
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    console.log('Categories loaded:', catRes.categories)
-                    setCategories(catRes.categories)
+                    // ✅ Đảm bảo unique categories từ API (tránh duplicate keys)
+                    const uniqueCategories = Array.from(new Set<string>(catRes.categories))
+                    console.log('Categories loaded:', uniqueCategories)
+                    setCategories(uniqueCategories)
                 }
             } catch (err) {
                 console.error("Fetch categories error:", err)
@@ -306,15 +308,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
                 
-                // ✅ NEW: Populate all 21 fields
-                 setNameKhoa(res.name_khoa || '')
-                 const currentCategory = res.category || 'Khác'
-                 setCategory(currentCategory)
-                 // Đảm bảo category hiện tại có trong danh sách để select hiển thị đúng
-                 if (currentCategory !== 'Khác' && !categories.includes(currentCategory)) {
-                     setCategories(prev => [...prev, currentCategory])
-                 }
-                 setStatus(res.status ?? true)
+                 // ✅ NEW: Populate all 21 fields
+                  setNameKhoa(res.name_khoa || '')
+                  const currentCategory = res.category || 'Khác'
+                  setCategory(currentCategory)
+                  setStatus(res.status ?? true)
                 setPin(res.pin || 0)
                 setDateJoin(res.date_join || '')
                 setTeacherId(res.teacherId || null)
@@ -437,7 +435,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                  >
                                      <option value="Khác">Khác</option>
-                                     {categories.map((cat: string) => (
+                                     {Array.from(new Set(categories)).map((cat: string) => (
                                          <option key={cat} value={cat}>{cat}</option>
                                      ))}
                                  </select>
