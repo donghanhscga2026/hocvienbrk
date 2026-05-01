@@ -27,7 +27,7 @@ type PlaylistItem = {
     title: string
     url: string
     id?: string | null
-    content?: string
+    content?: string // [FIX] Bắt buộc có content cho TEXT type
 }
 
 function extractVideoId(url: string): string | null {
@@ -245,8 +245,8 @@ const toggleFullScreen = () => {
             isFullscreen ? "fixed inset-0 z-[9999] h-screen w-screen" : "w-full"
         )}>
             <div className={cn(
-                "relative bg-black overflow-hidden shadow-2xl transition-all flex flex-col",
-                isFullscreen ? "flex-1" : "w-full aspect-video"
+                "relative bg-black overflow-hidden shadow-2xl transition-all",
+                isFullscreen ? "fixed inset-0 z-[9999] flex flex-col" : "w-full aspect-video"
             )}>
                 {currentItem?.type === 'video' ? (
                     <div className="relative w-full flex-1 group">
@@ -262,10 +262,9 @@ const toggleFullScreen = () => {
                         )}
                     </div>
                     ) : (currentItem?.type === 'text') ? (
-                    <div className="w-full h-full bg-white relative flex flex-col">
-                        <div className="flex-1 overflow-y-auto p-6">
-                            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: currentItem.content?.replace(/\n/g, '<br>') || '' }} />
-                        </div>
+                    <div className="absolute inset-0 bg-white overflow-y-auto p-6">
+                        {/* [FIX] TEXT hiển thị trong khung 16:9, scroll nếu dài */}
+                        <div className="text-gray-900 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: (currentItem.content || lessonContent || '').replace(/\n/g, '<br>') }} />
                     </div>
                 ) : (
                     <div className="w-full h-full bg-white relative flex flex-col">
