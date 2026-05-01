@@ -54,18 +54,14 @@ export default function VideoPlayer({
     serverPlaylist, // [OPTIMIZE] Ưu tiên playlist từ Server, chỉ parse client nếu không có
     courseType
 }: VideoPlayerProps) {
-    // [OPTIMIZE] Ưu tiên playlist từ Server, fallback sang parse từ videoUrl (backward compatible)
+    // [OPTIMIZE] Dùng trực tiếp serverPlaylist từ Server (đã đúng format)
     const playlist = useMemo(() => {
-        if (serverPlaylist) {
-            // [OPTIMIZE] Server already parsed - map types from Prisma LessonType to internal PlaylistItem
-            return serverPlaylist.map((item: any) => ({
-                type: item.type === 'TEXT' ? 'text' : item.type === 'DOCS' ? 'doc' : 'video',
-                title: item.title,
-                url: item.videoUrl || item.content || '',
-                id: item.id,
-                content: item.content || null
-            }))
+        if (serverPlaylist && serverPlaylist.length > 0) {
+            // ✅ Server đã parse đúng: type = 'text' | 'doc' | 'video'
+            // ✅ Có content (cho TEXT) và url (cho VIDEO/DOCS)
+            return serverPlaylist
         }
+        // Fallback: Parse từ videoUrl (backward compatible)
         if (!videoUrl) return []
         return videoUrl.split('|').map((item, index) => {
             const videoMatch = item.match(/^\[(.*?)\](.*)$/)
@@ -265,9 +261,11 @@ const toggleFullScreen = () => {
                             />
                         )}
                     </div>
-                ) : (currentItem?.type === 'text') ? (
-                    <div className="w-full h-full bg-white p-6 overflow-y-auto">
-                        <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: currentItem.content?.replace(/\n/g, '<br>') || '' }} />
+                    ) : (currentItem?.type === 'text') ? (
+                    <div className="w-full h-full bg-white relative flex flex-col">
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: currentItem.content?.replace(/\n/g, '<br>') || '' }} />
+                        </div>
                     </div>
                 ) : (
                     <div className="w-full h-full bg-white relative flex flex-col">

@@ -33,11 +33,12 @@ interface CoursePlayerProps {
     course: any
     enrollment: any
     session: any
+    serverPlaylist?: any[]
 }
 
 type MobileTab = 'list' | 'content' | 'record'
 
-export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
+export default function CoursePlayer({ course, enrollment: initialEnrollment, session, serverPlaylist: propServerPlaylist }: CoursePlayerProps) {
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const isSubmittingRef = useRef(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -285,7 +286,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 initialMaxTime={currentProgress?.maxTime || 0}
                                 playlistData={currentProgress?.scores?.playlist}
                                 lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
-                                serverPlaylist={currentLesson?.playlist} // [OPTIMIZE] Truyền playlist đã parse từ Server
+                                 serverPlaylist={propServerPlaylist} // [OPTIMIZE] Truyền playlist đã parse từ Server
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                                 courseType={course.type}
