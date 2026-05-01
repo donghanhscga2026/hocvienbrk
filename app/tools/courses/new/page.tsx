@@ -179,6 +179,85 @@ function LessonEditModal({ lesson, onClose, onSave }: { lesson: any, onClose: ()
     )
 }
 
+// ─── Component Thêm bài học mới ──────────────────────────────────
+function AddLessonModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
+    const [title, setTitle] = useState('')
+    const [videoUrl, setVideoUrl] = useState('')
+    const [order, setOrder] = useState(1)
+    const [lessonType, setLessonType] = useState('VIDEO')
+    const [content, setContent] = useState('')
+    const [saving, setSaving] = useState(false)
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!title.trim()) return
+        
+        setSaving(true)
+        try {
+            const res = await fetch(`/api/courses/${courseId}/lessons`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, videoUrl, order: parseInt(order.toString()), type: lessonType, content })
+            }).then(r => r.json())
+            
+            if (res.success) {
+                onComplete()
+                onClose()
+            } else {
+                alert(res.error || 'Lỗi khi tạo bài học')
+            }
+        } catch (err: any) {
+            alert('Lỗi: ' + err.message)
+        }
+        setSaving(false)
+    }
+
+    return (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
+                    <h3 className="font-black text-sm uppercase tracking-widest">Thêm bài học mới</h3>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-yellow-400" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tiêu đề bài học</label>
+                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại bài học</label>
+                        <select value={lessonType} onChange={(e) => setLessonType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                            <option value="VIDEO">Video (YouTube)</option>
+                            <option value="DOCS">Tài liệu (Docs)</option>
+                            <option value="TEXT">Văn bản (Text)</option>
+                        </select>
+                    </div>
+                    {(lessonType === 'VIDEO' || lessonType === 'DOCS') && (
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{lessonType === 'VIDEO' ? 'Link Video (YouTube)' : 'Link Tài liệu (Docs)'}</label>
+                            <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com/..." : "https://docs.google.com/..."} />
+                        </div>
+                    )}
+                    {lessonType === 'TEXT' && (
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung văn bản</label>
+                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Nhập nội dung bài học..." />
+                        </div>
+                    )}
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Thứ tự hiển thị</label>
+                        <input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
+                    </div>
+                    <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        Tạo bài học
+                    </button>
+                </form>
+            </div>
+        </div>
+    )
+}
+
 function CreateCourseContent() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -195,6 +274,7 @@ function CreateCourseContent() {
     const [lessons, setLessons] = useState<any[]>([])
     const [showImport, setShowImport] = useState(false)
     const [selectedLesson, setSelectedLesson] = useState<any>(null)
+    const [showAddLesson, setShowAddLesson] = useState(false)
     
     // Section1: Thông tin cơ bản
     const [idKhoa, setIdKhoa] = useState('')
@@ -776,13 +856,21 @@ function CreateCourseContent() {
                             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
                                 <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({lessons.length})
                             </h2>
+                        <div className="flex gap-2">
                             <button
                                 onClick={() => setShowImport(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl hover:bg-green-700 transition-all"
                             >
                                 <Upload className="w-4 h-4" /> Import
                             </button>
+                            <button 
+                                onClick={() => setShowAddLesson(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700 transition-all"
+                            >
+                                + Thêm bài học
+                            </button>
                         </div>
+                    </div>
                         <div className="space-y-3">
                             {lessons.map((lesson: any) => (
                                 <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex items-center justify-between group">
@@ -842,6 +930,19 @@ function CreateCourseContent() {
                         const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
                         if (courseRes && !courseRes.error) setLessons(courseRes.lessons || [])
                         setShowImport(false)
+                    }}
+                />
+            )}
+
+            {/* ✅ THÊM MỚI: AddLessonModal */}
+            {showAddLesson && (
+                <AddLessonModal
+                    courseId={courseId || ''}
+                    onClose={() => setShowAddLesson(false)}
+                    onComplete={async () => {
+                        const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
+                        if (courseRes && !courseRes.error) setLessons(courseRes.lessons || [])
+                        setShowAddLesson(false)
                     }}
                 />
             )}

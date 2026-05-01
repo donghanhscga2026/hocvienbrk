@@ -708,9 +708,11 @@ export async function updateCourseAction(courseId: number, data: any) {
             return { success: false, error: "Bạn không có quyền sửa khóa học này" }
         }
 
-        // ✅ Nếu là TEACHER, không cho phép thay đổi teacherId
-        if (!isAdmin && data.teacherId != null) {
-            delete data.teacherId
+        // ✅ Sửa lỗi 2026-05-01: TEACHER sửa khóa học bị mất teacherId
+        // Lỗi cũ: if (!isAdmin && data.teacherId != null) - khi teacherId=null thì không xóa được
+        // Sửa: Luôn xóa teacherId cho TEACHER để bảo vệ dữ liệu
+        if (!isAdmin) {
+            delete data.teacherId  // TEACHER không được thay đổi teacherId
         }
 
         const updatedCourse = await prisma.course.update({ where: { id: courseId }, data })

@@ -200,7 +200,7 @@ function LessonEditModal({ lesson, onClose, onSave }: { lesson: any, onClose: ()
 function AddLessonModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
     const [title, setTitle] = useState('')
     const [videoUrl, setVideoUrl] = useState('')
-    const [order, setOrder] = useState(1)
+    const [order, setOrder] = useState(1)  // ✅ Sửa lỗi 2026-05-01: Để order mặc định = 1 (sẽ check unique trong API)
     const [lessonType, setLessonType] = useState('VIDEO')
     const [content, setContent] = useState('')
     const [saving, setSaving] = useState(false)
@@ -750,6 +750,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         lesson={selectedLesson}
                         onClose={() => setSelectedLesson(null)}
                         onSave={handleUpdateLesson}
+                    />
+                )}
+
+                {/* MODAL THÊM BÀI HỌC */}
+                {showAddLesson && (
+                    <AddLessonModal
+                        courseId={id}
+                        onClose={() => setShowAddLesson(false)}
+                        onComplete={() => { fetchData(); setShowAddLesson(false) }}
                     />
                 )}
 
