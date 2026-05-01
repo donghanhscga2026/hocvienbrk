@@ -279,8 +279,10 @@ function CreateCourseContent() {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    console.log('Categories loaded:', catRes.categories)
-                    setCategories(catRes.categories)
+                    // ✅ Đảm bảo unique categories (tránh duplicate keys)
+                    const uniqueCategories = Array.from(new Set<string>(catRes.categories))
+                    console.log('Categories loaded:', uniqueCategories)
+                    setCategories(uniqueCategories)
                 }
             } catch (err) {
                 console.error("Fetch categories error:", err)
@@ -308,17 +310,13 @@ function CreateCourseContent() {
                 try {
                     const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
                     if (courseRes && !courseRes.error) {
-                        // Pre-fill 21 fields
-                        setIdKhoa(courseRes.id_khoa || '')
-                        setNameLop(courseRes.name_lop || '')
-                        setNameKhoa(courseRes.name_khoa || '')
-                         const currentCategory = courseRes.category || 'Khác'
-                         setCategory(currentCategory)
-                         // Đảm bảo category hiện tại có trong danh sách để select hiển thị đúng
-                         if (currentCategory !== 'Khác' && !categories.includes(currentCategory)) {
-                             setCategories(prev => [...prev, currentCategory])
-                         }
-                         setType(courseRes.type || 'NORMAL')
+                         // Pre-fill 21 fields
+                         setIdKhoa(courseRes.id_khoa || '')
+                         setNameLop(courseRes.name_lop || '')
+                         setNameKhoa(courseRes.name_khoa || '')
+                          const currentCategory = courseRes.category || 'Khác'
+                          setCategory(currentCategory)
+                          setType(courseRes.type || 'NORMAL')
                         setStatus(courseRes.status ?? true)
                         setPin(courseRes.pin || 0)
                         setDateJoin(courseRes.date_join || '')
@@ -501,7 +499,7 @@ function CreateCourseContent() {
                     </div>
                     
                         <div className="grid grid-cols-3 gap-4 mt-4">
-                         <div className="space-y-1.5">
+                             <div className="space-y-1.5">
                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
                              <select 
                                  value={category} 
@@ -509,7 +507,7 @@ function CreateCourseContent() {
                                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                              >
                                  <option value="Khác">Khác</option>
-                                 {categories.map((cat: string) => (
+                                 {Array.from(new Set(categories)).map((cat: string) => (
                                      <option key={cat} value={cat}>{cat}</option>
                                  ))}
                              </select>
