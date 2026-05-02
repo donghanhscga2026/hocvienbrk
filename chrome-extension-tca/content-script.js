@@ -1139,10 +1139,16 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
 
     // KHÔNG gọi precheck ở đây - sẽ gọi sau khi member info fetch xong
     
-    // Save to localStorage
+    // Save to localStorage (chỉ lưu tóm tắt để tránh tràn 5MB)
     try {
-      localStorage.setItem('tca_full_tree', JSON.stringify({ ...data, allNodes, precheckCache }));
-      console.log('[TCA Sync] Saved to localStorage');
+      const summaryData = {
+        stats: data.stats,
+        allNodes: allNodes.map(n => ({ id: n.id, name: n.name, parentFolderId: n.parentFolderId })),
+        precheckCache,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('tca_full_tree', JSON.stringify(summaryData));
+      console.log('[TCA Sync] Saved summary to localStorage (tránh tràn 5MB)');
     } catch (e) {
       console.error('[TCA Sync] localStorage error:', e);
     }
@@ -1423,41 +1429,34 @@ async function autoSyncTrigger(credentials, sendResponse) {
       console.log('[TCA Sync] Waiting for tree to load...');
       await new Promise(resolve => setTimeout(resolve, 5000));
       
-      // Step 4.5: Trigger manual scan if no data yet
-      const storedBefore = localStorage.getItem('tca_full_tree');
-      console.log('[TCA Sync] Data before trigger:', !!storedBefore);
-      
-      if (!storedBefore) {
-        console.log('[TCA Sync] No data yet, triggering manual scan...');
-        window.postMessage({ type: 'TCA_CONTROL', command: 'startScan' }, '*');
-      }
-      
-      // Step 5: Wait for full tree data to be captured
-      console.log('[TCA Sync] Waiting for scan to complete...');
-      let waitCount = 0;
-      const maxWait = 180;
-      
-      while (waitCount < maxWait) {
-        const stored = localStorage.getItem('tca_full_tree');
-        if (stored) {
-          try {
-            const data = JSON.parse(stored);
-            if (data.allNodes && data.allNodes.length > 0) {
-              console.log('[TCA Sync] Scan complete, found', data.allNodes.length, 'nodes');
-              break;
-            }
-          } catch(e) {}
-        }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        waitCount++;
-        if (waitCount % 30 === 0) {
-          console.log('[TCA Sync] Still waiting...', waitCount, '/', maxWait);
-        }
-      }
-      
-      if (waitCount >= maxWait) {
-        console.log('[TCA Sync] Timeout waiting for scan data');
-      }
+       // Step 4.5: Trigger manual scan if no data yet
+       console.log('[TCA Sync] Current allNodesGlobal:', allNodesGlobal?.length || 0, 'nodes');
+       
+       if (!allNodesGlobal || allNodesGlobal.length === 0) {
+         console.log('[TCA Sync] No data yet, triggering manual scan...');
+         window.postMessage({ type: 'TCA_CONTROL', command: 'startScan' }, '*');
+       }
+       
+       // Step 5: Wait for full tree data to be captured (dùng allNodesGlobal thay vì localStorage)
+       console.log('[TCA Sync] Waiting for scan to complete...');
+       let waitCount = 0;
+       const maxWait = 180;
+       
+       while (waitCount < maxWait) {
+         if (allNodesGlobal && allNodesGlobal.length > 0) {
+           console.log('[TCA Sync] Scan complete, found', allNodesGlobal.length, 'nodes');
+           break;
+         }
+         await new Promise(resolve => setTimeout(resolve, 1000));
+         waitCount++;
+         if (waitCount % 30 === 0) {
+           console.log('[TCA Sync] Still waiting...', waitCount, '/', maxWait);
+         }
+       }
+       
+       if (waitCount >= maxWait) {
+         console.log('[TCA Sync] Timeout waiting for scan data');
+       }
       
       // Step 6: Call sync API
       console.log('[TCA Sync] Calling sync API...');
@@ -1492,24 +1491,23 @@ async function autoSyncTrigger(credentials, sendResponse) {
   }
   
   async function callSyncAPI() {
-    // Get data from localStorage
-    const stored = localStorage.getItem('tca_full_tree');
-    if (!stored) {
-      throw new Error('No data to sync');
+    // Ưu tiên dùng biến toàn cục (đã có trong memory)
+    if (!allNodesGlobal || allNodesGlobal.length === 0) {
+      throw new Error('No data to sync (allNodesGlobal empty)');
     }
     
-    const data = JSON.parse(stored);
+    console.log('[TCA Sync] callSyncAPI using allNodesGlobal:', allNodesGlobal.length, 'nodes');
     
     // Call sync API
-    const response = await fetch('https://giautoandien.io.vn/api/sync-tca', {
+    const response = await fetch(SYNC_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         source: 'TCA_EXT_FULL',
         timestamp: Date.now(),
-        allNodes: data.allNodes,
-        memberInfo: data.memberInfo || {},
-        stats: data.stats || { total: data.allNodes?.length || 0 }
+        allNodes: allNodesGlobal,
+        memberInfo: memberInfoCache || {},
+        stats: { total: allNodesGlobal.length }
       })
     });
     
@@ -1524,9 +1522,9 @@ async function autoSyncTrigger(credentials, sendResponse) {
     // Format message for Telegram
     const message = formatTelegramMessage(syncResult);
     
-    // Call API endpoint to send notification
-    try {
-      await fetch('https://giautoandien.io.vn/api/notify/telegram', {
+     // Call API endpoint to send notification
+     try {
+       await fetch(API_BASE + '/api/notify/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message })
