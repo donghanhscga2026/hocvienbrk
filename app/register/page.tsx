@@ -174,8 +174,11 @@ function RegisterForm() {
             formData.append("countryCode", data.countryCode)
             formData.append("phone", data.phone)
             formData.append("password", data.password)
-            if (data.referrerId) {
-                formData.append("referrerId", data.referrerId.toString())
+            
+            // Ưu tiên dùng urlRef/resolvedRef, sau đó mới đến data.referrerId
+            const finalReferrerId = urlRef ? (resolvedRef || initialRef) : data.referrerId
+            if (finalReferrerId) {
+                formData.append("referrerId", finalReferrerId.toString())
             }
 
             const result = await registerUser(null, formData)
@@ -337,15 +340,22 @@ function RegisterForm() {
                                 Mã giới thiệu (Trân trọng biết ơn Nhân mạch)
                             </label>
                             <div className="flex items-center gap-2">
-                                <input
-                                    {...register("referrerId")}
-                                    type="number"
-                                    placeholder="0"
-                                    disabled={!!urlRef}
-                                    className={`block w-20 rounded-md border border-brk-outline px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary ${
-                                        urlRef ? 'bg-brk-background cursor-not-allowed text-brk-muted opacity-75' : ''
-                                    }`}
-                                />
+                                {urlRef ? (
+                                    // Khi có ?ref=: Hiển thị TEXT thuần túy, KHÔNG dùng input/register()
+                                    <div className="flex items-center gap-2 w-20">
+                                        <div className="block w-full rounded-md border border-brk-outline px-3 py-2 text-sm bg-brk-background text-brk-muted opacity-50 select-none cursor-not-allowed">
+                                            {resolvedRef || initialRef || ''}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    // Không có ?ref=: Cho phép nhập bình thường
+                                    <input
+                                        {...register("referrerId")}
+                                        type="number"
+                                        placeholder="0"
+                                        className="block w-20 rounded-md border border-brk-outline px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary"
+                                    />
+                                )}
                                 {formReferrerId && referrerName && (
                                     <div className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-md bg-brk-accent/10 border border-brk-accent/30 overflow-hidden">
                                         <span className="text-brk-accent text-xs whitespace-nowrap hidden min-[400px]:inline">Bởi:</span>
