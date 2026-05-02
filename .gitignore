@@ -53,7 +53,8 @@ nul
 
 # Documentation and history (MD files)
 *.md
-!README.md # Giữ lại README.md nếu bạn muốn, nếu không thì bỏ dòng này
+!README.md
+!AGENTS.md # Không ignore file cấu hình agent
 
 
 .vercel
