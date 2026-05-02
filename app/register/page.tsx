@@ -337,15 +337,17 @@ function RegisterForm() {
                                 Mã giới thiệu (Trân trọng biết ơn Nhân mạch)
                             </label>
                             <div className="flex items-center gap-2">
+                                {/* Input ẩn: giữ value thật để React Hook Form submit đúng dù field bị disabled */}
+                                {resolvedRef && (
+                                    <input type="hidden" {...register("referrerId")} value={resolvedRef} />
+                                )}
                                 <input
-                                    {...register("referrerId")}
-                                    type="number"
+                                    {...(resolvedRef ? {} : register("referrerId"))}
+                                    type="text"
                                     placeholder="0"
-                                    disabled={!!urlRef}
-                                    readOnly={!!urlRef}
-                                    className={`block w-20 rounded-md border border-brk-outline px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary ${
-                                        urlRef ? 'bg-brk-background text-brk-muted opacity-50 cursor-not-allowed select-none' : ''
-                                    }`}
+                                    disabled={!!resolvedRef}
+                                    value={resolvedRef || undefined}
+                                    className={`block w-20 rounded-md border px-3 py-2 text-sm shadow-sm ${resolvedRef ? 'border-brk-accent/40 bg-brk-accent/10 text-brk-accent font-semibold cursor-not-allowed opacity-80' : 'border-brk-outline focus:border-brk-primary focus:outline-none focus:ring-brk-primary'}`}
                                 />
                                 {formReferrerId && referrerName && (
                                     <div className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-md bg-brk-accent/10 border border-brk-accent/30 overflow-hidden">
