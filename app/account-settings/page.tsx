@@ -19,6 +19,7 @@ export default function AccountSettingsPage() {
     const [saving, setSaving] = useState(false)
     const [user, setUser] = useState<UserData | null>(null)
     const [accounts, setAccounts] = useState<UserData['accounts']>([])
+    const [hasPassword, setHasPassword] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
     // Form states
@@ -47,6 +48,22 @@ export default function AccountSettingsPage() {
         }
         fetchUser()
     }, [])
+
+    // Kiểm tra user có password thật không (an toàn, không expose hash)
+    useEffect(() => {
+        async function checkPassword() {
+            try {
+                const res = await fetch('/api/auth/has-password')
+                if (res.ok) {
+                    const data = await res.json()
+                    setHasPassword(data.hasPassword)
+                }
+            } catch (error) {
+                console.error('Error checking password:', error)
+            }
+        }
+        if (user) checkPassword()
+    }, [user])
 
     async function handleUpdateProfile(e: React.FormEvent) {
         e.preventDefault()
@@ -204,7 +221,6 @@ export default function AccountSettingsPage() {
         setSaving(false)
     }
 
-    const hasPassword = accounts.some(a => a.provider === 'credentials')
     const hasGoogle = accounts.some(a => a.provider === 'google')
 
     const userInitials = user?.name 
