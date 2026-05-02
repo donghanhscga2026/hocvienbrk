@@ -88,6 +88,13 @@ cat plan_temp/<backup>.txt  # So sánh với backup
 - ❌ **SAI LẶM (nguyên nhân lỗi lặp)**: Cố `edit` thay thế 30-70 dòng cùng lúc → Lỗi "oldString not found" → Thử lại → Lặp 5-6 lần → Cuối cùng dùng `write`
 - **Bài học**: Khi cần thay đổi >10 dòng → Dùng `write` từ đầu cho nhanh. Không lặp lại việc `edit` thất bại.
 
+**🔴 QUY TẮC BẮT BƯỢC (TRÁNH MẤT CODE CŨ KHI WRITE):**
+1. **TRƯỚC KHI WRITE**: Đọc TOÀN BỘ code gốc → Lập danh sách TẤT CẢ TÍNH NĂNG đang có (vd: [x] Upload ảnh OK, [x] Select category OK)
+2. **LẬP MỤC TIÊU MỚI**: Danh sách những gì code mới cần đạt được (vd: [ ] Thêm trường MSSV, [ ] Fix lỗi date)
+3. **SAU KHI WRITE**: Kiểm tra lại TOÀN BỘ → Check [x] Tất cả tính năng cũ còn đó + [x] Mục tiêu mới hoàn thành
+4. **THIẾU CODE**: Nếu tính năng nào bị mất → KHÔI PHỤC NGAY từ `plan_temp/` backup (đọc note 3 dòng) → Paste đè file gốc
+5. **BắT BUỘC**: KHÔNG được bỏ qua bước 1 (đọc toàn bộ) và bước 3 (kiểm tra lại). Nếu mất code → Lỗi của agent.
+
 ### Kỹ thuật EDIT (Tránh lỗi "oldString not found"):
 - ✅ **ĐÚNG**: `read({ filePath, offset })` → Copy Y NGUYÊN `<content>` (tabs/spaces đúng 100%)
 - ❌ **SAI**: Tự gõ oldString, copy từ terminal (sai whitespace)
