@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getUserWithAccounts, updateUserProfile, changePassword } from '@/app/actions/account-actions'
-import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 
 interface UserData {
@@ -32,6 +32,11 @@ export default function AccountSettingsPage() {
     const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [isSavingPassword, setIsSavingPassword] = useState(false)
+    // Toggle show/hide password
+    const [showCurrentPwd, setShowCurrentPwd] = useState(false)
+    const [showNewPwd, setShowNewPwd] = useState(false)
+    const [showConfirmPwd, setShowConfirmPwd] = useState(false)
 
     useEffect(() => {
         async function fetchUser() {
@@ -189,21 +194,33 @@ export default function AccountSettingsPage() {
         }
     }
 
+    // Validation mật khẩu nhất quán với trang register
+    function validateNewPassword(pwd: string): string | null {
+        if (pwd.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự'
+        if (!/[A-Z]/.test(pwd)) return 'Cần ít nhất 1 chữ hoa (A-Z)'
+        if (!/[a-z]/.test(pwd)) return 'Cần ít nhất 1 chữ thường (a-z)'
+        if (!/[0-9]/.test(pwd)) return 'Cần ít nhất 1 chữ số (0-9)'
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return 'Cần ít nhất 1 ký tự đặc biệt (!@#$...)'
+        return null
+    }
+
     async function handleChangePassword(e: React.FormEvent) {
         e.preventDefault()
-        
-        if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: 'Mật khẩu mới không khớp' })
-            return
-        }
-
-        if (newPassword.length < 6) {
-            setMessage({ type: 'error', text: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
-            return
-        }
-
-        setSaving(true)
         setMessage(null)
+
+        // Validate client-side trước
+        const pwdError = validateNewPassword(newPassword)
+        if (pwdError) {
+            setMessage({ type: 'error', text: pwdError })
+            return
+        }
+
+        if (newPassword !== confirmPassword) {
+            setMessage({ type: 'error', text: 'Xác nhận mật khẩu không khớp với mật khẩu mới' })
+            return
+        }
+
+        setIsSavingPassword(true)
 
         const result = await changePassword(currentPassword, newPassword)
         
@@ -216,9 +233,12 @@ export default function AccountSettingsPage() {
             setCurrentPassword('')
             setNewPassword('')
             setConfirmPassword('')
+            setShowCurrentPwd(false)
+            setShowNewPwd(false)
+            setShowConfirmPwd(false)
             setShowPasswordForm(false)
         }
-        setSaving(false)
+        setIsSavingPassword(false)
     }
 
     const hasGoogle = accounts.some(a => a.provider === 'google')
@@ -259,11 +279,13 @@ export default function AccountSettingsPage() {
                 {message && (
                     <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
                         message.type === 'success' 
-                            ? 'bg-brk-accent-20 border border-brk-accent text-brk-accent' 
-                            : 'bg-brk-accent-20 border border-brk-accent text-brk-accent'
+                            ? 'bg-green-500/10 border border-green-500/50 text-green-400' 
+                            : 'bg-red-500/10 border border-red-500/50 text-red-400'
                     }`}>
-                        {message.type === 'success' ? <Check className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-                        {message.text}
+                        {message.type === 'success' 
+                            ? <Check className="h-5 w-5 shrink-0" /> 
+                            : <AlertCircle className="h-5 w-5 shrink-0" />}
+                        <span>{message.text}</span>
                     </div>
                 )}
 
@@ -407,35 +429,82 @@ export default function AccountSettingsPage() {
                             </button>
                         ) : (
                             <form onSubmit={handleChangePassword} className="space-y-4">
+                                {/* Mật khẩu hiện tại */}
                                 <div>
                                     <label className="block text-sm text-brk-muted mb-2">Mật khẩu hiện tại</label>
-                                    <input
-                                        type="password"
-                                        value={currentPassword}
-                                        onChange={(e) => setCurrentPassword(e.target.value)}
-                                        required
-                                        className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-primary"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showCurrentPwd ? 'text' : 'password'}
+                                            value={currentPassword}
+                                            onChange={(e) => setCurrentPassword(e.target.value)}
+                                            required
+                                            placeholder="Nhập mật khẩu hiện tại"
+                                            className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 pr-12 text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-primary"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCurrentPwd(!showCurrentPwd)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface transition-colors"
+                                        >
+                                            {showCurrentPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
+                                    </div>
                                 </div>
+                                {/* Mật khẩu mới */}
                                 <div>
                                     <label className="block text-sm text-brk-muted mb-2">Mật khẩu mới</label>
-                                    <input
-                                        type="password"
-                                        value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
-                                        required
-                                        className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-primary"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showNewPwd ? 'text' : 'password'}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            required
+                                            placeholder="Ít nhất 8 ký tự, chữ hoa, số, ký tự đặc biệt"
+                                            className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 pr-12 text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-primary"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewPwd(!showNewPwd)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface transition-colors"
+                                        >
+                                            {showNewPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-brk-muted italic">
+                                        Yêu cầu: ≥ 8 ký tự, 1 chữ Hoa, 1 chữ thường, 1 số, 1 ký tự đặc biệt (vd: Brk$9319)
+                                    </p>
                                 </div>
+                                {/* Xác nhận mật khẩu */}
                                 <div>
                                     <label className="block text-sm text-brk-muted mb-2">Xác nhận mật khẩu mới</label>
-                                    <input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        required
-                                        className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-primary"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showConfirmPwd ? 'text' : 'password'}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            required
+                                            placeholder="Nhập lại mật khẩu mới"
+                                            className={`w-full bg-brk-background border rounded-lg px-4 py-3 pr-12 text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-primary ${
+                                                confirmPassword && confirmPassword !== newPassword
+                                                    ? 'border-red-500/60 focus:ring-red-500'
+                                                    : 'border-brk-outline'
+                                            }`}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPwd(!showConfirmPwd)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface transition-colors"
+                                        >
+                                            {showConfirmPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                        </button>
+                                    </div>
+                                    {/* Inline feedback khớp mật khẩu */}
+                                    {confirmPassword && confirmPassword !== newPassword && (
+                                        <p className="mt-1 text-[11px] text-red-400">Mật khẩu chưa khớp</p>
+                                    )}
+                                    {confirmPassword && confirmPassword === newPassword && newPassword && (
+                                        <p className="mt-1 text-[11px] text-green-400 flex items-center gap-1"><Check className="h-3 w-3" /> Mật khẩu khớp</p>
+                                    )}
                                 </div>
                                 <div className="flex gap-3">
                                     <button
@@ -445,18 +514,21 @@ export default function AccountSettingsPage() {
                                             setCurrentPassword('')
                                             setNewPassword('')
                                             setConfirmPassword('')
+                                            setShowCurrentPwd(false)
+                                            setShowNewPwd(false)
+                                            setShowConfirmPwd(false)
                                             setMessage(null)
                                         }}
-                                        className="flex-1 bg-brk-background hover:bg-brk-surface text-brk-on-surface font-medium py-3 rounded-xl transition-colors"
+                                        className="flex-1 bg-brk-background hover:bg-brk-surface text-brk-on-surface font-medium py-3 rounded-xl transition-colors border border-brk-outline"
                                     >
                                         Hủy
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={saving}
+                                        disabled={isSavingPassword}
                                         className="flex-1 bg-brk-primary hover:bg-brk-primary-hover text-brk-on-surface font-bold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
-                                        {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Xác nhận'}
+                                        {isSavingPassword ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Key className="h-4 w-4" /> Xác nhận đổi</>}
                                     </button>
                                 </div>
                             </form>
