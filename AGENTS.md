@@ -258,4 +258,48 @@ npm run import-v3      # Import v3 data
 
 ---
 
+## 11. CORE CODING PRINCIPLES
+
+### 🚨 QUY TẮC CỐT LÕI KHI XỬ LÝ CODE (CORE CODING PRINCIPLES)
+
+Từ bây giờ, khi phân tích yêu cầu và viết code, bạn BẮT BUỘC phải tuân thủ các nguyên tắc sau để tránh việc suy luận lan man và code chắp vá:
+
+**1. Giải quyết tận gốc rễ (Root Cause), KHÔNG vá lỗi bề mặt:**
+- Khi gặp lỗi UI/Logic, hãy xác định nguyên nhân từ Framework (ví dụ: vòng đời của React, cách React-Hook-Form quản lý state/event).
+- Tuyệt đối không dùng các biện pháp cồng kềnh như chèn hàng loạt event (onKeyDown, onFocus...) hay CSS (pointer-events-none) để ép buộc hành vi.
+
+**2. K.I.S.S (Keep It Simple, Stupid):**
+- Ưu tiên phương án ít dòng code nhất và ít can thiệp vào luồng dữ liệu (data flow) nhất.
+- Không thay đổi cấu trúc component (ví dụ: đổi <input> thành <div>) nếu điều đó làm gãy logic quản lý form của thư viện.
+
+**3. Tôn trọng tính toàn vẹn của Form (Data Integrity):**
+- Khi khóa một trường thông tin (disable/readonly), phải đảm bảo dữ liệu của trường đó vẫn được thư viện (React Hook Form) bắt được khi onSubmit.
+- Mẫu chuẩn: Dùng <input type="hidden"> để submit data + <input disabled> để hiển thị UI.
+
+**4. Trực tiếp và Dứt khoát:**
+- Dừng việc đưa ra các bản nháp mang tính "thử nghiệm". Hãy suy nghĩ kỹ về luồng chạy thực tế, chọn phương án chuẩn xác và tối ưu nhất ngay từ đầu.
+- Nếu phương án A không hoạt động, hãy lùi lại xem xét toàn bộ kiến trúc, KHÔNG đắp thêm code vào phương án A để ép nó chạy.
+
+### 🚨 CORE CODING PRINCIPLES & GUIDELINES (ENGLISH)
+
+From now on, when analyzing requirements and writing code, you MUST strictly adhere to the following principles to avoid over-engineering, over-thinking, and band-aid fixes:
+
+**1. Fix the Root Cause, NO Band-Aid Solutions:**
+- When encountering UI or Logic bugs, identify the root cause within the Framework's architecture.
+- Absolutely do NOT use clunky workarounds like stacking DOM events or CSS hacks to force a behavior.
+
+**2. K.I.S.S (Keep It Simple, Stupid):**
+- Prioritize the solution with the fewest lines of code and the least interference with the existing data flow.
+- Do NOT alter the structural integrity of components if doing so breaks the form library's underlying logic.
+
+**3. Maintain Form & Data Integrity:**
+- When locking a field, ensure that the data is still naturally captured by the library upon onSubmit.
+- Standard Pattern: Use <input type="hidden"> to store data + <input disabled> for UI display.
+
+**4. Be Direct, Decisive, and Stop the "Trial and Error" Loop:**
+- Stop providing experimental drafts. Think through the actual execution flow and choose the most accurate solution.
+- If Plan A does not work, step back and re-evaluate. Do NOT continuously patch Plan A.
+
+---
+
 **Ghi chú**: Mỗi phiên làm việc mới, agent sẽ đọc file này trước tiên để áp dụng các quy tắc.
