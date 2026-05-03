@@ -160,35 +160,23 @@ export default function AccountSettingsPage() {
         setMessage({ type: 'success', text: 'Đang tải ảnh...' })
 
         try {
-            // Tải ảnh từ URL
-            const response = await fetch(url)
-            if (!response.ok) throw new Error('Cannot download image')
+            // Tải ảnh qua proxy API (bỏ qua CORS)
+            const response = await fetch('/api/upload/url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            })
+            const data = await response.json()
             
-            const blob = await response.blob()
-            
-            // Kiểm tra loại file
-            if (!blob.type.startsWith('image/')) {
-                setMessage({ type: 'error', text: 'URL không phải là ảnh hợp lệ' })
+            if (!data.success || !data.base64) {
+                setMessage({ type: 'error', text: data.error || 'URL không trỏ đến một ảnh hợp lệ' })
                 return
             }
 
-            // Convert blob to base64
-            const reader = new FileReader()
-            reader.onload = async (event) => {
-                try {
-                    const result = event.target?.result as string
-                    // Nén ảnh về 50x50px
-                    const resized = await resizeImage(result, 50, 50)
-                    setAvatarUrl(resized)
-                    setMessage({ type: 'success', text: 'Ảnh đã được tải và nén!' })
-                } catch (error) {
-                    setMessage({ type: 'error', text: 'Lỗi khi xử lý ảnh' })
-                }
-            }
-            reader.onerror = () => {
-                setMessage({ type: 'error', text: 'Lỗi khi đọc ảnh' })
-            }
-            reader.readAsDataURL(blob)
+            // Nén ảnh về 50x50px từ chuỗi base64 trả về
+            const resized = await resizeImage(data.base64, 50, 50)
+            setAvatarUrl(resized)
+            setMessage({ type: 'success', text: 'Ảnh đã được tải và nén!' })
         } catch (error) {
             setMessage({ type: 'error', text: 'Không thể tải ảnh từ URL này' })
         }

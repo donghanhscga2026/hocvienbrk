@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, use } from 'react'
 import { updateCourseAction, updateLessonAction } from '@/app/actions/admin-actions'
@@ -7,274 +7,9 @@ import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, Li
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
-// ─── Component Popup Import Bài học ──────────────────────────────────────────
-function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
-    const [file, setFile] = useState<any>(null)
-    const [mode, setMode] = useState<'upsert' | 'skip'>('upsert')
-    const [sourceType, setSourceType] = useState<'file' | 'sheet'>('file')
-    const [sheetUrl, setSheetUrl] = useState('')
-    const [importing, setImporting] = useState(false)
-    const [result, setResult] = useState<any>(null)
-
-    const handleImport = async () => {
-        if (sourceType === 'file' && !file) return
-        if (sourceType === 'sheet' && !sheetUrl) return
-
-        setImporting(true)
-        setResult(null)
-
-        const formData = new FormData()
-        formData.append('mode', mode)
-        formData.append('sourceType', sourceType)
-
-        if (sourceType === 'file') {
-            formData.append('file', file)
-        } else {
-            formData.append('sheetUrl', sheetUrl)
-        }
-
-        try {
-            const res = await fetch(`/api/courses/${courseId}/lessons/import`, {
-                method: 'POST',
-                body: formData
-            })
-            const data = await res.json()
-            setResult(data)
-            if (data.success) onComplete()
-        } catch (err: any) {
-            setResult({ error: err.message })
-        }
-
-        setImporting(false)
-    }
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                        <FileSpreadsheet className="w-5 h-5" /> Import Bài học
-                    </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6 space-y-5">
-                    <a href="/lesson_template.csv" download className="flex items-center gap-2 text-xs font-bold text-purple-600 hover:underline">
-                        <Download className="w-4 h-4" /> Tải template mẫu
-                    </a>
-
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nguồn dữ liệu</label>
-                        <div className="flex gap-3">
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${sourceType === 'file' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="source" value="file" checked={sourceType === 'file'} onChange={() => setSourceType('file')} className="hidden" />
-                                <span className={`text-xs font-bold ${sourceType === 'file' ? 'text-purple-700' : 'text-gray-500'}`}>File CSV</span>
-                            </label>
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${sourceType === 'sheet' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="source" value="sheet" checked={sourceType === 'sheet'} onChange={() => setSourceType('sheet')} className="hidden" />
-                                <span className={`text-xs font-bold ${sourceType === 'sheet' ? 'text-purple-700' : 'text-gray-500'}`}>Google Sheets</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    {sourceType === 'file' ? (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File CSV</label>
-                            <input
-                                type="file"
-                                accept=".csv"
-                                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700"
-                            />
-                        </div>
-                    ) : (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link Google Sheets (Public)</label>
-                            <input
-                                type="text"
-                                value={sheetUrl}
-                                onChange={(e) => setSheetUrl(e.target.value)}
-                                placeholder="https://docs.google.com/spreadsheets/d/..."
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                            />
-                        </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Khi bài học đã tồn tại</label>
-                        <div className="flex gap-3">
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'upsert' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="mode" value="upsert" checked={mode === 'upsert'} onChange={() => setMode('upsert')} className="hidden" />
-                                <span className={`text-xs font-bold ${mode === 'upsert' ? 'text-purple-700' : 'text-gray-500'}`}>Cập nhật</span>
-                            </label>
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'skip' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="mode" value="skip" checked={mode === 'skip'} onChange={() => setMode('skip')} className="hidden" />
-                                <span className={`text-xs font-bold ${mode === 'skip' ? 'text-purple-700' : 'text-gray-500'}`}>Bỏ qua</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    {result && (
-                        <div className={`p-4 rounded-2xl text-xs font-bold ${result.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                            {result.error || result.message}
-                        </div>
-                    )}
-
-                    <button
-                        onClick={handleImport}
-                        disabled={(sourceType === 'file' && !file) || (sourceType === 'sheet' && !sheetUrl) || importing}
-                        className="w-full bg-green-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {importing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                        {importing ? 'Đang import...' : 'Import Bài học'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─── Component Popup Chỉnh sửa Bài học ──────────────────────────────────────────
-function LessonEditModal({ lesson, onClose, onSave }: { lesson: any, onClose: () => void, onSave: (data: any) => Promise<void> }) {
-    const [title, setTitle] = useState(lesson.title || '')
-    const [videoUrl, setVideoUrl] = useState(lesson.videoUrl || '')
-    const [order, setOrder] = useState(lesson.order || 0)
-    const [lessonType, setLessonType] = useState(lesson.type || 'VIDEO')
-    const [content, setContent] = useState(lesson.content || '')
-    const [saving, setSaving] = useState(false)
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setSaving(true)
-        await onSave({ id: lesson.id, title, videoUrl, order, type: lessonType, content })
-        setSaving(false)
-        onClose()
-    }
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-widest">Sửa bài học #{lesson.order}</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-yellow-400" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tiêu đề bài học</label>
-                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />       
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại bài học</label>
-                        <select value={lessonType} onChange={(e) => setLessonType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                            <option value="VIDEO">Video (YouTube)</option>
-                            <option value="DOCS">Tài liệu (Docs)</option>
-                            <option value="TEXT">Văn bản (Text)</option>
-                        </select>
-                    </div>
-                    {(lessonType === 'VIDEO' || lessonType === 'DOCS') && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{lessonType === 'VIDEO' ? 'Link Video (YouTube)' : 'Link Tài liệu (Docs)'}</label>
-                            <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com/..." : "https://docs.google.com/..."} />
-                        </div>
-                    )}
-                    {lessonType === 'TEXT' && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung văn bản</label>
-                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Nhập nội dung bài học..." />
-                        </div>
-                    )}
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Thứ tự hiển thị</label>
-                        <input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
-                    </div>
-                    <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Cập nhật bài học
-                    </button>
-                </form>
-            </div>
-        </div>
-    )
-}
-
-// ─── Component Thêm bài học mới ──────────────────────────────────────────
-function AddLessonModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
-    const [title, setTitle] = useState('')
-    const [videoUrl, setVideoUrl] = useState('')
-    const [order, setOrder] = useState(1)  // ✅ Sửa lỗi 2026-05-01: Để order mặc định = 1 (sẽ check unique trong API)
-    const [lessonType, setLessonType] = useState('VIDEO')
-    const [content, setContent] = useState('')
-    const [saving, setSaving] = useState(false)
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!title.trim()) return
-        
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/courses/${courseId}/lessons`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, videoUrl, order: parseInt(order.toString()), type: lessonType, content })
-            }).then(r => r.json())
-            
-            if (res.success) {
-                onComplete()
-                onClose()
-            } else {
-                alert(res.error || 'Lỗi khi tạo bài học')
-            }
-        } catch (err: any) {
-            alert('Lỗi: ' + err.message)
-        }
-        setSaving(false)
-    }
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-widest">Thêm bài học mới</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-yellow-400" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tiêu đề bài học</label>
-                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại bài học</label>
-                        <select value={lessonType} onChange={(e) => setLessonType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                            <option value="VIDEO">Video (YouTube)</option>
-                            <option value="DOCS">Tài liệu (Docs)</option>
-                            <option value="TEXT">Văn bản (Text)</option>
-                        </select>
-                    </div>
-                    {(lessonType === 'VIDEO' || lessonType === 'DOCS') && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{lessonType === 'VIDEO' ? 'Link Video (YouTube)' : 'Link Tài liệu (Docs)'}</label>
-                            <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com/..." : "https://docs.google.com/..."} />
-                        </div>
-                    )}
-                    {lessonType === 'TEXT' && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung văn bản</label>
-                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Nhập nội dung bài học..." />
-                        </div>
-                    )}
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Thứ tự hiển thị</label>
-                        <input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
-                    </div>
-                    <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Tạo bài học
-                    </button>
-                </form>
-            </div>
-        </div>
-    )
-}
-
+import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
+import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
+import { AddLessonModal } from '@/components/admin/courses/AddLessonModal'
 export default function EditCoursePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const [course, setCourse] = useState<any>(null)
@@ -291,9 +26,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [noidungEmail, setNoidungEmail] = useState('')
     const [type, setType] = useState('NORMAL')
     
-    // ✅ NEW: Section 1 - Basic info (16 more fields to have 21 total)
+    // âœ… NEW: Section 1 - Basic info (16 more fields to have 21 total)
     const [nameKhoa, setNameKhoa] = useState('')
-    const [category, setCategory] = useState('Khác')
+    const [category, setCategory] = useState('KhÃ¡c')
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
     const [dateJoin, setDateJoin] = useState('')
@@ -301,31 +36,31 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [isAdmin, setIsAdmin] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
     
-    // ✅ NEW: Section 2 - Description & Image
+    // âœ… NEW: Section 2 - Description & Image
     const [moTaNgan, setMoTaNgan] = useState('')
     const [moTaDai, setMoTaDai] = useState('')
     const [linkAnhBia, setLinkAnhBia] = useState('')
     const [categories, setCategories] = useState<string[]>([])
     const [uploadingImage, setUploadingImage] = useState(false)
     
-    // ✅ NEW: Section 3 - Fee & Payment
+    // âœ… NEW: Section 3 - Fee & Payment
     const [stk, setStk] = useState('')
     const [nameStk, setNameStk] = useState('')
     const [bankStk, setBankStk] = useState('')
     const [noidungStk, setNoidungStk] = useState('')
     const [linkQrcode, setLinkQrcode] = useState('')
     
-    // ✅ NEW: Section 4 - Email & Zalo
+    // âœ… NEW: Section 4 - Email & Zalo
     const [linkZalo, setLinkZalo] = useState('')
     const [fileEmail, setFileEmail] = useState('')
     
-    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc category)
+    // âœ… NEW: Fetch categories independently (cháº¡y ngay khi mount, khÃ´ng phá»¥ thuá»™c category)
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    // ✅ Đảm bảo unique categories từ API (tránh duplicate keys)
+                    // âœ… Äáº£m báº£o unique categories tá»« API (trÃ¡nh duplicate keys)
                     const uniqueCategories = Array.from(new Set<string>(catRes.categories))
                     console.log('Categories loaded:', uniqueCategories)
                     setCategories(uniqueCategories)
@@ -337,7 +72,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         fetchCategories()
     }, [])
     
-    // ✅ NEW: Handle image upload
+    // âœ… NEW: Handle image upload
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -356,15 +91,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             if (data.url) {
                 setLinkAnhBia(data.url)
             } else {
-                setMessage({ type: 'error', text: data.error || 'Lỗi upload ảnh' })
+                setMessage({ type: 'error', text: data.error || 'Lá»—i upload áº£nh' })
             }
         } catch (err: any) {
-            setMessage({ type: 'error', text: 'Lỗi upload: ' + err.message })
+            setMessage({ type: 'error', text: 'Lá»—i upload: ' + err.message })
         }
         setUploadingImage(false)
     }
     
-    // ✅ NEW: Handle Enter key in textarea to insert <br>
+    // âœ… NEW: Handle Enter key in textarea to insert <br>
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -383,7 +118,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const fetchData = async () => {
         setLoading(true)
         try {
-            // ✅ Fetch Session & Teachers if Admin
+            // âœ… Fetch Session & Teachers if Admin
             const sessionRes = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = sessionRes?.user?.role === 'ADMIN'
             setIsAdmin(isAdminUser)
@@ -406,9 +141,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
                 
-                 // ✅ NEW: Populate all 21 fields
+                 // âœ… NEW: Populate all 21 fields
                   setNameKhoa(res.name_khoa || '')
-                  const currentCategory = res.category || 'Khác'
+                  const currentCategory = res.category || 'KhÃ¡c'
                   setCategory(currentCategory)
                   setStatus(res.status ?? true)
                 setPin(res.pin || 0)
@@ -440,7 +175,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         e.preventDefault()
         setSaving(true)
         setMessage(null)
-        // ✅ Send all 21 fields to updateCourseAction
+        // âœ… Send all 21 fields to updateCourseAction
         const res = await updateCourseAction(parseInt(id), {
             id_khoa: idKhoa,
             name_lop: nameLop,
@@ -464,8 +199,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             file_email: fileEmail || null,
             noidung_email: noidungEmail || null,
         })
-        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học (21 trường)!' })
-        else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
+        if (res.success) setMessage({ type: 'success', text: 'ÄÃ£ lÆ°u thÃ´ng tin khÃ³a há»c (21 trÆ°á»ng)!' })
+        else setMessage({ type: 'error', text: res.error || 'Lá»—i khi lÆ°u.' })
         setSaving(false)
     }
 
@@ -474,37 +209,37 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content
         })
         if (res.success) {
-            setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
-            fetchData() // Tải lại danh sách
+            setMessage({ type: 'success', text: 'ÄÃ£ cáº­p nháº­t bÃ i há»c thÃ nh cÃ´ng!' })
+            fetchData() // Táº£i láº¡i danh sÃ¡ch
         }
     }
 
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-2" />
-            <p className="text-xs font-black uppercase">Đang tải...</p>
+            <p className="text-xs font-black uppercase">Äang táº£i...</p>
         </div>
     )
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <MainHeader title="CẤU HÌNH KHÓA HỌC" toolSlug="courses" />
+            <MainHeader title="Cáº¤U HÃŒNH KHÃ“A Há»ŒC" toolSlug="courses" />
             
             <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
-                    <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+                    <ArrowLeft className="w-4 h-4" /> Quay láº¡i danh sÃ¡ch
                 </Link>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* PHẦN 1: THÔNG TIN CƠ BẢN */}
+                    {/* PHáº¦N 1: THÃ”NG TIN CÆ  Báº¢N */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                            <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
+                            <BookOpen className="w-5 h-5 text-blue-500" /> ThÃ´ng tin cÆ¡ báº£n *
                         </h2>
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học (Không thể sửa - ảnh hưởng DB)</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ£ khÃ³a há»c (KhÃ´ng thá»ƒ sá»­a - áº£nh hÆ°á»Ÿng DB)</label>
                                  <input 
                                      type="text" 
                                      value={idKhoa} 
@@ -514,44 +249,44 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                  />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn lá»›p há»c *</label>
                                 <input type="text" value={nameLop} onChange={(e) => setNameLop(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
                             </div>
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên khóa học (khác tên lớp)</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn khÃ³a há»c (khÃ¡c tÃªn lá»›p)</label>
                             <input type="text" value={nameKhoa} onChange={(e) => setNameKhoa(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 mt-4">
                              <div className="space-y-1.5">
-                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
+                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh má»¥c</label>
                                  <select 
                                      value={category} 
                                      onChange={(e) => setCategory(e.target.value)}
                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                  >
-                                     <option value="Khác">Khác</option>
+                                     <option value="KhÃ¡c">KhÃ¡c</option>
                                      {Array.from(new Set(categories)).map((cat: string) => (
                                          <option key={cat} value={cat}>{cat}</option>
                                      ))}
                                  </select>
                              </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loáº¡i khÃ³a há»c</label>
                                 <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                                    <option value="NORMAL">Bình thường</option>
-                                    <option value="CHALLENGE">Thử thách</option>
-                                    <option value="LIB">Tài liệu (LIB)</option>
+                                    <option value="NORMAL">BÃ¬nh thÆ°á»ng</option>
+                                    <option value="CHALLENGE">Thá»­ thÃ¡ch</option>
+                                    <option value="LIB">TÃ i liá»‡u (LIB)</option>
                                 </select>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tráº¡ng thÃ¡i</label>
                                 <div className="flex items-center gap-3 h-full px-4">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={status} onChange={(e) => setStatus(e.target.checked)} className="w-5 h-5 rounded" />
-                                        <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
+                                        <span className="text-sm font-bold">{status ? 'Hiá»ƒn thá»‹' : 'áº¨n'}</span>
                                     </label>
                                 </div>
                             </div>
@@ -559,18 +294,18 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         
                         <div className="grid grid-cols-3 gap-4 mt-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=khÃ´ng)</label>
                                 <input type="number" value={pin} onChange={(e) => setPin(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">NgÃ y khai giáº£ng</label>
                                 <input type="date" value={dateJoin} onChange={(e) => setDateJoin(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             {isAdmin && (
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
+                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">GiÃ¡o viÃªn</label>
                                     <select value={teacherId || ''} onChange={(e) => setTeacherId(parseInt(e.target.value) || null)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                                        <option value="">Chọn giáo viên...</option>
+                                        <option value="">Chá»n giÃ¡o viÃªn...</option>
                                         {teachers.map((t: any) => (
                                             <option key={t.id} value={t.id}>{t.name || t.email}</option>
                                         ))}
@@ -580,36 +315,36 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         </div>
                     </div>
 
-                    {/* PHẦN 2: MÔ TẢ & HÌNH ẢNH */}
+                    {/* PHáº¦N 2: MÃ” Táº¢ & HÃŒNH áº¢NH */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
+                            <Settings className="w-5 h-5 text-green-500" /> MÃ´ táº£ & HÃ¬nh áº£nh
                         </h2>
                         
                          <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
-                              <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ´ táº£ ngáº¯n (max 200 chars, Enter Ä‘á»ƒ xuá»‘ng dÃ²ng)</label>
+                              <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter Ä‘á»ƒ xuá»‘ng dÃ²ng sáº½ tá»± thÃªm <br>..." />
                               <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
                           </div>
                          
                          <div className="space-y-1.5 mt-4">
-                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>
-                              <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ´ táº£ dÃ i (Enter Ä‘á»ƒ xuá»‘ng dÃ²ng)</label>
+                              <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter Ä‘á»ƒ xuá»‘ng dÃ²ng sáº½ tá»± thÃªm <br>..." />
                           </div>
                          
                          <div className="space-y-1.5 mt-4">
-                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
+                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link áº£nh bÃ¬a</label>
                              <div className="flex gap-2">
                                  <input 
                                      type="text" 
                                      value={linkAnhBia} 
                                      onChange={(e) => setLinkAnhBia(e.target.value)} 
                                      className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                     placeholder="https://... hoặc /uploads/courses/..." 
+                                     placeholder="https://... hoáº·c /uploads/courses/..." 
                                  />
                                  <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
                                      <Upload className="w-4 h-4" />
-                                     {uploadingImage ? 'Đang tải...' : 'Upload'}
+                                     {uploadingImage ? 'Äang táº£i...' : 'Upload'}
                                      <input 
                                          type="file" 
                                          accept="image/*" 
@@ -627,36 +362,36 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                          </div>
                     </div>
 
-                    {/* PHẦN 3: HỌC PHÍ & THANH TOÁN */}
+                    {/* PHáº¦N 3: Há»ŒC PHÃ & THANH TOÃN */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                            <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
+                            <DollarSign className="w-5 h-5 text-yellow-500" /> Há»c phÃ­ & Thanh toÃ¡n
                         </h2>
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Há»c phÃ­ (VND)</label>
                                 <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Sá»‘ tÃ i khoáº£n</label>
                                 <input type="text" value={stk} onChange={(e) => setStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mt-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên chủ TK</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn chá»§ TK</label>
                                 <input type="text" value={nameStk} onChange={(e) => setNameStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">NgÃ¢n hÃ ng</label>
                                 <input type="text" value={bankStk} onChange={(e) => setBankStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chuyển khoản</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ná»™i dung chuyá»ƒn khoáº£n</label>
                             <input type="text" value={noidungStk} onChange={(e) => setNoidungStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
@@ -666,24 +401,24 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         </div>
                     </div>
 
-                    {/* PHẦN 4: EMAIL & ZALO */}
+                    {/* PHáº¦N 4: EMAIL & ZALO */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                             <Upload className="w-5 h-5 text-purple-500" /> Email & Zalo
                         </h2>
                         
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhóm Zalo</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhÃ³m Zalo</label>
                             <input type="url" value={linkZalo} onChange={(e) => setLinkZalo(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email đính kèm</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email Ä‘Ã­nh kÃ¨m</label>
                             <input type="text" value={fileEmail} onChange={(e) => setFileEmail(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung email kích hoạt</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ná»™i dung email kÃ­ch hoáº¡t</label>
                             <textarea value={noidungEmail} onChange={(e) => setNoidungEmail(e.target.value)} rows={4} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
                         </div>
                     </div>
@@ -696,15 +431,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     )}
 
                     <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Khóa học
+                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} LÆ°u KhÃ³a há»c
                     </button>
                 </form>
 
-                {/* PHẦN 5: DANH SÁCH BÀI HỌC */}
+                {/* PHáº¦N 5: DANH SÃCH BÃ€I Há»ŒC */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
-                            <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({course?.lessons?.length || 0})
+                            <List className="w-5 h-5 text-indigo-500" /> BÃ i giáº£ng ({course?.lessons?.length || 0})
                         </h2>
                         <button
                             onClick={() => setShowImport(true)}
@@ -716,7 +451,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             onClick={() => setShowAddLesson(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700 transition-all"
                         >
-                            + Thêm bài học
+                            + ThÃªm bÃ i há»c
                         </button>
                     </div>
                     <div className="space-y-3">
@@ -729,7 +464,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     <div className="space-y-0.5">
                                         <h4 className="text-sm font-black text-gray-800 leading-tight">{lesson.title}</h4>
                                         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
-                                            <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
+                                            <Play className="w-3 h-3" /> {lesson.videoUrl ? 'ÄÃ£ cÃ³ Video' : 'ChÆ°a cÃ³ Video'}
                                         </div>
                                     </div>
                                 </div>
@@ -744,7 +479,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     </div>
                 </div>
 
-                {/* MODAL SỬA BÀI HỌC */}
+                {/* MODAL Sá»¬A BÃ€I Há»ŒC */}
                 {selectedLesson && (
                     <LessonEditModal
                         lesson={selectedLesson}
@@ -753,7 +488,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     />
                 )}
 
-                {/* MODAL THÊM BÀI HỌC */}
+                {/* MODAL THÃŠM BÃ€I Há»ŒC */}
                 {showAddLesson && (
                     <AddLessonModal
                         courseId={id}
@@ -762,7 +497,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     />
                 )}
 
-                {/* MODAL IMPORT BÀI HỌC */}
+                {/* MODAL IMPORT BÃ€I Há»ŒC */}
                 {showImport && (
                     <ImportLessonsModal
                         courseId={id}

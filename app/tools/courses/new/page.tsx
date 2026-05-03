@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -8,256 +8,9 @@ import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
-// ─── Component Popup Import Bài học ──────────────────────────────────────────
-function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
-    const [file, setFile] = useState<any>(null)
-    const [mode, setMode] = useState<'upsert' | 'skip'>('upsert')
-    const [sourceType, setSourceType] = useState<'file' | 'sheet'>('file')
-    const [sheetUrl, setSheetUrl] = useState('')
-    const [importing, setImporting] = useState(false)
-    const [result, setResult] = useState<any>(null)
-
-    const handleImport = async () => {
-        if (sourceType === 'file' && !file) return
-        if (sourceType === 'sheet' && !sheetUrl) return
-
-        setImporting(true)
-        setResult(null)
-
-        const formData = new FormData()
-        formData.append('mode', mode)
-        formData.append('sourceType', sourceType)
-
-        if (sourceType === 'file') {
-            formData.append('file', file)
-        } else {
-            formData.append('sheetUrl', sheetUrl)
-        }
-
-        try {
-            const res = await fetch(`/api/courses/${courseId}/lessons/import`, {
-                method: 'POST',
-                body: formData
-            })
-            const data = await res.json()
-            setResult(data)
-            if (data.success) onComplete()
-        } catch (err: any) {
-            setResult({ error: err.message })
-        }
-
-        setImporting(false)
-    }
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                        <FileSpreadsheet className="w-5 h-5" /> Import Bài học
-                    </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6 space-y-5">
-                    <a href="/lesson_template.csv" download className="flex items-center gap-2 text-xs font-bold text-purple-600 hover:underline">
-                        <Download className="w-4 h-4" /> Tải template mẫu
-                    </a>
-
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nguồn dữ liệu</label>
-                        <div className="flex gap-3">
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${sourceType === 'file' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="source" value="file" checked={sourceType === 'file'} onChange={() => setSourceType('file')} className="hidden" />
-                                <span className={`text-xs font-bold ${sourceType === 'file' ? 'text-purple-700' : 'text-gray-500'}`}>File CSV</span>
-                            </label>
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${sourceType === 'sheet' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="source" value="sheet" checked={sourceType === 'sheet'} onChange={() => setSourceType('sheet')} className="hidden" />
-                                <span className={`text-xs font-bold ${sourceType === 'sheet' ? 'text-purple-700' : 'text-gray-500'}`}>Google Sheets</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    {sourceType === 'file' ? (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File CSV</label>
-                            <input
-                                type="file"
-                                accept=".csv"
-                                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700"
-                            />
-                        </div>
-                    ) : (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link Google Sheets (Public)</label>
-                            <input
-                                type="text"
-                                value={sheetUrl}
-                                onChange={(e) => setSheetUrl(e.target.value)}
-                                placeholder="https://docs.google.com/spreadsheets/d/..."
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                            />
-                        </div>
-                    )}
-
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Khi bài học đã tồn tại</label>
-                        <div className="flex gap-3">
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'upsert' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="mode" value="upsert" checked={mode === 'upsert'} onChange={() => setMode('upsert')} className="hidden" />
-                                <span className={`text-xs font-bold ${mode === 'upsert' ? 'text-purple-700' : 'text-gray-500'}`}>Cập nhật</span>
-                            </label>
-                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'skip' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
-                                <input type="radio" name="mode" value="skip" checked={mode === 'skip'} onChange={() => setMode('skip')} className="hidden" />
-                                <span className={`text-xs font-bold ${mode === 'skip' ? 'text-purple-700' : 'text-gray-500'}`}>Bỏ qua</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    {result && (
-                        <div className={`p-4 rounded-2xl text-xs font-bold ${result.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                            {result.error || result.message}
-                        </div>
-                    )}
-
-                    <button
-                        onClick={handleImport}
-                        disabled={(sourceType === 'file' && !file) || (sourceType === 'sheet' && !sheetUrl) || importing}
-                        className="w-full bg-green-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {importing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                        {importing ? 'Đang import...' : 'Import Bài học'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-// ─── Component Popup Chỉnh sửa Bài học ──────────────────────────────────────────
-function LessonEditModal({ lesson, onClose, onSave }: { lesson: any, onClose: () => void, onSave: (data: any) => Promise<void> }) {
-    const [title, setTitle] = useState(lesson.title || '')
-    const [videoUrl, setVideoUrl] = useState(lesson.videoUrl || '')
-    const [order, setOrder] = useState(lesson.order || 0)
-    const [saving, setSaving] = useState(false)
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setSaving(true)
-        await onSave({ id: lesson.id, title, videoUrl, order })
-        setSaving(false)
-        onClose()
-    }
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-widest">Sửa bài học #{lesson.order}</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-yellow-400" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tiêu đề bài học</label>
-                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />       
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link Video (YouTube)</label>
-                        <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder="https://youtube.com/..." />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Thứ tự hiển thị</label>
-                        <input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
-                    </div>
-                    <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Cập nhật bài học
-                    </button>
-                </form>
-            </div>
-        </div>
-    )
-}
-
-// ─── Component Thêm bài học mới ──────────────────────────────────
-function AddLessonModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
-    const [title, setTitle] = useState('')
-    const [videoUrl, setVideoUrl] = useState('')
-    const [order, setOrder] = useState(1)
-    const [lessonType, setLessonType] = useState('VIDEO')
-    const [content, setContent] = useState('')
-    const [saving, setSaving] = useState(false)
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!title.trim()) return
-        
-        setSaving(true)
-        try {
-            const res = await fetch(`/api/courses/${courseId}/lessons`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, videoUrl, order: parseInt(order.toString()), type: lessonType, content })
-            }).then(r => r.json())
-            
-            if (res.success) {
-                onComplete()
-                onClose()
-            } else {
-                alert(res.error || 'Lỗi khi tạo bài học')
-            }
-        } catch (err: any) {
-            alert('Lỗi: ' + err.message)
-        }
-        setSaving(false)
-    }
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-white w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
-                    <h3 className="font-black text-sm uppercase tracking-widest">Thêm bài học mới</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X className="w-5 h-5 text-yellow-400" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tiêu đề bài học</label>
-                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại bài học</label>
-                        <select value={lessonType} onChange={(e) => setLessonType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                            <option value="VIDEO">Video (YouTube)</option>
-                            <option value="DOCS">Tài liệu (Docs)</option>
-                            <option value="TEXT">Văn bản (Text)</option>
-                        </select>
-                    </div>
-                    {(lessonType === 'VIDEO' || lessonType === 'DOCS') && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{lessonType === 'VIDEO' ? 'Link Video (YouTube)' : 'Link Tài liệu (Docs)'}</label>
-                            <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com/..." : "https://docs.google.com/..."} />
-                        </div>
-                    )}
-                    {lessonType === 'TEXT' && (
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung văn bản</label>
-                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Nhập nội dung bài học..." />
-                        </div>
-                    )}
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Thứ tự hiển thị</label>
-                        <input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
-                    </div>
-                    <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        Tạo bài học
-                    </button>
-                </form>
-            </div>
-        </div>
-    )
-}
-
+import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
+import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
+import { AddLessonModal } from '@/components/admin/courses/AddLessonModal'
 function CreateCourseContent() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -265,7 +18,7 @@ function CreateCourseContent() {
     const [isAdmin, setIsAdmin] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
     
-    // ✅ NEW: Edit mode states (Thêm mới, giữ nguyên 21 states cũ)
+    // âœ… NEW: Edit mode states (ThÃªm má»›i, giá»¯ nguyÃªn 21 states cÅ©)
     const searchParams = useSearchParams()
     const courseId = searchParams.get('id')
     const isEditMode = !!courseId
@@ -276,23 +29,23 @@ function CreateCourseContent() {
     const [selectedLesson, setSelectedLesson] = useState<any>(null)
     const [showAddLesson, setShowAddLesson] = useState(false)
     
-    // Section1: Thông tin cơ bản
+    // Section1: ThÃ´ng tin cÆ¡ báº£n
     const [idKhoa, setIdKhoa] = useState('')
     const [nameLop, setNameLop] = useState('')
     const [nameKhoa, setNameKhoa] = useState('')
-    const [category, setCategory] = useState('Khác')
+    const [category, setCategory] = useState('KhÃ¡c')
     const [type, setType] = useState('NORMAL')
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
     const [dateJoin, setDateJoin] = useState('')
     const [teacherId, setTeacherId] = useState<string>('')
     
-    // Section2: Mô tả & Hình ảnh
+    // Section2: MÃ´ táº£ & HÃ¬nh áº£nh
     const [moTaNgan, setMoTaNgan] = useState('')
     const [moTaDai, setMoTaDai] = useState('')
     const [linkAnhBia, setLinkAnhBia] = useState('')
     
-    // Section3: Học phí & Thanh toán
+    // Section3: Há»c phÃ­ & Thanh toÃ¡n
     const [phiCoc, setPhiCoc] = useState(0)
     const [stk, setStk] = useState('')
     const [nameStk, setNameStk] = useState('')
@@ -305,11 +58,11 @@ function CreateCourseContent() {
     const [fileEmail, setFileEmail] = useState('')
     const [noidungEmail, setNoidungEmail] = useState('')
     
-    // ✅ NEW: Categories & Upload state
+    // âœ… NEW: Categories & Upload state
     const [categories, setCategories] = useState<string[]>([])
     const [uploadingImage, setUploadingImage] = useState(false)
     
-    // ✅ NEW: Handle image upload
+    // âœ… NEW: Handle image upload
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -328,15 +81,15 @@ function CreateCourseContent() {
             if (data.url) {
                 setLinkAnhBia(data.url)
             } else {
-                setMessage({ type: 'error', text: data.error || 'Lỗi upload ảnh' })
+                setMessage({ type: 'error', text: data.error || 'Lá»—i upload áº£nh' })
             }
         } catch (err: any) {
-            setMessage({ type: 'error', text: 'Lỗi upload: ' + err.message })
+            setMessage({ type: 'error', text: 'Lá»—i upload: ' + err.message })
         }
         setUploadingImage(false)
     }
     
-    // ✅ NEW: Handle Enter key in textarea to insert <br>
+    // âœ… NEW: Handle Enter key in textarea to insert <br>
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -353,13 +106,13 @@ function CreateCourseContent() {
         }
     }
     
-    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc courseId)
+    // âœ… NEW: Fetch categories independently (cháº¡y ngay khi mount, khÃ´ng phá»¥ thuá»™c courseId)
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    // ✅ Đảm bảo unique categories (tránh duplicate keys)
+                    // âœ… Äáº£m báº£o unique categories (trÃ¡nh duplicate keys)
                     const uniqueCategories = Array.from(new Set<string>(catRes.categories))
                     console.log('Categories loaded:', uniqueCategories)
                     setCategories(uniqueCategories)
@@ -384,7 +137,7 @@ function CreateCourseContent() {
                 }
             }
              
-            // ✅ EDIT MODE: Fetch course data if courseId exists (THÊM MỚI)
+            // âœ… EDIT MODE: Fetch course data if courseId exists (THÃŠM Má»šI)
             if (courseId) {
                 setLoading(true)
                 try {
@@ -394,7 +147,7 @@ function CreateCourseContent() {
                          setIdKhoa(courseRes.id_khoa || '')
                          setNameLop(courseRes.name_lop || '')
                          setNameKhoa(courseRes.name_khoa || '')
-                          const currentCategory = courseRes.category || 'Khác'
+                          const currentCategory = courseRes.category || 'KhÃ¡c'
                           setCategory(currentCategory)
                           setType(courseRes.type || 'NORMAL')
                         setStatus(courseRes.status ?? true)
@@ -420,11 +173,11 @@ function CreateCourseContent() {
                         // Set lessons
                         setLessons(courseRes.lessons || [])
                     } else {
-                        setMessage({ type: 'error', text: courseRes.error || 'Không tìm thấy khóa học' })
+                        setMessage({ type: 'error', text: courseRes.error || 'KhÃ´ng tÃ¬m tháº¥y khÃ³a há»c' })
                     }
                 } catch (err) {
                     console.error("Fetch course error:", err)
-                    setMessage({ type: 'error', text: 'Lỗi khi tải thông tin khóa học' })
+                    setMessage({ type: 'error', text: 'Lá»—i khi táº£i thÃ´ng tin khÃ³a há»c' })
                 } finally {
                     setLoading(false)
                 }
@@ -439,7 +192,7 @@ function CreateCourseContent() {
         setMessage(null)
         
         if (isEditMode && courseId) {
-            // ✅ EDIT MODE: Gọi updateCourseAction (THÊM MỚI)
+            // âœ… EDIT MODE: Gá»i updateCourseAction (THÃŠM Má»šI)
             const res = await updateCourseAction(parseInt(courseId), {
                 id_khoa: idKhoa,
                 name_lop: nameLop,
@@ -465,13 +218,13 @@ function CreateCourseContent() {
             })
             
             if (res.success) {
-                setMessage({ type: 'success', text: 'Đã cập nhật khóa học thành công!' })
+                setMessage({ type: 'success', text: 'ÄÃ£ cáº­p nháº­t khÃ³a há»c thÃ nh cÃ´ng!' })
                 setTimeout(() => router.push('/tools/courses'), 1500)
             } else {
-                setMessage({ type: 'error', text: res.error || 'Lỗi khi cập nhật.' })
+                setMessage({ type: 'error', text: res.error || 'Lá»—i khi cáº­p nháº­t.' })
             }
         } else {
-            // ✅ CREATE MODE: Giữ nguyên code cũ
+            // âœ… CREATE MODE: Giá»¯ nguyÃªn code cÅ©
             const formData = new FormData()
             formData.append('id_khoa', idKhoa)
             formData.append('name_lop', nameLop)
@@ -498,10 +251,10 @@ function CreateCourseContent() {
             const res = await createCourseAction(formData)
             
             if (res.success) {
-                setMessage({ type: 'success', text: res.message || 'Đã tạo khóa học thành công!' })
+                setMessage({ type: 'success', text: res.message || 'ÄÃ£ táº¡o khÃ³a há»c thÃ nh cÃ´ng!' })
                 setTimeout(() => router.push('/tools/courses'), 1500)
             } else {
-                setMessage({ type: 'error', text: res.error || 'Lỗi khi tạo khóa học' })
+                setMessage({ type: 'error', text: res.error || 'Lá»—i khi táº¡o khÃ³a há»c' })
             }
         }
         
@@ -510,7 +263,7 @@ function CreateCourseContent() {
     
     return (
         <div className="min-h-screen bg-gray-50">
-            <MainHeader title={isEditMode ? "SỬA KHÓA HỌC" : "TẠO KHÓA HỌC MỚI"} toolSlug="courses" />
+            <MainHeader title={isEditMode ? "Sá»¬A KHÃ“A Há»ŒC" : "Táº O KHÃ“A Há»ŒC Má»šI"} toolSlug="courses" />
             
             {isEditMode && (
                 <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mx-4 mb-6">
@@ -518,33 +271,33 @@ function CreateCourseContent() {
                         onClick={() => setActiveTab('info')} 
                         className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        <Settings className="w-4 h-4 inline mr-2" /> Thông tin
+                        <Settings className="w-4 h-4 inline mr-2" /> ThÃ´ng tin
                     </button>
                     <button 
                         onClick={() => setActiveTab('lessons')} 
                         className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'lessons' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                     >
-                        <List className="w-4 h-4 inline mr-2" /> Bài giảng ({lessons.length})
+                        <List className="w-4 h-4 inline mr-2" /> BÃ i giáº£ng ({lessons.length})
                     </button>
                 </div>
             )}
             
             <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
-                    <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+                    <ArrowLeft className="w-4 h-4" /> Quay láº¡i danh sÃ¡ch
                 </Link>
                 
                 {( !isEditMode || activeTab === 'info' ) && (
                 <form onSubmit={handleSubmit} className="space-y-8">
-                {/* SECTION 1: THÔNG TIN CƠ BẢN */}
+                {/* SECTION 1: THÃ”NG TIN CÆ  Báº¢N */}
                 <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                        <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
+                        <BookOpen className="w-5 h-5 text-blue-500" /> ThÃ´ng tin cÆ¡ báº£n *
                     </h2>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học *</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ£ khÃ³a há»c *</label>
                             <input 
                                 type="text" 
                                 value={idKhoa} 
@@ -555,57 +308,57 @@ function CreateCourseContent() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn lá»›p há»c *</label>
                             <input 
                                 type="text" 
                                 value={nameLop} 
                                 onChange={(e) => setNameLop(e.target.value)} 
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên lớp..." 
+                                placeholder="TÃªn lá»›p..." 
                                 required 
                             />
                         </div>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên khóa học (khác tên lớp)</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn khÃ³a há»c (khÃ¡c tÃªn lá»›p)</label>
                         <input 
                             type="text" 
                             value={nameKhoa} 
                             onChange={(e) => setNameKhoa(e.target.value)} 
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            placeholder="Tên khóa..." 
+                            placeholder="TÃªn khÃ³a..." 
                         />
                     </div>
                     
                         <div className="grid grid-cols-3 gap-4 mt-4">
                              <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
+                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh má»¥c</label>
                              <select 
                                  value={category} 
                                  onChange={(e) => setCategory(e.target.value)}
                                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                              >
-                                 <option value="Khác">Khác</option>
+                                 <option value="KhÃ¡c">KhÃ¡c</option>
                                  {Array.from(new Set(categories)).map((cat: string) => (
                                      <option key={cat} value={cat}>{cat}</option>
                                  ))}
                              </select>
                          </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loáº¡i khÃ³a há»c</label>
                             <select 
                                 value={type} 
                                 onChange={(e) => setType(e.target.value)}
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                             >
-                                <option value="NORMAL">Bình thường</option>
-                                <option value="CHALLENGE">Thử thách</option>
-                                <option value="LIB">Tài liệu (LIB)</option>
+                                <option value="NORMAL">BÃ¬nh thÆ°á»ng</option>
+                                <option value="CHALLENGE">Thá»­ thÃ¡ch</option>
+                                <option value="LIB">TÃ i liá»‡u (LIB)</option>
                             </select>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tráº¡ng thÃ¡i</label>
                             <div className="flex items-center gap-3 h-full px-4">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input 
@@ -614,7 +367,7 @@ function CreateCourseContent() {
                                         onChange={(e) => setStatus(e.target.checked)} 
                                         className="w-5 h-5 rounded" 
                                     />
-                                    <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
+                                    <span className="text-sm font-bold">{status ? 'Hiá»ƒn thá»‹' : 'áº¨n'}</span>
                                 </label>
                             </div>
                         </div>
@@ -622,7 +375,7 @@ function CreateCourseContent() {
                     
                     <div className="grid grid-cols-3 gap-4 mt-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=khÃ´ng)</label>
                             <input 
                                 type="number" 
                                 value={pin} 
@@ -631,7 +384,7 @@ function CreateCourseContent() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">NgÃ y khai giáº£ng</label>
                             <input 
                                 type="date" 
                                 value={dateJoin} 
@@ -641,13 +394,13 @@ function CreateCourseContent() {
                         </div>
                         {isAdmin && (
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">GiÃ¡o viÃªn</label>
                                 <select 
                                     value={teacherId} 
                                     onChange={(e) => setTeacherId(e.target.value)}
                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                 >
-                                    <option value="">Tự động (session)</option>
+                                    <option value="">Tá»± Ä‘á»™ng (session)</option>
                                     {teachers.map((t: any) => (
                                         <option key={t.id} value={t.id}>{t.name || t.email}</option>
                                     ))}
@@ -657,50 +410,50 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
-                {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
+                {/* SECTION 2: MÃ” Táº¢ & HÃŒNH áº¢NH */}
                 <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                        <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
+                        <Settings className="w-5 h-5 text-green-500" /> MÃ´ táº£ & HÃ¬nh áº£nh
                     </h2>
                     
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ´ táº£ ngáº¯n (max 200 chars, Enter Ä‘á»ƒ xuá»‘ng dÃ²ng)</label>
                         <textarea 
                             value={moTaNgan} 
                             onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))}
                             onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)}
                             rows={6}
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
-                            placeholder="Mô tả ngắn gọn... (Enter để xuống dòng sẽ tự thêm <br>)" 
+                            placeholder="MÃ´ táº£ ngáº¯n gá»n... (Enter Ä‘á»ƒ xuá»‘ng dÃ²ng sáº½ tá»± thÃªm <br>)" 
                         />
                         <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ´ táº£ dÃ i (Enter Ä‘á»ƒ xuá»‘ng dÃ²ng)</label>
                         <textarea 
                             value={moTaDai} 
                             onChange={(e) => setMoTaDai(e.target.value)}
                             onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)}
                             rows={10}
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
-                            placeholder="Mô tả chi tiết khóa học... (Enter để xuống dòng sẽ tự thêm <br>)" 
+                            placeholder="MÃ´ táº£ chi tiáº¿t khÃ³a há»c... (Enter Ä‘á»ƒ xuá»‘ng dÃ²ng sáº½ tá»± thÃªm <br>)" 
                         />
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link áº£nh bÃ¬a</label>
                         <div className="flex gap-2">
                             <input 
                                  type="text" 
                                  value={linkAnhBia} 
                                  onChange={(e) => setLinkAnhBia(e.target.value)} 
                                  className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                 placeholder="https://... hoặc /uploads/courses/..." 
+                                 placeholder="https://... hoáº·c /uploads/courses/..." 
                              />
                             <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
                                 <Upload className="w-4 h-4" />
-                                {uploadingImage ? 'Đang tải...' : 'Upload'}
+                                {uploadingImage ? 'Äang táº£i...' : 'Upload'}
                                 <input 
                                     type="file" 
                                     accept="image/*" 
@@ -718,15 +471,15 @@ function CreateCourseContent() {
                     </div>
                 </div>
                 
-                {/* SECTION 3: HỌC PHÍ & THANH TOÁN */}
+                {/* SECTION 3: Há»ŒC PHÃ & THANH TOÃN */}
                 <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                     <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                        <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
+                        <DollarSign className="w-5 h-5 text-yellow-500" /> Há»c phÃ­ & Thanh toÃ¡n
                     </h2>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Há»c phÃ­ (VND)</label>
                             <input 
                                 type="number" 
                                 value={phiCoc} 
@@ -735,48 +488,48 @@ function CreateCourseContent() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Sá»‘ tÃ i khoáº£n</label>
                             <input 
                                 type="text" 
                                 value={stk} 
                                 onChange={(e) => setStk(e.target.value)} 
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Số TK..." 
+                                placeholder="Sá»‘ TK..." 
                             />
                         </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4 mt-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên chủ TK</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn chá»§ TK</label>
                             <input 
                                 type="text" 
                                 value={nameStk} 
                                 onChange={(e) => setNameStk(e.target.value)} 
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên..." 
+                                placeholder="TÃªn..." 
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">NgÃ¢n hÃ ng</label>
                             <input 
                                 type="text" 
                                 value={bankStk} 
                                 onChange={(e) => setBankStk(e.target.value)} 
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên NH..." 
+                                placeholder="TÃªn NH..." 
                             />
                         </div>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chuyển khoản</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ná»™i dung chuyá»ƒn khoáº£n</label>
                         <input 
                             type="text" 
                             value={noidungStk} 
                             onChange={(e) => setNoidungStk(e.target.value)} 
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            placeholder="Nội dung..." 
+                            placeholder="Ná»™i dung..." 
                         />
                     </div>
                     
@@ -799,7 +552,7 @@ function CreateCourseContent() {
                     </h2>
                     
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhóm Zalo</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhÃ³m Zalo</label>
                         <input 
                             type="url" 
                             value={linkZalo} 
@@ -810,7 +563,7 @@ function CreateCourseContent() {
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email đính kèm</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email Ä‘Ã­nh kÃ¨m</label>
                         <input 
                             type="text" 
                             value={fileEmail} 
@@ -821,13 +574,13 @@ function CreateCourseContent() {
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung email kích hoạt</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ná»™i dung email kÃ­ch hoáº¡t</label>
                         <textarea 
                             value={noidungEmail} 
                             onChange={(e) => setNoidungEmail(e.target.value)} 
                             rows={4}
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" 
-                            placeholder="Nội dung email..." 
+                            placeholder="Ná»™i dung email..." 
                         />
                     </div>
                 </div>
@@ -845,7 +598,7 @@ function CreateCourseContent() {
                     className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <BookOpen className="w-5 h-5" />}
-                    {isEditMode ? 'Lưu Khóa học' : 'Tạo Khóa học'}
+                    {isEditMode ? 'LÆ°u KhÃ³a há»c' : 'Táº¡o KhÃ³a há»c'}
                 </button>
                 </form>
                 )}
@@ -854,7 +607,7 @@ function CreateCourseContent() {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
-                                <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({lessons.length})
+                                <List className="w-5 h-5 text-indigo-500" /> BÃ i giáº£ng ({lessons.length})
                             </h2>
                         <div className="flex gap-2">
                             <button
@@ -867,7 +620,7 @@ function CreateCourseContent() {
                                 onClick={() => setShowAddLesson(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700 transition-all"
                             >
-                                + Thêm bài học
+                                + ThÃªm bÃ i há»c
                             </button>
                         </div>
                     </div>
@@ -881,7 +634,7 @@ function CreateCourseContent() {
                                         <div className="space-y-0.5">
                                             <h4 className="text-sm font-black text-gray-800 leading-tight">{lesson.title}</h4>
                                             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
-                                                <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
+                                                <Play className="w-3 h-3" /> {lesson.videoUrl ? 'ÄÃ£ cÃ³ Video' : 'ChÆ°a cÃ³ Video'}
                                             </div>
                                         </div>
                                     </div>
@@ -895,7 +648,7 @@ function CreateCourseContent() {
                             ))}
                             {lessons.length === 0 && (
                                 <div className="text-center py-8 text-gray-400 text-xs font-black uppercase">
-                                    Chưa có bài giảng nào. Hãy import bài học!
+                                    ChÆ°a cÃ³ bÃ i giáº£ng nÃ o. HÃ£y import bÃ i há»c!
                                 </div>
                             )}
                         </div>
@@ -913,7 +666,7 @@ function CreateCourseContent() {
                             title: data.title, videoUrl: data.videoUrl, order: data.order
                         })
                         if (res.success) {
-                            setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
+                            setMessage({ type: 'success', text: 'ÄÃ£ cáº­p nháº­t bÃ i há»c thÃ nh cÃ´ng!' })
                             // Refresh data
                             const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
                             if (courseRes && !courseRes.error) setLessons(courseRes.lessons || [])
@@ -934,7 +687,7 @@ function CreateCourseContent() {
                 />
             )}
 
-            {/* ✅ THÊM MỚI: AddLessonModal */}
+            {/* âœ… THÃŠM Má»šI: AddLessonModal */}
             {showAddLesson && (
                 <AddLessonModal
                     courseId={courseId || ''}

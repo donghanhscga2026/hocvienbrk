@@ -120,10 +120,13 @@
 8. UPDATE DOC → Cập nhật PLAN.md + docs/{feature}.md nếu có
 ```
 
-### Khi cần quay lại:
-- **File lỗi**: Đọc note backup → Copy nội dung → Paste đè file gốc
-- **Code hỏng nặng**: `.\restore-from-backup.ps1` → Chọn ZIP → `npm install`
+### 9. KHÔI PHỤC — THỨ TỰ ƯU TIÊN & BẮT BUỘC HỎI TRƯỚC
+> Tuyệt đối **KHÔNG ĐƯỢC TỰ ĐỘNG** thực hiện bất cứ bước khôi phục nào nếu chưa báo cáo và được user xác nhận đồng ý.
 
+Khi cần khôi phục code, phải tuân thủ nghiêm ngặt thứ tự ưu tiên sau:
+1. **Ưu tiên 1 (File backup lẻ)**: Đọc file trong `plan_temp/` → Copy nội dung → Paste đè file gốc.
+2. **Ưu tiên 2 (Git repository)**: Sử dụng lệnh `git checkout -- <file>` hoặc `git reset` để lấy lại bản commit gần nhất.
+3. **Ưu tiên 3 (Zip backup toàn bộ)**: Chạy script `.\restore-from-backup.ps1` → Chọn ZIP → `npm install` (Chỉ dùng khi hỏng nặng toàn dự án).
 ---
 
 ## 🟡 AN TOÀN CODE
