@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { Suspense } from 'react'
 import { auth } from '@/auth'
 
 import MainHeader from '@/components/layout/MainHeader'
@@ -176,24 +177,26 @@ export default async function Home() {
       />
       
       {/* Home Page Client - Survey + Community + Courses */}
-      <HomePageClient
-        profile={safeProfile}
-        courses={courses}
-        myCourses={myCourses}
-        groupedOtherCourses={groupedOtherCourses}
-        posts={posts}
-        session={session}
-        enrollmentsMap={enrollmentsMap}
-        isCourseOneActive={enrollmentsMap[1]?.status === 'ACTIVE'}
-        userPhone={userPhone}
-        userId={userId}
-        customPath={customPath as number[] | null}
-        userGoal={userGoal}
-        targetPointId={targetPointId}
-        roadmapPoints={roadmapPoints || []}
-        survey={survey}
-        resetSurveyAction={resetSurveyAction}
-      />
+      <Suspense fallback={<div className="flex justify-center p-8"><span className="animate-spin text-purple-500">⏳</span></div>}>
+        <HomePageClient
+          profile={safeProfile}
+          courses={courses}
+          myCourses={myCourses}
+          groupedOtherCourses={groupedOtherCourses}
+          posts={posts}
+          session={session}
+          enrollmentsMap={enrollmentsMap}
+          isCourseOneActive={enrollmentsMap[1]?.status === 'ACTIVE'}
+          userPhone={userPhone}
+          userId={userId}
+          customPath={customPath as number[] | null}
+          userGoal={userGoal}
+          targetPointId={targetPointId}
+          roadmapPoints={roadmapPoints || []}
+          survey={survey}
+          resetSurveyAction={resetSurveyAction}
+        />
+      </Suspense>
       
       {/* Footer */}
       <FooterSection profile={safeProfile} />

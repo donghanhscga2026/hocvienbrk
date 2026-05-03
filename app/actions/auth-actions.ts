@@ -104,9 +104,27 @@ export async function registerUser(prevState: any, formData: FormData) {
         const { sendTelegram, sendVerificationEmail } = await import("@/lib/notifications")
         const newId = await getNextAvailableId()
         
-        // Parse referrerId
-        const parsedRef = parseInt(referrerId || "0")
-        const refId = isNaN(parsedRef) ? 0 : parsedRef
+        // Parse referrerId: Ưu tiên lấy từ Cookie an toàn ở phía Server
+        let refId = 0;
+        const cookieStore = await cookies();
+        const affRefCookie = cookieStore.get('aff_ref');
+        
+        if (affRefCookie) {
+            try {
+                const affData = JSON.parse(decodeURIComponent(affRefCookie.value));
+                if (affData.r) {
+                    refId = parseInt(affData.r);
+                }
+            } catch (e) {
+                console.error("[Affiliate] Lỗi parse cookie aff_ref:", e);
+            }
+        }
+        
+        // Fallback: Nếu không có cookie hợp lệ, lấy từ form ẩn
+        if (!refId || isNaN(refId)) {
+            const parsedRef = parseInt(referrerId || "0");
+            refId = isNaN(parsedRef) ? 0 : parsedRef;
+        }
 
         // Tao user
         const user = await prisma.user.create({
