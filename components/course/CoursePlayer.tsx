@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import Link from "next/link"
+import { useRouter } from 'next/navigation'
 import { 
     ArrowLeft, ListVideo, FileText, X, ClipboardCheck, 
     Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw 
@@ -33,12 +33,12 @@ interface CoursePlayerProps {
     course: any
     enrollment: any
     session: any
-    serverPlaylist?: any[]
 }
 
 type MobileTab = 'list' | 'content' | 'record'
 
-export default function CoursePlayer({ course, enrollment: initialEnrollment, session, serverPlaylist: propServerPlaylist }: CoursePlayerProps) {
+export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
+    const router = useRouter()
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const isSubmittingRef = useRef(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -228,9 +228,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             {/* Header */}
             <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 z-50 fixed top-0 left-0 right-0">
                 <div className="flex items-center gap-3 min-w-0">
-                    <Link href="/" className="shrink-0 text-brk-muted hover:text-brk-on-surface transition-colors">
+                    <button onClick={() => router.back()} className="shrink-0 text-brk-muted hover:text-brk-on-surface transition-colors">
                         <ArrowLeft className="w-5 h-5" />
-                    </Link>
+                    </button>
                     <h1 className="font-bold text-brk-on-surface truncate text-sm sm:text-base">{course.name_lop}</h1>
                 </div>
                 
@@ -286,7 +286,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 initialMaxTime={currentProgress?.maxTime || 0}
                                 playlistData={currentProgress?.scores?.playlist}
                                 lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
-                                 serverPlaylist={propServerPlaylist} // [OPTIMIZE] Truyền playlist đã parse từ Server
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                                 courseType={course.type}

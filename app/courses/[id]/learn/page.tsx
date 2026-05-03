@@ -121,21 +121,12 @@ export default async function CourseLearnPage({
     redirect(`/courses/${id}`)
   }
 
-  // [OPTIMIZE] Use server data directly - map type from Prisma LessonType to internal PlaylistItem type
-  const serverPlaylist = enrollment.course.lessons.map((lesson: any) => ({
-    ...lesson,
-    type: lesson.type === 'TEXT' ? 'text' : lesson.type === 'DOCS' ? 'doc' : 'video',
-    url: lesson.videoUrl || lesson.content || '',
-    content: lesson.content || null
-  }))
-  
   return (
     <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
       <CoursePlayer
         course={{ ...enrollment.course, type: course.type }}
         enrollment={enrollment}
         session={session}
-        serverPlaylist={serverPlaylist}
       />
     </div>
   )

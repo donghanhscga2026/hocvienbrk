@@ -1,305 +1,276 @@
-# Workspace Configuration
-
-Quy tắc cho agent làm việc trong workspace này.
-
----
-
-## QUY TRÌNH 3 BƯỚC CHUẨN (NHẤT!)
-
-### Khi sắp sửa file (Bắt buộc):
-1. **BACKUP** → `read` file gốc → Copy toàn bộ → Lưu `plan_temp/{file}_backup_YYYYMMDD_HHMM.txt` (3 dòng note)
-2. **SO SÁNH** → Đọc code cũ (backup/git/file) → Nắm rõ trước khi đổi
-3. **EDIT** → `read` lấy oldString (1-3 dòng) → `edit` → `read` lại verify ngay
-4. **TEST** → Kiểm tra thủ công → Chờ user xác nhận
-
-### Khi muốn quay lại:
-- **File lỗi** → Đọc note backup → Copy nội dung → Paste đè file gốc
-- **Code hỏng nặng** → Chạy `.\restore-from-backup.ps1` → Chọn ZIP → `npm install`
+# AGENTS.md — Quy tắc làm việc cho AI Agent
+> **Đọc file này TRƯỚC TIÊN mỗi phiên làm việc. Tuân thủ bắt buộc, không ngoại lệ.**
 
 ---
 
-## 1. Cấu hình chung
+## 🔴 NGUYÊN TẮC CỐT LÕI (MANDATORY)
+
+### 1. ĐỌC TRƯỚC — SỬA SAU
+> Không bao giờ sửa file khi chưa đọc nội dung hiện tại của nó.
+
+- **Bắt buộc `read` file gốc** trước mọi thao tác chỉnh sửa
+- Không bao giờ đoán nội dung file — phải đọc thực tế
+- Hiểu rõ code đang làm gì trước khi thay đổi
+
+### 2. BACKUP TRƯỚC — SỬA SAU
+> Mọi thay đổi đều phải có điểm quay lại an toàn.
+
+- Copy file gốc vào `plan_temp/{tên_file}_backup_YYYYMMDD_HHMM.txt` **trước khi sửa**
+- Ghi đúng **3 dòng note** theo format chuẩn (xem Ví dụ A)
+- Chỉ giữ **1 bản backup mới nhất** cho mỗi file (xóa bản cũ hơn)
+
+### 3. CHỌN ĐÚNG PHƯƠNG PHÁP SỬA
+> Quy tắc **dứt khoát** — không mơ hồ, không thử sai nhiều lần.
+
+**Phân loại thay đổi TRƯỚC khi làm:**
+
+| Loại | Khi nào | Công cụ |
+|------|---------|---------|
+| **Surgical edit** | Thay đổi ≤ 10 dòng, đúng 1 chỗ | `edit` với oldString 1–3 dòng |
+| **Full rewrite** | Thay đổi > 10 dòng, hoặc cấu trúc lớn | `write` toàn bộ file |
+| **Chuyển sang rewrite** | `edit` thất bại **1 lần** → dừng ngay, không thử lại | `write` |
+
+> ❌ **Cấm**: Cố `edit` 30–70 dòng, thất bại, thử lại nhiều lần → lãng phí thời gian.  
+> ✅ **Đúng**: Xác định loại thay đổi từ đầu. Nếu > 10 dòng → `write` luôn.
+
+**Khi `write`: bắt buộc bảo tồn tính năng cũ:**
+1. Liệt kê checklist tất cả tính năng hiện có trước khi write
+2. Sau khi write: đối chiếu checklist, tính năng nào mất → khôi phục từ backup ngay
+
+### 4. GIẢI QUYẾT GỐC RỄ — KHÔNG VÁ LỖI BỀ MẶT
+> Fix nguyên nhân thật, không patch triệu chứng.
+
+- Khi gặp lỗi: xác định nguyên nhân từ **framework/architecture** trước
+- ❌ Không dùng hack CSS (`pointer-events-none`), stacking events (`onKeyDown`, `onFocus`) để ép hành vi
+- ❌ Nếu hướng giải quyết thất bại → **lùi lại xem xét toàn bộ kiến trúc**, không tiếp tục vá thêm
+
+### 5. K.I.S.S — ĐƠN GIẢN LÀ VƯƠNG
+> Phương án ít code nhất, ít can thiệp nhất mà vẫn đúng là phương án tốt nhất.
+
+- Ưu tiên giải pháp đơn giản, ít phụ thuộc
+- Không thêm abstraction/boilerplate khi không cần thiết
+- Không thay đổi cấu trúc component nếu chỉ cần sửa logic
+
+### 6. CẬP NHẬT TÀI LIỆU — BẮT BUỘC SAU MỖI THAY ĐỔI ĐƯỢC XÁC NHẬN
+> Tài liệu là bộ nhớ dài hạn của dự án. Không cập nhật = thông tin thất lạc.
+
+**Ngay sau khi user xác nhận thay đổi hoạt động tốt, PHẢI cập nhật:**
+
+| Tài liệu | Cập nhật khi nào | Nội dung |
+|---|---|---|
+| `PLAN.md` | **Mọi thay đổi** (fix bug, tính năng mới, tối ưu) | Ngày, file đã sửa, vấn đề & cách fix, trạng thái |
+| `docs/{feature}.md` | Tính năng lớn có file riêng | Đặc tả kỹ thuật chi tiết, API, data flow |
+
+**Quy tắc cụ thể:**
+- `PLAN.md` là lịch sử **tổng hợp toàn dự án** — luôn có, không phụ thuộc vào docs/
+- `docs/{feature}.md` là đặc tả **chi tiết một tính năng** — bổ sung thêm, không thay thế PLAN.md
+- Cập nhật **ngay sau khi xác nhận**, không chờ cuối phiên
+- Nếu quên → đó là **lỗi của agent**, phải cập nhật bù trước khi làm việc khác
+
+### 7. PHÂN TÍCH DỰA TRÊN DỮ LIỆU THẬT — KHÔNG SUY ĐOÁN
+> Mọi giải pháp đều phải xuất phát từ code và dữ liệu thực tế đang có, không tự điền giả định.
+
+**Trước khi đưa ra giải pháp, BẮT BUỘC phải:**
+- **Đọc file liên quan** bằng `read` — không suy ra nội dung từ tên file hay context
+- **Tra cứu bằng `grep/search`** khi cần biết đoạn code nào đang tồn tại
+- **Dựa trên code thực tế** khi suy luận — không suy luận từ assumption
+
+**Cấm:**
+- ❌ Đưa giải pháp khi chưa đọc file liên quan
+- ❌ Giả sử biến/hàm/state tồn tại mà không đọc file confirm
+- ❌ Copy-paste pattern từ nơi khác mà không đối chiếu với code hiện tại
+
+### 8. HỎi XÁC NHẬN TRƯỚC KHI SỬa — KHÔNG CÓ NGOẠI LỆ
+> Không bao giờ tự ý sửa file code mà không được user xác nhận rõ ràng.
+
+**BẮT BUỘC trước mọi thay đổi file:**
+1. Trình bày **kế hoạch rõ ràng**: sửa file nào, đoạn nào, thay thế bằng gì
+2. **Chờ user xác nhận** ("đồng ý", "ok", "tiếp tục", …) rồi mới thực hiện
+3. **Không có ngoại lệ** — dù thay đổi nhỏ, dù "chỉ sửa 1 dòng", dù rõ ràng
+
+**Tính chất — ranh giới rõ ràng:**
+- ✅ Đọc file, phân tích, đưa đề xuất → được phép, không cần hỏi trước
+- ❌ Sửa file, tạo file, xóa code → **PHẢI HỎI TRƯỚC**, không có ngoại lệ
+
+---
+
+## 🟡 QUY TRÌNH LÀM VIỆC — PHÂN LOẠI THEO ĐỘ PHỨC TẠP
+
+> **Quan trọng**: Không áp dụng đồng đều 6 bước cho mọi thay đổi. Phân loại trước.
+
+### Thay đổi ĐƠN GIẢN (sửa 1 file, ≤ 10 dòng)
+```
+1. READ       → Đọc file liên quan, lấy oldString chính xác
+2. BACKUP     → Lưu plan_temp/
+3. PROPOSE    → Trình bày rõ kế hoạch sửa → CHờ USER XÁC NHẬN
+4. EDIT       → Thực hiện surgical edit (sau khi được xác nhận)
+5. VERIFY     → Read lại file để confirm thay đổi đúng
+6. UPDATE DOC → Cập nhật PLAN.md sau khi user xác nhận OK
+```
+
+### Thay đổi PHỨC TẠP (nhiều file, cấu trúc lớn, tính năng mới)
+```
+1. READ       → Đọc tất cả file liên quan (không bỏ sót)
+2. ANALYZE    → Phân tích dựa trên code thực tế, không suy đoán
+3. BACKUP     → Lưu plan_temp/ cho từng file sẽ sửa
+4. PLAN       → Trình bày kế hoạch chi tiết
+5. CONFIRM    → CHờ USER XÁC NHẬN — không sửa nếu chưa được đồng ý
+6. EDIT       → Thực hiện từng file một
+7. VERIFY     → Read lại, kiểm tra output
+8. UPDATE DOC → Cập nhật PLAN.md + docs/{feature}.md nếu có
+```
+
+### Khi cần quay lại:
+- **File lỗi**: Đọc note backup → Copy nội dung → Paste đè file gốc
+- **Code hỏng nặng**: `.\restore-from-backup.ps1` → Chọn ZIP → `npm install`
+
+---
+
+## 🟡 AN TOÀN CODE
+
+| ❌ Nguy hiểm | ✅ Đúng |
+|---|---|
+| `if (userId)` — falsy khi `userId = 0` | `if (userId != null)` |
+| Đổi tên biến tùy tiện | Giữ nguyên tên, **hỏi user** nếu muốn đổi |
+| Xóa biến khi chưa tìm usages | Dùng grep/search tìm tất cả nơi dùng trước |
+| Gọi Server Action với Prisma trong Client Component | Dùng `fetch('/api/...')` thay thế |
+
+---
+
+## 🟡 TECH STACK NHANH
 
 | Công nghệ | Chi tiết |
 |-----------|----------|
 | Framework | Next.js 16 (App Router) |
 | Database | Prisma ORM + PostgreSQL |
-| Authentication | NextAuth v5 |
+| Auth | NextAuth v5 |
 | Styling | Tailwind CSS v4 |
 | Language | TypeScript (strict mode) |
 
-### Cấu trúc thư mục
+**Cấu trúc thư mục:**
 ```
-app/           - Next.js App Router pages & API
-components/    - React components (theo feature: components/home/, components/course/)
-hooks/         - Custom React hooks
-lib/           - Utility functions & business logic (lib/affiliate/)
-scripts/       - Migration scripts, seed, data import
-prisma/        - Database schema & seed files
+app/           → Pages & API routes
+components/    → UI components (theo feature)
+hooks/         → Custom React hooks
+lib/           → Business logic & utilities
+prisma/        → Schema & seed
+scripts/       → Migration & data tools
+plan_temp/     → Backup files (không commit)
+docs/          → Tài liệu kỹ thuật từng tính năng
 ```
 
 ---
 
-## 2. BACKUP & RESTORE
+## 🟡 COMMANDS HAY DÙNG
 
-### A. Thủ công (plan_temp/) - Trước khi sửa
-1. Đọc file gốc bằng `read` tool
-2. Copy toàn bộ nội dung → Lưu `plan_temp/{original}_backup_YYYYMMDD_HHMM_note.txt`
-3. Ghi 3 dòng note đầu:
 ```bash
-# BACKUP NOTE: [2026-05-02 08:30] - [Tình trạng: OK]
-# TÌNH TRẠNG: [Các tính năng đang OK]
-# KẾ HOẠCH: [Chuẩn bị sửa gì]
+# Dev
+npm run dev           # Dev server → localhost:3000
+npm run build         # Build production (chỉ khi thay đổi lớn)
+npm run lint          # ESLint check
+
+# Database (sau khi sửa schema)
+npx prisma generate   # Generate Prisma client
+npx prisma db push    # Sync schema lên DB
+
+# Git
+git show HEAD:<file>  # Xem file trên git HEAD
 ```
-4. Tự động dọn: Chỉ giữ **1 bản mới nhất** cho mỗi loại file
 
-### B. Tự động (backups/) - Trước khi Push
-- **Script**: `auto-commit-push.ps1` (Bước 2)
-- **Vị trí**: `backups/backup_YYYY-MM-DD_HH-mm.zip`
-- **Nội dung**: Toàn bộ dự án (trừ `node_modules/`, `.next/`, `.git/`, `backups/`)
-- **Tự động dọn**: Chỉ giữ **5 file ZIP mới nhất**
+---
 
-### C. Khôi phục (Restore)
-| Cách | Khi nào | Thao tác |
-|------|--------|-----------|
-| Từ `plan_temp/` | File lỗi, cần bản cũ | Đọc note → Copy → Paste đè file gốc |
-| Từ `backups/*.zip` | Code hỏng nặng | `.\restore-from-backup.ps1` → Chọn ZIP → `npm install` |
+## 📋 VÍ DỤ THAM KHẢO (Chi tiết kỹ thuật)
 
-### D. So sánh với Git HEAD
-```bash
-git show HEAD:<file>  # Xem file trên git
-cat plan_temp/<backup>.txt  # So sánh với backup
+> Phần này là **tham khảo** — không cần đọc hết mỗi lần, chỉ tra khi cần.
+
+### A. Backup đúng chuẩn — Format 3 dòng note
 ```
-**Nguyên tắc**: Ưu tiên bản khớp 100% với git HEAD.
+# BACKUP NOTE: [2026-05-03 12:00] - Tình trạng: Ổn định
+# TÌNH TRẠNG: Upload ảnh OK | Form đăng ký OK | Affiliate OK
+# KẾ HOẠCH: Thêm validation mật khẩu vào account-settings
+```
+> Tên file: `plan_temp/{tên_file_gốc}_backup_YYYYMMDD_HHMM.txt`
 
----
+### B. Edit đúng kỹ thuật (tránh "oldString not found")
+```
+❌ SAI: Tự gõ lại oldString, hoặc copy từ terminal output (sai whitespace)
+✅ ĐÚNG: read() file → copy Y NGUYÊN text từ nội dung file → dùng làm oldString
 
-## 3. SỬA CODE (NHANH & AN TOÀN)
+Quy tắc oldString:
+- Chỉ 1–3 dòng, đủ để xác định duy nhất vị trí trong file
+- Phải bao gồm đúng whitespace/indentation gốc
+- Luôn dùng replaceAll: false
+```
 
-### Quy trình 4 bước (Bắt buộc):
-1. **BACKUP** → `read` file → Copy toàn bộ → Lưu `plan_temp/` (3 dòng note)
-2. **SO SÁNH** → Đọc code cũ (ưu tiên: backup → git → file hiện tại)
-3. **EDIT** → `read` lấy oldString (1-3 dòng) → `edit` → `read` lại verify ngay
-4. **TEST** → Kiểm tra → Chờ user xác nhận
-
-**🔴 QUY TẮC VÀNG: KHI NÀO DÙNG `edit` / KHI NÀO DÙNG `write`:**
-- ✅ **Dùng `edit` (oldString 1-3 dòng)**: Chỉ sửa 1-5 dòng, đổi 1 thông số (vd: `pt-2` → `pt-4`)
-- ✅ **Dùng `write` (viết lại toàn bộ)**: Tái cấu trúc file, thay đổi >10 dòng, hoặc `edit` thất bại 2 lần
-- ❌ **SAI LẶM (nguyên nhân lỗi lặp)**: Cố `edit` thay thế 30-70 dòng cùng lúc → Lỗi "oldString not found" → Thử lại → Lặp 5-6 lần → Cuối cùng dùng `write`
-- **Bài học**: Khi cần thay đổi >10 dòng → Dùng `write` từ đầu cho nhanh. Không lặp lại việc `edit` thất bại.
-
-**🔴 QUY TẮC BẮT BƯỢC (TRÁNH MẤT CODE CŨ KHI WRITE):**
-1. **TRƯỚC KHI WRITE**: Đọc TOÀN BỘ code gốc → Lập danh sách TẤT CẢ TÍNH NĂNG đang có (vd: [x] Upload ảnh OK, [x] Select category OK)
-2. **LẬP MỤC TIÊU MỚI**: Danh sách những gì code mới cần đạt được (vd: [ ] Thêm trường MSSV, [ ] Fix lỗi date)
-3. **SAU KHI WRITE**: Kiểm tra lại TOÀN BỘ → Check [x] Tất cả tính năng cũ còn đó + [x] Mục tiêu mới hoàn thành
-4. **THIẾU CODE**: Nếu tính năng nào bị mất → KHÔI PHỤC NGAY từ `plan_temp/` backup (đọc note 3 dòng) → Paste đè file gốc
-5. **BắT BUỘC**: KHÔNG được bỏ qua bước 1 (đọc toàn bộ) và bước 3 (kiểm tra lại). Nếu mất code → Lỗi của agent.
-
-### Kỹ thuật EDIT (Tránh lỗi "oldString not found"):
-- ✅ **ĐÚNG**: `read({ filePath, offset })` → Copy Y NGUYÊN `<content>` (tabs/spaces đúng 100%)
-- ❌ **SAI**: Tự gõ oldString, copy từ terminal (sai whitespace)
-- **oldString NGẮN GỌN**: Chỉ 1-3 dòng, chứa phần cần đổi + đủ để định vị duy nhất
-- **LUÔN DÙNG `replaceAll: false`** → Tránh thay thế nhầm nhiều chỗ
-- **Ví dụ**: Chỉ đổi `pt-2` → `pt-4` thì oldString = `"    pt-2"` (1 dòng)
-
-### Verify sau edit (Bắt buộc):
-- [ ] Đã `read` file trước edit (lấy oldString)
-- [ ] Đã edit với oldString ngắn (1-3 dòng)
-- [ ] Đã `read` lại (cùng offset) để verify
-- [ ] Đã test thủ công + chờ user xác nhận
-
-### Version & An toàn:
-**Nâng cấp version:**
-- **Patch (số cuối)**: Sửa bug nhỏ → `// @version 2.3.1 - Patch: fix bug`
-- **Minor (số giữa)**: Thay đổi logic → `// @version 2.4.0`
-- **Major (số đầu)**: Thêm tính năng → `// @version 3.0.0`
-
-**An toàn (NHẤT!):**
-- ❌ SAI: `if (userId)` → userId=0 là falsy → false
-- ✅ ĐÚNG: `if (userId != null)` → userId=0 → true
-- ❌ SAI: Đổi tên biến tùy tiện → ✅ Giữ nguyên, cần đổi **phải hỏi user**
-- ❌ SAI: Xóa biến khi chưa search → ✅ Dùng grep tìm tất cả nơi dùng
-
----
-
-## 4. TEST & VERIFY
-
-**TEST VÀ XÁC NHẬN** - Mỗi bước xong phải chờ user xác nhận.
-**THAY ĐỔI NHỎ, TEST LIÊN TỤC** - Sửa từng phần nhỏ, test ngay.
-**NGUYÊN TẮC BUILD TEST:**
-- Chỉ `npm run build` khi thay đổi lớn (thêm feature, thay đổi cấu trúc)
-- Sửa nhỏ (fix bug, UI) → KHÔNG cần build, chỉ verify thủ công
-
-**NGUYÊN TẮC DATABASE:**
-1. Dừng server dev → `npx prisma generate` → Start lại server
-2. `npx prisma db push` nếu cần sync schema
-
----
-
-## 5. SHELL COMMANDS (QUAN TRỌNG)
-
-**LUÔN DÙNG LỆNH BASH UNIX** (không dùng PowerShell):
-
-| Tác vụ | ✅ BASH UNIX | ❌ PowerShell |
-|--------|---------------|---------------|
-| Copy file | `cp a.txt b.txt` | `Copy-Item a.txt b.txt` |
-| Tạo thư mục | `mkdir -p dir/` | `New-Item -ItemType Directory dir` |
-| Xóa file | `rm file.txt` | `Remove-Item file.txt` |
-| Xóa thư mục | `rm -rf dir/` | `Remove-Item -Recurse -Force dir/` |
-| Đường dẫn | `C:/Users/ADMIN/Desktop/project` | `C:\Users\ADMIN\Desktop\project` |
-
----
-
-## 6. QUY TẮC CODE
-
-### Next.js 16 Migration
+### C. Next.js 16 — Các lỗi thường gặp
 ```typescript
-// ✅ Route Handler: params phải là Promise
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params
+// ✅ Route Handler params phải await
+export async function GET(req, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params  // KHÔNG được destructure trực tiếp
 }
 
-// ✅ useSearchParams() phải có Suspense boundary
-function PageContent() {
-    const searchParams = useSearchParams()
-    return <div>{searchParams.get('q')}</div>
-}
+// ✅ useSearchParams() phải có Suspense
 export default function Page() {
     return <Suspense fallback={<Loading />}><PageContent /></Suspense>
 }
 
-// ✅ Dùng revalidatePath thay vì revalidateTag
+// ✅ Dùng revalidatePath (KHÔNG dùng revalidateTag)
 import { revalidatePath } from "next/cache"
-revalidatePath('/some-page')
+revalidatePath('/account-settings')
 ```
 
-### TypeScript & React
-- **Strict Mode**: Khai báo explicit types, tránh `any`
-- **Lazy Loading**: Dùng `useRef` thay vì `useState` cho giá trị tạm thời (tránh re-render vô hạn)
-- **Server Actions**: KHÔNG gọi trực tiếp trong client components → Dùng `fetch('/api/...')` thay thế
+### D. Form Data Integrity (React Hook Form + disabled field)
+```tsx
+// ❌ SAI: disabled field không được RHF capture khi submit
+<input disabled {...register("referrerId")} />
 
-### Quy ước đặt tên
-- **Components**: PascalCase (`CourseCard.tsx`, `ShareModal.tsx`)
-- **Hooks**: camelCase với prefix `use` (`useAffiliateCode.ts`)
-- **Actions**: kebab-case (`affiliate-actions.ts`)
-- **Scripts**: camelCase (`import-csv.ts`, `seed-courses.ts`)
-
-### Format & Comments
-- **Import order**: External → Internal → Relative
-- **Comments**: Tiếng Việt, ghi rõ "Sửa cái gì, tác dụng như nào"
-- **ESLint**: Luôn chạy `npm run lint` trước khi commit/build
-
----
-
-## 7. COMMANDS
-
-### Development
-```bash
-npm run dev          # Development server (http://localhost:3000)
-npm run build       # Production build (LUÔN chạy trước khi deploy)
-npm run start       # Production server
-npm run lint        # ESLint check
+// ✅ ĐÚNG: hidden giữ data, disabled chỉ để hiển thị UI
+{isLocked && <input type="hidden" {...register("referrerId")} value={lockedValue} />}
+<input disabled={isLocked} value={isLocked ? lockedValue : undefined}
+       {...(isLocked ? {} : register("referrerId"))} />
 ```
 
-### Database
-```bash
-npx prisma generate     # Generate Prisma client (SAU KHI SỬA SCHEMA)
-npx prisma db push      # Push schema lên database
-npx prisma validate     # Validate schema
+### E. Quy ước đặt tên
+```
+Components  → PascalCase    : CourseCard.tsx, ShareModal.tsx
+Hooks       → camelCase     : useAffiliateCode.ts
+Actions     → kebab-case    : affiliate-actions.ts
+API routes  → kebab-case    : /api/auth/has-password/route.ts
 ```
 
-### Scripts có sẵn
-```bash
-npm run import-csv      # Import CSV data
-npm run seed-courses    # Seed courses
-npm run make-admin      # Make user admin
-npm run import-v3      # Import v3 data
+### G. Cập nhật PLAN.md — Format chuẩn
+````markdown
+## ✅ [Tên thay đổi] ([YYYY-MM-DD])
+
+### Mục tiêu
+Mô tả ngắn gọn vấn đề và mục đích thay đổi.
+
+### Các file đã sửa
+#### `path/to/file.tsx`
+- Vấn đề: ...
+- Fix: ...
+- Code snippet nếu cần (≤ 10 dòng)
+
+### Trạng thái
+- ✅ [Tính năng 1] hoạt động đúng
+- ✅ [Tính năng 2] không bị ảnh hưởng
+````
+> **Lưu ý**: Thêm vào **cuối file PLAN.md**, không xóa lịch sử cũ.
+
+### F. Pre-deploy Checklist
+```
+- [ ] npx prisma generate (sau khi sửa schema)
+- [ ] Tất cả route handlers đã await params
+- [ ] Tất cả useSearchParams() có Suspense wrapper
+- [ ] npm run build không lỗi
+- [ ] Không dùng revalidateTag
 ```
 
 ---
 
-## 8. TESTING
+## 📁 TÀI LIỆU QUAN TRỌNG
 
-### Pre-Deployment Checklist
-- [ ] Chạy `npx prisma generate` sau mỗi lần sửa schema
-- [ ] Test local: `npm run build` trước khi deploy
-- [ ] Kiểm tra tất cả route handlers có `await params` (Next.js 16)
-- [ ] Kiểm tra tất cả `useSearchParams()` được wrap trong Suspense
-- [ ] KHÔNG dùng `revalidateTag` - dùng `revalidatePath` thay thế
-
-### Lưu ý
-- Dự án hiện không có unit test framework
-- Test thủ công qua scripts trong `scripts/`
-- Luôn test với `npm run build` trước khi báo cáo hoàn thành
-
----
-
-## 9. CÁC HỆ THỐNG
-
-### Affiliate System (Đã hoàn thành)
-- Multi-level Points (F1: 10%, F2: 5%, F3: 2%)
-- Wallet & Payout system
-- CTV Dashboard (`/affiliate`), Admin Dashboard (`/admin/affiliate`)
-
-### Landing Page System (Đã hoàn thành)
-- 5 pre-built templates (hero-cta, feature-grid, video-intro, webinar-reg, testimonial)
-- Click tracking, Commission override
-
-### Share Module (Đã hoàn thành)
-- Share button trên course cards, Modal chia sẻ (Facebook, Zalo, Telegram)
-- Affiliate link auto-generation
-
----
-
-## 10. FILE THAM KHẢO
-
-- `PLAN.md` - Lịch sử thay đổi và tài liệu kỹ thuật chi tiết
-- `docs/AFFILIATE_SYSTEM.md` - Tài liệu hệ thống Affiliate
-
----
-
-## 11. CORE CODING PRINCIPLES
-
-### 🚨 QUY TẮC CỐT LÕI KHI XỬ LÝ CODE (CORE CODING PRINCIPLES)
-
-Từ bây giờ, khi phân tích yêu cầu và viết code, bạn BẮT BUỘC phải tuân thủ các nguyên tắc sau để tránh việc suy luận lan man và code chắp vá:
-
-**1. Giải quyết tận gốc rễ (Root Cause), KHÔNG vá lỗi bề mặt:**
-- Khi gặp lỗi UI/Logic, hãy xác định nguyên nhân từ Framework (ví dụ: vòng đời của React, cách React-Hook-Form quản lý state/event).
-- Tuyệt đối không dùng các biện pháp cồng kềnh như chèn hàng loạt event (onKeyDown, onFocus...) hay CSS (pointer-events-none) để ép buộc hành vi.
-
-**2. K.I.S.S (Keep It Simple, Stupid):**
-- Ưu tiên phương án ít dòng code nhất và ít can thiệp vào luồng dữ liệu (data flow) nhất.
-- Không thay đổi cấu trúc component (ví dụ: đổi <input> thành <div>) nếu điều đó làm gãy logic quản lý form của thư viện.
-
-**3. Tôn trọng tính toàn vẹn của Form (Data Integrity):**
-- Khi khóa một trường thông tin (disable/readonly), phải đảm bảo dữ liệu của trường đó vẫn được thư viện (React Hook Form) bắt được khi onSubmit.
-- Mẫu chuẩn: Dùng <input type="hidden"> để submit data + <input disabled> để hiển thị UI.
-
-**4. Trực tiếp và Dứt khoát:**
-- Dừng việc đưa ra các bản nháp mang tính "thử nghiệm". Hãy suy nghĩ kỹ về luồng chạy thực tế, chọn phương án chuẩn xác và tối ưu nhất ngay từ đầu.
-- Nếu phương án A không hoạt động, hãy lùi lại xem xét toàn bộ kiến trúc, KHÔNG đắp thêm code vào phương án A để ép nó chạy.
-
-### 🚨 CORE CODING PRINCIPLES & GUIDELINES (ENGLISH)
-
-From now on, when analyzing requirements and writing code, you MUST strictly adhere to the following principles to avoid over-engineering, over-thinking, and band-aid fixes:
-
-**1. Fix the Root Cause, NO Band-Aid Solutions:**
-- When encountering UI or Logic bugs, identify the root cause within the Framework's architecture.
-- Absolutely do NOT use clunky workarounds like stacking DOM events or CSS hacks to force a behavior.
-
-**2. K.I.S.S (Keep It Simple, Stupid):**
-- Prioritize the solution with the fewest lines of code and the least interference with the existing data flow.
-- Do NOT alter the structural integrity of components if doing so breaks the form library's underlying logic.
-
-**3. Maintain Form & Data Integrity:**
-- When locking a field, ensure that the data is still naturally captured by the library upon onSubmit.
-- Standard Pattern: Use <input type="hidden"> to store data + <input disabled> for UI display.
-
-**4. Be Direct, Decisive, and Stop the "Trial and Error" Loop:**
-- Stop providing experimental drafts. Think through the actual execution flow and choose the most accurate solution.
-- If Plan A does not work, step back and re-evaluate. Do NOT continuously patch Plan A.
-
----
-
-**Ghi chú**: Mỗi phiên làm việc mới, agent sẽ đọc file này trước tiên để áp dụng các quy tắc.
+- `PLAN.md` — Lịch sử thay đổi & kế hoạch kỹ thuật
+- `GEMINI.md` — Hướng dẫn nền tảng cho AI agent
+- `docs/AFFILIATE_SYSTEM.md` — Tài liệu hệ thống Affiliate
+- `plan_temp/` — Backup files (tra cứu khi cần restore)
