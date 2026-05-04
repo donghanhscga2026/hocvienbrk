@@ -51,12 +51,7 @@ nul
 /notebooklm_txt_bundles/
 /code_txt/
 
-# Documentation and history (MD files)
-*.md
-!README.md
-!AGENTS.md # Không ignore file cấu hình agent
-!chrome-extension-tca/ExtensionTCA.md
-# File tài liệu Extension TCA
+
 
 
 

@@ -184,17 +184,24 @@ const toggleFullScreen = () => {
         return () => { if (docTimerRef.current) clearInterval(docTimerRef.current) }
     }, [currentIndex, currentItem?.type])
 
+    const videoContainerRef = useRef<HTMLDivElement>(null)
+
     useEffect(() => {
         if (!isMounted || currentItem?.type !== 'video' || !currentItem?.id) return
+        
+        let player: any = null
+
         const initPlayer = () => {
-            if (playerRef.current) playerRef.current.destroy()
+            if (!videoContainerRef.current) return
             
             const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
             // [FIX] Luôn bắt đầu từ mốc đã lưu (nếu đã xong thì đứng ở cuối)
             const startTime = Math.floor(stored.maxTime)
             
-            playerRef.current = new (window as any).YT.Player(`multimedia-player`, {
+            player = new (window as any).YT.Player(videoContainerRef.current, {
                 videoId: currentItem.id,
+                height: '100%',
+                width: '100%',
                 playerVars: { 
                     autoplay: 1, 
                     modestbranding: 1, 
@@ -205,26 +212,55 @@ const toggleFullScreen = () => {
                 },
                 events: {
                     onStateChange: (e: any) => {
-                        const YT = (window as any).YT.PlayerState
-                        if (e.data === YT.PLAYING) {
+                        const YTState = (window as any).YT.PlayerState
+                        if (e.data === YTState.PLAYING) {
                             if (!saveIntervalRef.current) saveIntervalRef.current = setInterval(trackVideoProgress, 5000)
                         } else {
                             if (saveIntervalRef.current) { clearInterval(saveIntervalRef.current); saveIntervalRef.current = null; }
                         }
-                        if (e.data === YT.ENDED) {
-                            const dur = playerRef.current.getDuration()
+                        if (e.data === YTState.ENDED) {
+                            const dur = player.getDuration()
                             saveProgress(currentIndex, dur, dur)
                         }
                     }
                 }
             })
+            playerRef.current = player
         }
-        if ((window as any).YT?.Player) initPlayer()
-        else {
-            const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag)
-            ;(window as any).onYouTubeIframeAPIReady = initPlayer
+
+        if ((window as any).YT && (window as any).YT.Player) {
+            initPlayer()
+        } else {
+            if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+                const tag = document.createElement('script')
+                tag.src = 'https://www.youtube.com/iframe_api'
+                document.head.appendChild(tag)
+                
+                const originalCallback = (window as any).onYouTubeIframeAPIReady
+                ;(window as any).onYouTubeIframeAPIReady = () => {
+                    if (originalCallback) originalCallback()
+                    initPlayer()
+                }
+            } else {
+                // Script đang tải dở
+                const originalCallback = (window as any).onYouTubeIframeAPIReady
+                ;(window as any).onYouTubeIframeAPIReady = () => {
+                    if (originalCallback) originalCallback()
+                    initPlayer()
+                }
+            }
         }
-        return () => { if (saveIntervalRef.current) clearInterval(saveIntervalRef.current); if (playerRef.current?.destroy) playerRef.current.destroy() }
+        
+        return () => { 
+            if (saveIntervalRef.current) {
+                clearInterval(saveIntervalRef.current)
+                saveIntervalRef.current = null
+            }
+            if (player && typeof player.destroy === 'function') {
+                player.destroy()
+            }
+            playerRef.current = null
+        }
     }, [currentIndex, isMounted, currentItem?.type, currentItem?.id])
 
     const handleNext = () => setCurrentVideoIndex((prev) => (prev + 1) % playlist.length)
@@ -249,8 +285,12 @@ const toggleFullScreen = () => {
                 isFullscreen ? "fixed inset-0 z-[9999] flex flex-col" : "w-full aspect-video"
             )}>
                 {currentItem?.type === 'video' ? (
-                    <div className="relative w-full flex-1 group">
-                        <div id="multimedia-player" className="absolute inset-0 w-full h-full" />
+                    <div className="relative w-full h-full flex-1 group">
+                        {/* THE BỌC AN TOÀN CHO REACT QUẢN LÝ */}
+                        <div key={currentIndex} className="absolute inset-0 w-full h-full">
+                            {/* THE ĐÍCH ĐỂ YOUTUBE API REPLACE (SẼ BIẾN THÀNH IFRAME) */}
+                            <div ref={videoContainerRef} />
+                        </div>
                         
                         {/* THE MỘT LỚP PHỦ TRANSPARENT CHẶN CLICK VÀO TITLE VÀ NÚT SHARE Ở TOP */}
                         {courseType === 'LIB' && (

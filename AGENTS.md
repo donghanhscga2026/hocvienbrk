@@ -12,12 +12,13 @@
 - Không bao giờ đoán nội dung file — phải đọc thực tế
 - Hiểu rõ code đang làm gì trước khi thay đổi
 
-### 2. BACKUP TRƯỚC — SỬA SAU
-> Mọi thay đổi đều phải có điểm quay lại an toàn.
+### 2. BACKUP TRƯỚC — SỬA SAU (CHỈ THỰC HIỆN KHI ĐÃ ĐƯỢC PHÊ DUYỆT PLAN)
+> Mọi thay đổi đều phải có điểm quay lại an toàn, nhưng không tạo file rác.
 
-- Copy file gốc vào `plan_temp/{tên_file}_backup_YYYYMMDD_HHMM.txt` **trước khi sửa**
-- Ghi đúng **3 dòng note** theo format chuẩn (xem Ví dụ A)
-- Chỉ giữ **1 bản backup mới nhất** cho mỗi file (xóa bản cũ hơn)
+- Chỉ tạo backup **SAU KHI** user đã đồng ý với đề xuất sửa code, và **NGAY TRƯỚC KHI** thực hiện lệnh `edit`/`write`.
+- Tên file: `plan_temp/{tên_file_gốc}.backup.{ext}` (ví dụ: `plan_temp/CourseCard.backup.tsx`). 
+- **Tuyệt đối không ghi bất kỳ comment/note nào** vào trong file backup để đảm bảo khi copy/paste khôi phục không bị lỗi cú pháp.
+- Chỉ giữ 1 bản backup mới nhất cho mỗi file (ghi đè file backup cũ).
 
 ### 3. CHỌN ĐÚNG PHƯƠNG PHÁP SỬA
 > Quy tắc **dứt khoát** — không mơ hồ, không thử sai nhiều lần.
@@ -33,9 +34,10 @@
 > ❌ **Cấm**: Cố `edit` 30–70 dòng, thất bại, thử lại nhiều lần → lãng phí thời gian.  
 > ✅ **Đúng**: Xác định loại thay đổi từ đầu. Nếu > 10 dòng → `write` luôn.
 
-**Khi `write`: bắt buộc bảo tồn tính năng cũ:**
-1. Liệt kê checklist tất cả tính năng hiện có trước khi write
-2. Sau khi write: đối chiếu checklist, tính năng nào mất → khôi phục từ backup ngay
+**Khi `write`: Bắt buộc bảo tồn cấu trúc cũ:**
+- Giữ nguyên toàn bộ khối `import`, các `hooks` không liên quan, và các hàm tiện ích trong file.
+- Không tự ý xóa các state hoặc props đang tồn tại trừ khi user yêu cầu đích danh.
+- Đảm bảo trả lại nguyên vẹn những phần code nằm ngoài scope của vấn đề đang xử lý.
 
 ### 4. GIẢI QUYẾT GỐC RỄ — KHÔNG VÁ LỖI BỀ MẶT
 > Fix nguyên nhân thật, không patch triệu chứng.
@@ -51,10 +53,10 @@
 - Không thêm abstraction/boilerplate khi không cần thiết
 - Không thay đổi cấu trúc component nếu chỉ cần sửa logic
 
-### 6. CẬP NHẬT TÀI LIỆU — BẮT BUỘC SAU MỖI THAY ĐỔI ĐƯỢC XÁC NHẬN
+### 6. CẬP NHẬT TÀI LIỆU — BẮT BUỘC SAU MỖI THAY ĐỔI ĐƯỢC XÁC NHẬN CHẠY TỐT
 > Tài liệu là bộ nhớ dài hạn của dự án. Không cập nhật = thông tin thất lạc.
 
-**Ngay sau khi user xác nhận thay đổi hoạt động tốt, PHẢI cập nhật:**
+**Chỉ được cập nhật tài liệu SAU KHI user đã test và xác nhận code hoạt động tốt:**
 
 | Tài liệu | Cập nhật khi nào | Nội dung |
 |---|---|---|
@@ -64,7 +66,6 @@
 **Quy tắc cụ thể:**
 - `PLAN.md` là lịch sử **tổng hợp toàn dự án** — luôn có, không phụ thuộc vào docs/
 - `docs/{feature}.md` là đặc tả **chi tiết một tính năng** — bổ sung thêm, không thay thế PLAN.md
-- Cập nhật **ngay sau khi xác nhận**, không chờ cuối phiên
 - Nếu quên → đó là **lỗi của agent**, phải cập nhật bù trước khi làm việc khác
 
 ### 7. PHÂN TÍCH DỰA TRÊN DỮ LIỆU THẬT — KHÔNG SUY ĐOÁN
@@ -80,7 +81,7 @@
 - ❌ Giả sử biến/hàm/state tồn tại mà không đọc file confirm
 - ❌ Copy-paste pattern từ nơi khác mà không đối chiếu với code hiện tại
 
-### 8. HỎi XÁC NHẬN TRƯỚC KHI SỬa — KHÔNG CÓ NGOẠI LỆ
+### 8. HỎI XÁC NHẬN TRƯỚC KHI SỬA — KHÔNG CÓ NGOẠI LỆ
 > Không bao giờ tự ý sửa file code mà không được user xác nhận rõ ràng.
 
 **BẮT BUỘC trước mọi thay đổi file:**
@@ -94,39 +95,27 @@
 
 ---
 
-## 🟡 QUY TRÌNH LÀM VIỆC — PHÂN LOẠI THEO ĐỘ PHỨC TẠP
+## 🟡 QUY TRÌNH LÀM VIỆC (MANDATORY)
 
-> **Quan trọng**: Không áp dụng đồng đều 6 bước cho mọi thay đổi. Phân loại trước.
+> Áp dụng chung cho mọi thay đổi (đơn giản hay phức tạp).
 
-### Thay đổi ĐƠN GIẢN (sửa 1 file, ≤ 10 dòng)
-```
-1. READ       → Đọc file liên quan, lấy oldString chính xác
-2. BACKUP     → Lưu plan_temp/
-3. PROPOSE    → Trình bày rõ kế hoạch sửa → CHờ USER XÁC NHẬN
-4. EDIT       → Thực hiện surgical edit (sau khi được xác nhận)
-5. VERIFY     → Read lại file để confirm thay đổi đúng
-6. UPDATE DOC → Cập nhật PLAN.md sau khi user xác nhận OK
-```
-
-### Thay đổi PHỨC TẠP (nhiều file, cấu trúc lớn, tính năng mới)
-```
-1. READ       → Đọc tất cả file liên quan (không bỏ sót)
-2. ANALYZE    → Phân tích dựa trên code thực tế, không suy đoán
-3. BACKUP     → Lưu plan_temp/ cho từng file sẽ sửa
-4. PLAN       → Trình bày kế hoạch chi tiết
-5. CONFIRM    → CHờ USER XÁC NHẬN — không sửa nếu chưa được đồng ý
-6. EDIT       → Thực hiện từng file một
-7. VERIFY     → Read lại, kiểm tra output
-8. UPDATE DOC → Cập nhật PLAN.md + docs/{feature}.md nếu có
-```
+1. **READ & ANALYZE:** Đọc các file code thực tế liên quan. Tuyệt đối không suy đoán.
+2. **PLAN:** Trình bày rõ kế hoạch sửa (sửa file nào, ở đâu, thay bằng gì).
+3. **CONFIRM:** Dừng lại. Chờ User xác nhận đồng ý (OK, tiếp tục).
+4. **BACKUP:** Lưu bản sao của file sẽ sửa vào `plan_temp/`.
+5. **EDIT/WRITE:** Thực hiện thay đổi code.
+6. **VERIFY:** Đọc lại file (bằng lệnh read) để chắc chắn code đã lưu đúng chuẩn. 
+7. **TEST & WAIT:** Báo cáo đã sửa xong và chờ User chạy test thực tế trên môi trường dev.
+8. **UPDATE DOC:** Chỉ ghi vào `PLAN.md` (và `docs/` nếu có) **SAU KHI** User phản hồi tính năng đã hoạt động tốt không có lỗi.
 
 ### 9. KHÔI PHỤC — THỨ TỰ ƯU TIÊN & BẮT BUỘC HỎI TRƯỚC
 > Tuyệt đối **KHÔNG ĐƯỢC TỰ ĐỘNG** thực hiện bất cứ bước khôi phục nào nếu chưa báo cáo và được user xác nhận đồng ý.
 
 Khi cần khôi phục code, phải tuân thủ nghiêm ngặt thứ tự ưu tiên sau:
-1. **Ưu tiên 1 (File backup lẻ)**: Đọc file trong `plan_temp/` → Copy nội dung → Paste đè file gốc.
+1. **Ưu tiên 1 (File backup lẻ)**: Đọc file backup trong `plan_temp/` → Copy nội dung → Paste đè file gốc.
 2. **Ưu tiên 2 (Git repository)**: Sử dụng lệnh `git checkout -- <file>` hoặc `git reset` để lấy lại bản commit gần nhất.
 3. **Ưu tiên 3 (Zip backup toàn bộ)**: Chạy script `.\restore-from-backup.ps1` → Chọn ZIP → `npm install` (Chỉ dùng khi hỏng nặng toàn dự án).
+
 ---
 
 ## 🟡 AN TOÀN CODE
@@ -186,15 +175,7 @@ git show HEAD:<file>  # Xem file trên git HEAD
 
 > Phần này là **tham khảo** — không cần đọc hết mỗi lần, chỉ tra khi cần.
 
-### A. Backup đúng chuẩn — Format 3 dòng note
-```
-# BACKUP NOTE: [2026-05-03 12:00] - Tình trạng: Ổn định
-# TÌNH TRẠNG: Upload ảnh OK | Form đăng ký OK | Affiliate OK
-# KẾ HOẠCH: Thêm validation mật khẩu vào account-settings
-```
-> Tên file: `plan_temp/{tên_file_gốc}_backup_YYYYMMDD_HHMM.txt`
-
-### B. Edit đúng kỹ thuật (tránh "oldString not found")
+### A. Edit đúng kỹ thuật (tránh "oldString not found")
 ```
 ❌ SAI: Tự gõ lại oldString, hoặc copy từ terminal output (sai whitespace)
 ✅ ĐÚNG: read() file → copy Y NGUYÊN text từ nội dung file → dùng làm oldString
@@ -205,7 +186,7 @@ Quy tắc oldString:
 - Luôn dùng replaceAll: false
 ```
 
-### C. Next.js 16 — Các lỗi thường gặp
+### B. Next.js 16 — Các lỗi thường gặp
 ```typescript
 // ✅ Route Handler params phải await
 export async function GET(req, { params }: { params: Promise<{ id: string }> }) {
@@ -222,7 +203,7 @@ import { revalidatePath } from "next/cache"
 revalidatePath('/account-settings')
 ```
 
-### D. Form Data Integrity (React Hook Form + disabled field)
+### C. Form Data Integrity (React Hook Form + disabled field)
 ```tsx
 // ❌ SAI: disabled field không được RHF capture khi submit
 <input disabled {...register("referrerId")} />
@@ -233,7 +214,7 @@ revalidatePath('/account-settings')
        {...(isLocked ? {} : register("referrerId"))} />
 ```
 
-### E. Quy ước đặt tên
+### D. Quy ước đặt tên
 ```
 Components  → PascalCase    : CourseCard.tsx, ShareModal.tsx
 Hooks       → camelCase     : useAffiliateCode.ts
@@ -241,7 +222,7 @@ Actions     → kebab-case    : affiliate-actions.ts
 API routes  → kebab-case    : /api/auth/has-password/route.ts
 ```
 
-### G. Cập nhật PLAN.md — Format chuẩn
+### E. Cập nhật PLAN.md — Format chuẩn
 ````markdown
 ## ✅ [Tên thay đổi] ([YYYY-MM-DD])
 
@@ -277,3 +258,4 @@ Mô tả ngắn gọn vấn đề và mục đích thay đổi.
 - `GEMINI.md` — Hướng dẫn nền tảng cho AI agent
 - `docs/AFFILIATE_SYSTEM.md` — Tài liệu hệ thống Affiliate
 - `plan_temp/` — Backup files (tra cứu khi cần restore)
+```
