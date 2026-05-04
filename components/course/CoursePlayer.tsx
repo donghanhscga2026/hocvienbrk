@@ -236,7 +236,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
                 {statusMsg && (
                     <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${statusMsg.type === 'loading' ? 'bg-brk-accent text-brk-on-surface' :
-                            statusMsg.type === 'success' ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'
+                        statusMsg.type === 'success' ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'
                         }`}>
                         {statusMsg.type === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
                         {statusMsg.text}
@@ -304,7 +304,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
                                 {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
                                 {currentLesson?.type === 'ALL' ? (
-                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed transition-all italic">Hãy xem các phần trong danh sách bài học</div>
+                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
                                 ) : currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
                                     <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
                                 )}
