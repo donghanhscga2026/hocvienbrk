@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-    ArrowLeft, ListVideo, FileText, X, ClipboardCheck, 
-    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw 
+import {
+    ArrowLeft, ListVideo, FileText, X, ClipboardCheck,
+    Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -66,7 +66,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     // [HYDRATION FIX] Đảm bảo component đã mount trên client mới thực hiện các tính toán logic và render giao diện chính
     useEffect(() => {
         setIsMounted(true)
-        
+
         // Chỉ tìm bài học cũ khi đã ở client
         if (enrollment.lastLessonId) {
             setCurrentLessonId(enrollment.lastLessonId)
@@ -110,7 +110,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             const currentTab = mobileTab
             if (currentTab !== prevTab) {
                 if (prevTab === 'record' && currentTab === 'content' && assignmentFormRef.current && !isSubmittingRef.current) {
-                    await assignmentFormRef.current().catch(() => {})
+                    await assignmentFormRef.current().catch(() => { })
                 }
             }
             prevMobileTabRef.current = mobileTab
@@ -120,9 +120,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const handleLessonSelect = async (lessonId: string) => {
         if (isSubmittingRef.current) return
-        
+
         if (assignmentFormRef.current) {
-            await assignmentFormRef.current().catch(() => {})
+            await assignmentFormRef.current().catch(() => { })
         }
 
         if (currentLessonId && videoProgressRef.current) {
@@ -131,14 +131,14 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 lessonId: currentLessonId,
                 maxTime: videoProgressRef.current.maxTime,
                 duration: videoProgressRef.current.duration
-            }).catch(() => {})
+            }).catch(() => { })
         }
 
         setCurrentLessonId(lessonId)
         setVideoPercent(0)
         setMobileTab('content')
         setShowContentModal(false)
-        updateLastLessonAction(enrollment.id, lessonId).catch(() => {})
+        updateLastLessonAction(enrollment.id, lessonId).catch(() => { })
     }
 
     const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
@@ -146,11 +146,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const pct = Math.min(100, Math.round((maxTime / duration) * 100))
         setVideoPercent(pct)
         videoProgressRef.current = { maxTime, duration }
-        
+
         const threshold = Math.floor(pct / 10) * 10
         if ((threshold > lastSavedPercentRef.current || pct === 100) && threshold <= 100) {
             lastSavedPercentRef.current = threshold
-            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => {})
+            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => { })
         }
     }, [currentLessonId, enrollment.id])
 
@@ -159,11 +159,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
         isSubmittingRef.current = true
         notify(isUpdate ? 'Đang cập nhật bài học...' : 'Đang chấm điểm...', 'loading')
-        
+
         try {
             const currentProg = progressMap[currentLessonId!]
             const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
-            
+
             const result = await submitAssignmentAction({
                 enrollmentId: enrollment.id,
                 lessonId: currentLessonId!,
@@ -176,7 +176,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 existingVideoScore: currentProg?.scores?.video,
                 existingTimingScore: currentProg?.scores?.timing
             })
-            
+
             if (!(result as any)?.success) {
                 notify((result as any)?.message || 'Lỗi xử lý dữ liệu!', 'error')
                 return
@@ -184,7 +184,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
             const res = result as any
             notify(res.totalScore >= 5 ? `✅ Hoàn thành! Điểm: ${res.totalScore}/10` : `📊 Đã ghi nhận: ${res.totalScore}/10đ`, 'success')
-            
+
             const updatedProgress = {
                 ...(progressMap[currentLessonId!] || {}),
                 assignment: { reflection: data.reflection, links: data.links, supports: data.supports },
@@ -210,7 +210,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
-    
+
     const initialPercent = !currentLesson?.videoUrl ? 100 : (
         currentProgress?.duration ? (currentProgress.maxTime / currentProgress.duration) * 100 : 0
     )
@@ -233,12 +233,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </button>
                     <h1 className="font-bold text-brk-on-surface truncate text-sm sm:text-base">{course.name_lop}</h1>
                 </div>
-                
+
                 {statusMsg && (
-                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${
-                        statusMsg.type === 'loading' ? 'bg-brk-accent text-brk-on-surface' :
-                        statusMsg.type === 'success' ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'
-                    }`}>
+                    <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${statusMsg.type === 'loading' ? 'bg-brk-accent text-brk-on-surface' :
+                            statusMsg.type === 'success' ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'
+                        }`}>
                         {statusMsg.type === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
                         {statusMsg.text}
                     </div>
@@ -289,9 +288,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                                 courseType={course.type}
+                                lessonType={currentLesson?.type}
                                 serverPlaylist={
-                                    currentLesson?.type === 'TEXT' 
-                                        ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }] 
+                                    currentLesson?.type === 'TEXT'
+                                        ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }]
                                         : undefined
                                 }
                             />
@@ -303,9 +303,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             <div className="shrink-0">
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
                                 {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
-                                 {currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
-                                     <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
-                                  )}
+                                {currentLesson?.type === 'ALL' ? (
+                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed transition-all italic">Hãy xem các phần trong danh sách bài học</div>
+                                ) : currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
+                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
+                                )}
                             </div>
                             <div className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden">
                                 <ChatSection lessonId={currentLessonId!} session={session} />
@@ -334,8 +336,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     <div className="flex-1 flex flex-col min-h-0">
                                         <div className="px-4 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
                                             <p className="text-base font-bold text-white leading-tight">{currentLesson?.title}</p>
-                                            {currentLesson?.type !== 'TEXT' && (
-                                            <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung →</button>
+                                            {currentLesson?.type !== 'TEXT' && currentLesson?.type !== 'ALL' && (
+                                                <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung &rarr;</button>
+                                            )}
+                                            {currentLesson?.type === 'ALL' && (
+                                                <p className="text-xs text-zinc-400 mt-2 italic">H&atilde;y xem c&aacute;c ph&acirc;̀n trong playlist b&agrave;i h&ocirc;̣c.</p>
                                             )}
                                         </div>
                                         <div className="flex-1 min-h-0">
@@ -438,9 +443,9 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
     const [saving, setSaving] = useState(false)
 
     // Lọc progress chỉ hiển thị các bài học không bị reset
-    const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => { 
-        if (p.status !== 'RESET') acc[id] = p; 
-        return acc 
+    const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => {
+        if (p.status !== 'RESET') acc[id] = p;
+        return acc
     }, {})
 
     const handleReset = async () => {
@@ -472,7 +477,7 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                             </p>
                         </div>
                     </div>
-                    <button 
+                    <button
                         onClick={() => setShowDatePicker(!showDatePicker)}
                         className="flex items-center gap-1 text-[11px] text-orange-400 border border-orange-500/30 rounded-lg px-2.5 py-1 font-bold active:scale-95 transition-all"
                     >
@@ -483,22 +488,22 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                 {showDatePicker && (
                     <div className="bg-zinc-800 rounded-xl p-3 space-y-2.5 border border-zinc-700 shadow-xl">
                         <p className="text-[10px] text-zinc-400 font-medium">Chọn ngày mới cho lộ trình:</p>
-                        <input 
-                            type="date" 
-                            value={dateInput} 
-                            onChange={e => setDateInput(e.target.value)} 
-                            className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500" 
+                        <input
+                            type="date"
+                            value={dateInput}
+                            onChange={e => setDateInput(e.target.value)}
+                            className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                         <div className="flex gap-2">
-                            <button 
-                                onClick={handleReset} 
-                                disabled={!dateInput || saving} 
+                            <button
+                                onClick={handleReset}
+                                disabled={!dateInput || saving}
                                 className="flex-1 text-xs font-black bg-orange-500 text-white rounded-lg py-2 disabled:opacity-50"
                             >
                                 {saving ? 'Đang lưu...' : 'XÁC NHẬN'}
                             </button>
-                            <button 
-                                onClick={() => setShowDatePicker(false)} 
+                            <button
+                                onClick={() => setShowDatePicker(false)}
                                 className="flex-1 text-xs font-bold text-zinc-400 border border-zinc-700 rounded-lg py-2"
                             >
                                 HỦY
@@ -521,15 +526,15 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                 {lessons.map((lesson: any) => {
                     const prog = filteredProgress[lesson.id]
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = courseType === 'LIB' || lesson.order === 1 || (filteredProgress[lessons.find((l:any)=>l.order===lesson.order-1)?.id]?.status === 'COMPLETED')
+                    const unlocked = courseType === 'LIB' || lesson.order === 1 || (filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]?.status === 'COMPLETED')
                     return (
                         <button
                             key={lesson.id}
                             onClick={() => unlocked && onLessonSelect(lesson.id)}
                             className={cn(
-                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b transition-all active:bg-brk-background', 
+                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b transition-all active:bg-brk-background',
                                 'border-brk-outline/50',
-                                isActive && 'bg-brk-background border-l-4 border-l-brk-accent', 
+                                isActive && 'bg-brk-background border-l-4 border-l-brk-accent',
                                 !unlocked && 'opacity-40 grayscale'
                             )}
                         >

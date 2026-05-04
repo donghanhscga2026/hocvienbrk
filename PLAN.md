@@ -511,3 +511,35 @@ Giảm thiểu code đồ sộ và chặn re-render toàn màn hình bằng các
 - ✅ Lỗi mất hình YouTube Video đã được khắc phục hoàn toàn.
 - ✅ Bài giảng TEXT hiển thị tập trung, đẹp mắt, giao diện tối giản.
 
+
+## ✅ [Bổ sung loại bài học ALL] ([2026-05-04])
+
+### Mục tiêu
+Bổ sung loại bài học \ALL\ vào hệ thống để kết hợp hiển thị Nội dung dạng văn bản (TEXT) và Chuỗi Video/Tài liệu (PLAYLIST) trong cùng một giao diện Player 16:9 duy nhất, đem lại trải nghiệm học tập liền mạch.
+
+### Các file đã sửa
+
+#### \prisma/schema.prisma\
+- Vấn đề: Cần thêm \ALL\ vào schema hiện tại.
+- Fix: Bổ sung giá trị \ALL\ vào \enum LessonType\, chạy lệnh đồng bộ \
+px prisma db push\ và \
+px prisma generate\.
+
+#### \components/course/VideoPlayer.tsx\
+- Vấn đề: Logic trước đây chỉ lấy playlist từ \ideoUrl\ và bỏ qua \content\ nếu là video.
+- Fix:
+  - Bổ sung \lessonType\ vào Props.
+  - Sửa hàm \useMemo\ tính \playlist\: Nếu \lessonType === 'ALL'\, tự động chèn \content\ vào vị trí đầu tiên của mảng \playlist\.
+  - Tích hợp hàm \makeLinksClickable\ vào trong VideoPlayer để hiển thị đúng định dạng các đường link trong khung 16:9.
+
+#### \components/course/CoursePlayer.tsx\
+- Vấn đề: Khung mô tả (phía dưới trên Desktop và trong Modal trên Mobile) bị thừa nội dung \content\ khi học viên xem dạng \ALL\.
+- Fix:
+  - Truyền \lessonType={currentLesson?.type}\ vào \VideoPlayer\.
+  - Ẩn hiển thị text mặc định, thay bằng thông báo in nghiêng *"Hãy xem các phần trong playlist bài học."* (Áp dụng cho cả bản Desktop và nút "Xem chi tiết nội dung" ở Mobile).
+
+### Trạng thái
+- ✅ Tính năng LessonType \ALL\ hoạt động đúng.
+- ✅ Type Check (\
+px tsc --noEmit\) không báo lỗi.
+- ✅ Các loại bài học \VIDEO\, \TEXT\, \DOCS\ cũ không bị ảnh hưởng.

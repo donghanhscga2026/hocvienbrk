@@ -18,8 +18,9 @@ interface VideoPlayerProps {
     onPercentChange: (percent: number) => void
     playlistData?: any 
     lastVideoIndex?: number 
-    serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client - now includes TEXT type
+    serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client
     courseType?: string
+    lessonType?: string
 }
 
 type PlaylistItem = {
@@ -52,25 +53,39 @@ export default function VideoPlayer({
     playlistData,
     lastVideoIndex = 0,
     serverPlaylist, // [OPTIMIZE] Ưu tiên playlist từ Server, chỉ parse client nếu không có
-    courseType
+    courseType,
+    lessonType
 }: VideoPlayerProps) {
+    // Chuyển URL thành link clickable
+    const makeLinksClickable = (text: string): string => {
+        if (!text) return ''
+        const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
+        return text.replace(urlRegex, (match) => {
+            return `<a href="${match}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:700">${match}</a>`
+        })
+    }
     // [OPTIMIZE] Dùng trực tiếp serverPlaylist từ Server (đã đúng format)
     const playlist = useMemo(() => {
+        let basePlaylist: PlaylistItem[] = []
         if (serverPlaylist && serverPlaylist.length > 0) {
-            // ✅ Server đã parse đúng: type = 'text' | 'doc' | 'video'
-            // ✅ Có content (cho TEXT) và url (cho VIDEO/DOCS)
-            return serverPlaylist
+            basePlaylist = serverPlaylist
+        } else if (videoUrl) {
+            basePlaylist = videoUrl.split('|').map((item, index) => {
+                const videoMatch = item.match(/^\[(.*?)\](.*)$/)
+                if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
+                const docMatch = item.match(/^\((.*?)\)(.*)$/)
+                if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
+                return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
+            })
         }
-        // Fallback: Parse từ videoUrl (backward compatible)
-        if (!videoUrl) return []
-        return videoUrl.split('|').map((item, index) => {
-            const videoMatch = item.match(/^\[(.*?)\](.*)$/)
-            if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
-            const docMatch = item.match(/^\((.*?)\)(.*)$/)
-            if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
-            return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
-        })
-    }, [videoUrl, serverPlaylist])
+        if (lessonType === 'ALL' && lessonContent) {
+            return [
+                { type: 'text' as const, title: 'Nội dung bài học', url: '', content: lessonContent },
+                ...basePlaylist
+            ]
+        }
+        return basePlaylist
+    }, [videoUrl, serverPlaylist, lessonType, lessonContent])
 const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
 const [showPlaylist, setShowPlaylist] = useState(false)
 const [isMounted, setIsMounted] = useState(false)
@@ -303,8 +318,7 @@ const toggleFullScreen = () => {
                     </div>
                     ) : (currentItem?.type === 'text') ? (
                     <div className="absolute inset-0 bg-white overflow-y-auto p-6">
-                        {/* [FIX] TEXT hiển thị trong khung 16:9, scroll nếu dài */}
-                        <div className="text-gray-900 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: (currentItem.content || lessonContent || '').replace(/\n/g, '<br>') }} />
+                        <div className="text-gray-900 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: makeLinksClickable((currentItem.content || lessonContent || '').replace(/\n/g, '<br>')) }} />
                     </div>
                 ) : (
                     <div className="w-full h-full bg-white relative flex flex-col">
@@ -319,12 +333,12 @@ const toggleFullScreen = () => {
 
                 {/* PLAYLIST POPUP */}
                 {showPlaylist && (
-                    <div className="absolute inset-0 bg-brk-surface/95 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
-                        <div className="flex items-center justify-between p-5 border-b border-brk-outline shrink-0">
-                            <h3 className="text-brk-on-surface font-black text-base flex items-center gap-3">
-                                <List className="w-5 h-5 text-brk-accent" /> DANH SÁCH HỌC ({playlist.length})
+                    <div className="absolute inset-0 bg-zinc-900 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
+                        <div className="flex items-center justify-between p-5 border-b border-zinc-700 shrink-0">
+                            <h3 className="text-white font-black text-base flex items-center gap-3">
+                                <List className="w-5 h-5 text-orange-400" /> DANH SÁCH HỌC ({playlist.length})
                             </h3>
-                            <button onClick={() => setShowPlaylist(false)} className="p-2 bg-brk-background rounded-full text-brk-muted hover:text-brk-on-surface transition-all"><X className="w-5 h-5" /></button>
+                            <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"><X className="w-5 h-5" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[66vh] custom-scrollbar">
                             {playlist.map((item, idx) => {
@@ -332,16 +346,16 @@ const toggleFullScreen = () => {
                                 const prog = granularProgress[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
                                 const pct = prog.duration > 0 ? Math.round((prog.maxTime / prog.duration) * 100) : 0
                                 return (
-                                    <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false); }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-brk-accent-10 border-brk-accent shadow-lg' : 'bg-brk-background border-brk-outline hover:bg-brk-background'}`}>
-                                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-background text-brk-muted'}`}>{item.type === 'video' ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}</div>
+                                    <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false); }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-orange-500/20 border-orange-400 shadow-lg' : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'}`}>
+                                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-zinc-700 text-zinc-300'}`}>{item.type === 'video' ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}</div>
                                         <div className="flex-1 text-left min-w-0">
-                                            <p className={`text-xs font-bold truncate ${isCurrent ? 'text-brk-on-primary' : 'text-brk-muted'}`}>{item.title}</p>
+                                            <p className={`text-xs font-bold truncate ${isCurrent ? 'text-orange-300' : 'text-zinc-200'}`}>{item.title}</p>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex-1 h-1 bg-brk-background rounded-full overflow-hidden"><div className={`h-full transition-all duration-1000 ${pct >= 100 ? 'bg-brk-accent' : 'bg-brk-accent'}`} style={{ width: `${pct}%` }} /></div>
-                                                <span className="text-[9px] text-brk-muted font-bold">{pct}%</span>
+                                                <div className="flex-1 h-1 bg-zinc-700 rounded-full overflow-hidden"><div className="h-full transition-all duration-1000 bg-orange-500" style={{ width: `${pct}%` }} /></div>
+                                                <span className="text-[9px] text-zinc-400 font-bold">{pct}%</span>
                                             </div>
                                         </div>
-                                        {pct >= 95 && <CheckCircle2 className="w-4 h-4 text-brk-accent shrink-0" />}
+                                        {pct >= 95 && <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />}
                                     </button>
                                 )
                             })}
@@ -351,12 +365,12 @@ const toggleFullScreen = () => {
             </div>
 
             {/* ── 2. EXTERNAL CONTROL BAR ──────────────────────────────── */}
-            <div className="bg-brk-background border-t border-brk-outline px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
+            <div className="bg-zinc-900 border-t border-zinc-700 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
                 {/* Playlist Toggle */}
                 <div className="flex items-center gap-2 shrink-0">
                     <button 
                         onClick={() => setShowPlaylist(!showPlaylist)}
-                        className="flex items-center gap-2 px-2.5 py-1.5 bg-brk-background hover:bg-brk-surface text-brk-muted hover:text-brk-on-surface rounded-lg transition-all border border-brk-outline shadow-sm"
+                        className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-lg transition-all border border-zinc-600 shadow-sm"
                     >
                         <List className="w-4 h-4 text-brk-accent" />
                         <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Lộ trình ({currentIndex + 1}/{playlist.length})</span>
@@ -366,32 +380,32 @@ const toggleFullScreen = () => {
                 {/* Info & Type Icon */}
                 <div className="flex-1 flex flex-col items-center min-w-0 px-1">
                     <div className="flex items-center gap-1.5 max-w-full">
-                        {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-brk-muted shrink-0" /> : <FileText className="w-3 h-3 text-brk-muted shrink-0" />}
-                        <p className="text-[10px] sm:text-[11px] font-black text-brk-accent truncate tracking-tight uppercase">{currentItem?.title}</p>
+                        {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-zinc-400 shrink-0" /> : <FileText className="w-3 h-3 text-zinc-400 shrink-0" />}
+                        <p className="text-[10px] sm:text-[11px] font-black text-orange-400 truncate tracking-tight uppercase">{currentItem?.title}</p>
                     </div>
                     
                     <div className="flex items-center gap-1.5 mt-0.5">
                         {currentItem?.type === 'doc' ? (
                             isReading ? (
-                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-brk-muted font-bold uppercase"><Clock className="w-2.5 h-2.5 animate-spin" /> {30 - docTimer}s</span>
+                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-zinc-400 font-bold uppercase"><Clock className="w-2.5 h-2.5 animate-spin" /> {30 - docTimer}s</span>
                             ) : (
-                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-brk-accent font-bold uppercase"><CheckCircle2 className="w-2.5 h-2.5" /> Xong</span>
+                                <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-orange-400 font-bold uppercase"><CheckCircle2 className="w-2.5 h-2.5" /> Xong</span>
                             )
                         ) : (
-                            <span className="text-[8px] sm:text-[9px] text-brk-muted font-bold uppercase tracking-widest">Video</span>
+                            <span className="text-[8px] sm:text-[9px] text-zinc-400 font-bold uppercase tracking-widest">Video</span>
                         )}
                     </div>
                 </div>
 
                 {/* Navigation & Fullscreen Buttons */}
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                    <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-brk-background hover:bg-brk-accent text-brk-muted hover:text-brk-on-primary rounded-lg transition-all border border-brk-outline active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
-                    <button onClick={handleNext} className="p-1.5 sm:p-2 bg-brk-background hover:bg-brk-accent text-brk-muted hover:text-brk-on-primary rounded-lg transition-all border border-brk-outline active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
+                    <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
+                    <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
                     
-                    {/* Fullscreen Button - Nổi bật hơn trên mobile */}
+                    {/* Fullscreen Button */}
                     <button 
                         onClick={toggleFullScreen}
-                        className="p-1.5 sm:p-2 bg-brk-accent-10 hover:bg-brk-accent text-brk-accent hover:text-brk-on-primary rounded-lg transition-all border border-brk-accent/20 active:scale-90 ml-1"
+                        className="p-1.5 sm:p-2 bg-orange-500/20 hover:bg-orange-500 text-orange-400 hover:text-white rounded-lg transition-all border border-orange-400/30 active:scale-90 ml-1"
                         title="Xem toàn màn hình"
                     >
                         <Maximize2 className="w-3.5 h-3.5 sm:w-4 h-4" />
