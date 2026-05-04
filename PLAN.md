@@ -497,3 +497,17 @@ Giảm thiểu code đồ sộ và chặn re-render toàn màn hình bằng các
 - ✅ Quét bằng grep_search không còn component nào bị lọt lưới Suspense.
 - ✅ Lỗi Hydration đã được xử lý triệt để, an toàn cho production build.
 
+
+## ✅ Khắc phục lỗi Video YouTube và Tối ưu bài học TEXT (2026-05-04)
+### Mục tiêu
+1. Sửa lỗi mất khung hình (chỉ có tiếng không có hình) khi chuyển bài học Video do YouTube API nuốt mất thẻ DOM React.
+2. Bổ sung logic hiển thị: Nếu bài học có loại (type) là TEXT, nội dung chữ sẽ được nạp thẳng vào khu vực Video Player 16:9, đồng thời ẩn phần mô tả bên dưới và ẩn nút xem chi tiết trên mobile để tránh trùng lặp nội dung.
+### Các file đã sửa
+#### [MODIFY] components/course/VideoPlayer.tsx`n- Vấn đề: YT.Player thay thế thẻ div gốc khiến iframe sinh ra mất class kích thước (w-full h-full). Lệnh destroy làm mất thẻ vĩnh viễn trong DOM thật.
+- Fix: Bọc thêm thẻ div bảo vệ cho React quản lý, dùng ef cấp key động, ép height/width 100% cho Player.
+#### [MODIFY] components/course/CoursePlayer.tsx`n- Vấn đề: Logic hiển thị TEXT đã có trong VideoPlayer nhưng chưa được truyền dữ liệu mồi.
+- Fix: Truyền serverPlaylist có định dạng text nếu 	ype === 'TEXT', thêm cờ ẩn giao diện thừa.
+### Trạng thái
+- ✅ Lỗi mất hình YouTube Video đã được khắc phục hoàn toàn.
+- ✅ Bài giảng TEXT hiển thị tập trung, đẹp mắt, giao diện tối giản.
+

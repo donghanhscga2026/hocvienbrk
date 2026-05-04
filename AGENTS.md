@@ -15,10 +15,12 @@
 ### 2. BACKUP TRƯỚC — SỬA SAU (CHỈ THỰC HIỆN KHI ĐÃ ĐƯỢC PHÊ DUYỆT PLAN)
 > Mọi thay đổi đều phải có điểm quay lại an toàn, nhưng không tạo file rác.
 
-- Chỉ tạo backup **SAU KHI** user đã đồng ý với đề xuất sửa code, và **NGAY TRƯỚC KHI** thực hiện lệnh `edit`/`write`.
-- Tên file: `plan_temp/{tên_file_gốc}.backup.{ext}` (ví dụ: `plan_temp/CourseCard.backup.tsx`). 
+- **Bắt buộc hỏi user** trước khi backup: "File hiện tại có đang hoạt động tốt không?"
+- Nếu user **OK** → Tiến hành backup **NGAY TRƯỚC KHI** thực hiện lệnh `edit`/`write`.
+- Nếu user **không OK** → Sửa code luôn, **KHÔNG** cần backup.
+- Tên file: `plan_temp/{tên_file_gốc}.backup_YYYYMMDD_HHMM.{ext}` (ví dụ: `plan_temp/CourseCard.backup_20260503_1530.tsx`).
 - **Tuyệt đối không ghi bất kỳ comment/note nào** vào trong file backup để đảm bảo khi copy/paste khôi phục không bị lỗi cú pháp.
-- Chỉ giữ 1 bản backup mới nhất cho mỗi file (ghi đè file backup cũ).
+- Mỗi file tối đa **3 bản backup mới nhất**. Tự động xóa bản backup cũ nhất khi có bản mới.
 
 ### 3. CHỌN ĐÚNG PHƯƠNG PHÁP SỬA
 > Quy tắc **dứt khoát** — không mơ hồ, không thử sai nhiều lần.
