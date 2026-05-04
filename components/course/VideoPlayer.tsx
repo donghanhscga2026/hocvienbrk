@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { 
-    RotateCcw, CheckCircle, List, ChevronLeft, ChevronRight, 
+import {
+    RotateCcw, CheckCircle, List, ChevronLeft, ChevronRight,
     Play, CheckCircle2, X, FileText, Clock, Loader2, PlayCircle, SkipBack, SkipForward, Maximize2
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
@@ -16,8 +16,8 @@ interface VideoPlayerProps {
     initialMaxTime: number
     onProgress: (maxTime: number, duration: number) => void
     onPercentChange: (percent: number) => void
-    playlistData?: any 
-    lastVideoIndex?: number 
+    playlistData?: any
+    lastVideoIndex?: number
     serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client
     courseType?: string
     lessonType?: string
@@ -86,26 +86,26 @@ export default function VideoPlayer({
         }
         return basePlaylist
     }, [videoUrl, serverPlaylist, lessonType, lessonContent])
-const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
-const [showPlaylist, setShowPlaylist] = useState(false)
-const [isMounted, setIsMounted] = useState(false)
-const [isFullscreen, setIsFullscreen] = useState(false) // State cho lớp phủ toàn màn hình
+    const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
+    const [showPlaylist, setShowPlaylist] = useState(false)
+    const [isMounted, setIsMounted] = useState(false)
+    const [isFullscreen, setIsFullscreen] = useState(false) // State cho lớp phủ toàn màn hình
 
-// Timer cho tài liệu (30s)
-const [docTimer, setDocTimer] = useState<number>(0)
-const [isReading, setIsReading] = useState(false)
+    // Timer cho tài liệu (30s)
+    const [docTimer, setDocTimer] = useState<number>(0)
+    const [isReading, setIsReading] = useState(false)
 
-// Tiến độ chi tiết từng mục: { index: { maxTime, duration } }
-const [granularProgress, setGranularProgress] = useState<Record<number, {maxTime: number, duration: number}>>(() => {
-    return playlistData || {}
-})
+    // Tiến độ chi tiết từng mục: { index: { maxTime, duration } }
+    const [granularProgress, setGranularProgress] = useState<Record<number, { maxTime: number, duration: number }>>(() => {
+        return playlistData || {}
+    })
 
     const playerRef = useRef<any>(null)
     const containerRef = useRef<HTMLDivElement>(null)
-const saveIntervalRef = useRef<any>(null)
-const docTimerRef = useRef<any>(null)
-const currentItem = playlist[currentIndex]
-    
+    const saveIntervalRef = useRef<any>(null)
+    const docTimerRef = useRef<any>(null)
+    const currentItem = playlist[currentIndex]
+
     if (!currentItem) {
         return (
             <div className="w-full h-full flex items-center justify-center bg-zinc-900">
@@ -117,20 +117,20 @@ const currentItem = playlist[currentIndex]
         )
     }
 
-useEffect(() => { setIsMounted(true) }, [])
+    useEffect(() => { setIsMounted(true) }, [])
 
-// Xử lý phím Esc để thoát full màn hình
-useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setIsFullscreen(false)
+    // Xử lý phím Esc để thoát full màn hình
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsFullscreen(false)
+        }
+        window.addEventListener('keydown', handleEsc)
+        return () => window.removeEventListener('keydown', handleEsc)
+    }, [])
+
+    const toggleFullScreen = () => {
+        setIsFullscreen(!isFullscreen)
     }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-}, [])
-
-const toggleFullScreen = () => {
-    setIsFullscreen(!isFullscreen)
-}
     const calculateAggregateProgress = useCallback((updatedGranular: any) => {
         let totalMaxTime = 0
         let totalDuration = 0
@@ -148,7 +148,7 @@ const toggleFullScreen = () => {
         setGranularProgress(nextGranular)
 
         const aggregate = calculateAggregateProgress(nextGranular)
-        
+
         // [FIX] Sử dụng setTimeout để đẩy các thay đổi state ra khỏi chu kỳ render hiện tại
         setTimeout(() => {
             onProgress(aggregate.maxTime, aggregate.duration)
@@ -156,14 +156,14 @@ const toggleFullScreen = () => {
                 onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
             }
             // Gọi Server Action an toàn sau render
-            saveVideoProgressAction({ 
-                enrollmentId, 
-                lessonId, 
-                maxTime: aggregate.maxTime, 
-                duration: aggregate.duration, 
-                lastIndex: index, 
-                playlistScores: nextGranular 
-            }).catch(() => {})
+            saveVideoProgressAction({
+                enrollmentId,
+                lessonId,
+                maxTime: aggregate.maxTime,
+                duration: aggregate.duration,
+                lastIndex: index,
+                playlistScores: nextGranular
+            }).catch(() => { })
         }, 0)
     }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
 
@@ -203,24 +203,24 @@ const toggleFullScreen = () => {
 
     useEffect(() => {
         if (!isMounted || currentItem?.type !== 'video' || !currentItem?.id) return
-        
+
         let player: any = null
 
         const initPlayer = () => {
             if (!videoContainerRef.current) return
-            
+
             const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
             // [FIX] Luôn bắt đầu từ mốc đã lưu (nếu đã xong thì đứng ở cuối)
             const startTime = Math.floor(stored.maxTime)
-            
+
             player = new (window as any).YT.Player(videoContainerRef.current, {
                 videoId: currentItem.id,
                 height: '100%',
                 width: '100%',
-                playerVars: { 
-                    autoplay: 1, 
-                    modestbranding: 1, 
-                    rel: 0, 
+                playerVars: {
+                    autoplay: 1,
+                    modestbranding: 1,
+                    rel: 0,
                     start: startTime,
                     origin: window.location.origin,
                     fs: 0
@@ -250,23 +250,23 @@ const toggleFullScreen = () => {
                 const tag = document.createElement('script')
                 tag.src = 'https://www.youtube.com/iframe_api'
                 document.head.appendChild(tag)
-                
+
                 const originalCallback = (window as any).onYouTubeIframeAPIReady
-                ;(window as any).onYouTubeIframeAPIReady = () => {
-                    if (originalCallback) originalCallback()
-                    initPlayer()
-                }
+                    ; (window as any).onYouTubeIframeAPIReady = () => {
+                        if (originalCallback) originalCallback()
+                        initPlayer()
+                    }
             } else {
                 // Script đang tải dở
                 const originalCallback = (window as any).onYouTubeIframeAPIReady
-                ;(window as any).onYouTubeIframeAPIReady = () => {
-                    if (originalCallback) originalCallback()
-                    initPlayer()
-                }
+                    ; (window as any).onYouTubeIframeAPIReady = () => {
+                        if (originalCallback) originalCallback()
+                        initPlayer()
+                    }
             }
         }
-        
-        return () => { 
+
+        return () => {
             if (saveIntervalRef.current) {
                 clearInterval(saveIntervalRef.current)
                 saveIntervalRef.current = null
@@ -306,17 +306,17 @@ const toggleFullScreen = () => {
                             {/* THE ĐÍCH ĐỂ YOUTUBE API REPLACE (SẼ BIẾN THÀNH IFRAME) */}
                             <div ref={videoContainerRef} />
                         </div>
-                        
+
                         {/* THE MỘT LỚP PHỦ TRANSPARENT CHẶN CLICK VÀO TITLE VÀ NÚT SHARE Ở TOP */}
                         {courseType === 'LIB' && (
-                            <div 
-                                className="absolute top-0 left-0 right-0 h-[65px] z-[90] bg-transparent opacity-0 cursor-default" 
-                                title="Video được bảo vệ" 
+                            <div
+                                className="absolute top-0 left-0 right-0 h-[65px] z-[90] bg-transparent opacity-0 cursor-default"
+                                title="Video được bảo vệ"
                                 onContextMenu={(e) => e.preventDefault()}
                             />
                         )}
                     </div>
-                    ) : (currentItem?.type === 'text') ? (
+                ) : (currentItem?.type === 'text') ? (
                     <div className="absolute inset-0 bg-white overflow-y-auto p-6">
                         <div className="text-gray-900 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: makeLinksClickable((currentItem.content || lessonContent || '').replace(/\n/g, '<br>')) }} />
                     </div>
@@ -368,12 +368,12 @@ const toggleFullScreen = () => {
             <div className="bg-zinc-900 border-t border-zinc-700 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
                 {/* Playlist Toggle */}
                 <div className="flex items-center gap-2 shrink-0">
-                    <button 
+                    <button
                         onClick={() => setShowPlaylist(!showPlaylist)}
                         className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-lg transition-all border border-zinc-600 shadow-sm"
                     >
                         <List className="w-4 h-4 text-brk-accent" />
-                        <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Lộ trình ({currentIndex + 1}/{playlist.length})</span>
+                        <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Các học phần của bài học ({currentIndex + 1}/{playlist.length})</span>
                     </button>
                 </div>
 
@@ -383,7 +383,7 @@ const toggleFullScreen = () => {
                         {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-zinc-400 shrink-0" /> : <FileText className="w-3 h-3 text-zinc-400 shrink-0" />}
                         <p className="text-[10px] sm:text-[11px] font-black text-orange-400 truncate tracking-tight uppercase">{currentItem?.title}</p>
                     </div>
-                    
+
                     <div className="flex items-center gap-1.5 mt-0.5">
                         {currentItem?.type === 'doc' ? (
                             isReading ? (
@@ -401,9 +401,9 @@ const toggleFullScreen = () => {
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                     <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
                     <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
-                    
+
                     {/* Fullscreen Button */}
-                    <button 
+                    <button
                         onClick={toggleFullScreen}
                         className="p-1.5 sm:p-2 bg-orange-500/20 hover:bg-orange-500 text-orange-400 hover:text-white rounded-lg transition-all border border-orange-400/30 active:scale-90 ml-1"
                         title="Xem toàn màn hình"
