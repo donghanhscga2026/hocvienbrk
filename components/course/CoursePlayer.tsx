@@ -289,6 +289,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 onProgress={handleVideoProgress}
                                 onPercentChange={setVideoPercent}
                                 courseType={course.type}
+                                serverPlaylist={
+                                    currentLesson?.type === 'TEXT' 
+                                        ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }] 
+                                        : undefined
+                                }
                             />
                         </div>
                     </div>
@@ -298,7 +303,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             <div className="shrink-0">
                                 <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
                                 {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
-                                 {currentLesson?.content && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
+                                 {currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
                                      <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
                                   )}
                             </div>
@@ -329,7 +334,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     <div className="flex-1 flex flex-col min-h-0">
                                         <div className="px-4 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
                                             <p className="text-base font-bold text-white leading-tight">{currentLesson?.title}</p>
+                                            {currentLesson?.type !== 'TEXT' && (
                                             <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung →</button>
+                                            )}
                                         </div>
                                         <div className="flex-1 min-h-0">
                                             <ChatSection lessonId={currentLessonId!} session={session} />
