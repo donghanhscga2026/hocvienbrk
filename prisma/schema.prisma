@@ -366,6 +366,7 @@ enum LessonType {
   VIDEO
   DOCS
   TEXT
+  ALL
 }
 
 model Lesson {
