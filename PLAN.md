@@ -806,3 +806,23 @@ Bổ sung tính năng xóa bài học cho quản trị viên và giáo viên, đ
 - ✅ Xóa bài học hoạt động đúng quyền hạn.
 - ✅ Giao diện nhất quán giữa các trang quản trị.
 - ✅ Trải nghiệm xóa nhanh chóng, không rườm rà.
+
+---
+
+## ✅ Sửa lỗi Xuất dữ liệu YouTube Tools (2026-05-05)
+
+### Mục tiêu
+Khắc phục lỗi font tiếng Việt khi xuất CSV và xử lý vấn đề file Google Sheet trống khi xuất dữ liệu từ công cụ YouTube Tools.
+
+### Các file đã sửa
+#### `app/tools/youtube-tools/page.tsx`
+- **Fix CSV**: Thêm ký tự BOM (`\uFEFF`) vào đầu file CSV để Excel nhận diện đúng định dạng UTF-8, giúp hiển thị tiếng Việt chuẩn xác.
+- **Fix Google Sheet**: 
+    - Thay đổi quy trình từ mở file trống sang quy trình **TSV-Clipboard**.
+    - Dữ liệu được định dạng Tab-Separated Values (TSV) và tự động copy vào clipboard.
+    - Thêm thông báo hướng dẫn người dùng nhấn **Ctrl+V** để dán dữ liệu vào trang Google Sheet mới mở.
+
+### Trạng thái
+- ✅ Font tiếng Việt trong CSV hiển thị đúng trong Excel.
+- ✅ Xuất Google Sheet hoạt động mượt mà qua cơ chế Copy-Paste tự động.
+- ✅ Trải nghiệm người dùng rõ ràng với thông báo hướng dẫn.
