@@ -9,7 +9,9 @@ import { Role } from '@prisma/client'
 // ==========================================
 export async function getSystemStatsAction() {
   const session = await auth()
-  if (session?.user?.id === undefined || session.user.role !== Role.ADMIN) {
+  const userId = session?.user?.id ? parseInt(session.user.id) : null
+  const userRole = session?.user?.role
+  if (userId === null || (userId !== 0 && userRole !== Role.ADMIN)) {
     return { error: 'Unauthorized' }
   }
 
@@ -48,7 +50,9 @@ export async function getSystemStatsAction() {
 // ==========================================
 export async function createSystemAction(nameSystem: string, onSystem?: number) {
   const session = await auth()
-  if (session?.user?.id === undefined || session.user.role !== Role.ADMIN) {
+  const userId = session?.user?.id ? parseInt(session.user.id) : null
+  const userRole = session?.user?.role
+  if (userId === null || (userId !== 0 && userRole !== Role.ADMIN)) {
     return { error: 'Unauthorized' }
   }
 
@@ -102,7 +106,9 @@ export async function createSystemAction(nameSystem: string, onSystem?: number) 
 // ==========================================
 export async function deleteSystemTreeAction(onSystem: number) {
   const session = await auth()
-  if (session?.user?.id === undefined || session.user.role !== Role.ADMIN) {
+  const userId = session?.user?.id ? parseInt(session.user.id) : null
+  const userRole = session?.user?.role
+  if (userId === null || (userId !== 0 && userRole !== Role.ADMIN)) {
     return { error: 'Unauthorized' }
   }
 

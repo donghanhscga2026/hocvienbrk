@@ -156,11 +156,12 @@ async function buildStandardTree(
         const desc = isSystem ? c.descendant.user : c.descendant
         if (desc?.id) allUserIds.add(desc.id)
     }
-// Batch fetch TCAMember scores cho toàn bộ node trong cây
-    // Query theo cả userId (thành viên thường) và tcaId (root TCA)
-    // Đã đồng bộ schema prisma nên có thể dùng prisma.tCAMember.findMany
-    const tcaMembers = isSystem
-        ? await prisma.tCAMember.findMany({
+    // Logic lấy dữ liệu bổ trợ theo hệ thống
+    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null; groupName: string | null; chucDanh: string | null }>()
+    let tcaMembers: any[] = []
+
+    if (isSystem && systemId === 1) { // Chỉ lấy dữ liệu TCA nếu là hệ thống TCA (ID=1)
+        tcaMembers = await prisma.tCAMember.findMany({
             where: { 
                 OR: [
                     { userId: { in: [...allUserIds] } },
@@ -169,31 +170,15 @@ async function buildStandardTree(
             },
             select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true, groupName: true, chuc_danh: true }
         })
-        : []
 
-    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null; groupName: string | null; chucDanh: string | null }>()
-    for (const m of tcaMembers) {
-        const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
-        const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
-        
-        // Map theo userId - ưu tiên giá trị có điểm cao hơn
-        const existing = tcaMemberMap.get(m.userId)
-        if (!existing || (newPersonalScore && newPersonalScore > (existing.personalScore ?? 0))) {
-            tcaMemberMap.set(m.userId, {
-                level: m.level ?? null,
-                personalScore: newPersonalScore,
-                totalScore: newTotalScore,
-                name: m.name ?? null,
-                groupName: m.groupName ?? null,
-                chucDanh: (m as any).chuc_danh ?? null
-            })
-        }
-        
-        // Map theo tcaId cho root TCA (nếu khác userId)
-        if (m.tcaId && m.tcaId !== m.userId) {
-            const existingTcaId = tcaMemberMap.get(m.tcaId)
-            if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
-                tcaMemberMap.set(m.tcaId, {
+        for (const m of tcaMembers) {
+            const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
+            const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
+            
+            // Map theo userId - ưu tiên giá trị có điểm cao hơn
+            const existing = tcaMemberMap.get(m.userId)
+            if (!existing || (newPersonalScore && newPersonalScore > (existing.personalScore ?? 0))) {
+                tcaMemberMap.set(m.userId, {
                     level: m.level ?? null,
                     personalScore: newPersonalScore,
                     totalScore: newTotalScore,
@@ -201,6 +186,21 @@ async function buildStandardTree(
                     groupName: m.groupName ?? null,
                     chucDanh: (m as any).chuc_danh ?? null
                 })
+            }
+            
+            // Map theo tcaId cho root TCA (nếu khác userId)
+            if (m.tcaId && m.tcaId !== m.userId) {
+                const existingTcaId = tcaMemberMap.get(m.tcaId)
+                if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
+                    tcaMemberMap.set(m.tcaId, {
+                        level: m.level ?? null,
+                        personalScore: newPersonalScore,
+                        totalScore: newTotalScore,
+                        name: m.name ?? null,
+                        groupName: m.groupName ?? null,
+                        chucDanh: (m as any).chuc_danh ?? null
+                    })
+                }
             }
         }
     }
@@ -380,12 +380,13 @@ async function buildStandardTree(
     const rootTca = tcaMemberMap.get(rootUser.id)
     
     // v8.8.1: Tính toán thống kê dựa trên dữ liệu thực tế
-    const statsData = isSystem ? {
+    // v8.8.1: Tính toán thống kê dựa trên dữ liệu thực tế (chỉ cho TCA)
+    const statsData = (isSystem && systemId === 1) ? {
         total: totalCount,
         active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
         bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
         dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
-    } : null
+    } : (isSystem ? { total: totalCount, active: 0, bdh: 0, dhtt: 0 } : null)
 
     return {
         id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
@@ -747,6 +748,37 @@ export async function updateLessonAction(lessonId: string, data: any) {
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
+export async function deleteLessonAction(lessonId: string) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+
+    try {
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            include: { course: { select: { teacherId: true, id_khoa: true } } }
+        })
+
+        if (!lesson) return { success: false, error: "Không tìm thấy bài học." }
+
+        // ✅ TEACHER chỉ được xóa lesson của course mình dạy
+        if (!isAdmin && lesson.course?.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền xóa bài học này" }
+        }
+
+        await prisma.lesson.delete({ where: { id: lessonId } })
+        
+        if (lesson?.course?.id_khoa) {
+            revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
+            revalidatePath(`/tools/courses/${lesson.courseId}`)
+        }
+        
+        return { success: true }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
 // ==========================================
 // FULL SYSTEM TREE - Hiển thị toàn bộ cây (V3.0)
 // ==========================================
@@ -1068,9 +1100,13 @@ export async function getCurrentUserRoleAction() {
     console.log('[getCurrentUserRoleAction] User role:', role, typeof role)
     const userId = parseInt(session.user.id)
     const validUserId = isNaN(userId) || userId < 0 ? null : userId
+    
+    // v8.9.1: Ưu tiên tuyệt đối cho root admin ID 0
+    const finalRole = (validUserId === 0) ? Role.ADMIN : role
+
     return { 
         success: true, 
-        role: role,
+        role: finalRole,
         userId: validUserId
     }
 }
@@ -1083,8 +1119,9 @@ export async function createSystemRootAction(systemId: number, userId: number) {
     const session = await auth()
     if (!session?.user?.id) throw new Error("Unauthorized")
     
-    // Chỉ admin mới được tạo root
-    if (session.user.role !== Role.ADMIN) {
+    // v8.9.1: Root admin ID 0 hoặc Role ADMIN đều được quyền
+    const userId_0 = parseInt(session.user.id)
+    if (userId_0 !== 0 && session.user.role !== Role.ADMIN) {
         return { success: false, error: "Chỉ admin mới được tạo hệ thống mới" }
     }
     
