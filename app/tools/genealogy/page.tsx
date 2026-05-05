@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search } from 'lucide-react'
+import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile } from 'lucide-react'
 import {
   ReactFlow,
   Node,
@@ -1418,11 +1418,20 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
           </button>
 
           {/* Avatar Profile */}
-          <div className="absolute -bottom-10 left-8">
-            <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-xl rotate-3">
-              <div className={`w-full h-full rounded-2xl flex items-center justify-center text-white font-black text-3xl ${tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
-                #{info.userId}
+          <div className="absolute -bottom-12 left-8 flex items-end gap-3">
+            <div className="w-24 h-24 rounded-full bg-white p-1.5 shadow-2xl relative z-10 border-4 border-white">
+              <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden ${tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
+                {user?.image ? (
+                  <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
+                ) : (
+                  <Smile className="w-12 h-12 text-white/80" />
+                )}
               </div>
+            </div>
+            <div className="mb-2 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 rotate-[-2deg]">
+              <span className={`font-black text-[20px] tracking-tighter ${tca ? 'text-indigo-600' : 'text-emerald-600'}`}>
+                #{info.userId}
+              </span>
             </div>
           </div>
         </div>
@@ -1448,16 +1457,17 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
               </div>
 
               {/* Grid Thông tin */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InfoItem icon={<User className="w-4 h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
-                  <InfoItem icon={<Zap className="w-4 h-4" />} label="Cấp bậc" value={tca?.level ? `Cấp ${tca.level}` : 'Học viên'} />
-                  <InfoItem icon={<Users className="w-4 h-4" />} label="Đội nhóm" value={tca?.groupName || 'Hệ thống Học viên'} />
+                  <InfoItem icon={<Phone className="w-4 h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
                 </div>
-                <div className="space-y-4">
-                  <InfoItem icon={<Zap className="w-4 h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
-                  <InfoItem icon={<Zap className="w-4 h-4 text-indigo-500" />} label="Email" value={user?.email || 'Chưa cập nhật'} />
-                  <InfoItem icon={<Zap className="w-4 h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InfoItem icon={<Zap className="w-4 h-4" />} label="Cấp bậc" value={tca?.level ? `Cấp ${tca.level}` : 'Học viên'} />
+                  <InfoItem icon={<Calendar className="w-4 h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
+                </div>
+                <div className="w-full">
+                  <InfoItem icon={<Mail className="w-4 h-4 text-indigo-500" />} label="Email" value={user?.email || 'Chưa cập nhật'} />
                 </div>
               </div>
 

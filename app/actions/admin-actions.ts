@@ -1170,7 +1170,7 @@ export async function getMemberDetailsAction(userId: number) {
     try {
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, name: true, email: true, phone: true, createdAt: true }
+            select: { id: true, name: true, email: true, phone: true, createdAt: true, image: true }
         })
         const tcaRaw = await prisma.tCAMember.findFirst({
             where: { userId },
