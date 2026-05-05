@@ -41,7 +41,7 @@ export async function getCommentsByLesson(lessonId: string) {
         if (!avatar) {
             const facebookAccount = comment.user.accounts.find((a: any) => a.provider === 'facebook')
             if (facebookAccount) {
-                avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture`
+                avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture?type=large`
             }
         }
 
@@ -94,6 +94,13 @@ export async function createComment(lessonId: string, content: string) {
             const googleAccount = comment.user.accounts.find((a: any) => a.provider === 'google')
             if (googleAccount) {
                 avatar = `https://www.googleapis.com/plus/v1/people/${googleAccount.providerAccountId}?picture`
+            }
+        }
+        
+        if (!avatar) {
+            const facebookAccount = comment.user.accounts.find((a: any) => a.provider === 'facebook')
+            if (facebookAccount) {
+                avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture?type=large`
             }
         }
 

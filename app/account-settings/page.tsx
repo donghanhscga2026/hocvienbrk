@@ -88,23 +88,34 @@ export default function AccountSettingsPage() {
         setSaving(false)
     }
 
-    // Hàm nén ảnh về kích thước 50x50px
-    function resizeImage(base64: string, maxWidth = 50, maxHeight = 50): Promise<string> {
+    // Hàm tối ưu ảnh đại diện: Nén về 400x400px, giữ tỷ lệ vuông (crop cover)
+    function resizeImage(base64: string, targetWidth = 400, targetHeight = 400): Promise<string> {
         return new Promise((resolve, reject) => {
             const img = new Image()
             img.onload = () => {
                 const canvas = document.createElement('canvas')
-                canvas.width = maxWidth
-                canvas.height = maxHeight
+                canvas.width = targetWidth
+                canvas.height = targetHeight
                 const ctx = canvas.getContext('2d')
                 if (!ctx) {
                     reject(new Error('Cannot get canvas context'))
                     return
                 }
-                // Vẽ ảnh thu nhỏ
-                ctx.drawImage(img, 0, 0, maxWidth, maxHeight)
-                // Chuyển thành base64 với chất lượng 70%
-                const resized = canvas.toDataURL('image/jpeg', 0.7)
+
+                // Logic crop cover để giữ tỷ lệ khung hình
+                const scale = Math.max(targetWidth / img.width, targetHeight / img.height)
+                const scaledWidth = img.width * scale
+                const scaledHeight = img.height * scale
+                const dx = (targetWidth - scaledWidth) / 2
+                const dy = (targetHeight - scaledHeight) / 2
+
+                // Vẽ ảnh với chất lượng cao
+                ctx.imageSmoothingEnabled = true
+                ctx.imageSmoothingQuality = 'high'
+                ctx.drawImage(img, dx, dy, scaledWidth, scaledHeight)
+                
+                // Chuyển thành base64 với chất lượng 90% (tối ưu nét)
+                const resized = canvas.toDataURL('image/jpeg', 0.9)
                 resolve(resized)
             }
             img.onerror = () => {
@@ -135,8 +146,8 @@ export default function AccountSettingsPage() {
         reader.onload = async (event) => {
             try {
                 const result = event.target?.result as string
-                // Nén ảnh về 50x50px
-                const resized = await resizeImage(result, 50, 50)
+                // Tối ưu ảnh đại diện về chuẩn 400x400px sắc nét
+                const resized = await resizeImage(result, 400, 400)
                 setAvatarUrl(resized)
                 setMessage(null)
             } catch (error) {
