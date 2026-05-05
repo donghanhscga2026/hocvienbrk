@@ -91,6 +91,7 @@ export default function UserMenu() {
                         src={userImage ?? session.user?.image ?? ''}
                         alt="Avatar"
                         className="h-9 w-9 rounded-full object-cover border-2 border-brk-primary"
+                        style={{ imageRendering: 'high-quality' }}
                     />
                 ) : (
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brk-primary text-sm font-black text-brk-on-surface">
