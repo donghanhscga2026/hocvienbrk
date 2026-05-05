@@ -18,9 +18,11 @@
 - **Bắt buộc hỏi user** trước khi backup: "File hiện tại có đang hoạt động tốt không?"
 - Nếu user **OK** → Tiến hành backup **NGAY TRƯỚC KHI** thực hiện lệnh `edit`/`write`.
 - Nếu user **không OK** → Sửa code luôn, **KHÔNG** cần backup.
-- Tên file: `plan_temp/{tên_file_gốc}.backup_YYYYMMDD_HHMM.{ext}` (ví dụ: `plan_temp/CourseCard.backup_20260503_1530.tsx`).
-- **Tuyệt đối không ghi bất kỳ comment/note nào** vào trong file backup để đảm bảo khi copy/paste khôi phục không bị lỗi cú pháp.
-- Mỗi file tối đa **3 bản backup mới nhất**. Tự động xóa bản backup cũ nhất khi có bản mới.
+- **Mặc định dùng Git backup** (ưu tiên 1): `git diff path/to/file > plan_temp/file_backup_YYYYMMDD_HHMM.patch`
+  - Nếu file chưa commit lần nào → fallback dùng file copy: `plan_temp/{tên_file_gốc}.backup_YYYYMMDD_HHMM.{ext}`
+- **Tuyệt đối không ghi bất kỳ comment/note nào** vào trong file backup để đảm bảo khi restore không bị lỗi cú pháp.
+- **KHÔNG tự động xóa** bất kỳ backup nào (file hoặc patch).
+- Chỉ dùng file copy `plan_temp/` làm fallback cho trường hợp đặc biệt.
 
 ### 3. CHỌN ĐÚNG PHƯƠNG PHÁP SỬA
 > Quy tắc **dứt khoát** — không mơ hồ, không thử sai nhiều lần.
@@ -104,7 +106,10 @@
 1. **READ & ANALYZE:** Đọc các file code thực tế liên quan. Tuyệt đối không suy đoán.
 2. **PLAN:** Trình bày rõ kế hoạch sửa (sửa file nào, ở đâu, thay bằng gì).
 3. **CONFIRM:** Dừng lại. Chờ User xác nhận đồng ý (OK, tiếp tục).
-4. **BACKUP:** Lưu bản sao của file sẽ sửa vào `plan_temp/`.
+4. **BACKUP:** Lưu bản sao của file sẽ sửa vào `plan_temp/`:
+   - **Mặc định (Git)**: `git diff path/to/file > plan_temp/file_backup_YYYYMMDD_HHMM.patch`
+   - **Fallback (File copy)**: Nếu file chưa commit lần nào → `cp path/to/file plan_temp/{tên_file_gốc}.backup_YYYYMMDD_HHMM.{ext}`
+   - **KHÔNG tự động xóa** bất kỳ backup nào.
 5. **EDIT/WRITE:** Thực hiện thay đổi code.
 6. **VERIFY:** Đọc lại file (bằng lệnh read) để chắc chắn code đã lưu đúng chuẩn. 
 7. **TEST & WAIT:** Báo cáo đã sửa xong và chờ User chạy test thực tế trên môi trường dev.
@@ -114,9 +119,14 @@
 > Tuyệt đối **KHÔNG ĐƯỢC TỰ ĐỘNG** thực hiện bất cứ bước khôi phục nào nếu chưa báo cáo và được user xác nhận đồng ý.
 
 Khi cần khôi phục code, phải tuân thủ nghiêm ngặt thứ tự ưu tiên sau:
-1. **Ưu tiên 1 (File backup lẻ)**: Đọc file backup trong `plan_temp/` → Copy nội dung → Paste đè file gốc.
-2. **Ưu tiên 2 (Git repository)**: Sử dụng lệnh `git checkout -- <file>` hoặc `git reset` để lấy lại bản commit gần nhất.
+1. **Ưu tiên 1 (Git repository)**: Sử dụng lệnh `git apply plan_temp/file_backup_YYYYMMDD_HHMM.patch` hoặc `git checkout -- <file>` để lấy lại bản gần nhất.
+2. **Ưu tiên 2 (File backup lẻ)**: Đọc file backup trong `plan_temp/` → Báo cáo cho user → Chờ user xác nhận → Copy nội dung → Paste đè file gốc.
 3. **Ưu tiên 3 (Zip backup toàn bộ)**: Chạy script `.\restore-from-backup.ps1` → Chọn ZIP → `npm install` (Chỉ dùng khi hỏng nặng toàn dự án).
+
+**QUY TẮC BẮT BUỘC KHI KHÔI PHỤC:**
+- **PHẢI báo cáo** chi tiết: Backup nào, file nào, thay đổi những gì
+- **PHẢI hỏi user**: "Xác nhận khôi phục từ backup XYZ không?"
+- **CẤM tự động**: Không tự động xóa backup, không tự động khôi phục khi chưa có xác nhận "OK"
 
 ---
 

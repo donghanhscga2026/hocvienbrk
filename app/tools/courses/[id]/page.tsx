@@ -1,4 +1,4 @@
-﻿'use client'
+﻿﻿'use client'
 
 import { useState, useEffect, use } from 'react'
 import { updateCourseAction, updateLessonAction } from '@/app/actions/admin-actions'
@@ -26,9 +26,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [noidungEmail, setNoidungEmail] = useState('')
     const [type, setType] = useState('NORMAL')
     
-    // âœ… NEW: Section 1 - Basic info (16 more fields to have 21 total)
+    // ✅ NEW: Section 1 - Basic info (16 more fields to have 21 total)
     const [nameKhoa, setNameKhoa] = useState('')
-    const [category, setCategory] = useState('KhÃ¡c')
+    const [category, setCategory] = useState('Khác')
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
     const [dateJoin, setDateJoin] = useState('')
@@ -36,31 +36,31 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [isAdmin, setIsAdmin] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
     
-    // âœ… NEW: Section 2 - Description & Image
+    // ✅ NEW: Section 2 - Description & Image
     const [moTaNgan, setMoTaNgan] = useState('')
     const [moTaDai, setMoTaDai] = useState('')
     const [linkAnhBia, setLinkAnhBia] = useState('')
     const [categories, setCategories] = useState<string[]>([])
     const [uploadingImage, setUploadingImage] = useState(false)
     
-    // âœ… NEW: Section 3 - Fee & Payment
+    // ✅ NEW: Section 3 - Fee & Payment
     const [stk, setStk] = useState('')
     const [nameStk, setNameStk] = useState('')
     const [bankStk, setBankStk] = useState('')
     const [noidungStk, setNoidungStk] = useState('')
     const [linkQrcode, setLinkQrcode] = useState('')
     
-    // âœ… NEW: Section 4 - Email & Zalo
+    // ✅ NEW: Section 4 - Email & Zalo
     const [linkZalo, setLinkZalo] = useState('')
     const [fileEmail, setFileEmail] = useState('')
     
-    // âœ… NEW: Fetch categories independently (cháº¡y ngay khi mount, khÃ´ng phá»¥ thuá»™c category)
+    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc category)
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    // âœ… Äáº£m báº£o unique categories tá»« API (trÃ¡nh duplicate keys)
+                    // ✅ Đảm bảo unique categories từ API (tránh duplicate keys)
                     const uniqueCategories = Array.from(new Set<string>(catRes.categories))
                     console.log('Categories loaded:', uniqueCategories)
                     setCategories(uniqueCategories)
@@ -72,7 +72,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         fetchCategories()
     }, [])
     
-    // âœ… NEW: Handle image upload
+    // ✅ NEW: Handle image upload
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
@@ -91,15 +91,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             if (data.url) {
                 setLinkAnhBia(data.url)
             } else {
-                setMessage({ type: 'error', text: data.error || 'Lá»—i upload áº£nh' })
+                setMessage({ type: 'error', text: data.error || 'Lỗi upload ảnh' })
             }
         } catch (err: any) {
-            setMessage({ type: 'error', text: 'Lá»—i upload: ' + err.message })
+            setMessage({ type: 'error', text: 'Lỗi upload: ' + err.message })
         }
         setUploadingImage(false)
     }
     
-    // âœ… NEW: Handle Enter key in textarea to insert <br>
+    // ✅ NEW: Handle Enter key in textarea to insert <br>
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, setter: React.Dispatch<React.SetStateAction<string>>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -118,7 +118,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const fetchData = async () => {
         setLoading(true)
         try {
-            // âœ… Fetch Session & Teachers if Admin
+            // ✅ Fetch Session & Teachers if Admin
             const sessionRes = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = sessionRes?.user?.role === 'ADMIN'
             setIsAdmin(isAdminUser)
@@ -141,9 +141,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
                 
-                 // âœ… NEW: Populate all 21 fields
+                 // ✅ NEW: Populate all 21 fields
                   setNameKhoa(res.name_khoa || '')
-                  const currentCategory = res.category || 'KhÃ¡c'
+                  const currentCategory = res.category || 'Khác'
                   setCategory(currentCategory)
                   setStatus(res.status ?? true)
                 setPin(res.pin || 0)
@@ -175,7 +175,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         e.preventDefault()
         setSaving(true)
         setMessage(null)
-        // âœ… Send all 21 fields to updateCourseAction
+        // ✅ Send all 21 fields to updateCourseAction
         const res = await updateCourseAction(parseInt(id), {
             id_khoa: idKhoa,
             name_lop: nameLop,
@@ -199,8 +199,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             file_email: fileEmail || null,
             noidung_email: noidungEmail || null,
         })
-        if (res.success) setMessage({ type: 'success', text: 'ÄÃ£ lÆ°u thÃ´ng tin khÃ³a há»c (21 trÆ°á»ng)!' })
-        else setMessage({ type: 'error', text: res.error || 'Lá»—i khi lÆ°u.' })
+        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học (21 trường)!' })
+        else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
         setSaving(false)
     }
 
@@ -209,37 +209,37 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content
         })
         if (res.success) {
-            setMessage({ type: 'success', text: 'ÄÃ£ cáº­p nháº­t bÃ i há»c thÃ nh cÃ´ng!' })
-            fetchData() // Táº£i láº¡i danh sÃ¡ch
+            setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
+            fetchData() // Tải lại danh sách
         }
     }
 
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin text-purple-500 mb-2" />
-            <p className="text-xs font-black uppercase">Äang táº£i...</p>
+            <p className="text-xs font-black uppercase">Đang tải...</p>
         </div>
     )
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <MainHeader title="Cáº¤U HÃŒNH KHÃ“A Há»ŒC" toolSlug="courses" />
+            <MainHeader title="CẤU HÌNH KHÓA HỌC" toolSlug="courses" />
             
             <div className="max-w-2xl mx-auto space-y-8 p-4 pb-32">
                 <Link href="/tools/courses" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
-                    <ArrowLeft className="w-4 h-4" /> Quay láº¡i danh sÃ¡ch
+                    <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
                 </Link>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* PHáº¦N 1: THÃ”NG TIN CÆ  Báº¢N */}
+                    {/* PHẦN 1: THÔNG TIN CƠ BẢN */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                            <BookOpen className="w-5 h-5 text-blue-500" /> ThÃ´ng tin cÆ¡ báº£n *
+                            <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
                         </h2>
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ£ khÃ³a há»c (KhÃ´ng thá»ƒ sá»­a - áº£nh hÆ°á»Ÿng DB)</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học (Không thể sửa - ảnh hưởng DB)</label>
                                  <input 
                                      type="text" 
                                      value={idKhoa} 
@@ -249,44 +249,44 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                  />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn lá»›p há»c *</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
                                 <input type="text" value={nameLop} onChange={(e) => setNameLop(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
                             </div>
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn khÃ³a há»c (khÃ¡c tÃªn lá»›p)</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên khóa học (khác tên lớp)</label>
                             <input type="text" value={nameKhoa} onChange={(e) => setNameKhoa(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 mt-4">
                              <div className="space-y-1.5">
-                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh má»¥c</label>
+                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
                                  <select 
                                      value={category} 
                                      onChange={(e) => setCategory(e.target.value)}
                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                  >
-                                     <option value="KhÃ¡c">KhÃ¡c</option>
+                                     <option value="Khác">Khác</option>
                                      {Array.from(new Set(categories)).map((cat: string) => (
                                          <option key={cat} value={cat}>{cat}</option>
                                      ))}
                                  </select>
                              </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loáº¡i khÃ³a há»c</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
                                 <select value={type} onChange={(e) => setType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                                    <option value="NORMAL">BÃ¬nh thÆ°á»ng</option>
-                                    <option value="CHALLENGE">Thá»­ thÃ¡ch</option>
-                                    <option value="LIB">TÃ i liá»‡u (LIB)</option>
+                                    <option value="NORMAL">Bình thường</option>
+                                    <option value="CHALLENGE">Thử thách</option>
+                                    <option value="LIB">Tài liệu (LIB)</option>
                                 </select>
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tráº¡ng thÃ¡i</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
                                 <div className="flex items-center gap-3 h-full px-4">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={status} onChange={(e) => setStatus(e.target.checked)} className="w-5 h-5 rounded" />
-                                        <span className="text-sm font-bold">{status ? 'Hiá»ƒn thá»‹' : 'áº¨n'}</span>
+                                        <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
                                     </label>
                                 </div>
                             </div>
@@ -294,18 +294,18 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         
                         <div className="grid grid-cols-3 gap-4 mt-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=khÃ´ng)</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
                                 <input type="number" value={pin} onChange={(e) => setPin(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">NgÃ y khai giáº£ng</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
                                 <input type="date" value={dateJoin} onChange={(e) => setDateJoin(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             {isAdmin && (
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">GiÃ¡o viÃªn</label>
+                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
                                     <select value={teacherId || ''} onChange={(e) => setTeacherId(parseInt(e.target.value) || null)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                                        <option value="">Chá»n giÃ¡o viÃªn...</option>
+                                        <option value="">Chọn giáo viên...</option>
                                         {teachers.map((t: any) => (
                                             <option key={t.id} value={t.id}>{t.name || t.email}</option>
                                         ))}
@@ -315,36 +315,36 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         </div>
                     </div>
 
-                    {/* PHáº¦N 2: MÃ” Táº¢ & HÃŒNH áº¢NH */}
+                    {/* PHẦN 2: MÔ TẢ & HÌNH ẢNH */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                            <Settings className="w-5 h-5 text-green-500" /> MÃ´ táº£ & HÃ¬nh áº£nh
+                            <Settings className="w-5 h-5 text-green-500" /> Mô tả & Hình ảnh
                         </h2>
                         
                          <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ´ táº£ ngáº¯n (max 200 chars, Enter Ä‘á»ƒ xuá»‘ng dÃ²ng)</label>
-                              <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter Ä‘á»ƒ xuá»‘ng dÃ²ng sáº½ tá»± thÃªm <br>..." />
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
+                              <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
                               <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
                           </div>
                          
                          <div className="space-y-1.5 mt-4">
-                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">MÃ´ táº£ dÃ i (Enter Ä‘á»ƒ xuá»‘ng dÃ²ng)</label>
-                              <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter Ä‘á»ƒ xuá»‘ng dÃ²ng sáº½ tá»± thÃªm <br>..." />
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>
+                              <textarea value={moTaDai} onChange={(e) => setMoTaDai(e.target.value)} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaDai)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
                           </div>
                          
                          <div className="space-y-1.5 mt-4">
-                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link áº£nh bÃ¬a</label>
+                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link ảnh bìa</label>
                              <div className="flex gap-2">
                                  <input 
                                      type="text" 
                                      value={linkAnhBia} 
                                      onChange={(e) => setLinkAnhBia(e.target.value)} 
                                      className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                     placeholder="https://... hoáº·c /uploads/courses/..." 
+                                     placeholder="https://... hoặc /uploads/courses/..." 
                                  />
                                  <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
                                      <Upload className="w-4 h-4" />
-                                     {uploadingImage ? 'Äang táº£i...' : 'Upload'}
+                                     {uploadingImage ? 'Đang tải...' : 'Upload'}
                                      <input 
                                          type="file" 
                                          accept="image/*" 
@@ -362,36 +362,36 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                          </div>
                     </div>
 
-                    {/* PHáº¦N 3: Há»ŒC PHÃ & THANH TOÃN */}
+                    {/* PHẦN 3: HỌC PHÍ & THANH TOÁN */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
-                            <DollarSign className="w-5 h-5 text-yellow-500" /> Há»c phÃ­ & Thanh toÃ¡n
+                            <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
                         </h2>
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Há»c phÃ­ (VND)</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
                                 <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Sá»‘ tÃ i khoáº£n</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản</label>
                                 <input type="text" value={stk} onChange={(e) => setStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 mt-4">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">TÃªn chá»§ TK</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên chủ TK</label>
                                 <input type="text" value={nameStk} onChange={(e) => setNameStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">NgÃ¢n hÃ ng</label>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
                                 <input type="text" value={bankStk} onChange={(e) => setBankStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ná»™i dung chuyá»ƒn khoáº£n</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chuyển khoản</label>
                             <input type="text" value={noidungStk} onChange={(e) => setNoidungStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
@@ -401,24 +401,24 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         </div>
                     </div>
 
-                    {/* PHáº¦N 4: EMAIL & ZALO */}
+                    {/* PHẦN 4: EMAIL & ZALO */}
                     <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-100">
                         <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight flex items-center gap-2">
                             <Upload className="w-5 h-5 text-purple-500" /> Email & Zalo
                         </h2>
                         
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhÃ³m Zalo</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link nhóm Zalo</label>
                             <input type="url" value={linkZalo} onChange={(e) => setLinkZalo(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email Ä‘Ã­nh kÃ¨m</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File email đính kèm</label>
                             <input type="text" value={fileEmail} onChange={(e) => setFileEmail(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         
                         <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ná»™i dung email kÃ­ch hoáº¡t</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung email kích hoạt</label>
                             <textarea value={noidungEmail} onChange={(e) => setNoidungEmail(e.target.value)} rows={4} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none" />
                         </div>
                     </div>
@@ -431,15 +431,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     )}
 
                     <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} LÆ°u KhÃ³a há»c
+                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Khóa học
                     </button>
                 </form>
 
-                {/* PHáº¦N 5: DANH SÃCH BÃ€I Há»ŒC */}
+                {/* PHẦN 5: DANH SÁCH BÀI HỌC */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
-                            <List className="w-5 h-5 text-indigo-500" /> BÃ i giáº£ng ({course?.lessons?.length || 0})
+                            <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({course?.lessons?.length || 0})
                         </h2>
                         <button
                             onClick={() => setShowImport(true)}
@@ -451,7 +451,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             onClick={() => setShowAddLesson(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700 transition-all"
                         >
-                            + ThÃªm bÃ i há»c
+                            + Thêm bài học
                         </button>
                     </div>
                     <div className="space-y-3">
@@ -464,7 +464,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     <div className="space-y-0.5">
                                         <h4 className="text-sm font-black text-gray-800 leading-tight">{lesson.title}</h4>
                                         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
-                                            <Play className="w-3 h-3" /> {lesson.videoUrl ? 'ÄÃ£ cÃ³ Video' : 'ChÆ°a cÃ³ Video'}
+                                            <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
                                         </div>
                                     </div>
                                 </div>
@@ -479,7 +479,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     </div>
                 </div>
 
-                {/* MODAL Sá»¬A BÃ€I Há»ŒC */}
+                {/* MODAL SỬA BÀI HỌC */}
                 {selectedLesson && (
                     <LessonEditModal
                         lesson={selectedLesson}
@@ -488,7 +488,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     />
                 )}
 
-                {/* MODAL THÃŠM BÃ€I Há»ŒC */}
+                {/* MODAL THÊM BÀI HỌC */}
                 {showAddLesson && (
                     <AddLessonModal
                         courseId={id}
@@ -497,7 +497,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     />
                 )}
 
-                {/* MODAL IMPORT BÃ€I Há»ŒC */}
+                {/* MODAL IMPORT BÀI HỌC */}
                 {showImport && (
                     <ImportLessonsModal
                         courseId={id}

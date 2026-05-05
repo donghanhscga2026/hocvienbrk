@@ -526,7 +526,7 @@ px prisma db push\ và \
 px prisma generate\.
 
 #### \components/course/VideoPlayer.tsx\
-- Vấn đề: Logic trước đây chỉ lấy playlist từ \ideoUrl\ và bỏ qua \content\ nếu là video.
+- Vấn đề: Logic trước đây chỉ lấy playlist từ \videoUrl\ và bỏ qua \content\ nếu là video.
 - Fix:
   - Bổ sung \lessonType\ vào Props.
   - Sửa hàm \useMemo\ tính \playlist\: Nếu \lessonType === 'ALL'\, tự động chèn \content\ vào vị trí đầu tiên của mảng \playlist\.
@@ -540,6 +540,85 @@ px prisma generate\.
 
 ### Trạng thái
 - ✅ Tính năng LessonType \ALL\ hoạt động đúng.
-- ✅ Type Check (\
-px tsc --noEmit\) không báo lỗi.
+- ✅ Type Check (\npx tsc --noEmit\) không báo lỗi.
 - ✅ Các loại bài học \VIDEO\, \TEXT\, \DOCS\ cũ không bị ảnh hưởng.
+
+---
+
+## ✅ PHẦN 8: REFACTOR COURSE DISPLAY + MOBILE UI (2026-05-05)
+
+### Mục tiêu
+Loại bỏ redundancy (trùng lặp logic) giữa `CourseSection.tsx` và `CourseCategoryGroup.tsx`, đồng thời thay đổi số khóa học hiển thị trên mobile từ 1 → 3 khóa khi thu gọn.
+
+### Các file đã sửa
+
+#### [NEW] `hooks/useExpandWithCountdown.ts`
+- Tạo custom hook mới gộp chung logic expand/collapse + countdown 10s
+- Input: `countdownSeconds` (default 10)
+- Return: `{ isExpanded, setIsExpanded, countdown, resetTimer, handleActivity }`
+- Xử lý: Timer + Interval tự động cleanup trong useEffect
+
+#### [MODIFY] `components/home/CourseSection.tsx`
+- **Vấn đề**: Logic expand/collapse + countdown bị lặp lại 2 nơi (CourseSection và CourseCategoryGroup) ~60 dòng duplicate
+- **Fix**: 
+  - Xóa bỏ state/refs/effects trùng lặp (dòng 187-217 cũ)
+  - Import và sử dụng `useExpandWithCountdown()` hook
+  - Thay đổi `displayCount` từ responsive (3 desktop/1 mobile) → **cố định 3 khóa** cho cả mobile và desktop
+  - Xóa bỏ `useEffect` theo dõi resize window (không cần thiết nữa)
+
+#### [MODIFY] `components/home/CourseSection.tsx` (phần CourseCategoryGroup)
+- **Fix**: 
+  - Xóa bỏ state/refs/effects trùng lặp (dòng 30-81 cũ)
+  - Import và sử dụng `useExpandWithCountdown()` hook
+  - Thay đổi `displayCount` từ responsive (3 desktop/1 mobile) → **cố định 3 khóa** cho cả mobile và desktop
+  - Xóa bỏ `useEffect` theo dõi resize window (không cần thiết nữa)
+
+### Backup
+- File gốc đã lưu: `plan_temp/CourseSection.backup_20260505_1200.tsx`
+
+### Trạng thái
+- ✅ Loại bỏ thành công ~120 dòng code duplicate (60 dòng × 2 components)
+- ✅ Hook `useExpandWithCountdown` hoạt động đúng (expand/collapse/countdown/reset)
+- ✅ Mobile hiển thị 3 khóa khi thu gọn (đã test OK)
+- ✅ Desktop hiển thị 3 khóa khi thu gọn (giữ nguyên)
+- ✅ Behavior không đổi: Click "Xem thêm" → mở rộng toàn bộ, đếm ngược 10s tự đóng, mouse/touch reset countdown
+
+---
+
+## ✅ PHẦN 9: FIX NEWLINE TRONG MÔ TẢ NGẮN (2026-05-05)
+
+### Mục tiêu
+Khắc phục lỗi xuống dòng (`\n`) trong trường `mo_ta_ngan` (DB) không hiển thị đúng trên trang chủ (bị dính liền thành 1 dòng do HTML whitespace collapsing).
+
+### Vấn đề
+- Newline `\n` trong DB được lưu đúng
+- Khi render bằng `dangerouslySetInnerHTML`, trình duyệt HTML tự động gộp tất cả khoảng trắng/xuống dòng thành 1 dấu cách
+- Hàm `makeLinksClickable()` cũ chỉ convert URL → `<a>`, không xử lý `\n`
+
+### Các file đã sửa
+
+#### [MODIFY] `components/course/CourseCard.tsx`
+- **Fix**: Sửa hàm `makeLinksClickable()` (dòng 12-20):
+  - Bước 1: Convert `\n` → `<br />` trước
+  - Bước 2: Convert URL → `<a>` sau (để URL không chứa `<br />`)
+```typescript
+const makeLinksClickable = (html: string): string => {
+    if (!html) return ''
+    // 1. Convert newlines to <br />
+    let processed = html.replace(/\n/g, '<br />')
+    // 2. Make URLs clickable
+    const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
+    processed = processed.replace(urlRegex, (match) => {
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="text-brk-accent hover:underline font-bold">${match}</a>`
+    })
+    return processed
+}
+```
+
+### Backup
+- File gốc đã lưu: `plan_temp/CourseCard.backup_20260505_1230.tsx`
+
+### Trạng thái
+- ✅ Newline trong `mo_ta_ngan` hiển thị đúng (có xuống dòng)
+- ✅ URL trong mô tả vẫn clickable bình thường
+- ✅ Thứ tự xử lý đúng: newline trước → URL sau (đã test OK)

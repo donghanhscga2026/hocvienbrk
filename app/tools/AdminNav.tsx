@@ -18,6 +18,7 @@ const menuItems = [
   { label: 'Lộ Trình', href: '/tools/roadmap', icon: Map },
   { label: 'Chiến Dịch Email', href: '/tools/email-mkt', icon: Mail },
   { label: 'Nhân Mạch', href: '/tools/genealogy', icon: Users },
+  { label: 'Hệ Thống', href: '/tools/admin', icon: Settings },
 ]
 
 export default function AdminNav() {
