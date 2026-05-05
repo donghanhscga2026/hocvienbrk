@@ -61,15 +61,16 @@ export default async function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
-        <script
-          id="theme-initializer"
-          dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }}
-        />
       </head>
       <body
         className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
         suppressHydrationWarning
       >
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }}
+        />
         <Providers>
           {children}
           <AffiliateTracker />

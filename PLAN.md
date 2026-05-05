@@ -622,3 +622,88 @@ const makeLinksClickable = (html: string): string => {
 - ✅ Newline trong `mo_ta_ngan` hiển thị đúng (có xuống dòng)
 - ✅ URL trong mô tả vẫn clickable bình thường
 - ✅ Thứ tự xử lý đúng: newline trước → URL sau (đã test OK)
+
+---
+
+## ✅ PHẦN 10: TẠO TRANG QUẢN TRỊ HỆ THỐNG (2026-05-05)
+
+### Mục tiêu
+Tạo trang `/tools/admin` để quản trị hệ thống (SystemTree, System, SystemClosure) với tính năng tạo mới và xóa an toàn.
+
+### Các file đã tạo/sửa
+
+#### [NEW] `app/actions/system-actions.ts`
+- **`getSystemStatsAction()`**: Lấy thống kê hệ thống (số nodes, closures)
+- **`createSystemAction()`**: Tạo hệ thống mới (tự động sinh `onSystem` nếu không nhập)
+- **`deleteSystemTreeAction()`**: Xóa hệ thống an toàn (theo thứ tự: SystemClosure → System → SystemTree)
+- **Bảo vệ**: Không cho xóa `onSystem` 0,1,2 (hệ thống mặc định)
+- **Ghi log**: Mọi thao tác xóa đều ghi vào `SyncLog` để có thể khôi phục
+
+#### [NEW] `components/admin/system/CreateSystemModal.tsx`
+- Modal tạo hệ thống mới (dùng shadcn/ui Dialog)
+- Validation: Tên không được để trống
+- Tự động sinh `onSystem` = max + 1 nếu không nhập
+
+#### [NEW] `components/admin/system/DeleteConfirmDialog.tsx`
+- Dialog xác nhận xóa (yêu cầu nhập tên hệ thống để xác nhận)
+- Hiển thị thống kê: "Sẽ xóa X nodes, Y closure records"
+- Bảo vệ: Disable nút xóa nếu chưa nhập đúng tên
+
+#### [NEW] `app/tools/admin/page.tsx`
+- Trang quản trị với bảng hiển thị hệ thống
+- Stats cards: Tổng số hệ thống, tổng nodes, tổng closures
+- Actions: Tạo mới, Xóa (với xác nhận)
+
+#### [MODIFY] `app/tools/AdminNav.tsx`
+- Thêm mục "Hệ Thống" vào menu navigation
+- **Backup**: `plan_temp/AdminNav_backup_20260505_1400.patch`
+
+### Trạng thái
+- ✅ Tạo hệ thống mới hoạt động đúng
+- ✅ Xóa hệ thống an toàn (có SyncLog)
+- ✅ Bảo vệ hệ thống mặc định (0,1,2)
+- ✅ Build thành công (`npm run build` → ✅ Compiled)
+- ✅ Đã test thực tế (user xác nhận "ok")
+
+---
+
+## ✅ FIX LỖI ĐĂNG NHẬP "CredentialsSignin" (2026-05-05)
+
+### Mục tiêu
+Sửa lỗi hiển thị thông báo sai khi đăng nhập sai thông tin.
+
+### Vấn đề
+- NextAuth trả về lỗi `"CredentialsSignin"` (class CredentialsSignin)
+- Code cũ kiểm tra `"CredentialsSignin"` (viết hoa C) → không bao giờ khớp
+- Kết quả: Luôn hiển thị "Đã xảy ra lỗi không mong muốn" thay vì "Thông tin đăng nhập không chính xác"
+
+### Các file đã sửa
+
+#### [MODIFY] `app/login/page.tsx`
+- **Fix (dòng 54)**: Đổi từ `result.error === "CredentialsSignin"` 
+  → `result.error.includes("CredentialsSignin")`
+- **Cải tiến**: Dùng `includes()` cho tất cả các trường hợp kiểm tra lỗi (USER_NOT_FOUND, INVALID_PASSWORD, etc.)
+- **Mặc định**: Nếu lỗi không xác định → hiển thị "Thông tin đăng nhập không chính xác"
+
+### Trạng thái
+- ✅ Hiển thị đúng thông báo lỗi khi đăng nhập sai
+- ✅ Build thành công (`npm run build` → ✅ Compiled)
+- ✅ Đã test thực tế (user xác nhận "ok")
+
+## ✅ Sửa lỗi hiển thị thông báo đăng nhập ([2026-05-05])
+
+### Mục tiêu
+Khắc phục lỗi chỉ hiện thông báo generic "CredentialsSignin" khi đăng nhập thất bại, thay vào đó hiển thị lỗi tiếng Việt chi tiết (VD: "Sai mật khẩu", "Không tìm thấy tài khoản").
+
+### Các file đã sửa
+#### `app/login/page.tsx`
+- Vấn đề: `signIn` dùng `redirect: false` ngăn cản NextAuth v5 đẩy mã lỗi (errorCode) vào URL, khiến client không bắt được lỗi cụ thể.
+- Fix:
+  - Bỏ `redirect: false` (chuyển sang mặc định `true`).
+  - Thêm `useEffect` để bắt `errorCode` từ URL parameters khi trang load lại sau khi redirect.
+  - Ánh xạ các mã lỗi (`USER_NOT_FOUND`, `INVALID_PASSWORD`, v.v.) sang thông báo tiếng Việt thân thiện.
+
+### Trạng thái
+- ✅ Hiển thị lỗi chi tiết khi sai email/SĐT/mã học viên.
+- ✅ Hiển thị lỗi chi tiết khi sai mật khẩu.
+- ✅ Tự động bắt lỗi từ URL khi NextAuth redirect về.

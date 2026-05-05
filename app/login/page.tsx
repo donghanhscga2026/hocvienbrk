@@ -17,9 +17,13 @@ function LoginForm() {
     const [success, setSuccess] = useState<string | null>(null)
     const router = useRouter()
     const searchParams = useSearchParams()
-    
+
     const redirectSlug = searchParams.get('redirect')
     const refCode = searchParams.get('ref')
+    
+    // NextAuth CredentialsSignin trả về error qua URL params
+    // Format: ?error=CredentialsSignin&code=USER_NOT_FOUND:Email
+    const errorCode = searchParams.get('code')
 
     const { register, handleSubmit, formState: { errors } } = useForm({
         defaultValues: {
@@ -37,46 +41,44 @@ function LoginForm() {
         }
     }, [session])
 
+    // Xử lý lỗi từ URL (NextAuth CredentialsSignin redirect về kèm ?code=...)
+    useEffect(() => {
+        if (errorCode) {
+            const errorStr = String(errorCode)
+            if (errorStr.includes("USER_NOT_FOUND")) {
+                const type = errorStr.split(":")[1] || "thông tin đăng nhập"
+                setError(`Không tìm thấy tài khoản với ${type} này. Vui lòng kiểm tra lại.`)
+            } else if (errorStr.includes("INVALID_PASSWORD")) {
+                setError("Mật khẩu không chính xác. Vui lòng thử lại.")
+            } else if (errorStr.includes("NO_PASSWORD")) {
+                setError("Tài khoản này chưa thiết lập mật khẩu. Vui lòng đăng nhập bằng Google.")
+            } else if (errorStr.includes("EMAIL_NOT_VERIFIED")) {
+                setError("Vui lòng xác minh email trước khi đăng nhập.")
+            } else if (errorStr.includes("EMAIL_VERIFICATION_PENDING")) {
+                setError("Tài khoản của bạn cần được xác minh. Vui lòng kiểm tra email đã gửi.")
+            } else {
+                setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại.")
+            }
+        }
+    }, [errorCode])
+
     async function onSubmit(data: any) {
         setIsLoading(true)
         setError(null)
 
         try {
-            const result = await signIn("credentials", {
+            const callbackUrl = redirectSlug ? `/${redirectSlug}` : "/"
+            
+            await signIn("credentials", {
                 identifier: data.identifier,
                 password: data.password,
-                redirect: false,
+                callbackUrl: callbackUrl, // Chuyển hướng về trang chủ hoặc trang yêu cầu sau khi thành công
+                redirect: true,
             })
-
-            if (result?.error) {
-                console.error("Login error:", result.error)
-                
-                if (result.error === "CredentialsSignin") {
-                    setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại.")
-                } else if (result.error.includes("USER_NOT_FOUND")) {
-                    const type = result.error.split(":")[1] || "thông tin đăng nhập"
-                    setError(`Không tìm thấy tài khoản với ${type} này. Vui lòng kiểm tra lại.`)
-                } else if (result.error.includes("INVALID_PASSWORD")) {
-                    setError("Mật khẩu không chính xác. Vui lòng thử lại.")
-                } else if (result.error.includes("NO_PASSWORD")) {
-                    setError("Tài khoản này chưa thiết lập mật khẩu. Vui lòng đăng nhập bằng Google.")
-                } else if (result.error.includes("EMAIL_NOT_VERIFIED")) {
-                    setError("Vui lòng xác minh email trước khi đăng nhập.")
-                } else if (result.error.includes("EMAIL_VERIFICATION_PENDING")) {
-                    setError("Tài khoản của bạn cần được xác minh. Vui lòng kiểm tra email đã gửi.")
-                } else {
-                    setError(result.error)
-                }
-            } else {
-                // Redirect về course landing page nếu có redirect param
-                if (redirectSlug) {
-                    router.push(`/${redirectSlug}`)
-                } else {
-                    router.push("/")
-                }
-                router.refresh()
-            }
-        } catch (err) {
+        } catch (err: any) {
+            // Auth.js v5 ném lỗi khi redirect, đây là hành vi bình thường
+            if (err.message === 'NEXT_REDIRECT') throw err;
+            console.error("Submit error:", err)
             setError("Đã xảy ra lỗi không mong muốn.")
         } finally {
             setIsLoading(false)
@@ -156,7 +158,7 @@ function LoginForm() {
                             </p>
                         </div>
 
-                        <form onSubmit={handleSubmit(onChangePassword)} className="space-y-4">
+                        <form onSubmit={handleSubmit(onChangePassword)} method="POST" className="space-y-4">
                             {error && (
                                 <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                             )}
@@ -248,7 +250,7 @@ function LoginForm() {
                         <div className="relative flex justify-center text-xs"><span className="bg-transparent px-2 text-brk-muted">hoặc dùng tài khoản</span></div>
                     </div>
 
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={handleSubmit(onSubmit)} method="POST" className="space-y-4">
                         {error && (
                             <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                         )}

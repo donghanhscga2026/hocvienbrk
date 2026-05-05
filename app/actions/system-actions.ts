@@ -9,7 +9,7 @@ import { Role } from '@prisma/client'
 // ==========================================
 export async function getSystemStatsAction() {
   const session = await auth()
-  if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+  if (session?.user?.id === undefined || session.user.role !== Role.ADMIN) {
     return { error: 'Unauthorized' }
   }
 
@@ -26,9 +26,9 @@ export async function getSystemStatsAction() {
 
   // Get closure counts via raw query
   const closureCounts = await prisma.$queryRaw<{ systemId: number, count: bigint }[]>`
-    SELECT system_id as "systemId", COUNT(*) as count 
+    SELECT "systemId", COUNT(*) as count 
     FROM system_closure 
-    GROUP BY system_id
+    GROUP BY "systemId"
   `
   const closureMap = new Map(closureCounts.map(c => [c.systemId, Number(c.count)]))
 
@@ -48,7 +48,7 @@ export async function getSystemStatsAction() {
 // ==========================================
 export async function createSystemAction(nameSystem: string, onSystem?: number) {
   const session = await auth()
-  if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+  if (session?.user?.id === undefined || session.user.role !== Role.ADMIN) {
     return { error: 'Unauthorized' }
   }
 
@@ -102,7 +102,7 @@ export async function createSystemAction(nameSystem: string, onSystem?: number) 
 // ==========================================
 export async function deleteSystemTreeAction(onSystem: number) {
   const session = await auth()
-  if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+  if (session?.user?.id === undefined || session.user.role !== Role.ADMIN) {
     return { error: 'Unauthorized' }
   }
 
@@ -137,15 +137,15 @@ export async function deleteSystemTreeAction(onSystem: number) {
     })
 
     await prisma.$transaction(async (tx) => {
-      // 1. Log closures to SyncLog
-      for (const closure of closuresToDelete) {
+      // 1. Log closures to SyncLog (Ghi 1 bản ghi tổng hợp vì system_closure không có ID duy nhất kiểu Int)
+      if (closuresToDelete.length > 0) {
         await tx.syncLog.create({
           data: {
             syncId,
             tableName: 'system_closure',
-            recordId: closure.ancestorId,
+            recordId: onSystem,
             action: 'DELETE',
-            oldData: JSON.stringify(closure),
+            oldData: JSON.stringify(closuresToDelete),
             newData: null,
             createdAt: new Date()
           }
