@@ -32,6 +32,7 @@ export interface GenealogyNode {
     groupB: any[]
     children: GenealogyNode[]
     isRoot?: boolean
+    isSearchTarget?: boolean
     // Thông tin TCA Member (chỉ có khi thuộc hệ thống TCA)
     level?: number | null
     personalScore?: number | null
@@ -70,7 +71,8 @@ async function getSystemRootUser(systemId: number): Promise<{ id: number; name: 
 async function buildStandardTree(
     rootId: number, 
     type: 'USER' | 'SYSTEM',
-    systemId?: number
+    systemId?: number,
+    forceFull: boolean = false
 ): Promise<GenealogyNode | null> {
     const isSystem = type === 'SYSTEM'
     
@@ -399,7 +401,7 @@ async function buildStandardTree(
         groupCTotalSub,
         groupA,
         groupB,
-        children,
+        children: forceFull ? buildFullSubtree(rootAutoId) : children,
         isRoot: true,
         level: rootTca?.level ?? null,
         personalScore: rootTca?.personalScore ?? null,
@@ -478,12 +480,12 @@ export async function getSystemChildrenAction(parentId: number, systemId: number
 }
 
 // SỬA 2026-03-30: Thêm tính năng tìm kiếm Nhân mạch theo ID (FIX: tối ưu query)
-// Tìm đường đi từ root đến target node và trả về path - chỉ hiện path đơn giản
+// Tìm đường đi từ root đến target node và trả về path - trả về cây gộp đầy đủ (ancestors + descendants)
 export async function searchGenealogyByIdAction(targetId: number, systemId?: number) {
     const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     const isSystem = systemId !== undefined
     try {
-        // 1. Kiểm tra user/system tồn tại
+        // 1. Kiểm tra user/system tồn tại và lấy autoId
         let targetAutoId: number | null = null
         
         if (isSystem) {
@@ -495,18 +497,17 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
         } else {
             const user = await prisma.user.findUnique({ where: { id: targetId } })
             if (!user) return { success: false, error: `Không tìm thấy mã #${targetId}` }
+            targetAutoId = targetId
         }
 
-        // 2. Query closure để lấy path từ root đến target - depth DESC (root → target)
+        // 2. Query closure để lấy path từ root đến target - orderBy depth DESC (root → target)
         const ancestors = isSystem
             ? await prisma.systemClosure.findMany({
                 where: { systemId, descendantId: targetAutoId! },
                 orderBy: { depth: 'desc' },
                 include: { 
                     ancestor: { 
-                        include: { 
-                            user: { select: { id: true, name: true } },
-                        }
+                        include: { user: { select: { id: true, name: true } } }
                     } 
                 }
               })
@@ -520,54 +521,57 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
             return { success: false, error: `Không tìm thấy đường dẫn cho mã #${targetId}` }
         }
 
-        // 3. Build path nodes đơn giản
-        const pathNodes: GenealogyNode[] = []
+        // 3. Lấy toàn bộ cây con của targetId - v8.8.2: forceFull = true để hiện tất cả con cháu
+        const targetSubtree = await buildStandardTree(targetId, isSystem ? 'SYSTEM' : 'USER', systemId, true)
+        if (!targetSubtree) return { success: false, error: "Lỗi khi khởi tạo cây con" }
         
-        for (let i = 0; i < ancestors.length; i++) {
-            const anc = ancestors[i] as any
-            const nodeId = isSystem ? anc.ancestor.userId : anc.ancestorId
-            const name = isSystem ? anc.ancestor.user?.name : anc.ancestor.name
-            const depth = anc.depth
+        // Đánh dấu node mục tiêu để frontend highlight
+        targetSubtree.isSearchTarget = true
 
-            // Build children - chỉ có 1 child trên path (node tiếp theo)
-            const children: GenealogyNode[] = []
-            if (i < ancestors.length - 1) {
-                const nextAnc = ancestors[i + 1] as any
-                const nextId = isSystem ? nextAnc.ancestor.userId : nextAnc.ancestorId
-                const nextName = isSystem ? nextAnc.ancestor.user?.name : nextAnc.ancestor.name
-                children.push({
-                    id: nextId,
-                    name: nextName || 'HV',
-                    referrerId: null,
-                    totalSubCount: 0,
-                    f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                    groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                    groupA: [], groupB: [], children: []
-                })
-            }
+        // 4. Build cây gộp từ dưới lên (Target -> Parent -> ... -> Root)
+        // ancestors list là [Root, ..., Parent, Target]
+        let mergedTree: GenealogyNode = { ...targetSubtree, isRoot: ancestors.length === 1 }
+        const pathNodes: { id: number; name: string | null }[] = ancestors.map((anc: any) => ({
+            id: isSystem ? anc.ancestor.userId : (anc.ancestorId || anc.ancestor.id),
+            name: isSystem ? anc.ancestor.user?.name : anc.ancestor.name
+        }))
 
-            pathNodes.push({
+        // Lấy thông tin chi tiết cho các node trên path (trừ node Target đã có trong subtree)
+        for (let i = ancestors.length - 2; i >= 0; i--) {
+            const nodeId = pathNodes[i].id
+            const name = pathNodes[i].name
+            
+            // v8.5.1: Luôn lấy dữ liệu TCA nếu có để hiển thị đầy đủ thông tin ancestors
+            const tcaData = await prisma.tCAMember.findFirst({ 
+                where: { userId: nodeId }, 
+                select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true } 
+            })
+
+            // Lấy thêm stats cơ bản cho ancestor (optional but better)
+            const f1Count = await prisma.user.count({ where: { referrerId: nodeId } })
+
+            mergedTree = {
                 id: nodeId,
                 name: name || 'HV',
                 referrerId: null,
-                totalSubCount: 1,
-                f1aCount: 0,
-                f1bCount: 0,
-                f1cCount: 0,
-                groupATotalSub: 0,
-                groupBTotalSub: 0,
-                groupCTotalSub: 0,
-                groupA: [],
-                groupB: [],
-                children,
-                isRoot: depth === 0
-            })
+                totalSubCount: 0, // Tổ tiên trên path chỉ hiển thị đường dẫn nên tạm để 0 hoặc query nốt
+                f1aCount: f1Count, f1bCount: 0, f1cCount: 0, 
+                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                groupA: [], groupB: [],
+                children: [mergedTree],
+                isRoot: i === 0,
+                level: tcaData?.level ?? null,
+                personalScore: tcaData?.personalScore != null ? Number(tcaData.personalScore) : 0,
+                totalScore: tcaData?.totalScore != null ? Number(tcaData.totalScore) : 0,
+                groupName: tcaData?.groupName ?? null,
+                chucDanh: (tcaData as any)?.chuc_danh ?? null
+            }
         }
 
         return { 
             success: true, 
+            mergedTree,
             path: pathNodes,
-            targetNode: pathNodes[pathNodes.length - 1],
             targetId 
         }
     } catch (error: any) { 
@@ -1160,3 +1164,30 @@ export async function createSystemRootAction(systemId: number, userId: number) {
         return { success: false, error: error.message }
     }
 }
+
+export async function getMemberDetailsAction(userId: number) {
+    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true, email: true, phone: true, createdAt: true }
+        })
+        const tcaRaw = await prisma.tCAMember.findFirst({
+            where: { userId },
+            select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true }
+        })
+        
+        // v8.5.1: Fix Decimal serialization error
+        const tca = tcaRaw ? {
+            ...tcaRaw,
+            personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0,
+            totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0
+        } : null
+
+        return { success: true, user, tca }
+    } catch (e: any) {
+        return { success: false, error: e.message }
+    }
+}
+
+

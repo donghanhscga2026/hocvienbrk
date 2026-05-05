@@ -827,3 +827,33 @@ Khắc phục lỗi font tiếng Việt khi xuất CSV và xử lý vấn đề 
 - ✅ Font tiếng Việt trong CSV hiển thị đúng trong Excel.
 - ✅ Xuất Google Sheet hoạt động mượt mà qua cơ chế Copy-Paste tự động.
 - ✅ Trải nghiệm người dùng rõ ràng với thông báo hướng dẫn.
+
+---
+
+## ✅ PHẦN 12: NÂNG CẤP TÌM KIẾM TOÀN DIỆN & POPUP THÔNG TIN (2026-05-05)
+
+### Mục tiêu
+Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem nhanh thông tin chi tiết thành viên mà không làm thay đổi cấu trúc cây chính.
+
+### Các file đã sửa
+
+#### `app/actions/admin-actions.ts`
+- **searchGenealogyByIdAction**: Nâng cấp logic để gộp đường dẫn từ Root và toàn bộ cây con của ID mục tiêu thành một `mergedTree`.
+- **getMemberDetailsAction**: Thêm mới Action để lấy thông tin từ bảng `User` và `TCAMember`.
+- **GenealogyNode**: Thêm thuộc tính `isSearchTarget` để hỗ trợ highlight.
+
+#### `app/tools/genealogy/page.tsx`
+- **handleSearch**: Cập nhật để nhận và hiển thị `mergedTree`, tự động mở rộng đường dẫn và cây con.
+- **GenealogyCard**: Thêm hiệu ứng highlight viền vàng cho node mục tiêu tìm kiếm và sự kiện click vào hình bán nguyệt để xem chi tiết.
+- **MemberDetailsModal**: Thêm component modal với thiết kế hiện đại, hiển thị đầy đủ thông tin (Email, SĐT, Cấp bậc, Đội nhóm...).
+- **Attention Effect**: Thêm hiệu ứng nhấp nháy (`animate-pulse-slow`) cho ô chọn hệ thống khi chưa có hệ thống nào được chọn để thu hút sự chú ý của người dùng.
+- **v8.5.1 Fixes**: 
+    - Khắc phục lỗi Serialization `Decimal objects are not supported` bằng cách convert các trường điểm số sang `Number`.
+    - Cải tiến logic tìm kiếm: Luôn lấy đầy đủ thông tin (cấp bậc, điểm số, stats) cho các node tổ tiên trên đường dẫn tìm kiếm.
+    - **SỬA LỖI NGHIÊM TRỌNG (SERVER)**: Đã tích hợp `forceFull` vào `buildStandardTree` để đảm bảo khi tìm kiếm, hệ thống hiển thị TRỌN VẸN tất cả các node phía dưới (không bị ẩn bởi cơ chế phân nhóm A/B).
+    - **SỬA LỖI NGHIÊM TRỌNG (FRONTEND)**: Loại bỏ toán tử ba ngôi "phá đám" trong JSX của `page.tsx`. Giờ đây React Flow sẽ luôn sử dụng dữ liệu cây đầy đủ (`nodes`, `edges`) ngay cả khi tìm kiếm, không còn bị ép hiển thị chỉ đường dẫn dạng thẻ đơn giản.
+
+### Trạng thái
+- ✅ Tìm kiếm ID hiển thị trọn vẹn "Họ đến từ đâu" và "Họ dẫn dắt những ai".
+- ✅ Popup thông tin chi tiết hoạt động mượt mà, thiết kế cao cấp.
+- ✅ Tuyệt đối bảo tồn layout gốc, không dùng nút Quay lại.

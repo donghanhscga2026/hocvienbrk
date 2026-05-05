@@ -19,7 +19,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
 
@@ -32,6 +32,15 @@ const VERTICAL_SPACING = 320 // Sửa: tăng khoảng cách các hàng từ 270 
 // Đếm số con trực tiếp của node
 // Hàm đệ quy build D3 Tree object
 type D3Node = { id: number; data: GenealogyNode; children: D3Node[] };
+interface MemberDetailInfo {
+  show: boolean;
+  userId: number;
+  data?: {
+    user: any;
+    tca: any;
+  };
+  loading: boolean;
+}
 
 const buildD3Tree = (node: GenealogyNode, isFullMode: boolean, currentFocusMap?: Map<number, number>, isParentVisibleAndExpanded: boolean = true): D3Node | null => {
   const isFocusNode = isFullMode || isParentVisibleAndExpanded;
@@ -163,6 +172,7 @@ const GenealogyCard = (props: NodeProps) => {
     onOpenGroup?: (type: 'A' | 'B', data: any[], totalSub: number) => void;
     onAddChild?: (parentId: number) => void;
     onDeleteNode?: (nodeId: number) => void;
+    onShowDetails?: (userId: number) => void;
   }
 
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
@@ -200,7 +210,10 @@ const GenealogyCard = (props: NodeProps) => {
           </div>
         )}
         {/* Clip container: chỉ hiện nửa trên của hình tròn 164px (Sửa: h-[82px] = nửa của 164px) */}
-        <div className={`overflow-hidden h-[82px] ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400 rounded-t-full' : ''}`}>
+        <div
+          onClick={(e) => { e.stopPropagation(); data.onShowDetails?.(data.id); }}
+          className={`overflow-hidden h-[82px] cursor-pointer hover:scale-105 transition-transform ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400 rounded-t-full' : ''}`}
+        >
           <div className={`w-[164px] h-[164px] rounded-full flex items-start pt-9 justify-center text-white shadow-lg border-4 bg-gradient-to-br ${getLevelColor(colorDepth, isActuallyRoot)}`}>
             <span className="text-[28px] font-black leading-tight text-center px-2">#{data.id}</span>
           </div>
@@ -449,6 +462,19 @@ function GenealogyFlow() {
   const [userSearch, setUserSearch] = useState<string>('')
   const [loadingUsers, setLoadingUsers] = useState<boolean>(false)
 
+  // v8.5.0: Member Details Modal
+  const [memberDetail, setMemberDetail] = useState<MemberDetailInfo>({ show: false, userId: 0, loading: false })
+
+  const handleShowDetails = useCallback(async (userId: number) => {
+    setMemberDetail({ show: true, userId, loading: true })
+    const res = await getMemberDetailsAction(userId)
+    if (res.success) {
+      setMemberDetail({ show: true, userId, data: { user: res.user, tca: res.tca }, loading: false })
+    } else {
+      setMemberDetail(prev => ({ ...prev, loading: false }))
+    }
+  }, [])
+
   const mergeSubtree = useCallback((root: GenealogyNode, subtree: GenealogyNode): GenealogyNode => {
     if (root.id === subtree.id) return { ...root, ...subtree }
     if (root.children) {
@@ -514,10 +540,15 @@ function GenealogyFlow() {
           displayMode: nodeDisplayMode ?? displayMode,
           treeDepth: level,   // depth trong cây (0=root) - dùng cho màu avatar
           onToggleExpand: actions.onToggleExpand,
-          onFocusSubtree: actions.onFocusSubtree,
+          onFocusSubtree: (id: number, name?: string | null) => {
+            setFocusedNodeName(name || null)
+            setFocusedSubtreeNode(parent)
+            handleFocusSubtree(id, name)
+          },
           onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
-          onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true })
+          onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true }),
+          onShowDetails: handleShowDetails
         },
       })
     }
@@ -781,39 +812,29 @@ function GenealogyFlow() {
       const systemIdForSearch = selectedSystem === 0 ? undefined : (selectedSystem ?? undefined)
       console.log('[SEARCH] Searching for ID:', id, 'systemId:', systemIdForSearch)
 
-      if (selectedSystem === 0 || selectedSystem === null) {
-        const childrenResult = await getGenealogyChildrenAction(id)
-        console.log('[SEARCH] Fetch children result:', childrenResult.success ? 'Success' : 'Failed')
-
-        if (childrenResult.success && childrenResult.tree) {
-          const treeResult = await getGenealogyTreeAction(0)
-          if (treeResult.success && treeResult.tree) {
-            const subtreeWithId = { ...childrenResult.tree, isRoot: false } as GenealogyNode
-            setFullTree(prev => {
-              if (!prev) return subtreeWithId
-              return mergeSubtree(prev, subtreeWithId)
-            })
-          }
-        }
-      }
-
       const result = await searchGenealogyByIdAction(id, systemIdForSearch)
-      console.log('[SEARCH] Result:', JSON.stringify(result))
+      console.log('[SEARCH] Result success:', result.success)
 
-      if (result.success && result.path && result.path.length > 0) {
-        setSearchResult({
-          path: result.path.map(n => ({ id: n.id, name: n.name })),
-          targetId: result.targetId
-        })
-        console.log('[SEARCH] searchResult set with', result.path.length, 'nodes')
+      if (result.success && result.mergedTree) {
+        // v8.5.0: Dùng mergedTree để hiển thị trọn vẹn (Ancestors + Subtree)
+        setFullTree(result.mergedTree as GenealogyNode)
+        setIsSearchMode(true)
+        setDisplayMode('full')
 
-        const targetId = result.targetId
-        activeFocusMapRef.current = new Map()
-        for (let i = 0; i < result.path.length - 1; i++) {
-          activeFocusMapRef.current.set(result.path[i].id, result.path[i + 1].id)
+        if (result.path) {
+          setSearchResult({
+            path: result.path,
+            targetId: result.targetId
+          })
+
+          // Xây dựng focus map từ path
+          activeFocusMapRef.current = new Map()
+          for (let i = 0; i < result.path.length - 1; i++) {
+            activeFocusMapRef.current.set(result.path[i].id, result.path[i + 1].id)
+          }
+          focusMapSizeRef.current = activeFocusMapRef.current.size
+          setFocusMapVersion(v => v + 1)
         }
-        focusMapSizeRef.current = activeFocusMapRef.current.size
-        setFocusMapVersion(v => v + 1)
 
         setError(null)
       } else {
@@ -854,7 +875,7 @@ function GenealogyFlow() {
         console.error('[Tree] Position map error:', e)
       }
 
-      const { resNodes, resEdges } = generateGraphNodes(treeToRender, 0, 0, { onToggleExpand: handleToggleExpand, onFocusSubtree: handleFocusSubtree }, activeFocusMapRef.current, true, editMode, isFocusMode ? 'full' : displayMode, positionMapRef.current)
+      const { resNodes, resEdges } = generateGraphNodes(treeToRender, 0, 0, { onToggleExpand: handleToggleExpand, onFocusSubtree: handleFocusSubtree, onShowDetails: handleShowDetails }, activeFocusMapRef.current, true, editMode, isFocusMode ? 'full' : displayMode, positionMapRef.current)
 
       const uniqueNodes = Array.from(new Map(resNodes.map(item => [item.id, item])).values())
       const uniqueEdges = Array.from(new Map(resEdges.map(item => [item.id, item])).values())
@@ -982,7 +1003,7 @@ function GenealogyFlow() {
               }
               handleSystemChange(systemId)
             }}
-            className="w-28 sm:w-32 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer"
+            className={`w-28 sm:w-32 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer transition-all ${selectedSystem === null ? 'animate-pulse-slow border-pink-400' : ''}`}
           >
             <option value="">Chọn hệ thống</option>
             {availableSystems.map((sys) => (
@@ -1122,29 +1143,13 @@ function GenealogyFlow() {
         {loading && nodes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full w-full absolute inset-0 z-30 text-center">
             <Zap className="w-8 h-8 text-rose-500 animate-pulse mb-4 mx-auto" />
-            <p className="text-slate-400 font-black text-xs tracking-widest uppercase">BIẾT ƠN NHÂN MẠCH NHÂN DUYÊN ...</p>
+            <p className="text-slate-400 font-black text-xs tracking-widest uppercase">HÃY CHỌN 1 HỆ THỐNG ĐỂ XEM NHÂN MẠCH & NHÂN DUYÊN CỦA BẠN...</p>
           </div>
         ) : (
           <div className="w-full h-full">
             <ReactFlow
-              nodes={searchResult ? searchResult.path.map((node, i) => ({
-                id: `search-${node.id}-${i}`,
-                type: 'searchNode',
-                position: { x: 0, y: i * 110 },
-                data: {
-                  id: node.id,
-                  name: node.name,
-                  isTarget: node.id === searchResult.targetId,
-                  level: i
-                }
-              })) : nodes}
-              edges={searchResult ? searchResult.path.slice(0, -1).map((node, i) => ({
-                id: `search-edge-${i}`,
-                source: `search-${node.id}-${i}`,
-                target: `search-${searchResult.path[i + 1].id}-${i + 1}`,
-                style: { stroke: '#f43f5e', strokeWidth: 2 },
-                type: 'straight'
-              })) : edges}
+              nodes={nodes}
+              edges={edges}
               defaultEdgeOptions={{ type: 'straight' }}
               nodeTypes={nodeTypes}
               fitView
@@ -1327,7 +1332,7 @@ function GenealogyFlow() {
               </button>
             </div>
             <p className="text-xs text-brk-muted mb-4 font-bold uppercase tracking-tight">Chọn một người dùng để làm Root (gốc) cho hệ thống này.</p>
-            
+
             <div className="relative mb-3">
               <input
                 type="text"
@@ -1374,10 +1379,10 @@ function GenealogyFlow() {
                 ))
               )}
             </div>
-            
+
             <div className="pt-4 border-t border-brk-outline mt-2">
-              <button 
-                onClick={() => { setCreateRootModal({ show: false, systemId: null }); setUserSearch(''); }} 
+              <button
+                onClick={() => { setCreateRootModal({ show: false, systemId: null }); setUserSearch(''); }}
                 className="w-full py-2.5 bg-brk-bg text-brk-on-surface rounded-xl font-black text-xs uppercase tracking-widest hover:opacity-80 transition-all border border-brk-outline"
               >
                 Đóng
@@ -1386,9 +1391,105 @@ function GenealogyFlow() {
           </div>
         </div>
       )}
+      {/* Member Details Modal */}
+      <MemberDetailsModal info={memberDetail} onClose={() => setMemberDetail(prev => ({ ...prev, show: false }))} />
 
     </div>
   )
+}
+
+// v8.5.0: Popup Modal hiển thị thông tin chi tiết thành viên
+function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose: () => void }) {
+  if (!info.show) return null;
+
+  const { user, tca } = info.data || {};
+  const isLoading = info.loading;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex items-center justify-center p-4 transition-all duration-300">
+      <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col animate-in fade-in zoom-in duration-300">
+        {/* Header với Gradient & Avatar */}
+        <div className={`h-32 bg-gradient-to-r ${tca ? 'from-indigo-600 to-violet-600' : 'from-emerald-600 to-teal-600'} relative`}>
+          <button
+            onClick={onClose}
+            className="absolute top-6 right-6 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all text-white backdrop-blur-sm"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {/* Avatar Profile */}
+          <div className="absolute -bottom-10 left-8">
+            <div className="w-24 h-24 rounded-3xl bg-white p-1.5 shadow-xl rotate-3">
+              <div className={`w-full h-full rounded-2xl flex items-center justify-center text-white font-black text-3xl ${tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
+                #{info.userId}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="pt-14 px-8 pb-8 flex flex-col">
+          {isLoading ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-4">
+              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent animate-spin rounded-full"></div>
+              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Đang tải thông tin...</span>
+            </div>
+          ) : (
+            <>
+              <div className="mb-6">
+                <h3 className="text-3xl font-black text-slate-800 leading-tight">
+                  {tca?.name || user?.name || 'Học viên'}
+                </h3>
+                {tca?.chuc_danh && (
+                  <div className="inline-block mt-1 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest border border-amber-100">
+                    {tca.chuc_danh}
+                  </div>
+                )}
+              </div>
+
+              {/* Grid Thông tin */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <InfoItem icon={<User className="w-4 h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
+                  <InfoItem icon={<Zap className="w-4 h-4" />} label="Cấp bậc" value={tca?.level ? `Cấp ${tca.level}` : 'Học viên'} />
+                  <InfoItem icon={<Users className="w-4 h-4" />} label="Đội nhóm" value={tca?.groupName || 'Hệ thống Học viên'} />
+                </div>
+                <div className="space-y-4">
+                  <InfoItem icon={<Zap className="w-4 h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
+                  <InfoItem icon={<Zap className="w-4 h-4 text-indigo-500" />} label="Email" value={user?.email || 'Chưa cập nhật'} />
+                  <InfoItem icon={<Zap className="w-4 h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
+                </div>
+              </div>
+
+              {/* Footer Button */}
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <button
+                  onClick={onClose}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98]"
+                >
+                  Xác nhận
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoItem({ icon, label, value }: { icon: any, label: string, value: string }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100/50">
+      <div className="mt-0.5 p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
+        {icon}
+      </div>
+      <div className="flex flex-col min-w-0">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{label}</span>
+        <span className="text-sm font-black text-slate-700 truncate">{value}</span>
+      </div>
+    </div>
+  );
 }
 
 export default function GenealogyPage() {
