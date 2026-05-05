@@ -1422,7 +1422,7 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
             <div className="w-24 h-24 rounded-full bg-white p-1.5 shadow-2xl relative z-10 border-4 border-white">
               <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden ${tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
                 {user?.image ? (
-                  <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" style={{ imageRendering: 'high-quality' }} />
+                  <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
                 ) : (
                   <Smile className="w-12 h-12 text-white/80" />
                 )}
