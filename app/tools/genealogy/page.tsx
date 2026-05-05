@@ -27,7 +27,7 @@ import * as d3 from 'd3-hierarchy'
 const NODE_WIDTH = 200
 const NODE_HEIGHT = 130
 const HORIZONTAL_SPACING = 20
-const VERTICAL_SPACING = 320 // Sửa: tăng khoảng cách các hàng từ 270 lên 320
+const VERTICAL_SPACING = 450 // Sửa: tăng khoảng cách các hàng từ 320 lên 450
 
 // Đếm số con trực tiếp của node
 // Hàm đệ quy build D3 Tree object
@@ -201,28 +201,42 @@ const GenealogyCard = (props: NodeProps) => {
     `}>
       {!isActuallyRoot && <Handle type="target" position={Position.Top} className="!opacity-0 !w-2 !h-2" style={{ top: -8 }} />}
 
-      {/* Avatar Semicircle - hình bán nguyệt, đường kính = 86% chiều ngang box (Sửa: 190px * 86% = 164px) */}
-      <div className="relative z-10 w-[164px] mx-auto -mt-6">
-        {/* Level Badge hình tròn - tăng kích thước to hơn (Sửa: tăng từ w-16 h-16 lên w-20 h-20 để chữ không bị giới hạn) */}
+      {/* Avatar Circle - thiết kế mới đồng bộ với Modal chi tiết */}
+      <div className="relative z-10 w-[164px] mx-auto -mt-10">
+        {/* Level Badge hình tròn - cho lùi xuống 1 chút (từ -top-16 xuống -top-12) */}
         {levelBadgeText && (
-          <div className={`absolute -top-10 left-1/2 -translate-x-1/2 z-20 w-18 h-18 rounded-full flex items-center justify-center text-[35px] font-black border-4 border-white shadow-lg ${getLevelBadgeColor(colorDepth)}`}>
+          <div className={`absolute -top-12 left-1/2 -translate-x-1/2 z-20 w-18 h-18 rounded-full flex items-center justify-center text-[35px] font-black border-4 border-white shadow-lg ${getLevelBadgeColor(colorDepth)}`}>
             {tcaLevel != null ? tcaLevel : '★'}
           </div>
         )}
-        {/* Clip container: chỉ hiện nửa trên của hình tròn 164px (Sửa: h-[82px] = nửa của 164px) */}
+        
+        {/* Container hình tròn hoàn chỉnh */}
         <div
           onClick={(e) => { e.stopPropagation(); data.onShowDetails?.(data.id); }}
-          className={`overflow-hidden h-[82px] cursor-pointer hover:scale-105 transition-transform ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400 rounded-t-full' : ''}`}
+          className={`relative p-2 bg-white rounded-full shadow-2xl cursor-pointer hover:scale-105 transition-transform ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400' : ''}`}
         >
-          <div className={`w-[164px] h-[164px] rounded-full flex items-start pt-9 justify-center text-white shadow-lg border-4 bg-gradient-to-br ${getLevelColor(colorDepth, isActuallyRoot)}`}>
-            <span className="text-[28px] font-black leading-tight text-center px-2">#{data.id}</span>
+          <div className={`w-[148px] h-[148px] rounded-full flex items-center justify-center text-white overflow-hidden shadow-inner border-4 bg-gradient-to-br ${getLevelColor(colorDepth, isActuallyRoot)}`}>
+            {data.image ? (
+              <img 
+                src={data.image} 
+                alt={data.name || ''} 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <User className="w-20 h-20 opacity-40" />
+            )}
+          </div>
+
+          {/* ID thành viên - Mới: Đưa lên phần dưới của hình tròn như một chiếc tag */}
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 px-3 py-0.5 bg-white/95 backdrop-blur-sm rounded-full shadow-md border border-slate-100 text-[13px] font-black text-slate-600 tracking-tighter">
+            #{data.id}
           </div>
         </div>
       </div>
 
-      {/* Information Box - tiếp ngay dưới semicircle, padding top nhỏ lại */}
-      <div className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-2 -mt rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-t-0 border-slate-100 w-full text-center relative z-0 flex flex-col items-center`}>
-        {/* Tên thành viên - Chuyển sang font Inter (Sửa: dùng inline style như các component khác trong dự án) */}
+      {/* Information Box - Tiếp ngay dưới circle, chèn lùi lên trên */}
+      <div className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center`}>
+        {/* Tên thành viên */}
         <div className="font-bold text-[20px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px font-sans">
           {data.name || 'Học viên'}
         </div>
