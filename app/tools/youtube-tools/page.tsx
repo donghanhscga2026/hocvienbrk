@@ -136,9 +136,10 @@ function FetchLinksTab() {
   const exportCSV = () => {
     const headers = ['STT', 'Tiêu đề', 'Link', 'Thời lượng', 'Ngày đăng']
     const rows = results.map(r => [r.stt, r.title, r.url, r.duration, r.publishedAt])
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const csvWithBom = '\uFEFF' + csvContent
     
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob([csvWithBom], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = `youtube-videos-${new Date().toISOString().split('T')[0]}.csv`
@@ -146,8 +147,24 @@ function FetchLinksTab() {
   }
 
   const exportToGoogleSheet = () => {
-    const sheetUrl = `https://docs.google.com/spreadsheets/create?usp=sharing&title=YouTube%20Videos%20${new Date().toISOString().split('T')[0]}`
-    window.open(sheetUrl, '_blank')
+    // 1. Chuẩn bị dữ liệu TSV (Tab Separated Values) - Google Sheet dán vào cực chuẩn
+    const headers = ['STT', 'Tiêu đề', 'Link', 'Thời lượng', 'Ngày đăng']
+    const rows = results.map(r => [r.stt, r.title, r.url, r.duration, r.publishedAt])
+    const tsvContent = [headers, ...rows].map(row => row.join('\t')).join('\n')
+    
+    // 2. Copy vào clipboard
+    navigator.clipboard.writeText(tsvContent).then(() => {
+      // 3. Thông báo cho người dùng
+      setError('✅ Đã copy dữ liệu! Hãy bấm Ctrl+V để dán vào Google Sheet mới mở.')
+      // Xóa thông báo sau 5s
+      setTimeout(() => setError(''), 5000)
+      
+      // 4. Mở Google Sheet mới
+      const sheetUrl = `https://docs.google.com/spreadsheets/create?usp=sharing&title=YouTube%20Videos%20${new Date().toISOString().split('T')[0]}`
+      window.open(sheetUrl, '_blank')
+    }).catch(err => {
+      setError('❌ Lỗi khi copy dữ liệu: ' + err.message)
+    })
   }
 
   return (
