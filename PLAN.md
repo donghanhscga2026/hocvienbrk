@@ -817,10 +817,11 @@ Khắc phục lỗi font tiếng Việt khi xuất CSV và xử lý vấn đề 
 ### Các file đã sửa
 #### `app/tools/youtube-tools/page.tsx`
 - **Fix CSV**: Thêm ký tự BOM (`\uFEFF`) vào đầu file CSV để Excel nhận diện đúng định dạng UTF-8, giúp hiển thị tiếng Việt chuẩn xác.
-- **Fix Google Sheet**: 
-    - Thay đổi quy trình từ mở file trống sang quy trình **TSV-Clipboard**.
-    - Dữ liệu được định dạng Tab-Separated Values (TSV) và tự động copy vào clipboard.
-    - Thêm thông báo hướng dẫn người dùng nhấn **Ctrl+V** để dán dữ liệu vào trang Google Sheet mới mở.
+- **Fix Google Sheet (UX Optimized)**: 
+    - Thay đổi quy trình thành **Copy -> Hướng dẫn -> Mở Sheet**.
+    - Khi nhấn nút "Sheet", dữ liệu TSV được tự động copy vào clipboard.
+    - Một **Modal hướng dẫn chuyên nghiệp** hiện ra với đầy đủ chỉ dẫn về cách dán dữ liệu (Ctrl+V).
+    - Chỉ khi người dùng nhấn **Tiếp tục**, hệ thống mới mở trang Google Sheet mới, giúp đảm bảo không bị trình duyệt chặn popup và người dùng đã đọc kỹ hướng dẫn.
 
 ### Trạng thái
 - ✅ Font tiếng Việt trong CSV hiển thị đúng trong Excel.

@@ -50,6 +50,7 @@ function FetchLinksTab() {
   const [results, setResults] = useState<VideoResult[]>([])
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [showSheetModal, setShowSheetModal] = useState(false)
 
   useEffect(() => {
     checkYouTubeConnection()
@@ -147,21 +148,15 @@ function FetchLinksTab() {
   }
 
   const exportToGoogleSheet = () => {
-    // 1. Chuẩn bị dữ liệu TSV (Tab Separated Values) - Google Sheet dán vào cực chuẩn
+    // 1. Chuẩn bị dữ liệu TSV (Tab Separated Values)
     const headers = ['STT', 'Tiêu đề', 'Link', 'Thời lượng', 'Ngày đăng']
     const rows = results.map(r => [r.stt, r.title, r.url, r.duration, r.publishedAt])
     const tsvContent = [headers, ...rows].map(row => row.join('\t')).join('\n')
     
     // 2. Copy vào clipboard
     navigator.clipboard.writeText(tsvContent).then(() => {
-      // 3. Thông báo cho người dùng
-      setError('✅ Đã copy dữ liệu! Hãy bấm Ctrl+V để dán vào Google Sheet mới mở.')
-      // Xóa thông báo sau 5s
-      setTimeout(() => setError(''), 5000)
-      
-      // 4. Mở Google Sheet mới
-      const sheetUrl = `https://docs.google.com/spreadsheets/create?usp=sharing&title=YouTube%20Videos%20${new Date().toISOString().split('T')[0]}`
-      window.open(sheetUrl, '_blank')
+      // 3. Hiện Modal hướng dẫn
+      setShowSheetModal(true)
     }).catch(err => {
       setError('❌ Lỗi khi copy dữ liệu: ' + err.message)
     })
@@ -416,6 +411,45 @@ function FetchLinksTab() {
         <div className="text-center py-12 text-gray-400">
           <Play className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>Nhập link YouTube và bấm "Lấy link video"</p>
+        </div>
+      )}
+
+      {/* MODAL HUONG DAN COPY SHEET */}
+      {showSheetModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSheetModal(false)} />
+          <div className="relative bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border border-gray-100 animate-in fade-in zoom-in duration-300">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <FileSpreadsheet className="w-10 h-10 text-green-600" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">Dữ liệu đã sẵn sàng!</h3>
+              <p className="text-gray-500 mb-8 leading-relaxed text-sm">
+                Đã copy <span className="font-bold text-gray-900">{results.length} video</span> vào bộ nhớ tạm. 
+                <br/>
+                Hãy bấm <span className="font-bold text-red-600">Tiếp tục</span> để mở Google Sheet mới, sau đó bấm <span className="font-bold text-red-600">Ctrl + V</span> để dán dữ liệu.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSheetModal(false)}
+                  className="flex-1 px-6 py-4 bg-gray-100 text-gray-600 font-bold uppercase tracking-widest text-[10px] rounded-2xl hover:bg-gray-200 transition-all"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => {
+                    const sheetUrl = `https://docs.google.com/spreadsheets/create?usp=sharing&title=YouTube%20Videos%20${new Date().toISOString().split('T')[0]}`
+                    window.open(sheetUrl, '_blank')
+                    setShowSheetModal(false)
+                  }}
+                  className="flex-1 px-6 py-4 bg-green-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-green-700 shadow-lg shadow-green-200 hover:shadow-green-300 transition-all active:scale-95"
+                >
+                  Tiếp tục
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
