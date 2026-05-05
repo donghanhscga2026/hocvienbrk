@@ -1034,26 +1034,7 @@ function GenealogyFlow() {
         {isTreeEmpty && selectedSystem !== null && selectedSystem !== 0 ? (
           <button
             type="button"
-            onClick={async (e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              const userIdInput = prompt('Nhập User ID làm root:')
-              if (!userIdInput) return
-              const userId = parseInt(userIdInput)
-              if (isNaN(userId) || userId <= 0) {
-                alert('User ID không hợp lệ')
-                return
-              }
-              setLoading(true)
-              const result = await createSystemRootAction(selectedSystem, userId)
-              console.log('[Tạo cây] Result:', result)
-              if (result.success) {
-                handleSystemChange(selectedSystem)
-              } else {
-                alert(result.error || 'Lỗi khi tạo root')
-                setLoading(false)
-              }
-            }}
+            onClick={() => setCreateRootModal({ show: true, systemId: selectedSystem })}
             className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 transition-all shrink-0"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1334,6 +1315,78 @@ function GenealogyFlow() {
           </div>
         </div>
       )}
+
+      {/* Create Root Modal (Admin Only) */}
+      {createRootModal.show && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-brk-surface w-full max-w-md rounded-2xl shadow-2xl p-6 max-h-[80vh] flex flex-col border border-brk-outline">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black text-brk-primary">Khởi tạo hệ thống #{createRootModal.systemId}</h2>
+              <button onClick={() => { setCreateRootModal({ show: false, systemId: null }); setUserSearch(''); }} className="p-2 hover:bg-brk-bg rounded-lg transition-colors">
+                <X className="w-5 h-5 text-brk-on-surface" />
+              </button>
+            </div>
+            <p className="text-xs text-brk-muted mb-4 font-bold uppercase tracking-tight">Chọn một người dùng để làm Root (gốc) cho hệ thống này.</p>
+            
+            <div className="relative mb-3">
+              <input
+                type="text"
+                placeholder="Tìm user theo tên hoặc ID..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-brk-bg border border-brk-outline text-brk-on-surface rounded-lg text-sm font-bold focus:ring-2 focus:ring-brk-primary outline-none transition-all"
+              />
+              <Search className="w-4 h-4 text-brk-muted absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar min-h-[200px]">
+              {loadingUsers ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <div className="w-6 h-6 border-2 border-brk-primary border-t-transparent animate-spin rounded-full"></div>
+                  <span className="text-xs font-bold text-brk-muted">Đang tải danh sách...</span>
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center py-10 text-sm text-brk-muted font-bold">Không tìm thấy người dùng phù hợp</div>
+              ) : (
+                filteredUsers.map(u => (
+                  <button
+                    key={u.id}
+                    onClick={async () => {
+                      if (!createRootModal.systemId) return;
+                      setLoading(true);
+                      setCreateRootModal({ show: false, systemId: null });
+                      const res = await createSystemRootAction(createRootModal.systemId, u.id);
+                      if (res.success) {
+                        handleSystemChange(createRootModal.systemId);
+                      } else {
+                        alert(res.error || 'Lỗi khi tạo root');
+                        setLoading(false);
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-brk-bg border border-transparent hover:border-brk-outline transition-all text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-brk-bg text-brk-muted flex items-center justify-center font-black text-sm group-hover:bg-brk-primary group-hover:text-brk-on-primary transition-colors">#{u.id}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-black text-brk-on-surface truncate">{u.name || 'Học viên'}</div>
+                      <div className="text-[10px] font-bold text-brk-muted truncate uppercase tracking-widest">{u.email}</div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            
+            <div className="pt-4 border-t border-brk-outline mt-2">
+              <button 
+                onClick={() => { setCreateRootModal({ show: false, systemId: null }); setUserSearch(''); }} 
+                className="w-full py-2.5 bg-brk-bg text-brk-on-surface rounded-xl font-black text-xs uppercase tracking-widest hover:opacity-80 transition-all border border-brk-outline"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

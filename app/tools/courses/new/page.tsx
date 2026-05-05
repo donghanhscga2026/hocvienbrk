@@ -1,10 +1,10 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
-import { updateCourseAction, updateLessonAction } from '@/app/actions/admin-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save } from 'lucide-react'
+import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -259,6 +259,19 @@ function CreateCourseContent() {
         }
         
         setLoading(false)
+    }
+
+    const handleDeleteLesson = async (lessonId: string) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa bài học này?')) return
+        const res = await deleteLessonAction(lessonId)
+        if (res.success) {
+            setMessage({ type: 'success', text: 'Đã xóa bài học thành công!' })
+            // Refresh lessons
+            const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
+            if (courseRes && !courseRes.error) setLessons(courseRes.lessons || [])
+        } else {
+            setMessage({ type: 'error', text: res.error || 'Lỗi khi xóa bài học' })
+        }
     }
     
     return (
@@ -638,12 +651,20 @@ function CreateCourseContent() {
                                             </div>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setSelectedLesson(lesson)}
-                                        className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                                    >
-                                        <Settings className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setSelectedLesson(lesson)}
+                                            className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all active:scale-90"
+                                        >
+                                            <Settings className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteLesson(lesson.id)}
+                                            className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all active:scale-90"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                             {lessons.length === 0 && (
@@ -663,7 +684,7 @@ function CreateCourseContent() {
                     onClose={() => setSelectedLesson(null)}
                     onSave={async (data: any) => {
                         const res = await updateLessonAction(data.id, {
-                            title: data.title, videoUrl: data.videoUrl, order: data.order
+                            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content
                         })
                         if (res.success) {
                             setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
@@ -672,6 +693,7 @@ function CreateCourseContent() {
                             if (courseRes && !courseRes.error) setLessons(courseRes.lessons || [])
                         }
                     }}
+                    onDelete={handleDeleteLesson}
                 />
             )}
 

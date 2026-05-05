@@ -53,52 +53,57 @@ export default function CreateSystemModal({ isOpen, onClose, onSuccess }: Create
 
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-brk-surface border-brk-outline text-brk-on-surface">
         <DialogHeader>
-          <DialogTitle>Tạo Hệ Thống Mới</DialogTitle>
+          <DialogTitle className="text-brk-on-surface">Tạo Hệ Thống Mới</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Tên hệ thống *</label>
+            <label className="block text-sm font-medium mb-1 text-brk-on-surface">Tên hệ thống *</label>
             <input
               type="text"
               value={nameSystem}
               onChange={(e) => setNameSystem(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-brk-bg border border-brk-outline text-brk-on-surface rounded-lg focus:outline-none focus:ring-2 focus:ring-brk-primary placeholder-brk-muted"
               placeholder="Ví dụ: Hệ thống mới"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Mã hệ thống (onSystem)</label>
+            <label className="block text-sm font-medium mb-1 text-brk-on-surface">Mã hệ thống (onSystem)</label>
             <input
               type="number"
               value={onSystem}
               onChange={(e) => setOnSystem(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-brk-bg border border-brk-outline text-brk-on-surface rounded-lg focus:outline-none focus:ring-2 focus:ring-brk-primary placeholder-brk-muted"
               placeholder="Để trống để tự động sinh"
             />
-            <p className="text-xs text-gray-500 mt-1">Nếu để trống, hệ thống sẽ tự động gán mã lớn nhất + 1</p>
+            <p className="text-xs text-brk-muted mt-1">Nếu để trống, hệ thống sẽ tự động gán mã lớn nhất + 1</p>
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
               {error}
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
+              className="border-brk-outline text-brk-on-surface hover:bg-brk-bg"
               onClick={() => { onClose(); setNameSystem(''); setOnSystem(''); setError('') }}
               disabled={loading}
             >
               Hủy
             </Button>
-            <Button type="submit" disabled={loading || !nameSystem.trim()}>
+            <Button 
+              type="submit" 
+              disabled={loading || !nameSystem.trim()}
+              className="bg-brk-primary text-brk-on-primary hover:opacity-90"
+            >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

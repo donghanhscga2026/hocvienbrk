@@ -1,9 +1,9 @@
-﻿﻿'use client'
+'use client'
 
 import { useState, useEffect, use } from 'react'
-import { updateCourseAction, updateLessonAction } from '@/app/actions/admin-actions'
+import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
 import { getTeachersAction } from '@/app/actions/course-actions'
-import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, List, Settings, Upload, FileSpreadsheet, Download, DollarSign, BookOpen } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, List, Settings, Upload, FileSpreadsheet, Download, DollarSign, BookOpen, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -211,6 +211,17 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         if (res.success) {
             setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
             fetchData() // Tải lại danh sách
+        }
+    }
+
+    const handleDeleteLesson = async (lessonId: string) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa bài học này?')) return
+        const res = await deleteLessonAction(lessonId)
+        if (res.success) {
+            setMessage({ type: 'success', text: 'Đã xóa bài học thành công!' })
+            fetchData()
+        } else {
+            setMessage({ type: 'error', text: res.error || 'Lỗi khi xóa bài học' })
         }
     }
 
@@ -468,12 +479,20 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setSelectedLesson(lesson)}
-                                    className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                                >
-                                    <Settings className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setSelectedLesson(lesson)}
+                                        className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all active:scale-90"
+                                    >
+                                        <Settings className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteLesson(lesson.id)}
+                                        className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all active:scale-90"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -485,6 +504,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         lesson={selectedLesson}
                         onClose={() => setSelectedLesson(null)}
                         onSave={handleUpdateLesson}
+                        onDelete={handleDeleteLesson}
                     />
                 )}
 

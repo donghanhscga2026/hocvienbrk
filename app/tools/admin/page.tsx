@@ -80,17 +80,20 @@ export default function AdminPage() {
   }
 
   return (
-    <main>
+    <main className="min-h-screen bg-brk-bg text-brk-on-surface">
       <MainHeader title="Quản Trị Hệ Thống" />
 
       <div className="container mx-auto px-4 py-8">
         {/* Header with create button */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tight">Quản Trị Hệ Thống</h1>
-            <p className="text-gray-600 mt-1">Quản lý các hệ thống trong dự án</p>
+            <h1 className="text-3xl font-black uppercase tracking-tight text-brk-on-surface">Quản Trị Hệ Thống</h1>
+            <p className="text-brk-muted mt-1">Quản lý các hệ thống trong dự án</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button 
+            onClick={() => setShowCreateModal(true)}
+            className="bg-brk-primary text-brk-on-primary hover:opacity-90"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Tạo hệ thống mới
           </Button>
@@ -98,19 +101,19 @@ export default function AdminPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-sm text-gray-500 mb-1">Tổng số hệ thống</p>
-            <p className="text-3xl font-black text-blue-600">{systems.length}</p>
+          <div className="bg-brk-surface p-6 rounded-2xl border border-brk-outline shadow-sm">
+            <p className="text-sm text-brk-muted mb-1">Tổng số hệ thống</p>
+            <p className="text-3xl font-black text-brk-primary">{systems.length}</p>
           </div>
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-sm text-gray-500 mb-1">Tổng số nodes</p>
-            <p className="text-3xl font-black text-green-600">
+          <div className="bg-brk-surface p-6 rounded-2xl border border-brk-outline shadow-sm">
+            <p className="text-sm text-brk-muted mb-1">Tổng số nodes</p>
+            <p className="text-3xl font-black text-green-500">
               {systems.reduce((sum, s) => sum + s.systemCount, 0)}
             </p>
           </div>
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <p className="text-sm text-gray-500 mb-1">Tổng closures</p>
-            <p className="text-3xl font-black text-purple-600">
+          <div className="bg-brk-surface p-6 rounded-2xl border border-brk-outline shadow-sm">
+            <p className="text-sm text-brk-muted mb-1">Tổng closures</p>
+            <p className="text-3xl font-black text-purple-500">
               {systems.reduce((sum, s) => sum + s.closureCount, 0)}
             </p>
           </div>
@@ -118,7 +121,7 @@ export default function AdminPage() {
 
         {/* Error Display */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 mb-6">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 mb-6">
             <AlertTriangle className="w-5 h-5 inline mr-2" />
             {error}
           </div>
@@ -127,75 +130,77 @@ export default function AdminPage() {
         {/* Loading State */}
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-            <span className="ml-3 text-lg">Đang tải...</span>
+            <Loader2 className="w-8 h-8 animate-spin text-brk-primary" />
+            <span className="ml-3 text-lg text-brk-muted">Đang tải...</span>
           </div>
         )}
 
         {/* Systems Table */}
         {!loading && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Mã (onSystem)</th>
-                  <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Tên hệ thống</th>
-                  <th className="px-6 py-4 text-center text-sm font-bold text-gray-700">Số nodes</th>
-                  <th className="px-6 py-4 text-center text-sm font-bold text-gray-700">Số closures</th>
-                  <th className="px-6 py-4 text-center text-sm font-bold text-gray-700">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {systems.length === 0 ? (
+          <div className="bg-brk-surface rounded-2xl border border-brk-outline shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-brk-bg border-b border-brk-outline">
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      Chưa có hệ thống nào. Hãy tạo hệ thống mới.
-                    </td>
+                    <th className="px-6 py-4 text-left text-sm font-bold text-brk-on-surface">Mã (onSystem)</th>
+                    <th className="px-6 py-4 text-left text-sm font-bold text-brk-on-surface">Tên hệ thống</th>
+                    <th className="px-6 py-4 text-center text-sm font-bold text-brk-on-surface">Số nodes</th>
+                    <th className="px-6 py-4 text-center text-sm font-bold text-brk-on-surface">Số closures</th>
+                    <th className="px-6 py-4 text-center text-sm font-bold text-brk-on-surface">Thao tác</th>
                   </tr>
-                ) : (
-                  systems.map((system) => {
-                    const isDefault = [0, 1, 2].includes(system.onSystem)
-                    return (
-                      <tr key={system.onSystem} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <span className="font-bold text-blue-600">{system.onSystem}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-medium">{system.nameSystem}</span>
-                          {isDefault && (
-                            <span className="ml-2 px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">
-                              Mặc định
+                </thead>
+                <tbody>
+                  {systems.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-brk-muted">
+                        Chưa có hệ thống nào. Hãy tạo hệ thống mới.
+                      </td>
+                    </tr>
+                  ) : (
+                    systems.map((system) => {
+                      const isDefault = [0, 1, 2].includes(system.onSystem)
+                      return (
+                        <tr key={system.onSystem} className="border-b border-brk-outline hover:bg-brk-bg/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-brk-primary">{system.onSystem}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-medium text-brk-on-surface">{system.nameSystem}</span>
+                            {isDefault && (
+                              <span className="ml-2 px-2 py-1 bg-amber-500/10 text-amber-500 text-xs font-bold rounded-full">
+                                Mặc định
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="px-3 py-1 bg-brk-primary/10 text-brk-primary rounded-full text-sm font-bold">
+                              {system.systemCount}
                             </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-bold">
-                            {system.systemCount}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm font-bold">
-                            {system.closureCount}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteClick(system)}
-                            disabled={isDefault}
-                            className={isDefault ? 'opacity-50 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}
-                            title={isDefault ? 'Hệ thống mặc định không thể xóa' : 'Xóa hệ thống'}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="px-3 py-1 bg-purple-500/10 text-purple-500 rounded-full text-sm font-bold">
+                              {system.closureCount}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteClick(system)}
+                              disabled={isDefault}
+                              className={isDefault ? 'opacity-50 cursor-not-allowed border-brk-outline' : 'text-red-500 border-red-500/20 hover:bg-red-500/10'}
+                              title={isDefault ? 'Hệ thống mặc định không thể xóa' : 'Xóa hệ thống'}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
