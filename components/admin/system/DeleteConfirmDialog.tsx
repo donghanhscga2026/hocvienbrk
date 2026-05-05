@@ -25,14 +25,11 @@ interface DeleteConfirmDialogProps {
 }
 
 export default function DeleteConfirmDialog({ isOpen, onClose, system, onSuccess }: DeleteConfirmDialogProps) {
-  const [confirmText, setConfirmText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const isConfirmed = confirmText === system?.nameSystem
-
   const handleDelete = async () => {
-    if (!system || !isConfirmed) return
+    if (!system) return
 
     setError('')
     setLoading(true)
@@ -44,7 +41,6 @@ export default function DeleteConfirmDialog({ isOpen, onClose, system, onSuccess
         setError(result.error)
       } else {
         alert(result.message || 'Xóa thành công!')
-        setConfirmText('')
         onSuccess()
         onClose()
       }
@@ -56,7 +52,6 @@ export default function DeleteConfirmDialog({ isOpen, onClose, system, onSuccess
   }
 
   const handleClose = () => {
-    setConfirmText('')
     setError('')
     onClose()
   }
@@ -92,18 +87,9 @@ export default function DeleteConfirmDialog({ isOpen, onClose, system, onSuccess
             </ul>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Nhập <span className="font-bold">{system.nameSystem}</span> để xác nhận:
-            </label>
-            <input
-              type="text"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-              placeholder={`Nhập "${system.nameSystem}"`}
-            />
-          </div>
+          <p className="text-sm text-red-600 font-medium italic">
+            ⚠️ Hành động này không thể hoàn tác.
+          </p>
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -124,7 +110,7 @@ export default function DeleteConfirmDialog({ isOpen, onClose, system, onSuccess
           <Button
             type="button"
             onClick={handleDelete}
-            disabled={loading || !isConfirmed}
+            disabled={loading}
             className="bg-red-600 hover:bg-red-700 text-white"
           >
             {loading ? (

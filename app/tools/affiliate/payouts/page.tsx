@@ -4,7 +4,8 @@ import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { approvePayout, rejectPayout } from "@/app/actions/affiliate-actions"
-import { AdminSubNav, affiliateSubNav } from "../../AdminNav"
+import { AdminSubNav } from "@/components/admin/AdminSubNav"
+import { affiliateSubNav } from "../affiliate-nav"
 
 async function getPayouts() {
     const payouts = await prisma.affiliatePayout.findMany({

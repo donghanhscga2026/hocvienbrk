@@ -6,7 +6,6 @@ import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Settings, ArrowLeft, Plus, Trash2, Loader2, AlertTriangle } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
-import AdminNav from '@/app/tools/AdminNav'
 import CreateSystemModal from '@/components/admin/system/CreateSystemModal'
 import DeleteConfirmDialog from '@/components/admin/system/DeleteConfirmDialog'
 import { getSystemStatsAction } from '@/app/actions/system-actions'
@@ -65,7 +64,6 @@ export default function AdminPage() {
     return (
       <main>
         <MainHeader title="Không có quyền truy cập" />
-        <AdminNav />
         <div className="container mx-auto px-4 py-20 text-center">
           <AlertTriangle className="w-16 h-16 mx-auto text-red-500 mb-4" />
           <h2 className="text-2xl font-bold text-red-600 mb-2">Không có quyền truy cập</h2>
@@ -84,7 +82,6 @@ export default function AdminPage() {
   return (
     <main>
       <MainHeader title="Quản Trị Hệ Thống" />
-      <AdminNav />
 
       <div className="container mx-auto px-4 py-8">
         {/* Header with create button */}

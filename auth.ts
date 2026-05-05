@@ -60,7 +60,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 // GIỚI HẠN INT4: 2,147,483,647. Nếu identifier là số quá lớn (như SĐT), không parse sang ID.
                 const potentialId = isNumeric ? parseInt(identifier) : -1;
-                const isValidId = potentialId > 0 && potentialId < 2147483647;
+                const isValidId = potentialId >= 0 && potentialId < 2147483647;
 
                 const user = await prisma.user.findFirst({
                     where: {
@@ -143,16 +143,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ],
     callbacks: {
         async redirect({ url, baseUrl }) {
-            // Ép buộc dùng domain chính nếu phát hiện đang ở domain vercel
+            // Hỗ trợ cả localhost và domain chính
+            if (url.startsWith("/")) return `${baseUrl}${url}`;
+            
+            // Nếu URL chứa vercel.app, có thể do đang ở môi trường preview
+            // Nếu bạn muốn ép về domain chính ở production thì giữ logic này, 
+            // nhưng phải cho phép localhost
             const mainDomain = "https://giautoandien.io.vn";
-            if (url.includes("vercel.app")) {
+            if (url.includes("vercel.app") && baseUrl !== "http://localhost:3000") {
                 return url.replace(/https:\/\/.*\.vercel\.app/, mainDomain);
             }
-            // Cho phép chuyển hướng nếu cùng domain chính
-            if (url.startsWith(mainDomain)) return url;
-            // Mặc định về trang chủ của domain chính
-            if (url.startsWith("/")) return `${mainDomain}${url}`;
-            return mainDomain;
+
+            // Nếu URL đã là tuyệt đối và cùng origin với baseUrl thì cho phép
+            try {
+                const urlObj = new URL(url);
+                const baseObj = new URL(baseUrl);
+                if (urlObj.origin === baseObj.origin) return url;
+            } catch (e) {
+                // Ignore invalid URLs
+            }
+
+            return baseUrl;
         },
         async jwt({ token, user, trigger, session }) {
             if (user) {
