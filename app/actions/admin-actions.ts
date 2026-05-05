@@ -20,6 +20,7 @@ async function checkAdmin() {
 export interface GenealogyNode {
     id: number
     name: string | null
+    image?: string | null
     referrerId: number | null
     totalSubCount: number
     f1aCount: number
@@ -62,7 +63,7 @@ async function getSystemRootUser(systemId: number): Promise<{ id: number; name: 
     if (!rootSystem) return null
     const user = await prisma.user.findUnique({
         where: { id: rootSystem.userId },
-        select: { id: true, name: true }
+        select: { id: true, name: true, image: true }
     })
     return user
 }
@@ -79,7 +80,7 @@ async function buildStandardTree(
     // 1. Lấy thông tin Root
     const rootUser = await prisma.user.findUnique({
         where: { id: rootId },
-        select: { id: true, name: true, referrerId: true }
+        select: { id: true, name: true, image: true, referrerId: true }
     })
     if (!rootUser) return null
 
@@ -99,7 +100,7 @@ async function buildStandardTree(
                 onSystem: systemId,
                 userId: { not: rootId }
             },
-            include: { user: { select: { id: true, name: true } } }
+            include: { user: { select: { id: true, name: true, image: true } } }
         })
     } else {
         const users = await prisma.user.findMany({
@@ -107,7 +108,7 @@ async function buildStandardTree(
                 referrerId: rootId,
                 id: { not: rootId }
             },
-            select: { id: true, name: true }
+            select: { id: true, name: true, image: true }
         })
         f1Data = users.map((u: { id: number; name: string | null }) => ({ ...u, autoId: u.id, user: u }))
     }
@@ -143,7 +144,7 @@ async function buildStandardTree(
                 ],
                 depth: { gte: 0 }
             },
-            include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true } } } } : { select: { id: true, name: true } } }
+            include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true, image: true } } } } : { select: { id: true, name: true, image: true } } }
         }),
         (closureModel as any).count({
             where: { ...whereBase, ancestorId: rootAutoId }
@@ -214,6 +215,7 @@ async function buildStandardTree(
             depth: c.depth,
             userId: desc.id,
             name: desc.name,
+            image: desc.image,
             autoId: isSystem ? c.descendantId : desc.id
         })
     }
@@ -233,6 +235,7 @@ async function buildStandardTree(
             return { 
                 id: c.userId, 
                 name: c.name,
+                image: c.image,
                 level: f2tca?.level ?? null,
                 personalScore: f2tca?.personalScore ?? null,
                 totalScore: f2tca?.totalScore ?? null,
@@ -247,6 +250,7 @@ async function buildStandardTree(
         const fData = { 
             id: f1.user.id, 
             name: f1.user.name, 
+            image: f1.user.image, 
             totalSubCount: closures.length, 
             children: f2s,
             level: f1tca?.level ?? null,
@@ -286,6 +290,7 @@ async function buildStandardTree(
             return {
                 id: child.userId,
                 name: child.name,
+                image: child.image,
                 referrerId: null,
                 totalSubCount: (closureByAncestor.get(child.autoId) || []).length,
                 f1aCount: 0, f1bCount: 0, f1cCount: 0,
@@ -316,6 +321,7 @@ async function buildStandardTree(
             return {
                 id: f2.userId,
                 name: f2.name,
+                image: f2.image,
                 referrerId: null,
                 totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
                 f1aCount: 0, f1bCount: 0, f1cCount: 0,
@@ -391,7 +397,7 @@ async function buildStandardTree(
     } : (isSystem ? { total: totalCount, active: 0, bdh: 0, dhtt: 0 } : null)
 
     return {
-        id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
+        id: rootUser.id, name: rootUser.name, image: rootUser.image, referrerId: rootUser.referrerId || null,
         totalSubCount: totalCount,
         f1aCount: groupA.length,
         f1bCount: groupB.length,
