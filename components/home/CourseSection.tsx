@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import CourseCard from '@/components/course/CourseCard'
 import { ChevronDown, ChevronUp, Clock, LayoutGrid } from 'lucide-react'
+import { useExpandWithCountdown } from '@/hooks/useExpandWithCountdown'
 
 interface CourseCategoryGroupProps {
     categoryName: string
@@ -27,59 +28,11 @@ function CourseCategoryGroup({
     darkMode = false,
     profileSlug = null
 }: CourseCategoryGroupProps) {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const [countdown, setCountdown] = useState(10)
-    const timerRef = useRef<NodeJS.Timeout | null>(null)
-    const intervalRef = useRef<NodeJS.Timeout | null>(null)
-    const groupRef = useRef<HTMLDivElement>(null)
+    const { isExpanded, countdown, handleActivity, setIsExpanded } = useExpandWithCountdown(10)
+    const groupRef = React.useRef<HTMLDivElement>(null)
 
-    const resetTimer = useCallback(() => {
-        if (timerRef.current) clearTimeout(timerRef.current)
-        if (intervalRef.current) clearInterval(intervalRef.current)
-        
-        if (isExpanded) {
-            setCountdown(10)
-            
-            intervalRef.current = setInterval(() => {
-                setCountdown(prev => (prev > 0 ? prev - 1 : 0))
-            }, 1000)
-
-            timerRef.current = setTimeout(() => {
-                setIsExpanded(false)
-            }, 10000)
-        }
-    }, [isExpanded])
-
-    useEffect(() => {
-        if (isExpanded) {
-            resetTimer()
-        } else {
-            if (timerRef.current) clearTimeout(timerRef.current)
-            if (intervalRef.current) clearInterval(intervalRef.current)
-        }
-        return () => {
-            if (timerRef.current) clearTimeout(timerRef.current)
-            if (intervalRef.current) clearInterval(intervalRef.current)
-        }
-    }, [isExpanded, resetTimer])
-
-    const handleActivity = () => {
-        if (isExpanded) resetTimer()
-    }
-
-    // Tính toán số lượng khóa học hiển thị khi thu gọn dựa trên thiết bị
-    const [displayCount, setDisplayCount] = useState(1)
-    
-    useEffect(() => {
-        const updateCount = () => {
-            // Trên Desktop (>= 768px) hiện 3 khóa, trên Mobile hiện 1 khóa
-            setDisplayCount(window.innerWidth >= 768 ? 3 : 1)
-        }
-        updateCount()
-        window.addEventListener('resize', updateCount)
-        return () => window.removeEventListener('resize', updateCount)
-    }, [])
-
+    // Hiển thị 3 khóa khi thu gọn (cả mobile và desktop)
+    const displayCount = 3
     const visibleCourses = isExpanded ? courses : courses.slice(0, displayCount)
     const hasMore = courses.length > displayCount
 
@@ -184,37 +137,7 @@ export default function CourseSection({
     accentColor = 'bg-blue-600',
     profileSlug = null
 }: CourseSectionProps) {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const [countdown, setCountdown] = useState(10)
-    const timerRef = useRef<NodeJS.Timeout | null>(null)
-    const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-    const resetTimer = useCallback(() => {
-        if (timerRef.current) clearTimeout(timerRef.current)
-        if (intervalRef.current) clearInterval(intervalRef.current)
-        
-        if (isExpanded) {
-            setCountdown(10)
-            intervalRef.current = setInterval(() => {
-                setCountdown(prev => (prev > 0 ? prev - 1 : 0))
-            }, 1000)
-            timerRef.current = setTimeout(() => {
-                setIsExpanded(false)
-            }, 10000)
-        }
-    }, [isExpanded])
-
-    useEffect(() => {
-        if (isExpanded) resetTimer()
-        return () => {
-            if (timerRef.current) clearTimeout(timerRef.current)
-            if (intervalRef.current) clearInterval(intervalRef.current)
-        }
-    }, [isExpanded, resetTimer])
-
-    const handleActivity = () => {
-        if (isExpanded) resetTimer()
-    }
+    const { isExpanded, countdown, handleActivity, setIsExpanded } = useExpandWithCountdown(10)
 
     // Nếu có groupedCourses thì hiển thị theo nhóm
     if (groupedCourses && groupedCourses.length > 0) {
@@ -247,20 +170,8 @@ export default function CourseSection({
         )
     }
 
-    // Tính toán số lượng khóa học hiển thị khi thu gọn dựa trên thiết bị cho nhóm "Khóa học của tôi"
-    const [displayCount, setDisplayCount] = useState(3)
-    
-    useEffect(() => {
-        const updateCount = () => {
-            // Trên Desktop (>= 768px) hiện 3 khóa, trên Mobile hiện 1 khóa
-            setDisplayCount(window.innerWidth >= 768 ? 3 : 1)
-        }
-        updateCount()
-        window.addEventListener('resize', updateCount)
-        return () => window.removeEventListener('resize', updateCount)
-    }, [])
-
-    // Hiển thị dạng phẳng có thu gọn cho "Khóa học của tôi"
+    // Hiển thị 3 khóa khi thu gọn (cả mobile và desktop)
+    const displayCount = 3
     const visibleCourses = isExpanded ? (courses || []) : (courses || []).slice(0, displayCount)
     const hasMore = (courses || []).length > displayCount
 
