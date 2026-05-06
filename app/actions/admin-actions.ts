@@ -350,6 +350,7 @@ async function buildStandardTree(
             const gfData = { 
                 id: gf1.userId, 
                 name: gf1.name, 
+                image: gf1.image,
                 totalSubCount: gf1Closures.length, 
                 children: gf2sOld,
                 groupName: gf1tca?.groupName ?? null,  // v8.4.1: Thêm groupName
@@ -370,7 +371,7 @@ async function buildStandardTree(
 
         const f1tca = tcaMemberMap.get(f1Info.id) ?? tcaMemberMap.get(f1Record?.autoId)
         return {
-            id: f1Info.id, name: f1Info.name, referrerId: null,
+            id: f1Info.id, name: f1Info.name, image: f1Info.image, referrerId: null,
             totalSubCount: f1Closures.length, 
             f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
             groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
@@ -513,14 +514,14 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
                 orderBy: { depth: 'desc' },
                 include: { 
                     ancestor: { 
-                        include: { user: { select: { id: true, name: true } } }
+                        include: { user: { select: { id: true, name: true, image: true } } }
                     } 
                 }
               })
             : await prisma.userClosure.findMany({
                 where: { descendantId: targetId },
                 orderBy: { depth: 'desc' },
-                include: { ancestor: { select: { id: true, name: true, referrerId: true } } }
+                include: { ancestor: { select: { id: true, name: true, image: true, referrerId: true } } }
               })
 
         if (!ancestors || ancestors.length === 0) {
@@ -537,9 +538,10 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
         // 4. Build cây gộp từ dưới lên (Target -> Parent -> ... -> Root)
         // ancestors list là [Root, ..., Parent, Target]
         let mergedTree: GenealogyNode = { ...targetSubtree, isRoot: ancestors.length === 1 }
-        const pathNodes: { id: number; name: string | null }[] = ancestors.map((anc: any) => ({
+        const pathNodes: { id: number; name: string | null; image: string | null }[] = ancestors.map((anc: any) => ({
             id: isSystem ? anc.ancestor.userId : (anc.ancestorId || anc.ancestor.id),
-            name: isSystem ? anc.ancestor.user?.name : anc.ancestor.name
+            name: isSystem ? anc.ancestor.user?.name : anc.ancestor.name,
+            image: isSystem ? anc.ancestor.user?.image : anc.ancestor.image
         }))
 
         // Lấy thông tin chi tiết cho các node trên path (trừ node Target đã có trong subtree)
@@ -559,6 +561,7 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
             mergedTree = {
                 id: nodeId,
                 name: name || 'HV',
+                image: pathNodes[i].image,
                 referrerId: null,
                 totalSubCount: 0, // Tổ tiên trên path chỉ hiển thị đường dẫn nên tạm để 0 hoặc query nốt
                 f1aCount: f1Count, f1bCount: 0, f1cCount: 0, 
