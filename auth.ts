@@ -128,16 +128,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const isDefault = await isDefaultPassword(user.password);
                 const userAny = user as any;
                 
+                // Tối ưu hóa: Nếu ảnh là base64 quá lớn (> 2KB), không cho vào session để tránh lỗi Header Too Large (494)
+                let sessionImage = user.image;
+                if (sessionImage && sessionImage.startsWith('data:image') && sessionImage.length > 2048) {
+                    console.log(`⚠️ [Auth] Ảnh của user #${user.id} quá lớn (${sessionImage.length} chars), đã loại bỏ khỏi session để tránh lỗi cookie.`);
+                    sessionImage = null; 
+                }
+
                 return {
                     id: user.id.toString(),
                     name: user.name,
                     email: user.email,
                     role: user.role,
-                    image: user.image,
-                    affiliateCode: user.affiliateCode ?? undefined, // Chuyển null thành undefined cho TS
+                    image: sessionImage,
+                    affiliateCode: user.affiliateCode ?? undefined, 
                     needsPasswordChange: isDefault && !userAny.passwordChanged,
                     isUnverifiedLegacy: !user.emailVerified && isLegacy, 
-                } as any; // Cast as any để tránh lỗi type hẹp của NextAuth User
+                } as any; 
             },
         }),
     ],
