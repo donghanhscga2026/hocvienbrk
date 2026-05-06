@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { saveBase64Image } from "@/lib/image-utils"
 
 export async function getUserWithAccounts() {
     const session = await auth()
@@ -34,7 +35,6 @@ export async function updateUserProfile(data: {
     if (!session?.user?.id) return { success: false, message: "Unauthorized" }
 
     const userId = parseInt(session.user.id as string)
-    const { saveBase64Image } = await import("@/lib/image-utils")
 
     try {
         let finalImageUrl = data.image;
