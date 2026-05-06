@@ -44,10 +44,16 @@ export async function createPaymentForEnrollment(enrollmentId: number, courseFee
 
 export async function updatePaymentProof(enrollmentId: number, proofImageUrl: string) {
   try {
+    const { saveBase64Image } = await import("@/lib/image-utils")
+    let finalImageUrl = proofImageUrl
+    if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+      finalImageUrl = await saveBase64Image(finalImageUrl, 'payments')
+    }
+
     const payment = await prisma.payment.update({
       where: { enrollmentId },
       data: {
-        proofImage: proofImageUrl,
+        proofImage: finalImageUrl,
         verifyMethod: 'MANUAL_UPLOAD'
       }
     })
