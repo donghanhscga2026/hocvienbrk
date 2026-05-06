@@ -34,14 +34,20 @@ export async function updateUserProfile(data: {
     if (!session?.user?.id) return { success: false, message: "Unauthorized" }
 
     const userId = parseInt(session.user.id as string)
+    const { saveBase64Image } = await import("@/lib/image-utils")
 
     try {
+        let finalImageUrl = data.image;
+        if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+            finalImageUrl = await saveBase64Image(finalImageUrl);
+        }
+
         await prisma.user.update({
             where: { id: userId },
             data: {
                 name: data.name,
                 phone: data.phone,
-                image: data.image,
+                image: finalImageUrl,
             }
         })
 
