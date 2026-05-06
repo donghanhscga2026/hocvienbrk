@@ -23,29 +23,36 @@ export async function saveBase64Image(base64Data: string, subDir: string = 'avat
         const fileName = `img_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
 
         // 1. THỬ ĐẨY LÊN SUPABASE STORAGE (ƯU TIÊN)
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        // Lưu ý: Trên Server ta có thể dùng cả biến có hoặc không có NEXT_PUBLIC_
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
         if (supabaseUrl && supabaseKey) {
-            console.log(`☁️ [ImageUtils] Đang đẩy lên Supabase Storage (${subDir}/${fileName})...`);
+            console.log(`☁️ [ImageUtils] Đang thử đẩy lên Supabase... (Bucket: uploads, Thư mục: ${subDir})`);
             
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('uploads')
                 .upload(`${subDir}/${fileName}`, buffer, {
                     contentType: `image/${extension}`,
+                    cacheControl: '3600',
                     upsert: true
                 });
 
-            if (!uploadError && uploadData) {
+            if (uploadError) {
+                console.error(`❌ [ImageUtils] Lỗi Supabase Storage:`, uploadError.message);
+                console.error(`🔍 [ImageUtils] Chi tiết lỗi:`, JSON.stringify(uploadError));
+            } else if (uploadData) {
                 const { data: publicUrlData } = supabase.storage
                     .from('uploads')
                     .getPublicUrl(`${subDir}/${fileName}`);
                 
-                console.log(`✅ [ImageUtils] Đã đẩy lên Supabase: ${publicUrlData.publicUrl}`);
-                return publicUrlData.publicUrl;
-            } else {
-                console.warn(`⚠️ [ImageUtils] Lỗi Supabase Storage (Có thể do chưa tạo bucket 'uploads'):`, uploadError?.message);
+                if (publicUrlData?.publicUrl) {
+                    console.log(`✅ [ImageUtils] Up thành công! URL: ${publicUrlData.publicUrl}`);
+                    return publicUrlData.publicUrl;
+                }
             }
+        } else {
+            console.warn('⚠️ [ImageUtils] Thiếu biến môi trường SUPABASE_URL hoặc KEY. Kiểm tra lại Vercel Settings.');
         }
 
         // 2. DỰ PHÒNG: LƯU LOCAL (CHỈ CHẠY ĐƯỢC TRÊN LOCAL/VPS, KHÔNG CHẠY ĐƯỢC TRÊN VERCEL)
