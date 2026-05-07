@@ -853,10 +853,17 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
     - **SỬA LỖI NGHIÊM TRỌNG (SERVER)**: Đã tích hợp `forceFull` vào `buildStandardTree` để đảm bảo khi tìm kiếm, hệ thống hiển thị TRỌN VẸN tất cả các node phía dưới (không bị ẩn bởi cơ chế phân nhóm A/B).
     - **SỬA LỖI NGHIÊM TRỌNG (FRONTEND)**: Loại bỏ toán tử ba ngôi "phá đám" trong JSX của `page.tsx`. Giờ đây React Flow sẽ luôn sử dụng dữ liệu cây đầy đủ (`nodes`, `edges`) ngay cả khi tìm kiếm, không còn bị ép hiển thị chỉ đường dẫn dạng thẻ đơn giản.
 - **v8.5.2 UI Enhancements**:
-    - Cập nhật giao diện `MemberDetailsModal`: Thêm ảnh đại diện hình tròn (hoặc icon mặt cười), sắp xếp lại grid thông tin (Ngày tham gia lên hàng 2, Email xuống hàng 3 rộng toàn bộ), loại bỏ mục Đội nhóm không cần thiết.
-    - Tối ưu font chữ `#UserID` nhỏ gọn hơn trong modal.
+    - Cập nhật giao diện MemberDetailsModal: Thêm ảnh đại diện hình tròn (hoặc icon mặt cười), sắp xếp lại grid thông tin.
+    - Tối ưu font chữ #UserID nhỏ gọn hơn trong modal.
+- **v8.6.0 Premium Design & Storage Optimization (2026-05-06)**:
+    - **Thiết kế Node Cây hệ thống mới**: Node hình tròn (Circular Avatar), viền trắng 3D, tag #UserID backdrop-blur.
+    - **Tối ưu hóa Storage**: Tích hợp Supabase Storage, loại bỏ Base64 trong DB cho Avatar/Post/Payment.
+    - **Sửa lỗi & Bảo mật**: Fix lỗi 494 Header Too Large cho Admin, sửa lỗi mất ảnh node con Nhóm C.
 
 ### Trạng thái
+- ✅ Hệ thống Genealogy đạt chuẩn thẩm mỹ cao cấp (Premium Design).
+- ✅ Tối ưu hóa hiệu suất Cookie và Database thông qua Cloud Storage.
+- ✅ Đăng nhập Admin hoạt động ổn định, không còn lỗi tràn Header.
 - ✅ Tìm kiếm ID hiển thị trọn vẹn "Họ đến từ đâu" và "Họ dẫn dắt những ai".
 - ✅ Popup thông tin chi tiết hoạt động mượt mà, thiết kế cao cấp.
 - ✅ Tuyệt đối bảo tồn layout gốc, không dùng nút Quay lại.
