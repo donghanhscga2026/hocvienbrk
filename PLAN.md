@@ -860,10 +860,21 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
     - **Tối ưu hóa Storage**: Tích hợp Supabase Storage, loại bỏ Base64 trong DB cho Avatar/Post/Payment.
     - **Sửa lỗi & Bảo mật**: Fix lỗi 494 Header Too Large cho Admin, sửa lỗi mất ảnh node con Nhóm C.
 
+- **v8.7.0 Genealogy UI & UX Upgrade (2026-05-07)**:
+    - **Tối ưu hóa không gian Toolbar**: Thu hẹp chiều rộng ô Chọn hệ thống và ô Tìm kiếm ID.
+    - **Tính năng "Đội của tôi" (My Team)**: Tích hợp checkbox tự động focus vào người dùng với tối đa 2 tầng cha + toàn bộ tầng dưới.
+    - **Cải tiến Logic Server**: Cập nhật search action hỗ trợ tham số limitAncestors.
+
 ### Trạng thái
 - ✅ Hệ thống Genealogy đạt chuẩn thẩm mỹ cao cấp (Premium Design).
 - ✅ Tối ưu hóa hiệu suất Cookie và Database thông qua Cloud Storage.
 - ✅ Đăng nhập Admin hoạt động ổn định, không còn lỗi tràn Header.
-- ✅ Tìm kiếm ID hiển thị trọn vẹn "Họ đến từ đâu" và "Họ dẫn dắt những ai".
-- ✅ Popup thông tin chi tiết hoạt động mượt mà, thiết kế cao cấp.
+- ✅ Tính năng "Đội của tôi" hoạt động thông minh, hiển thị đúng 2 tầng cha + toàn bộ tầng dưới.
+- ✅ Giao diện thanh công cụ gọn gàng, tiết kiệm diện tích.
 - ✅ Tuyệt đối bảo tồn layout gốc, không dùng nút Quay lại.
+
+- **v8.7.5 Tree Structure Fix (2026-05-07)**:
+    - **Sửa lỗi Vỡ cấu trúc (Flattening Bug)**: Khắc phục lỗi trong `buildFullTreeFromClosures` khiến toàn bộ hậu duệ bị đẩy lên làm con trực tiếp của Root. Đã thêm ràng buộc `depth === 1` để khôi phục đúng phân cấp cây đa tầng.
+- **v8.7.6 Race Condition & UI Feedback (2026-05-07)**:
+    - **Fix Race Condition**: Đồng bộ hóa `handleSearch` và `handleSystemChange` bằng cách cho phép truyền `forcedSystemId` trực tiếp, tránh lỗi hiển thị nhầm hệ thống "Học viên" do độ trễ state.
+    - **Cải thiện UX**: Cập nhật thông báo "ĐANG TẢI DỮ LIỆU..." khi chuyển đổi hệ thống thay vì hiện placeholder mặc định.
