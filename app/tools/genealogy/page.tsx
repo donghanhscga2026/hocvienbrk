@@ -19,7 +19,8 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { Role } from '@prisma/client'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
 
@@ -385,6 +386,9 @@ function GenealogyFlow() {
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
   // v8.4.0: State cho filter Active
   const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false)
+  // v8.7.0: State cho "Đội của tôi"
+  const [showMyTeamOnly, setShowMyTeamOnly] = useState<boolean>(false)
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
 
   // v8.4.0: Computed tree - lọc tại nguồn data khi showActiveOnly thay đổi
   const filteredTree = useMemo(() => {
@@ -431,9 +435,10 @@ function GenealogyFlow() {
     async function loadUserRole() {
       const result = await getCurrentUserRoleAction()
       console.log('[Genealogy] User role result:', result)
-      if (result.success && result.role === 'ADMIN') {
-        setIsAdmin(true)
-        console.log('[Genealogy] Set isAdmin = true')
+      if (result.success) {
+        if (result.role === 'ADMIN') setIsAdmin(true)
+        setCurrentUserId(result.userId ?? null)
+        console.log('[Genealogy] Current User ID:', result.userId)
       }
     }
     loadUserRole()
@@ -717,102 +722,9 @@ function GenealogyFlow() {
     setLoading(false);
   }, [fullTree, mergeSubtree, selectedSystem])
 
-  const handleSystemChange = useCallback(async (systemId: number | null) => {
-    setSelectedSystem(systemId)
-    setLoading(true)
-    setError(null)
-    setIsTreeEmpty(false)
-    activeFocusMapRef.current = new Map()
-    focusMapSizeRef.current = 0
-    setFocusMapVersion(v => v + 1)
-    lastExpandedIdRef.current = null
-    setIsSearchMode(false)
-    setSearchResult(null)
-
-    // Lấy userId hiện tại
-    const roleResult = await getCurrentUserRoleAction()
-    const currentUserId = roleResult.userId || 0
-    const isAdminNow = roleResult.success && roleResult.role === 'ADMIN'
-
-    try {
-      if (systemId === null) {
-        setFullTree(null)
-      } else if (systemId === 0) {
-        // Hệ thống Học viên - lấy từ user đang đăng nhập
-        const result = await getGenealogyTreeAction(currentUserId)
-        if (result.success && result.tree) {
-          setFullTree(result.tree)
-          setIsTreeEmpty(false)
-        } else {
-          setFullTree(null)
-          setIsTreeEmpty(true)
-          alert('Chưa có dữ liệu nhân mạch. Hãy bắt đầu giới thiệu thành viên để xây dựng cây.')
-        }
-      } else {
-        // Hệ thống TCA/KTC - Sửa bug: gọi đúng function theo displayMode
-        const result = displayMode === 'full'
-          ? await getFullSystemTreeAction(systemId)
-          : await getSystemTreeAction(systemId)
-        if (result.success && result.tree) {
-          setFullTree(result.tree)
-          setIsTreeEmpty(false)
-        } else {
-          const errMsg = result.error || ''
-          // Nếu lỗi là "không tìm thấy root" hoặc "không thuộc hệ thống"
-          const isNoRootError = errMsg.includes('root') || errMsg.includes('thuộc')
-
-          if (isAdminNow && isNoRootError) {
-            // Admin + hệ thống chưa có root
-            setFullTree(null)
-            setIsTreeEmpty(true)
-            alert('Hệ thống chưa có dữ liệu. Nhấn nút + để tạo cây sơ đồ với bạn làm root.')
-          } else {
-            // User thường hoặc đã có root nhưng không thuộc
-            setFullTree(null)
-            alert('Bạn chưa tham gia hệ thống đã chọn')
-          }
-        }
-      }
-    } catch (e) {
-      setFullTree(null)
-      setError("Lỗi khi tải dữ liệu")
-    }
-    setLoading(false)
-  }, [])
-
-  // Không cần useEffect catch displayMode để refetch nữa vì dữ liệu tree chung đã có đủ F1, F2
-
-
-  const initTree = useCallback(async (rootId: number = 0) => {
-    setLoading(true); setError(null); setIsTreeEmpty(false); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
-
-    let result;
-    if (selectedSystem === null) {
-      setLoading(false)
-      return
-    } else if (selectedSystem === 0) {
-      result = await getGenealogyTreeAction(rootId)
-    } else {
-      // Sửa bug: gọi đúng function theo displayMode
-      result = displayMode === 'full'
-        ? await getFullSystemTreeAction(selectedSystem)
-        : await getSystemTreeAction(selectedSystem)
-    }
-
-    if (result && result.success && result.tree) {
-      setFullTree(result.tree)
-      setIsTreeEmpty(false)
-    } else if (result) {
-      // Khi không tìm thấy cây (root không tồn tại)
-      setFullTree(null)
-      setIsTreeEmpty(true)
-      setError(null)
-    }
-    setLoading(false)
-  }, [selectedSystem, displayMode])
-
-  const handleSearch = useCallback(async () => {
-    const id = parseInt(searchInput.replace('#', ''))
+  const handleSearch = useCallback(async (forcedId?: number, forcedSystemId?: number | null) => {
+    const idStr = forcedId ? `#${forcedId}` : searchInput
+    const id = parseInt(idStr.replace('#', ''))
     if (isNaN(id)) {
       setSearchError('ID không hợp lệ')
       return
@@ -823,10 +735,13 @@ function GenealogyFlow() {
     setSearchResult(null)
 
     try {
-      const systemIdForSearch = selectedSystem === 0 ? undefined : (selectedSystem ?? undefined)
+      const activeSystemId = forcedSystemId !== undefined ? forcedSystemId : selectedSystem
+      const systemIdForSearch = activeSystemId === 0 ? undefined : (activeSystemId ?? undefined)
       console.log('[SEARCH] Searching for ID:', id, 'systemId:', systemIdForSearch)
 
-      const result = await searchGenealogyByIdAction(id, systemIdForSearch)
+      // v8.7.0: Nêu là "Đội của tôi" thì chỉ lấy 2 tầng cha
+      const limitAncestors = (forcedId && showMyTeamOnly) ? 2 : null
+      const result = await searchGenealogyByIdAction(id, systemIdForSearch, limitAncestors)
       console.log('[SEARCH] Result success:', result.success)
 
       if (result.success && result.mergedTree) {
@@ -864,7 +779,119 @@ function GenealogyFlow() {
       setSearchResult(null)
     }
     setLoading(false)
-  }, [searchInput, selectedSystem, mergeSubtree])
+  }, [searchInput, selectedSystem, mergeSubtree, showMyTeamOnly])
+
+  const handleSystemChange = useCallback(async (systemId: number | null) => {
+    setSelectedSystem(systemId)
+    setLoading(true)
+    setError(null)
+    setIsTreeEmpty(false)
+    activeFocusMapRef.current = new Map()
+    focusMapSizeRef.current = 0
+    setFocusMapVersion(v => v + 1)
+    lastExpandedIdRef.current = null
+    setIsSearchMode(false)
+    setSearchResult(null)
+
+    // Lấy userId hiện tại
+    const roleResult = await getCurrentUserRoleAction()
+    const currentUserIdLocal = roleResult.userId || 0
+    const isAdminNow = roleResult.success && roleResult.role === Role.ADMIN
+
+    // v8.7.0: Kiểm tra Root hệ thống để set mặc định cho "Đội của tôi"
+    let isSystemRoot = false
+    if (systemId && systemId !== 0) {
+      const rootUser = await getSystemRootUserAction(systemId)
+      isSystemRoot = rootUser?.id === currentUserIdLocal
+    }
+
+    const shouldShowMyTeam = currentUserIdLocal !== 0 && !isSystemRoot && systemId !== null
+    setShowMyTeamOnly(shouldShowMyTeam)
+
+    if (shouldShowMyTeam) {
+      setSearchInput(`#${currentUserIdLocal}`)
+      // v8.7.3: Gọi search trực tiếp với systemId mới để tránh race condition
+      await handleSearch(currentUserIdLocal, systemId)
+      setLoading(false)
+      return // Thoát sớm, không chạy logic fetch tree mặc định bên dưới
+    }
+
+    try {
+      if (systemId === null) {
+        setFullTree(null)
+      } else if (systemId === 0) {
+        // Hệ thống Học viên - lấy từ user đang đăng nhập
+        const result = await getGenealogyTreeAction(currentUserIdLocal)
+        if (result.success && result.tree) {
+          setFullTree(result.tree)
+          setIsTreeEmpty(false)
+        } else {
+          setFullTree(null)
+          setIsTreeEmpty(true)
+          alert('Chưa có dữ liệu nhân mạch. Hãy bắt đầu giới thiệu thành viên để xây dựng cây.')
+        }
+      } else {
+        // Hệ thống TCA/KTC - Sửa bug: gọi đúng function theo displayMode
+        const result = displayMode === 'full'
+          ? await getFullSystemTreeAction(systemId)
+          : await getSystemTreeAction(systemId)
+        if (result.success && result.tree) {
+          setFullTree(result.tree)
+          setIsTreeEmpty(false)
+        } else {
+          const errMsg = result.error || ''
+          // Nếu lỗi là "không tìm thấy root" hoặc "không thuộc hệ thống"
+          const isNoRootError = errMsg.includes('root') || errMsg.includes('thuộc')
+
+          if (isAdminNow && isNoRootError) {
+            // Admin + hệ thống chưa có root
+            setFullTree(null)
+            setIsTreeEmpty(true)
+            alert('Hệ thống chưa có dữ liệu. Nhấn nút + để tạo cây sơ đồ với bạn làm root.')
+          } else if (!isAdminNow) {
+            // User thường: nếu không có root hoặc không thuộc hệ thống
+            setFullTree(null)
+            alert('Bạn chưa tham gia hệ thống đã chọn')
+          } else {
+            // Admin: Nếu có lỗi khác thì chỉ set null, không alert "chưa tham gia"
+            setFullTree(null)
+          }
+        }
+      }
+    } catch (e) {
+      setFullTree(null)
+      setError("Lỗi khi tải dữ liệu")
+    }
+    setLoading(false)
+  }, [displayMode, handleSearch])
+
+  const initTree = useCallback(async (rootId: number = 0) => {
+    setLoading(true); setError(null); setIsTreeEmpty(false); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
+
+    let result;
+    if (selectedSystem === null) {
+      setLoading(false)
+      return
+    } else if (selectedSystem === 0) {
+      result = await getGenealogyTreeAction(rootId)
+    } else {
+      // Sửa bug: gọi đúng function theo displayMode
+      result = displayMode === 'full'
+        ? await getFullSystemTreeAction(selectedSystem)
+        : await getSystemTreeAction(selectedSystem)
+    }
+
+    if (result && result.success && result.tree) {
+      setFullTree(result.tree)
+      setIsTreeEmpty(false)
+    } else if (result) {
+      // Khi không tìm thấy cây (root không tồn tại)
+      setFullTree(null)
+      setIsTreeEmpty(true)
+      setError(null)
+    }
+    setLoading(false)
+  }, [selectedSystem, displayMode])
 
   const handleClearSearch = useCallback(() => {
     setSearchInput('')
@@ -1002,13 +1029,17 @@ function GenealogyFlow() {
 
       {/* Controls */}
       <div className="flex flex-nowrap items-center gap-1 px-2 py-2 bg-gray-50 border-b overflow-x-auto">
-        {/* Dropdown chọn hệ thống - đủ rộng hiển thị mũi tên */}
+        {/* Dropdown chọn hệ thống - thu gọn */}
         <div className="relative shrink-0">
           <select
             value={selectedSystem === null ? '' : selectedSystem}
             onChange={(e) => {
               const val = e.target.value
               const systemId = val === '' ? null : Number(val)
+              
+              // v8.7.4: Reset state sớm để tránh race condition với useEffect
+              if (systemId !== null) setIsSearchMode(true)
+              
               setSelectedSystem(systemId)
               if (systemId !== null && systemId !== 0) {
                 setDisplayMode('full')
@@ -1017,9 +1048,9 @@ function GenealogyFlow() {
               }
               handleSystemChange(systemId)
             }}
-            className={`w-28 sm:w-32 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer transition-all ${selectedSystem === null ? 'animate-pulse-slow border-pink-400' : ''}`}
+            className={`w-24 sm:w-28 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer transition-all ${selectedSystem === null ? 'animate-pulse-slow border-pink-400' : ''}`}
           >
-            <option value="">Chọn hệ thống</option>
+            <option value="">Hệ thống</option>
             {availableSystems.map((sys) => (
               <option key={sys.onSystem} value={sys.onSystem}>
                 {sys.nameSystem || sys.onSystem}
@@ -1089,11 +1120,31 @@ function GenealogyFlow() {
           </button>
         )}
 
-        {/* Ô tìm kiếm - nhỏ gọn */}
-        <div className="relative flex items-center w-[140px] sm:w-[170px] shrink-0">
+        {/* v8.7.0: Checkbox "Đội của tôi" */}
+        <label className="flex items-center gap-1 cursor-pointer shrink-0 bg-white px-2 py-1 rounded-lg border border-gray-200 shadow-sm">
+          <input
+            type="checkbox"
+            checked={showMyTeamOnly}
+            onChange={(e) => {
+              const checked = e.target.checked
+              setShowMyTeamOnly(checked)
+              if (checked && currentUserId) {
+                setSearchInput(`#${currentUserId}`)
+                handleSearch(currentUserId)
+              } else if (!checked) {
+                handleClearSearch()
+              }
+            }}
+            className="w-3.5 h-3.5 accent-blue-600"
+          />
+          <span className="text-[10px] font-bold text-slate-700 whitespace-nowrap">Đội của tôi</span>
+        </label>
+
+        {/* Ô tìm kiếm - thu hẹp */}
+        <div className="relative flex items-center w-[110px] sm:w-[140px] shrink-0">
           <input
             type="text"
-            placeholder="Tìm theo ID..."
+            placeholder="Tìm ID..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className={`w-full bg-white text-slate-700 text-[10px] font-bold pl-2 pr-6 py-1.5 rounded-lg border border-gray-200 outline-none placeholder:text-slate-400 ${searchError ? 'ring-1 ring-red-500' : ''}`}
@@ -1107,7 +1158,7 @@ function GenealogyFlow() {
             </button>
           )}
           <button
-            onClick={handleSearch}
+            onClick={() => handleSearch()}
             className="absolute right-1 p-1 rounded bg-blue-600 text-white"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1157,7 +1208,9 @@ function GenealogyFlow() {
         {loading && nodes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full w-full absolute inset-0 z-30 text-center">
             <Zap className="w-8 h-8 text-rose-500 animate-pulse mb-4 mx-auto" />
-            <p className="text-slate-400 font-black text-xs tracking-widest uppercase">HÃY CHỌN 1 HỆ THỐNG ĐỂ XEM NHÂN MẠCH & NHÂN DUYÊN CỦA BẠN...</p>
+            <p className="text-slate-400 font-black text-xs tracking-widest uppercase">
+              {selectedSystem !== null ? 'ĐANG TẢI DỮ LIỆU NHÂN MẠCH...' : 'HÃY CHỌN 1 HỆ THỐNG ĐỂ XEM NHÂN MẠCH & NHÂN DUYÊN CỦA BẠN...'}
+            </p>
           </div>
         ) : (
           <div className="w-full h-full">
