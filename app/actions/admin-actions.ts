@@ -834,9 +834,10 @@ function buildFullTreeFromClosures(
     rootSysAutoId: number,
     rootUserId: number,
     rootUserName: string | null,
-    allClosures: { ancestorAutoId: number; descendantAutoId: number; depth: number; userId: number; name: string | null }[],
+    rootUserImage: string | null,
+    allClosures: { ancestorAutoId: number; descendantAutoId: number; depth: number; userId: number; name: { name: string | null; image: string | null } | null }[],
     sysAutoToUserId: Map<number, number>,
-    userMap: Map<number, string | null>,
+    userMap: Map<number, { name: string | null, image: string | null }>,
     tcaMemberMap: Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>
 ): GenealogyNode {
     // Build parent -> children map (tất cả các depth)
@@ -875,8 +876,10 @@ function buildFullTreeFromClosures(
         // Build children
         const children: GenealogyNode[] = directChildren.map(child => buildNode(child.autoId))
         
-        // Name
-        const name = sysAutoId === rootSysAutoId ? rootUserName : (userMap.get(userId) || null)
+        // Name & Image
+        const userData = userMap.get(userId)
+        const name = sysAutoId === rootSysAutoId ? rootUserName : (userData?.name || null)
+        const image = sysAutoId === rootSysAutoId ? rootUserImage : (userData?.image || null)
         
         // TCA Data
         const tcaData = tcaMemberMap.get(userId)
@@ -887,6 +890,7 @@ function buildFullTreeFromClosures(
         return {
             id: userId,
             name: name,
+            image: image,
             referrerId: null,
             totalSubCount: totalSub > 0 ? totalSub : 1,
             f1aCount: 0, f1bCount: 0, f1cCount: 0,
@@ -951,8 +955,13 @@ export async function getFullSystemTreeAction(systemId: number) {
         }
         
         // Batch query: Lấy users one-time
-        const users = await prisma.user.findMany({ where: { id: { in: [...userIdSet] } } })
-        const userMap = new Map<number, string | null>(users.map((u: { id: number; name: string | null }) => [u.id, u.name]))
+        const users = await prisma.user.findMany({ 
+            where: { id: { in: [...userIdSet] } },
+            select: { id: true, name: true, image: true }
+        })
+        const userMap = new Map<number, { name: string | null, image: string | null }>(
+            users.map((u: any) => [u.id, { name: u.name, image: u.image }])
+        )
         
         // Transform closure data với đúng format mới
         const closureData = allClosures.map((c: any) => ({
@@ -979,11 +988,14 @@ export async function getFullSystemTreeAction(systemId: number) {
             })
         }
         
+        const rootUserData = userMap.get(rootUserId)
+        
         // Build tree với rootSysAutoId và autoToUser map
         const tree = buildFullTreeFromClosures(
             rootSys.autoId, 
             rootUserId, 
-            userMap.get(rootUserId) || null, 
+            rootUserData?.name || null, 
+            rootUserData?.image || null,
             closureData, 
             autoToUser,
             userMap,
@@ -1038,8 +1050,13 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
         // Lấy users
         const userIds = new Set<number>()
         for (const [, uid] of autoToUser) userIds.add(uid)
-        const users = await prisma.user.findMany({ where: { id: { in: [...userIds] } } })
-        const userMap = new Map(users.map(u => [u.id, u.name]))
+        const users = await prisma.user.findMany({ 
+            where: { id: { in: [...userIds] } },
+            select: { id: true, name: true, image: true }
+        })
+        const userMap = new Map<number, { name: string | null, image: string | null }>(
+            users.map((u: any) => [u.id, { name: u.name, image: u.image }])
+        )
 
         // BỔ SUNG: Batch fetch TCAMember scores cho children
         const tcaMembers = await (prisma as any).tCAMember.findMany({
@@ -1073,9 +1090,12 @@ export async function getFullSystemChildrenAction(parentId: number, systemId: nu
 
             const tcaData = tcaMemberMap.get(userId)
             
+            const userData = userMap.get(userId)
+            
             directChildren.push({
                 id: userId,
-                name: userMap.get(userId) || null,
+                name: userData?.name || null,
+                image: userData?.image || null,
                 referrerId: parentId,
                 totalSubCount: subCount + 1,
                 f1aCount: 0, f1bCount: 0, f1cCount: 0,
