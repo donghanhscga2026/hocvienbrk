@@ -11,6 +11,7 @@ import prisma from '@/lib/prisma'
 import { getDefaultProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getRandomMessage } from './actions/message-actions'
 import { resetSurveyAction } from './actions/survey-actions'
+import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 
 export const metadata: Metadata = {
   title: 'BRK - Ngân hàng Phước Báu',
@@ -20,50 +21,29 @@ export const metadata: Metadata = {
 export default async function Home() {
   const session = await auth()
   
-  // Lấy BRK Profile mặc định
+  // Lấy BRK Profile mặc định - Đã có try-catch fallback bên trong action
   const profile = await getDefaultProfile()
-  
-  // Nếu không có profile, dùng fallback
-  const safeProfile = profile || {
-    title: 'TRANG CHỦ',
-    subtitle: 'Tri thức là sức mạnh',
-    showCommunity: true,
-    showAllCourses: true,
-    communityTitle: 'Bảng tin cộng đồng',
-    coursesTitle: 'Khóa học nổi bật',
-    allCoursesTitle: 'Tất cả khóa học',
-    footerText: '© 2026 Ngân hàng Phước Báu. Mọi quyền được bảo lưu.',
-    backgroundColor: null,
-    heroImage: null,
-    heroOverlay: 0.3,
-    messageContent: null,
-    messageDetail: null,
-    messageImage: null,
-    surveyTitle: null,
-    customRoadmap: null,
-    roadmapTitle: null,
-    courseIds: null,
-    accentColor: null,
-    textColor: null,
-    footerLinks: null,
-    metaTitle: 'BRK',
-    metaDescription: null,
-    metaImage: null,
-    themeId: null,
-    viewCount: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
+  const safeProfile = profile || FALLBACK_PROFILE
 
   // Tăng view count (async)
   if (profile?.slug) {
-    incrementProfileView(profile.slug).catch(console.error)
+    incrementProfileView(profile.slug).catch(() => {})
   }
 
-  // Lấy user ID - Dùng != null để xử lý userId = 0
+  // Lấy user ID
   const userIdNum = session?.user?.id != null ? parseInt(session.user.id) : null
 
-  // Lấy các data cần thiết (parallel)
+  // Helper function để gọi database an toàn trong Promise.all
+  const safeQuery = async (queryPromise: Promise<any>, fallbackValue: any) => {
+    try {
+      return await queryPromise
+    } catch (e) {
+      console.error("[PAGE DB ERROR]:", e)
+      return fallbackValue
+    }
+  }
+
+  // Lấy các data cần thiết (parallel) với bọc lỗi từng cái
   const [
     courses,
     survey,
@@ -78,15 +58,13 @@ export default async function Home() {
     getPostsForProfile(safeProfile),
     getRandomMessage(),
     userIdNum != null
-      ? prisma.user.findUnique({
+      ? safeQuery(prisma.user.findUnique({
           where: { id: userIdNum },
-          select: {
-            name: true, id: true, image: true, phone: true, roadmap: true
-          }
-        })
+          select: { name: true, id: true, image: true, phone: true, roadmap: true }
+        }), null)
       : null,
     userIdNum != null
-      ? prisma.enrollment.findMany({
+      ? safeQuery(prisma.enrollment.findMany({
           where: { userId: userIdNum },
           select: {
             id: true,
@@ -97,45 +75,36 @@ export default async function Home() {
             course: { select: { _count: { select: { lessons: true } } } },
             _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
           }
-        })
+        }), [])
       : [],
-    prisma.roadmapPoint.findMany({ orderBy: { pointId: 'asc' } })
+    safeQuery(prisma.roadmapPoint.findMany({ orderBy: { pointId: 'asc' } }), [])
   ])
 
-  // Xử lý enrollments map
+  // Xử lý enrollments map an toàn
   const myCourseIds = new Set<number>()
-  const enrollmentsMap: Record<number, {
-    status: string
-    startedAt: Date | null
-    completedCount: number
-    totalLessons: number
-    enrollmentId?: number
-    payment?: {
-      id: number
-      status: string
-      proofImage?: string | null
-    }
-  }> = {}
+  const enrollmentsMap: Record<number, any> = {}
 
-  enrollments.forEach((e: any) => {
-    if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
-      myCourseIds.add(e.courseId)
-    }
-    enrollmentsMap[e.courseId] = {
-      status: e.status,
-      startedAt: e.startedAt,
-      completedCount: e._count?.lessonProgress || 0,
-      totalLessons: e.course?._count?.lessons || 0,
-      enrollmentId: e.id,
-      payment: e.payment
-    }
-  })
+  if (Array.isArray(enrollments)) {
+    enrollments.forEach((e: any) => {
+      if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
+        myCourseIds.add(e.courseId)
+      }
+      enrollmentsMap[e.courseId] = {
+        status: e.status,
+        startedAt: e.startedAt,
+        completedCount: e._count?.lessonProgress || 0,
+        totalLessons: e.course?._count?.lessons || 0,
+        enrollmentId: e.id,
+        payment: e.payment
+      }
+    })
+  }
 
-  // Phân loại courses
-  const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
-  const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
+  // Phân loại courses an toàn
+  const safeCourses = Array.isArray(courses) ? courses : []
+  const myCourses = safeCourses.filter((c: any) => myCourseIds.has(c.id))
+  const otherCourses = safeCourses.filter((c: any) => !myCourseIds.has(c.id))
 
-  // Group courses theo category
   const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
     const category = course.category || "Khác"
     const existingGroup = acc.find(g => g.category === category)
@@ -147,59 +116,43 @@ export default async function Home() {
     return acc
   }, [])
 
-  // User data
-  const userName = userRecord?.name ?? null
-  const userId = userRecord?.id ?? null
-  const userPhone = userRecord?.phone ?? null
-  const userRoadmap = userRecord?.roadmap
-  const customPath = userRoadmap?.customPath ?? null
-  const userGoal = userRoadmap?.goal ?? null
-  const targetPointId = userRoadmap?.targetPointId ?? 1
-
   return (
     <main className="min-h-screen" style={{
       backgroundColor: safeProfile.backgroundColor || undefined
     }}>
-      {/* Header */}
-      <MainHeader
-        title={safeProfile.title || 'TRANG CHỦ'}
-        profile={profile}
-      />
+      <MainHeader title={safeProfile.title || 'TRANG CHỦ'} profile={profile} />
       
-      {/* Hero Section - Full width, Server-side render */}
       <MessageCard
-        profile={safeProfile}
+        profile={safeProfile as any}
         session={session}
-        userName={userName || ''}
-        userId={userId !== null ? String(userId) : ''}
+        userName={userRecord?.name || ''}
+        userId={userRecord?.id !== undefined ? String(userRecord.id) : ''}
         isDefault={profile?.isDefault || false}
         messageImageUrl={message?.imageUrl || null}
       />
       
-      {/* Home Page Client - Survey + Community + Courses */}
-      <Suspense fallback={<div className="flex justify-center p-8"><span className="animate-spin text-purple-500">⏳</span></div>}>
+      <Suspense fallback={<div className="flex justify-center p-8">⏳ Đang tải...</div>}>
         <HomePageClient
-          profile={safeProfile}
-          courses={courses}
+          profile={safeProfile as any}
+          courses={safeCourses}
           myCourses={myCourses}
           groupedOtherCourses={groupedOtherCourses}
-          posts={posts}
+          posts={posts || []}
           session={session}
           enrollmentsMap={enrollmentsMap}
           isCourseOneActive={enrollmentsMap[1]?.status === 'ACTIVE'}
-          userPhone={userPhone}
-          userId={userId}
-          customPath={customPath as number[] | null}
-          userGoal={userGoal}
-          targetPointId={targetPointId}
+          userPhone={userRecord?.phone || null}
+          userId={userRecord?.id || null}
+          customPath={userRecord?.roadmap?.customPath as number[] | null}
+          userGoal={userRecord?.roadmap?.goal}
+          targetPointId={userRecord?.roadmap?.targetPointId || 1}
           roadmapPoints={roadmapPoints || []}
           survey={survey}
           resetSurveyAction={resetSurveyAction}
         />
       </Suspense>
       
-      {/* Footer */}
-      <FooterSection profile={safeProfile} />
+      <FooterSection profile={safeProfile as any} />
     </main>
   )
 }
