@@ -929,3 +929,14 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
 - **v8.7.6 Race Condition & UI Feedback (2026-05-07)**:
     - **Fix Race Condition**: Đồng bộ hóa `handleSearch` và `handleSystemChange` bằng cách cho phép truyền `forcedSystemId` trực tiếp, tránh lỗi hiển thị nhầm hệ thống "Học viên" do độ trễ state.
     - **Cải thiện UX**: Cập nhật thông báo "ĐANG TẢI DỮ LIỆU..." khi chuyển đổi hệ thống thay vì hiện placeholder mặc định.
+
+- **v8.7.7 Prisma & DB Environment Fix (2026-05-08)**:
+    - **Sửa lỗi EPERM trên Windows**: Cập nhật `binaryTargets = ["native"]` trong `schema.prisma` để tự động nhận diện binary phù hợp (Windows vs macOS), khắc phục lỗi không thể rename file `.node` khi chạy trên Windows.
+    - **Ổn định kết nối DB**: Chuyển từ Connection Pooler (cổng 6543) sang Direct Connection (cổng 5432) để tránh lỗi xác thực đột ngột khi đồng bộ dữ liệu.
+
+- **v8.7.8 Genealogy Tree Initial Rendering Fix (2026-05-08)**:
+    - **Refactor `handleSystemChange`**: Loại bỏ sự phụ thuộc vào state `displayMode` bất đồng bộ của React. Sử dụng biến `intendedDisplayMode` cục bộ để kích hoạt ngay lập tức action `getFullSystemTreeAction`, đảm bảo cây full được render ngay khi chọn hệ thống (như TCA) mà không cần tích/bỏ tích checkbox.
+
+- **v8.7.9 Interactive Node Search (2026-05-08)**:
+    - **Nâng cấp `GenealogyCard`**: Thêm sự kiện `onClick` vào ô thông tin của Node. Khi nhấn vào, hệ thống sẽ tự động tìm kiếm Node đó (Focus mode), hiển thị 2 đời cha và toàn bộ đời con cháu.
+    - **Gộp logic Tìm kiếm**: Cập nhật `handleSearch` hỗ trợ tham số `forceLimitAncestors` để tái sử dụng logic tìm kiếm chuẩn cho tính năng click chọn node.
