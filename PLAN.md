@@ -946,3 +946,8 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
         - **Admin (ID 0)**: Hiển thị trọn vẹn cây của cả hệ thống (System Root).
         - **User thường**: Hiển thị cây bắt đầu từ chính mình làm Root (My Team).
     - **Cải tiến Logic Reset**: Cập nhật `handleSystemChange` để reset toàn bộ các state phụ như `focusedSubtreeNode`, `focusedNodeName`, giúp việc chuyển đổi giữa các chế độ xem mượt mà hơn.
+
+- **v8.8.1 Self-Node Highlighting (2026-05-08)**:
+    - **Hiệu ứng Nhận diện Bản thân (Self-Focus)**: Node của người dùng đang đăng nhập sẽ tự động có hiệu ứng "lóe sáng" và "phóng to thu nhỏ" liên tục.
+    - **Kỹ thuật**: Sử dụng kết hợp `animate-pulse` (độ sáng) và `animate-ping` (lóe sáng lan tỏa), cùng với vòng ring xanh Blue-500 và bóng đổ phát sáng (Glow Shadow) để tạo sự chú ý tuyệt đối.
+    - **Trạng thái**: Áp dụng trong mọi chế độ xem (Full Tree, My Team, Search mode).
