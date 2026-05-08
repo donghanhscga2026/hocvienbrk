@@ -213,7 +213,7 @@ const GenealogyCard = (props: NodeProps) => {
             {tcaLevel != null ? tcaLevel : '★'}
           </div>
         )}
-        
+
         {/* Container hình tròn hoàn chỉnh */}
         <div
           onClick={(e) => { e.stopPropagation(); data.onShowDetails?.(data.id); }}
@@ -227,10 +227,10 @@ const GenealogyCard = (props: NodeProps) => {
           )}
           <div className={`w-[148px] h-[148px] rounded-full flex items-center justify-center text-white overflow-hidden shadow-inner border-4 bg-gradient-to-br ${getLevelColor(colorDepth, isActuallyRoot)}`}>
             {data.image ? (
-              <img 
-                src={data.image} 
-                alt={data.name || ''} 
-                className="w-full h-full object-cover" 
+              <img
+                src={data.image}
+                alt={data.name || ''}
+                className="w-full h-full object-cover"
               />
             ) : (
               <User className="w-20 h-20 opacity-40" />
@@ -245,7 +245,7 @@ const GenealogyCard = (props: NodeProps) => {
       </div>
 
       {/* Information Box - Tiếp ngay dưới circle, chèn lùi lên trên */}
-      <div 
+      <div
         onClick={(e) => { e.stopPropagation(); data.onSearchNode?.(data.id); }}
         className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all`}
       >
@@ -1058,175 +1058,183 @@ function GenealogyFlow() {
     <div className="h-screen bg-slate-50 flex flex-col overflow-hidden font-sans text-slate-900">
       <MainHeader title="NHÂN MẠCH" toolSlug="genealogy" />
 
-      {/* Controls */}
-      <div className="flex flex-nowrap items-center gap-1 px-2 py-2 bg-gray-50 border-b overflow-x-auto">
-        {/* Dropdown chọn hệ thống - thu gọn */}
-        <div className="relative shrink-0">
-          <select
-            value={selectedSystem === null ? '' : selectedSystem}
-            onChange={(e) => {
-              const val = e.target.value
-              const systemId = val === '' ? null : Number(val)
-              
-              handleSystemChange(systemId)
-            }}
-            className={`w-24 sm:w-28 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer transition-all ${selectedSystem === null ? 'animate-pulse-slow border-pink-400' : ''}`}
-          >
-            <option value="">Hệ thống</option>
-            {availableSystems.map((sys) => (
-              <option key={sys.onSystem} value={sys.onSystem}>
-                {sys.nameSystem || sys.onSystem}
-              </option>
-            ))}
-          </select>
-          <svg className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+      {/* Thanh công cụ điều khiển - Tối ưu v8.9.0 (2 hàng trên mobile) */}
+      <div className="flex flex-wrap items-center gap-y-3 gap-x-2 px-3 py-3 bg-white border-b shadow-sm z-40 sticky top-0">
 
-        {/* Nút ← Quay về (chỉ hiện khi đang ở Focus Subtree Mode) */}
-        {focusedSubtreeNode && (
-          <button
-            onClick={handleExitFocusSubtree}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold hover:bg-amber-100 transition-all shrink-0"
-            title="Quay về cây toàn bộ"
-          >
-            <ArrowLeft className="w-3 h-3" />
-            <span className="hidden sm:inline">Quay về</span>
-            {focusedNodeName && <span className="text-amber-500 truncate max-w-[80px]">{focusedNodeName}</span>}
-          </button>
-        )}
-
-        {/* Dropdown chế độ hiển thị */}
-        <select
-          value={displayMode}
-          onChange={(e) => setDisplayMode(e.target.value as 'default' | 'full')}
-          className="w-14 sm:w-16 bg-white text-slate-700 text-[10px] font-bold px-1 py-1.5 rounded-lg border border-gray-200 outline-none cursor-pointer shrink-0"
-        >
-          <option value="default">Gọn</option>
-          <option value="full">Full</option>
-        </select>
-
-        {/* v8.4.0: Checkbox Active filter */}
-        <label className="flex items-center gap-1 cursor-pointer shrink-0">
-          <input
-            type="checkbox"
-            checked={showActiveOnly}
-            onChange={(e) => setShowActiveOnly(e.target.checked)}
-            className="w-3.5 h-3.5"
-          />
-          <span className="text-[10px] font-bold text-slate-700">Active</span>
-        </label>
-
-        {/* Nút Tạo cây/Sửa */}
-        {isTreeEmpty && selectedSystem !== null && selectedSystem !== 0 ? (
-          <button
-            type="button"
-            onClick={() => setCreateRootModal({ show: true, systemId: selectedSystem })}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 transition-all shrink-0"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span className="hidden sm:inline">Tạo cây</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => setEditMode(!editMode)}
-            className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all shrink-0 ${editMode
-              ? 'bg-orange-500 text-white hover:bg-orange-600'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-              }`}
-          >
-            {editMode ? 'HỦY' : 'SỬA'}
-          </button>
-        )}
-
-        {/* v8.7.0: Checkbox "Đội của tôi" */}
-        <label className="flex items-center gap-1 cursor-pointer shrink-0 bg-white px-2 py-1 rounded-lg border border-gray-200 shadow-sm">
-          <input
-            type="checkbox"
-            checked={showMyTeamOnly}
-            onChange={(e) => {
-              const checked = e.target.checked
-              setShowMyTeamOnly(checked)
-              if (checked && currentUserId) {
-                setSearchInput(`#${currentUserId}`)
-                handleSearch(currentUserId)
-              } else if (!checked) {
-                handleClearSearch()
-              }
-            }}
-            className="w-3.5 h-3.5 accent-blue-600"
-          />
-          <span className="text-[10px] font-bold text-slate-700 whitespace-nowrap">Đội của tôi</span>
-        </label>
-
-        {/* v8.8.0: Nút Quay về cây chính */}
-        {selectedSystem !== null && (
-          <button
-            onClick={handleResetToRoot}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-all shrink-0 shadow-sm"
-            title="Quay về cây mặc định (Hệ thống hoặc Đội của tôi)"
-          >
-            <Home className="w-3 h-3" />
-            <span className="hidden lg:inline uppercase">Cây chính</span>
-          </button>
-        )}
-
-        {/* Ô tìm kiếm - thu hẹp */}
-        <div className="relative flex items-center w-[110px] sm:w-[140px] shrink-0">
-          <input
-            type="text"
-            placeholder="Tìm ID..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className={`w-full bg-white text-slate-700 text-[10px] font-bold pl-2 pr-6 py-1.5 rounded-lg border border-gray-200 outline-none placeholder:text-slate-400 ${searchError ? 'ring-1 ring-red-500' : ''}`}
-          />
-          {searchInput && (
-            <button
-              onClick={() => { setSearchInput(''); setSearchError(null); }}
-              className="absolute right-4 text-red-400"
+        {/* --- NHÓM 1: HỆ THỐNG & ĐIỀU HƯỚNG --- */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Dropdown chọn hệ thống - v8.9.0: Giao diện premium hơn */}
+          <div className="relative shrink-0">
+            <select
+              value={selectedSystem === null ? '' : selectedSystem}
+              onChange={(e) => {
+                const val = e.target.value
+                const systemId = val === '' ? null : Number(val)
+                handleSystemChange(systemId)
+              }}
+              className={`w-48 sm:w-44 appearance-none bg-slate-50 text-slate-700 text-[11px] font-black px-3 py-2 pr-8 rounded-xl border border-slate-200 outline-none cursor-pointer transition-all hover:bg-white hover:border-indigo-300 ${selectedSystem === null ? 'animate-[pulse_1.5s_infinite] ring-4 ring-pink-500/30 border-pink-500 bg-pink-50 text-pink-700 scale-105 shadow-[0_0_20px_rgba(236,72,153,0.4)]' : ''}`}
             >
-              <X className="h-3 w-3" />
+              <option value="">{selectedSystem === null ? '➔ CHỌN HỆ THỐNG' : 'HỆ THỐNG'}</option>
+              {availableSystems.map((sys) => (
+                <option key={sys.onSystem} value={sys.onSystem}>
+                  {sys.nameSystem || sys.onSystem}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* Nút Quay về (chỉ hiện khi đang ở Focus Subtree Mode) */}
+          {focusedSubtreeNode && (
+            <button
+              onClick={handleExitFocusSubtree}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-black hover:bg-amber-100 transition-all shrink-0"
+              title="Quay về cây toàn bộ"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline uppercase">Quay về</span>
+              {focusedNodeName && <span className="text-amber-500 truncate max-w-[60px] ml-1">({focusedNodeName})</span>}
             </button>
           )}
-          <button
-            onClick={() => handleSearch()}
-            className="absolute right-1 p-1 rounded bg-blue-600 text-white"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
+
+          {/* v8.8.0: Nút Quay về cây chính */}
+          {selectedSystem !== null && (
+            <button
+              onClick={handleResetToRoot}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-[11px] font-black hover:bg-emerald-700 hover:scale-105 transition-all shrink-0 shadow-md shadow-emerald-200"
+              title="Quay về cây mặc định (Hệ thống hoặc Đội của tôi)"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline uppercase">Cây chính</span>
+            </button>
+          )}
+
+          {/* Dropdown chế độ hiển thị */}
+          <div className="relative shrink-0">
+            <select
+              value={displayMode}
+              onChange={(e) => setDisplayMode(e.target.value as 'default' | 'full')}
+              className="appearance-none w-18 sm:w-20 bg-slate-50 text-slate-700 text-[11px] font-black px-3 py-2 pr-7 rounded-xl border border-slate-200 outline-none cursor-pointer hover:bg-white hover:border-indigo-300 transition-all"
+            >
+              <option value="default">GỌN</option>
+              <option value="full">FULL</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+          </div>
         </div>
 
-        {/* v8.8.1: Khối thống kê từ Server (đính kèm trong Root Node) */}
+        {/* --- NHÓM 2: BỘ LỌC & TÌM KIẾM --- */}
+        <div className="flex items-center gap-2 flex-grow sm:flex-nowrap">
+
+          {/* Checkbox Active filter */}
+          <label className="flex items-center gap-2 cursor-pointer shrink-0 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-200 transition-all">
+            <input
+              type="checkbox"
+              checked={showActiveOnly}
+              onChange={(e) => setShowActiveOnly(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter">Active</span>
+          </label>
+
+          {/* v8.7.0: Checkbox "Đội của tôi" */}
+          <label className="flex items-center gap-2 cursor-pointer shrink-0 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-200 transition-all">
+            <input
+              type="checkbox"
+              checked={showMyTeamOnly}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setShowMyTeamOnly(checked)
+                if (checked && currentUserId) {
+                  setSearchInput(`#${currentUserId}`)
+                  handleSearch(currentUserId)
+                } else if (!checked) {
+                  handleClearSearch()
+                }
+              }}
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter whitespace-nowrap">Đội của tôi</span>
+          </label>
+
+          {/* Nút Tạo cây/Sửa */}
+          <div className="shrink-0">
+            {isTreeEmpty && selectedSystem !== null && selectedSystem !== 0 ? (
+              <button
+                type="button"
+                onClick={() => setCreateRootModal({ show: true, systemId: selectedSystem })}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600 text-white text-[11px] font-black hover:bg-violet-700 hover:scale-105 transition-all shadow-md shadow-violet-200"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline uppercase">Tạo cây</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black transition-all shadow-md ${editMode
+                  ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
+                  : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-100'
+                  }`}
+              >
+                {editMode ? 'HỦY' : 'SỬA'}
+              </button>
+            )}
+          </div>
+
+          {/* Ô tìm kiếm - v8.9.0: Tối ưu không gian */}
+          <div className="relative flex items-center flex-grow min-w-[120px] sm:max-w-[180px]">
+            <input
+              type="text"
+              placeholder="TÌM ID..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className={`w-full bg-slate-50 text-slate-800 text-[11px] font-black pl-8 pr-8 py-2 rounded-xl border border-slate-200 outline-none placeholder:text-slate-400 transition-all focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50/50 ${searchError ? 'ring-2 ring-red-500 border-red-200' : ''}`}
+            />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            {searchInput && (
+              <button
+                onClick={() => { setSearchInput(''); setSearchError(null); }}
+                className="absolute right-8 text-slate-300 hover:text-red-400 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={() => handleSearch()}
+              className="absolute right-1.5 p-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* v8.8.1: Khối thống kê - Tối ưu v8.9.0 cho mobile */}
         {fullTree?.stats && (
-          <div className="flex flex-wrap items-center gap-1 sm:gap-2 ml-1 border-l border-slate-200 pl-2 shrink-0">
-            <div className="flex items-center gap-1 bg-slate-100 px-1.5 py-1 rounded-md border border-slate-200 shadow-sm">
-              <span className="text-[9px] font-medium text-slate-500 uppercase tracking-tighter">
-                {showActiveOnly ? 'Tổng Active:' : 'Tổng:'}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 ml-0 sm:ml-2 sm:border-l sm:border-slate-200 sm:pl-3 shrink-0">
+            <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                {showActiveOnly ? 'ACTIVE' : 'TỔNG'}
               </span>
-              <span className="text-[10px] font-black text-slate-900">
+              <span className="text-[11px] font-black text-white">
                 {showActiveOnly ? fullTree.stats.active : fullTree.stats.total}
               </span>
             </div>
 
             {!showActiveOnly && (
-              <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-1 rounded-md border border-emerald-100">
-                <span className="text-[9px] font-medium text-emerald-600 uppercase tracking-tighter">Active:</span>
-                <span className="text-[10px] font-black text-emerald-700">{fullTree.stats.active}</span>
+              <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">ACTIVE</span>
+                <span className="text-[11px] font-black text-emerald-700">{fullTree.stats.active}</span>
               </div>
             )}
 
-            <div className="flex items-center gap-1 bg-orange-50 px-1.5 py-1 rounded-md border border-orange-100">
-              <span className="text-[9px] font-medium text-orange-500 uppercase tracking-tighter">BĐH:</span>
-              <span className="text-[10px] font-black text-orange-700">{fullTree.stats.bdh}</span>
+            <div className="flex items-center gap-1.5 bg-orange-50 px-2.5 py-1.5 rounded-xl border border-orange-100">
+              <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest">BĐH</span>
+              <span className="text-[11px] font-black text-orange-700">{fullTree.stats.bdh}</span>
             </div>
-            <div className="flex items-center gap-1 bg-pink-50 px-1.5 py-1 rounded-md border border-pink-100">
-              <span className="text-[9px] font-medium text-pink-500 uppercase tracking-tighter">TT:</span>
-              <span className="text-[10px] font-black text-pink-700">{fullTree.stats.dhtt}</span>
+            <div className="flex items-center gap-1.5 bg-pink-50 px-2.5 py-1.5 rounded-xl border border-pink-100">
+              <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">DHTT</span>
+              <span className="text-[11px] font-black text-pink-700">{fullTree.stats.dhtt}</span>
             </div>
           </div>
         )}
@@ -1238,9 +1246,10 @@ function GenealogyFlow() {
         </div>
       )}
 
-      <div className="flex-1 relative w-full h-full">
+      {/* Khu vực hiển thị cây - v8.9.3: Tách biệt với Toolbar để không bị đè */}
+      <div className="flex-1 relative overflow-hidden">
         {loading && nodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full w-full absolute inset-0 z-30 text-center">
+          <div className="flex flex-col items-center justify-center w-full h-full text-center bg-slate-50/50 backdrop-blur-sm z-10">
             <Zap className="w-8 h-8 text-rose-500 animate-pulse mb-4 mx-auto" />
             <p className="text-slate-400 font-black text-xs tracking-widest uppercase">
               {selectedSystem !== null ? 'ĐANG TẢI DỮ LIỆU NHÂN MẠCH...' : 'HÃY CHỌN 1 HỆ THỐNG ĐỂ XEM NHÂN MẠCH & NHÂN DUYÊN CỦA BẠN...'}
