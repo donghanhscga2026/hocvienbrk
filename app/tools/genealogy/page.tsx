@@ -174,6 +174,7 @@ const GenealogyCard = (props: NodeProps) => {
     onAddChild?: (parentId: number) => void;
     onDeleteNode?: (nodeId: number) => void;
     onShowDetails?: (userId: number) => void;
+    onSearchNode?: (userId: number) => void;
   }
 
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
@@ -236,7 +237,10 @@ const GenealogyCard = (props: NodeProps) => {
       </div>
 
       {/* Information Box - Tiếp ngay dưới circle, chèn lùi lên trên */}
-      <div className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center`}>
+      <div 
+        onClick={(e) => { e.stopPropagation(); data.onSearchNode?.(data.id); }}
+        className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all`}
+      >
         {/* Tên thành viên */}
         <div className="font-bold text-[20px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px font-sans">
           {data.name || 'Học viên'}
@@ -567,7 +571,8 @@ function GenealogyFlow() {
           onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
           onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true }),
-          onShowDetails: handleShowDetails
+          onShowDetails: handleShowDetails,
+          onSearchNode: handleSearchNodeClick
         },
       })
     }
@@ -722,7 +727,7 @@ function GenealogyFlow() {
     setLoading(false);
   }, [fullTree, mergeSubtree, selectedSystem])
 
-  const handleSearch = useCallback(async (forcedId?: number, forcedSystemId?: number | null) => {
+  const handleSearch = useCallback(async (forcedId?: number, forcedSystemId?: number | null, forceLimitAncestors: boolean = false) => {
     const idStr = forcedId ? `#${forcedId}` : searchInput
     const id = parseInt(idStr.replace('#', ''))
     if (isNaN(id)) {
@@ -739,8 +744,8 @@ function GenealogyFlow() {
       const systemIdForSearch = activeSystemId === 0 ? undefined : (activeSystemId ?? undefined)
       console.log('[SEARCH] Searching for ID:', id, 'systemId:', systemIdForSearch)
 
-      // v8.7.0: Nêu là "Đội của tôi" thì chỉ lấy 2 tầng cha
-      const limitAncestors = (forcedId && showMyTeamOnly) ? 2 : null
+      // v8.7.0: Nêu là "Đội của tôi" thì chỉ lấy 2 tầng cha. Hỗ trợ forceLimitAncestors khi click vào ô chữ nhật node.
+      const limitAncestors = ((forcedId && showMyTeamOnly) || forceLimitAncestors) ? 2 : null
       const result = await searchGenealogyByIdAction(id, systemIdForSearch, limitAncestors)
       console.log('[SEARCH] Result success:', result.success)
 
@@ -781,6 +786,11 @@ function GenealogyFlow() {
     setLoading(false)
   }, [searchInput, selectedSystem, mergeSubtree, showMyTeamOnly])
 
+  const handleSearchNodeClick = useCallback(async (nodeId: number) => {
+    setSearchInput(`#${nodeId}`)
+    await handleSearch(nodeId, undefined, true)
+  }, [handleSearch])
+
   const handleSystemChange = useCallback(async (systemId: number | null) => {
     setSelectedSystem(systemId)
     setLoading(true)
@@ -816,6 +826,10 @@ function GenealogyFlow() {
       return // Thoát sớm, không chạy logic fetch tree mặc định bên dưới
     }
 
+    // Tính toán displayMode hợp lý ngay trong hàm để tránh lỗi state cũ
+    const intendedDisplayMode = (systemId !== null && systemId !== 0) ? 'full' : 'default'
+    setDisplayMode(intendedDisplayMode)
+
     try {
       if (systemId === null) {
         setFullTree(null)
@@ -831,8 +845,8 @@ function GenealogyFlow() {
           alert('Chưa có dữ liệu nhân mạch. Hãy bắt đầu giới thiệu thành viên để xây dựng cây.')
         }
       } else {
-        // Hệ thống TCA/KTC - Sửa bug: gọi đúng function theo displayMode
-        const result = displayMode === 'full'
+        // Hệ thống TCA/KTC - gọi đúng function theo intendedDisplayMode
+        const result = intendedDisplayMode === 'full'
           ? await getFullSystemTreeAction(systemId)
           : await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
@@ -863,7 +877,7 @@ function GenealogyFlow() {
       setError("Lỗi khi tải dữ liệu")
     }
     setLoading(false)
-  }, [displayMode, handleSearch])
+  }, [handleSearch])
 
   const initTree = useCallback(async (rootId: number = 0) => {
     setLoading(true); setError(null); setIsTreeEmpty(false); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
@@ -1037,15 +1051,6 @@ function GenealogyFlow() {
               const val = e.target.value
               const systemId = val === '' ? null : Number(val)
               
-              // v8.7.4: Reset state sớm để tránh race condition với useEffect
-              if (systemId !== null) setIsSearchMode(true)
-              
-              setSelectedSystem(systemId)
-              if (systemId !== null && systemId !== 0) {
-                setDisplayMode('full')
-              } else {
-                setDisplayMode('default')
-              }
               handleSystemChange(systemId)
             }}
             className={`w-24 sm:w-28 appearance-none bg-white text-slate-700 text-[10px] font-bold px-2 py-1.5 pr-6 rounded-lg border border-gray-200 outline-none cursor-pointer transition-all ${selectedSystem === null ? 'animate-pulse-slow border-pink-400' : ''}`}

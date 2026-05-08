@@ -503,10 +503,13 @@ Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi ch
 
 ## ✅ Sửa lỗ hổng Affiliate Data Integrity (2026-05-04)
 ### Mục tiêu
-Ngăn chặn người dùng thao túng eferrerId ẩn trong form đăng ký.
+Ngăn chặn người dùng thao túng 
+eferrerId ẩn trong form đăng ký.
 ### Các file đã sửa
-#### pp/actions/auth-actions.ts`n- Vấn đề: Lấy eferrerId trực tiếp từ formData.
-- Fix: Ưu tiên trích xuất eferrerId từ cookie ff_ref do server quản lý.
+#### pp/actions/auth-actions.ts`n- Vấn đề: Lấy 
+eferrerId trực tiếp từ formData.
+- Fix: Ưu tiên trích xuất 
+eferrerId từ cookie ff_ref do server quản lý.
 ### Trạng thái
 - ✅ Affiliate Cookie được ưu tiên tuyệt đối.
 - ✅ Đăng ký hoạt động bình thường.
@@ -538,7 +541,8 @@ Giảm thiểu code đồ sộ và chặn re-render toàn màn hình bằng các
 Đảm bảo tất cả các component sử dụng \useSearchParams\ trong dự án đều được bọc bởi thẻ \<Suspense>\ đúng chuẩn của Next.js 16 (App Router) để tránh các cảnh báo deopt (hạ cấp) xuống Client Rendering khi build.
 ### Các file đã sửa
 #### [MODIFY] pp/page.tsx`n- Vấn đề: \HomePageClient\ đang gọi \useSearchParams\ bên trong nhưng chưa có Suspense boundary ở \pp/page.tsx\.
-- Fix: Import \Suspense\ từ \eact\ và bọc toàn bộ thẻ \<HomePageClient>\ kèm \allback\ loader đẹp mắt.
+- Fix: Import \Suspense\ từ \
+eact\ và bọc toàn bộ thẻ \<HomePageClient>\ kèm \allback\ loader đẹp mắt.
 ### Trạng thái
 - ✅ Quét bằng grep_search không còn component nào bị lọt lưới Suspense.
 - ✅ Lỗi Hydration đã được xử lý triệt để, an toàn cho production build.
@@ -550,7 +554,8 @@ Giảm thiểu code đồ sộ và chặn re-render toàn màn hình bằng các
 2. Bổ sung logic hiển thị: Nếu bài học có loại (type) là TEXT, nội dung chữ sẽ được nạp thẳng vào khu vực Video Player 16:9, đồng thời ẩn phần mô tả bên dưới và ẩn nút xem chi tiết trên mobile để tránh trùng lặp nội dung.
 ### Các file đã sửa
 #### [MODIFY] components/course/VideoPlayer.tsx`n- Vấn đề: YT.Player thay thế thẻ div gốc khiến iframe sinh ra mất class kích thước (w-full h-full). Lệnh destroy làm mất thẻ vĩnh viễn trong DOM thật.
-- Fix: Bọc thêm thẻ div bảo vệ cho React quản lý, dùng ef cấp key động, ép height/width 100% cho Player.
+- Fix: Bọc thêm thẻ div bảo vệ cho React quản lý, dùng 
+ef cấp key động, ép height/width 100% cho Player.
 #### [MODIFY] components/course/CoursePlayer.tsx`n- Vấn đề: Logic hiển thị TEXT đã có trong VideoPlayer nhưng chưa được truyền dữ liệu mồi.
 - Fix: Truyền serverPlaylist có định dạng text nếu 	ype === 'TEXT', thêm cờ ẩn giao diện thừa.
 ### Trạng thái
@@ -924,42 +929,3 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
 - **v8.7.6 Race Condition & UI Feedback (2026-05-07)**:
     - **Fix Race Condition**: Đồng bộ hóa `handleSearch` và `handleSystemChange` bằng cách cho phép truyền `forcedSystemId` trực tiếp, tránh lỗi hiển thị nhầm hệ thống "Học viên" do độ trễ state.
     - **Cải thiện UX**: Cập nhật thông báo "ĐANG TẢI DỮ LIỆU..." khi chuyển đổi hệ thống thay vì hiện placeholder mặc định.
-
-## ✅ PHẦN 13: NÂNG CẤP HỆ THỐNG LÊN NEXT.JS 16 & AUTH.JS V5 (2026-05-08)
-
-### Mục tiêu
-Khắc phục lỗi không khởi động được server do xung đột phiên bản Next.js (9.3.3 vs 16) và hỗ trợ React 19.
-
-### Các file đã sửa
-
-#### 1. `package.json`
-- **Vấn đề**: Phiên bản `next` bị ghi nhầm là `^9.3.3` trong khi code sử dụng App Router và React 19. Next.js 9 không hỗ trợ `next.config.ts`.
-- **Fix**: 
-  - Cập nhật `next` lên `16.1.6` để khớp với `eslint-config-next` và yêu cầu dự án.
-  - Nâng cấp `next-auth` lên `5.0.0-beta.25` để tương thích với React 19 và Next.js 16.
-
-### Trạng thái
-- ✅ Server khởi động thành công với Turbopack: `▲ Next.js 16.1.6 (Turbopack)`
-- ✅ Lỗi `next.config.ts` không được hỗ trợ đã được xử lý triệt để.
-- ✅ Dependencies được dọn dẹp và cài đặt đúng phiên bản cho macOS (`npm install --legacy-peer-deps --ignore-scripts`).
-- ✅ Sửa lỗi `lightningcss` missing native binary bằng cách xóa `package-lock.json` và cài đặt lại trên môi trường hiện tại.
-- ✅ Prisma Client được generate thành công (`npx prisma generate`).
-
----
-## 💡 HƯỚNG DẪN ĐỒNG BỘ SANG MÁY WINDOWS (CƠ QUAN)
-
-### 1. Cấu hình Database mới
-Copy dòng dưới đây dán vào file `.env` trên máy Windows:
-```
-DATABASE_URL="postgresql://postgres.osqcudipywyfvvutbctb:Brk37732689@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?connection_limit=1"
-DIRECT_URL="postgresql://postgres.osqcudipywyfvvutbctb:Brk37732689@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?connection_limit=1"
-```
-
-### 2. Xử lý lỗi Build trên Windows
-Nếu chạy `npm run dev` bị báo lỗi `lightningcss`, hãy làm các bước:
-1. `npm install --legacy-peer-deps`
-2. Nếu vẫn lỗi, chạy lệnh sau trong PowerShell:
-```powershell
-cp node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node node_modules/lightningcss/
-```
-
