@@ -802,6 +802,8 @@ function GenealogyFlow() {
     lastExpandedIdRef.current = null
     setIsSearchMode(false)
     setSearchResult(null)
+    setFocusedSubtreeNode(null)
+    setFocusedNodeName(null)
 
     // Lấy userId hiện tại
     const roleResult = await getCurrentUserRoleAction()
@@ -878,6 +880,12 @@ function GenealogyFlow() {
     }
     setLoading(false)
   }, [handleSearch])
+
+  // v8.8.0: Quay về cây chính (Root Admin -> Full System, User -> My Team)
+  const handleResetToRoot = useCallback(async () => {
+    if (selectedSystem === null) return
+    await handleSystemChange(selectedSystem)
+  }, [selectedSystem, handleSystemChange])
 
   const initTree = useCallback(async (rootId: number = 0) => {
     setLoading(true); setError(null); setIsTreeEmpty(false); activeFocusMapRef.current = new Map(); focusMapSizeRef.current = 0; lastExpandedIdRef.current = null
@@ -1144,6 +1152,18 @@ function GenealogyFlow() {
           />
           <span className="text-[10px] font-bold text-slate-700 whitespace-nowrap">Đội của tôi</span>
         </label>
+
+        {/* v8.8.0: Nút Quay về cây chính */}
+        {selectedSystem !== null && (
+          <button
+            onClick={handleResetToRoot}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-600 text-white text-[10px] font-bold hover:bg-emerald-700 transition-all shrink-0 shadow-sm"
+            title="Quay về cây mặc định (Hệ thống hoặc Đội của tôi)"
+          >
+            <Home className="w-3 h-3" />
+            <span className="hidden lg:inline uppercase">Cây chính</span>
+          </button>
+        )}
 
         {/* Ô tìm kiếm - thu hẹp */}
         <div className="relative flex items-center w-[110px] sm:w-[140px] shrink-0">
