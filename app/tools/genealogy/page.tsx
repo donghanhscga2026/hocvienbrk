@@ -175,12 +175,14 @@ const GenealogyCard = (props: NodeProps) => {
     onDeleteNode?: (nodeId: number) => void;
     onShowDetails?: (userId: number) => void;
     onSearchNode?: (userId: number) => void;
+    currentUserId?: number | null;
   }
 
   const hasChildren = data.f1cCount > 0 || data.f1aCount > 0 || data.f1bCount > 0
   const isActuallyRoot = data.isRoot
   const isTarget = data.isSearchTarget
   const isFullMode = data.displayMode === 'full'
+  const isCurrentUser = data.id === data.currentUserId
 
   // Hiển thị Level thực từ TCA (ưu tiên data.level từ tca_member, fallback về treeDepth)
   const tcaLevel = data.level   // Giá trị thực từ bảng tca_member (Cấp 1, Cấp 2...)
@@ -215,8 +217,14 @@ const GenealogyCard = (props: NodeProps) => {
         {/* Container hình tròn hoàn chỉnh */}
         <div
           onClick={(e) => { e.stopPropagation(); data.onShowDetails?.(data.id); }}
-          className={`relative p-2 bg-white rounded-full shadow-2xl cursor-pointer hover:scale-105 transition-transform ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400' : ''}`}
+          className={`relative p-2 bg-white rounded-full shadow-2xl cursor-pointer hover:scale-105 transition-transform 
+            ${isTarget ? 'ring-4 ring-offset-2 ring-amber-400' : ''}
+            ${isCurrentUser ? 'ring-4 ring-offset-4 ring-blue-500 animate-pulse shadow-[0_0_40px_rgba(59,130,246,0.6)]' : ''}
+          `}
         >
+          {isCurrentUser && (
+            <div className="absolute inset-0 rounded-full animate-ping bg-blue-500 opacity-20 -z-10"></div>
+          )}
           <div className={`w-[148px] h-[148px] rounded-full flex items-center justify-center text-white overflow-hidden shadow-inner border-4 bg-gradient-to-br ${getLevelColor(colorDepth, isActuallyRoot)}`}>
             {data.image ? (
               <img 
@@ -572,7 +580,8 @@ function GenealogyFlow() {
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
           onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true }),
           onShowDetails: handleShowDetails,
-          onSearchNode: handleSearchNodeClick
+          onSearchNode: handleSearchNodeClick,
+          currentUserId: currentUserId
         },
       })
     }
