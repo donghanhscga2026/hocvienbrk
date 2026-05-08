@@ -838,7 +838,7 @@ function buildFullTreeFromClosures(
     allClosures: { ancestorAutoId: number; descendantAutoId: number; depth: number; userId: number; name: { name: string | null; image: string | null } | null }[],
     sysAutoToUserId: Map<number, number>,
     userMap: Map<number, { name: string | null, image: string | null }>,
-    tcaMemberMap: Map<number, { level: number | null; personalScore: number | null; totalScore: number | null }>
+    tcaMemberMap: Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; groupName: string | null; chucDanh: string | null; tcaName: string | null }>
 ): GenealogyNode {
     // Build parent -> children map (tất cả các depth)
     const parentToChildren = new Map<number, { autoId: number; userId: number }[]>()
@@ -899,7 +899,10 @@ function buildFullTreeFromClosures(
             children: children,
             level: tcaData?.level ?? null,
             personalScore: tcaData?.personalScore ?? null,
-            totalScore: tcaData?.totalScore ?? null
+            totalScore: tcaData?.totalScore ?? null,
+            groupName: tcaData?.groupName ?? null,
+            chucDanh: tcaData?.chucDanh ?? null,
+            tcaName: tcaData?.tcaName ?? null
         }
     }
     
@@ -975,16 +978,17 @@ export async function getFullSystemTreeAction(systemId: number) {
         // v8.8.1: Lấy dữ liệu TCA cho chế độ Full để thống kê và tô màu
         const tcaMembers = await (prisma as any).tCAMember.findMany({
             where: { userId: { in: [...userIdSet] } },
-            select: { userId: true, level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true }
+            select: { userId: true, level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true }
         })
-        const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; groupName: string | null; chucDanh: string | null }>()
+        const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; groupName: string | null; chucDanh: string | null; tcaName: string | null }>()
         for (const m of tcaMembers) {
             tcaMemberMap.set(m.userId, {
                 level: m.level ?? null,
                 personalScore: m.personalScore != null ? Number(m.personalScore) : null,
                 totalScore: m.totalScore != null ? Number(m.totalScore) : null,
                 groupName: m.groupName ?? null,
-                chucDanh: m.chuc_danh ?? null
+                chucDanh: m.chuc_danh ?? null,
+                tcaName: m.name ?? null
             })
         }
         
