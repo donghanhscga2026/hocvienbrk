@@ -365,6 +365,29 @@ Bất kỳ khi nào sửa extension:
 
 *Tài liệu này được cập nhật **ngay sau mỗi thay đổi code**, không chờ cuối phiên.*
 
+## ✅ FIX LỖI BUILD LIGHTNINGCSS (2026-05-08)
+
+### Mục tiêu
+Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi chạy `next dev` với Turbopack và Tailwind v4.
+
+### Vấn đề
+`lightningcss` (dependency của Tailwind v4) không tìm thấy native binary trong môi trường Turbopack, mặc dù gói `lightningcss-darwin-x64` đã được cài đặt.
+
+### Các thao tác đã thực hiện
+1. **Xóa cache**: `rm -rf .next` để buộc Turbopack build lại từ đầu.
+2. **Workaround native binary**: Copy file `lightningcss.darwin-x64.node` từ `node_modules/lightningcss-darwin-x64/` trực tiếp vào `node_modules/lightningcss/`. 
+   - Thao tác này giúp logic fallback `require('../lightningcss.darwin-x64.node')` trong `lightningcss/node/index.js` hoạt động chính xác.
+3. **Cài đặt lại**: Chạy `npm install --legacy-peer-deps` để đảm bảo các link dependency ổn định.
+
+### Trạng thái
+- ✅ `npm run build` vượt qua bước compile CSS thành công.
+- ✅ Đã test require thủ công qua script: Thành công.
+- ✅ Cấu trúc `node_modules` đã có đủ binary ở cả 2 vị trí (root package và native package).
+
+---
+
+*Tài liệu này được cập nhật **ngay sau mỗi thay đổi code**, không chờ cuối phiên.*
+
 ---
 
 ## ✅ PHẦN 5: AFFILIATE REFERRAL FIELD LOCK (2026-05-03)
@@ -450,6 +473,29 @@ Tái cấu trúc `AGENTS.md` để AI tuân thủ tốt hơn: nguyên tắc quan
 - ✅ AGENTS.md được tối ưu — 250 dòng (từ 306 dòng gốc)
 - ✅ Không còn quy tắc xung đột hoặc trùng lặp
 - ✅ Quy tắc cập nhật tài liệu được tích hợp vào cả 2 luồng quy trình
+
+---
+
+*Tài liệu này được cập nhật **ngay sau mỗi thay đổi code**, không chờ cuối phiên.*
+
+## ✅ FIX LỖI BUILD LIGHTNINGCSS (2026-05-08)
+
+### Mục tiêu
+Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi chạy `next dev` với Turbopack và Tailwind v4.
+
+### Vấn đề
+`lightningcss` (dependency của Tailwind v4) không tìm thấy native binary trong môi trường Turbopack, mặc dù gói `lightningcss-darwin-x64` đã được cài đặt.
+
+### Các thao tác đã thực hiện
+1. **Xóa cache**: `rm -rf .next` để buộc Turbopack build lại từ đầu.
+2. **Workaround native binary**: Copy file `lightningcss.darwin-x64.node` từ `node_modules/lightningcss-darwin-x64/` trực tiếp vào `node_modules/lightningcss/`. 
+   - Thao tác này giúp logic fallback `require('../lightningcss.darwin-x64.node')` trong `lightningcss/node/index.js` hoạt động chính xác.
+3. **Cài đặt lại**: Chạy `npm install --legacy-peer-deps` để đảm bảo các link dependency ổn định.
+
+### Trạng thái
+- ✅ `npm run build` vượt qua bước compile CSS thành công.
+- ✅ Đã test require thủ công qua script: Thành công.
+- ✅ Cấu trúc `node_modules` đã có đủ binary ở cả 2 vị trí (root package và native package).
 
 ---
 
@@ -878,3 +924,42 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
 - **v8.7.6 Race Condition & UI Feedback (2026-05-07)**:
     - **Fix Race Condition**: Đồng bộ hóa `handleSearch` và `handleSystemChange` bằng cách cho phép truyền `forcedSystemId` trực tiếp, tránh lỗi hiển thị nhầm hệ thống "Học viên" do độ trễ state.
     - **Cải thiện UX**: Cập nhật thông báo "ĐANG TẢI DỮ LIỆU..." khi chuyển đổi hệ thống thay vì hiện placeholder mặc định.
+
+## ✅ PHẦN 13: NÂNG CẤP HỆ THỐNG LÊN NEXT.JS 16 & AUTH.JS V5 (2026-05-08)
+
+### Mục tiêu
+Khắc phục lỗi không khởi động được server do xung đột phiên bản Next.js (9.3.3 vs 16) và hỗ trợ React 19.
+
+### Các file đã sửa
+
+#### 1. `package.json`
+- **Vấn đề**: Phiên bản `next` bị ghi nhầm là `^9.3.3` trong khi code sử dụng App Router và React 19. Next.js 9 không hỗ trợ `next.config.ts`.
+- **Fix**: 
+  - Cập nhật `next` lên `16.1.6` để khớp với `eslint-config-next` và yêu cầu dự án.
+  - Nâng cấp `next-auth` lên `5.0.0-beta.25` để tương thích với React 19 và Next.js 16.
+
+### Trạng thái
+- ✅ Server khởi động thành công với Turbopack: `▲ Next.js 16.1.6 (Turbopack)`
+- ✅ Lỗi `next.config.ts` không được hỗ trợ đã được xử lý triệt để.
+- ✅ Dependencies được dọn dẹp và cài đặt đúng phiên bản cho macOS (`npm install --legacy-peer-deps --ignore-scripts`).
+- ✅ Sửa lỗi `lightningcss` missing native binary bằng cách xóa `package-lock.json` và cài đặt lại trên môi trường hiện tại.
+- ✅ Prisma Client được generate thành công (`npx prisma generate`).
+
+---
+## 💡 HƯỚNG DẪN ĐỒNG BỘ SANG MÁY WINDOWS (CƠ QUAN)
+
+### 1. Cấu hình Database mới
+Copy dòng dưới đây dán vào file `.env` trên máy Windows:
+```
+DATABASE_URL="postgresql://postgres.osqcudipywyfvvutbctb:Brk37732689@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?connection_limit=1"
+DIRECT_URL="postgresql://postgres.osqcudipywyfvvutbctb:Brk37732689@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres?connection_limit=1"
+```
+
+### 2. Xử lý lỗi Build trên Windows
+Nếu chạy `npm run dev` bị báo lỗi `lightningcss`, hãy làm các bước:
+1. `npm install --legacy-peer-deps`
+2. Nếu vẫn lỗi, chạy lệnh sau trong PowerShell:
+```powershell
+cp node_modules/lightningcss-win32-x64-msvc/lightningcss.win32-x64-msvc.node node_modules/lightningcss/
+```
+

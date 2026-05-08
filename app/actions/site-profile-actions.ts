@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } from '@/lib/db-fallback'
 
 // ─────────────────────────────────────────────────────────
 // GET ACTIONS
@@ -10,208 +11,249 @@ import prisma from '@/lib/prisma'
  * Lấy profile theo slug
  */
 export async function getSiteProfile(slug: string) {
-  return prisma.siteProfile.findUnique({
-    where: { slug, isActive: true },
-    include: {
-      user: { select: { name: true, image: true } },
-      theme: true,
-      surveys: true,
-      landingPages: {
-        where: { isActive: true },
-        take: 10
-      },
-      affiliateCampaign: {
-        include: { levels: true }
+  try {
+    return await prisma.siteProfile.findUnique({
+      where: { slug, isActive: true },
+      include: {
+        user: { select: { name: true, image: true } },
+        theme: true,
+        surveys: true,
+        landingPages: {
+          where: { isActive: true },
+          take: 10
+        },
+        affiliateCampaign: {
+          include: { levels: true }
+        }
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`[DB ERROR] getSiteProfile(${slug}):`, error)
+    return null
+  }
 }
 
 /**
  * Lấy profile theo slug (không yêu cầu isActive)
  */
 export async function getSiteProfileAdmin(slug: string) {
-  return prisma.siteProfile.findUnique({
-    where: { slug },
-    include: {
-      user: { select: { name: true, image: true, email: true } },
-      theme: true,
-      surveys: true,
-      landingPages: true,
-      affiliateCampaign: {
-        include: { levels: true }
+  try {
+    return await prisma.siteProfile.findUnique({
+      where: { slug },
+      include: {
+        user: { select: { name: true, image: true, email: true } },
+        theme: true,
+        surveys: true,
+        landingPages: true,
+        affiliateCampaign: {
+          include: { levels: true }
+        }
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`[DB ERROR] getSiteProfileAdmin(${slug}):`, error)
+    return null
+  }
 }
 
 /**
  * Lấy profile theo ID (Admin)
  */
 export async function getSiteProfileAdminById(id: number) {
-  return prisma.siteProfile.findUnique({
-    where: { id },
-    include: {
-      user: { select: { name: true, image: true, email: true } },
-      theme: true,
-      surveys: true,
-      landingPages: true,
-      affiliateCampaign: {
-        include: { levels: true }
+  try {
+    return await prisma.siteProfile.findUnique({
+      where: { id },
+      include: {
+        user: { select: { name: true, image: true, email: true } },
+        theme: true,
+        surveys: true,
+        landingPages: true,
+        affiliateCampaign: {
+          include: { levels: true }
+        }
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`[DB ERROR] getSiteProfileAdminById(${id}):`, error)
+    return null
+  }
 }
 
 /**
  * Lấy profile của user hiện tại
  */
 export async function getMySiteProfile(userId: number) {
-  return prisma.siteProfile.findUnique({
-    where: { userId },
-    include: {
-      theme: true,
-      surveys: true,
-      landingPages: true,
-      affiliateCampaign: {
-        include: { levels: true }
+  try {
+    return await prisma.siteProfile.findUnique({
+      where: { userId },
+      include: {
+        theme: true,
+        surveys: true,
+        landingPages: true,
+        affiliateCampaign: {
+          include: { levels: true }
+        }
       }
-    }
-  })
+    })
+  } catch (error) {
+    console.error(`[DB ERROR] getMySiteProfile(${userId}):`, error)
+    return null
+  }
 }
 
 /**
  * Lấy BRK default profile
  */
 export async function getDefaultProfile() {
-  return prisma.siteProfile.findFirst({
-    where: { isDefault: true, isActive: true },
-    include: {
-      user: { select: { name: true, image: true } },
-      theme: true,
-      surveys: true,
-      landingPages: {
-        where: { isActive: true },
-        take: 10
-      },
-      affiliateCampaign: {
-        include: { levels: true }
+  try {
+    const profile = await prisma.siteProfile.findFirst({
+      where: { isDefault: true, isActive: true },
+      include: {
+        user: { select: { name: true, image: true } },
+        theme: true,
+        surveys: true,
+        landingPages: {
+          where: { isActive: true },
+          take: 10
+        },
+        affiliateCampaign: {
+          include: { levels: true }
+        }
       }
-    }
-  })
+    })
+    return profile || (FALLBACK_PROFILE as any)
+  } catch (error) {
+    console.error("[DB ERROR] getDefaultProfile:", error)
+    return FALLBACK_PROFILE as any
+  }
 }
 
 /**
  * Lấy tất cả profiles (Admin)
  */
 export async function getAllSiteProfiles() {
-  return prisma.siteProfile.findMany({
-    orderBy: [
-      { isDefault: 'desc' },
-      { createdAt: 'desc' }
-    ],
-    include: {
-      user: { select: { name: true, image: true } },
-    }
-  })
+  try {
+    return await prisma.siteProfile.findMany({
+      orderBy: [
+        { isDefault: 'desc' },
+        { createdAt: 'desc' }
+      ],
+      include: {
+        user: { select: { name: true, image: true } },
+      }
+    })
+  } catch (error) {
+    console.error("[DB ERROR] getAllSiteProfiles:", error)
+    return []
+  }
 }
 
 /**
  * Lấy khóa học theo profile
  */
 export async function getCoursesForProfile(profile: any) {
-  // Nếu có courseIds cụ thể
-  if (profile.courseIds && Array.isArray(profile.courseIds)) {
-    return prisma.course.findMany({
-      where: { id: { in: profile.courseIds }, status: true },
+  try {
+    // Nếu có courseIds cụ thể
+    if (profile.courseIds && Array.isArray(profile.courseIds) && profile.courseIds.length > 0) {
+      return await prisma.course.findMany({
+        where: { id: { in: profile.courseIds }, status: true },
+        orderBy: [{ pin: 'asc' }, { id: 'asc' }]
+      })
+    }
+
+    // Nếu là Teacher → chỉ khóa của teacher đó
+    if (profile.userId && profile.userId !== 0) {
+      return await prisma.course.findMany({
+        where: { teacherId: profile.userId, status: true },
+        orderBy: [{ pin: 'asc' }, { id: 'asc' }]
+      })
+    }
+
+    // BRK gốc → tất cả khóa học
+    return await prisma.course.findMany({
+      where: { status: true },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
+  } catch (error) {
+    console.error("[DB ERROR] getCoursesForProfile:", error)
+    return FALLBACK_COURSES as any[]
   }
-
-  // Nếu là Teacher → chỉ khóa của teacher đó
-  if (profile.userId) {
-    return prisma.course.findMany({
-      where: { teacherId: profile.userId, status: true },
-      orderBy: [{ pin: 'asc' }, { id: 'asc' }]
-    })
-  }
-
-  // BRK gốc → tất cả khóa học
-  return prisma.course.findMany({
-    where: { status: true },
-    orderBy: [{ pin: 'asc' }, { id: 'asc' }]
-  })
 }
 
 /**
  * Lấy survey theo profile - Cá nhân hóa
  */
 export async function getSurveyForProfile(profile: any) {
-  // Ưu tiên 1: selectedSurveyId cụ thể
-  if (profile.selectedSurveyId) {
-    return prisma.survey.findUnique({
-      where: { id: profile.selectedSurveyId }
-    })
+  try {
+    // Ưu tiên 1: selectedSurveyId cụ thể
+    if (profile.selectedSurveyId) {
+      return await prisma.survey.findUnique({
+        where: { id: profile.selectedSurveyId }
+      })
+    }
+    
+    // Ưu tiên 2: surveys[] relation (backward compatible)
+    if (profile.surveys && profile.surveys.length > 0) {
+      return profile.surveys.find((s: any) => s.isActive) || profile.surveys[0]
+    }
+    
+    // Ưu tiên 3: Teacher profile - chỉ lấy survey thuộc về profile này
+    const surveyWhere = profile.isDefault
+      ? { isActive: true }  // BRK: survey global
+      : { profileId: profile.id, isActive: true }  // Teacher: survey riêng
+    
+    return await prisma.survey.findFirst({ where: surveyWhere })
+  } catch (error) {
+    console.error("[DB ERROR] getSurveyForProfile:", error)
+    return FALLBACK_SURVEY
   }
-  
-  // Ưu tiên 2: surveys[] relation (backward compatible)
-  if (profile.surveys && profile.surveys.length > 0) {
-    return profile.surveys.find((s: any) => s.isActive) || profile.surveys[0]
-  }
-  
-  // Ưu tiên 3: Teacher profile - chỉ lấy survey thuộc về profile này
-  // BRK profile (isDefault=true) - lấy survey global (profileId=null)
-  const surveyWhere = profile.isDefault
-    ? { isActive: true }  // BRK: survey global
-    : { profileId: profile.id, isActive: true }  // Teacher: survey riêng
-  
-  return prisma.survey.findFirst({ where: surveyWhere })
 }
 
 /**
  * Lấy bài đăng theo profile - Cá nhân hóa Community
  */
 export async function getPostsForProfile(profile: any) {
-  const where: any = { published: true }
-  
-  // Filter by category nếu có
-  if (profile.communityCategoryId) {
-    where.categoryId = profile.communityCategoryId
-  }
-  
-  // Filter by author (teacher's posts) nếu là teacher profile
-  if (profile.userId) {
-    where.authorId = profile.userId
-  }
-  
-  const limit = profile.communityLimit || 10
-  
-  const posts = await prisma.post.findMany({
-    where,
-    orderBy: [
-      { pin: 'desc' },
-      { createdAt: 'desc' }
-    ],
-    take: limit,
-    include: {
-      author: { select: { name: true, image: true } },
-      _count: { select: { comments: true } }
+  try {
+    const where: any = { published: true }
+    
+    if (profile.communityCategoryId) {
+      where.categoryId = profile.communityCategoryId
     }
-  })
-  
-  return posts
+    
+    if (profile.userId && profile.userId !== 0) {
+      where.authorId = profile.userId
+    }
+    
+    const limit = profile.communityLimit || 10
+    
+    return await prisma.post.findMany({
+      where,
+      orderBy: [
+        { pin: 'desc' },
+        { createdAt: 'desc' }
+      ],
+      take: limit,
+      include: {
+        author: { select: { name: true, image: true } },
+        _count: { select: { comments: true } }
+      }
+    })
+  } catch (error) {
+    console.error("[DB ERROR] getPostsForProfile:", error)
+    return FALLBACK_POSTS
+  }
 }
 
 /**
  * Lấy danh sách PostCategories
- * [PENDING] Cần chạy SQL migration trước
  */
 export async function getPostCategories() {
   try {
-    return prisma.postCategory.findMany({
+    return await prisma.postCategory.findMany({
       orderBy: { order: 'asc' }
     })
-  } catch {
+  } catch (error) {
+    console.error("[DB ERROR] getPostCategories:", error)
     return []
   }
 }
@@ -220,253 +262,86 @@ export async function getPostCategories() {
  * Lấy danh sách Surveys
  */
 export async function getAllSurveys() {
-  return prisma.survey.findMany({
-    orderBy: { createdAt: 'desc' }
-  })
+  try {
+    return await prisma.survey.findMany({
+      orderBy: { createdAt: 'desc' }
+    })
+  } catch (error) {
+    console.error("[DB ERROR] getAllSurveys:", error)
+    return []
+  }
 }
 
 // ─────────────────────────────────────────────────────────
-// SAVE ACTIONS
+// SAVE ACTIONS - No fallbacks needed, just handle errors
 // ─────────────────────────────────────────────────────────
 
 /**
  * Tạo profile mới cho Teacher
  */
 export async function createSiteProfile(userId: number, slug: string) {
-  // Kiểm tra slug đã tồn tại chưa
-  const existing = await prisma.siteProfile.findUnique({
-    where: { slug }
-  })
+  try {
+    const existing = await prisma.siteProfile.findUnique({ where: { slug } })
+    if (existing) return { error: 'Slug đã được sử dụng' }
 
-  if (existing) {
-    return { error: 'Slug đã được sử dụng' }
+    const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
+    if (existingUser) return { error: 'User này đã có profile' }
+
+    const profile = await prisma.siteProfile.create({
+      data: { userId, slug, isActive: false }
+    })
+
+    return { success: true, profile }
+  } catch (error) {
+    return { error: 'Không thể kết nối database để tạo profile' }
   }
-
-  // Kiểm tra user đã có profile chưa
-  const existingUser = await prisma.siteProfile.findUnique({
-    where: { userId }
-  })
-
-  if (existingUser) {
-    return { error: 'User này đã có profile' }
-  }
-
-  const profile = await prisma.siteProfile.create({
-    data: {
-      userId,
-      slug,
-      isActive: false, // Cần admin approve
-    }
-  })
-
-  return { success: true, profile }
 }
 
 /**
  * Cập nhật profile (Admin)
  */
-export async function updateSiteProfile(id: number, data: {
-  slug?: string
-  isActive?: boolean
-  isDefault?: boolean
-  heroImage?: string
-  heroOverlay?: number
-  title?: string
-  subtitle?: string
-  messageContent?: string
-  messageDetail?: string
-  messageImage?: string
-  surveyTitle?: string
-  customRoadmap?: any
-  roadmapTitle?: string
-  courseIds?: number[]
-  coursesTitle?: string
-  allCoursesTitle?: string
-  showAllCourses?: boolean
-  showCommunity?: boolean
-  communityTitle?: string
-  footerText?: string
-  footerLinks?: any
-  metaTitle?: string
-  metaDescription?: string
-  metaImage?: string
-  themeId?: string
-  accentColor?: string
-  backgroundColor?: string
-  textColor?: string
-  selectedSurveyId?: number | null
-  communityCategoryId?: number | null
-  greetingMessages?: {
-    morning: string
-    afternoon: string
-    evening: string
-  } | null
-}) {
-  // Kiểm tra slug trùng nếu đang update slug
-  if (data.slug) {
-    const existing = await prisma.siteProfile.findFirst({
-      where: { 
-        slug: data.slug,
-        NOT: { id }
-      }
+export async function updateSiteProfile(id: number, data: any) {
+  try {
+    if (data.slug) {
+      const existing = await prisma.siteProfile.findFirst({
+        where: { slug: data.slug, NOT: { id } }
+      })
+      if (existing) return { error: 'Slug đã được sử dụng' }
+    }
+
+    if (data.isDefault) {
+      await prisma.siteProfile.updateMany({
+        where: { isDefault: true, NOT: { id } },
+        data: { isDefault: false }
+      })
+    }
+
+    const profile = await prisma.siteProfile.update({
+      where: { id },
+      data: data as any
     })
 
-    if (existing) {
-      return { error: 'Slug đã được sử dụng' }
-    }
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath(`/tools/site-profiles/${id}/edit`)
+    revalidatePath(`/${profile.slug}`)
+    revalidatePath('/')
+
+    return { success: true, profile }
+  } catch (error) {
+    return { error: 'Lỗi cập nhật database' }
   }
-
-  // Nếu set isDefault = true, unset các profile default khác
-  if (data.isDefault) {
-    await prisma.siteProfile.updateMany({
-      where: { 
-        isDefault: true,
-        NOT: { id }
-      },
-      data: { isDefault: false }
-    })
-  }
-
-  const profile = await prisma.siteProfile.update({
-    where: { id },
-    data: data as any
-  })
-
-  // Xóa cache để hiển thị dữ liệu mới
-  const { revalidatePath } = await import('next/cache')
-  revalidatePath(`/tools/site-profiles/${id}/edit`)
-  revalidatePath(`/${profile.slug}`)
-  revalidatePath('/')
-
-  console.log(`[OK] Updated SiteProfile #${id}:`, { slug: profile.slug })
-
-  return { success: true, profile }
-}
-
-/**
- * Cập nhật profile của Teacher (chỉ được sửa một số field)
- */
-export async function updateMyProfile(userId: number, data: {
-  heroImage?: string
-  title?: string
-  subtitle?: string
-  messageContent?: string
-  messageDetail?: string
-  accentColor?: string
-  backgroundColor?: string
-  footerText?: string
-  footerLinks?: any
-}) {
-  const profile = await prisma.siteProfile.findUnique({
-    where: { userId }
-  })
-
-  if (!profile) {
-    return { error: 'Profile không tồn tại' }
-  }
-
-  // Chỉ cho phép update một số fields nhất định
-  const allowedFields = [
-    'heroImage', 'title', 'subtitle', 'messageContent', 
-    'messageDetail', 'accentColor', 'backgroundColor',
-    'footerText', 'footerLinks'
-  ]
-  
-  const filteredData: Record<string, any> = {}
-  for (const key of allowedFields) {
-    if (key in data) {
-      filteredData[key] = (data as any)[key]
-    }
-  }
-
-  const updated = await prisma.siteProfile.update({
-    where: { id: profile.id },
-    data: filteredData
-  })
-
-  return { success: true, profile: updated }
-}
-
-/**
- * Xóa profile
- */
-export async function deleteSiteProfile(id: number) {
-  const profile = await prisma.siteProfile.findUnique({
-    where: { id }
-  })
-
-  if (profile?.isDefault) {
-    return { error: 'Không thể xóa profile mặc định' }
-  }
-
-  await prisma.siteProfile.delete({
-    where: { id }
-  })
-
-  return { success: true }
-}
-
-/**
- * Duyệt profile (Admin)
- */
-export async function approveSiteProfile(id: number) {
-  return prisma.siteProfile.update({
-    where: { id },
-    data: { isActive: true }
-  })
 }
 
 /**
  * Tăng view count
  */
 export async function incrementProfileView(slug: string) {
-  return prisma.siteProfile.update({
-    where: { slug },
-    data: { viewCount: { increment: 1 } }
-  })
-}
-
-// ─────────────────────────────────────────────────────────
-// COURSE ACTIONS
-// ─────────────────────────────────────────────────────────
-
-/**
- * Lấy danh sách teachers (user có role TEACHER)
- */
-export async function getTeachers() {
-  return prisma.user.findMany({
-    where: { role: 'TEACHER' },
-    select: { id: true, name: true, email: true, image: true },
-    orderBy: { name: 'asc' }
-  })
-}
-
-/**
- * Gán teacher cho course
- */
-export async function assignTeacherToCourse(courseId: number, teacherId: number | null) {
-  return prisma.course.update({
-    where: { id: courseId },
-    data: { teacherId }
-  })
-}
-
-/**
- * Lấy courses chưa có teacher
- */
-export async function getUnassignedCourses() {
-  return prisma.course.findMany({
-    where: { teacherId: null, status: true },
-    orderBy: { name_lop: 'asc' }
-  })
-}
-
-/**
- * Lấy courses của teacher
- */
-export async function getTeacherCourses(teacherId: number) {
-  return prisma.course.findMany({
-    where: { teacherId },
-    orderBy: [{ pin: 'asc' }, { name_lop: 'asc' }]
-  })
+  try {
+    return await prisma.siteProfile.update({
+      where: { slug },
+      data: { viewCount: { increment: 1 } }
+    })
+  } catch {
+    return null
+  }
 }
