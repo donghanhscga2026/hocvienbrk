@@ -54,6 +54,11 @@
     "uuid": "^13.0.0",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "next-auth": {
+      "next": "$next"
+    }
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/d3-hierarchy": "^3.1.7",
