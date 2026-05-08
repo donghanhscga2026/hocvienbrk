@@ -940,3 +940,9 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
 - **v8.7.9 Interactive Node Search (2026-05-08)**:
     - **Nâng cấp `GenealogyCard`**: Thêm sự kiện `onClick` vào ô thông tin của Node. Khi nhấn vào, hệ thống sẽ tự động tìm kiếm Node đó (Focus mode), hiển thị 2 đời cha và toàn bộ đời con cháu.
     - **Gộp logic Tìm kiếm**: Cập nhật `handleSearch` hỗ trợ tham số `forceLimitAncestors` để tái sử dụng logic tìm kiếm chuẩn cho tính năng click chọn node.
+
+- **v8.8.0 Reset to Main Tree Feature (2026-05-08)**:
+    - **Nút "Cây chính" (Quay về root)**: Thêm nút bấm chuyên nghiệp trên thanh công cụ. Khi nhấn vào, hệ thống sẽ xóa toàn bộ trạng thái tìm kiếm/focus và quay về trạng thái mặc định:
+        - **Admin (ID 0)**: Hiển thị trọn vẹn cây của cả hệ thống (System Root).
+        - **User thường**: Hiển thị cây bắt đầu từ chính mình làm Root (My Team).
+    - **Cải tiến Logic Reset**: Cập nhật `handleSystemChange` để reset toàn bộ các state phụ như `focusedSubtreeNode`, `focusedNodeName`, giúp việc chuyển đổi giữa các chế độ xem mượt mà hơn.
