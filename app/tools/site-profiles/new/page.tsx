@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Shield, AlertCircle } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
-import { createSiteProfile, getTeachers } from '@/app/actions/site-profile-actions'
+import { createSiteProfile } from '@/app/actions/site-profile-actions'
+import { getTeachersAction } from '@/app/actions/course-actions'
 
 export default function NewSiteProfilePage() {
   const router = useRouter()
@@ -28,8 +29,10 @@ export default function NewSiteProfilePage() {
 
   async function loadTeachers() {
     try {
-      const data = await getTeachers()
-      setTeachers(data || [])
+      const result = await getTeachersAction()
+      if (result.success) {
+        setTeachers(result.teachers || [])
+      }
     } catch (err) {
       console.error('Error loading teachers:', err)
     }

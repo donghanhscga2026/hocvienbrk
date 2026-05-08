@@ -95,7 +95,14 @@
 
 **Tính chất — ranh giới rõ ràng:**
 - ✅ Đọc file, phân tích, đưa đề xuất → được phép, không cần hỏi trước
-- ❌ Sửa file, tạo file, xóa code → **PHẢI HỎI TRƯỚC**, không có ngoại lệ
+- ✅ Sửa file, tạo file, xóa code → **PHẢI HỎI TRƯỚC**, không có ngoại lệ
+
+### 9. TUYỆT ĐỐI KHÔNG CÓ LỖI BUILD (ZERO TOLERANCE)
+> Mọi lỗi biên dịch đều là lỗi chặn (Blocker). Không có khái niệm "lỗi không liên quan".
+
+- **Bắt buộc**: Chạy `npx tsc --noEmit` và đảm bảo kết quả trả về `Exit code: 0` trước khi báo cáo hoàn thành.
+- **Không ngoại lệ**: Ngay cả khi lỗi nằm ở file cũ hoặc file không thuộc phạm vi sửa đổi, Agent vẫn phải xử lý (hoặc báo cáo để xử lý) vì Vercel sẽ từ chối Deploy nếu còn bất kỳ lỗi TypeScript nào.
+- **Nguyên tắc**: "Code trên máy chạy được" chưa phải là xong. "Code build thành công" mới là xong.
 
 ---
 

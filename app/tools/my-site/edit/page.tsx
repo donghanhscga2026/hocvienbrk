@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle, Save, Image } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
-import { getMySiteProfile, updateMyProfile } from '@/app/actions/site-profile-actions'
+import { getMySiteProfile, updateSiteProfile } from '@/app/actions/site-profile-actions'
 
 interface Profile {
   id: number
@@ -93,14 +93,14 @@ export default function MySiteEditPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!userId) return
+    if (!userId || !profile) return
 
     setSaving(true)
     setError(null)
     setSaved(false)
 
     try {
-      const result = await updateMyProfile(parseInt(userId), formData)
+      const result = await updateSiteProfile(profile.id, formData)
       if (result.error) {
         setError(result.error)
       } else {
