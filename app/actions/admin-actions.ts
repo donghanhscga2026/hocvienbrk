@@ -50,22 +50,26 @@ export interface GenealogyNode {
 
 // Helper: Lay thong tin System cua user (tim theo onSystem dau tien)
 async function getUserSystemInfo(userId: number): Promise<{ onSystem: number | null; refSysId: number; autoId: number } | null> {
-    const system = await prisma.system.findFirst({ where: { userId } })
-    if (!system) return null
-    return { onSystem: system.onSystem, refSysId: system.refSysId, autoId: system.autoId }
+    try {
+        const system = await prisma.system.findFirst({ where: { userId } })
+        if (!system) return null
+        return { onSystem: system.onSystem, refSysId: system.refSysId, autoId: system.autoId }
+    } catch { return null }
 }
 
 // Helper: Lay root cua he thong
 async function getSystemRootUser(systemId: number): Promise<{ id: number; name: string | null } | null> {
-    const rootSystem = await prisma.system.findFirst({
-        where: { onSystem: systemId, refSysId: 0 }
-    })
-    if (!rootSystem) return null
-    const user = await prisma.user.findUnique({
-        where: { id: rootSystem.userId },
-        select: { id: true, name: true, image: true }
-    })
-    return user
+    try {
+        const rootSystem = await prisma.system.findFirst({
+            where: { onSystem: systemId, refSysId: 0 }
+        })
+        if (!rootSystem) return null
+        const user = await prisma.user.findUnique({
+            where: { id: rootSystem.userId },
+            select: { id: true, name: true, image: true }
+        })
+        return user
+    } catch { return null }
 }
 
 export async function getSystemRootUserAction(systemId: number) {
@@ -79,153 +83,134 @@ async function buildStandardTree(
     systemId?: number,
     forceFull: boolean = false
 ): Promise<GenealogyNode | null> {
-    const isSystem = type === 'SYSTEM'
-    
-    // 1. Lấy thông tin Root
-    const rootUser = await prisma.user.findUnique({
-        where: { id: rootId },
-        select: { id: true, name: true, image: true, referrerId: true }
-    })
-    if (!rootUser) return null
-
-    let rootAutoId = rootId
-    if (isSystem) {
-        const rootSys = await prisma.system.findFirst({ where: { userId: rootId, onSystem: systemId } })
-        if (!rootSys) return null
-        rootAutoId = rootSys.autoId
-    }
-
-    // 2. Lấy F1s trực tiếp (refSysId = userId của parent - ĐÚNG theo schema)
-    let f1Data: any[] = []
-    if (isSystem) {
-        f1Data = await prisma.system.findMany({
-            where: { 
-                refSysId: rootId,  // Tìm theo userId của parent
-                onSystem: systemId,
-                userId: { not: rootId }
-            },
-            include: { user: { select: { id: true, name: true, image: true } } }
+    try {
+        const isSystem = type === 'SYSTEM'
+        
+        // 1. Lấy thông tin Root
+        const rootUser = await prisma.user.findUnique({
+            where: { id: rootId },
+            select: { id: true, name: true, image: true, referrerId: true }
         })
-    } else {
-        const users = await prisma.user.findMany({
-            where: { 
-                referrerId: rootId,
-                id: { not: rootId }
-            },
-            select: { id: true, name: true, image: true }
-        })
-        f1Data = users.map((u: { id: number; name: string | null }) => ({ ...u, autoId: u.id, user: u }))
-    }
+        if (!rootUser) return null
 
-    if (f1Data.length === 0) {
-        return {
-            id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
-            totalSubCount: 1, f1aCount: 0, f1bCount: 0, f1cCount: 0,
-            groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-            groupA: [], groupB: [], children: [], isRoot: true
+        let rootAutoId = rootId
+        if (isSystem) {
+            const rootSys = await prisma.system.findFirst({ where: { userId: rootId, onSystem: systemId } })
+            if (!rootSys) return null
+            rootAutoId = rootSys.autoId
         }
-    }
 
-    const f1AutoIds = f1Data.map(f => f.autoId)
+        // 2. Lấy F1s trực tiếp (refSysId = userId của parent - ĐÚNG theo schema)
+        let f1Data: any[] = []
+        if (isSystem) {
+            f1Data = await prisma.system.findMany({
+                where: { 
+                    refSysId: rootId,  // Tìm theo userId của parent
+                    onSystem: systemId,
+                    userId: { not: rootId }
+                },
+                include: { user: { select: { id: true, name: true, image: true } } }
+            })
+        } else {
+            const users = await prisma.user.findMany({
+                where: { 
+                    referrerId: rootId,
+                    id: { not: rootId }
+                },
+                select: { id: true, name: true, image: true }
+            })
+            f1Data = users.map((u: { id: number; name: string | null }) => ({ ...u, autoId: u.id, user: u }))
+        }
 
-    // 3. Lấy Closures (Lấy descendants của F1s để tìm F2s)
-    const closureModel = isSystem ? prisma.systemClosure : prisma.userClosure
-    const whereBase = isSystem ? { systemId } : {}
+        if (f1Data.length === 0) {
+            return {
+                id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
+                totalSubCount: 1, f1aCount: 0, f1bCount: 0, f1cCount: 0,
+                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                groupA: [], groupB: [], children: [], isRoot: true
+            }
+        }
 
-    // v8.7.1: Nếu forceFull, lấy toàn bộ descendants của root để build cây đầy đủ
-    let allClosures: any[] = []
-    let totalCount = 0
+        const f1AutoIds = f1Data.map(f => f.autoId)
 
-    if (forceFull) {
-        // Lấy tất cả descendantId thuộc rootAutoId
-        const descendantIds = await (closureModel as any).findMany({
-            where: { ...whereBase, ancestorId: rootAutoId },
-            select: { descendantId: true }
-        })
-        const idList = descendantIds.map((d: any) => d.descendantId)
-        totalCount = idList.length
+        // 3. Lấy Closures (Lấy descendants của F1s để tìm F2s)
+        const closureModel = isSystem ? prisma.systemClosure : prisma.userClosure
+        const whereBase = isSystem ? { systemId } : {}
 
-        // Lấy toàn bộ quan hệ giữa các node trong idList (để build tree) + quan hệ của chính root
-        allClosures = await (closureModel as any).findMany({
-            where: {
-                ...whereBase,
-                ancestorId: { in: [rootAutoId, ...idList] },
-                descendantId: { in: idList }
-            },
-            include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true, image: true } } } } : { select: { id: true, name: true, image: true } } }
-        })
-    } else {
-        const allDescOfF1s = await (closureModel as any).findMany({
-            where: { ...whereBase, ancestorId: { in: f1AutoIds }, depth: { gte: 1 } },
-            select: { descendantId: true }
-        })
-        const f2AutoIds = [...new Set(allDescOfF1s.map((c: any) => c.descendantId))]
+        let allClosures: any[] = []
+        let totalCount = 0
 
-        const [closures, count] = await Promise.all([
-            (closureModel as any).findMany({
+        if (forceFull) {
+            const descendantIds = await (closureModel as any).findMany({
+                where: { ...whereBase, ancestorId: rootAutoId },
+                select: { descendantId: true }
+            })
+            const idList = descendantIds.map((d: any) => d.descendantId)
+            totalCount = idList.length
+
+            allClosures = await (closureModel as any).findMany({
                 where: {
                     ...whereBase,
-                    OR: [
-                        { ancestorId: { in: [rootAutoId, ...f1AutoIds, ...f2AutoIds] } },
-                        { descendantId: { in: f1AutoIds } }
-                    ],
-                    depth: { gte: 0 }
+                    ancestorId: { in: [rootAutoId, ...idList] },
+                    descendantId: { in: idList }
                 },
                 include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true, image: true } } } } : { select: { id: true, name: true, image: true } } }
-            }),
-            (closureModel as any).count({
-                where: { ...whereBase, ancestorId: rootAutoId }
             })
-        ])
-        allClosures = closures
-        totalCount = count
-    }
+        } else {
+            const allDescOfF1s = await (closureModel as any).findMany({
+                where: { ...whereBase, ancestorId: { in: f1AutoIds }, depth: { gte: 1 } },
+                select: { descendantId: true }
+            })
+            const f2AutoIds = [...new Set(allDescOfF1s.map((c: any) => c.descendantId))]
 
-    // 4. Build map
-    const closureByAncestor = new Map<number, any[]>()
-    // Thu thập tất cả userId trong cây để batch fetch TCAMember một lần
-    const allUserIds = new Set<number>([rootUser.id])
-    for (const c of allClosures) {
-        const desc = isSystem ? c.descendant.user : c.descendant
-        if (desc?.id) allUserIds.add(desc.id)
-    }
-    // Logic lấy dữ liệu bổ trợ theo hệ thống
-    const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; name: string | null; groupName: string | null; chucDanh: string | null }>()
-    let tcaMembers: any[] = []
-
-    if (isSystem && systemId === 1) { // Chỉ lấy dữ liệu TCA nếu là hệ thống TCA (ID=1)
-        tcaMembers = await prisma.tCAMember.findMany({
-            where: { 
-                OR: [
-                    { userId: { in: [...allUserIds] } },
-                    { tcaId: { in: [...allUserIds] } }
-                ]
-            },
-            select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true, groupName: true, chuc_danh: true }
-        })
-
-        for (const m of tcaMembers) {
-            const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
-            const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
-            
-            // Map theo userId - ưu tiên giá trị có điểm cao hơn
-            const existing = tcaMemberMap.get(m.userId)
-            if (!existing || (newPersonalScore && newPersonalScore > (existing.personalScore ?? 0))) {
-                tcaMemberMap.set(m.userId, {
-                    level: m.level ?? null,
-                    personalScore: newPersonalScore,
-                    totalScore: newTotalScore,
-                    name: m.name ?? null,
-                    groupName: m.groupName ?? null,
-                    chucDanh: (m as any).chuc_danh ?? null
+            const [closures, count] = await Promise.all([
+                (closureModel as any).findMany({
+                    where: {
+                        ...whereBase,
+                        OR: [
+                            { ancestorId: { in: [rootAutoId, ...f1AutoIds, ...f2AutoIds] } },
+                            { descendantId: { in: f1AutoIds } }
+                        ],
+                        depth: { gte: 0 }
+                    },
+                    include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true, image: true } } } } : { select: { id: true, name: true, image: true } } }
+                }),
+                (closureModel as any).count({
+                    where: { ...whereBase, ancestorId: rootAutoId }
                 })
-            }
-            
-            // Map theo tcaId cho root TCA (nếu khác userId)
-            if (m.tcaId && m.tcaId !== m.userId) {
-                const existingTcaId = tcaMemberMap.get(m.tcaId)
-                if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
-                    tcaMemberMap.set(m.tcaId, {
+            ])
+            allClosures = closures
+            totalCount = count
+        }
+
+        const closureByAncestor = new Map<number, any[]>()
+        const allUserIds = new Set<number>([rootUser.id])
+        for (const c of allClosures) {
+            const desc = isSystem ? c.descendant.user : c.descendant
+            if (desc?.id) allUserIds.add(desc.id)
+        }
+        
+        const tcaMemberMap = new Map<number, any>()
+        let tcaMembers: any[] = []
+
+        if (isSystem && systemId === 1) { 
+            tcaMembers = await prisma.tCAMember.findMany({
+                where: { 
+                    OR: [
+                        { userId: { in: [...allUserIds] } },
+                        { tcaId: { in: [...allUserIds] } }
+                    ]
+                },
+                select: { userId: true, tcaId: true, level: true, personalScore: true, totalScore: true, name: true, groupName: true, chuc_danh: true }
+            })
+
+            for (const m of tcaMembers) {
+                const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
+                const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
+                
+                const existing = tcaMemberMap.get(m.userId)
+                if (!existing || (newPersonalScore && newPersonalScore > (existing.personalScore ?? 0))) {
+                    tcaMemberMap.set(m.userId, {
                         level: m.level ?? null,
                         personalScore: newPersonalScore,
                         totalScore: newTotalScore,
@@ -234,241 +219,187 @@ async function buildStandardTree(
                         chucDanh: (m as any).chuc_danh ?? null
                     })
                 }
+                
+                if (m.tcaId && m.tcaId !== m.userId) {
+                    const existingTcaId = tcaMemberMap.get(m.tcaId)
+                    if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
+                        tcaMemberMap.set(m.tcaId, {
+                            level: m.level ?? null,
+                            personalScore: newPersonalScore,
+                            totalScore: newTotalScore,
+                            name: m.name ?? null,
+                            groupName: m.groupName ?? null,
+                            chucDanh: (m as any).chuc_danh ?? null
+                        })
+                    }
+                }
             }
         }
-    }
 
-    // Helper de lay user record tu row (ho tro ca SYSTEM va USER mode)
-    const getUserFromRow = (row: any) => isSystem ? row.descendant?.user : row.descendant
+        const getUserFromRow = (row: any) => isSystem ? row.descendant?.user : row.descendant
 
-    for (const c of allClosures) {
-        if (!closureByAncestor.has(c.ancestorId)) closureByAncestor.set(c.ancestorId, [])
-        const user = getUserFromRow(c)
-        if (!user) continue
-        
-        closureByAncestor.get(c.ancestorId)!.push({
-            depth: c.depth,
-            userId: user.id,
-            name: user.name,
-            image: user.image,
-            autoId: isSystem ? c.descendantId : user.id
-        })
-    }
-
-    // 5. Phân nhóm F1
-    let groupA: any[] = [], groupB: any[] = [], groupC: any[] = []
-    let groupATotalSub = 0, groupBTotalSub = 0, groupCTotalSub = 0
-
-    for (const f1 of f1Data) {
-        const user = getUserFromRow(f1)
-        if (!user) continue
-
-        const closures = closureByAncestor.get(f1.autoId) || []
-        const hasF2 = closures.some(c => c.depth === 1)
-        const hasF3 = closures.some(c => c.depth === 2)
-        
-        // Lấy đầy đủ dữ liệu TCA cho F2s của nhóm B
-        const f2s = closures.filter(c => c.depth === 1).map(c => {
-            const f2tca = tcaMemberMap.get(c.userId) ?? tcaMemberMap.get(c.autoId)
-            return { 
-                id: c.userId, 
-                name: c.name,
-                image: c.image,
-                level: f2tca?.level ?? null,
-                personalScore: f2tca?.personalScore ?? null,
-                totalScore: f2tca?.totalScore ?? null,
-                tcaName: f2tca?.name ?? null,
-                groupName: f2tca?.groupName ?? null,
-                chucDanh: f2tca?.chucDanh ?? null
-            }
-        })
-
-        // Lấy dữ liệu TCA cho chính F1 (cha của nhóm A/B)
-        const f1tca = tcaMemberMap.get(user.id) ?? tcaMemberMap.get(f1.autoId)
-        const fData = { 
-            id: user.id, 
-            name: user.name, 
-            image: user.image, 
-            totalSubCount: closures.length, 
-            children: f2s,
-            level: f1tca?.level ?? null,
-            personalScore: f1tca?.personalScore ?? null,
-            totalScore: f1tca?.totalScore ?? null,
-            tcaName: f1tca?.name ?? null,
-            groupName: f1tca?.groupName ?? null,
-            chucDanh: f1tca?.chucDanh ?? null
+        for (const c of allClosures) {
+            if (!closureByAncestor.has(c.ancestorId)) closureByAncestor.set(c.ancestorId, [])
+            const user = getUserFromRow(c)
+            if (!user) continue
+            
+            closureByAncestor.get(c.ancestorId)!.push({
+                depth: c.depth,
+                userId: user.id,
+                name: user.name,
+                image: user.image,
+                autoId: isSystem ? c.descendantId : user.id
+            })
         }
 
-        if (!hasF2) {
-            groupA.push(fData)
-            groupATotalSub += closures.length
-        } else if (!hasF3) {
-            groupB.push(fData)
-            groupBTotalSub += closures.length
-        } else {
-            groupC.push(fData)
-            groupCTotalSub += closures.length
-        }
-    }
+        let groupA: any[] = [], groupB: any[] = [], groupC: any[] = []
+        let groupATotalSub = 0, groupBTotalSub = 0, groupCTotalSub = 0
 
-    // 6. Build Children (Group C) - Sửa lỗi: hiển thị đầy đủ cây (bao gồm cả F3, F4...)
-    // Hàm helper đệ quy để build cây con đầy đủ từ closures
-    const buildFullSubtree = (ancestorAutoId: number, maxDepth: number = 10): GenealogyNode[] => {
-        const ancestorClosures = closureByAncestor.get(ancestorAutoId) || []
-        // Lấy children trực tiếp (depth = 1)
-        const directChildren = ancestorClosures.filter(c => c.depth === 1)
-        
-        return directChildren.map(child => {
-            // Đệ quy lấy grandchildren
-            const grandchildren = child.autoId && child.autoId !== ancestorAutoId 
-                ? buildFullSubtree(child.autoId, maxDepth - 1) 
-                : []
-            // Ưu tiên lookup theo userId, fallback theo tcaId (cho TCA members không link user)
-            const tcaData = tcaMemberMap.get(child.userId) ?? tcaMemberMap.get(child.autoId)
-            return {
-                id: child.userId,
-                name: child.name,
-                image: child.image,
-                referrerId: null,
-                totalSubCount: (closureByAncestor.get(child.autoId) || []).length,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                groupA: [], groupB: [],
-                children: grandchildren,
-                level: tcaData?.level ?? null,
-                personalScore: tcaData?.personalScore ?? null,
-                totalScore: tcaData?.totalScore ?? null,
-                tcaName: tcaData?.name ?? null,
-                groupName: tcaData?.groupName ?? null,
-                chucDanh: tcaData?.chucDanh ?? null,
-            }
-        })
-    }
+        for (const f1 of f1Data) {
+            const user = getUserFromRow(f1)
+            if (!user) continue
 
-    // Build children cho Group C với đầy đủ các level
-    const children: GenealogyNode[] = groupC.map(f1Info => {
-        const f1Record = f1Data.find(f => {
-            const u = getUserFromRow(f)
-            return u?.id === f1Info.id
-        })
-        if (!f1Record) return null as any
-        const f1Closures = closureByAncestor.get(f1Record.autoId) || []
-        
-        // Lấy F2s (depth = 1) và build đầy đủ subtree
-        const f2s = f1Closures.filter(c => c.depth === 1)
-        const f2Subtrees = f2s.map(f2 => {
-            // Build đệ quy subtree cho mỗi F2
-            const grandchildren = buildFullSubtree(f2.autoId, 5)
-            const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
-            return {
-                id: f2.userId,
-                name: f2.name,
-                image: f2.image,
-                referrerId: null,
-                totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                groupA: [], groupB: [],
-                children: grandchildren,
-                level: f2tca?.level ?? null,
-                personalScore: f2tca?.personalScore ?? null,
-                totalScore: f2tca?.totalScore ?? null,
-                groupName: f2tca?.groupName ?? null,  // v8.4.1: Thêm groupName
-                chucDanh: f2tca?.chucDanh ?? null,
-            }
-        })
+            const closures = closureByAncestor.get(f1.autoId) || []
+            const hasF2 = closures.some(c => c.depth === 1)
+            const hasF3 = closures.some(c => c.depth === 2)
+            
+            const f2s = closures.filter(c => c.depth === 1).map(c => {
+                const f2tca = tcaMemberMap.get(c.userId) ?? tcaMemberMap.get(c.autoId)
+                return { 
+                    id: c.userId, name: c.name, image: c.image,
+                    level: f2tca?.level ?? null,
+                    personalScore: f2tca?.personalScore ?? null,
+                    totalScore: f2tca?.totalScore ?? null,
+                    tcaName: f2tca?.name ?? null,
+                    groupName: f2tca?.groupName ?? null,
+                    chucDanh: f2tca?.chucDanh ?? null
+                }
+            })
 
-        // Group A/B/C vẫn giữ nguyên cho default mode
-        const grandF1s = f1Closures.filter(c => c.depth === 1)
-        let gA: any[] = [], gB: any[] = [], gC: any[] = []
-        let gATotal = 0, gBTotal = 0, gCTotal = 0
-
-        for (const gf1 of grandF1s) {
-            const gf1Closures = closureByAncestor.get(gf1.autoId) || []
-            const gHasF2 = gf1Closures.some(c => c.depth === 1)
-            const gHasF3 = gf1Closures.some(c => c.depth === 2)
-            const gf2sOld = gf1Closures.filter(c => c.depth === 1).map(c => ({ id: c.userId, name: c.name }))
-            const gf1tca = tcaMemberMap.get(gf1.userId) ?? tcaMemberMap.get(gf1.autoId)
-            const gfData = { 
-                id: gf1.userId, 
-                name: gf1.name, 
-                image: gf1.image,
-                totalSubCount: gf1Closures.length, 
-                children: gf2sOld,
-                groupName: gf1tca?.groupName ?? null,  // v8.4.1: Thêm groupName
-                chucDanh: gf1tca?.chucDanh ?? null
+            const f1tca = tcaMemberMap.get(user.id) ?? tcaMemberMap.get(f1.autoId)
+            const fData = { 
+                id: user.id, name: user.name, image: user.image, totalSubCount: closures.length, children: f2s,
+                level: f1tca?.level ?? null,
+                personalScore: f1tca?.personalScore ?? null,
+                totalScore: f1tca?.totalScore ?? null,
+                tcaName: f1tca?.name ?? null,
+                groupName: f1tca?.groupName ?? null,
+                chucDanh: f1tca?.chucDanh ?? null
             }
 
-            if (!gHasF2) {
-                gA.push(gfData)
-                gATotal += gf1Closures.length
-            } else if (!gHasF3) {
-                gB.push(gfData)
-                gBTotal += gf1Closures.length
+            if (!hasF2) {
+                groupA.push(fData)
+                groupATotalSub += closures.length
+            } else if (!hasF3) {
+                groupB.push(fData)
+                groupBTotalSub += closures.length
             } else {
-                gC.push(gfData)
-                gCTotal += gf1Closures.length
+                groupC.push(fData)
+                groupCTotalSub += closures.length
             }
         }
 
-        const f1tca = tcaMemberMap.get(f1Info.id) ?? tcaMemberMap.get(f1Record?.autoId)
-        return {
-            id: f1Info.id, name: f1Info.name, image: f1Info.image, referrerId: null,
-            totalSubCount: f1Closures.length, 
-            f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
-            groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
-            groupA: gA, groupB: gB,
-            // Sửa: Dùng f2Subtrees thay vì gC.map với children rỗng - để hiển thị đầy đủ cây
-            children: f2Subtrees,
-            level: f1tca?.level ?? null,
-            personalScore: f1tca?.personalScore ?? null,
-            totalScore: f1tca?.totalScore ?? null,
-            chucDanh: f1tca?.chucDanh ?? null,
+        const buildFullSubtree = (ancestorAutoId: number, maxDepth: number = 10): GenealogyNode[] => {
+            const ancestorClosures = closureByAncestor.get(ancestorAutoId) || []
+            const directChildren = ancestorClosures.filter(c => c.depth === 1)
+            return directChildren.map(child => {
+                const grandchildren = child.autoId && child.autoId !== ancestorAutoId ? buildFullSubtree(child.autoId, maxDepth - 1) : []
+                const tcaData = tcaMemberMap.get(child.userId) ?? tcaMemberMap.get(child.autoId)
+                return {
+                    id: child.userId, name: child.name, image: child.image, referrerId: null,
+                    totalSubCount: (closureByAncestor.get(child.autoId) || []).length,
+                    f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                    groupA: [], groupB: [], children: grandchildren,
+                    level: tcaData?.level ?? null,
+                    personalScore: tcaData?.personalScore ?? null,
+                    totalScore: tcaData?.totalScore ?? null,
+                    tcaName: tcaData?.name ?? null,
+                    groupName: tcaData?.groupName ?? null,
+                    chucDanh: tcaData?.chucDanh ?? null,
+                }
+            })
         }
-    })
 
-    // Gắn TCA data cho root node
-    const rootTca = tcaMemberMap.get(rootUser.id)
-    
-    // v8.8.1: Tính toán thống kê dựa trên dữ liệu thực tế
-    // v8.8.1: Tính toán thống kê dựa trên dữ liệu thực tế (chỉ cho TCA)
-    const statsData = (isSystem && systemId === 1) ? {
-        total: totalCount,
-        active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
-        bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
-        dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
-    } : (isSystem ? { total: totalCount, active: 0, bdh: 0, dhtt: 0 } : null)
+        const children: GenealogyNode[] = groupC.map(f1Info => {
+            const f1Record = f1Data.find(f => {
+                const u = getUserFromRow(f)
+                return u?.id === f1Info.id
+            })
+            if (!f1Record) return null as any
+            const f1Closures = closureByAncestor.get(f1Record.autoId) || []
+            const f2s = f1Closures.filter(c => c.depth === 1)
+            const f2Subtrees = f2s.map(f2 => {
+                const grandchildren = buildFullSubtree(f2.autoId, 5)
+                const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
+                return {
+                    id: f2.userId, name: f2.name, image: f2.image, referrerId: null,
+                    totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
+                    f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                    groupA: [], groupB: [], children: grandchildren,
+                    level: f2tca?.level ?? null,
+                    personalScore: f2tca?.personalScore ?? null,
+                    totalScore: f2tca?.totalScore ?? null,
+                    groupName: f2tca?.groupName ?? null,
+                    chucDanh: f2tca?.chucDanh ?? null,
+                }
+            })
 
-    return {
-        id: rootUser.id, name: rootUser.name, image: rootUser.image, referrerId: rootUser.referrerId || null,
-        totalSubCount: totalCount,
-        f1aCount: groupA.length,
-        f1bCount: groupB.length,
-        f1cCount: groupC.length,
-        groupATotalSub,
-        groupBTotalSub,
-        groupCTotalSub,
-        children: forceFull ? buildFullSubtree(rootAutoId) : children,
-        groupA: forceFull ? [] : groupA, // Trong mode full thi khong dung groupA/B
-        groupB: forceFull ? [] : groupB,
-        isRoot: true,
-        level: rootTca?.level ?? null,
-        personalScore: rootTca?.personalScore ?? null,
-        totalScore: rootTca?.totalScore ?? null,
-        tcaName: rootTca?.name ?? null,
-        groupName: rootTca?.groupName ?? null,
-        chucDanh: rootTca?.chucDanh ?? null,
-        stats: statsData // Đính kèm thống kê vào Root
+            const grandF1s = f1Closures.filter(c => c.depth === 1)
+            let gA: any[] = [], gB: any[] = [], gC: any[] = []
+            let gATotal = 0, gBTotal = 0, gCTotal = 0
+
+            for (const gf1 of grandF1s) {
+                const gf1Closures = closureByAncestor.get(gf1.autoId) || []
+                const gHasF2 = gf1Closures.some(c => c.depth === 1)
+                const gHasF3 = gf1Closures.some(c => c.depth === 2)
+                const gf1tca = tcaMemberMap.get(gf1.userId) ?? tcaMemberMap.get(gf1.autoId)
+                const gfData = { id: gf1.userId, name: gf1.name, image: gf1.image, totalSubCount: gf1Closures.length, groupName: gf1tca?.groupName ?? null, chucDanh: gf1tca?.chucDanh ?? null }
+                if (!gHasF2) { gA.push(gfData); gATotal += gf1Closures.length }
+                else if (!gHasF3) { gB.push(gfData); gBTotal += gf1Closures.length }
+                else { gC.push(gfData); gCTotal += gf1Closures.length }
+            }
+
+            const f1tca = tcaMemberMap.get(f1Info.id) ?? tcaMemberMap.get(f1Record?.autoId)
+            return {
+                id: f1Info.id, name: f1Info.name, image: f1Info.image, referrerId: null,
+                totalSubCount: f1Closures.length, f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
+                groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
+                groupA: gA, groupB: gB, children: f2Subtrees,
+                level: f1tca?.level ?? null, personalScore: f1tca?.personalScore ?? null, totalScore: f1tca?.totalScore ?? null, chucDanh: f1tca?.chucDanh ?? null,
+            }
+        })
+
+        const rootTca = tcaMemberMap.get(rootUser.id)
+        const statsData = (isSystem && systemId === 1) ? {
+            total: totalCount,
+            active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
+            bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
+            dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
+        } : (isSystem ? { total: totalCount, active: 0, bdh: 0, dhtt: 0 } : null)
+
+        return {
+            id: rootUser.id, name: rootUser.name, image: rootUser.image, referrerId: rootUser.referrerId || null,
+            totalSubCount: totalCount, f1aCount: groupA.length, f1bCount: groupB.length, f1cCount: groupC.length,
+            groupATotalSub, groupBTotalSub, groupCTotalSub,
+            children: forceFull ? buildFullSubtree(rootAutoId) : children,
+            groupA: forceFull ? [] : groupA, groupB: forceFull ? [] : groupB,
+            isRoot: true,
+            level: rootTca?.level ?? null, personalScore: rootTca?.personalScore ?? null, totalScore: rootTca?.totalScore ?? null,
+            tcaName: rootTca?.name ?? null, groupName: rootTca?.groupName ?? null, chucDanh: rootTca?.chucDanh ?? null,
+            stats: statsData 
+        }
+    } catch (e) {
+        console.error("[DB ERROR] buildStandardTree:", e)
+        return null
     }
 }
-
 
 // --- Public Actions ---
 
 export async function getGenealogyTreeAction(rootId: number = 0) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-    const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
     try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
         let actualRootId = rootId
         if (rootId === 0) {
             if (isAdmin) {
@@ -482,21 +413,20 @@ export async function getGenealogyTreeAction(rootId: number = 0) {
 }
 
 export async function getGenealogyChildrenAction(parentId: number) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
         const tree = await buildStandardTree(parentId, 'USER')
         return { success: true, tree: tree ? { ...tree, isRoot: false } : null }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
 export async function getSystemTreeAction(systemId: number) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-    const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
-    const isRootAdmin = userId === 0 || isAdmin
     try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
+        const isRootAdmin = userId === 0 || isAdmin
         let rootUserId = userId 
 
-        // v8.9.0: Kiểm tra quyền xem toàn bộ cho thành viên chiến lược C5
         const userTca = await prisma.tCAMember.findFirst({
             where: { userId },
             select: { chuc_danh: true }
@@ -504,7 +434,6 @@ export async function getSystemTreeAction(systemId: number) {
         const isC5 = userTca?.chuc_danh === 'C5'
         
         const systemInfo = await getUserSystemInfo(userId)
-        // Nếu không thuộc hệ thống này HOẶC là C5/Admin -> Cố gắng lấy root của hệ thống
         if (!systemInfo || systemInfo.onSystem !== systemId || isC5 || isRootAdmin) {
             if (isRootAdmin || isC5) {
                 const root = await getSystemRootUser(systemId)
@@ -521,26 +450,21 @@ export async function getSystemTreeAction(systemId: number) {
 }
 
 export async function getSystemChildrenAction(parentId: number, systemId: number) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
         const tree = await buildStandardTree(parentId, 'SYSTEM', systemId)
         return { success: true, tree: tree ? { ...tree, isRoot: false } : null }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-// SỬA 2026-03-30: Thêm tính năng tìm kiếm Nhân mạch theo ID (FIX: tối ưu query)
-// Tìm đường đi từ root đến target node và trả về path - trả về cây gộp đầy đủ (ancestors + descendants)
 export async function searchGenealogyByIdAction(targetId: number, systemId?: number, limitAncestors: number | null = null) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-    const isSystem = systemId !== undefined
     try {
-        // 1. Kiểm tra user/system tồn tại và lấy autoId
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        const isSystem = systemId !== undefined
         let targetAutoId: number | null = null
         
         if (isSystem) {
-            const system = await prisma.system.findFirst({ 
-                where: { userId: targetId, onSystem: systemId } 
-            })
+            const system = await prisma.system.findFirst({ where: { userId: targetId, onSystem: systemId } })
             if (!system) return { success: false, error: `Không tìm thấy mã #${targetId} trong hệ thống này` }
             targetAutoId = system.autoId
         } else {
@@ -549,16 +473,11 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
             targetAutoId = targetId
         }
 
-        // 2. Query closure để lấy path từ root đến target - orderBy depth DESC (root → target)
         const ancestors = isSystem
             ? await prisma.systemClosure.findMany({
                 where: { systemId, descendantId: targetAutoId! },
                 orderBy: { depth: 'desc' },
-                include: { 
-                    ancestor: { 
-                        include: { user: { select: { id: true, name: true, image: true } } }
-                    } 
-                }
+                include: { ancestor: { include: { user: { select: { id: true, name: true, image: true } } } } }
               })
             : await prisma.userClosure.findMany({
                 where: { descendantId: targetId },
@@ -566,72 +485,46 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
                 include: { ancestor: { select: { id: true, name: true, image: true, referrerId: true } } }
               })
 
-        if (!ancestors || ancestors.length === 0) {
-            return { success: false, error: `Không tìm thấy đường dẫn cho mã #${targetId}` }
-        }
+        if (!ancestors || ancestors.length === 0) return { success: false, error: `Không tìm thấy đường dẫn cho mã #${targetId}` }
 
-        // 3. Lấy toàn bộ cây con của targetId - v8.8.2: forceFull = true để hiện tất cả con cháu
         const targetSubtree = await buildStandardTree(targetId, isSystem ? 'SYSTEM' : 'USER', systemId, true)
         if (!targetSubtree) return { success: false, error: "Lỗi khi khởi tạo cây con" }
-        
-        // Đánh dấu node mục tiêu để frontend highlight
         targetSubtree.isSearchTarget = true
 
-        // 4. Build cây gộp từ dưới lên (Target -> Parent -> ... -> Root)
-        // ancestors list là [Root, ..., Parent, Target]
         let mergedTree: GenealogyNode = { ...targetSubtree, isRoot: ancestors.length === 1 }
-        const pathNodes: { id: number; name: string | null; image: string | null }[] = ancestors.map((anc: any) => ({
+        const pathNodes: any[] = ancestors.map((anc: any) => ({
             id: isSystem ? anc.ancestor.userId : (anc.ancestorId || anc.ancestor.id),
             name: isSystem ? anc.ancestor.user?.name : anc.ancestor.name,
             image: isSystem ? anc.ancestor.user?.image : anc.ancestor.image
         }))
 
-        // Lấy thông tin chi tiết cho các node trên path (trừ node Target đã có trong subtree)
-        // v8.7.0: Thêm giới hạn tầng cha (limitAncestors)
-        const startIdx = ancestors.length - 2; // Index của Parent
-        const endIdx = limitAncestors !== null 
-            ? Math.max(0, ancestors.length - 1 - limitAncestors) 
-            : 0; // Index của node cao nhất sẽ hiển thị
+        const startIdx = ancestors.length - 2;
+        const endIdx = limitAncestors !== null ? Math.max(0, ancestors.length - 1 - limitAncestors) : 0;
 
         for (let i = startIdx; i >= endIdx; i--) {
             const nodeId = pathNodes[i].id
-            
-            // Fetch full data cho ancestor để hiển thị trung thực
-            // v8.7.2: Dùng buildStandardTree để lấy trọn vẹn data TCA và Group A/B/C
             const ancTree = await buildStandardTree(nodeId, isSystem ? 'SYSTEM' : 'USER', systemId, false)
-            
             if (ancTree) {
-                mergedTree = {
-                    ...ancTree,
-                    isRoot: i === endIdx,
-                    children: [mergedTree], // Chèn nhánh hiện tại làm child
-                    groupA: [], groupB: [], // Không dùng phân nhóm A/B cho các node trên đường dẫn
-                }
+                mergedTree = { ...ancTree, isRoot: i === endIdx, children: [mergedTree], groupA: [], groupB: [] }
             }
         }
 
-        return { 
-            success: true, 
-            mergedTree,
-            path: pathNodes,
-            targetId 
-        }
-    } catch (error: any) { 
-        console.error('[Search Error]', error)
-        return { success: false, error: error.message || 'Lỗi khi tìm kiếm' } 
-    }
+        return { success: true, mergedTree, path: pathNodes, targetId }
+    } catch (error: any) { return { success: false, error: error.message || 'Lỗi khi tìm kiếm' } }
 }
 
 export async function getUserSystemsAction() {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-    const userId = parseInt(session.user.id)
-    const systems = await prisma.system.findMany({ where: { userId }, select: { onSystem: true } })
-    return { success: true, systems: systems.map((s: { onSystem: number }) => s.onSystem) }
+    try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        const userId = parseInt(session.user.id)
+        const systems = await prisma.system.findMany({ where: { userId }, select: { onSystem: true } })
+        return { success: true, systems: systems.map((s: any) => s.onSystem) }
+    } catch { return { success: false, error: "Lỗi DB" } }
 }
 
 export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc') {
-    await checkAdmin()
     try {
+        await checkAdmin()
         let where: any = {};
         if (role === 'COURSE_86_DAYS') where.enrollments = { some: { courseId: 1 } };
         else if (role && role !== 'ALL') where.role = role;
@@ -662,35 +555,12 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function addReservedIdAction(prevState: any, formData: FormData) {
-    await checkAdmin()
-    const id = parseInt(formData.get("id") as string)
-    const note = formData.get("note") as string || "Admin Added"
-    if (isNaN(id)) return { message: "Error: ID phải là số." }
-    try {
-        const existing = await prisma.reservedId.findUnique({ where: { id } })
-        if (existing) return { message: `Error: ID ${id} đã có trong danh sách.` }
-        await prisma.reservedId.create({ data: { id, note } })
-        revalidatePath("/admin/reserved-ids")
-        return { message: `Success: Đã thêm ID ${id} vào danh sách dự trữ.` }
-    } catch (_e) { return { message: "Error: Lỗi Server." } }
-}
-
-export async function deleteReservedIdAction(id: number) {
-    await checkAdmin()
-    try {
-        await prisma.reservedId.delete({ where: { id } })
-        revalidatePath("/admin/reserved-ids")
-        return { message: `Success: Đã xóa ID ${id}.` }
-    } catch (_e) { return { message: "Error: Lỗi khi xóa ID." } }
-}
-
 export async function changeUserIdAction(prevState: any, formData: FormData) {
-    await checkAdmin()
-    const currentId = parseInt(formData.get("currentId") as string)
-    const newId = parseInt(formData.get("newId") as string)
-    if (isNaN(currentId) || isNaN(newId)) return { message: "Error: ID sai định dạng." }
     try {
+        await checkAdmin()
+        const currentId = parseInt(formData.get("currentId") as string)
+        const newId = parseInt(formData.get("newId") as string)
+        if (isNaN(currentId) || isNaN(newId)) return { message: "Error: ID sai định dạng." }
         await prisma.$executeRawUnsafe(`UPDATE "User" SET id = ${newId} WHERE id = ${currentId}`)
         await prisma.$executeRawUnsafe(`SELECT setval(pg_get_serial_sequence('"User"', 'id'), max(id), true) FROM "User"`)
         revalidatePath("/admin/reserved-ids")
@@ -698,564 +568,41 @@ export async function changeUserIdAction(prevState: any, formData: FormData) {
     } catch (e) { return { message: "Error: Lỗi hệ thống." } }
 }
 
-export async function getReservedIds() {
-    await checkAdmin()
-    return await prisma.reservedId.findMany({ orderBy: { id: 'asc' } })
-}
-
-export async function getStudentDetailsAction(userId: number) {
-    await checkAdmin()
+export async function getAdminCoursesAction() {
     try {
-        const student = await prisma.user.findUnique({ where: { id: userId }, include: { enrollments: { include: { course: { include: { lessons: { orderBy: { order: 'asc' } } } }, lessonProgress: { include: { lesson: { select: { title: true, order: true } } } } }, orderBy: { createdAt: 'desc' } } } })
-        if (!student) return { success: false, error: "Không tìm thấy." }
-        return { success: true, student }
-    } catch (error: any) { return { success: false, error: error.message } }
-}
-
-export async function getCoursesAction() {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
-    try {
-        const where = isAdmin ? {} : { teacherId: userId }  // ✅ TEACHER chỉ thấy course của mình
-        const courses = await prisma.course.findMany({
-            where,
-            include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true },
-            orderBy: { id: 'asc' }
-        })
+        const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+        const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
+        const where = isAdmin ? {} : { teacherId: userId }
+        const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true }, orderBy: { id: 'asc' } })
         return { success: true, courses, isAdmin }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function getAdminCoursesAction() {
-    return getCoursesAction()
-}
-
-export async function updateCourseAction(courseId: number, data: any) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
-    try {
-        // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
-        const course = await prisma.course.findUnique({
-            where: { id: courseId },
-            select: { teacherId: true }
-        })
-
-        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
-
-        // ✅ TEACHER chỉ được sửa course có teacherId = userId
-        if (!isAdmin && course.teacherId !== userId) {
-            return { success: false, error: "Bạn không có quyền sửa khóa học này" }
-        }
-
-        // ✅ Sửa lỗi 2026-05-01: TEACHER sửa khóa học bị mất teacherId
-        // Lỗi cũ: if (!isAdmin && data.teacherId != null) - khi teacherId=null thì không xóa được
-        // Sửa: Luôn xóa teacherId cho TEACHER để bảo vệ dữ liệu
-        if (!isAdmin) {
-            delete data.teacherId  // TEACHER không được thay đổi teacherId
-        }
-
-        const updatedCourse = await prisma.course.update({ where: { id: courseId }, data })
-        revalidatePath('/tools/courses'); revalidatePath('/')
-        return { success: true, course: updatedCourse }
-    } catch (error: any) { return { success: false, error: error.message } }
-}
-
-export async function updateLessonAction(lessonId: string, data: any) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
-    try {
-        const lesson = await prisma.lesson.findUnique({
-            where: { id: lessonId },
-            include: { course: { select: { teacherId: true, id_khoa: true } } }
-        })
-
-        if (!lesson) return { success: false, error: "Không tìm thấy bài học." }
-
-        // ✅ TEACHER chỉ được sửa lesson của course mình dạy
-        if (!isAdmin && lesson.course?.teacherId !== userId) {
-            return { success: false, error: "Bạn không có quyền sửa bài học này" }
-        }
-
-        const updatedLesson = await prisma.lesson.update({ where: { id: lessonId }, data })
-        if (lesson?.course?.id_khoa) revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
-        return { success: true, lesson: updatedLesson }
-    } catch (error: any) { return { success: false, error: error.message } }
-}
-
-export async function deleteLessonAction(lessonId: string) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
-    try {
-        const lesson = await prisma.lesson.findUnique({
-            where: { id: lessonId },
-            include: { course: { select: { teacherId: true, id_khoa: true } } }
-        })
-
-        if (!lesson) return { success: false, error: "Không tìm thấy bài học." }
-
-        // ✅ TEACHER chỉ được xóa lesson của course mình dạy
-        if (!isAdmin && lesson.course?.teacherId !== userId) {
-            return { success: false, error: "Bạn không có quyền xóa bài học này" }
-        }
-
-        await prisma.lesson.delete({ where: { id: lessonId } })
-        
-        if (lesson?.course?.id_khoa) {
-            revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
-            revalidatePath(`/tools/courses/${lesson.courseId}`)
-        }
-        
-        return { success: true }
-    } catch (error: any) { return { success: false, error: error.message } }
-}
-
-// ==========================================
-// FULL SYSTEM TREE - Hiển thị toàn bộ cây (V3.0)
-// ==========================================
-
-// Helper: Build full tree từ closure data (dùng iterative approach thay vì đệ quy)
-function buildFullTreeFromClosures(
-    rootSysAutoId: number,
-    rootUserId: number,
-    rootUserName: string | null,
-    rootUserImage: string | null,
-    allClosures: { ancestorAutoId: number; descendantAutoId: number; depth: number; userId: number; name: { name: string | null; image: string | null } | null }[],
-    sysAutoToUserId: Map<number, number>,
-    userMap: Map<number, { name: string | null, image: string | null }>,
-    tcaMemberMap: Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; groupName: string | null; chucDanh: string | null; tcaName: string | null }>
-): GenealogyNode {
-    // Build parent -> children map (tất cả các depth)
-    const parentToChildren = new Map<number, { autoId: number; userId: number }[]>()
-    // Map để đếm descendants cho mỗi ancestor (dùng Map thay vì filter)
-    const descendantCount = new Map<number, number>()
-    
-    for (const c of allClosures) {
-        if (c.depth === 0) continue // Skip self
-        
-        // v8.7.5: Chỉ thêm vào danh sách con trực tiếp nếu depth = 1
-        if (c.depth === 1) {
-            if (!parentToChildren.has(c.ancestorAutoId)) {
-                parentToChildren.set(c.ancestorAutoId, [])
-            }
-            parentToChildren.get(c.ancestorAutoId)!.push({
-                autoId: c.descendantAutoId,
-                userId: c.userId
-            })
-        }
-        
-        // Vẫn đếm tổng số descendants cho mọi ancestor
-        descendantCount.set(c.ancestorAutoId, (descendantCount.get(c.ancestorAutoId) || 0) + 1)
-    }
-    
-    // Build node không đệ quy - dùng stack để duyệt
-    function buildNode(sysAutoId: number): GenealogyNode {
-        const userId = sysAutoId === rootSysAutoId ? rootUserId : (sysAutoToUserId.get(sysAutoId) || sysAutoId)
-        
-        // Lấy direct children
-        const directChildren = parentToChildren.get(sysAutoId) || []
-        
-        // Total sub = số descendants
-        const totalSub = descendantCount.get(sysAutoId) || 0
-        
-        // Build children
-        const children: GenealogyNode[] = directChildren.map(child => buildNode(child.autoId))
-        
-        // Name & Image
-        const userData = userMap.get(userId)
-        const name = sysAutoId === rootSysAutoId ? rootUserName : (userData?.name || null)
-        const image = sysAutoId === rootSysAutoId ? rootUserImage : (userData?.image || null)
-        
-        // TCA Data
-        const tcaData = tcaMemberMap.get(userId)
-        
-        // Sắp xếp children theo name
-        children.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        
-        return {
-            id: userId,
-            name: name,
-            image: image,
-            referrerId: null,
-            totalSubCount: totalSub > 0 ? totalSub : 1,
-            f1aCount: 0, f1bCount: 0, f1cCount: 0,
-            groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-            groupA: [], groupB: [],
-            children: children,
-            level: tcaData?.level ?? null,
-            personalScore: tcaData?.personalScore ?? null,
-            totalScore: tcaData?.totalScore ?? null,
-            groupName: tcaData?.groupName ?? null,
-            chucDanh: tcaData?.chucDanh ?? null,
-            tcaName: tcaData?.tcaName ?? null
-        }
-    }
-    
-    return buildNode(rootSysAutoId)
-}
-
-// Lấy full tree cho System (TCA/KTC) - hiển thị toàn bộ cây không phân nhóm
-export async function getFullSystemTreeAction(systemId: number) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-    const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
-    const isRootAdmin = userId === 0 || isAdmin
-    
-    try {
-        let rootUserId = userId
-        
-        // Tìm root của system
-        const rootSys = await prisma.system.findFirst({ 
-            where: { onSystem: systemId, refSysId: 0 }
-        })
-        if (!rootSys) return { success: false, error: "Không tìm thấy root" }
-        
-        // Nếu user không thuộc system hoặc không phải admin, kiểm tra membership
-        if (!isRootAdmin) {
-            const userSys = await prisma.system.findFirst({ where: { userId, onSystem: systemId } })
-            if (!userSys) return { success: false, error: "Bạn không thuộc hệ thống này" }
-        }
-        
-        rootUserId = rootSys.userId
-        
-        // Batch query: Lấy tất cả closure data
-        const allClosures = await prisma.systemClosure.findMany({
-            where: { systemId },
-            select: { ancestorId: true, descendantId: true, depth: true }
-        })
-        
-        // Batch query: Lấy tất cả system records one-time
-        const allAutoIds = new Set<number>()
-        for (const c of allClosures) {
-            allAutoIds.add(c.ancestorId)
-            allAutoIds.add(c.descendantId)
-        }
-        
-        const systemRecords = await prisma.system.findMany({ 
-            where: { autoId: { in: [...allAutoIds] }, onSystem: systemId }
-        })
-        
-        // Map autoId -> userId
-        const autoToUser = new Map<number, number>()
-        const userIdSet = new Set<number>()
-        for (const s of systemRecords) {
-            autoToUser.set(s.autoId, s.userId)
-            userIdSet.add(s.userId)
-        }
-        
-        // Batch query: Lấy users one-time
-        const users = await prisma.user.findMany({ 
-            where: { id: { in: [...userIdSet] } },
-            select: { id: true, name: true, image: true }
-        })
-        const userMap = new Map<number, { name: string | null, image: string | null }>(
-            users.map((u: any) => [u.id, { name: u.name, image: u.image }])
-        )
-        
-        // Transform closure data với đúng format mới
-        const closureData = allClosures.map((c: any) => ({
-            ancestorAutoId: c.ancestorId,
-            descendantAutoId: c.descendantId,
-            depth: c.depth,
-            userId: autoToUser.get(c.descendantId) || 0,
-            name: userMap.get(autoToUser.get(c.descendantId) || 0) || null
-        })).filter((c: any) => c.userId > 0)
-
-        // v8.8.1: Lấy dữ liệu TCA cho chế độ Full để thống kê và tô màu
-        const tcaMembers = await (prisma as any).tCAMember.findMany({
-            where: { userId: { in: [...userIdSet] } },
-            select: { userId: true, level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true }
-        })
-        const tcaMemberMap = new Map<number, { level: number | null; personalScore: number | null; totalScore: number | null; groupName: string | null; chucDanh: string | null; tcaName: string | null }>()
-        for (const m of tcaMembers) {
-            tcaMemberMap.set(m.userId, {
-                level: m.level ?? null,
-                personalScore: m.personalScore != null ? Number(m.personalScore) : null,
-                totalScore: m.totalScore != null ? Number(m.totalScore) : null,
-                groupName: m.groupName ?? null,
-                chucDanh: m.chuc_danh ?? null,
-                tcaName: m.name ?? null
-            })
-        }
-        
-        const rootUserData = userMap.get(rootUserId)
-        
-        // Build tree với rootSysAutoId và autoToUser map
-        const tree = buildFullTreeFromClosures(
-            rootSys.autoId, 
-            rootUserId, 
-            rootUserData?.name || null, 
-            rootUserData?.image || null,
-            closureData, 
-            autoToUser,
-            userMap,
-            tcaMemberMap
-        )
-
-        // v8.8.1: Thống kê cho chế độ Full
-        const stats = {
-            total: userIdSet.size,
-            active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
-            bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
-            dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
-        }
-
-        return { success: true, tree: { ...tree, isRoot: true, stats } }
-    } catch (error: any) { return { success: false, error: error.message } }
-}
-
-// Lấy full children cho một node (dùng khi expand)
-export async function getFullSystemChildrenAction(parentId: number, systemId: number) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-    
-    try {
-        // Tìm userId của parent trong system
-        const parentSys = await prisma.system.findFirst({ 
-            where: { userId: parentId, onSystem: systemId }
-        })
-        if (!parentSys) return { success: false, error: "Không tìm thấy node" }
-        
-        // Lấy tất cả descendants của parent
-        const closures = await prisma.systemClosure.findMany({
-            where: { 
-                systemId,
-                ancestorId: parentSys.autoId,
-                depth: { gt: 0 }
-            },
-            select: { ancestorId: true, descendantId: true, depth: true }
-        })
-        
-        // Map autoId -> userId
-        const autoToUser = new Map<number, number>()
-        const allAutoIds = new Set<number>()
-        for (const c of closures) {
-            allAutoIds.add(c.ancestorId)
-            allAutoIds.add(c.descendantId)
-        }
-        const sysRecords = await prisma.system.findMany({ 
-            where: { autoId: { in: [...allAutoIds] }, onSystem: systemId }
-        })
-        for (const s of sysRecords) autoToUser.set(s.autoId, s.userId)
-        
-        // Lấy users
-        const userIds = new Set<number>()
-        for (const [, uid] of autoToUser) userIds.add(uid)
-        const users = await prisma.user.findMany({ 
-            where: { id: { in: [...userIds] } },
-            select: { id: true, name: true, image: true }
-        })
-        const userMap = new Map<number, { name: string | null, image: string | null }>(
-            users.map((u: any) => [u.id, { name: u.name, image: u.image }])
-        )
-
-        // BỔ SUNG: Batch fetch TCAMember scores cho children
-        const tcaMembers = await (prisma as any).tCAMember.findMany({
-            where: { userId: { in: [...userIds] } },
-            select: { userId: true, level: true, personalScore: true, totalScore: true }
-        })
-        const tcaMemberMap = new Map()
-        for (const m of tcaMembers) {
-            tcaMemberMap.set(m.userId, {
-                level: m.level ?? null,
-                personalScore: m.personalScore != null ? Number(m.personalScore) : null,
-                totalScore: m.totalScore != null ? Number(m.totalScore) : null
-            })
-        }
-        
-        // Group by depth - lấy depth nhỏ nhất (children trực tiếp)
-        const minDepth = Math.min(...closures.map(c => c.depth))
-        const childIds = closures.filter(c => c.depth === minDepth).map(c => c.descendantId)
-        
-        const directChildren: GenealogyNode[] = []
-        for (const autoId of [...new Set(childIds)]) {
-            const userId = autoToUser.get(autoId) || 0
-            if (userId === 0) continue
-            
-            // Đếm sub
-            const childSys = sysRecords.find(s => s.autoId === autoId)
-            let subCount = 0
-            if (childSys) {
-                subCount = closures.filter(c => c.ancestorId === childSys.autoId && c.depth > 0).length
-            }
-
-            const tcaData = tcaMemberMap.get(userId)
-            
-            const userData = userMap.get(userId)
-            
-            directChildren.push({
-                id: userId,
-                name: userData?.name || null,
-                image: userData?.image || null,
-                referrerId: parentId,
-                totalSubCount: subCount + 1,
-                f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                groupA: [], groupB: [],
-                children: [],
-                level: tcaData?.level ?? null,
-                personalScore: tcaData?.personalScore ?? null,
-                totalScore: tcaData?.totalScore ?? null
-            })
-        }
-        
-            directChildren.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        
-        return { 
-            success: true, 
-            tree: {
-                id: parentId,
-                name: null,
-                referrerId: null,
-                totalSubCount: directChildren.reduce((sum, c) => sum + c.totalSubCount, 0),
-                f1aCount: 0, f1bCount: 0, f1cCount: 0,
-                groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                groupA: [], groupB: [],
-                children: directChildren,
-                isRoot: false
-            }
-        }
-    } catch (error: any) { return { success: false, error: error.message } }
-}
-
-// ==========================================
-// SYSTEM TREE - LẤY DANH SÁCH HỆ THỐNG
-// ==========================================
-
-export interface SystemTreeInfo {
-    onSystem: number
-    nameSystem?: string
-}
-
 export async function getAvailableSystemsAction() {
     try {
-        console.log('[getAvailableSystemsAction] Fetching systems from DB...')
-        const systems = await prisma.systemTree.findMany({
-            orderBy: { onSystem: 'asc' },
-            select: {
-                onSystem: true,
-                nameSystem: true
-            }
-        })
-        console.log('[getAvailableSystemsAction] Systems found:', systems)
+        const systems = await prisma.systemTree.findMany({ orderBy: { onSystem: 'asc' }, select: { onSystem: true, nameSystem: true } })
         return { success: true, systems }
-    } catch (error: any) {
-        console.error('[getAvailableSystemsAction] Error:', error)
-        return { success: false, error: error.message }
-    }
+    } catch (error: any) { return { success: false, error: error.message } }
 }
-
-// ==========================================
-// LẤY THÔNG TIN USER HIỆN TẠI
-// ==========================================
 
 export async function getCurrentUserRoleAction() {
-    const session = await auth()
-    console.log('[getCurrentUserRoleAction] Session:', session)
-    if (!session?.user?.id) {
-        return { success: false, role: null }
-    }
-    const role = session.user.role
-    console.log('[getCurrentUserRoleAction] User role:', role, typeof role)
-    const userId = parseInt(session.user.id)
-    const validUserId = isNaN(userId) || userId < 0 ? null : userId
-    
-    // v8.9.1: Ưu tiên tuyệt đối cho root admin ID 0
-    const finalRole = (validUserId === 0) ? Role.ADMIN : role
-
-    return { 
-        success: true, 
-        role: finalRole,
-        userId: validUserId
-    }
-}
-
-// ==========================================
-// SYSTEM TREE - TẠO ROOT MỚI (CHỈ ADMIN)
-// ==========================================
-
-export async function createSystemRootAction(systemId: number, userId: number) {
-    const session = await auth()
-    if (!session?.user?.id) throw new Error("Unauthorized")
-    
-    // v8.9.1: Root admin ID 0 hoặc Role ADMIN đều được quyền
-    const userId_0 = parseInt(session.user.id)
-    if (userId_0 !== 0 && session.user.role !== Role.ADMIN) {
-        return { success: false, error: "Chỉ admin mới được tạo hệ thống mới" }
-    }
-    
     try {
-        // Kiểm tra đã có root chưa
-        const existingRoot = await prisma.system.findFirst({
-            where: { onSystem: systemId, refSysId: 0 }
-        })
-        
-        if (existingRoot) {
-            return { success: false, error: "Hệ thống đã có root" }
-        }
-        
-        // Tạo root mới
-        const newSystem = await prisma.system.create({
-            data: {
-                userId: userId,
-                onSystem: systemId,
-                refSysId: 0  // Root
-            }
-        })
-        
-        // Tạo self-closure cho root
-        await prisma.systemClosure.create({
-            data: {
-                ancestorId: newSystem.autoId,
-                descendantId: newSystem.autoId,
-                depth: 0,
-                systemId: systemId
-            }
-        })
-        
-        return { success: true, system: newSystem }
-    } catch (error: any) {
-        console.error('[createSystemRootAction] Error:', error)
-        return { success: false, error: error.message }
-    }
+        const session = await auth(); if (!session?.user?.id) return { success: false, role: null }
+        const role = session.user.role; const userId = parseInt(session.user.id)
+        const validUserId = isNaN(userId) || userId < 0 ? null : userId
+        const finalRole = (validUserId === 0) ? Role.ADMIN : role
+        return { success: true, role: finalRole, userId: validUserId }
+    } catch { return { success: false, role: null } }
 }
 
 export async function getMemberDetailsAction(userId: number) {
-    const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
     try {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, name: true, email: true, phone: true, createdAt: true, image: true }
-        })
-        const tcaRaw = await prisma.tCAMember.findFirst({
-            where: { userId },
-            select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true }
-        })
-        
-        // v8.5.1: Fix Decimal serialization error
-        const tca = tcaRaw ? {
-            ...tcaRaw,
-            personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0,
-            totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0
-        } : null
-
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        const [user, tcaRaw] = await Promise.all([
+            prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true, createdAt: true, image: true } }),
+            prisma.tCAMember.findFirst({ where: { userId }, select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true } })
+        ])
+        const tca = tcaRaw ? { ...tcaRaw, personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0, totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0 } : null
         return { success: true, user, tca }
-    } catch (e: any) {
-        return { success: false, error: e.message }
-    }
+    } catch (e: any) { return { success: false, error: e.message } }
 }
-
-
