@@ -192,7 +192,7 @@ const GenealogyCard = (props: NodeProps) => {
   // Badge: Nếu có Level TCA thực → hiển thị "Cấp X", nếu không → ẩn
   const levelBadgeText = tcaLevel != null ? `Cấp ${tcaLevel}` : (treeDepth === 0 ? 'ROOT' : null)
 
-  // Số liệu điểm (chỉ có khi TCA member data tồn tại)
+  // Số liệu điểm ( chỉ có khi TCA member data tồn tại)
   const hasTcaData = data.personalScore != null || data.totalScore != null
   const pScore = data.personalScore ?? 0
   const tScore = data.totalScore ?? 0
