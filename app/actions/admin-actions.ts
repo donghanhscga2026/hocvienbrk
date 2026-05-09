@@ -606,3 +606,175 @@ export async function getMemberDetailsAction(userId: number) {
         return { success: true, user, tca }
     } catch (e: any) { return { success: false, error: e.message } }
 }
+
+// ==========================================
+// RESERVED ID & USER ID MANAGEMENT
+// ==========================================
+
+export async function getReservedIds() {
+    await checkAdmin()
+    return await prisma.reservedId.findMany({
+        orderBy: { id: 'asc' }
+    })
+}
+
+export async function addReservedIdAction(prevState: any, formData: FormData) {
+    await checkAdmin()
+    const id = parseInt(formData.get("id") as string)
+    const note = formData.get("note") as string || "Admin Added"
+    if (isNaN(id)) return { message: "Error: ID phải là số." }
+    try {
+        const existing = await prisma.reservedId.findUnique({ where: { id } })
+        if (existing) return { message: `Error: ID ${id} đã có trong danh sách.` }
+        await prisma.reservedId.create({
+            data: { id, note }
+        })
+        revalidatePath("/admin/reserved-ids")
+        return { message: `Success: Đã thêm ID ${id} vào danh sách dự trữ.` }
+    } catch (_e) {
+        console.error(_e)
+        return { message: "Error: Lỗi Server khi thêm ID." }
+    }
+}
+
+export async function deleteReservedIdAction(id: number) {
+    await checkAdmin()
+    try {
+        await prisma.reservedId.delete({ where: { id } })
+        revalidatePath("/admin/reserved-ids")
+        return { message: `Success: Đã xóa ID ${id}.` }
+    } catch (_e) {
+        return { message: "Error: Lỗi khi xóa ID." }
+    }
+}
+
+// ==========================================
+// SYSTEM MANAGEMENT ACTIONS
+// ==========================================
+
+export interface SystemTreeInfo {
+    onSystem: number
+    nameSystem: string
+}
+
+export async function createSystemRootAction(systemId: number, userId: number) {
+    try {
+        await checkAdmin()
+        // Check if root already exists for this system
+        const existingRoot = await prisma.system.findFirst({
+            where: { onSystem: systemId, refSysId: 0 }
+        })
+        if (existingRoot) return { success: false, error: "Hệ thống đã có Root" }
+        
+        // Create new root record in system table
+        const newSystemRoot = await prisma.system.create({
+            data: { onSystem: systemId, userId, refSysId: 0 }
+        })
+        
+        // Add root node to system_closure (self-relation at depth 0)
+        await prisma.systemClosure.create({
+            data: { 
+                systemId, 
+                ancestorId: newSystemRoot.autoId, 
+                descendantId: newSystemRoot.autoId, 
+                depth: 0 
+            }
+        })
+        
+        revalidatePath("/tools/genealogy")
+        return { success: true }
+    } catch (e: any) { 
+        console.error("[createSystemRootAction] Error:", e)
+        return { success: false, error: e.message || 'Lỗi khi tạo root' } 
+    }
+}
+
+// ==========================================
+// COURSE MANAGEMENT ACTIONS
+// ==========================================
+
+export async function updateCourseAction(courseId: number, data: {
+    name_lop?: string,
+    name_khoa?: string | null,
+    phi_coc?: number,
+    id_khoa?: string,
+    noidung_email?: string | null,
+    stk?: string | null,
+    name_stk?: string | null,
+    bank_stk?: string | null,
+    category?: string,
+    type?: any,
+    status?: boolean,
+    pin?: number,
+    date_join?: string | null,
+    mo_ta_ngan?: string | null,
+    mo_ta_dai?: string | null,
+    link_anh_bia?: string | null,
+    noidung_stk?: string | null,
+    link_qrcode?: string | null,
+    link_zalo?: string | null,
+    file_email?: string | null,
+    teacherId?: number | null
+}) {
+    await checkAdmin()
+    try {
+        const updatedCourse = await prisma.course.update({
+            where: { id: courseId },
+            data
+        })
+        revalidatePath('/admin/courses')
+        revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
+        return { success: true, course: updatedCourse }
+    } catch (error: any) {
+        console.error("Update Course Error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateLessonAction(lessonId: string, data: {
+    title?: string,
+    content?: string | null,
+    videoUrl?: string | null,
+    order?: number,
+    type?: any
+}) {
+    await checkAdmin()
+    try {
+        const updatedLesson = await prisma.lesson.update({
+            where: { id: lessonId },
+            data
+        })
+        // Revalidate các trang liên quan
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { course: { select: { id_khoa: true } } }
+        })
+        if (lesson?.course?.id_khoa) {
+            revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
+        }
+        return { success: true, lesson: updatedLesson }
+    } catch (error: any) {
+        console.error("Update Lesson Error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function deleteLessonAction(lessonId: string) {
+    await checkAdmin()
+    try {
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: { course: { select: { id_khoa: true } } }
+        })
+        await prisma.lesson.delete({
+            where: { id: lessonId }
+        })
+        if (lesson?.course?.id_khoa) {
+            revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
+        }
+        return { success: true }
+    } catch (error: any) {
+        console.error("Delete Lesson Error:", error)
+        return { success: false, error: error.message }
+    }
+}
