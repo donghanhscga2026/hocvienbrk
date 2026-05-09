@@ -100,7 +100,7 @@ export async function checkAndRedeemPoints(userId: number, campaignId: number) {
         })
 
         const currentPoints = wallet?.points || 0
-        const requiredPoints = campaign.requiredPointsToRedeem || 0
+        const requiredPoints = campaign.pointsRequired || 0
 
         if (currentPoints >= requiredPoints && requiredPoints > 0) {
             // Kiểm tra xem đã sở hữu khóa học chưa
