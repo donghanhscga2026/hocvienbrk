@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma'
-import { WalletService } from "./wallet-service"
+import { ensureWalletAndUpdate, createTransactionLog } from "./wallet-service"
 
 export interface ConversionData {
     refCode: string
@@ -10,107 +10,45 @@ export interface ConversionData {
     enrollmentId?: number
 }
 
-export async function trackAffiliateConversion(data: ConversionData) {
-    const { refCode, userId, landingSlug, orderAmount = 0, type, enrollmentId } = data
-    
-    // Find the affiliate link by code
-    const link = await prisma.affiliateLink.findUnique({
-        where: { code: refCode },
-        include: { campaign: true }
+export async function processRegistrationPoints(userId: number, landingSlug?: string | null) {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, referrerId: true }
     })
-    
-    if (!link) {
-        console.warn(`[Track] Affiliate link not found: ${refCode}`)
-        return null
-    }
-    
-    // Find landing if slug provided
+
+    if (!user || !user.referrerId) return
+
+    const campaign = await prisma.affiliateCampaign.findFirst({
+        where: { slug: 'default', isActive: true }
+    })
+
+    if (!campaign) return
+
+    // Create conversion record
     let landingId: number | undefined
     if (landingSlug) {
         const landing = await prisma.landingPage.findUnique({
             where: { slug: landingSlug }
         })
-        if (landing) {
-            landingId = landing.id
-        }
+        if (landing) landingId = landing.id
     }
-    
-    // Create conversion record
-    const conversion = await prisma.affiliateConversion.create({
-        data: {
-            linkId: link.id,
-            campaignId: link.campaignId,
-            customerId: userId,
-            enrollmentId,
-            orderAmount,
-            status: 'PENDING',
-            pendingUntil: type === 'REGISTRATION' 
-                ? new Date() // Immediate for registration
-                : new Date(Date.now() + (link.campaign.pendingDays || 30) * 24 * 60 * 60 * 1000),
-            landingSlug,
-            landingId
-        }
-    })
-    
-    // For registrations, immediately process the registration points
-    if (type === 'REGISTRATION') {
-        await processRegistrationPoints({
-            userId,
-            campaignId: link.campaignId,
-            landingSlug,
-            landingId
-        })
-    }
-    
-    return conversion
-}
 
-async function processRegistrationPoints(data: {
-    userId: number
-    campaignId: number
-    landingSlug?: string | null
-    landingId?: number
-}) {
-    const { userId, campaignId, landingSlug, landingId } = data
-    
-    // Get user's referrer (F1)
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { referrerId: true }
-    })
-    
-    if (!user?.referrerId) {
-        return
-    }
-    
-    // Get campaign config
-    const campaign = await prisma.affiliateCampaign.findUnique({
-        where: { id: campaignId }
-    })
-    
-    if (!campaign) {
-        return
-    }
-    
-    // Create registration point for F1
-    await prisma.registrationPoint.create({
+    await prisma.affiliateConversion.create({
         data: {
-            referrerId: user.referrerId,
-            refereeId: userId,
-            campaignId,
-            points: campaign.pointsPerRegistration || 1,
+            campaignId: campaign.id,
+            customerId: userId,
+            type: 'REGISTRATION',
             status: 'CONFIRMED',
-            confirmedAt: new Date(),
             landingSlug,
             landingId
         }
     })
     
-    // Update F1 wallet points & Log transaction
+    // Update F1 wallet points & Log transaction (Dùng service mới)
     const pointsToAdd = campaign.pointsPerRegistration || 1
-    const updatedWallet = await WalletService.ensureWalletAndUpdate(user.referrerId, { points: pointsToAdd })
+    const updatedWallet = await ensureWalletAndUpdate(user.referrerId, { points: pointsToAdd })
     
-    await WalletService.createTransactionLog({
+    await createTransactionLog({
         userId: user.referrerId,
         amount: pointsToAdd,
         type: 'POINT_EARNED',
@@ -123,31 +61,25 @@ async function processRegistrationPoints(data: {
 export async function getCommissionConfig(
     campaignId: number,
     landingSlug?: string | null
-): Promise<{
-    maxLevels: number
-    levels: { level: number; percentage: number }[]
-}> {
+) {
     const campaign = await prisma.affiliateCampaign.findUnique({
         where: { id: campaignId },
         include: { levels: true }
     })
-    
-    if (!campaign) {
-        return { maxLevels: 3, levels: [{ level: 1, percentage: 10 }] }
-    }
-    
-    // Check for landing-specific override
+
+    if (!campaign) return null
+
+    // Check for landing override
     if (landingSlug && campaign.landingOverrides) {
-        const overrides = campaign.landingOverrides as Record<string, { f1: number; f2: number; f3: number }>
+        const overrides = campaign.landingOverrides as Record<string, any>
         if (overrides[landingSlug]) {
-            const custom = overrides[landingSlug]
             return {
                 maxLevels: campaign.maxLevels,
                 levels: [
-                    { level: 1, percentage: custom.f1 },
-                    { level: 2, percentage: custom.f2 },
-                    { level: 3, percentage: custom.f3 },
-                ].filter((_, i) => i < campaign.maxLevels)
+                    { level: 1, percentage: overrides[landingSlug].f1 },
+                    { level: 2, percentage: overrides[landingSlug].f2 },
+                    { level: 3, percentage: overrides[landingSlug].f3 }
+                ].filter(l => l.level <= campaign.maxLevels)
             }
         }
     }
