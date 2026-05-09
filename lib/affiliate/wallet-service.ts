@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
+import { Prisma, TransactionType } from "@prisma/client"
 
 export interface WalletUpdateParams {
     balance?: number
@@ -10,7 +10,7 @@ export interface WalletUpdateParams {
 }
 
 /**
- * Cập nhật ví bằng upsert (tối ưu 1 query thay vì check-then-create/update)
+ * Service quản lý ví Affiliate tập trung
  */
 export async function ensureWalletAndUpdate(userId: number, updates: WalletUpdateParams) {
     const updateData: Prisma.AffiliateWalletUpdateInput = {}
@@ -47,7 +47,7 @@ export async function ensureWalletAndUpdate(userId: number, updates: WalletUpdat
 export async function createTransactionLog(params: {
     userId: number
     amount: number
-    type: string
+    type: TransactionType
     description: string
     balanceBefore: number
     balanceAfter: number
