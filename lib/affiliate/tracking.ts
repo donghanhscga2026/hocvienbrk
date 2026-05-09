@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { WalletService } from "./wallet-service"
 
 export interface ConversionData {
     refCode: string
@@ -105,35 +106,18 @@ async function processRegistrationPoints(data: {
         }
     })
     
-    // Update F1 wallet points
-    await prisma.affiliateWallet.upsert({
-        where: { userId: user.referrerId },
-        create: {
-            userId: user.referrerId,
-            points: campaign.pointsPerRegistration || 1
-        },
-        update: {
-            points: { increment: campaign.pointsPerRegistration || 1 }
-        }
-    })
+    // Update F1 wallet points & Log transaction
+    const pointsToAdd = campaign.pointsPerRegistration || 1
+    const updatedWallet = await WalletService.ensureWalletAndUpdate(user.referrerId, { points: pointsToAdd })
     
-    // Log transaction
-    const wallet = await prisma.affiliateWallet.findUnique({
-        where: { userId: user.referrerId }
+    await WalletService.createTransactionLog({
+        userId: user.referrerId,
+        amount: pointsToAdd,
+        type: 'POINT_EARNED',
+        description: `Nhận điểm từ đăng ký${landingSlug ? ` (${landingSlug})` : ''}`,
+        balanceBefore: updatedWallet.points - pointsToAdd,
+        balanceAfter: updatedWallet.points
     })
-    
-    if (wallet) {
-        await prisma.affiliateTransaction.create({
-            data: {
-                walletId: wallet.id,
-                amount: campaign.pointsPerRegistration || 1,
-                type: 'POINT_EARNED',
-                description: `Nhận điểm từ đăng ký${landingSlug ? ` (${landingSlug})` : ''}`,
-                balanceBefore: wallet.points - (campaign.pointsPerRegistration || 1),
-                balanceAfter: wallet.points
-            }
-        })
-    }
 }
 
 export async function getCommissionConfig(

@@ -2,6 +2,8 @@
 
 import prisma from "@/lib/prisma"
 import { CommissionStatus, ConversionStatus } from "@prisma/client"
+import { ensureWalletAndUpdate } from "./wallet-service"
+import { traceUpline } from "./closure-service"
 
 interface LevelConfig {
     level: number
@@ -18,7 +20,7 @@ export async function processEnrollmentCommission(
         userAffiliateCode?: string
     }
 ) {
-    const { landingSlug, userAffiliateCode } = options || {}
+    const { landingSlug } = options || {}
     try {
         // 1. Tìm thông tin user và referrer
         const user = await prisma.user.findUnique({
@@ -132,7 +134,7 @@ export async function processEnrollmentCommission(
             if (netAmount <= 0) continue
 
             // Tạo commission record
-            const commission = await prisma.affiliateCommission.create({
+            await prisma.affiliateCommission.create({
                 data: {
                     conversionId: conversion.id,
                     affiliateId: upline.userId,
@@ -180,38 +182,6 @@ export async function processEnrollmentCommission(
     }
 }
 
-async function traceUpline(userId: number, maxLevels: number) {
-    const chain: { userId: number; level: number }[] = []
-
-    // Sử dụng closure table để trace nhanh
-    // Lấy tất cả ancestors của user với depth <= maxLevels
-    const ancestors = await prisma.userClosure.findMany({
-        where: {
-            descendantId: userId,
-            depth: { gt: 0, lte: maxLevels }
-        },
-        include: {
-            ancestor: {
-                select: { id: true }
-            }
-        },
-        orderBy: {
-            depth: 'asc'
-        }
-    })
-
-    let level = 1
-    for (const ancestor of ancestors) {
-        chain.push({
-            userId: ancestor.ancestor.id,
-            level: level
-        })
-        level++
-    }
-
-    return chain
-}
-
 async function getCommissionLevels(campaign: any, landingSlug?: string | null): Promise<LevelConfig[]> {
     // Check for landing-specific override
     if (landingSlug && campaign.landingOverrides) {
@@ -233,38 +203,6 @@ async function getCommissionLevels(campaign: any, landingSlug?: string | null): 
         percentage: l.percentage,
         minOrder: l.minOrder
     }))
-}
-
-async function ensureWalletAndUpdate(
-    userId: number,
-    updates: { balance?: number; pendingBalance?: number }
-) {
-    const existingWallet = await prisma.affiliateWallet.findUnique({
-        where: { userId }
-    })
-
-    if (!existingWallet) {
-        await prisma.affiliateWallet.create({
-            data: {
-                userId,
-                balance: updates.balance || 0,
-                pendingBalance: updates.pendingBalance || 0
-            }
-        })
-    } else {
-        const updateData: any = {}
-        if (updates.balance !== undefined) {
-            updateData.balance = { increment: updates.balance }
-        }
-        if (updates.pendingBalance !== undefined) {
-            updateData.pendingBalance = { increment: updates.pendingBalance }
-        }
-
-        await prisma.affiliateWallet.update({
-            where: { userId },
-            data: updateData
-        })
-    }
 }
 
 export async function getCommissionsByUser(userId: number, options?: {
