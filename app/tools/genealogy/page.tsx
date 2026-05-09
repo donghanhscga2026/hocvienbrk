@@ -19,7 +19,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, getFullSystemTreeAction, getFullSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import { Role } from '@prisma/client'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
@@ -858,7 +858,7 @@ function GenealogyFlow() {
       } else {
         // Hệ thống TCA/KTC - gọi đúng function theo intendedDisplayMode
         const result = intendedDisplayMode === 'full'
-          ? await getFullSystemTreeAction(systemId)
+          ? await getSystemTreeAction(systemId)
           : await getSystemTreeAction(systemId)
         if (result.success && result.tree) {
           setFullTree(result.tree)
@@ -908,7 +908,7 @@ function GenealogyFlow() {
     } else {
       // Sửa bug: gọi đúng function theo displayMode
       result = displayMode === 'full'
-        ? await getFullSystemTreeAction(selectedSystem)
+        ? await getSystemTreeAction(selectedSystem)
         : await getSystemTreeAction(selectedSystem)
     }
 

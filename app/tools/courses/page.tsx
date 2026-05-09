@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getCoursesAction } from '@/app/actions/admin-actions'
+import { getAdminCoursesAction } from '@/app/actions/admin-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
@@ -13,7 +13,7 @@ export default function ToolsCoursesPage() {
     useEffect(() => {
         const fetchCourses = async () => {
             setLoading(true)
-            const res = await getCoursesAction()
+            const res = await getAdminCoursesAction()
             if (res.success) {
                 setCourses(res.courses || [])
             }
