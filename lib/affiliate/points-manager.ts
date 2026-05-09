@@ -2,86 +2,67 @@
 
 import prisma from "@/lib/prisma"
 import { PointStatus } from "@prisma/client"
-import { WalletService } from "./wallet-service"
+import { ensureWalletAndUpdate, createTransactionLog } from "./wallet-service"
 
 const DEFAULT_CAMPAIGN_SLUG = 'default'
 
 export async function onEmailVerified(userId: number) {
     try {
-        // 1. Lấy thông tin user vừa xác thực
+        // 1. Lấy thông tin user
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, email: true, referrerId: true, emailVerified: true }
+            select: { id: true, emailVerified: true, referrerId: true }
         })
 
-        if (!user) {
-            console.error('[Affiliate] User not found:', userId)
-            return { success: false, error: 'User not found' }
+        if (!user || !user.emailVerified) {
+            return { success: false, error: 'User not found or email not verified' }
         }
 
-        // 2. Nếu không có referrer hoặc referrer = 0, không cộng điểm
-        if (!user.referrerId || user.referrerId === 0) {
-            console.log('[Affiliate] User has no referrer, skip point assignment')
+        // 2. Nếu không có referrer, không có điểm thưởng
+        if (!user.referrerId) {
             return { success: true, message: 'No referrer' }
         }
 
-        // 3. Tìm campaign mặc định
+        // 3. Lấy campaign mặc định
         const campaign = await prisma.affiliateCampaign.findFirst({
-            where: { 
-                slug: DEFAULT_CAMPAIGN_SLUG,
-                isActive: true 
-            }
+            where: { slug: DEFAULT_CAMPAIGN_SLUG, isActive: true }
         })
 
         if (!campaign) {
-            console.log('[Affiliate] No active campaign found, skip point assignment')
-            return { success: true, message: 'No campaign' }
+            return { success: false, error: 'No active point campaign' }
         }
 
-        // 4. Chỉ cộng điểm cho F1 (direct referrer)
-        const f1Id = user.referrerId
-
-        // Verify F1 is also verified
-        const f1 = await prisma.user.findUnique({
-            where: { id: f1Id },
-            select: { emailVerified: true }
-        })
-        if (!f1?.emailVerified) {
-            console.log('[Affiliate] F1 has not verified email, skip point assignment')
-            return { success: true, message: 'F1 not verified' }
-        }
-
-        // 5. Kiểm tra đã có point record chưa (tránh trùng lặp)
+        // 4. Kiểm tra xem đã được cộng điểm cho đăng ký này chưa (tránh trùng lặp)
         const existingPoint = await prisma.registrationPoint.findFirst({
-            where: {
-                refereeId: user.id,
-                referrerId: f1Id
-            }
+            where: { refereeId: userId, campaignId: campaign.id }
         })
 
         if (existingPoint) {
-            console.log('[Affiliate] Point already assigned for this referral')
-            return { success: true, message: 'Already assigned' }
+            return { success: true, message: 'Points already awarded' }
         }
 
-        // 6. Tạo RegistrationPoint record
-        const pointsToAdd = campaign.pointsPerRegistration
+        const pointsToAdd = campaign.pointsPerRegistration || 0
+        if (pointsToAdd <= 0) return { success: true }
 
+        // 5. Tìm ID của F1 (người giới thiệu trực tiếp)
+        const f1Id = user.referrerId
+
+        // 6. Ghi nhận điểm thưởng (Transaction)
         await prisma.registrationPoint.create({
             data: {
                 referrerId: f1Id,
-                refereeId: user.id,
+                refereeId: userId,
                 campaignId: campaign.id,
                 points: pointsToAdd,
                 status: PointStatus.CONFIRMED,
-                confirmedAt: user.emailVerified || new Date()
+                confirmedAt: user.emailVerified
             }
         })
 
-        // 7. Update wallet & 8. Transaction log
-        const updatedWallet = await WalletService.ensureWalletAndUpdate(f1Id, { points: pointsToAdd })
+        // 7. Update wallet & 8. Transaction log (Dùng service mới)
+        const updatedWallet = await ensureWalletAndUpdate(f1Id, { points: pointsToAdd })
         
-        await WalletService.createTransactionLog({
+        await createTransactionLog({
             userId: f1Id,
             amount: pointsToAdd,
             type: 'POINT_EARNED',
@@ -97,88 +78,78 @@ export async function onEmailVerified(userId: number) {
             await checkAndRedeemPoints(f1Id, campaign.id)
         }
 
-        return { success: true, pointsAdded: pointsToAdd }
+        return { success: true, points: pointsToAdd }
 
     } catch (error) {
-        console.error('[Affiliate] Error in onEmailVerified:', error)
+        console.error('[Affiliate Points] Error:', error)
         return { success: false, error: String(error) }
     }
 }
 
 export async function checkAndRedeemPoints(userId: number, campaignId: number) {
     try {
-        const wallet = await prisma.affiliateWallet.findUnique({
-            where: { userId }
-        })
-
         const campaign = await prisma.affiliateCampaign.findUnique({
             where: { id: campaignId }
         })
 
-        if (!wallet || !campaign || !campaign.redemptionCourseId) {
-            return { success: false, error: 'Missing data' }
-        }
+        if (!campaign || !campaign.redemptionCourseId) return { success: false }
 
-        const requiredPoints = campaign.pointsRequired
-        
-        // Kiểm tra đủ điểm chưa
-        if (wallet.points < requiredPoints) {
-            return { success: false, error: 'Not enough points' }
-        }
+        // Lấy ví của user
+        const wallet = await prisma.affiliateWallet.findUnique({
+            where: { userId }
+        })
 
-        // Kiểm tra đã enrolled khóa học này chưa
-        const existingEnrollment = await prisma.enrollment.findFirst({
-            where: {
+        const currentPoints = wallet?.points || 0
+        const requiredPoints = campaign.requiredPointsToRedeem || 0
+
+        if (currentPoints >= requiredPoints && requiredPoints > 0) {
+            // Kiểm tra xem đã sở hữu khóa học chưa
+            const existingEnrollment = await prisma.enrollment.findFirst({
+                where: {
+                    userId,
+                    courseId: campaign.redemptionCourseId
+                }
+            })
+
+            if (existingEnrollment) return { success: false, error: 'Already enrolled' }
+
+            // Thực hiện đổi điểm
+            // 1. Tạo enrollment mới
+            await prisma.enrollment.create({
+                data: {
+                    userId,
+                    courseId: campaign.redemptionCourseId,
+                    status: 'ACTIVE',
+                    startedAt: new Date()
+                }
+            })
+
+            // 2. Trừ điểm & Ghi transaction log (Dùng service mới)
+            const updatedWallet = await ensureWalletAndUpdate(userId, { points: -requiredPoints })
+
+            await createTransactionLog({
                 userId,
-                courseId: campaign.redemptionCourseId
-            }
-        })
+                amount: -requiredPoints,
+                type: 'POINT_REDEEMED',
+                description: `Đổi ${requiredPoints} điểm lấy khóa học #${campaign.redemptionCourseId} (${campaign.name})`,
+                balanceBefore: updatedWallet.points + requiredPoints,
+                balanceAfter: updatedWallet.points
+            })
 
-        if (existingEnrollment) {
-            return { success: false, error: 'Already enrolled' }
+            console.log(`[Affiliate] User #${userId} redeemed ${requiredPoints} points for course #${campaign.redemptionCourseId}`)
+
+            return { success: true, pointsRedeemed: requiredPoints }
         }
 
-        // Tạo enrollment miễn phí
-        await prisma.enrollment.create({
-            data: {
-                userId,
-                courseId: campaign.redemptionCourseId,
-                status: 'ACTIVE',
-                startedAt: new Date()
-            }
-        })
-
-        // Trừ điểm & Ghi transaction log
-        const updatedWallet = await WalletService.ensureWalletAndUpdate(userId, { points: -requiredPoints })
-
-        await WalletService.createTransactionLog({
-            userId,
-            amount: -requiredPoints,
-            type: 'POINT_REDEEMED',
-            description: `Đổi ${requiredPoints} điểm lấy khóa học #${campaign.redemptionCourseId} (${campaign.name})`,
-            balanceBefore: updatedWallet.points + requiredPoints,
-            balanceAfter: updatedWallet.points
-        })
-
-        console.log(`[Affiliate] User #${userId} redeemed ${requiredPoints} points for course #${campaign.redemptionCourseId}`)
-
-        return { success: true, pointsRedeemed: requiredPoints }
+        return { success: false, error: 'Insufficient points' }
 
     } catch (error) {
-        console.error('[Affiliate] Error in checkAndRedeemPoints:', error)
+        console.error('[Affiliate Redemption] Error:', error)
         return { success: false, error: String(error) }
     }
 }
 
-export async function getWalletPoints(userId: number) {
-    const wallet = await prisma.affiliateWallet.findUnique({
-        where: { userId }
-    })
-    
-    return wallet?.points || 0
-}
-
-export async function getReferralStats(userId: number) {
+export async function getPointsSummary(userId: number) {
     const stats = await prisma.registrationPoint.aggregate({
         where: { referrerId: userId },
         _count: true,
