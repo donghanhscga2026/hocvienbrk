@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { PointStatus } from "@prisma/client"
+import { WalletService } from "./wallet-service"
 
 const DEFAULT_CAMPAIGN_SLUG = 'default'
 
@@ -77,32 +78,16 @@ export async function onEmailVerified(userId: number) {
             }
         })
 
-        // 7. Update wallet
-        let wallet = await prisma.affiliateWallet.findUnique({
-            where: { userId: f1Id }
-        })
-
-        if (!wallet) {
-            wallet = await prisma.affiliateWallet.create({
-                data: { userId: f1Id, points: pointsToAdd }
-            })
-        } else {
-            await prisma.affiliateWallet.update({
-                where: { userId: f1Id },
-                data: { points: { increment: pointsToAdd } }
-            })
-        }
-
-        // 8. Transaction log
-        await prisma.affiliateTransaction.create({
-            data: {
-                walletId: f1Id,
-                amount: pointsToAdd,
-                type: 'POINT_EARNED',
-                description: `Nhận ${pointsToAdd} điểm từ F1 (#${user.id})`,
-                balanceBefore: wallet.points,
-                balanceAfter: wallet.points + pointsToAdd
-            }
+        // 7. Update wallet & 8. Transaction log
+        const updatedWallet = await WalletService.ensureWalletAndUpdate(f1Id, { points: pointsToAdd })
+        
+        await WalletService.createTransactionLog({
+            userId: f1Id,
+            amount: pointsToAdd,
+            type: 'POINT_EARNED',
+            description: `Nhận ${pointsToAdd} điểm từ F1 (#${user.id})`,
+            balanceBefore: updatedWallet.points - pointsToAdd,
+            balanceAfter: updatedWallet.points
         })
 
         console.log(`[Affiliate] F1 #${f1Id}: +${pointsToAdd} điểm từ #${user.id}`)
@@ -163,22 +148,16 @@ export async function checkAndRedeemPoints(userId: number, campaignId: number) {
             }
         })
 
-        // Trừ điểm
-        await prisma.affiliateWallet.update({
-            where: { userId },
-            data: { points: { decrement: requiredPoints } }
-        })
+        // Trừ điểm & Ghi transaction log
+        const updatedWallet = await WalletService.ensureWalletAndUpdate(userId, { points: -requiredPoints })
 
-        // Ghi transaction log
-        await prisma.affiliateTransaction.create({
-            data: {
-                walletId: userId,
-                amount: -requiredPoints,
-                type: 'POINT_REDEEMED',
-                description: `Đổi ${requiredPoints} điểm lấy khóa học #${campaign.redemptionCourseId} (${campaign.name})`,
-                balanceBefore: wallet.points,
-                balanceAfter: wallet.points - requiredPoints
-            }
+        await WalletService.createTransactionLog({
+            userId,
+            amount: -requiredPoints,
+            type: 'POINT_REDEEMED',
+            description: `Đổi ${requiredPoints} điểm lấy khóa học #${campaign.redemptionCourseId} (${campaign.name})`,
+            balanceBefore: updatedWallet.points + requiredPoints,
+            balanceAfter: updatedWallet.points
         })
 
         console.log(`[Affiliate] User #${userId} redeemed ${requiredPoints} points for course #${campaign.redemptionCourseId}`)

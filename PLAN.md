@@ -947,7 +947,43 @@ Cung cấp cái nhìn toàn cảnh khi tìm kiếm một ID và hỗ trợ xem n
         - **User thường**: Hiển thị cây bắt đầu từ chính mình làm Root (My Team).
     - **Cải tiến Logic Reset**: Cập nhật `handleSystemChange` để reset toàn bộ các state phụ như `focusedSubtreeNode`, `focusedNodeName`, giúp việc chuyển đổi giữa các chế độ xem mượt mà hơn.
 
-- **v8.8.1 Self-Node Highlighting (2026-05-08)**:
-    - **Hiệu ứng Nhận diện Bản thân (Self-Focus)**: Node của người dùng đang đăng nhập sẽ tự động có hiệu ứng "lóe sáng" và "phóng to thu nhỏ" liên tục.
-    - **Kỹ thuật**: Sử dụng kết hợp `animate-pulse` (độ sáng) và `animate-ping` (lóe sáng lan tỏa), cùng với vòng ring xanh Blue-500 và bóng đổ phát sáng (Glow Shadow) để tạo sự chú ý tuyệt đối.
-    - **Trạng thái**: Áp dụng trong mọi chế độ xem (Full Tree, My Team, Search mode).
+
+---
+
+## ✅ PHẦN 13: TỐI ƯU LOGIC AFFILIATE & WALLET (2026-05-09)
+
+### Mục tiêu
+Hợp nhất logic xử lý ví (Wallet) và ghi log giao dịch (Transaction) để loại bỏ code trùng lặp, tối ưu số lượng truy vấn DB và nâng cao tính an toàn dữ liệu.
+
+### Các file đã tạo/sửa
+
+#### 1. `lib/affiliate/wallet-service.ts` [NEW]
+- **Mô tả**: Service tập trung quản lý ví.
+- **Tính năng**: 
+  - `ensureWalletAndUpdate`: Sử dụng `prisma.affiliateWallet.upsert` để cập nhật hoặc tạo mới ví chỉ trong **1 query** (thay vì 2-3 query như cũ).
+  - `createTransactionLog`: Tự động tìm `walletId` từ `userId` và ghi log giao dịch chính xác.
+- **Type Safety**: Sử dụng `Prisma.AffiliateWalletUpdateInput` và `Prisma.AffiliateWalletCreateInput` để loại bỏ lỗi `any`.
+
+#### 2. `lib/affiliate/commission-calculator.ts`
+- **Tối ưu**: Loại bỏ hàm `ensureWalletAndUpdate` cục bộ, chuyển sang dùng `WalletService`.
+- **Clean Code**: Xóa bỏ các biến không sử dụng (`commission`, `userAffiliateCode`) để hết cảnh báo ESLint.
+
+#### 3. `lib/affiliate/points-manager.ts`
+- **Tối ưu**: Thay thế toàn bộ logic check-then-create/update ví và ghi log thủ công bằng các phương thức của `WalletService`.
+- **Sửa lỗi**: Đảm bảo `walletId` trong `AffiliateTransaction` luôn là ID nội bộ của ví (trước đây một số chỗ dùng nhầm `userId`).
+
+#### 4. `lib/affiliate/tracking.ts`
+- **Tối ưu**: Rút gọn hàm `processRegistrationPoints`, sử dụng `WalletService` để gộp việc cập nhật điểm và ghi log.
+
+#### 5. `lib/affiliate/closure-service.ts` [NEW]
+- **Mô tả**: Service chuyên biệt để truy vấn cây phả hệ (Genealogy) từ Closure Table.
+- **Tối ưu**: 
+  - Loại bỏ việc `JOIN` với bảng `User` khi không cần thiết, chỉ lấy `ancestorId` trực tiếp.
+  - Trả về cấu trúc flat array đơn giản, giúp tăng tốc độ xử lý vòng lặp tính hoa hồng.
+  - Sử dụng chung cho toàn bộ hệ thống Affiliate.
+
+### Trạng thái
+- ✅ Logic Ví được tập trung hóa, dễ bảo trì.
+- ✅ Hiệu năng tăng nhờ giảm số lượng round-trip tới Database và tối ưu hóa truy vấn Genealogy.
+- ✅ Khắc phục triệt để các cảnh báo ESLint liên quan đến `any` và `unused-vars` trong các file đã sửa.
+- ✅ Đã backup file gốc an toàn trong `plan_temp/`.

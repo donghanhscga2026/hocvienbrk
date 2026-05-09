@@ -400,6 +400,8 @@ function GenealogyFlow() {
   const [showActiveOnly, setShowActiveOnly] = useState<boolean>(false)
   // v8.7.0: State cho "Đội của tôi"
   const [showMyTeamOnly, setShowMyTeamOnly] = useState<boolean>(false)
+  const [canToggleMyTeam, setCanToggleMyTeam] = useState<boolean>(true)
+  const [showMyTeamCheckbox, setShowMyTeamCheckbox] = useState<boolean>(true)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
 
   // v8.4.0: Computed tree - lọc tại nguồn data khi showActiveOnly thay đổi
@@ -814,27 +816,39 @@ function GenealogyFlow() {
     setFocusedSubtreeNode(null)
     setFocusedNodeName(null)
 
-    // Lấy userId hiện tại
-    const roleResult = await getCurrentUserRoleAction()
+    // Lấy userId hiện tại và kiểm tra vai trò hệ thống
+    const roleResult = await getCurrentUserRoleAction(systemId || undefined)
     const currentUserIdLocal = roleResult.userId || 0
     const isAdminNow = roleResult.success && roleResult.role === Role.ADMIN
 
-    // v8.7.0: Kiểm tra Root hệ thống để set mặc định cho "Đội của tôi"
-    let isSystemRoot = false
-    if (systemId && systemId !== 0) {
-      const rootUser = await getSystemRootUserAction(systemId)
-      isSystemRoot = rootUser?.id === currentUserIdLocal
+    // CẬP NHẬT LOGIC CHECKBOX "ĐỘI CỦA TÔI" THEO QUY TẮC MỚI:
+    let shouldShowMyTeamLocal = false
+    if (roleResult.success) {
+      if (roleResult.isRoot) {
+        // 1. Nếu là Root (Admin 0 hoặc Root Hệ thống) -> Ẩn hoàn toàn Checkbox
+        setShowMyTeamCheckbox(false)
+        setShowMyTeamOnly(false)
+        shouldShowMyTeamLocal = false
+      } else {
+        setShowMyTeamCheckbox(true)
+        setShowMyTeamOnly(true)
+        shouldShowMyTeamLocal = true // Mặc định là Đội của tôi cho C5 và User thường
+        
+        if (roleResult.canViewFull) {
+          // Nếu có quyền xem Full (C5 hoặc Admin) -> Cho phép bỏ tích
+          setCanToggleMyTeam(true)
+        } else {
+          // Thành viên thường -> Khóa (disabled)
+          setCanToggleMyTeam(false)
+        }
+      }
     }
 
-    const shouldShowMyTeam = currentUserIdLocal !== 0 && !isSystemRoot && systemId !== null
-    setShowMyTeamOnly(shouldShowMyTeam)
-
-    if (shouldShowMyTeam) {
+    if (shouldShowMyTeamLocal) {
       setSearchInput(`#${currentUserIdLocal}`)
-      // v8.7.3: Gọi search trực tiếp với systemId mới để tránh race condition
       await handleSearch(currentUserIdLocal, systemId)
       setLoading(false)
-      return // Thoát sớm, không chạy logic fetch tree mặc định bên dưới
+      return
     }
 
     // Tính toán displayMode hợp lý ngay trong hàm để tránh lỗi state cũ
@@ -1137,25 +1151,29 @@ function GenealogyFlow() {
             <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter">Active</span>
           </label>
 
-          {/* v8.7.0: Checkbox "Đội của tôi" */}
-          <label className="flex items-center gap-2 cursor-pointer shrink-0 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-200 transition-all">
-            <input
-              type="checkbox"
-              checked={showMyTeamOnly}
-              onChange={(e) => {
-                const checked = e.target.checked
-                setShowMyTeamOnly(checked)
-                if (checked && currentUserId) {
-                  setSearchInput(`#${currentUserId}`)
-                  handleSearch(currentUserId)
-                } else if (!checked) {
-                  handleClearSearch()
-                }
-              }}
-              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter whitespace-nowrap">Đội của tôi</span>
-          </label>
+          {/* v8.7.0: Checkbox "Đội của tôi" - Cập nhật v9.0: Logic phân quyền Root/C5 */}
+          {showMyTeamCheckbox && (
+            <label className={`flex items-center gap-2 cursor-pointer shrink-0 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-200 transition-all ${!canToggleMyTeam ? 'opacity-60 cursor-not-allowed' : ''}`}>
+              <input
+                type="checkbox"
+                checked={showMyTeamOnly}
+                disabled={!canToggleMyTeam}
+                onChange={(e) => {
+                  if (!canToggleMyTeam) return
+                  const checked = e.target.checked
+                  setShowMyTeamOnly(checked)
+                  if (checked && currentUserId) {
+                    setSearchInput(`#${currentUserId}`)
+                    handleSearch(currentUserId)
+                  } else if (!checked) {
+                    handleClearSearch()
+                  }
+                }}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:bg-slate-200"
+              />
+              <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter whitespace-nowrap">Đội của tôi</span>
+            </label>
+          )}
 
           {/* Nút Tạo cây/Sửa */}
           <div className="shrink-0">
@@ -1209,33 +1227,74 @@ function GenealogyFlow() {
           </div>
         </div>
 
-        {/* v8.8.1: Khối thống kê - Tối ưu v8.9.0 cho mobile */}
-        {fullTree?.stats && (
+        {/* v8.8.1: Khối thống kê - Tối ưu v9.4: Fix số liệu nhảy theo đúng Đội của tôi */}
+        {fullTree && (
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 ml-0 sm:ml-2 sm:border-l sm:border-slate-200 sm:pl-3 shrink-0">
             <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                {showActiveOnly ? 'ACTIVE' : 'TỔNG'}
+                {showMyTeamOnly ? 'ĐỘI NHÓM' : (showActiveOnly ? 'ACTIVE' : 'TỔNG')}
               </span>
               <span className="text-[11px] font-black text-white">
-                {showActiveOnly ? fullTree.stats.active : fullTree.stats.total}
+                {(() => {
+                  // 1. Nếu xem Toàn hệ thống -> Lấy thẳng từ Root của cây
+                  if (!showMyTeamOnly) {
+                    return showActiveOnly ? (fullTree.stats?.active ?? 0) : (fullTree.stats?.total ?? fullTree.totalSubCount);
+                  }
+
+                  // 2. Nếu xem Đội của tôi -> Phải tìm đúng Node của mình trong cây để lấy số liệu
+                  const targetIdForStats = currentUserId;
+                  const findNodeStats = (node: GenealogyNode, targetId: number): { count: number, stats?: any } | null => {
+                    if (node.id === targetId) return { count: node.totalSubCount, stats: node.stats };
+                    const allChildren = [...(node.children || []), ...(node.groupA || []), ...(node.groupB || [])];
+                    for (const child of allChildren) {
+                      const found = findNodeStats(child, targetId);
+                      if (found) return found;
+                    }
+                    return null;
+                  };
+
+                  const myNodeData = targetIdForStats ? findNodeStats(fullTree, targetIdForStats) : null;
+                  return myNodeData ? myNodeData.count : fullTree.totalSubCount;
+                })()}
               </span>
             </div>
 
-            {!showActiveOnly && (
-              <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-100">
-                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">ACTIVE</span>
-                <span className="text-[11px] font-black text-emerald-700">{fullTree.stats.active}</span>
-              </div>
-            )}
+            {/* Hiển thị chi tiết stats (Active/BĐH/DHTT) của đúng đối tượng đang xem */}
+            {(() => {
+              const targetIdForStats = showMyTeamOnly ? currentUserId : fullTree.id;
+              const findNodeStats = (node: GenealogyNode, targetId: number): any | null => {
+                if (node.id === targetId) return node.stats;
+                const allChildren = [...(node.children || []), ...(node.groupA || []), ...(node.groupB || [])];
+                for (const child of allChildren) {
+                  const found = findNodeStats(child, targetId);
+                  if (found) return found;
+                }
+                return null;
+              };
+              
+              const activeStats = targetIdForStats ? findNodeStats(fullTree, targetIdForStats) : fullTree.stats;
 
-            <div className="flex items-center gap-1.5 bg-orange-50 px-2.5 py-1.5 rounded-xl border border-orange-100">
-              <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest">BĐH</span>
-              <span className="text-[11px] font-black text-orange-700">{fullTree.stats.bdh}</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-pink-50 px-2.5 py-1.5 rounded-xl border border-pink-100">
-              <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">DHTT</span>
-              <span className="text-[11px] font-black text-pink-700">{fullTree.stats.dhtt}</span>
-            </div>
+              if (!activeStats) return null;
+
+              return (
+                <>
+                  {!showActiveOnly && (
+                    <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+                      <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">ACTIVE</span>
+                      <span className="text-[11px] font-black text-emerald-700">{activeStats.active}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 bg-orange-50 px-2.5 py-1.5 rounded-xl border border-orange-100">
+                    <span className="text-[9px] font-black text-orange-500 uppercase tracking-widest">BĐH</span>
+                    <span className="text-[11px] font-black text-orange-700">{activeStats.bdh}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-pink-50 px-2.5 py-1.5 rounded-xl border border-pink-100">
+                    <span className="text-[9px] font-black text-pink-500 uppercase tracking-widest">DHTT</span>
+                    <span className="text-[11px] font-black text-pink-700">{activeStats.dhtt}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </div>

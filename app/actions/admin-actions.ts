@@ -141,6 +141,7 @@ async function buildStandardTree(
         let totalCount = 0
 
         if (forceFull) {
+            // SỬA: Phải dùng rootAutoId cho System
             const descendantIds = await (closureModel as any).findMany({
                 where: { ...whereBase, ancestorId: rootAutoId },
                 select: { descendantId: true }
@@ -157,18 +158,19 @@ async function buildStandardTree(
                 include: { descendant: isSystem ? { include: { user: { select: { id: true, name: true, image: true } } } } : { select: { id: true, name: true, image: true } } }
             })
         } else {
+            // SỬA: Lấy toàn bộ descendants của F1s (depth >= 1)
             const allDescOfF1s = await (closureModel as any).findMany({
                 where: { ...whereBase, ancestorId: { in: f1AutoIds }, depth: { gte: 1 } },
                 select: { descendantId: true }
             })
-            const f2AutoIds = [...new Set(allDescOfF1s.map((c: any) => c.descendantId))]
+            const otherAutoIds = [...new Set(allDescOfF1s.map((c: any) => c.descendantId))]
 
             const [closures, count] = await Promise.all([
                 (closureModel as any).findMany({
                     where: {
                         ...whereBase,
                         OR: [
-                            { ancestorId: { in: [rootAutoId, ...f1AutoIds, ...f2AutoIds] } },
+                            { ancestorId: { in: [rootAutoId, ...f1AutoIds, ...otherAutoIds] } },
                             { descendantId: { in: f1AutoIds } }
                         ],
                         depth: { gte: 0 }
@@ -444,7 +446,7 @@ export async function getSystemTreeAction(systemId: number) {
             }
         }
         
-        const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId)
+        const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId, true)
         return { success: true, tree }
     } catch (error: any) { return { success: false, error: error.message } }
 }
@@ -585,13 +587,43 @@ export async function getAvailableSystemsAction() {
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function getCurrentUserRoleAction() {
+export async function getCurrentUserRoleAction(systemId?: number) {
     try {
-        const session = await auth(); if (!session?.user?.id) return { success: false, role: null }
-        const role = session.user.role; const userId = parseInt(session.user.id)
-        const validUserId = isNaN(userId) || userId < 0 ? null : userId
-        const finalRole = (validUserId === 0) ? Role.ADMIN : role
-        return { success: true, role: finalRole, userId: validUserId }
+        const session = await auth()
+        if (!session?.user?.id) return { success: false, role: null }
+        
+        const userId = parseInt(session.user.id)
+        const role = session.user.role
+        const isSuperAdmin = userId === 0
+        const isAdminRole = role === Role.ADMIN
+        
+        let isActualSystemRoot = false
+        let isC5 = false
+
+        if (systemId) {
+            // Check if is the real root of this system (refSysId = 0)
+            const root = await getSystemRootUser(systemId)
+            if (root && root.id === userId) isActualSystemRoot = true
+            
+            // Check if is C5 in TCA
+            if (systemId === 1) {
+                const tca = await prisma.tCAMember.findFirst({
+                    where: { userId },
+                    select: { chuc_danh: true }
+                })
+                if (tca?.chuc_danh === 'C5') isC5 = true
+            }
+        }
+
+        return { 
+            success: true, 
+            role: isSuperAdmin ? Role.ADMIN : role, 
+            userId,
+            // CHỈ ẨN CHECKBOX NẾU LÀ ADMIN TỐI CAO HOẶC ROOT THỰC SỰ CỦA HỆ THỐNG ĐÓ
+            isRoot: isSuperAdmin || isActualSystemRoot,
+            isC5,
+            canViewFull: isSuperAdmin || isAdminRole || isC5
+        }
     } catch { return { success: false, role: null } }
 }
 
