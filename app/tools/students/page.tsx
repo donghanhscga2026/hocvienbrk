@@ -149,13 +149,10 @@ export default function ToolsStudentsPage() {
   const endItem = Math.min((page + 1) * PAGE_SIZE, total)
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col">
       <MainHeader title="THÀNH VIÊN" toolSlug="students" />
-      <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
-        {total > 0 ? `${startItem}-${endItem} / ${total}` : '0'}
-      </div>
 
-      <div className="sticky top-16 z-40 bg-white border-b shadow-sm">
+      <div className="shrink-0 bg-white border-b shadow-sm">
         <div className="p-4 space-y-3">
           {isAdmin ? (
             <div className="flex gap-2">
@@ -234,15 +231,17 @@ export default function ToolsStudentsPage() {
             </button>
           </div>
         </div>
+        <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100 border-t">
+          {total > 0 ? `${startItem}-${endItem} / ${total}` : '0'}
+        </div>
       </div>
 
-      {error && (
-        <div className="mx-4 mt-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      <div className="flex-1 p-4 pb-8">
+      <div className="flex-1 overflow-y-auto p-4">
+        {error && (
+          <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            {error}
+          </div>
+        )}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-3 border-purple-600 border-t-transparent"></div>
@@ -315,7 +314,7 @@ export default function ToolsStudentsPage() {
       </div>
 
       {totalPages > 1 && (
-        <div className="sticky bottom-0 bg-white border-t p-3 flex items-center justify-center gap-4">
+        <div className="shrink-0 bg-white border-t p-3 flex items-center justify-center gap-4">
           <button
             onClick={goToPrevPage}
             disabled={page === 0}
