@@ -1,11 +1,29 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { getStudentsAction } from '@/app/actions/admin-actions'
-import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { getStudentsAction, getAdminCoursesAction } from '@/app/actions/admin-actions'
+import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
+
+interface EnrollmentData {
+  courseId: number
+  course: { name_lop: string }
+  _count: { lessonProgress: number }
+}
+
+interface StudentData {
+  id: number
+  name: string | null
+  email: string
+  image: string | null
+  phone: string | null
+  role: string
+  createdAt: Date
+  enrollments?: EnrollmentData[]
+}
 
 const roleConfig: Record<string, { label: string; icon: any; color: string; bgColor: string; textColor: string }> = {
   ALL: { label: 'Tất cả', icon: Users, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
@@ -35,45 +53,80 @@ const roleTextColors: Record<string, string> = {
 const PAGE_SIZE = 20
 
 export default function ToolsStudentsPage() {
-  const [students, setStudents] = useState<any[]>([])
+  const { data: session } = useSession()
+  const isAdmin = session?.user?.role === 'ADMIN'
+  const isTeacher = session?.user?.role === 'TEACHER'
+
+  const [students, setStudents] = useState<StudentData[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedRole, setSelectedRole] = useState<string>('ALL') 
+  const [selectedRole, setSelectedRole] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<'createdAt' | 'id'>('createdAt')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  
+
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [total, setTotal] = useState(0)
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({})
 
+  const [courses, setCourses] = useState<{ id: number; name_lop: string }[]>([])
+  const [selectedCourseId, setSelectedCourseId] = useState<number | undefined>(undefined)
+
+  useEffect(() => {
+    if (isTeacher) {
+      getAdminCoursesAction().then(res => {
+        if (res.success) setCourses((res.courses || []).map((c: any) => ({ id: c.id, name_lop: c.name_lop })))
+      })
+    }
+  }, [isTeacher])
+
   const fetchStudents = useCallback(async (pageNum: number = 0) => {
     setLoading(true)
-    const res = await getStudentsAction(searchQuery, selectedRole as any, pageNum, PAGE_SIZE, sortBy, sortOrder)
-    if (res.success) {
-      setStudents(res.students || [])
-      setTotal(res.total || 0)
-      setTotalPages(res.totalPages || 0)
-      setPage(pageNum)
-      if (res.roleCounts) {
-        setRoleCounts(res.roleCounts)
+    setError(null)
+    try {
+      const res = await getStudentsAction(searchQuery, selectedRole as any, pageNum, PAGE_SIZE, sortBy, sortOrder, selectedCourseId)
+      if (res.success) {
+        setStudents(res.students || [])
+        setTotal(res.total || 0)
+        setTotalPages(res.totalPages || 0)
+        setPage(pageNum)
+        if (res.roleCounts) setRoleCounts(res.roleCounts)
+      } else {
+        setError(res.error || 'Có lỗi xảy ra')
       }
+    } catch {
+      setError('Lỗi kết nối đến máy chủ')
     }
     setLoading(false)
-  }, [searchQuery, selectedRole, sortBy, sortOrder])
+  }, [searchQuery, selectedRole, sortBy, sortOrder, selectedCourseId])
+
+  const isFirstRender = useRef(true)
 
   useEffect(() => {
     fetchStudents(0)
-  }, [fetchStudents])
+  }, [])
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    fetchStudents(0)
+  }, [searchQuery, selectedRole, sortBy, sortOrder, selectedCourseId])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchStudents(0)
   }
 
+  const clearSearch = () => {
+    setSearchQuery('')
+    fetchStudents(0)
+  }
+
   const handleRoleChange = (role: string) => {
     setSelectedRole(role)
-    fetchStudents(0)
   }
 
   const toggleSort = () => {
@@ -97,52 +150,82 @@ export default function ToolsStudentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-    <MainHeader title="THÀNH VIÊN" toolSlug="students" />
+      <MainHeader title="THÀNH VIÊN" toolSlug="students" />
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {total > 0 ? `${startItem}-${endItem} / ${total}` : '0'}
       </div>
 
       <div className="sticky top-16 z-40 bg-white border-b shadow-sm">
         <div className="p-4 space-y-3">
-          <div className="flex gap-2">
-            {Object.entries(roleConfig).map(([key, config]) => {
-              const Icon = config.icon
-              const isSelected = selectedRole === key
-              const count = roleCounts[key] ?? 0
-              return (
-                <button
-                  key={key}
-                  onClick={() => handleRoleChange(key)}
-                  className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl transition-all border-2 ${
-                    isSelected 
-                      ? `${config.bgColor} ${config.textColor} shadow-lg ring-2 ring-yellow-400 ring-offset-1 border-yellow-400` 
-                      : `${config.bgColor} ${config.textColor} border-transparent hover:shadow-md`
-                  }`}
+          {isAdmin ? (
+            <div className="flex gap-2">
+              {Object.entries(roleConfig).map(([key, config]) => {
+                const Icon = config.icon
+                const isSelected = selectedRole === key
+                const count = roleCounts[key] ?? 0
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleRoleChange(key)}
+                    className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl transition-all border-2 ${
+                      isSelected
+                        ? `${config.bgColor} ${config.textColor} shadow-lg ring-2 ring-yellow-400 ring-offset-1 border-yellow-400`
+                        : `${config.bgColor} ${config.textColor} border-transparent hover:shadow-md`
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="text-[9px] font-black uppercase tracking-tight leading-tight">{config.label}</span>
+                    <span className="text-[10px] font-bold">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <div className="flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl bg-gray-100 text-gray-600 border-2 border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 shadow-lg">
+                <GraduationCap className="w-4 h-4" />
+                <span className="text-[9px] font-black uppercase tracking-tight leading-tight">Học viên</span>
+                <span className="text-[10px] font-bold">{roleCounts['ALL'] ?? 0}</span>
+              </div>
+
+              {courses.length > 0 && (
+                <select
+                  value={selectedCourseId ?? ''}
+                  onChange={(e) => setSelectedCourseId(e.target.value ? Number(e.target.value) : undefined)}
+                  className="flex-1 px-2 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-[9px] font-black uppercase tracking-tight leading-tight">{config.label}</span>
-                  <span className="text-[10px] font-bold">{count}</span>
-                </button>
-              )
-            })}
-          </div>
+                  <option value="">Tất cả các khóa</option>
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.name_lop}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2">
             <form onSubmit={handleSearch} className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <button type="submit" className="absolute left-3 top-1/2 -translate-y-1/2">
+                <Search className="w-4 h-4 text-gray-400" />
+              </button>
               <input
                 type="text"
                 placeholder="Tìm Tên, SĐT, Email..."
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                className="w-full pl-10 pr-8 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searchQuery && (
+                <button type="button" onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
             </form>
             <button
               onClick={toggleSort}
               className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs transition-all ${
-                sortOrder === 'desc' 
-                  ? 'bg-black text-yellow-400' 
+                sortOrder === 'desc'
+                  ? 'bg-black text-yellow-400'
                   : 'bg-gray-100 text-gray-600'
               }`}
             >
@@ -152,6 +235,12 @@ export default function ToolsStudentsPage() {
           </div>
         </div>
       </div>
+
+      {error && (
+        <div className="mx-4 mt-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       <div className="flex-1 p-4 pb-8">
         {loading ? (
@@ -174,7 +263,7 @@ export default function ToolsStudentsPage() {
               const displayRole = isCoach ? 'COURSE_86_DAYS' : student.role
               const bgColor = roleCardColors[displayRole] || 'bg-gray-100'
               const textColor = roleTextColors[displayRole] || 'text-gray-900'
-              
+
               return (
                 <Link
                   key={student.id}
@@ -206,12 +295,12 @@ export default function ToolsStudentsPage() {
                       <h3 className={`font-bold text-base truncate ${isCoach ? 'text-purple-600' : textColor}`}>
                         {student.name || 'Chưa có tên'}
                       </h3>
-                      
+
                       <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500">
                         <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                         <span className="truncate">{student.email}</span>
                       </div>
-                      
+
                       <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
                         <Phone className="w-4 h-4 text-gray-400 shrink-0" />
                         <span>{student.phone || 'Chưa có SĐT'}</span>
