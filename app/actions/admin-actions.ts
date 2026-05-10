@@ -524,34 +524,92 @@ export async function getUserSystemsAction() {
     } catch { return { success: false, error: "Lỗi DB" } }
 }
 
-export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc') {
+export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc', courseId?: number) {
     try {
-        await checkAdmin()
-        let where: any = {};
-        if (role === 'COURSE_86_DAYS') where.enrollments = { some: { courseId: 1 } };
-        else if (role && role !== 'ALL') where.role = role;
-        if (query) {
-            const trimmedQuery = query.trim();
-            if (trimmedQuery.startsWith('#')) {
-                const id = parseInt(trimmedQuery.substring(1));
-                if (!isNaN(id)) where.id = id;
-            } else if (/^\d+$/.test(trimmedQuery)) {
-                const id = parseInt(trimmedQuery);
-                where.OR = [{ id }, { name: { contains: trimmedQuery, mode: 'insensitive' } }, { email: { contains: trimmedQuery, mode: 'insensitive' } }];
-            } else {
-                where.OR = [{ name: { contains: trimmedQuery, mode: 'insensitive' } }, { email: { contains: trimmedQuery, mode: 'insensitive' } }, { phone: { contains: trimmedQuery, mode: 'insensitive' } }];
+        const session = await auth()
+        if (!session?.user?.id) throw new Error("Unauthorized")
+
+        const userId = parseInt(session.user.id)
+        const isAdmin = session.user.role === Role.ADMIN
+        const isTeacher = session.user.role === Role.TEACHER
+
+        if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+
+        let where: any = {}
+        let scopeWhere: any = {}
+
+        if (isTeacher) {
+            const enrollFilter: any = { course: { teacherId: userId } }
+            if (courseId) enrollFilter.courseId = courseId
+            where.enrollments = { some: enrollFilter }
+            where.role = Role.STUDENT
+
+            scopeWhere.enrollments = { some: { course: { teacherId: userId } } }
+            scopeWhere.role = Role.STUDENT
+        }
+
+        if (isAdmin) {
+            if (role === 'COURSE_86_DAYS') {
+                where.enrollments = { some: { courseId: 1 } }
+            } else if (role && role !== 'ALL') {
+                where.role = role
             }
         }
-        const skip = page * limit;
+
+        if (query) {
+            const trimmedQuery = query.trim()
+            if (trimmedQuery.startsWith('#')) {
+                const id = parseInt(trimmedQuery.substring(1))
+                if (!isNaN(id)) where.id = id
+            } else if (/^\d+$/.test(trimmedQuery)) {
+                const id = parseInt(trimmedQuery)
+                where.OR = [
+                    { id },
+                    { name: { contains: trimmedQuery, mode: 'insensitive' } },
+                    { email: { contains: trimmedQuery, mode: 'insensitive' } }
+                ]
+            } else {
+                where.OR = [
+                    { name: { contains: trimmedQuery, mode: 'insensitive' } },
+                    { email: { contains: trimmedQuery, mode: 'insensitive' } },
+                    { phone: { contains: trimmedQuery, mode: 'insensitive' } }
+                ]
+            }
+        }
+
+        const skip = page * limit
+
         const [students, total, rawRoleCounts] = await Promise.all([
-            prisma.user.findMany({ where, include: { enrollments: { include: { course: { select: { name_lop: true } }, _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } } } } }, orderBy: { [sortBy]: sortOrder }, take: limit, skip }),
+            prisma.user.findMany({
+                where,
+                include: {
+                    enrollments: {
+                        include: {
+                            course: { select: { name_lop: true } },
+                            _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
+                        }
+                    }
+                },
+                orderBy: { [sortBy]: sortOrder },
+                take: limit,
+                skip
+            }),
             prisma.user.count({ where }),
-            prisma.user.groupBy({ by: ['role'], _count: { id: true } })
+            isAdmin
+                ? prisma.user.groupBy({ by: ['role'], _count: { id: true } })
+                : prisma.user.groupBy({ by: ['role'], _count: { id: true }, where: scopeWhere })
         ])
+
         const roleCounts: Record<string, number> = {}
         rawRoleCounts.forEach((rc: any) => { roleCounts[rc.role] = rc._count.id })
-        roleCounts['ALL'] = await prisma.user.count()
-        roleCounts['COURSE_86_DAYS'] = await prisma.enrollment.count({ where: { courseId: 1 } })
+
+        if (isAdmin) {
+            roleCounts['ALL'] = await prisma.user.count()
+            roleCounts['COURSE_86_DAYS'] = await prisma.enrollment.count({ where: { courseId: 1 } })
+        } else {
+            roleCounts['ALL'] = await prisma.user.count({ where: scopeWhere })
+        }
+
         const totalPages = Math.ceil(total / limit)
         return { success: true, students, total, page, totalPages, roleCounts }
     } catch (error: any) { return { success: false, error: error.message } }
@@ -809,4 +867,38 @@ export async function deleteLessonAction(lessonId: string) {
         console.error("Delete Lesson Error:", error)
         return { success: false, error: error.message }
     }
+}
+
+export async function getStudentDetailAction(studentId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) throw new Error("Unauthorized")
+
+        const userId = parseInt(session.user.id)
+        const isAdmin = session.user.role === Role.ADMIN
+        const isTeacher = session.user.role === Role.TEACHER
+        if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+
+        const user = await prisma.user.findUnique({
+            where: { id: studentId },
+            select: {
+                id: true, name: true, email: true, phone: true,
+                image: true, role: true, createdAt: true,
+                enrollments: {
+                    include: {
+                        course: { select: { name_lop: true, teacherId: true } },
+                        _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
+                    }
+                }
+            }
+        })
+        if (!user) return { success: false, error: "Không tìm thấy học viên" }
+
+        if (isTeacher) {
+            const hasAccess = user.enrollments.some(e => e.course.teacherId === userId)
+            if (!hasAccess) throw new Error("Forbidden")
+        }
+
+        return { success: true, user }
+    } catch (error: any) { return { success: false, error: error.message } }
 }
