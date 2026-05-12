@@ -26,7 +26,8 @@ export async function enrollInCourseAction(courseId: number) {
                 name_stk: true,
                 bank_stk: true,
                 noidung_email: true,
-                type: true
+                type: true,
+                teacherId: true
             }
         })
 
@@ -35,7 +36,7 @@ export async function enrollInCourseAction(courseId: number) {
         // Lấy thông tin user
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, name: true, phone: true, email: true }
+            select: { id: true, name: true, phone: true, email: true, referrerId: true }
         })
 
         // Xử lý riêng cho loại khóa học LIB
@@ -78,6 +79,12 @@ export async function enrollInCourseAction(courseId: number) {
                 status: isAutoActive ? "ACTIVE" : "PENDING"
             }
         })
+
+        // Auto-sync vào hệ thống YTB (onSystem=3) nếu là khóa của teacher 327
+        if (course.teacherId === 327) {
+            const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
+            await syncUserToYtbSystem(userId, course.teacherId)
+        }
 
         const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
 

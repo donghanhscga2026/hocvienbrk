@@ -19,14 +19,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Node not in this system' }, { status: 400 })
     }
 
-    // Không cho phép xóa F0 (root) - refSysId = 0
-    if (nodeRecord.refSysId === 0) {
+    // Kiểm tra xem node có phải là root thực sự không (không có node cha nào phía trên)
+    const hasParent = await prisma.systemClosure.findFirst({
+      where: { descendantId: nodeRecord.autoId, systemId: onSystem, depth: { gt: 0 } }
+    })
+
+    // Không cho phép xóa F0 (root) - node không có cha
+    if (!hasParent) {
       return NextResponse.json({ error: 'Không thể xóa F0 (root)' }, { status: 400 })
     }
 
     // Kiểm tra xem node có con không (chỉ xóa node không có con)
+    // SỬA: refSysId lưu userId của cha, không phải autoId
     const hasChildren = await prisma.system.findFirst({
-      where: { refSysId: nodeRecord.autoId, onSystem }
+      where: { refSysId: nodeRecord.userId, onSystem }
     })
 
     if (hasChildren) {

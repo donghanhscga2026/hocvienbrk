@@ -316,7 +316,7 @@ export default function Zero2HeroSurvey({ session, survey, onComplete }: { sessi
                             return (
                                 <div key={`${id}-${idx}`} className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-bold text-brk-on-surface animate-in slide-in-from-left duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
                                     <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-brk-primary-25 flex items-center justify-center text-brk-primary text-[9px] sm:text-[10px] font-black">{idx + 1}</div>
-                                    <span className="truncate">{c?.name_lop || `Chặng ${idx + 1}`}</span>
+                                    <span>{c?.name_lop || `Chặng ${idx + 1}`}</span>
                                 </div>
                             )
                         })}

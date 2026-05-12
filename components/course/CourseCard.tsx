@@ -144,7 +144,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                     {/* Title */}
                     <div className="mb-3 flex items-center gap-2.5">
                         <span className="text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
-                        <h3 className="text-base sm:text-lg font-black leading-tight truncate flex-1 text-brk-on-surface"
+                        <h3 className="text-base sm:text-lg font-black leading-tight flex-1 text-brk-on-surface"
                             style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
                             {course.name_lop}
                         </h3>

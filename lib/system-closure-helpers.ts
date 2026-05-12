@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma'
 
-// THEM 1 USER VAO SYSTEM CLOSURE
+// ADD 1 USER TO SYSTEM CLOSURE
 export async function addUserToSystemClosure(
     userId: number,
     refSysId: number,
@@ -31,21 +31,21 @@ export async function addUserToSystemClosure(
 
     const { autoId } = systemRecord
 
-    // 2. Chen closure cho chinh user do (ancestor = descendant = autoId, depth = 0)
+    // 2. Insert closure for user itself (ancestor = descendant = autoId, depth = 0)
     await prisma.systemClosure.upsert({
         where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } },
         update: { depth: 0 },
         create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
     }).catch(() => { }) // Ignore if exists
 
-    // 3. Neu co upline (refSysId > 0), copy tat ca closure cua upline va cap nhat depth
-    if (refSysId > 0) {
+    // 3. If upline exists (refSysId >= 0), copy all upline closures and update depth
+    if (refSysId >= 0) {
         const uplineSystem = await prisma.system.findFirst({
             where: { userId: refSysId, onSystem: systemId }
         })
 
         if (uplineSystem) {
-            // Lấy TẤT CẢ ancestors của upline (từ root đến upline)
+            // Get ALL ancestors of upline (from root to upline)
             const ancestors = await prisma.systemClosure.findMany({
                 where: {
                     systemId,
@@ -54,7 +54,7 @@ export async function addUserToSystemClosure(
                 orderBy: { depth: 'desc' }
             })
 
-            // Tạo closure cho user - copy từ mỗi ancestor + 1 depth
+            // Create closures for user - copy from each ancestor + 1 depth
             for (const ancestor of ancestors) {
                 await prisma.systemClosure.create({
                     data: {
@@ -69,7 +69,7 @@ export async function addUserToSystemClosure(
     }
 }
 
-// KIEM TRA USER CO THUOC HE THONG KHONG
+// CHECK IF USER BELONGS TO SYSTEM
 export async function checkUserInSystem(
     userId: number,
     systemId: number
@@ -88,21 +88,21 @@ export async function checkUserInSystem(
     }
 }
 
-// LAY ROOT CUA HE THONG
+// GET SYSTEM ROOT
 export async function getSystemRoot(systemId: number): Promise<number | null> {
-    // Tim user co refSysId = 0 trong he thong
+    // Find user with refSysId = 0 in system
     const rootSystem = await prisma.system.findFirst({
         where: { onSystem: systemId, refSysId: 0 }
     })
     return rootSystem?.userId || null
 }
 
-// TAO SYSTEM CLOSURE TU SHEET DATA
+// BUILD SYSTEM CLOSURE FROM SHEET DATA
 export async function buildSystemClosuresFromData(
     data: { userId: number; refSysId: number }[],
     systemId: number
 ): Promise<{ systemCount: number; closureCount: number }> {
-    // 1. Xoa closure cu cua system nay
+    // 1. Delete old closures for this system
     await prisma.systemClosure.deleteMany({ where: { systemId } })
 
     // 2. Create/Update System records
@@ -124,23 +124,23 @@ export async function buildSystemClosuresFromData(
         systemRecords.set(row.userId, record.autoId)
     }
 
-    // 3. Tao closure cho tung user
+    // 3. Create closures for each user
     let closureCount = 0
     for (const row of data) {
         const autoId = systemRecords.get(row.userId)
         if (!autoId) continue
 
-        // Closure cho chinh minh
+        // Self closure
         await prisma.systemClosure.create({
             data: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
         }).catch(() => { })
         closureCount++
 
-        // Neu co upline, copy closures tu upline (tất cả ancestors)
+        // If upline exists, copy closures from upline (all ancestors)
         if (row.refSysId > 0) {
             const uplineAutoId = systemRecords.get(row.refSysId)
             if (uplineAutoId) {
-                // Lấy TẤT CẢ ancestors của upline (từ root đến upline)
+                // Get ALL ancestors of upline
                 const ancestors = await prisma.systemClosure.findMany({
                     where: { systemId, descendantId: uplineAutoId },
                     orderBy: { depth: 'desc' }
@@ -162,4 +162,83 @@ export async function buildSystemClosuresFromData(
     }
 
     return { systemCount: systemRecords.size, closureCount }
+}
+
+// ENSURE ALL ANCESTORS ARE IN SYSTEM
+export async function ensureAncestorsInSystem(userId: number, systemId: number): Promise<void> {
+    const chain: number[] = []
+    let currentId = userId
+    let depth = 0
+
+    while (currentId && depth < 50) {
+        const existingSystem = await prisma.system.findFirst({
+            where: { userId: currentId, onSystem: systemId }
+        })
+        if (existingSystem) break
+
+        chain.push(currentId)
+        const user = await prisma.user.findUnique({
+            where: { id: currentId },
+            select: { referrerId: true }
+        })
+        if (!user || !user.referrerId) break
+
+        currentId = user.referrerId
+        depth++
+    }
+
+    // Add from farthest ancestor -> nearest
+    chain.reverse()
+    for (const id of chain) {
+        const user = await prisma.user.findUnique({
+            where: { id },
+            select: { id: true, referrerId: true }
+        })
+        if (!user) continue
+        await addUserToSystemClosure(user.id, user.referrerId || 0, systemId)
+    }
+}
+
+// FIND NEAREST REFERRER IN SYSTEM
+export async function resolveSystemReferrer(
+    userId: number,
+    systemId: number,
+    defaultRoot: number = 922
+): Promise<number> {
+    let currentId = userId
+    let depth = 0
+
+    while (currentId && depth < 50) {
+        const existingSystem = await prisma.system.findFirst({
+            where: { userId: currentId, onSystem: systemId }
+        })
+        if (existingSystem && currentId !== defaultRoot) return currentId
+
+        const user = await prisma.user.findUnique({
+            where: { id: currentId },
+            select: { referrerId: true }
+        })
+        if (!user || !user.referrerId) break
+
+        currentId = user.referrerId
+        depth++
+    }
+
+    return 0
+}
+
+/**
+ * Sync user to YTB system (onSystem=3)
+ */
+export async function syncUserToYtbSystem(userId: number, teacherId: number): Promise<void> {
+    if (teacherId !== 327) return
+
+    try {
+        const systemId = 3
+        const refSysId = await resolveSystemReferrer(userId, systemId)
+        await addUserToSystemClosure(userId, refSysId, systemId)
+        console.log(`[Sync-YTB] Synced user #${userId} to system #3 (refSysId=${refSysId})`)
+    } catch (error) {
+        console.error(`[Sync-YTB] Error syncing user #${userId}:`, error)
+    }
 }

@@ -193,7 +193,7 @@ function CreateCourseContent() {
         
         if (isEditMode && courseId) {
             // ✅ EDIT MODE: Gọi updateCourseAction (THÊM MỚI)
-            const res = await updateCourseAction(parseInt(courseId), {
+            const updateData: any = {
                 id_khoa: idKhoa,
                 name_lop: nameLop,
                 name_khoa: nameKhoa || null,
@@ -202,7 +202,6 @@ function CreateCourseContent() {
                 status,
                 pin,
                 date_join: dateJoin || null,
-                teacherId: (isAdmin && teacherId) ? parseInt(teacherId) : null,
                 mo_ta_ngan: moTaNgan || null,
                 mo_ta_dai: moTaDai || null,
                 link_anh_bia: linkAnhBia || null,
@@ -215,7 +214,14 @@ function CreateCourseContent() {
                 link_zalo: linkZalo || null,
                 file_email: fileEmail || null,
                 noidung_email: noidungEmail || null,
-            })
+            }
+
+            // CHỈ cho phép Admin thay đổi Giáo viên
+            if (isAdmin) {
+                updateData.teacherId = teacherId ? parseInt(teacherId) : null
+            }
+
+            const res = await updateCourseAction(parseInt(courseId), updateData)
             
             if (res.success) {
                 setMessage({ type: 'success', text: 'Đã cập nhật khóa học thành công!' })
