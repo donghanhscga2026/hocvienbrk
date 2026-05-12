@@ -175,8 +175,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         e.preventDefault()
         setSaving(true)
         setMessage(null)
-        // ✅ Send all 21 fields to updateCourseAction
-        const res = await updateCourseAction(parseInt(id), {
+        // ✅ Send all fields to updateCourseAction
+        const updateData: any = {
             id_khoa: idKhoa,
             name_lop: nameLop,
             name_khoa: nameKhoa || null,
@@ -185,7 +185,6 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             status,
             pin,
             date_join: dateJoin || null,
-            teacherId: (isAdmin && teacherId) ? teacherId : null,
             mo_ta_ngan: moTaNgan || null,
             mo_ta_dai: moTaDai || null,
             link_anh_bia: linkAnhBia || null,
@@ -198,7 +197,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             link_zalo: linkZalo || null,
             file_email: fileEmail || null,
             noidung_email: noidungEmail || null,
-        })
+        }
+
+        // CHỈ cho phép Admin thay đổi Giáo viên
+        if (isAdmin) {
+            updateData.teacherId = teacherId ? parseInt(teacherId as any) : null
+        }
+
+        const res = await updateCourseAction(parseInt(id), updateData)
         if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học (21 trường)!' })
         else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
         setSaving(false)

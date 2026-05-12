@@ -60,12 +60,30 @@ async function getUserSystemInfo(userId: number): Promise<{ onSystem: number | n
 // Helper: Lay root cua he thong
 async function getSystemRootUser(systemId: number): Promise<{ id: number; name: string | null } | null> {
     try {
-        const rootSystem = await prisma.system.findFirst({
+        // Tìm các node có refSysId = 0
+        const potentialRoots = await prisma.system.findMany({
             where: { onSystem: systemId, refSysId: 0 }
         })
-        if (!rootSystem) return null
+
+        if (potentialRoots.length === 0) return null
+
+        // Trong số các node đó, tìm node thực sự không có cha trong closure table
+        for (const sys of potentialRoots) {
+            const hasParent = await prisma.systemClosure.findFirst({
+                where: { descendantId: sys.autoId, systemId: systemId, depth: { gt: 0 } }
+            })
+            if (!hasParent) {
+                const user = await prisma.user.findUnique({
+                    where: { id: sys.userId },
+                    select: { id: true, name: true, image: true }
+                })
+                if (user) return user
+            }
+        }
+        
+        // Fallback: nếu không tìm thấy node nào thỏa mãn, lấy node đầu tiên
         const user = await prisma.user.findUnique({
-            where: { id: rootSystem.userId },
+            where: { id: potentialRoots[0].userId },
             select: { id: true, name: true, image: true }
         })
         return user
@@ -434,10 +452,11 @@ export async function getSystemTreeAction(systemId: number) {
             select: { chuc_danh: true }
         })
         const isC5 = userTca?.chuc_danh === 'C5'
+        const isYtbAdmin = systemId === 3 && (userId === 327 || userId === 330)
         
         const systemInfo = await getUserSystemInfo(userId)
-        if (!systemInfo || systemInfo.onSystem !== systemId || isC5 || isRootAdmin) {
-            if (isRootAdmin || isC5) {
+        if (!systemInfo || systemInfo.onSystem !== systemId || isC5 || isRootAdmin || isYtbAdmin) {
+            if (isRootAdmin || isC5 || isYtbAdmin) {
                 const root = await getSystemRootUser(systemId)
                 if (root) rootUserId = root.id
                 else if (!isRootAdmin) return { success: false, error: "Hệ thống chưa có dữ liệu" }
@@ -671,6 +690,11 @@ export async function getCurrentUserRoleAction(systemId?: number) {
                 })
                 if (tca?.chuc_danh === 'C5') isC5 = true
             }
+
+            // Check if is YTB admin (users 327, 330 — full access to YTB system)
+            if (systemId === 3 && (userId === 327 || userId === 330)) {
+                isActualSystemRoot = true
+            }
         }
 
         return { 
@@ -806,13 +830,36 @@ export async function updateCourseAction(courseId: number, data: {
     file_email?: string | null,
     teacherId?: number | null
 }) {
-    await checkAdmin()
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+    
     try {
+        // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
+        const course = await prisma.course.findUnique({ 
+            where: { id: courseId },
+            select: { teacherId: true }
+        })
+        
+        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
+        
+        // ✅ TEACHER chỉ được sửa course có teacherId = userId
+        if (!isAdmin && course.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền sửa khóa học này" }
+        }
+        
+        // ✅ Nếu không phải ADMIN, tuyệt đối không cho phép thay đổi teacherId
+        if (!isAdmin) {
+            delete data.teacherId
+        }
+
         const updatedCourse = await prisma.course.update({
             where: { id: courseId },
             data
         })
-        revalidatePath('/admin/courses')
+        revalidatePath('/tools/courses')
         revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
         return { success: true, course: updatedCourse }
     } catch (error: any) {
@@ -828,18 +875,31 @@ export async function updateLessonAction(lessonId: string, data: {
     order?: number,
     type?: any
 }) {
-    await checkAdmin()
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+
     try {
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            include: { course: { select: { teacherId: true, id_khoa: true } } }
+        })
+        
+        if (!lesson) return { success: false, error: "Không tìm thấy bài học" }
+        
+        // ✅ TEACHER chỉ được sửa bài học của khóa học mình dạy
+        if (!isAdmin && lesson.course.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền sửa bài học này" }
+        }
+
         const updatedLesson = await prisma.lesson.update({
             where: { id: lessonId },
             data
         })
-        // Revalidate các trang liên quan
-        const lesson = await prisma.lesson.findUnique({
-            where: { id: lessonId },
-            select: { course: { select: { id_khoa: true } } }
-        })
-        if (lesson?.course?.id_khoa) {
+
+        if (lesson.course.id_khoa) {
             revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
         }
         return { success: true, lesson: updatedLesson }
@@ -850,16 +910,30 @@ export async function updateLessonAction(lessonId: string, data: {
 }
 
 export async function deleteLessonAction(lessonId: string) {
-    await checkAdmin()
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    
+    const isAdmin = session.user.role === Role.ADMIN
+    const userId = parseInt(session.user.id)
+
     try {
         const lesson = await prisma.lesson.findUnique({
             where: { id: lessonId },
-            select: { course: { select: { id_khoa: true } } }
+            include: { course: { select: { teacherId: true, id_khoa: true } } }
         })
+        
+        if (!lesson) return { success: false, error: "Không tìm thấy bài học" }
+        
+        // ✅ TEACHER chỉ được xóa bài học của khóa học mình dạy
+        if (!isAdmin && lesson.course.teacherId !== userId) {
+            return { success: false, error: "Bạn không có quyền xóa bài học này" }
+        }
+
         await prisma.lesson.delete({
             where: { id: lessonId }
         })
-        if (lesson?.course?.id_khoa) {
+        
+        if (lesson.course.id_khoa) {
             revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
         }
         return { success: true }

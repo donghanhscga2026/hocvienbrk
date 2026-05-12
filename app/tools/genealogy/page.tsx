@@ -1187,15 +1187,18 @@ function GenealogyFlow() {
                 <span className="hidden sm:inline uppercase">Tạo cây</span>
               </button>
             ) : (
-              <button
-                onClick={() => setEditMode(!editMode)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black transition-all shadow-md ${editMode
-                  ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
-                  : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-100'
-                  }`}
-              >
-                {editMode ? 'HỦY' : 'SỬA'}
-              </button>
+              // v9.1.0: Chỉ hiện nút SỬA nếu không phải hệ thống Học viên (0) hoặc TCA (1)
+              selectedSystem !== 0 && selectedSystem !== 1 && (
+                <button
+                  onClick={() => setEditMode(!editMode)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black transition-all shadow-md ${editMode
+                    ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
+                    : 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-indigo-100'
+                    }`}
+                >
+                  {editMode ? 'HỦY' : 'SỬA'}
+                </button>
+              )
             )}
           </div>
 

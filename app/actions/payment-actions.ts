@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
+import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { processEnrollmentCommission } from "@/lib/affiliate/commission-calculator"
 
@@ -79,6 +80,13 @@ export async function verifyPaymentAction(
       return { success: false, error: "Unauthorized" }
     }
 
+    const userId = parseInt(session.user.id)
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+    if (!isAdmin && !isTeacher) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
       include: { course: true, payment: true }
@@ -86,6 +94,10 @@ export async function verifyPaymentAction(
 
     if (!enrollment) {
       return { success: false, error: "Enrollment not found" }
+    }
+
+    if (isTeacher && enrollment.course.teacherId !== userId) {
+      return { success: false, error: "Forbidden" }
     }
 
     if (enrollment.status === 'ACTIVE') {
@@ -107,6 +119,12 @@ export async function verifyPaymentAction(
         data: { status: 'ACTIVE' }
       })
     ])
+
+    // Auto-sync vào hệ thống YTB (onSystem=3) nếu là khóa của teacher 327
+    if (enrollment.course.teacherId === 327) {
+        const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
+        await syncUserToYtbSystem(enrollment.userId, enrollment.course.teacherId)
+    }
 
     // Xử lý affiliate commission cho người giới thiệu
     const commissionResult = await processEnrollmentCommission(
@@ -142,6 +160,13 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
       return { success: false, error: "Unauthorized" }
     }
 
+    const userId = parseInt(session.user.id)
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+    if (!isAdmin && !isTeacher) {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
       include: { course: true }
@@ -149,6 +174,10 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
 
     if (!enrollment) {
       return { success: false, error: "Enrollment not found" }
+    }
+
+    if (isTeacher && enrollment.course.teacherId !== userId) {
+      return { success: false, error: "Forbidden" }
     }
 
     const payment = await prisma.payment.update({
@@ -172,8 +201,21 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
 
 export async function getPendingPayments() {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const userId = parseInt(session.user.id)
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+    if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
+
+    const where: any = { status: 'PENDING' }
+    if (isTeacher) {
+      where.enrollment = { course: { teacherId: userId } }
+    }
+
     const payments = await prisma.payment.findMany({
-      where: { status: 'PENDING' },
+      where,
       include: {
         enrollment: {
           include: {
@@ -198,7 +240,21 @@ export async function getPendingPayments() {
 
 export async function getAllPayments() {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const userId = parseInt(session.user.id)
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+    if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
+
+    const where: any = {}
+    if (isTeacher) {
+      where.enrollment = { course: { teacherId: userId } }
+    }
+
     const payments = await prisma.payment.findMany({
+      where,
       include: {
         enrollment: {
           include: {
@@ -234,7 +290,7 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
     // Lấy enrollment info trước
     const enrollmentInfo = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true }
+      include: { user: true, course: { select: { teacherId: true } } }
     })
 
     const payment = await prisma.payment.update({
@@ -257,6 +313,12 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
       where: { id: enrollmentId },
       data: { status: 'ACTIVE' }
     })
+
+    // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327
+    if (enrollmentInfo?.course?.teacherId === 327) {
+      const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
+      await syncUserToYtbSystem(enrollmentInfo.userId, enrollmentInfo.course.teacherId)
+    }
 
     // Xử lý affiliate commission cho người giới thiệu
     if (enrollmentInfo) {

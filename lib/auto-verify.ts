@@ -105,6 +105,17 @@ export async function processPaymentEmails() {
           where: { id: enrollment.id },
           data: { status: 'ACTIVE' }
         });
+
+        // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327
+        const { syncUserToYtbSystem } = await import("./system-closure-helpers");
+        const course = await prisma.course.findUnique({
+          where: { id: enrollment.courseId },
+          select: { teacherId: true }
+        });
+        if (course?.teacherId === 327) {
+          await syncUserToYtbSystem(enrollment.userId, 327);
+        }
+
         await gmail.users.messages.modify({
           userId: 'me', id: msg.id || '',
           requestBody: { removeLabelIds: ['UNREAD'] }

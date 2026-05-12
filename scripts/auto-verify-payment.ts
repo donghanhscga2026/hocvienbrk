@@ -163,6 +163,68 @@ async function processBankEmails() {
           data: { status: 'ACTIVE' }
         })
 
+        // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327
+        if (enrollment.course.teacherId === 327) {
+          try {
+            // Import logic directly here since it's a script
+            const systemId = 3
+            const userId = enrollment.userId
+            
+            // Tìm refSysId
+            let currentId = userId
+            let depth = 0
+            let refSysId = 0
+            while (currentId && depth < 50) {
+                const existing = await prisma.system.findFirst({
+                    where: { userId: currentId, onSystem: systemId }
+                })
+                if (existing && currentId !== 922) {
+                    refSysId = currentId
+                    break
+                }
+                const user = await prisma.user.findUnique({
+                    where: { id: currentId },
+                    select: { referrerId: true }
+                })
+                if (!user || !user.referrerId) break
+                currentId = user.referrerId
+                depth++
+            }
+
+            // Add to system
+            const existingSys = await prisma.system.findFirst({ where: { userId, onSystem: systemId } })
+            let sysRec
+            if (existingSys) {
+                sysRec = await prisma.system.update({ where: { autoId: existingSys.autoId }, data: { refSysId } })
+            } else {
+                sysRec = await prisma.system.create({ data: { userId, onSystem: systemId, refSysId } })
+            }
+
+            // Self closure
+            await prisma.systemClosure.upsert({
+                where: { ancestorId_descendantId_systemId: { ancestorId: sysRec.autoId, descendantId: sysRec.autoId, systemId } },
+                update: { depth: 0 },
+                create: { ancestorId: sysRec.autoId, descendantId: sysRec.autoId, depth: 0, systemId }
+            }).catch(() => {})
+
+            // Ancestor closures
+            if (refSysId >= 0) {
+                const upline = await prisma.system.findFirst({ where: { userId: refSysId, onSystem: systemId } })
+                if (upline) {
+                    const ancestors = await prisma.systemClosure.findMany({ where: { systemId, descendantId: upline.autoId } })
+                    for (const anc of ancestors) {
+                        await prisma.systemClosure.create({
+                            data: { ancestorId: anc.ancestorId, descendantId: sysRec.autoId, depth: anc.depth + 1, systemId }
+                        }).catch(() => {})
+                    }
+                }
+            }
+            console.log(`   🔗 Đã đồng bộ #${userId} vào hệ thống YTB (refSysId=${refSysId})`)
+          } catch (syncErr) {
+            console.error(`   ❌ Lỗi đồng bộ YTB:`, syncErr)
+          }
+        }
+
         console.log(`   ✅ Đã kích hoạt khóa học!`)
         
         // Đánh dấu đã đọc
