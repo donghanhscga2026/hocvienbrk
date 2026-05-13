@@ -1165,3 +1165,34 @@ Sửa lỗi nhận diện nhầm node Root, cải thiện logic xóa node trong 
 - ✅ Học viên khóa teacher 327 tự động xuất hiện trong sơ đồ YTB ngay khi được kích hoạt.
 - ✅ Giao diện phả hệ an toàn hơn, ngăn chặn chỉnh sửa nhầm các hệ thống tự động.
 
+---
+
+## ✅ PHẦN 19: NÂNG CẤP SITE PROFILE THÀNH "CỘNG ĐỒNG" (COMMUNITY HUB) (2026-05-13)
+
+### Mục tiêu
+Nâng cấp tính năng Site Profile từ mô hình 1 người đại diện sang mô hình Cộng đồng (nhiều người đại diện), cho phép gộp khóa học và bài viết của chủ sở hữu và các cộng sự.
+
+### Các file đã sửa
+
+#### 1. `prisma/schema.prisma`
+- Thêm model `SiteProfileMember` để quản lý danh sách cộng sự.
+- Thêm relations vào model `User` và `SiteProfile`.
+- Đã chạy `npx prisma generate` và `npx prisma db push`.
+
+#### 2. `app/actions/site-profile-actions.ts`
+- Cập nhật `getSiteProfile`, `getDefaultProfile`, `getMySiteProfile`, `getSiteProfileAdmin`, `getSiteProfileAdminById` để include `members`.
+- Cập nhật `getCoursesForProfile` và `getPostsForProfile` để gộp (aggregate) dữ liệu từ Owner + Associates.
+- Thêm server actions `addProfileMember`, `removeProfileMember` để quản lý thành viên.
+
+#### 3. `components/admin/ProfileMemberManager.tsx` [NEW]
+- Thành phần UI dùng chung để quản lý danh sách cộng sự (thêm/xóa theo User ID).
+
+#### 4. `app/tools/site-profiles/[id]/edit/page.tsx` & `app/tools/my-site/edit/page.tsx`
+- Tích hợp `ProfileMemberManager` vào giao diện chỉnh sửa profile dành cho Admin và Teacher (Owner).
+
+### Trạng thái
+- ✅ Database đã sẵn sàng với bảng `SiteProfileMember`.
+- ✅ Các trang Community Profile (Public) hiển thị đầy đủ khóa học và bài viết của team cộng sự.
+- ✅ Admin và Chủ cộng đồng (Owner) có thể tự quản lý team cộng sự của mình (thêm/xóa thành viên).
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+
