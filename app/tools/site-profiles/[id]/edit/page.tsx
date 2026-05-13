@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react'
 import { Shield, AlertCircle } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { getSiteProfileAdminById, updateSiteProfile } from '@/app/actions/site-profile-actions'
+import ProfileMemberManager from '@/components/admin/ProfileMemberManager'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -518,6 +519,13 @@ export default function EditSiteProfilePage({ params }: PageProps) {
               )}
             </div>
           </section>
+
+          {/* Community Members */}
+          <ProfileMemberManager 
+            profileId={profileId} 
+            initialMembers={profile.members || []} 
+            onUpdate={loadProfile}
+          />
 
           {/* SEO */}
           <section className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle, Save, Image } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { getMySiteProfile, updateSiteProfile } from '@/app/actions/site-profile-actions'
+import ProfileMemberManager from '@/components/admin/ProfileMemberManager'
 
 interface Profile {
   id: number
@@ -355,6 +356,14 @@ export default function MySiteEditPage() {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <ProfileMemberManager 
+              profileId={profile.id} 
+              initialMembers={(profile as any).members || []} 
+              onUpdate={loadProfile}
+            />
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">

@@ -16,6 +16,9 @@ export async function getSiteProfile(slug: string) {
       where: { slug, isActive: true },
       include: {
         user: { select: { name: true, image: true } },
+        members: {
+          include: { user: { select: { id: true, name: true, image: true } } }
+        },
         theme: true,
         surveys: true,
         landingPages: {
@@ -42,6 +45,9 @@ export async function getSiteProfileAdmin(slug: string) {
       where: { slug },
       include: {
         user: { select: { name: true, image: true, email: true } },
+        members: {
+          include: { user: { select: { id: true, name: true, email: true, image: true } } }
+        },
         theme: true,
         surveys: true,
         landingPages: true,
@@ -65,6 +71,9 @@ export async function getSiteProfileAdminById(id: number) {
       where: { id },
       include: {
         user: { select: { name: true, image: true, email: true } },
+        members: {
+          include: { user: { select: { id: true, name: true, email: true, image: true } } }
+        },
         theme: true,
         surveys: true,
         landingPages: true,
@@ -87,6 +96,10 @@ export async function getMySiteProfile(userId: number) {
     return await prisma.siteProfile.findUnique({
       where: { userId },
       include: {
+        user: { select: { name: true, image: true, email: true } },
+        members: {
+          include: { user: { select: { id: true, name: true, email: true, image: true } } }
+        },
         theme: true,
         surveys: true,
         landingPages: true,
@@ -110,6 +123,9 @@ export async function getDefaultProfile() {
       where: { isDefault: true, isActive: true },
       include: {
         user: { select: { name: true, image: true } },
+        members: {
+          include: { user: { select: { id: true, name: true, image: true } } }
+        },
         theme: true,
         surveys: true,
         landingPages: {
@@ -161,10 +177,13 @@ export async function getCoursesForProfile(profile: any) {
       })
     }
 
-    // Nếu là Teacher → chỉ khóa của teacher đó
+    // Nếu là Teacher → khóa của teacher đó và các cộng sự
     if (profile.userId && profile.userId !== 0) {
+      const associateIds = profile.members?.map((m: any) => m.userId) || []
+      const allTeacherIds = [profile.userId, ...associateIds]
+
       return await prisma.course.findMany({
-        where: { teacherId: profile.userId, status: true },
+        where: { teacherId: { in: allTeacherIds }, status: true },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
     }
@@ -221,7 +240,9 @@ export async function getPostsForProfile(profile: any) {
     }
     
     if (profile.userId && profile.userId !== 0) {
-      where.authorId = profile.userId
+      const associateIds = profile.members?.map((m: any) => m.userId) || []
+      const allAuthorIds = [profile.userId, ...associateIds]
+      where.authorId = { in: allAuthorIds }
     }
     
     const limit = profile.communityLimit || 10
@@ -343,5 +364,61 @@ export async function incrementProfileView(slug: string) {
     })
   } catch {
     return null
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// MEMBER MANAGEMENT
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Thêm cộng sự vào profile
+ */
+export async function addProfileMember(profileId: number, userId: number, role: string = 'ASSOCIATE') {
+  try {
+    const profile = await prisma.siteProfile.findUnique({ where: { id: profileId } })
+    if (!profile) return { error: 'Không tìm thấy profile' }
+
+    if (profile.userId === userId) return { error: 'User này là chủ sở hữu profile' }
+
+    const member = await prisma.siteProfileMember.upsert({
+      where: { profileId_userId: { profileId, userId } },
+      create: { profileId, userId, role },
+      update: { role }
+    })
+
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath(`/tools/site-profiles/${profileId}/edit`)
+    revalidatePath(`/tools/my-site/edit`)
+    revalidatePath(`/${profile.slug}`)
+
+    return { success: true, member }
+  } catch (error) {
+    console.error("[DB ERROR] addProfileMember:", error)
+    return { error: 'Lỗi khi thêm thành viên' }
+  }
+}
+
+/**
+ * Xóa cộng sự khỏi profile
+ */
+export async function removeProfileMember(profileId: number, userId: number) {
+  try {
+    const profile = await prisma.siteProfile.findUnique({ where: { id: profileId } })
+    if (!profile) return { error: 'Không tìm thấy profile' }
+
+    await prisma.siteProfileMember.delete({
+      where: { profileId_userId: { profileId, userId } }
+    })
+
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath(`/tools/site-profiles/${profileId}/edit`)
+    revalidatePath(`/tools/my-site/edit`)
+    revalidatePath(`/${profile.slug}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("[DB ERROR] removeProfileMember:", error)
+    return { error: 'Lỗi khi xóa thành viên' }
   }
 }

@@ -50,6 +50,7 @@ model User {
   tcaMembers                   TCAMember[]
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
+  profileMemberships           SiteProfileMember[]
 
   @@index([email])
   @@index([phone])
@@ -1024,10 +1025,25 @@ model SiteProfile {
   theme                Theme?             @relation(fields: [themeId], references: [id])
   user                 User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   surveys              Survey[]
+  members              SiteProfileMember[]
 
   @@index([slug])
   @@index([userId])
   @@index([isActive])
+}
+
+model SiteProfileMember {
+  id        Int               @id @default(autoincrement())
+  profileId Int
+  userId    Int
+  role      String            @default("ASSOCIATE")
+  createdAt DateTime          @default(now())
+  profile   SiteProfile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, userId])
+  @@index([profileId])
+  @@index([userId])
 }
 
 model SyncLog {
