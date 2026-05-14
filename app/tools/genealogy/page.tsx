@@ -23,6 +23,7 @@ import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction
 import { Role } from '@prisma/client'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
+import GroupModal, { GroupMember } from '@/components/genealogy/GroupModal'
 
 // Constants cho tree layout
 const NODE_WIDTH = 200
@@ -410,7 +411,7 @@ function GenealogyFlow() {
     if (!showActiveOnly) return fullTree
     return filterToActiveTree(fullTree)
   }, [fullTree, showActiveOnly])
-  const [modalData, setModalData] = useState<{ users: any[], title: string, type: 'A' | 'B', totalSub: number } | null>(null)
+  const [modalData, setModalData] = useState<{ users: GroupMember[], type: 'A' | 'B', totalSub: number } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
   const lastExpandedIdRef = useRef<number | null>(null)
   const activeFocusMapRef = useRef<Map<number, number>>(new Map())
@@ -576,9 +577,10 @@ function GenealogyFlow() {
           onFocusSubtree: (id: number, name?: string | null) => {
             setFocusedNodeName(name || null)
             setFocusedSubtreeNode(parent)
+            pendingCenterNodeIdRef.current = null
             handleFocusSubtree(id, name)
           },
-          onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data, title: type === 'A' ? 'Nhóm F1 Trống (A)' : 'Nhóm F1 Cạn (B)', type, totalSub }),
+          onOpenGroup: (type: 'A' | 'B', data: any[], totalSub: number) => setModalData({ users: data as GroupMember[], type, totalSub }),
           onAddChild: (parentId: number) => setAddF1Modal({ parentId, show: true }),
           onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true }),
           onShowDetails: handleShowDetails,
@@ -654,15 +656,8 @@ function GenealogyFlow() {
         result = await getSystemChildrenAction(nodeId, selectedSystem)
       }
       if (result.success && result.tree) {
-        const subtreeRoot: GenealogyNode = {
-          ...result.tree,
-          isRoot: true,  // Đánh dấu là root của focus mode
-          name: result.tree.name || nodeName || null,
-        }
-        setFocusedSubtreeNode(subtreeRoot)
         setFocusedNodeName(nodeName || `#${nodeId}`)
-        pendingCenterNodeIdRef.current = null  // Reset center, sẽ dùng fitView
-        setFocusMapVersion(v => v + 1)
+        pendingCenterNodeIdRef.current = null
         console.log(`[FocusSubtree] Loaded subtree for #${nodeId}, children: ${result.tree.children?.length}`);
       } else {
         console.log(`[FocusSubtree] Failed:`, result.error)
@@ -1123,18 +1118,16 @@ function GenealogyFlow() {
             </button>
           )}
 
-          {/* Dropdown chế độ hiển thị */}
-          <div className="relative shrink-0">
-            <select
-              value={displayMode}
-              onChange={(e) => setDisplayMode(e.target.value as 'default' | 'full')}
-              className="appearance-none w-18 sm:w-20 bg-slate-50 text-slate-700 text-[11px] font-black px-3 py-2 pr-7 rounded-xl border border-slate-200 outline-none cursor-pointer hover:bg-white hover:border-indigo-300 transition-all"
-            >
-              <option value="default">GỌN</option>
-              <option value="full">FULL</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-          </div>
+          {/* Checkbox chế độ hiển thị Đầy đủ */}
+          <label className="flex items-center gap-2 cursor-pointer shrink-0 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-200 transition-all">
+            <input
+              type="checkbox"
+              checked={displayMode === 'full'}
+              onChange={(e) => setDisplayMode(e.target.checked ? 'full' : 'default')}
+              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter">Đầy đủ</span>
+          </label>
         </div>
 
         {/* --- NHÓM 2: BỘ LỌC & TÌM KIẾM --- */}
@@ -1343,83 +1336,15 @@ function GenealogyFlow() {
       </div>
 
       {modalData && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[180] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-4xl max-h-[80vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-180 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-black tracking-tight">{modalData.title}</h2>
-                <p className="text-sm text-slate-400 font-bold uppercase mt-1 tracking-widest">
-                  Gồm {modalData.users.length} F1 (Tổng: {modalData.totalSub} thành viên)
-                </p>
-              </div>
-              <button onClick={() => { setModalData(null); setExpandedF2Id(null); }} className="p-3 bg-slate-50 hover:bg-slate-180 rounded-2xl transition-colors"><X className="w-6 h-6 text-slate-400" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/30">
-              <div className="grid grid-cols-1 gap-2">
-                {modalData.users.map(u => (
-                  <div key={u.id} className="mb-1">
-                    <div
-                      onClick={() => { if (modalData.type === 'B') setExpandedF2Id(expandedF2Id === u.id ? null : u.id); }}
-                      className={`flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all border-2 ${expandedF2Id === u.id ? 'border-indigo-500 bg-indigo-50' : 'border-transparent hover:bg-white hover:shadow-sm'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-180 text-slate-500 flex items-center justify-center font-black text-xs">#{u.id}</div>
-                        <div><div className="text-sm font-black text-slate-900">{u.name || 'Học viên'}</div><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-emerald-600">TS: {u.totalSubCount}</div></div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {editMode && (
-                          <div className="flex gap-1">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setAddF1Modal({ parentId: u.id, show: true }); }}
-                              className="px-2 py-1 rounded bg-indigo-500 text-white text-[10px] font-bold hover:bg-indigo-600"
-                            >
-                              +F1
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setDeleteNodeModal({ nodeId: u.id, show: true }); }}
-                              className="px-2 py-1 rounded bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
-                            >
-                              X
-                            </button>
-                          </div>
-                        )}
-                        {modalData.type === 'B' && <ChevronDown className={`w-5 h-5 text-slate-300 transition-transform ${expandedF2Id === u.id ? 'rotate-180 text-sky-500' : ''}`} />}
-                      </div>
-                    </div>
-                    {expandedF2Id === u.id && modalData.type === 'B' && (
-                      <div className="p-2 pl-14 space-y-1 animate-in slide-in-from-top-2">
-                        {u.children?.map((f2: any) => (
-                          <div key={f2.id} className="p-3 bg-white border border-sky-180 rounded-2xl flex items-center justify-between shadow-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black text-sky-600">#{f2.id}</span>
-                              <span className="text-xs font-bold text-slate-600">{f2.name}</span>
-                            </div>
-                            {editMode && (
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setAddF1Modal({ parentId: f2.id, show: true }); }}
-                                  className="px-2 py-1 rounded bg-indigo-500 text-white text-[10px] font-bold hover:bg-indigo-600"
-                                >
-                                  +F1
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setDeleteNodeModal({ nodeId: f2.id, show: true }); }}
-                                  className="px-2 py-1 rounded bg-red-500 text-white text-[10px] font-bold hover:bg-red-600"
-                                >
-                                  X
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <GroupModal
+          users={modalData.users}
+          type={modalData.type}
+          totalSub={modalData.totalSub}
+          editMode={editMode}
+          onClose={() => { setModalData(null); setExpandedF2Id(null); }}
+          onAddChild={(parentId) => setAddF1Modal({ parentId, show: true })}
+          onDeleteNode={(nodeId) => setDeleteNodeModal({ nodeId, show: true })}
+        />
       )}
 
       <style jsx global>{`

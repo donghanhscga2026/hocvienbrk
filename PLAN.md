@@ -1196,3 +1196,49 @@ Nâng cấp tính năng Site Profile từ mô hình 1 người đại diện san
 - ✅ Admin và Chủ cộng đồng (Owner) có thể tự quản lý team cộng sự của mình (thêm/xóa thành viên).
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
 
+---
+
+## ✅ PHẦN 20: CẢI THIỆN MODAL GROUP A/B + GENEALOGY BUG FIXES (2026-05-14)
+
+### Mục tiêu
+1. Tách Modal Group A/B thành component riêng, thêm profile link và TCA data
+2. Fix `buildFullSubtree` không phân loại A/B/C — nút LÁ/CẠN không hiển thị
+3. Fix N nhánh tự co về 1 node — xóa `setFocusedSubtreeNode` thừa trong async handler
+4. Thay dropdown FULL/GỌN bằng checkbox "Đầy đủ"
+
+### Các file đã sửa
+
+#### 1. `components/genealogy/GroupModal.tsx` [NEW]
+- Modal Group A/B riêng biệt, nhận props có kiểu `GroupMember[]` thay `any[]`
+- Mỗi dòng hiển thị: avatar (`User` icon fallback), `#ID`, tên, `TS: N`
+- Badge: **Cấp X** (violet), **THÁI SƠN** (emerald), **C5/DHTT/C20** (màu tương ứng)
+- Nút **"👤 Hồ sơ"** → link `/tools/students/[id]` mở tab mới
+- Group B: expand F2 children, mỗi F2 cũng có badge cấp + link hồ sơ
+- Edit mode: giữ nguyên nút `+F1` và `X`
+- Giảm tải `page.tsx` 67 dòng (1683 → 1616)
+
+#### 2. `app/actions/admin-actions.ts` — `buildFullSubtree`
+- **Vấn đề**: Hàm hardcode `f1aCount: 0, f1bCount: 0, f1cCount: 0` — nút LÁ/CẠN/N nhánh không bao giờ hiển thị
+- **Fix**: Thêm vòng lặp phân loại grandchildren thành A (không F2), B (có F2 không F3), C (có F3+)
+- `groupA`/`groupB` chứa dữ liệu node LÁ/CẠN đầy đủ (level, score, groupName, chucDanh)
+- Giữ nguyên recursion cho tất cả children (không chỉ gC) → FULL mode không mất node
+
+#### 3. `app/tools/genealogy/page.tsx` — N nhánh collapse
+- **Vấn đề**: `onFocusSubtree` gọi `setFocusedSubtreeNode(parent)` (sync) + `handleFocusSubtree` lại gọi `setFocusedSubtreeNode(subtreeRoot)` (async) → API trả về dữ liệu forceFull=false (ít node hơn) ghi đè lên dữ liệu đúng → cây "tự co về 1 node"
+- **Fix**: Giữ sync `setFocusedSubtreeNode(parent)` để hiển thị ngay, **bỏ** `setFocusedSubtreeNode(subtreeRoot)` trong async handler (không ghi đè)
+
+#### 4. `app/tools/genealogy/page.tsx` — FULL/GỌN checkbox
+- Thay dropdown `<select>` bằng checkbox style đồng bộ với "Active"
+- Nhãn: **"ĐẦY ĐỦ"** — checked = FULL, unchecked = GỌN
+
+### Trạng thái
+- ✅ Modal Group A/B hiển thị avatar, TCA data, link profile
+- ✅ GỌN mode: nút LÁ/CẠN/N nhánh hiển thị đúng trên node có con cháu
+- ✅ Click LÁ/CẠN → mở GroupModal với dữ liệu đầy đủ
+- ✅ Click N nhánh → focus subtree không còn tự co về 1 node
+- ✅ Thoát focus → quay về cây gốc bình thường
+- ✅ Checkbox ĐẦY ĐỦ thay dropdown FULL/GỌN
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+- ✅ Backup trong `plan_temp/`: page_genealogy_backup_20260514.patch, page_genealogy_backup_v2_20260514.patch, admin-actions_backup_20260514.patch
+
+
