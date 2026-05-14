@@ -1241,4 +1241,64 @@ Nâng cấp tính năng Site Profile từ mô hình 1 người đại diện san
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
 - ✅ Backup trong `plan_temp/`: page_genealogy_backup_20260514.patch, page_genealogy_backup_v2_20260514.patch, admin-actions_backup_20260514.patch
 
+---
+
+## ✅ PHẦN 21: FIX USER MODE GENEALOGY TREE — F1 KHÔNG HIỂN THỊ (2026-05-15)
+
+### Mục tiêu
+Sửa lỗi cây "Hệ thống Học viên" (USER mode, systemId=0) chỉ hiển thị root admin dù có 407 F1s trong DB.
+
+### Vấn đề
+Commit `1f9bbd7` (7/5/2026, v8.7.1) thêm hàm `getUserFromRow` để chuẩn hóa code giữa USER và SYSTEM mode, nhưng áp dụng sai cho `f1Data` entries:
+
+```typescript
+// getUserFromRow: row.descendant — chỉ closure rows mới có property này
+const getUserFromRow = (row: any) => isSystem ? row.descendant?.user : row.descendant
+
+// f1Data được build từ direct user query — KHÔNG có .descendant
+f1Data = users.map(u => ({ ...u, autoId: u.id, user: u }))
+
+// Vòng lặp phân loại F1: getUserFromRow(f1) = undefined → skip hết 407 F1s
+for (const f1 of f1Data) {
+    const user = getUserFromRow(f1)  // undefined
+    if (!user) continue              // BOOM: skip ALL F1s
+}
+
+// Children mapping cũng bị lỗi tương tự
+const f1Record = f1Data.find(f => {
+    const u = getUserFromRow(f)      // undefined → không tìm thấy F1Record
+    return u?.id === f1Info.id
+})
+```
+
+**Không phát hiện kịp thời** vì SYSTEM mode (TCA/KTC) dùng `forceFull=true`, đi qua `buildFullSubtree()` — không dùng kết quả vòng lặp phân loại → cây TCA vẫn hiển thị đúng.
+
+### Các file đã sửa
+
+#### `app/actions/admin-actions.ts`
+- **Dòng 279**: `const user = getUserFromRow(f1)` → `const user = getUserFromRow(f1) || f1.user`
+- **Dòng 373**: `const u = getUserFromRow(f)` → `const u = getUserFromRow(f) || f.user`
+- **Cơ chế**: Fallback `f1.user` khi `getUserFromRow` trả về undefined (cho f1Data entries không có `.descendant`)
+
+### Tác động
+- `getUserFromRow` vẫn dùng cho closure rows (dòng 261) — không ảnh hưởng
+- Fallback `|| f1.user` chỉ kích hoạt khi `.descendant` undefined — đúng với f1Data entries
+- SYSTEM mode (forceFull=true) không bị ảnh hưởng
+
+### Dữ liệu kiểm tra
+| Nhóm | UI hiển thị | DB thực tế | Kết quả |
+|------|:-----------:|:----------:|:-------:|
+| LÁ (A) | 325 | 325 | ✅ |
+| CẠN (B) | 53 | 53 | ✅ |
+| Nhánh sâu (C) | 29 | 29 | ✅ |
+| Tổng F1 | 407 | 407 | ✅ |
+
+### Trạng thái
+- ✅ USER mode (systemId=0) hiển thị đủ 407 F1s
+- ✅ GỌN mode: 325 LÁ, 53 CẠN, 29 nhánh sâu
+- ✅ FULL mode qua checkbox không bị ảnh hưởng
+- ✅ SYSTEM mode (TCA/KTC) không bị ảnh hưởng
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi
+- ✅ Backup: `plan_temp/admin-actions_backup_fixUserFromRow_20260515.patch`
+
 

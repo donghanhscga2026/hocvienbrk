@@ -25,7 +25,7 @@ export async function addUserToClosure(userId: number, referrerId: number | null
         depth: 0
     })
     
-    if (referrerId !== null && referrerId !== 0) {
+    if (referrerId !== null) {
         const ancestorClosures = await prisma.userClosure.findMany({
             where: { descendantId: referrerId },
             select: { ancestorId: true, depth: true }
