@@ -323,13 +323,41 @@ async function buildStandardTree(
             const ancestorClosures = closureByAncestor.get(ancestorAutoId) || []
             const directChildren = ancestorClosures.filter(c => c.depth === 1)
             return directChildren.map(child => {
-                const grandchildren = child.autoId && child.autoId !== ancestorAutoId ? buildFullSubtree(child.autoId, maxDepth - 1) : []
+                const childClosures = closureByAncestor.get(child.autoId) || []
                 const tcaData = tcaMemberMap.get(child.userId) ?? tcaMemberMap.get(child.autoId)
+
+                let gA: any[] = [], gB: any[] = [], gC_count = 0
+                for (const gc of childClosures.filter(c => c.depth === 1)) {
+                    const gcClosures = closureByAncestor.get(gc.autoId) || []
+                    const hasF2 = gcClosures.some(c => c.depth === 1)
+                    const hasF3 = gcClosures.some(c => c.depth === 2)
+                    const gcTca = tcaMemberMap.get(gc.userId) ?? tcaMemberMap.get(gc.autoId)
+                    const gcData = {
+                        id: gc.userId, name: gc.name, image: gc.image,
+                        totalSubCount: gcClosures.length,
+                        level: gcTca?.level ?? null,
+                        personalScore: gcTca?.personalScore ?? null,
+                        totalScore: gcTca?.totalScore ?? null,
+                        groupName: gcTca?.groupName ?? null,
+                        chucDanh: gcTca?.chucDanh ?? null,
+                    }
+                    if (!hasF2) gA.push(gcData)
+                    else if (!hasF3) gB.push(gcData)
+                    else gC_count++
+                }
+
+                const grandchildren = child.autoId && child.autoId !== ancestorAutoId
+                    ? buildFullSubtree(child.autoId, maxDepth - 1)
+                    : []
+
                 return {
                     id: child.userId, name: child.name, image: child.image, referrerId: null,
-                    totalSubCount: (closureByAncestor.get(child.autoId) || []).length,
-                    f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                    groupA: [], groupB: [], children: grandchildren,
+                    totalSubCount: childClosures.length,
+                    f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC_count,
+                    groupATotalSub: gA.reduce((sum: number, n: any) => sum + n.totalSubCount, 0),
+                    groupBTotalSub: gB.reduce((sum: number, n: any) => sum + n.totalSubCount, 0),
+                    groupCTotalSub: grandchildren.reduce((sum: number, n: GenealogyNode) => sum + n.totalSubCount, 0),
+                    groupA: gA, groupB: gB, children: grandchildren,
                     level: tcaData?.level ?? null,
                     personalScore: tcaData?.personalScore ?? null,
                     totalScore: tcaData?.totalScore ?? null,
