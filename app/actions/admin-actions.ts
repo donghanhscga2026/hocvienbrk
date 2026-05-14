@@ -276,7 +276,7 @@ async function buildStandardTree(
         let groupATotalSub = 0, groupBTotalSub = 0, groupCTotalSub = 0
 
         for (const f1 of f1Data) {
-            const user = getUserFromRow(f1)
+            const user = getUserFromRow(f1) || f1.user
             if (!user) continue
 
             const closures = closureByAncestor.get(f1.autoId) || []
@@ -370,7 +370,7 @@ async function buildStandardTree(
 
         const children: GenealogyNode[] = groupC.map(f1Info => {
             const f1Record = f1Data.find(f => {
-                const u = getUserFromRow(f)
+                const u = getUserFromRow(f) || f.user
                 return u?.id === f1Info.id
             })
             if (!f1Record) return null as any
@@ -451,8 +451,7 @@ export async function getGenealogyTreeAction(rootId: number = 0) {
         let actualRootId = rootId
         if (rootId === 0) {
             if (isAdmin) {
-                const firstUser = await prisma.user.findFirst({ orderBy: { id: 'asc' }, select: { id: true } })
-                actualRootId = firstUser?.id || userId
+                actualRootId = 0
             } else actualRootId = userId
         }
         const tree = await buildStandardTree(actualRootId, 'USER')
