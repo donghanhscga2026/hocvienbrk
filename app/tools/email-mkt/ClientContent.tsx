@@ -146,11 +146,10 @@ function SendersTab() {
 
   return (
     <div className="space-y-4">
-      <Link href="/api/admin/auth/google">
-        <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-3 rounded-xl">
-          + Kết Nối Tài Khoản
-        </Button>
-      </Link>
+      <a href="/api/admin/auth/google"
+        className="block w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-3 rounded-xl text-center">
+        + Kết Nối Tài Khoản
+      </a>
 
       <Button 
         onClick={validateAllTokens}
