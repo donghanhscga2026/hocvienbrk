@@ -320,7 +320,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
           {campaign.status === 'DRAFT' && (
             <>
-              <Button onClick={handleSendBatch} disabled={sending || !campaign.totalRecipients}
+              <Button onClick={handleSendBatch} disabled={sending}
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
                 <Play className="w-4 h-4" /> {(campaign.sentCount || 0) > 0 ? 'Tiếp tục gửi' : 'Bắt đầu gửi'}
               </Button>
@@ -335,10 +335,16 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           )}
 
           {campaign.status === 'RUNNING' && (
-            <Button onClick={() => handleUpdateStatus('DRAFT')} disabled={sending}
-              className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-xl">
-              Tạm dừng
-            </Button>
+            <>
+              <Button onClick={handleSendBatch} disabled={sending}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+                <Play className="w-4 h-4" /> Gửi tiếp
+              </Button>
+              <Button onClick={() => handleUpdateStatus('DRAFT')} disabled={sending}
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-xl">
+                Tạm dừng
+              </Button>
+            </>
           )}
 
           {(campaign.status === 'COMPLETED' || campaign.status === 'FAILED') && (

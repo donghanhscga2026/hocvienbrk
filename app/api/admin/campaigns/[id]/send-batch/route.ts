@@ -61,6 +61,13 @@ export async function POST(
       return NextResponse.json({ success: true, finished: true });
     }
 
+    if (campaign.totalRecipients !== allRecipients.length) {
+      await prisma.emailCampaign.update({
+        where: { id: campaignId },
+        data: { totalRecipients: allRecipients.length }
+      });
+    }
+
     if (!campaignStats.has(campaignId)) {
       campaignStats.set(campaignId, { total: allRecipients.length, sent: 0, success: 0, failed: 0, emailsInBatch: 0 });
       
