@@ -59,7 +59,7 @@ export async function GET(req: Request) {
     });
 
     // Quay lại trang quản lý (trang này sẽ được tạo ở bước sau)
-    return NextResponse.redirect(new URL("/admin/email-senders", req.url));
+    return NextResponse.redirect(new URL("/tools/email-mkt", req.url));
 
   } catch (error: any) {
     console.error("OAuth Callback Error:", error);
