@@ -69,7 +69,13 @@ function CreateCampaignContent() {
 
   const handlePreviewSpin = () => {
     if (!htmlContent.trim()) return
-    setSpinPreviews(previewSpin(htmlContent, 3))
+    const raw = previewSpin(htmlContent, 3)
+    setSpinPreviews(raw.map(text => {
+      if (!text.includes('<p>') && !text.includes('<br')) {
+        return text.replace(/\n/g, '<br/>')
+      }
+      return text
+    }))
     setShowSpinPreview(true)
   }
 
