@@ -1342,4 +1342,61 @@ Fix hiện tượng nháy (flash) hiển thị cây cũ ở chế độ Full tro
 - ✅ `npx tsc --noEmit` — 0 lỗi
 - ✅ Backup: `plan_temp/genealogy_fix_displayMode_flash_20260515.patch`
 
+---
+
+## ✅ Fix Gọn/Full toggle cho TCA — forceFull động + chặn flash khi toggle ([2026-05-15])
+
+### Mục tiêu
+Khi xem TCA ở chế độ Gọn, cây phải chỉ hiển thị các F1 nhánh sâu (giống Học viên), ẩn các F1 nhóm LÁ/CẠN. Đồng thời không bị flash/nháy khi toggle giữa Gọn và Full.
+
+### Vấn đề gốc
+1. **`getSystemTreeAction` luôn hardcode `forceFull=true`** → tree luôn trả về tất cả nodes trong `children`, `groupA`/`groupB` rỗng → toggle Gọn/Full trên UI không có tác dụng vì data structure giống nhau
+2. **Flash khi toggle:** `setDisplayMode` trigger render với dữ liệu cũ + displayMode mới → Effect (dòng 943) chạy lại, generate nodes từ dữ liệu Full cũ → hiện F1 lá trong chốc lát → sau đó fetch xong mới ẩn đi
+
+### Các file đã sửa
+
+#### `app/actions/admin-actions.ts`
+- **Sửa**: Thêm tham số `forceFull: boolean = true` vào `getSystemTreeAction` (dòng 470), truyền xuống `buildStandardTree` thay vì hardcode `true`
+- **Backward compatible**: default `true` → không ảnh hưởng các chỗ gọi khác
+
+#### `app/tools/genealogy/page.tsx`
+- **Edit A** — Thêm `displayModeRef` (dòng 477-479): ref đồng bộ displayMode trên mỗi render, giải quyết stale closure
+- **Edit B** — Thêm `displayModeToggleRef` (dòng 480): cờ chặn effect khi đang fetch
+- **Edit C** — `initTree` (dòng 909-931): dùng `displayModeRef.current` thay closure, bỏ `displayMode` khỏi deps
+- **Edit D** — `handleSystemChange` (dòng 868): `getSystemTreeAction(systemId, intendedDisplayMode === 'full')`
+- **Edit E** — Toggle checkbox (dòng 1125-1134): sync ref → `setNodes([])` + `setEdges([])` → `initTree(0)`
+- **Edit F** — Effect render (dòng 943-946): check `displayModeToggleRef`, skip + clear nếu đang fetch
+
+### Logic chi tiết
+
+**Khi toggle Gọn/Full trên TCA:**
+1. `displayModeRef.current = newMode` (ref cập nhật ngay)
+2. `displayModeToggleRef.current = true` (chặn effect)
+3. `setNodes([])` → `nodes.length=0` + `setLoading(true)` → loading overlay hiện
+4. `initTree(0)` → đọc `displayModeRef.current` → `getSystemTreeAction(1, forceFull)`
+5. Effect chạy (displayMode thay đổi) → thấy toggleRef=true → set false → skip
+6. Fetch xong → setFullTree(data mới) → effect chạy lại với toggleRef=false → render tree đúng
+
+**Dữ liệu DB xác nhận (TCA, systemId=1):**
+| F1 | Nhóm | Closures |
+|---|---|---|
+| Nhung Phạm (327) | children (C) | 15 |
+| Thương Tuệ An (330) | children (C) | 13 |
+| MINH ĐỨC - LAN (862) | children (C) | 20 |
+| LÊ LÊ QUẢNG (873) | **groupA (LÁ)** | 1 |
+| NGUYỄN HỮU HẠNH (885) | children (C) | 4 |
+
+→ Gọn: hiện 4 F1, ẩn LÊ LÊ QUẢNG
+→ Full: hiện cả 5 F1
+
+### Trạng thái
+- ✅ `getSystemTreeAction` nhận `forceFull` động từ client
+- ✅ TCA Gọn: `forceFull=false` → groupA/groupB/children phân loại đúng, ẩn LÁ
+- ✅ TCA Full: `forceFull=true` → buildFullSubtree như cũ
+- ✅ Không flash khi toggle (loading overlay che cây cũ + effect skip)
+- ✅ Học viên toggle không bị ảnh hưởng
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ✅ Dev server chạy OK (`/tools/genealogy` 200)
+- ✅ Backup: `plan_temp/genealogy_backup_addForceFull_20260515.patch`, `plan_temp/genealogy_backup_toggleRefetch_20260515.patch`, `plan_temp/genealogy_backup_clearNodesOnToggle_20260515.patch`
+
 
