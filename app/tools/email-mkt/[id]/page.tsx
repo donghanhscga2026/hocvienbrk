@@ -126,11 +126,11 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   }, [campaign?.status, sending])
 
   const handleSendBatch = async () => {
-    if (!confirm('Bắt đầu gửi chiến dịch này?')) return
+    const isResume = (campaign?.sentCount || 0) > 0
+    if (!confirm(isResume ? 'Tiếp tục gửi những email còn lại?' : 'Bắt đầu gửi chiến dịch này?')) return
     setSending(true)
     setSendProgress('Đang khởi tạo...')
 
-    let offset = 0
     const batchSize = 20
     let finished = false
 
@@ -142,16 +142,22 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       })
 
       while (!finished) {
-        setSendProgress(`Đang gửi... (${offset} / ${campaign?.totalRecipients || 0})`)
         const res = await fetch(`/api/admin/campaigns/${id}/send-batch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ offset, batchSize }),
+          body: JSON.stringify({ batchSize }),
         })
 
         if (!res.ok) {
-          const err = await res.text()
-          setSendProgress(`Lỗi: ${err}`)
+          let errData: any
+          try { errData = await res.json() } catch { errData = {} }
+          if (errData.needsCooldown) {
+            const pauseMin = errData.pauseMinutes || 7
+            setSendProgress(`⏸️ Pause ${pauseMin} phút (chờ sender hết cooldown)`)
+            await new Promise(r => setTimeout(r, pauseMin * 60 * 1000))
+            continue
+          }
+          setSendProgress(`Lỗi: ${errData.error || 'Lỗi không xác định'}`)
           break
         }
 
@@ -159,16 +165,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
         if (data.needsCooldown) {
           const pauseMin = data.pauseMinutes || 7
-          offset += data.sentInBatch || 0
-          setSendProgress(`⏸️ Pause ${pauseMin} phút (đã gửi ${offset})`)
+          setSendProgress(`⏸️ Pause ${pauseMin} phút (đã gửi ${data.stats?.totalSent || 0})`)
           await new Promise(r => setTimeout(r, pauseMin * 60 * 1000))
           setSendProgress(`▶️ Tiếp tục gửi...`)
           continue
         }
 
         finished = data.finished
-        offset = data.nextOffset || offset + batchSize
-
         fetchProgress()
         fetchLogs()
         await new Promise(r => setTimeout(r, 2000))
@@ -319,13 +322,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             <>
               <Button onClick={handleSendBatch} disabled={sending || !campaign.totalRecipients}
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
-                <Play className="w-4 h-4" /> Bắt đầu gửi
+                <Play className="w-4 h-4" /> {(campaign.sentCount || 0) > 0 ? 'Tiếp tục gửi' : 'Bắt đầu gửi'}
               </Button>
-              <Link href={`/tools/email-mkt/new?id=${campaign.id}`}>
-                <Button className="w-full bg-gray-100 text-gray-700 font-bold py-3 rounded-xl">
-                  Chỉnh sửa
-                </Button>
-              </Link>
+              {(campaign.sentCount || 0) === 0 && (
+                <Link href={`/tools/email-mkt/new?id=${campaign.id}`}>
+                  <Button className="w-full bg-gray-100 text-gray-700 font-bold py-3 rounded-xl">
+                    Chỉnh sửa
+                  </Button>
+                </Link>
+              )}
             </>
           )}
 

@@ -30,7 +30,7 @@ export async function POST(
   }
 
   try {
-    const { offset = 0, batchSize = 20 } = await req.json();
+    const { batchSize = 20 } = await req.json();
     const config = await getEmailConfig();
 
     const campaign = await prisma.emailCampaign.findUnique({
@@ -47,7 +47,15 @@ export async function POST(
     }
 
     const allRecipients = await resolveRecipients(campaignId);
-    const recipientsBatch = allRecipients.slice(offset, offset + batchSize);
+
+    const existingLogs = await prisma.emailCampaignLog.findMany({
+      where: { campaignId, status: { in: ['SENT', 'SKIPPED', 'FAILED'] } },
+      select: { toEmail: true }
+    });
+    const sentEmails = new Set(existingLogs.map(l => l.toEmail));
+
+    const unsentRecipients = allRecipients.filter(r => !sentEmails.has(r.email));
+    const recipientsBatch = unsentRecipients.slice(0, batchSize);
 
     if (recipientsBatch.length === 0) {
       return NextResponse.json({ success: true, finished: true });
@@ -82,23 +90,37 @@ export async function POST(
 
       if (!sender) {
         console.log("[EmailCampaign] Không có sender khả dụng (hết quota hoặc đang cooldown)");
+
+        let pauseMinutes = 7
+        const soonestCooldown = await prisma.emailSender.findFirst({
+          where: { cooldownUntil: { gt: new Date() } },
+          orderBy: { cooldownUntil: 'asc' },
+          select: { cooldownUntil: true }
+        })
+        if (soonestCooldown?.cooldownUntil) {
+          pauseMinutes = Math.ceil((soonestCooldown.cooldownUntil.getTime() - Date.now()) / 60000)
+          if (pauseMinutes < 1) pauseMinutes = 1
+        }
         
         if (config.enableTelegramAlert) {
           await sendEmailCampaignNotification({
-            event: 'ERROR',
+            event: 'PAUSE',
             campaignTitle: campaign.title,
             total: allRecipients.length,
             sent: stats.sent,
             success: stats.success,
             failed: stats.failed,
-            error: 'Không có sender khả dụng'
+            pauseMinutes,
+            resumeTime: new Date(Date.now() + pauseMinutes * 60 * 1000)
+              .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
           });
         }
 
         return NextResponse.json({ 
           success: false, 
           error: "Tất cả email sender đã hết quota hoặc đang trong thời gian chờ.",
-          needsCooldown: true
+          needsCooldown: true,
+          pauseMinutes
         }, { status: 429 });
       }
 
@@ -262,18 +284,21 @@ export async function POST(
       }
     }
 
+    const remainingAfterBatch = unsentRecipients.length - recipientsBatch.length;
+    const isCompleted = remainingAfterBatch <= 0;
+
     await prisma.emailCampaign.update({
       where: { id: campaignId },
       data: {
         sentCount: { increment: results.sent },
         failedCount: { increment: results.failed },
-        status: (offset + recipientsBatch.length >= allRecipients.length) ? "COMPLETED" : "RUNNING",
+        status: isCompleted ? "COMPLETED" : "RUNNING",
         startedAt: campaign.startedAt || new Date(),
-        completedAt: (offset + recipientsBatch.length >= allRecipients.length) ? new Date() : null,
+        completedAt: isCompleted ? new Date() : null,
       }
     });
 
-    if (offset + recipientsBatch.length >= allRecipients.length) {
+    if (isCompleted) {
       campaignStats.delete(campaignId);
 
       if (config.enableTelegramAlert) {
@@ -292,8 +317,7 @@ export async function POST(
       success: true,
       sentInBatch: results.sent,
       failedInBatch: results.failed,
-      nextOffset: offset + batchSize,
-      finished: offset + recipientsBatch.length >= allRecipients.length,
+      finished: isCompleted,
       stats: {
         totalSent: stats.sent,
         totalSuccess: stats.success,
