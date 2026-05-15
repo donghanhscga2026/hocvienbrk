@@ -8,8 +8,7 @@ import {
   getAvailableSender,
   updateSenderCooldown,
   incrementSenderSentCount,
-  checkBatchStatus,
-  performCooldown
+  checkBatchStatus
 } from "@/lib/email-campaign-runner";
 import { spinContent } from "@/lib/email-spin";
 import { getEmailConfig, randomBetween } from "@/lib/email-config";
@@ -200,29 +199,47 @@ export async function POST(
 
         if (batchStatus.shouldPause) {
           console.log(`[EmailCampaign] Đã gửi ${stats.emailsInBatch} emails. Bắt đầu pause ${batchStatus.pauseDuration} phút.`);
-          
+
           stats.emailsInBatch = 0;
 
-          await performCooldown(
-            campaign.title,
-            sender.id,
-            stats.sent,
-            allRecipients.length,
-            stats.success,
-            stats.failed,
-            batchStatus.pauseDuration
-          );
+          await updateSenderCooldown(sender.id, batchStatus.pauseDuration);
 
           if (config.enableTelegramAlert) {
             await sendEmailCampaignNotification({
-              event: 'RESUME',
+              event: 'PAUSE',
               campaignTitle: campaign.title,
               total: allRecipients.length,
               sent: stats.sent,
               success: stats.success,
-              failed: stats.failed
+              failed: stats.failed,
+              pauseMinutes: batchStatus.pauseDuration,
+              resumeTime: new Date(Date.now() + batchStatus.pauseDuration * 60 * 1000)
+                .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
             });
           }
+
+          await prisma.emailCampaign.update({
+            where: { id: campaignId },
+            data: {
+              sentCount: { increment: results.sent },
+              failedCount: { increment: results.failed },
+              status: "RUNNING",
+              startedAt: campaign.startedAt || new Date(),
+            }
+          });
+
+          return NextResponse.json({
+            success: true,
+            sentInBatch: results.sent,
+            needsCooldown: true,
+            pauseMinutes: batchStatus.pauseDuration,
+            finished: false,
+            stats: {
+              totalSent: stats.sent,
+              totalSuccess: stats.success,
+              totalFailed: stats.failed
+            }
+          });
         } else {
           const delay = randomBetween(config.interEmailDelayMin, config.interEmailDelayMax);
           await new Promise(resolve => setTimeout(resolve, delay * 1000));
