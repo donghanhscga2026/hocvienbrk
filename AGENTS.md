@@ -269,6 +269,32 @@ Mô tả ngắn gọn vấn đề và mục đích thay đổi.
 - [ ] Không dùng revalidateTag
 ```
 
+### G. Supabase GRANT Compliance (Bắt buộc từ 2026-10-30)
+> Supabase thay đổi default permissions: new tables trong `public` schema cần explicit GRANTs.
+> Ref: https://supabase.com/blog/changing-default-permissions-for-public-schema
+
+**Architecture note:** App này dùng **Prisma ORM với direct PostgreSQL connection** (qua `DATABASE_URL`), KHÔNG qua Supabase REST/GraphQL API. Supabase chỉ dùng cho **Storage** (file uploads). Tuy nhiên vẫn cần GRANTs để đề phòng truy cập sau này.
+
+**BẮT BUỘC khi làm việc với database:**
+```sql
+-- Sau khi tạo table mới (qua Prisma model), chạy các GRANT này:
+GRANT ALL PRIVILEGES ON TABLE public."NewTableName" TO authenticated;
+GRANT ALL PRIVILEGES ON TABLE public."NewTableName" TO service_role;
+GRANT SELECT ON TABLE public."NewTableName" TO anon;
+
+-- Bật RLS + tạo policy cơ bản:
+ALTER TABLE public."NewTableName" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "NewTableName_authenticated_all" ON public."NewTableName"
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "NewTableName_anon_select" ON public."NewTableName"
+  FOR SELECT TO anon USING (true);
+```
+
+**Lưu ý quan trọng:**
+- Prisma tạo tên table giữ nguyên case (vd: `Account`, `Course`) — khi viết SQL raw **PHẢI double-quote**: `public."Account"`
+- Không quote → PostgreSQL tự động lowercase → lỗi "table not found"
+- File tham khảo: `prisma/migrations/20260515070125_supabase_grant_permissions/migration.sql`
+
 ---
 
 ## 📁 TÀI LIỆU QUAN TRỌNG

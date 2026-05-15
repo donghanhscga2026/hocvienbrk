@@ -1301,4 +1301,45 @@ const f1Record = f1Data.find(f => {
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi
 - ✅ Backup: `plan_temp/admin-actions_backup_fixUserFromRow_20260515.patch`
 
+---
+
+## ✅ Supabase GRANT + RLS Compliance ([2026-05-15])
+
+### Mục tiêu
+Tuân thủ chính sách Supabase mới (hiệu lực Oct 30, 2026): tất cả tables trong `public` schema cần explicit GRANTs + RLS policies. App dùng Prisma ORM direct connection (không qua Supabase REST), nên đây là bước future-proofing.
+
+### Các file đã sửa
+#### `prisma/migrations/20260515070125_supabase_grant_permissions/migration.sql`
+- **Vấn đề**: Table names viết hoa (47/58 tables như `Account`, `Course`) không được double-quote → PostgreSQL tự động lowercase → "table not found" → transaction `BEGIN/COMMIT` rollback toàn bộ
+- **Fix**: Quote tất cả tên table mixed-case: `public."Account"`, `public."Course"`, v.v. (11 tên lowercase để unquoted)
+- **Chi tiết**: GRANT ALL cho `authenticated` + `service_role`, GRANT SELECT cho `anon`, ENABLE ROW LEVEL SECURITY + tạo basic policies trên 58 tables
+
+#### `AGENTS.md`
+- Thêm section **G. Supabase GRANT Compliance** với rules bắt buộc cho mọi future DB work (GRANTs + double-quote khi viết raw SQL)
+
+### Trạng thái
+- ✅ 58/58 tables có RLS enabled
+- ✅ `anon` có SELECT, `authenticated` + `service_role` có ALL privileges
+- ✅ App dev server chạy OK (`/tools/genealogy`, `/tools/courses`, `/api/auth/session` — 200 OK)
+- ✅ AGENTS.md đã cập nhật permanent compliance rules
+- ✅ Backup: `plan_temp/supabase_migration_backup_20260515_2.patch`
+
+---
+
+## ✅ Fix flash khi chuyển hệ thống trên cây hệ thống ([2026-05-15])
+
+### Mục tiêu
+Fix hiện tượng nháy (flash) hiển thị cây cũ ở chế độ Full trong khoảnh khắc khi chuyển từ hệ thống này sang hệ thống khác trên trang Genealogy.
+
+### Các file đã sửa
+#### `app/tools/genealogy/page.tsx`
+- **Vấn đề**: `setDisplayMode('full')` được gọi trước `await getSystemTreeAction()` → async gap: React render với `fullTree=[cây cũ]` + `displayMode='full'` → cây cũ bung full rồi mới load cây mới
+- **Fix**: Chuyển `setDisplayMode(intendedDisplayMode)` xuống sau `try/catch`, ngay trước `setLoading(false)` — displayMode chỉ thay đổi sau khi dữ liệu mới đã load xong
+- **Code change**: 2 dòng (xóa 1 dòng, thêm 1 dòng)
+
+### Trạng thái
+- ✅ Khi chuyển hệ thống (vd: Học viên → TCA), không còn flash cây cũ ở chế độ Full
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ✅ Backup: `plan_temp/genealogy_fix_displayMode_flash_20260515.patch`
+
 

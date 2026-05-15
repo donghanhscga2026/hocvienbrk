@@ -848,7 +848,6 @@ function GenealogyFlow() {
 
     // Tính toán displayMode hợp lý ngay trong hàm để tránh lỗi state cũ
     const intendedDisplayMode = (systemId !== null && systemId !== 0) ? 'full' : 'default'
-    setDisplayMode(intendedDisplayMode)
 
     try {
       if (systemId === null) {
@@ -896,6 +895,7 @@ function GenealogyFlow() {
       setFullTree(null)
       setError("Lỗi khi tải dữ liệu")
     }
+    setDisplayMode(intendedDisplayMode)
     setLoading(false)
   }, [handleSearch])
 
