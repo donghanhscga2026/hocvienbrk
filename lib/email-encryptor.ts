@@ -16,6 +16,14 @@ export function encrypt(text: string): string {
   return iv.toString('hex') + ':' + encrypted.toString('hex');
 }
 
+export function tryDecrypt(text: string): string {
+  try {
+    return decrypt(text);
+  } catch {
+    return text;
+  }
+}
+
 export function decrypt(text: string): string {
   if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
     throw new Error('EMAIL_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');

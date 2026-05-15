@@ -3,7 +3,7 @@ import { getOAuth2Client } from "@/lib/google-auth";
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { decrypt } from "@/lib/email-encryptor";
+import { tryDecrypt } from "@/lib/email-encryptor";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const oauth2Client = getOAuth2Client();
     oauth2Client.setCredentials({
-      refresh_token: decrypt(sender.refreshToken),
+      refresh_token: tryDecrypt(sender.refreshToken),
     });
 
     const sheets = google.sheets({ version: "v4", auth: oauth2Client });
