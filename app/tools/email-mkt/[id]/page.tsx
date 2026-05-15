@@ -115,11 +115,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   }, [id])
 
   useEffect(() => {
-    if (!campaign || campaign.status !== 'RUNNING') return
-    const interval = setInterval(fetchProgress, 5000)
-    fetchLogs()
+    if (!campaign) return
+    const shouldPoll = campaign.status === 'RUNNING' || sending
+    if (!shouldPoll) return
+    const interval = setInterval(() => {
+      fetchProgress()
+      fetchLogs()
+    }, 5000)
     return () => clearInterval(interval)
-  }, [campaign?.status])
+  }, [campaign?.status, sending])
 
   const handleSendBatch = async () => {
     if (!confirm('Bắt đầu gửi chiến dịch này?')) return
@@ -152,8 +156,22 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         }
 
         const data = await res.json()
+
+        if (data.needsCooldown) {
+          const pauseMin = data.pauseMinutes || 7
+          offset += data.sentInBatch || 0
+          setSendProgress(`⏸️ Pause ${pauseMin} phút (đã gửi ${offset})`)
+          await new Promise(r => setTimeout(r, pauseMin * 60 * 1000))
+          setSendProgress(`▶️ Tiếp tục gửi...`)
+          continue
+        }
+
         finished = data.finished
         offset = data.nextOffset || offset + batchSize
+
+        fetchProgress()
+        fetchLogs()
+        await new Promise(r => setTimeout(r, 2000))
       }
 
       setSendProgress(finished ? 'Hoàn tất!' : 'Đã dừng')
