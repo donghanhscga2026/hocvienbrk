@@ -79,7 +79,9 @@ export function getEffectiveDailyLimit(sender: {
   dailyLimit: number;
   warmupPhase: number;
 }): number {
-  const warmupLimit = calculateWarmupLimit(sender.createdAt);
+  const warmupLimit = sender.warmupPhase > 0
+    ? WARMUP_LIMITS[sender.warmupPhase as keyof typeof WARMUP_LIMITS] ?? WARMUP_LIMITS[4]
+    : calculateWarmupLimit(sender.createdAt);
   const configuredLimit = sender.dailyLimit;
   const effectiveLimit = Math.min(warmupLimit, configuredLimit);
   return effectiveLimit;
