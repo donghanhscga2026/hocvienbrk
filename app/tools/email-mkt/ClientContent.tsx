@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 
 interface Campaign {
   id: number
@@ -123,9 +124,21 @@ function SendersTab() {
     if (!confirm('Bạn có chắc muốn gỡ tài khoản này?')) return
     try {
       const res = await fetch(`/api/admin/senders/${id}`, { method: 'DELETE' })
-      if (res.ok) setSenders(prev => prev.filter(s => s.id !== id))
+      if (res.ok) {
+        setSenders(prev => prev.filter(s => s.id !== id))
+        setValidationResults(prev => { const n = {...prev}; delete n[id]; return n })
+      }
     } catch (error) { console.error(error) }
   }
+
+  const sortedSenders = [...senders].sort((a, b) => {
+    const sa = validationResults[a.id]
+    const sb = validationResults[b.id]
+    if (sa && !sb) return -1
+    if (!sa && sb) return 1
+    if (sa && sb) return Number(sa.isValid) - Number(sb.isValid)
+    return 0
+  })
 
   if (loading) {
     return <div className="text-center py-12 text-gray-400">Đang tải...</div>
@@ -142,40 +155,92 @@ function SendersTab() {
       <Button 
         onClick={validateAllTokens}
         disabled={validating || senders.length === 0}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"
       >
-        {validating ? <><Loader2 className="w-5 h-5 animate-spin mr-2" />Đang kiểm tra...</> : 'Kiểm tra Token'}
+        {validating ? <><Loader2 className="w-5 h-5 animate-spin" />Đang kiểm tra...</> : 'Kiểm tra Token'}
       </Button>
 
       {validationSummary && (
-        <div className={`p-4 rounded-xl ${validationSummary.invalid === 0 ? 'bg-green-50' : 'bg-yellow-50'}`}>
-          <span className="font-bold">{validationSummary.valid}/{validationSummary.total} hợp lệ</span>
+        <div className={`p-4 rounded-xl border ${
+          validationSummary.invalid === 0 ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className={`font-bold ${validationSummary.invalid === 0 ? 'text-green-700' : 'text-yellow-700'}`}>
+              Kết quả kiểm tra
+            </h3>
+            <span className={`text-2xl font-black ${validationSummary.invalid === 0 ? 'text-green-600' : 'text-yellow-600'}`}>
+              {validationSummary.valid}/{validationSummary.total}
+            </span>
+          </div>
+          <div className="flex gap-4 text-sm">
+            <span className="flex items-center gap-1 text-green-600">
+              <CheckCircle className="w-4 h-4" /> {validationSummary.valid} hợp lệ
+            </span>
+            {validationSummary.invalid > 0 && (
+              <span className="flex items-center gap-1 text-red-600">
+                <XCircle className="w-4 h-4" /> {validationSummary.invalid} không hợp lệ
+              </span>
+            )}
+          </div>
         </div>
       )}
 
       {senders.length === 0 ? (
         <div className="text-center py-8 text-gray-400">Chưa có tài khoản nào</div>
       ) : (
-        senders.map((sender) => {
+        sortedSenders.map((sender) => {
           const status = validationResults[sender.id]
+          const borderColor = status
+            ? status.isValid ? 'border-green-300 bg-green-50/30' : 'border-red-300 bg-red-50/30'
+            : 'border-gray-100'
           return (
-            <div key={sender.id} className="bg-white rounded-xl border border-gray-100 p-4">
-              <div className="flex justify-between">
-                <div>
-                  <h3 className="font-bold">{sender.label}</h3>
-                  <p className="text-sm text-gray-400">{sender.email}</p>
+            <div key={sender.id} className={`bg-white rounded-xl border-2 p-4 shadow-sm ${borderColor}`}>
+              {status && (
+                <div className={`mb-3 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-2 ${
+                  status.isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {status.isValid ? <CheckCircle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+                  {status.isValid ? 'Token hợp lệ' : `Token không hợp lệ: ${status.error}`}
                 </div>
-                <span className={`px-2 py-1 rounded text-xs ${sender.isActive ? 'bg-green-100' : 'bg-red-100'}`}>
+              )}
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-gray-900">{sender.label}</h3>
+                  <p className="text-sm text-gray-400">{sender.email}</p>
+                  {sender.isMain && (
+                    <span className="mt-1 inline-block bg-black text-yellow-400 text-xs font-bold px-2 py-0.5 rounded">Main</span>
+                  )}
+                </div>
+                <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                  sender.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
                   {sender.isActive ? 'Active' : 'Tạm ngưng'}
                 </span>
               </div>
-              <Button onClick={() => removeSender(sender.id)} className="w-full mt-3 bg-red-50 text-red-600 text-sm">
+              <div className="mt-3 mb-3">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Quota hôm nay</span>
+                  <span>{sender.sentToday}/{sender.dailyLimit}</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-orange-500 rounded-full" style={{ width: `${(sender.sentToday / sender.dailyLimit) * 100}%` }} />
+                </div>
+              </div>
+              <Button onClick={() => removeSender(sender.id)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm py-2 rounded-lg">
                 Gỡ bỏ
               </Button>
             </div>
           )
         })
       )}
+
+      <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
+        <h3 className="text-blue-900 font-bold text-sm mb-2">💡 Hướng dẫn</h3>
+        <ul className="text-blue-700/80 text-xs space-y-1 list-disc list-inside">
+          <li>Thêm email vào "Test Users" trong Google Cloud</li>
+          <li>Tối đa 480 email/ngày</li>
+        </ul>
+      </div>
     </div>
   )
 }
@@ -269,7 +334,10 @@ function SettingsTab() {
 }
 
 export default function ClientContent({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'senders' | 'settings'>('campaigns')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab = tabParam === 'senders' ? 'senders' : tabParam === 'settings' ? 'settings' : 'campaigns'
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'senders' | 'settings'>(initialTab)
 
   return (
     <>

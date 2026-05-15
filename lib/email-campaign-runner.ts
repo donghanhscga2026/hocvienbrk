@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { getOAuth2Client } from "@/lib/google-auth";
-import { decrypt } from "@/lib/email-encryptor";
+import { tryDecrypt } from "@/lib/email-encryptor";
 import { spinContent } from "@/lib/email-spin";
 import { google } from "googleapis";
 import { getEmailConfig, randomBetween, getEffectiveDailyLimit } from "@/lib/email-config";
@@ -259,7 +259,7 @@ export async function sendGmailFromSender(
 ) { 
   const oauth2Client = getOAuth2Client(); 
   oauth2Client.setCredentials({ 
-    refresh_token: decrypt(sender.refreshToken), 
+    refresh_token: tryDecrypt(sender.refreshToken), 
   });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
@@ -515,7 +515,7 @@ async function scanSenderForBounces(
     }
     
     oauth2Client.setCredentials({
-      refresh_token: decrypt(sender.refreshToken)
+      refresh_token: tryDecrypt(sender.refreshToken)
     });
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });

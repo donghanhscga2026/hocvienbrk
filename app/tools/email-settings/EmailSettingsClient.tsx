@@ -109,7 +109,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
         <Link href="/tools/email-mkt" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
           📋 Chiến dịch
         </Link>
-        <Link href="/tools/email-senders" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
+        <Link href="/tools/email-mkt" className="px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200">
           📡 Tài Khoản
         </Link>
         <Link href="/tools/email-settings" className="px-3 py-1.5 rounded-full text-xs font-bold bg-orange-500 text-white">
