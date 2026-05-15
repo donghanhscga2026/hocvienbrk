@@ -467,7 +467,7 @@ export async function getGenealogyChildrenAction(parentId: number) {
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
-export async function getSystemTreeAction(systemId: number) {
+export async function getSystemTreeAction(systemId: number, forceFull: boolean = true) {
     try {
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
         const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
@@ -492,7 +492,7 @@ export async function getSystemTreeAction(systemId: number) {
             }
         }
         
-        const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId, true)
+        const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId, forceFull)
         return { success: true, tree }
     } catch (error: any) { return { success: false, error: error.message } }
 }
