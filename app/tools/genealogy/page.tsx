@@ -474,6 +474,11 @@ function GenealogyFlow() {
   // Position map cho tree layout (Reingold-Tilford)
   const positionMapRef = useRef<Map<number, { x: number; y: number }>>(new Map())
   const [positionVersion, setPositionVersion] = useState(0)
+  // Ref đồng bộ displayMode để initTree không bị stale closure khi gọi từ toggle
+  const displayModeRef = useRef(displayMode)
+  displayModeRef.current = displayMode
+  // Ref chặn effect render khi displayMode đang được toggle (đợi fetch xong)
+  const displayModeToggleRef = useRef(false)
 
   // Add F1 and delete node modals
   const [addF1Modal, setAddF1Modal] = useState<{ parentId: number, show: boolean }>({ parentId: 0, show: false })
@@ -864,10 +869,8 @@ function GenealogyFlow() {
           alert('Chưa có dữ liệu nhân mạch. Hãy bắt đầu giới thiệu thành viên để xây dựng cây.')
         }
       } else {
-        // Hệ thống TCA/KTC - gọi đúng function theo intendedDisplayMode
-        const result = intendedDisplayMode === 'full'
-          ? await getSystemTreeAction(systemId)
-          : await getSystemTreeAction(systemId)
+        // Hệ thống TCA/KTC - gọi với forceFull theo intendedDisplayMode
+        const result = await getSystemTreeAction(systemId, intendedDisplayMode === 'full')
         if (result.success && result.tree) {
           setFullTree(result.tree)
           setIsTreeEmpty(false)
@@ -915,10 +918,8 @@ function GenealogyFlow() {
     } else if (selectedSystem === 0) {
       result = await getGenealogyTreeAction(rootId)
     } else {
-      // Sửa bug: gọi đúng function theo displayMode
-      result = displayMode === 'full'
-        ? await getSystemTreeAction(selectedSystem)
-        : await getSystemTreeAction(selectedSystem)
+      // Hệ thống TCA/KTC - gọi với forceFull theo displayMode hiện tại (từ ref)
+      result = await getSystemTreeAction(selectedSystem, displayModeRef.current === 'full')
     }
 
     if (result && result.success && result.tree) {
@@ -931,7 +932,7 @@ function GenealogyFlow() {
       setError(null)
     }
     setLoading(false)
-  }, [selectedSystem, displayMode])
+  }, [selectedSystem])
 
   const handleClearSearch = useCallback(() => {
     setSearchInput('')
@@ -942,6 +943,10 @@ function GenealogyFlow() {
   }, [initTree])
 
   useEffect(() => {
+    if (displayModeToggleRef.current) {
+      displayModeToggleRef.current = false
+      return
+    }
     if (filteredTree) {
       const treeToRender = focusedSubtreeNode ?? filteredTree
       if (!treeToRender) return
@@ -1123,7 +1128,17 @@ function GenealogyFlow() {
             <input
               type="checkbox"
               checked={displayMode === 'full'}
-              onChange={(e) => setDisplayMode(e.target.checked ? 'full' : 'default')}
+              onChange={(e) => {
+                const newMode = e.target.checked ? 'full' : 'default'
+                displayModeRef.current = newMode
+                setDisplayMode(newMode)
+                if (selectedSystem !== null && selectedSystem !== 0) {
+                  displayModeToggleRef.current = true
+                  setNodes([])
+                  setEdges([])
+                  initTree(0)
+                }
+              }}
               className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
             <span className="text-[11px] font-black text-slate-700 uppercase tracking-tighter">Đầy đủ</span>
