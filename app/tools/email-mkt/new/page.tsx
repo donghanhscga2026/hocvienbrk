@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Eye } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Eye, Image, Shuffle, User, Hash, Link2 } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { Button } from '@/components/ui/button'
+import { previewSpin } from '@/lib/email-spin'
 
 function CreateCampaignContent() {
   const router = useRouter()
@@ -28,6 +29,49 @@ function CreateCampaignContent() {
   const [courses, setCourses] = useState<any[]>([])
   const [recipientPreview, setRecipientPreview] = useState<any[] | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showSpinPreview, setShowSpinPreview] = useState(false)
+  const [spinPreviews, setSpinPreviews] = useState<string[]>([])
+
+  const insertAtCursor = (text: string) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const newContent = htmlContent.substring(0, start) + text + htmlContent.substring(end)
+    setHtmlContent(newContent)
+    setTimeout(() => {
+      textarea.focus()
+      textarea.selectionStart = textarea.selectionEnd = start + text.length
+    }, 0)
+  }
+
+  const wrapSpin = () => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = htmlContent.substring(start, end)
+    if (selected) {
+      insertAtCursor(`{${selected}}`)
+    } else {
+      insertAtCursor('{option1|option2}')
+    }
+  }
+
+  const insertImage = () => {
+    const url = prompt('Nhập URL hình ảnh:')
+    if (url) {
+      insertAtCursor(`<img src="${url}" alt="" style="max-width:100%;height:auto;" />`)
+    }
+  }
+
+  const handlePreviewSpin = () => {
+    if (!htmlContent.trim()) return
+    setSpinPreviews(previewSpin(htmlContent, 3))
+    setShowSpinPreview(true)
+  }
 
   useEffect(() => {
     fetch('/api/courses')
@@ -237,13 +281,54 @@ function CreateCampaignContent() {
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung HTML</label>
-              <textarea value={htmlContent} onChange={e => setHtmlContent(e.target.value)}
+              <div className="flex flex-wrap gap-1 mb-2">
+                <button type="button" onClick={insertImage}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold text-gray-600">
+                  <Image className="w-3.5 h-3.5" /> Ảnh
+                </button>
+                <button type="button" onClick={wrapSpin}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold text-gray-600">
+                  <Shuffle className="w-3.5 h-3.5" /> Spin
+                </button>
+                <button type="button" onClick={() => insertAtCursor('[Tên]')}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold text-gray-600">
+                  <User className="w-3.5 h-3.5" /> [Tên]
+                </button>
+                <button type="button" onClick={() => insertAtCursor('[MãHV]')}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold text-gray-600">
+                  <Hash className="w-3.5 h-3.5" /> [MãHV]
+                </button>
+                <button type="button" onClick={() => insertAtCursor('<unsubscribe></unsubscribe>')}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-bold text-gray-600">
+                  <Link2 className="w-3.5 h-3.5" /> Hủy ĐK
+                </button>
+                <button type="button" onClick={handlePreviewSpin}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 rounded-lg text-xs font-bold text-blue-600">
+                  <Eye className="w-3.5 h-3.5" /> Xem Spin
+                </button>
+              </div>
+              <textarea ref={textareaRef} value={htmlContent} onChange={e => setHtmlContent(e.target.value)}
                 rows={12}
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none resize-y font-mono"
                 placeholder="<html><body>...</body></html>" />
               <p className="text-[10px] text-gray-400">
                 Hỗ trợ: {'{Tên}'}, {'{MãHV}'}, {'{option1|option2}'} (spin content), 
                 {'<unsubscribe>'}</p>
+              {showSpinPreview && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-blue-700">Xem trước Spin (3 phiên bản)</span>
+                    <button type="button" onClick={() => setShowSpinPreview(false)}
+                      className="text-blue-400 hover:text-blue-600 text-xs font-bold">Đóng</button>
+                  </div>
+                  {spinPreviews.map((preview, i) => (
+                    <div key={i} className="bg-white rounded-lg p-3 text-xs text-gray-700 border border-blue-100 max-h-32 overflow-y-auto">
+                      <span className="font-bold text-blue-500 mr-2">#{i + 1}:</span>
+                      <div dangerouslySetInnerHTML={{ __html: preview }} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
