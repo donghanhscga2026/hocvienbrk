@@ -169,33 +169,14 @@ export interface BatchStatus {
 }
 
 export async function checkBatchStatus(
-  senderId: number,
   emailsSentSinceLastPause: number
 ): Promise<BatchStatus> {
-  const sender = await prisma.emailSender.findUnique({
-    where: { id: senderId },
-    select: {
-      maxPerBatch: true,
-      staggerDelayMin: true,
-      staggerDelayMax: true,
-      pauseDurationMin: true,
-      pauseDurationMax: true,
-    }
-  });
-
   const config = await getEmailConfig();
 
-  const maxPerBatch = sender?.maxPerBatch || 15;
-  const staggerDelayMin = sender?.staggerDelayMin || config.pauseDurationMin;
-  const staggerDelayMax = sender?.staggerDelayMax || config.pauseDurationMax;
+  const maxPerBatch = randomBetween(config.emailsBeforePauseMin, config.emailsBeforePauseMax);
+  const shouldPause = emailsSentSinceLastPause >= maxPerBatch;
 
-  const nextPauseAt = maxPerBatch;
-  const shouldPause = emailsSentSinceLastPause >= nextPauseAt;
-
-  const pauseDuration = randomBetween(
-    staggerDelayMin || config.pauseDurationMin,
-    staggerDelayMax || config.pauseDurationMax
-  );
+  const pauseDuration = randomBetween(config.pauseDurationMin, config.pauseDurationMax);
 
   const nextResumeTime = new Date(Date.now() + pauseDuration * 60 * 1000)
     .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -203,7 +184,7 @@ export async function checkBatchStatus(
   return {
     shouldPause,
     emailsInBatch: emailsSentSinceLastPause,
-    nextPauseAt,
+    nextPauseAt: maxPerBatch,
     pauseDuration,
     nextResumeTime
   };

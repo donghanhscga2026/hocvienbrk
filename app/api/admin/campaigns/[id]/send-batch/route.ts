@@ -224,7 +224,7 @@ export async function POST(
         stats.emailsInBatch++;
         results.sent++;
 
-        const batchStatus = await checkBatchStatus(sender.id, stats.emailsInBatch);
+        const batchStatus = await checkBatchStatus(stats.emailsInBatch);
 
         if (batchStatus.shouldPause) {
           console.log(`[EmailCampaign] Đã gửi ${stats.emailsInBatch} emails. Bắt đầu pause ${batchStatus.pauseDuration} phút.`);

@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { Button } from '@/components/ui/button'
 
@@ -71,6 +71,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const [sendProgress, setSendProgress] = useState('')
   const [logSummary, setLogSummary] = useState<LogSummary | null>(null)
   const [senderStats, setSenderStats] = useState<SenderStat[]>([])
+  const [issueLogs, setIssueLogs] = useState<any[]>([])
 
   const fetchCampaign = async () => {
     try {
@@ -95,6 +96,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         const data = await res.json()
         setLogSummary(data.summary)
         setSenderStats(data.senderStats || [])
+        setIssueLogs(data.issueLogs || [])
       }
     } catch {}
   }
@@ -202,6 +204,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     try {
       const res = await fetch(`/api/admin/campaigns/${id}`, { method: 'DELETE' })
       if (res.ok) router.push('/tools/email-mkt')
+    } catch {}
+  }
+
+  const handleRemoveFromBlacklist = async (email: string) => {
+    try {
+      const res = await fetch(`/api/admin/blacklist/${encodeURIComponent(email)}`, { method: 'DELETE' })
+      if (res.ok) {
+        setIssueLogs(prev => prev.filter(l => l.toEmail !== email))
+      }
     } catch {}
   }
 
@@ -359,6 +370,60 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             <Trash2 className="w-4 h-4" /> Xóa chiến dịch
           </Button>
         </div>
+
+        {issueLogs.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+            <h2 className="font-black text-gray-900 uppercase tracking-tight text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500" />
+              Email lỗi & bỏ qua ({issueLogs.length})
+            </h2>
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {issueLogs.map(log => (
+                <div key={log.id} className="flex items-start justify-between gap-2 bg-gray-50 rounded-xl p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-gray-900 truncate">{log.toEmail}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5 space-x-2">
+                      {log.userId ? (
+                        <span className="font-bold text-orange-600">#{log.userId} — {log.userName || 'Không tên'}</span>
+                      ) : (
+                        <span className="text-gray-400">(không có trong hệ thống)</span>
+                      )}
+                      <span className="text-gray-400">
+                        {log.senderEmail ? `qua ${log.senderLabel || log.senderEmail}` : '(không dùng sender)'}
+                      </span>
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                        log.status === 'FAILED'
+                          ? 'bg-red-100 text-red-600'
+                          : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        {log.status === 'FAILED' ? 'Lỗi' : 'Bỏ qua'}
+                      </span>
+                      {log.errorType && (
+                        <span className="text-[10px] text-gray-400">{log.errorType}</span>
+                      )}
+                      {log.errorCode && (
+                        <span className="text-[10px] text-gray-400 truncate">{log.errorCode}</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-gray-300 mt-0.5">
+                      {new Date(log.sentAt).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+                  {log.errorType === 'BLACKLISTED' && (
+                    <button
+                      onClick={() => handleRemoveFromBlacklist(log.toEmail)}
+                      className="shrink-0 text-[10px] font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-lg transition-colors"
+                    >
+                      Bỏ chặn
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
           <h2 className="font-black text-gray-900 uppercase tracking-tight text-sm">Nội dung email</h2>

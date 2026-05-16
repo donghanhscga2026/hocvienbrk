@@ -47,11 +47,37 @@ export async function GET(
       failed: logsBySender[sender.id]?.filter(l => l.status === 'FAILED').length || 0,
     }));
 
+    const issueLogsRaw = logs.filter(l => l.status === 'FAILED' || l.status === 'SKIPPED');
+    const uniqueEmails = [...new Set(issueLogsRaw.map(l => l.toEmail))];
+    const users = await prisma.user.findMany({
+      where: { email: { in: uniqueEmails } },
+      select: { id: true, name: true, email: true },
+    });
+    const userMap = new Map(users.map(u => [u.email.toLowerCase(), u]));
+
+    const issueLogs = issueLogsRaw.map(l => {
+      const user = userMap.get(l.toEmail.toLowerCase());
+      const sender = l.senderId ? allSenders.find(s => s.id === l.senderId) : null;
+      return {
+        id: l.id,
+        toEmail: l.toEmail,
+        userId: user?.id ?? null,
+        userName: user?.name ?? null,
+        senderEmail: sender?.email ?? null,
+        senderLabel: sender?.label ?? null,
+        status: l.status,
+        errorType: l.errorType,
+        errorCode: l.errorCode,
+        sentAt: l.sentAt,
+      };
+    });
+
     return NextResponse.json({
       logsBySender,
       senders: allSenders,
       senderStats,
       logsNoSender,
+      issueLogs,
       summary: {
         total: logs.length,
         sent: logs.filter(l => l.status === 'SENT').length,
