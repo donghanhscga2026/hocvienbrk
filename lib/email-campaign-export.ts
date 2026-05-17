@@ -23,6 +23,7 @@ export interface ExportResult {
   csvContent: string;
   fileName: string;
   totalRows: number;
+  sheetError?: string;
 }
 
 export async function exportCampaignToSheet(campaignId: number, campaignTitle: string, statusFilter?: string): Promise<ExportResult | null> {
@@ -77,12 +78,14 @@ export async function exportCampaignToSheet(campaignId: number, campaignTitle: s
   const csvContent = [csvHeader, ...csvRows].join("\n");
 
   // Thử tạo Google Sheet với từng sender, fallback sang main token
-  const sheetUrl = await tryCreateSheet(rows, headers, safeTitle);
+  const { sheetUrl, error } = await tryCreateSheet(rows, headers, safeTitle);
 
-  return { sheetUrl, csvContent, fileName, totalRows: rows.length };
+  return { sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error };
 }
 
-async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: string): Promise<string | undefined> {
+async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: string): Promise<{ sheetUrl?: string; error?: string }> {
+  const errors: string[] = [];
+
   try {
     const senders = await prisma.emailSender.findMany({ where: { isActive: true } });
     for (const sender of senders) {
@@ -90,8 +93,12 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
         const oauth2Client = getOAuth2Client();
         oauth2Client.setCredentials({ refresh_token: tryDecrypt(sender.refreshToken) });
         const sheets = google.sheets({ version: "v4", auth: oauth2Client });
-        return await doCreateSheet(sheets, rows, headers, safeTitle);
-      } catch {
+        const url = await doCreateSheet(sheets, rows, headers, safeTitle);
+        return { sheetUrl: url };
+      } catch (err: any) {
+        const msg = `Sender #${sender.id} ${sender.email}: ${err.message}`;
+        console.error(`[CampaignExport] ${msg}`);
+        errors.push(msg);
         continue;
       }
     }
@@ -99,15 +106,25 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
     // Fallback: thử dùng main GMAIL_REFRESH_TOKEN
     const mainRt = process.env.GMAIL_REFRESH_TOKEN;
     if (mainRt) {
-      const oauth2Client = getOAuth2Client();
-      oauth2Client.setCredentials({ refresh_token: mainRt });
-      const sheets = google.sheets({ version: "v4", auth: oauth2Client });
-      return await doCreateSheet(sheets, rows, headers, safeTitle);
+      try {
+        const oauth2Client = getOAuth2Client();
+        oauth2Client.setCredentials({ refresh_token: mainRt });
+        const sheets = google.sheets({ version: "v4", auth: oauth2Client });
+        const url = await doCreateSheet(sheets, rows, headers, safeTitle);
+        return { sheetUrl: url };
+      } catch (err: any) {
+        const msg = `Main token: ${err.message}`;
+        console.error(`[CampaignExport] ${msg}`);
+        errors.push(msg);
+      }
     }
-  } catch {
-    // All failed
+  } catch (err: any) {
+    const msg = `tryCreateSheet: ${err.message}`;
+    console.error(`[CampaignExport] ${msg}`);
+    errors.push(msg);
   }
-  return undefined;
+
+  return { error: errors.join(" | ") };
 }
 
 async function doCreateSheet(sheets: any, rows: string[][], headers: string[], safeTitle: string): Promise<string> {
