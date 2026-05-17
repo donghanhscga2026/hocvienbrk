@@ -47,7 +47,7 @@ export async function GET(
       failed: logsBySender[sender.id]?.filter(l => l.status === 'FAILED').length || 0,
     }));
 
-    const issueLogsRaw = logs.filter(l => l.status === 'FAILED' || l.status === 'SKIPPED');
+    const issueLogsRaw = logs.filter(l => l.status === 'FAILED' || l.status === 'SKIPPED' || l.status === 'BOUNCED');
     const uniqueEmails = [...new Set(issueLogsRaw.map(l => l.toEmail))];
     const users = await prisma.user.findMany({
       where: { email: { in: uniqueEmails } },

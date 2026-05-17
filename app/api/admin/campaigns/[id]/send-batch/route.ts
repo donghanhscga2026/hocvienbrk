@@ -13,6 +13,7 @@ import {
 import { spinContent } from "@/lib/email-spin";
 import { getEmailConfig, randomBetween } from "@/lib/email-config";
 import { sendEmailCampaignNotification } from "@/lib/notifications";
+import { exportCampaignToSheet } from "@/lib/email-campaign-export";
 import { NextResponse } from "next/server";
 
 let campaignStats: Map<number, { total: number; sent: number; success: number; failed: number; emailsInBatch: number }> = new Map();
@@ -308,6 +309,11 @@ export async function POST(
     if (isCompleted) {
       campaignStats.delete(campaignId);
 
+      const sheetUrl = await exportCampaignToSheet(campaignId, campaign.title);
+      if (sheetUrl) {
+        console.log(`[EmailCampaign] 📊 Sheet kết quả: ${sheetUrl}`);
+      }
+
       if (config.enableTelegramAlert) {
         await sendEmailCampaignNotification({
           event: 'COMPLETE',
@@ -315,7 +321,8 @@ export async function POST(
           total: allRecipients.length,
           sent: allRecipients.length,
           success: stats.success,
-          failed: stats.failed
+          failed: stats.failed,
+          sheetUrl: sheetUrl || undefined,
         });
       }
     }

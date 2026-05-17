@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban, Search } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { Button } from '@/components/ui/button'
 
@@ -72,6 +72,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const [logSummary, setLogSummary] = useState<LogSummary | null>(null)
   const [senderStats, setSenderStats] = useState<SenderStat[]>([])
   const [issueLogs, setIssueLogs] = useState<any[]>([])
+  const [bounceScanning, setBounceScanning] = useState(false)
+  const [bounceResult, setBounceResult] = useState<string | null>(null)
 
   const fetchCampaign = async () => {
     try {
@@ -205,6 +207,24 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       const res = await fetch(`/api/admin/campaigns/${id}`, { method: 'DELETE' })
       if (res.ok) router.push('/tools/email-mkt')
     } catch {}
+  }
+
+  const handleBounceScan = async () => {
+    setBounceScanning(true)
+    setBounceResult(null)
+    try {
+      const res = await fetch('/api/admin/campaigns/bounce-scan', { method: 'POST' })
+      const data = await res.json()
+      const total = (data.hardBounced || 0) + (data.softBounced || 0)
+      setBounceResult(`🔴 ${data.hardBounced || 0} hard bounce, 🟡 ${data.softBounced || 0} soft bounce${data.fakeEmails ? `, 🚫 ${data.fakeEmails} email ảo` : ''}`)
+      if (total > 0) {
+        await fetchLogs()
+        await fetchCampaign()
+      }
+    } catch {
+      setBounceResult('Lỗi khi quét bounce')
+    }
+    setBounceScanning(false)
   }
 
   const handleRemoveFromBlacklist = async (email: string) => {
@@ -369,13 +389,30 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2">
             <Trash2 className="w-4 h-4" /> Xóa chiến dịch
           </Button>
+
+          {campaign.sentCount > 0 && (
+            <Button onClick={handleBounceScan} disabled={bounceScanning}
+              className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+              {bounceScanning ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )} Quét bounce
+            </Button>
+          )}
+
+          {bounceResult && (
+            <div className="bg-purple-50 rounded-xl p-3 text-xs font-bold text-purple-700">
+              {bounceResult}
+            </div>
+          )}
         </div>
 
         {issueLogs.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
             <h2 className="font-black text-gray-900 uppercase tracking-tight text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-500" />
-              Email lỗi & bỏ qua ({issueLogs.length})
+              Email lỗi, bounce & bỏ qua ({issueLogs.length})
             </h2>
             <div className="space-y-2 max-h-72 overflow-y-auto">
               {issueLogs.map(log => (
@@ -394,11 +431,11 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                        log.status === 'FAILED'
-                          ? 'bg-red-100 text-red-600'
-                          : 'bg-gray-200 text-gray-500'
+                        log.status === 'FAILED' ? 'bg-red-100 text-red-600'
+                        : log.status === 'BOUNCED' ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-gray-200 text-gray-500'
                       }`}>
-                        {log.status === 'FAILED' ? 'Lỗi' : 'Bỏ qua'}
+                        {log.status === 'FAILED' ? 'Lỗi' : log.status === 'BOUNCED' ? 'Bounce' : 'Bỏ qua'}
                       </span>
                       {log.errorType && (
                         <span className="text-[10px] text-gray-400">{log.errorType}</span>
