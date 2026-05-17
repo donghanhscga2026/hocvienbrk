@@ -3,15 +3,26 @@ import { getOAuth2Client } from "@/lib/google-auth";
 import { tryDecrypt } from "@/lib/email-encryptor";
 import { google } from "googleapis";
 
-export async function exportCampaignToSheet(campaignId: number, campaignTitle: string): Promise<string | null> {
+const STATUS_LABELS: Record<string, string> = {
+  SENT: "Đã gửi",
+  FAILED: "Thất bại",
+  SKIPPED: "Bỏ qua",
+  BOUNCED: "Bounce",
+};
+
+export async function exportCampaignToSheet(campaignId: number, campaignTitle: string, statusFilter?: string): Promise<string | null> {
   try {
+    const where: any = { campaignId };
+    if (statusFilter) where.status = statusFilter;
+
     const logs = await prisma.emailCampaignLog.findMany({
-      where: { campaignId, status: "SENT" },
-      select: { toEmail: true },
+      where,
+      select: { toEmail: true, status: true, errorType: true, errorCode: true, sentAt: true },
+      orderBy: { sentAt: "asc" },
     });
 
     if (logs.length === 0) {
-      console.log("[CampaignExport] Không có log SENT nào để export");
+      console.log("[CampaignExport] Không có log nào để export");
       return null;
     }
 
@@ -23,8 +34,17 @@ export async function exportCampaignToSheet(campaignId: number, campaignTitle: s
     });
     const userMap = new Map(users.map(u => [u.email.toLowerCase(), u]));
 
-    const headers = ["STT", "User ID", "Họ tên", "Email", "Số điện thoại", "Mã giới thiệu"];
-    const rows = emails.map((email, index) => {
+    const logMap = new Map<string, { status: string; error: string }>();
+    for (const log of logs) {
+      const key = log.toEmail.toLowerCase();
+      const error = [log.errorType, log.errorCode].filter(Boolean).join(" - ");
+      if (!logMap.has(key)) {
+        logMap.set(key, { status: STATUS_LABELS[log.status] || log.status, error });
+      }
+    }
+
+    const headers = ["STT", "User ID", "Họ tên", "Email", "Số điện thoại", "Mã giới thiệu", "Trạng thái", "Lỗi"];
+    const rows = [...logMap.entries()].map(([email, info], index) => {
       const user = userMap.get(email);
       return [
         (index + 1).toString(),
@@ -33,6 +53,8 @@ export async function exportCampaignToSheet(campaignId: number, campaignTitle: s
         email,
         user?.phone || "",
         user?.affiliateCode || "",
+        info.status,
+        info.error,
       ];
     });
 
