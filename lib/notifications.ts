@@ -516,6 +516,7 @@ interface CampaignNotificationData {
   pauseMinutes?: number;
   resumeTime?: string;
   error?: string;
+  sheetUrl?: string;
 }
 
 export async function sendEmailCampaignNotification(data: CampaignNotificationData): Promise<void> {
@@ -560,7 +561,8 @@ export async function sendEmailCampaignNotification(data: CampaignNotificationDa
         `📧 Tổng: ${total}\n` +
         `✅ Thành công: <b>${success}</b>\n` +
         `❌ Thất bại: ${failed}\n\n` +
-        `📈 Tỷ lệ thành công: <b>${rate}%</b>`;
+        `📈 Tỷ lệ thành công: <b>${rate}%</b>` +
+        (data.sheetUrl ? `\n📊 <a href="${data.sheetUrl}">Xem danh sách trên Google Sheets</a>` : '');
       break;
 
     case 'ERROR':

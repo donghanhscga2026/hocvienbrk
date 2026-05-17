@@ -1399,4 +1399,83 @@ Khi xem TCA ở chế độ Gọn, cây phải chỉ hiển thị các F1 nhánh
 - ✅ Dev server chạy OK (`/tools/genealogy` 200)
 - ✅ Backup: `plan_temp/genealogy_backup_addForceFull_20260515.patch`, `plan_temp/genealogy_backup_toggleRefetch_20260515.patch`, `plan_temp/genealogy_backup_clearNodesOnToggle_20260515.patch`
 
+---
+
+## ✅ Email Campaign — Warmup, Batch Config & Issue Logs ([2026-05-16])
+
+### Mục tiêu
+1. Tăng warmup limit (từ 10 → 200 email/ngày/sender) để gửi campaign 930 email nhanh hơn
+2. Sửa `checkBatchStatus` để tuân theo cấu hình chung (tab Cấu hình) thay vì hardcode sender fields
+3. Hiển thị chi tiết email lỗi/bounce/skip trong trang campaign (kèm #ID, tên, sender, lý do)
+4. Thêm nút quét bounce và xóa blacklist
+
+### Các file đã sửa
+
+#### `lib/email-config.ts`
+- **Vấn đề**: `getEffectiveDailyLimit()` nhận `warmupPhase` nhưng không dùng — limit tính từ `createdAt` (ngày tạo sender = hôm qua → warmup limit 10/ngày)
+- **Fix**: Nếu `warmupPhase > 0`, dùng `WARMUP_LIMITS[warmupPhase]` (phase 4 = 200), nếu không fallback về `calculateWarmupLimit(createdAt)`
+
+#### `lib/email-campaign-runner.ts`
+- **Vấn đề**: `checkBatchStatus()` dùng `sender.maxPerBatch` (hardcode 20) + `staggerDelayMin/Max` (5-15) thay vì config global → không tuân theo tab Cấu hình
+- **Fix**: Bỏ query sender, chỉ dùng `config.emailsBeforePauseMin/Max` (random 30-50) cho số email trước pause, `config.pauseDurationMin/Max` (random 10-30) cho thời gian pause
+
+#### `app/api/admin/campaigns/[id]/send-batch/route.ts`
+- **Fix**: Cập nhật call `checkBatchStatus(stats.emailsInBatch)` — bỏ `sender.id` (không còn query sender trong function)
+
+#### `app/api/admin/campaigns/[id]/logs/route.ts`
+- **Vấn đề**: Chỉ trả summary counts, không có chi tiết từng email lỗi
+- **Fix**: Thêm `issueLogs` vào response — gồm failed/skipped/bounced logs kèm `userId`, `userName`, `senderEmail`, `senderLabel`
+
+#### `app/api/admin/blacklist/[email]/route.ts` [NEW]
+- **Mô tả**: API xóa email khỏi danh sách đen (`DELETE`)
+
+#### `app/tools/email-mkt/[id]/page.tsx`
+- **Vấn đề**: Không hiển thị chi tiết email lỗi, không có nút quét bounce, không có nút bỏ chặn
+- **Fix**:
+  - Thêm section "Email lỗi, bounce & bỏ qua" — hiển thị từng email kèm #ID, tên, sender, lý do, thời gian
+  - Nút "Bỏ chặn" cho email bị blacklist (gọi DELETE blacklist API)
+  - Nút "Quét bounce" — gọi `POST /api/admin/campaigns/bounce-scan`, hiện kết quả
+
+### DB changes
+- `UPDATE "EmailSender" SET "warmupPhase" = 4, "sentToday" = 0, "cooldownUntil" = NULL` — 10 senders
+- `UPDATE "EmailSender" SET "maxPerBatch" = NULL, "staggerDelayMin" = NULL, "staggerDelayMax" = NULL, "pauseDurationMin" = NULL, "pauseDurationMax" = NULL` — xoá sender override để dùng global config
+
+### Trạng thái
+- ✅ Warmup limit 200/ngày/sender (phase 4), đã reset sentToday=0
+- ✅ `checkBatchStatus` hoàn toàn dùng global config (tab Cấu hình)
+- ✅ UI hiển thị email lỗi/bounce/skip kèm #ID, tên, sender
+- ✅ Nút Bỏ chặn (xóa blacklist) + Quét bounce hoạt động
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ Email Campaign — Tài liệu đầy đủ EMAIL_MKT_PLAN.md v2.0 ([2026-05-16])
+
+### Mục tiêu
+Hoàn thiện file tài liệu `app/tools/email-mkt/EMAIL_MKT_PLAN.md` với TOÀN BỘ source code, database schema, hướng dẫn sử dụng và xử lý sự cố — đảm bảo có thể rebuild toàn bộ hệ thống Email MKT từ file này.
+
+### Các file đã sửa/tạo
+
+#### `app/tools/email-mkt/EMAIL_MKT_PLAN.md`
+- **Nâng cấp từ v1.0 lên v2.0**: 1934 dòng → 5018 dòng, 80KB → 167KB
+- **Bổ sung đầy đủ source code các file còn thiếu:**
+  - `lib/email-parser.ts` (311 dòng) — phân tích email ngân hàng
+  - `lib/notifications.ts` (588 dòng) — thay thế bản tóm tắt cũ
+  - `app/tools/email-mkt/ClientContent.tsx` (354 dòng) — thay tóm tắt
+  - `app/tools/email-mkt/new/page.tsx` (367 dòng) — thay tóm tắt
+  - `app/tools/email-mkt/[id]/page.tsx` (485 dòng) — thay tóm tắt
+  - `app/api/admin/senders/validate/route.ts` (102 dòng) — thay tóm tắt
+  - `app/api/admin/email-config/route.ts` (106 dòng) — thay tóm tắt
+  - `app/api/admin/auth/google/route.ts` — thay tóm tắt
+  - `app/api/admin/auth/google/callback/route.ts` — thay tóm tắt
+  - `app/api/cron/gmail-watch/route.ts` (77 dòng) — mới hoàn toàn
+  - `vercel.json` — cấu hình cron
+  - Tất cả API routes còn thiếu (restart, progress, bounce-scan, potential-recipients, google-sheets, blacklist, unsubscribe)
+- **Cấu trúc:** 11 sections (I→XI), 80 code blocks (29 TS, 3 TSX, 6 Prisma, 1 JSON, 41 plain)
+
+### Trạng thái
+- ✅ EMAIL_MKT_PLAN.md v2.0 hoàn chỉnh — 5018 dòng
+- ✅ Tất cả 35+ file source code của hệ thống Email MKT đều có trong 1 file
+- ✅ Có thể rebuild toàn bộ hệ thống từ file này
+
 
