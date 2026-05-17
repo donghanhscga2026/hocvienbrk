@@ -27,13 +27,25 @@ export async function POST(
 
     const { statusFilter } = await req.json().catch(() => ({}));
 
-    const sheetUrl = await exportCampaignToSheet(campaign.id, campaign.title, statusFilter);
+    const result = await exportCampaignToSheet(campaign.id, campaign.title, statusFilter);
 
-    if (!sheetUrl) {
-      return NextResponse.json({ error: "Không có log nào để export hoặc lỗi OAuth" }, { status: 400 });
+    if (!result) {
+      return NextResponse.json({ error: "Không có log nào để export" }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, sheetUrl });
+    if (result.sheetUrl) {
+      return NextResponse.json({ success: true, sheetUrl: result.sheetUrl });
+    }
+
+    // Fallback: token hết hạn → trả về CSV để user copy thủ công
+    return NextResponse.json({
+      success: false,
+      error: "Token Google hết hạn ở tất cả sender. Dùng dữ liệu CSV bên dưới để import vào Google Sheets thủ công.",
+      csvContent: result.csvContent,
+      fileName: result.fileName,
+      totalRows: result.totalRows,
+    });
+
   } catch (error: any) {
     console.error("[ExportSheet] Lỗi:", error);
     return new NextResponse(error.message, { status: 500 });

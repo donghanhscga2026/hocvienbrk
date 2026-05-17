@@ -309,9 +309,9 @@ export async function POST(
     if (isCompleted) {
       campaignStats.delete(campaignId);
 
-      const sheetUrl = await exportCampaignToSheet(campaignId, campaign.title);
-      if (sheetUrl) {
-        console.log(`[EmailCampaign] 📊 Sheet kết quả: ${sheetUrl}`);
+      const exportResult = await exportCampaignToSheet(campaignId, campaign.title);
+      if (exportResult?.sheetUrl) {
+        console.log(`[EmailCampaign] 📊 Sheet kết quả: ${exportResult.sheetUrl}`);
       }
 
       if (config.enableTelegramAlert) {
@@ -322,7 +322,7 @@ export async function POST(
           sent: allRecipients.length,
           success: stats.success,
           failed: stats.failed,
-          sheetUrl: sheetUrl || undefined,
+          sheetUrl: exportResult?.sheetUrl || undefined,
         });
       }
     }
