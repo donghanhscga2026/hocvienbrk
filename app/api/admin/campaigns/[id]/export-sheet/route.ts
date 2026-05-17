@@ -37,10 +37,10 @@ export async function POST(
       return NextResponse.json({ success: true, sheetUrl: result.sheetUrl });
     }
 
-    // Fallback: token hết hạn → trả về CSV để user copy thủ công
+    // Fallback: không tạo được Sheet → trả về CSV để user copy thủ công
     return NextResponse.json({
       success: false,
-      error: "Token Google hết hạn ở tất cả sender. Dùng dữ liệu CSV bên dưới để import vào Google Sheets thủ công.",
+      error: "Không thể tạo Google Sheets. Chi tiết lỗi: " + (result.sheetError || "Không rõ"),
       csvContent: result.csvContent,
       fileName: result.fileName,
       totalRows: result.totalRows,
