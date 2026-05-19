@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban, Search } from 'lucide-react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban, Search, FileSpreadsheet } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { Button } from '@/components/ui/button'
 
@@ -74,6 +74,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const [issueLogs, setIssueLogs] = useState<any[]>([])
   const [bounceScanning, setBounceScanning] = useState(false)
   const [bounceResult, setBounceResult] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   const fetchCampaign = async () => {
     try {
@@ -247,6 +249,27 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     } catch {}
   }
 
+  const handleExportSheet = async (statusFilter?: string) => {
+    setExporting(true)
+    setExportError('')
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/export-sheet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusFilter }),
+      })
+      const data = await res.json()
+      if (data.success && data.sheetUrl) {
+        window.open(data.sheetUrl, '_blank')
+      } else {
+        setExportError(data.error || 'Lỗi không xác định')
+      }
+    } catch (err: any) {
+      setExportError(err.message)
+    }
+    setExporting(false)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -404,6 +427,25 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           {bounceResult && (
             <div className="bg-purple-50 rounded-xl p-3 text-xs font-bold text-purple-700">
               {bounceResult}
+            </div>
+          )}
+
+          {campaign.sentCount > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={() => handleExportSheet()} disabled={exporting}
+                className="bg-green-50 hover:bg-green-100 text-green-700 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-xs">
+                {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSpreadsheet className="w-3 h-3" />} Xuất tất cả
+              </Button>
+              <Button onClick={() => handleExportSheet('ERRORS')} disabled={exporting}
+                className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-xs">
+                {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <AlertCircle className="w-3 h-3" />} Xuất log lỗi
+              </Button>
+            </div>
+          )}
+
+          {exportError && (
+            <div className="bg-red-50 rounded-xl p-3 text-xs font-bold text-red-600">
+              ❌ {exportError}
             </div>
           )}
         </div>

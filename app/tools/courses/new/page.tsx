@@ -16,6 +16,7 @@ function CreateCourseContent() {
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [isTeacher, setIsTeacher] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
     
     // ✅ NEW: Edit mode states (Thêm mới, giữ nguyên 21 states cũ)
@@ -128,12 +129,19 @@ function CreateCourseContent() {
         const fetchData = async () => {
             const res = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = res?.user?.role === 'ADMIN'
+            const isTeacherUser = res?.user?.role === 'TEACHER'
             setIsAdmin(isAdminUser)
+            setIsTeacher(isTeacherUser)
              
-            if (isAdminUser) {
+            if (isAdminUser || isTeacherUser) {
                 const teachersRes = await getTeachersAction()
                 if (teachersRes.success) {
                     setTeachers(teachersRes.teachers || [])
+                }
+                
+                // Mặc định là chính mình nếu đang tạo mới
+                if (!courseId && res?.user?.id) {
+                    setTeacherId(res.user.id.toString())
                 }
             }
              
@@ -216,8 +224,8 @@ function CreateCourseContent() {
                 noidung_email: noidungEmail || null,
             }
 
-            // CHỈ cho phép Admin thay đổi Giáo viên
-            if (isAdmin) {
+            // Cho phép Admin/Teacher thay đổi Giáo viên
+            if (isAdmin || isTeacher) {
                 updateData.teacherId = teacherId ? parseInt(teacherId) : null
             }
 
@@ -252,7 +260,7 @@ function CreateCourseContent() {
             if (linkZalo) formData.append('link_zalo', linkZalo)
             if (fileEmail) formData.append('file_email', fileEmail)
             if (noidungEmail) formData.append('noidung_email', noidungEmail)
-            if (isAdmin && teacherId) formData.append('teacherId', teacherId)
+            if ((isAdmin || isTeacher) && teacherId) formData.append('teacherId', teacherId)
             
             const res = await createCourseAction(formData)
             
@@ -411,7 +419,7 @@ function CreateCourseContent() {
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
                             />
                         </div>
-                        {isAdmin && (
+                        {(isAdmin || isTeacher) && (
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
                                 <select 
@@ -421,7 +429,7 @@ function CreateCourseContent() {
                                 >
                                     <option value="">Tự động (session)</option>
                                     {teachers.map((t: any) => (
-                                        <option key={t.id} value={t.id}>{t.name || t.email}</option>
+                                        <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
                                     ))}
                                 </select>
                             </div>

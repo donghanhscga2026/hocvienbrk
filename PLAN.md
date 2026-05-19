@@ -1479,3 +1479,6 @@ Hoàn thiện file tài liệu `app/tools/email-mkt/EMAIL_MKT_PLAN.md` với TO�
 - ✅ Có thể rebuild toàn bộ hệ thống từ file này
 
 
+$content
+$content
+$content

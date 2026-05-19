@@ -501,13 +501,12 @@ export async function createCourseAction(formData: FormData) {
     if (!id_khoa?.trim()) return { success: false, error: "Mã khóa học là bắt buộc" }
     if (!name_lop?.trim()) return { success: false, error: "Tên lớp học là bắt buộc" }
     
-    // ✅ Xác định teacherId: ADMIN được chọn, TEACHER tự động lấy session.id
-    let teacherId: number | null = null
-    if (isAdmin) {
-        const teacherIdStr = formData.get('teacherId') as string
-        teacherId = teacherIdStr ? parseInt(teacherIdStr) : null
-    } else if (session.user.role === Role.TEACHER) {
-        teacherId = userId
+    // ✅ Xác định teacherId: Mặc định là chính mình, cho phép chọn người khác nếu là ADMIN/TEACHER
+    let teacherId: number | null = userId
+    const teacherIdFromForm = formData.get('teacherId') as string
+    
+    if (teacherIdFromForm) {
+        teacherId = parseInt(teacherIdFromForm)
     }
     
     try {
@@ -631,11 +630,13 @@ export async function getTeachersAction() {
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
     
     const isAdmin = session.user.role === Role.ADMIN
-    if (!isAdmin) return { success: false, error: "Unauthorized" }
+    const isTeacher = session.user.role === Role.TEACHER
+
+    if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
     
     try {
         const teachers = await prisma.user.findMany({
-            where: { role: Role.TEACHER },
+            where: { role: { in: [Role.TEACHER, Role.ADMIN] } },
             select: { id: true, name: true, email: true }
         })
         return { success: true, teachers }

@@ -5015,3 +5015,68 @@ Tab **Cấu hình**: emailsBeforePause (20-100), pauseDuration (5-60 phút), int
 ---
 
 *Hết tài liệu.*
+
+---
+
+## XII. NÂNG CẤP XUẤT DỮ LIỆU GOOGLE SHEETS (2026-05-19)
+
+### 12.1 Mục tiêu
+Khắc phục triệt để các lỗi liên quan đến xuất dữ liệu:
+1. Lỗi tương thích locale: "Unable to parse range: Sheet1!A1".
+2. Lỗi quyền truy cập: "Access Denied" (yêu cầu xin cấp quyền từ sender).
+3. Nhu cầu lọc dữ liệu: Xuất riêng danh sách email lỗi để xử lý.
+
+### 12.2 Chi tiết thay đổi
+
+#### A. lib/email-campaign-export.ts (Logic Export)
+- **Dynamic Sheet Discovery**: Hệ thống tự động lấy `sheetId` và `title` thực tế từ Google response thay vì mặc định "Sheet1".
+- **Auto Public Sharing**: Sử dụng Google Drive API v3 để thiết lập quyền "Anyone with the link" (reader) ngay sau khi tạo file.
+- **ERRORS Filter**: Hỗ trợ lọc riêng các email có trạng thái `FAILED`, `BOUNCED`, `SKIPPED`.
+
+#### B. app/tools/email-mkt/[id]/page.tsx (Giao diện)
+- **Export Buttons**: Bổ sung bộ đôi nút "Xuất tất cả" và "Xuất log lỗi" vào trang chi tiết chiến dịch.
+
+### 12.3 Cập nhật Source Code quan trọng (lib/email-campaign-export.ts)
+```typescript
+async function doCreateSheet(sheets: any, rows: string[][], headers: string[], safeTitle: string): Promise<string> {
+  const createResponse = await sheets.spreadsheets.create({
+    requestBody: { properties: { title: `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}` } }
+  });
+  const spreadsheetId = createResponse.data.spreadsheetId;
+  const firstSheet = createResponse.data.sheets?.[0];
+  const firstSheetId = firstSheet?.properties?.sheetId || 0;
+  const firstSheetTitle = firstSheet?.properties?.title || "Sheet1";
+  let targetRange = `${firstSheetTitle}!A1`;
+
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          updateSheetProperties: { properties: { sheetId: firstSheetId, title: "Data" }, fields: "title" }
+        }]
+      }
+    });
+    targetRange = "Data!A1";
+  } catch (err: any) { console.warn("Rename failed, using original name."); }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId, range: targetRange, valueInputOption: "RAW", requestBody: { values: [headers, ...rows] }
+  });
+
+  // Mở quyền truy cập công khai
+  try {
+    const drive = google.drive({ version: "v3", auth: sheets.context._options.auth });
+    await drive.permissions.create({
+      fileId: spreadsheetId,
+      requestBody: { role: "reader", type: "anyone" }
+    });
+  } catch (err: any) { console.error("Permission error:", err.message); }
+
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+}
+```
+
+---
+
+*Hết tài liệu (Cập nhật 19/05/2026).*

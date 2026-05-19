@@ -104,6 +104,13 @@
 - **Không ngoại lệ**: Ngay cả khi lỗi nằm ở file cũ hoặc file không thuộc phạm vi sửa đổi, Agent vẫn phải xử lý (hoặc báo cáo để xử lý) vì Vercel sẽ từ chối Deploy nếu còn bất kỳ lỗi TypeScript nào.
 - **Nguyên tắc**: "Code trên máy chạy được" chưa phải là xong. "Code build thành công" mới là xong.
 
+### 10. BẢO TOÀN BẢNG MÃ UTF-8 (CẤM DÙNG SHELL COMMAND ĐỂ SỬA FILE)
+> Tuyệt đối không dùng PowerShell/Shell (`Add-Content`, `Set-Content`, `echo`) để ghi, nối, hoặc sửa file có chứa ký tự tiếng Việt (đặc biệt là các file `.md` như `PLAN.md`).
+
+- **Nguyên nhân**: Lệnh shell trên Windows (như `Add-Content`) mặc định thường dùng bảng mã ANSI/Windows-1252. Khi ghi chuỗi tiếng Việt vào file đang ở định dạng UTF-8, nó sẽ phá hỏng toàn bộ font chữ của file (lỗi Mojibake như `NNG CP`, `Mc tiu`).
+- **Quy định bắt buộc**: **Chỉ được sử dụng công cụ nội bộ `replace` hoặc `write_file`** của Agent để chỉnh sửa file. Các công cụ này chạy bằng Node.js nên luôn bảo toàn chính xác mã hóa UTF-8.
+- Nếu phải dùng shell, bắt buộc phải báo trước và giải thích tại sao không dùng được công cụ `replace`.
+
 ---
 
 ## 🟡 QUY TRÌNH LÀM VIỆC (MANDATORY)

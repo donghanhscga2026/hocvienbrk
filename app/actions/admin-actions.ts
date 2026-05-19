@@ -872,14 +872,10 @@ export async function updateCourseAction(courseId: number, data: {
         
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
         
-        // ✅ TEACHER chỉ được sửa course có teacherId = userId
-        if (!isAdmin && course.teacherId !== userId) {
+        // ✅ Quyền sửa: ADMIN hoặc chính TEACHER sở hữu khóa học
+        const isTeacherOwner = session.user.role === Role.TEACHER && course.teacherId === userId
+        if (!isAdmin && !isTeacherOwner) {
             return { success: false, error: "Bạn không có quyền sửa khóa học này" }
-        }
-        
-        // ✅ Nếu không phải ADMIN, tuyệt đối không cho phép thay đổi teacherId
-        if (!isAdmin) {
-            delete data.teacherId
         }
 
         const updatedCourse = await prisma.course.update({
