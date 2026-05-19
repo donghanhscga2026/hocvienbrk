@@ -28,7 +28,11 @@ export interface ExportResult {
 
 export async function exportCampaignToSheet(campaignId: number, campaignTitle: string, statusFilter?: string): Promise<ExportResult | null> {
   const where: any = { campaignId };
-  if (statusFilter) where.status = statusFilter;
+  if (statusFilter === "ERRORS") {
+    where.status = { in: ["FAILED", "BOUNCED", "SKIPPED"] };
+  } else if (statusFilter) {
+    where.status = statusFilter;
+  }
 
   const logs = await prisma.emailCampaignLog.findMany({
     where,
@@ -139,10 +143,34 @@ async function doCreateSheet(sheets: any, rows: string[][], headers: string[], s
   const spreadsheetId = createResponse.data.spreadsheetId;
   if (!spreadsheetId) throw new Error("Không thể tạo Google Sheet");
 
+  // Lấy sheetId và title của sheet đầu tiên (locale VN tạo "Trang tính1" thay vì "Sheet1")
+  const firstSheet = createResponse.data.sheets?.[0];
+  const firstSheetId = firstSheet?.properties?.sheetId || 0;
+  const firstSheetTitle = firstSheet?.properties?.title || "Sheet1";
+  let targetRange = `${firstSheetTitle}!A1`;
+
+  // Thử rename sheet sang "Data" cho đẹp
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          updateSheetProperties: {
+            properties: { sheetId: firstSheetId, title: "Data" },
+            fields: "title",
+          },
+        }],
+      },
+    });
+    targetRange = "Data!A1";
+  } catch (err: any) {
+    console.warn(`[CampaignExport] Không thể rename sheet: ${err.message}. Sẽ dùng tên gốc: ${firstSheetTitle}`);
+  }
+
   const values = [headers, ...rows];
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: "Sheet1!A1",
+    range: targetRange,
     valueInputOption: "RAW",
     requestBody: { values },
   });
@@ -161,6 +189,22 @@ async function doCreateSheet(sheets: any, rows: string[][], headers: string[], s
   });
 
   const sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+
+  // Thêm quyền public cho bất kỳ ai có link (reader) để admin không bị chặn access
+  try {
+    const drive = google.drive({ version: "v3", auth: sheets.context._options.auth });
+    await drive.permissions.create({
+      fileId: spreadsheetId,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
+    });
+    console.log(`[CampaignExport] 🔓 Đã mở quyền truy cập công khai cho Sheet: ${spreadsheetId}`);
+  } catch (err: any) {
+    console.error(`[CampaignExport] Không thể mở quyền truy cập: ${err.message}`);
+  }
+
   console.log(`[CampaignExport] ✅ Đã tạo Google Sheet: ${sheetUrl}`);
   return sheetUrl;
 }

@@ -75,6 +75,7 @@ export function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">File CSV</label>
                             <input
+                                key="file-input"
                                 type="file"
                                 accept=".csv"
                                 onChange={(e) => setFile(e.target.files?.[0] || null)}
@@ -85,6 +86,7 @@ export function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link Google Sheets (Public)</label>
                             <input
+                                key="sheet-input"
                                 type="text"
                                 value={sheetUrl}
                                 onChange={(e) => setSheetUrl(e.target.value)}
