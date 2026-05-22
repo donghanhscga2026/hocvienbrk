@@ -34,6 +34,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [dateJoin, setDateJoin] = useState('')
     const [teacherId, setTeacherId] = useState<number | null>(null)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [isTeacher, setIsTeacher] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
     
     // ✅ NEW: Section 2 - Description & Image
@@ -118,12 +119,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const fetchData = async () => {
         setLoading(true)
         try {
-            // ✅ Fetch Session & Teachers if Admin
+            // ✅ Fetch Session & Teachers if Admin or Teacher
             const sessionRes = await fetch('/api/auth/session').then(r => r.json())
             const isAdminUser = sessionRes?.user?.role === 'ADMIN'
+            const isTeacherUser = sessionRes?.user?.role === 'TEACHER'
             setIsAdmin(isAdminUser)
+            setIsTeacher(isTeacherUser)
             
-            if (isAdminUser) {
+            if (isAdminUser || isTeacherUser) {
                 const { getTeachersAction } = await import('@/app/actions/course-actions')
                 const teachersRes = await getTeachersAction()
                 if (teachersRes.success) {
@@ -199,8 +202,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             noidung_email: noidungEmail || null,
         }
 
-        // CHỈ cho phép Admin thay đổi Giáo viên
-        if (isAdmin) {
+        // Cho phép Admin/Teacher thay đổi Giáo viên
+        if (isAdmin || isTeacher) {
             updateData.teacherId = teacherId ? parseInt(teacherId as any) : null
         }
 
@@ -318,13 +321,13 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
                                 <input type="date" value={dateJoin} onChange={(e) => setDateJoin(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                             </div>
-                            {isAdmin && (
+                            {(isAdmin || isTeacher) && (
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
                                     <select value={teacherId || ''} onChange={(e) => setTeacherId(parseInt(e.target.value) || null)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                                         <option value="">Chọn giáo viên...</option>
                                         {teachers.map((t: any) => (
-                                            <option key={t.id} value={t.id}>{t.name || t.email}</option>
+                                            <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -339,10 +342,9 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         </h2>
                         
                          <div className="space-y-1.5">
-                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
-                              <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
-                              <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
-                          </div>
+                           <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (Enter để xuống dòng)</label>
+                           <textarea value={moTaNgan} onChange={(e) => setMoTaNgan(e.target.value)} onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)} rows={6} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Enter để xuống dòng sẽ tự thêm <br>..." />
+                         </div>
                          
                          <div className="space-y-1.5 mt-4">
                               <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả dài (Enter để xuống dòng)</label>

@@ -444,16 +444,15 @@ function CreateCourseContent() {
                     </h2>
                     
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (max 200 chars, Enter để xuống dòng)</label>
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mô tả ngắn (Enter để xuống dòng)</label>
                         <textarea 
                             value={moTaNgan} 
-                            onChange={(e) => setMoTaNgan(e.target.value.slice(0, 200))}
+                            onChange={(e) => setMoTaNgan(e.target.value)}
                             onKeyDown={(e) => handleTextareaKeyDown(e, setMoTaNgan)}
                             rows={6}
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" 
                             placeholder="Mô tả ngắn gọn... (Enter để xuống dòng sẽ tự thêm <br>)" 
                         />
-                        <div className="text-right text-[10px] text-gray-400">{moTaNgan.length}/200</div>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">
