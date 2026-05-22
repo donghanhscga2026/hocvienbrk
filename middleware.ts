@@ -2,7 +2,6 @@ import NextAuth from "next-auth"
 import { authConfig } from "./auth.config"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import prisma from "@/lib/prisma"
 
 const { auth } = NextAuth(authConfig)
 
@@ -23,90 +22,31 @@ const RESERVED_PATHS = new Set([
 ])
 
 export default auth(async function middleware(request: NextRequest & { auth: any }) {
+    const { nextUrl } = request
+    
+    // KHÔNG can thiệp vào các route auth để tránh lỗi PKCE/Cookies
+    if (nextUrl.pathname.startsWith('/api/auth')) {
+        return NextResponse.next()
+    }
+
     const response = NextResponse.next()
     
     const refCode = request.nextUrl.searchParams.get('ref')
     const pathParts = request.nextUrl.pathname.split('/').filter(Boolean)
     const potentialSlug = pathParts.length > 0 ? pathParts[0] : null
     
-    // Root path (giautoandien.io.vn/) → cho phép qua, app/page.tsx sẽ xử lý
-    if (!potentialSlug) {
-        if (refCode) {
-            saveRefCookie(response, refCode, null, null, null)
-        }
-        return response
+    // 1. Luôn lưu cookie ref nếu có (Mọi trang)
+    if (refCode) {
+        // Kiểm tra nếu là dynamic slug thì gán luôn vào cookie data
+        const landingSlug = potentialSlug && !RESERVED_PATHS.has(potentialSlug) ? potentialSlug : null
+        saveRefCookie(response, refCode, landingSlug, landingSlug, null)
     }
     
-    // Check nếu là reserved path
-    if (RESERVED_PATHS.has(potentialSlug)) {
-        if (refCode) {
-            saveRefCookie(response, refCode, null, null, null)
-        }
-        return response
-    }
-    
-    // Check nếu là SiteProfile slug (từ database)
-    const isSiteProfile = await checkIsSiteProfile(potentialSlug)
-    
-    if (isSiteProfile) {
-        // SiteProfile → cho phép qua (route /[slug]/page.tsx sẽ xử lý)
-        if (refCode) {
-            saveRefCookie(response, refCode, null, null, null)
-        }
-        return response
-    }
-    
-    // Không phải SiteProfile → xử lý affiliate ref
-    const session = request.auth
-    
-    // Kiểm tra course/landing slug
-    const courseSlug = potentialSlug
-    const landingSlug = potentialSlug
-    
-    saveRefCookie(response, refCode || '', landingSlug, courseSlug, null)
-    
-    if (!session?.user) {
-        // Chưa đăng nhập → redirect tới trang register
-        const redirectUrl = new URL('/register', request.url)
-        redirectUrl.searchParams.set('redirect', potentialSlug)
-        if (refCode) {
-            redirectUrl.searchParams.set('ref', refCode)
-        }
-        return NextResponse.redirect(redirectUrl)
-    }
-    
-    // Đã đăng nhập → cho phép truy cập trang (không redirect)
+    // 2. Cho phép request đi tiếp. 
+    // Logic Redirect nếu chưa đăng nhập cho Course/Landing sẽ được xử lý trong app/[slug]/page.tsx
+    // Middleware chỉ chặn các route cứng trong auth.config (admin, dashboard...)
     return response
 })
-
-// Cache để tránh query database quá nhiều
-let profileSlugCache: Set<string> | null = null
-let cacheTimestamp = 0
-const CACHE_TTL = 60 * 1000 // 1 phút
-
-async function checkIsSiteProfile(slug: string): Promise<boolean> {
-    // Check cache trước
-    if (profileSlugCache && Date.now() - cacheTimestamp < CACHE_TTL) {
-        return profileSlugCache.has(slug)
-    }
-    
-    try {
-        // Query database
-        const profiles = await prisma.siteProfile.findMany({
-            where: { isActive: true },
-            select: { slug: true }
-        })
-        
-        profileSlugCache = new Set(profiles.map((p: { slug: string }) => p.slug))
-        cacheTimestamp = Date.now()
-        
-        return profileSlugCache.has(slug)
-    } catch (error) {
-        console.error('Error checking SiteProfile:', error)
-        // Fallback: cho phép qua nếu lỗi (để tránh block pages hợp lệ)
-        return true
-    }
-}
 
 function saveRefCookie(
     response: NextResponse, 

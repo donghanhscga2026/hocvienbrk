@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 // Helper để duy trì phả hệ Closure
 import { addUserToClosure } from '@/lib/closure-helpers'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
+import { getNextAvailableId } from '@/lib/id-helper'
 
 const prisma = new PrismaClient()
 
@@ -452,9 +453,8 @@ const duration = Date.now() - startTime
 
           // ===== PE: Tạo User nếu chưa tìm thấy =====
           if (!targetUserId) {
-            // Tạo user mới với ID = tiếp theo
-            const maxUserId = Math.max(...allUsers.map(u => u.id), 0)
-            targetUserId = maxUserId + 1
+            // Tạo user mới với ID = tiếp theo (Tuân thủ quy tắc số đẹp/Reserved ID)
+            targetUserId = await getNextAvailableId()
             
             const hashedPassword = await bcrypt.hash('Brk#3773', 10)
             try {
@@ -472,9 +472,16 @@ const duration = Date.now() - startTime
               stats.usersCreated++
               action = 'PE'
               console.log(`[TCA Sync] Created user ${targetUserId} for tcaId ${tcaId}`)
+              
+              // Cập nhật map để các node sau có thể thấy ID mới này nếu trùng thông tin
+              if (normalizedPhone) phoneToUserId.set(normalizedPhone, targetUserId)
+              if (email) emailToUserId.set(email.toLowerCase(), targetUserId)
+              
             } catch (userError: any) {
               if (userError.code === 'P2002') {
-                console.log(`[TCA Sync] User ${targetUserId} already exists`)
+                console.log(`[TCA Sync] User ${targetUserId} already exists (Race condition?)`)
+                // Thử lấy lại ID khả dụng tiếp theo nếu bị trùng
+                targetUserId = await getNextAvailableId()
               } else {
                 throw userError
               }

@@ -499,6 +499,32 @@ Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi ch
 
 ---
 
+## ✅ PHẦN 25: TỐI ƯU LOGIC CẤP PHÁT ID (2026-05-22)
+
+### Mục tiêu
+Đảm bảo mọi phương thức tạo người dùng (Google OAuth, TCA Sync) đều tuân thủ quy tắc: ID tăng dần nhưng phải loại trừ danh sách "số đẹp" (Reserved IDs).
+
+### Các thay đổi chính
+
+#### 1. Google OAuth (`auth.ts`)
+- **Vấn đề**: Trước đây sử dụng Adapter mặc định, database tự tăng ID (autoincrement) nên có thể rơi vào các số đẹp đã được quy hoạch.
+- **Giải pháp**: Ghi đè phương thức `createUser` của PrismaAdapter. Sử dụng helper `getNextAvailableId()` để tìm ID normal cao nhất và tăng dần, đảm bảo bỏ qua mọi số đẹp.
+
+#### 2. Hệ thống TCA Sync (`app/api/sync-tca/route.ts`)
+- **Vấn đề**: Logic cũ lấy `max(id) + 1` trực tiếp từ database, vô tình lấy luôn các số đẹp (ví dụ 8888) làm mốc để cộng dồn, gây sai lệch nghiêm trọng.
+- **Giải pháp**: Chuyển sang sử dụng `getNextAvailableId()` cho từng user mới được tạo trong quá trình đồng bộ.
+
+#### 3. Preview TCA Sync (`app/api/sync-tca/preview/route.ts`)
+- **Cải tiến**: Xây dựng bộ tạo ID theo lô (batch generator) thông minh. Bộ tạo này không chỉ bỏ qua số đẹp trong DB mà còn đảm bảo không cấp trùng ID cho các user trong cùng một lượt preview.
+
+### Trạng thái
+- ✅ Đăng ký bằng Google tuân thủ đúng dải ID normal.
+- ✅ Đồng bộ TCA tuân thủ đúng dải ID normal.
+- ✅ Loại bỏ hoàn toàn lỗi "nhảy số" khi có sự xuất hiện của số đẹp trong DB.
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+
+---
+
 ## ✅ PHẦN 24: KÍCH HOẠT HỆ THỐNG MIDDLEWARE (2026-05-22)
 
 ### Mục tiêu

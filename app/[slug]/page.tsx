@@ -158,6 +158,26 @@ export default async function DynamicSlugPage({ params }: PageProps) {
     const profile = await getSiteProfile(slug)
     
     if (!profile) {
+        // KHÔNG PHẢI SITE PROFILE → Yêu cầu đăng nhập nếu chưa có session
+        // Đây là logic bảo mật được chuyển từ middleware sang trang để dùng được Prisma
+        if (!session?.user) {
+            const { cookies } = await import("next/headers")
+            const cookieStore = await cookies()
+            const affRefCookie = cookieStore.get('aff_ref')
+            let refCode = ""
+            if (affRefCookie) {
+                try {
+                    const data = JSON.parse(decodeURIComponent(affRefCookie.value))
+                    refCode = data.r || ""
+                } catch {}
+            }
+            
+            const redirectUrl = `/register?redirect=${slug}${refCode ? `&ref=${refCode}` : ''}`
+            import("next/navigation").then(nav => nav.redirect(redirectUrl))
+            // Fallback for RSC redirect
+            const { redirect } = await import("next/navigation")
+            redirect(redirectUrl)
+        }
         notFound()
     }
     

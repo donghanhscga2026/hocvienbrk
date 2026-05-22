@@ -94,8 +94,22 @@ export async function POST(request: Request) {
 
     // Import getNextAvailableId
     const { getNextAvailableId } = await import('@/lib/id-helper');
+    const reservedIds = await prisma.reservedId.findMany({ select: { id: true } });
+    const reservedIdSet = new Set(reservedIds.map((r: any) => r.id));
 
-    let nextAvailableUserId = await getNextAvailableId();
+    let currentUserIdBase = await getNextAvailableId();
+    const assignedUserIds = new Set<number>();
+
+    function getNextUserIdInBatch() {
+      while (reservedIdSet.has(currentUserIdBase) || assignedUserIds.has(currentUserIdBase)) {
+        currentUserIdBase++;
+      }
+      const id = currentUserIdBase;
+      assignedUserIds.add(id);
+      currentUserIdBase++;
+      return id;
+    }
+
     let nextAvailableSystemId = 1;
 
     // Get current max system autoId
@@ -109,7 +123,7 @@ export async function POST(request: Request) {
 
     const preview = {
       total: allNodes.length,
-      nextAvailableUserId,
+      nextAvailableUserId: currentUserIdBase,
       nextAvailableSystemId,
       rows: [] as {
         // Column 1: TCA info
@@ -410,7 +424,7 @@ export async function POST(request: Request) {
       if (matchType === 'N') {
         // N: Mới hoàn toàn - tạo User + referrer closure, System + system closure, TCA Member
         action = 'PE S TCA'  // Tạo tất cả
-        expectedUserId = nextAvailableUserId++
+        expectedUserId = getNextUserIdInBatch()
         expectedSystemId = nextAvailableSystemId++
       } else if (matchType === 'PE') {
         // PE: Có User (P+E), thiếu S và TCA
@@ -545,7 +559,7 @@ export async function POST(request: Request) {
       } else {
         // Fallback - tạo mới tất cả (chỉ khi không khớp bất kỳ case nào)
         action = 'PE S TCA'
-        expectedUserId = nextAvailableUserId++
+        expectedUserId = getNextUserIdInBatch()
         expectedSystemId = nextAvailableSystemId++
       }
 
