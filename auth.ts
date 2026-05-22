@@ -25,9 +25,32 @@ export async function isDefaultPassword(password: string): Promise<boolean> {
   return bcrypt.compare("Brk#3773", password);
 }
 
+const baseAdapter = PrismaAdapter(prisma)
+const customAdapter = {
+    ...baseAdapter,
+    createUser: async (data: any) => {
+        try {
+            const { getNextAvailableId } = await import("@/lib/id-helper")
+            const newId = await getNextAvailableId()
+            console.log(`✨ [Auth] Tạo user mới qua OAuth với ID tùy chỉnh: #${newId} (${data.email})`)
+            return prisma.user.create({
+                data: {
+                    ...data,
+                    id: newId,
+                },
+            })
+        } catch (error) {
+            console.error("❌ [Auth] Lỗi khi tạo user với ID tùy chỉnh:", error)
+            // Fallback: để database tự quyết định nếu có lỗi (tránh block sign-in)
+            return baseAdapter.createUser!(data)
+        }
+    }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig,
-    adapter: PrismaAdapter(prisma) as any, 
+    trustHost: true,
+    adapter: customAdapter as any, 
     session: { strategy: "jwt" },
     providers: [
         Google({

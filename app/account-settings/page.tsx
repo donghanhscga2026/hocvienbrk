@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getUserWithAccounts, updateUserProfile, changePassword } from '@/app/actions/account-actions'
-import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, Hash } from 'lucide-react'
 import Link from 'next/link'
 
 interface UserData {
@@ -333,6 +333,19 @@ export default function AccountSettingsPage() {
                 <div className="bg-brk-background rounded-2xl border border-brk-outline p-6 mb-6">
                     <h2 className="text-lg font-semibold text-brk-on-surface mb-4">Thông tin tài khoản</h2>
                     <form onSubmit={handleUpdateProfile} className="space-y-4">
+                        <div>
+                            <label className="block text-sm text-brk-muted mb-2">
+                                <Hash className="inline h-4 w-4 mr-2" />
+                                ID Học viên
+                            </label>
+                            <input
+                                type="text"
+                                value={user.id}
+                                disabled
+                                className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-muted cursor-not-allowed font-mono"
+                            />
+                            <p className="text-xs text-brk-muted mt-1">ID định danh duy nhất của bạn trên hệ thống</p>
+                        </div>
                         <div>
                             <label className="block text-sm text-brk-muted mb-2">
                                 <User className="inline h-4 w-4 mr-2" />
