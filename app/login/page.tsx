@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 
 function LoginForm() {
     const { data: session } = useSession()
@@ -132,9 +133,8 @@ function LoginForm() {
         signOut({ callbackUrl: '/login' })
     }
 
-    const handleGoogleSignIn = () => {
-        setIsLoading(true)
-        signIn("google", { callbackUrl: "/" })
+    const handleGoogleLoading = (loading: boolean) => {
+        setIsLoading(loading)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -236,14 +236,11 @@ function LoginForm() {
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
                     {/* Google */}
-                    <button
-                        onClick={handleGoogleSignIn}
-                        disabled={isLoading}
-                        className="flex w-full items-center justify-center gap-3 rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-sm font-medium text-brk-on-surface hover:bg-brk-surface/10 transition-colors disabled:opacity-50"
-                    >
-                        <svg className="h-4 w-4 shrink-0" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z" /></svg>
-                        Đăng nhập bằng Google
-                    </button>
+                    <SocialAuthButtons 
+                        callbackUrl={redirectSlug ? `/${redirectSlug}` : "/"} 
+                        isLoading={isLoading}
+                        onLoading={handleGoogleLoading}
+                    />
 
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>

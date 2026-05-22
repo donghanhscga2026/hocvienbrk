@@ -202,6 +202,57 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         signIn: '/login',
     },
     events: {
+        async createUser({ user }) {
+            console.log(`👤 Người dùng mới được tạo qua OAuth: ${user.email} (ID: ${user.id})`);
+            try {
+                const { cookies } = await import("next/headers");
+                const cookieStore = await cookies();
+                const affRefCookie = cookieStore.get('aff_ref');
+                
+                let refId = 0;
+                let landingSlug = null;
+                
+                if (affRefCookie) {
+                    try {
+                        const affData = JSON.parse(decodeURIComponent(affRefCookie.value));
+                        if (affData.r) {
+                            refId = parseInt(affData.r);
+                        }
+                        landingSlug = affData.l || affData.c || null;
+                    } catch (e) {
+                        console.error("[Auth] Lỗi parse cookie aff_ref trong createUser:", e);
+                    }
+                }
+
+                if (!user.id) return;
+                const userIdNum = parseInt(user.id);
+
+                if (refId && !isNaN(refId)) {
+                    // Cập nhật referrerId
+                    await prisma.user.update({
+                        where: { id: userIdNum },
+                        data: { referrerId: refId }
+                    });
+                    
+                    // Thêm vào cây phả hệ
+                    const { addUserToClosure } = await import("@/lib/closure-helpers");
+                    await addUserToClosure(userIdNum, refId);
+                    
+                    // Theo dõi chuyển đổi affiliate
+                    const { trackAffiliateConversion } = await import("@/lib/affiliate/tracking");
+                    await trackAffiliateConversion({
+                        refCode: refId.toString(),
+                        userId: userIdNum,
+                        landingSlug: landingSlug,
+                        type: 'REGISTRATION'
+                    });
+
+                    console.log(`✅ Đã gán người giới thiệu #${refId} cho người dùng mới #${user.id}`);
+                }
+            } catch (error) {
+                console.error("❌ Lỗi trong sự kiện createUser:", error);
+            }
+        },
         async signIn({ user, account }) {
             console.log(`🔐 Sự kiện signIn kích hoạt cho user: ${user.email}, Provider: ${account?.provider}`);
             

@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật dự án HocVien-BRK
-> Cập nhật lần cuối: **2026-04-23 19:10**  
+> Cập nhật lần cuối: **2026-05-22 18:45**  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -496,6 +496,53 @@ Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi ch
 - ✅ `npm run build` vượt qua bước compile CSS thành công.
 - ✅ Đã test require thủ công qua script: Thành công.
 - ✅ Cấu trúc `node_modules` đã có đủ binary ở cả 2 vị trí (root package và native package).
+
+---
+
+## ✅ PHẦN 24: KÍCH HOẠT HỆ THỐNG MIDDLEWARE (2026-05-22)
+
+### Mục tiêu
+Sửa lỗi file Middleware bị đặt sai tên khiến toàn bộ logic điều hướng, bảo mật và lưu cookie Affiliate không hoạt động.
+
+### Thay đổi
+- **Thao tác**: Đổi tên file `proxy.ts` (thư mục gốc) thành `middleware.ts`.
+- **Lý do**: Next.js chỉ nhận diện file có tên chính xác là `middleware.ts` (hoặc `.js`) để thực hiện các logic can thiệp vào request (Request Interception).
+
+### Hệ quả tích cực sau khi sửa
+- ✅ **Affiliate Tracking**: Tự động nhận diện và lưu cookie `aff_ref` ngay khi người dùng nhấn vào link có `?ref=...`.
+- ✅ **Bảo mật**: Middleware của NextAuth được kích hoạt để bảo vệ các route `/admin`, `/dashboard`, `/tools`.
+- ✅ **Site Profiles**: Các đường dẫn rút gọn của Site Profile được xử lý chính xác thông qua logic `checkIsSiteProfile`.
+
+### Trạng thái
+- ✅ Đã đổi tên thành công.
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+
+---
+
+## ✅ PHẦN 23: TỐI ƯU HÓA ĐĂNG NHẬP GOOGLE (2026-05-22)
+
+### Mục tiêu
+Nâng cao trải nghiệm người dùng và đảm bảo tính toàn vẹn dữ liệu cho tính năng đăng nhập bằng Google (OAuth).
+
+### Các thay đổi chính
+
+#### 1. Component hóa (`components/auth/SocialAuthButtons.tsx`)
+- **Mô tả**: Tách nút Google ra thành component riêng để dùng chung.
+- **Tính năng**: Hỗ trợ `callbackUrl` linh hoạt và quản lý trạng thái loading đồng bộ.
+
+#### 2. Trang Đăng nhập & Đăng ký
+- **Đồng bộ**: Thêm nút Google vào trang Đăng ký (`/register`), giúp người dùng tạo tài khoản nhanh chóng.
+- **Thông minh**: Tự động nhận diện trang trước đó để quay lại (redirect) sau khi đăng nhập thành công.
+
+#### 3. Toàn vẹn dữ liệu Affiliate (`auth.ts`)
+- **Sự kiện `createUser`**: Thêm logic xử lý khi người dùng mới được tạo qua Google.
+- **Bảo toàn Referral**: Tự động đọc cookie `aff_ref` để gán `referrerId`, thêm vào cây phả hệ (Genealogy) và theo dõi chuyển đổi (Affiliate Tracking) ngay cả khi đăng ký nhanh bằng Google.
+
+### Trạng thái
+- ✅ Đăng ký/Đăng nhập Google hoạt động ở cả 2 trang.
+- ✅ Tự động liên kết tài khoản (Account Linking) an toàn.
+- ✅ Bảo toàn hệ thống Affiliate cho người dùng OAuth.
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
 
 ---
 
