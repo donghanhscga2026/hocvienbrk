@@ -499,9 +499,31 @@ Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi ch
 
 ---
 
-*Tài liệu này được cập nhật **ngay sau mỗi thay đổi code**, không chờ cuối phiên.*
+## ✅ PHẦN 22: BỔ SUNG ĐẦY ĐỦ MÃ VÙNG QUỐC TẾ (2026-05-22)
 
-## ✅ Sửa lỗ hổng Affiliate Data Integrity (2026-05-04)
+### Mục tiêu
+Bổ sung đầy đủ tất cả các mã vùng điện thoại của các quốc gia trên thế giới vào trang đăng ký tài khoản, thay vì chỉ có 20 quốc gia mặc định như trước.
+
+### Các file đã tạo/sửa
+
+#### 1. `lib/country-codes.ts` [NEW]
+- **Mô tả**: File chứa danh sách đầy đủ tất cả các mã vùng điện thoại quốc tế.
+- **Tối ưu**: Ưu tiên đẩy các quốc gia phổ biến lên đầu (Việt Nam, Mỹ, Anh, Úc, Singapore...) để thuận tiện cho việc chọn lựa.
+- **Cấu trúc**: Mỗi quốc gia gồm `code` (+X), `iso` (2 chữ cái), `flag` (mã cờ cho flagcdn).
+
+#### 2. `app/register/page.tsx`
+- **Refactor**: Loại bỏ mảng `COUNTRY_CODES` cứng trong file, thay bằng import từ `lib/country-codes`.
+- **Logic Selection**: 
+  - Thêm state `selectedIso` để theo dõi chính xác quốc gia được chọn (giải quyết vấn đề nhiều quốc gia dùng chung mã vùng như Mỹ và Canada đều là +1).
+  - Cập nhật hàm `selectedCountry` tìm kiếm theo `iso` thay vì `code`.
+  - Cập nhật `key` trong danh sách dropdown từ `code` sang `iso` để đảm bảo tính duy nhất.
+
+### Trạng thái
+- ✅ Danh sách đầy đủ ~250 quốc gia/vùng lãnh thổ.
+- ✅ Phân biệt được các quốc gia dùng chung mã vùng (+1, +44, +7...).
+- ✅ **Tính năng tìm kiếm**: Đã thêm ô tìm kiếm thông minh trong dropdown, hỗ trợ tìm theo Tên, Mã vùng (+XX) hoặc Mã ISO (VN, US...).
+- ✅ **Trải nghiệm người dùng**: Tự động focus vào ô tìm kiếm khi mở menu, lọc kết quả tức thì.
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
 ### Mục tiêu
 Ngăn chặn người dùng thao túng 
 eferrerId ẩn trong form đăng ký.

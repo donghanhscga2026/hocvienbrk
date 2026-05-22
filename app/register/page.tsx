@@ -6,29 +6,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2 } from "lucide-react"
 import { registerUser } from "../actions/auth-actions"
-
-const COUNTRY_CODES = [
-    { code: "+84", iso: "VN", flag: "vn" },
-    { code: "+1", iso: "US", flag: "us" },
-    { code: "+44", iso: "UK", flag: "gb" },
-    { code: "+61", iso: "AU", flag: "au" },
-    { code: "+65", iso: "SG", flag: "sg" },
-    { code: "+66", iso: "TH", flag: "th" },
-    { code: "+855", iso: "KH", flag: "kh" },
-    { code: "+856", iso: "LA", flag: "la" },
-    { code: "+60", iso: "MY", flag: "my" },
-    { code: "+62", iso: "ID", flag: "id" },
-    { code: "+63", iso: "PH", flag: "ph" },
-    { code: "+81", iso: "JP", flag: "jp" },
-    { code: "+82", iso: "KR", flag: "kr" },
-    { code: "+86", iso: "CN", flag: "cn" },
-    { code: "+33", iso: "FR", flag: "fr" },
-    { code: "+49", iso: "DE", flag: "de" },
-    { code: "+39", iso: "IT", flag: "it" },
-    { code: "+34", iso: "ES", flag: "es" },
-    { code: "+7", iso: "RU", flag: "ru" },
-    { code: "+971", iso: "AE", flag: "ae" },
-]
+import { COUNTRY_CODES } from "@/lib/country-codes"
 
 function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false)
@@ -42,7 +20,10 @@ function RegisterForm() {
     const [showPassword, setShowPassword] = useState(false)
     const [referrerName, setReferrerName] = useState<string | null>(null)
     const [isCountryOpen, setIsCountryOpen] = useState(false)
+    const [selectedIso, setSelectedIso] = useState("VN")
+    const [countrySearch, setCountrySearch] = useState("")
     const countryRef = useRef<HTMLDivElement>(null)
+    const searchInputRef = useRef<HTMLInputElement>(null)
     
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -131,7 +112,7 @@ function RegisterForm() {
     const countryCode = watch("countryCode")
     const formReferrerId = watch("referrerId")
     const userName = watch("name")
-    const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0]
+    const selectedCountry = COUNTRY_CODES.find(c => c.iso === selectedIso) || COUNTRY_CODES[0]
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -160,6 +141,20 @@ function RegisterForm() {
             setReferrerName(null)
         }
     }, [formReferrerId])
+
+    useEffect(() => {
+        if (isCountryOpen && searchInputRef.current) {
+            setTimeout(() => searchInputRef.current?.focus(), 100)
+        } else {
+            setCountrySearch("")
+        }
+    }, [isCountryOpen])
+
+    const filteredCountries = COUNTRY_CODES.filter(c => 
+        c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
+        c.code.includes(countrySearch) || 
+        c.iso.toLowerCase().includes(countrySearch.toLowerCase())
+    )
 
     async function onSubmit(data: any) {
         setIsLoading(true)
@@ -245,14 +240,16 @@ function RegisterForm() {
     }
 
     return (
-        <div className="w-full max-w-md space-y-8 rounded-xl bg-brk-surface p-6 sm:p-8 shadow-lg">
+        <div className="w-full max-w-md space-y-6 rounded-xl bg-brk-surface p-6 sm:p-8 shadow-lg">
             <div className="text-center">
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-brk-on-surface">
                     {success && registeredEmail ? "Xác minh tài khoản" : "Tạo tài khoản mới"}
                 </h2>
-                <p className="mt-2 text-sm text-brk-muted">
-                    {success && registeredEmail ? "Nhập mã OTP đã gửi đến email của bạn" : "Chào mừng tham gia Học viện BRK"}
-                </p>
+                {success && registeredEmail && (
+                    <p className="mt-2 text-sm text-brk-muted">
+                        Nhập mã OTP đã gửi đến email của bạn
+                    </p>
+                )}
             </div>
 
             <div className="space-y-4">
@@ -366,26 +363,28 @@ function RegisterForm() {
                             </div>
                         )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-brk-on-surface">
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-medium text-brk-on-surface w-24 shrink-0">
                                 Họ và tên
                             </label>
-                            <input
-                                {...register("name", { required: "Vui lòng nhập họ tên" })}
-                                type="text"
-                                placeholder="Nguyễn Văn A"
-                                className="mt-1 block w-full rounded-md border border-brk-outline px-3 py-2 shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary text-sm"
-                            />
-                            {errors.name && (
-                                <p className="mt-1 text-xs text-brk-accent font-medium">{errors.name.message}</p>
-                            )}
-                            {fieldErrors?.name && (
-                                <p className="mt-1 text-xs text-brk-accent font-medium">{fieldErrors.name[0]}</p>
-                            )}
+                            <div className="flex-1">
+                                <input
+                                    {...register("name", { required: "Vui lòng nhập họ tên" })}
+                                    type="text"
+                                    placeholder="Nguyễn Văn A"
+                                    className="block w-full rounded-md border border-brk-outline px-3 py-2 shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary text-sm"
+                                />
+                                {errors.name && (
+                                    <p className="mt-1 text-xs text-brk-accent font-medium">{errors.name.message}</p>
+                                )}
+                                {fieldErrors?.name && (
+                                    <p className="mt-1 text-xs text-brk-accent font-medium">{fieldErrors.name[0]}</p>
+                                )}
+                            </div>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-medium text-brk-on-surface">
+                            <label className="block text-xs font-medium text-brk-on-surface mb-1">
                                 Địa chỉ Email (cần xác minh sau khi đăng ký)
                             </label>
                             <input
@@ -405,16 +404,16 @@ function RegisterForm() {
                             )}
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-medium text-brk-on-surface">
-                                Số điện thoại (dùng zalo/telegram là tốt nhất)
-                            </label>
-                            <div className="flex gap-2">
+                        <div className="space-y-4 pt-1">
+                            <div>
+                                <label className="block text-xs font-medium text-brk-on-surface mb-1">
+                                    Quốc gia / Mã vùng
+                                </label>
                                 <div className="relative" ref={countryRef}>
                                     <button
                                         type="button"
                                         onClick={() => setIsCountryOpen(!isCountryOpen)}
-                                        className="flex w-36 items-center justify-between rounded-md border border-brk-outline bg-brk-surface px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+                                        className="flex w-full items-center justify-between rounded-md border border-brk-outline bg-brk-surface px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
                                     >
                                         <div className="flex items-center gap-2 overflow-hidden">
                                             <img 
@@ -422,40 +421,64 @@ function RegisterForm() {
                                                 alt={selectedCountry.iso}
                                                 className="h-3.5 w-auto flex-shrink-0"
                                             />
-                                            <span className="truncate">{selectedCountry.iso} ({selectedCountry.code})</span>
+                                            <span className="truncate">{selectedCountry.name} ({selectedCountry.code})</span>
                                         </div>
                                         <ChevronDown className={`h-4 w-4 flex-shrink-0 text-brk-muted transition-transform ${isCountryOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {isCountryOpen && (
-                                        <div className="absolute z-50 mt-1 max-h-60 w-48 overflow-auto rounded-md bg-brk-surface py-1 shadow-xl border border-brk-outline/30 focus:outline-none">
-                                            {COUNTRY_CODES.map((c) => (
-                                                <button
-                                                    key={c.code}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setValue("countryCode", c.code)
-                                                        setIsCountryOpen(false)
-                                                    }}
-                                                    className={`flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-brk-primary/10 ${
-                                                        countryCode === c.code ? 'bg-brk-primary/10 font-semibold text-brk-primary' : 'text-brk-on-surface'
-                                                    }`}
-                                                >
-                                                    <img 
-                                                        src={`https://flagcdn.com/w20/${c.flag}.png`} 
-                                                        alt={c.iso}
-                                                        className="h-3.5 w-auto"
-                                                    />
-                                                    <span className="flex-1 text-left">{c.iso} ({c.code})</span>
-                                                    {countryCode === c.code && (
-                                                        <div className="h-1.5 w-1.5 rounded-full bg-brk-primary"></div>
-                                                    )}
-                                                </button>
-                                            ))}
+                                        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-hidden rounded-md bg-brk-surface shadow-xl border border-brk-outline/30 flex flex-col">
+                                            <div className="p-2 border-b border-brk-outline/20 sticky top-0 bg-brk-surface z-10">
+                                                <input
+                                                    ref={searchInputRef}
+                                                    type="text"
+                                                    placeholder="Tìm tên, mã vùng..."
+                                                    value={countrySearch}
+                                                    onChange={(e) => setCountrySearch(e.target.value)}
+                                                    className="w-full px-3 py-1.5 text-xs rounded border border-brk-outline bg-brk-background focus:outline-none focus:ring-1 focus:ring-brk-primary"
+                                                />
+                                            </div>
+                                            <div className="overflow-auto max-h-56 py-1">
+                                                {filteredCountries.length > 0 ? (
+                                                    filteredCountries.map((c) => (
+                                                        <button
+                                                            key={c.iso}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setValue("countryCode", c.code)
+                                                                setSelectedIso(c.iso)
+                                                                setIsCountryOpen(false)
+                                                            }}
+                                                            className={`flex w-full items-center gap-3 px-3 py-2 text-sm hover:bg-brk-primary/10 ${
+                                                                selectedIso === c.iso ? 'bg-brk-primary/10 font-semibold text-brk-primary' : 'text-brk-on-surface'
+                                                            }`}
+                                                        >
+                                                            <img 
+                                                                src={`https://flagcdn.com/w20/${c.flag}.png`} 
+                                                                alt={c.iso}
+                                                                className="h-3.5 w-auto"
+                                                            />
+                                                            <span className="flex-1 text-left truncate">{c.name} ({c.code})</span>
+                                                            {selectedIso === c.iso && (
+                                                                <div className="h-1.5 w-1.5 rounded-full bg-brk-primary"></div>
+                                                            )}
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-3 py-4 text-center text-xs text-brk-muted">
+                                                        Không tìm thấy kết quả
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
+                            </div>
 
+                            <div>
+                                <label className="block text-xs font-medium text-brk-on-surface mb-1">
+                                    Số điện thoại (dùng zalo/telegram là tốt nhất)
+                                </label>
                                 <input
                                     {...register("phone", { 
                                         required: "Vui lòng nhập số điện thoại",
@@ -470,15 +493,15 @@ function RegisterForm() {
                                     })}
                                     type="tel"
                                     placeholder={countryCode === "+84" ? "912..." : "SĐT"}
-                                    className="max-w-[180px] flex-1 min-w-0 rounded-md border border-brk-outline px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary"
+                                    className="block w-full rounded-md border border-brk-outline px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary"
                                 />
+                                {errors.phone && (
+                                    <p className="mt-1 text-xs text-brk-accent font-medium">{errors.phone.message}</p>
+                                )}
+                                {fieldErrors?.phone && (
+                                    <p className="mt-1 text-xs text-brk-accent font-medium">{fieldErrors.phone[0]}</p>
+                                )}
                             </div>
-                            {errors.phone && (
-                                <p className="mt-1 text-xs text-brk-accent font-medium">{errors.phone.message}</p>
-                            )}
-                            {fieldErrors?.phone && (
-                                <p className="mt-1 text-xs text-brk-accent font-medium">{fieldErrors.phone[0]}</p>
-                            )}
                         </div>
 
                         <div>
