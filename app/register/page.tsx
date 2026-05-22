@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2 } from "lucide-react"
 import { registerUser } from "../actions/auth-actions"
 import { COUNTRY_CODES } from "@/lib/country-codes"
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 
 function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false)
@@ -328,7 +329,19 @@ function RegisterForm() {
                         </p>
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="space-y-4">
+                        <SocialAuthButtons 
+                            callbackUrl={redirectSlug ? `/${redirectSlug}` : "/"} 
+                            isLoading={isLoading}
+                            onLoading={(loading) => setIsLoading(loading)}
+                        />
+
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
+                            <div className="relative flex justify-center text-xs"><span className="bg-brk-surface px-2 text-brk-muted">hoặc dùng biểu mẫu</span></div>
+                        </div>
+
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                         <div>
                             <label className="block text-xs font-medium text-brk-on-surface mb-1">
                                 Mã giới thiệu (Trân trọng biết ơn Nhân mạch)
@@ -556,6 +569,7 @@ function RegisterForm() {
                             {isLoading ? <Loader2 className="animate-spin h-5 w-5" /> : "Đăng ký"}
                         </button>
                     </form>
+                </div>
                 )}
 
                 {!success && (
