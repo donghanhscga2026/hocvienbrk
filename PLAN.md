@@ -1673,4 +1673,29 @@ Chuyển tính năng xóa người dùng hàng loạt từ `/tools/tca-sync` san
 - ✅ Cơ chế Preview giúp tránh xóa nhầm dữ liệu quan trọng.
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
 
+---
+
+## ✅ PHẦN 29: FIX LỖI SSR SESSIONPROVIDER (2026-05-23)
+
+### Mục tiêu
+Sửa lỗi `[next-auth]: useSession must be wrapped in a <SessionProvider />` xảy ra trong quá trình Server Rendering (SSR) của trang `/complete-profile` và các trang Client Components khác.
+
+### Vấn đề
+Mặc dù `SessionProvider` đã được bọc ở `RootLayout`, nhưng trong kiến trúc App Router của Next.js 16, nếu không truyền dữ liệu session từ Server xuống Client Provider, hook `useSession()` có thể gây lỗi khi server cố gắng pre-render các component cần session.
+
+### Các file đã sửa
+
+#### 1. `app/providers.tsx`
+- **Cập nhật**: Chấp nhận prop `session` (kiểu `Session | null`).
+- **Logic**: Truyền prop này vào `<SessionProvider session={session}>` để đồng bộ trạng thái ngay từ phía Server.
+
+#### 2. `app/layout.tsx`
+- **Cập nhật**: Gọi hàm `auth()` phía server để lấy thông tin session hiện tại.
+- **Tích hợp**: Truyền session vừa lấy được vào component `<Providers session={session}>`.
+
+### Trạng thái
+- ✅ Lỗi SSR liên quan đến NextAuth đã được xử lý triệt để theo khuyến nghị của Auth.js v5.
+- ✅ Trải nghiệm người dùng mượt mà hơn, không còn hiện tượng "Recoverable Error" trong console dev.
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+
 *Tài liệu này được cập nhật **ngay sau mỗi thay đổi code**, không chờ cuối phiên.*

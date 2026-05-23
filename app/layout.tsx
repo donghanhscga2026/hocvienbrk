@@ -6,6 +6,7 @@ import "./globals.css";
 import Providers from "./providers";
 import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
 import AffiliateTracker from "@/components/AffiliateTracker";
+import { auth } from "@/auth";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
@@ -41,6 +42,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const siteThemeId = await getSiteTheme()
+  const session = await auth()
 
   const INITIAL_SCRIPT = `
 (function(){
@@ -71,7 +73,7 @@ export default async function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }}
         />
-        <Providers>
+        <Providers session={session}>
           {children}
           <AffiliateTracker />
         </Providers>
