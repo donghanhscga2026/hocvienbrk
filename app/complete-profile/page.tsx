@@ -33,10 +33,18 @@ export default function CompleteProfilePage() {
     const countryCode = watch("countryCode")
     const selectedCountry = COUNTRY_CODES.find(c => c.iso === selectedIso) || COUNTRY_CODES[0]
 
-    // Tự động kiểm tra: Nếu DB đã có SĐT thì update session và về Home luôn
+    // Tự động kiểm tra: Nếu đã có SĐT (trong session hoặc DB) thì về Home luôn
     useEffect(() => {
         const checkExistingProfile = async () => {
-            if (session?.user && !(session.user as any).phone) {
+            // Trường hợp 1: Đã có SĐT ngay trong session
+            if ((session?.user as any)?.phone) {
+                console.log("✨ Đã có SĐT trong session, chuyển hướng về trang chủ...")
+                router.push(redirectSlug ? `/${redirectSlug}` : '/')
+                return
+            }
+
+            // Trường hợp 2: Chưa có trong session nhưng có trong DB (tài khoản cũ)
+            if (session?.user?.id) {
                 try {
                     const res = await fetch(`/api/user/${session.user.id}`)
                     const userData = await res.json()
@@ -52,7 +60,10 @@ export default function CompleteProfilePage() {
                 }
             }
         }
-        checkExistingProfile()
+        
+        if (session) {
+            checkExistingProfile()
+        }
     }, [session, update, router, redirectSlug])
 
     // Sync name if session loads later
