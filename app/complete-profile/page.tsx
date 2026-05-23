@@ -1,14 +1,14 @@
 'use client'
 
 import { useForm } from "react-hook-form"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Loader2, ChevronDown, CheckCircle2, User, Phone, Hash } from "lucide-react"
 import { COUNTRY_CODES } from "@/lib/country-codes"
 import { completeProfileAction } from "../actions/auth-actions"
 
-export default function CompleteProfilePage() {
+function CompleteProfileContent() {
     const { data: session, update } = useSession()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -300,5 +300,17 @@ export default function CompleteProfilePage() {
                 </p>
             </div>
         </div>
+    )
+}
+
+export default function CompleteProfilePage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center bg-brk-background">
+                <Loader2 className="h-8 w-8 animate-spin text-brk-primary" />
+            </div>
+        }>
+            <CompleteProfileContent />
+        </Suspense>
     )
 }
