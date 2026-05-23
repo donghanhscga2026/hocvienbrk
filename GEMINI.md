@@ -37,6 +37,8 @@
 > ✅ **Đúng**: Xác định loại thay đổi từ đầu. Nếu > 10 dòng → `write` luôn.
 
 **Khi `write`: Bắt buộc bảo tồn cấu trúc cũ:**
+- ❌ **CẤM TUYỆT ĐỐI:** Không sử dụng các ký hiệu lược bỏ như `...`, `// ...`, hoặc `// unchanged`. Phải cung cấp toàn bộ nội dung file một cách tường minh.
+- ✅ **BẮT BUỘC đối chiếu:** Sau khi `write`, Agent phải tự đối chiếu số lượng `hooks` (useEffect, useState), các hàm logic cũ và các `imports` so với bản backup để đảm bảo không làm mất tính năng hiện có.
 - Giữ nguyên toàn bộ khối `import`, các `hooks` không liên quan, và các hàm tiện ích trong file.
 - Không tự ý xóa các state hoặc props đang tồn tại trừ khi user yêu cầu đích danh.
 - Đảm bảo trả lại nguyên vẹn những phần code nằm ngoài scope của vấn đề đang xử lý.

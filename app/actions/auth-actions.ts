@@ -217,14 +217,14 @@ export async function registerUser(prevState: any, formData: FormData) {
     }
 }
 
-export async function completeProfileAction(data: { name: string, phone: string, countryCode: string }) {
+export async function completeProfileAction(data: { name: string, phone: string, countryCode: string, password?: string }) {
     const session = await auth()
     if (!session?.user?.id) {
         return { success: false, message: "Bạn cần đăng nhập để thực hiện thao tác này." }
     }
 
     const userId = parseInt(session.user.id)
-    const { name, phone, countryCode } = data
+    const { name, phone, countryCode, password } = data
 
     try {
         // Chuẩn hóa SĐT: Loại bỏ số 0 ở đầu nếu có
@@ -246,14 +246,34 @@ export async function completeProfileAction(data: { name: string, phone: string,
             return { success: false, message: "Số điện thoại này đã được sử dụng bởi một tài khoản khác." }
         }
 
+        // Kiểm tra an toàn: Đảm bảo user luôn có referrerId (mặc định là 0)
+        const currentUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { referrerId: true }
+        })
+
+        // Hash password if provided
+        let hashedPassword = undefined;
+        if (password) {
+            hashedPassword = await bcrypt.hash(password, 10);
+        }
+
         await prisma.user.update({
             where: { id: userId },
             data: {
                 name: name.trim(),
                 phone: fullPhone,
-                emailVerified: new Date() // Đã qua Google nên email đã được xác minh
+                emailVerified: new Date(), // Đã qua Google nên email đã được xác minh
+                ...(password ? { password: hashedPassword, passwordChanged: true } : {}),
+                ...(currentUser?.referrerId === null ? { referrerId: 0 } : {})
             }
         })
+
+        // Nếu vừa cập nhật referrerId từ null sang 0, cần thêm vào closure table
+        if (currentUser?.referrerId === null) {
+            console.log(`✨ [CompleteProfile] Gán referrerId mặc định (#0) cho user #${userId}`)
+            await addUserToClosure(userId, 0)
+        }
 
         revalidatePath('/')
         return { success: true, message: "Cập nhật thông tin thành công!" }

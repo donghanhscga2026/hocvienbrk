@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { Loader2, ChevronDown, CheckCircle2, User, Phone, Hash } from "lucide-react"
+import { Loader2, ChevronDown, CheckCircle2, User, Phone, Hash, Eye, EyeOff, Lock } from "lucide-react"
 import { COUNTRY_CODES } from "@/lib/country-codes"
 import { completeProfileAction } from "../actions/auth-actions"
 
@@ -19,6 +19,7 @@ function CompleteProfileContent() {
     const [isCountryOpen, setIsCountryOpen] = useState(false)
     const [selectedIso, setSelectedIso] = useState("VN")
     const [countrySearch, setCountrySearch] = useState("")
+    const [showPassword, setShowPassword] = useState(false)
     const countryRef = useRef<HTMLDivElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -27,6 +28,7 @@ function CompleteProfileContent() {
             name: session?.user?.name || "",
             countryCode: "+84",
             phone: "",
+            password: "",
         }
     })
 
@@ -277,6 +279,51 @@ function CompleteProfileContent() {
                             </div>
                             {errors.phone && (
                                 <p className="text-xs text-brk-accent font-medium mt-1">{errors.phone.message as string}</p>
+                            )}
+                        </div>
+
+                        {/* Mật khẩu */}
+                        <div className="flex flex-col gap-1.5 pt-1">
+                            <label className="block text-sm font-medium text-brk-on-surface ml-1">
+                                Mật khẩu mới (Tùy chọn)
+                            </label>
+                            <p className="text-[10px] text-brk-muted ml-1 mb-1">
+                                Thiết lập mật khẩu để có thể đăng nhập bằng ID/Email sau này.
+                            </p>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brk-muted">
+                                    <Lock className="h-4 w-4" />
+                                </div>
+                                <input
+                                    {...register("password", {
+                                        minLength: { value: 8, message: "Mật khẩu phải có ít nhất 8 ký tự" },
+                                        validate: (value) => {
+                                            if (!value) return true; // Optional
+                                            const hasUpperCase = /[A-Z]/.test(value);
+                                            const hasLowerCase = /[a-z]/.test(value);
+                                            const hasNumber = /[0-9]/.test(value);
+                                            const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value);
+                                            
+                                            if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+                                                return "Mật khẩu cần: 1 chữ Hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt";
+                                            }
+                                            return true;
+                                        }
+                                    })}
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="******"
+                                    className="block w-full rounded-md border border-brk-outline bg-brk-background pl-10 pr-10 py-2.5 shadow-sm focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface"
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                            {errors.password && (
+                                <p className="text-xs text-brk-accent font-medium mt-1">{errors.password.message as string}</p>
                             )}
                         </div>
                     </div>

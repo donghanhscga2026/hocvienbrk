@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react'
 import { getStudentsAction, getAdminCoursesAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
+import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
 
 interface EnrollmentData {
   courseId: number
@@ -236,7 +237,9 @@ export default function ToolsStudentsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {isAdmin && <DeleteByUserSection />}
+
         {error && (
           <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
             {error}

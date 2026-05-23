@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { Role } from "@prisma/client"
+import { Role, Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
 // Helper to check admin permission
@@ -997,5 +997,118 @@ export async function getStudentDetailAction(studentId: number) {
         }
 
         return { success: true, user }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+// ==========================================
+// BULK USER DELETION (MOVED FROM TCA-SYNC)
+// ==========================================
+
+export type UserDeleteCondition = {
+    type: 'gte' | 'between' | 'in'
+    value?: number
+    valueA?: number
+    valueB?: number
+    values?: number[]
+}
+
+async function buildUserDeleteWhere(condition: UserDeleteCondition): Promise<Prisma.UserWhereInput> {
+    const where: Prisma.UserWhereInput = {}
+    if (condition.type === 'gte') {
+        where.id = { gte: condition.value || 0 }
+    } else if (condition.type === 'between') {
+        where.id = { gte: condition.valueA || 0, lte: condition.valueB || 999999 }
+    } else if (condition.type === 'in') {
+        where.id = { in: condition.values || [] }
+    }
+    return where
+}
+
+export async function previewDeleteUsersAction(condition: UserDeleteCondition) {
+    try {
+        await checkAdmin()
+        const userWhere = await buildUserDeleteWhere(condition)
+        
+        const users = await prisma.user.findMany({ where: userWhere, select: { id: true, name: true, email: true, phone: true } })
+        if (users.length === 0) return { success: false, error: "Không tìm thấy user nào thỏa mãn điều kiện" }
+
+        const ids = users.map(u => u.id)
+
+        // Count related records
+        const [userClosures, systems, tcaMembers, registrationPoints] = await Promise.all([
+            prisma.userClosure.count({ where: { descendantId: { in: ids } } }),
+            prisma.system.findMany({ where: { userId: { in: ids } }, select: { autoId: true } }),
+            prisma.tCAMember.count({ where: { OR: [{ userId: { in: ids } }, { tcaId: { in: ids } }] } }),
+            prisma.registrationPoint.count({ where: { refereeId: { in: ids } } })
+        ])
+
+        const systemIds = systems.map(s => s.autoId)
+        const systemClosures = await prisma.systemClosure.count({
+            where: { OR: [{ descendantId: { in: systemIds } }, { ancestorId: { in: systemIds } }] }
+        })
+
+        const stats = {
+            users: users.length,
+            userClosures,
+            systems: systems.length,
+            systemClosures,
+            tcaMembers,
+            registrationPoints,
+            total: users.length + userClosures + systems.length + systemClosures + tcaMembers + registrationPoints
+        }
+
+        return { success: true, stats, usersPreview: users.slice(0, 50), hasMore: users.length > 50 }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function bulkDeleteUsersAction(condition: UserDeleteCondition) {
+    try {
+        await checkAdmin()
+        const userWhere = await buildUserDeleteWhere(condition)
+        
+        const users = await prisma.user.findMany({ where: userWhere, select: { id: true } })
+        if (users.length === 0) return { success: false, error: "Không tìm thấy user" }
+
+        const ids = users.map(u => u.id)
+        const systems = await prisma.system.findMany({ where: { userId: { in: ids } }, select: { autoId: true } })
+        const systemIds = systems.map(s => s.autoId)
+
+        const result = { users: 0, systems: 0, tcaMembers: 0, registrationPoints: 0, systemClosures: 0, userClosures: 0 }
+
+        await prisma.$transaction(async (tx) => {
+            // 1. User Closures
+            const uc = await tx.userClosure.deleteMany({ where: { descendantId: { in: ids } } })
+            result.userClosures = uc.count
+
+            // 2. System Closures
+            const sc = await tx.systemClosure.deleteMany({
+                where: { OR: [{ descendantId: { in: systemIds } }, { ancestorId: { in: systemIds } }] }
+            })
+            result.systemClosures = sc.count
+
+            // 3. TCA Members
+            const tc = await tx.tCAMember.deleteMany({
+                where: { OR: [{ userId: { in: ids } }, { tcaId: { in: ids } }] }
+            })
+            result.tcaMembers = tc.count
+
+            // 4. Systems
+            const sy = await tx.system.deleteMany({ where: { userId: { in: ids } } })
+            result.systems = sy.count
+
+            // 5. Registration Points
+            const rp = await tx.registrationPoint.deleteMany({ where: { refereeId: { in: ids } } })
+            result.registrationPoints = rp.count
+
+            // 6. Users (Safety check: do not delete system accounts < 100)
+            const safeIds = ids.filter(id => id > 100)
+            if (safeIds.length > 0) {
+                const u = await tx.user.deleteMany({ where: { id: { in: safeIds } } })
+                result.users = u.count
+            }
+        })
+
+        revalidatePath('/tools/students')
+        return { success: true, result, message: `Đã xóa: ${result.users} users, ${result.systems} systems, ${result.tcaMembers} TCA, ${result.userClosures} closures.` }
     } catch (error: any) { return { success: false, error: error.message } }
 }
