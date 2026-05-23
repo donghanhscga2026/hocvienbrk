@@ -37,6 +37,7 @@ const customAdapter = {
                 data: {
                     ...data,
                     id: newId,
+                    referrerId: 0, // Default to root admin
                 },
             })
         } catch (error) {
@@ -265,27 +266,34 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (!user.id) return;
                 const userIdNum = parseInt(user.id);
 
-                if (refId && !isNaN(refId)) {
-                    // Cập nhật referrerId
+                // Luôn đảm bảo có referrerId (mặc định là 0)
+                const finalRefId = (refId && !isNaN(refId)) ? refId : 0;
+
+                // Cập nhật referrerId nếu khác null (Adapter đã gán 0, nhưng ghi đè nếu có refId)
+                if (finalRefId !== 0) {
                     await prisma.user.update({
                         where: { id: userIdNum },
-                        data: { referrerId: refId }
+                        data: { referrerId: finalRefId }
                     });
-                    
-                    // Thêm vào cây phả hệ
-                    const { addUserToClosure } = await import("@/lib/closure-helpers");
-                    await addUserToClosure(userIdNum, refId);
-                    
-                    // Theo dõi chuyển đổi affiliate
+                }
+                
+                // BẮT BUỘC: Thêm vào cây phả hệ (Genealogy) cho mọi user mới
+                const { addUserToClosure } = await import("@/lib/closure-helpers");
+                await addUserToClosure(userIdNum, finalRefId);
+                
+                if (finalRefId !== 0) {
+                    // Theo dõi chuyển đổi affiliate chỉ khi có người giới thiệu thực sự
                     const { trackAffiliateConversion } = await import("@/lib/affiliate/tracking");
                     await trackAffiliateConversion({
-                        refCode: refId.toString(),
+                        refCode: finalRefId.toString(),
                         userId: userIdNum,
                         landingSlug: landingSlug,
                         type: 'REGISTRATION'
                     });
 
-                    console.log(`✅ Đã gán người giới thiệu #${refId} cho người dùng mới #${user.id}`);
+                    console.log(`✅ Đã gán người giới thiệu #${finalRefId} cho người dùng mới #${user.id}`);
+                } else {
+                    console.log(`ℹ️ Người dùng mới #${user.id} không có người giới thiệu, mặc định gán cho Admin (#0)`);
                 }
             } catch (error) {
                 console.error("❌ Lỗi trong sự kiện createUser:", error);

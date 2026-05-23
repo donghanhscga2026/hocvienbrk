@@ -1,7 +1,8 @@
 'use strict'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient, Prisma, Role } from '@prisma/client'
+import { auth } from '@/auth'
 
 const prisma = new PrismaClient()
 
@@ -13,6 +14,11 @@ const CORS_HEADERS = {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (session?.user?.role !== Role.ADMIN) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS })
+    }
+
     const body = await request.json()
     const { action, userIdCondition } = body
     
