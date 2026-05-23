@@ -499,6 +499,34 @@ Sửa lỗi `Error: Cannot find module '../lightningcss.darwin-x64.node'` khi ch
 
 ---
 
+## ✅ PHẦN 26: QUY TRÌNH HOÀN TẤT HỒ SƠ BẮT BUỘC (2026-05-22)
+
+### Mục tiêu
+Đảm bảo người dùng đăng ký qua Google phải cung cấp đầy đủ Họ tên và Số điện thoại trước khi được phép sử dụng hệ thống.
+
+### Các thay đổi chính
+
+#### 1. Cấu hình Auth (`auth.ts`)
+- **JWT & Session**: Bổ sung logic truy vấn Database để đưa Số điện thoại (`phone`) vào Session. 
+- **OAuth Sync**: Đối với người dùng Google, hệ thống tự động kiểm tra trạng thái hồ sơ ngay khi đăng nhập.
+
+#### 2. Middleware Bảo mật (`middleware.ts`)
+- **Enforcement**: Kích hoạt cơ chế kiểm tra toàn diện. Nếu người dùng đã đăng nhập nhưng chưa có SĐT, hệ thống sẽ **ép buộc chuyển hướng** về trang `/complete-profile`.
+- **Chặn truy cập**: Người dùng không thể truy cập bất kỳ trang nào khác (trừ API và trang hoàn tất hồ sơ) nếu chưa cung cấp thông tin liên lạc.
+
+#### 3. Trang Hoàn tất hồ sơ (`app/complete-profile/page.tsx`) [NEW]
+- **Giao diện**: Form nhập liệu chuyên nghiệp, tích hợp sẵn danh sách mã vùng quốc tế và ô tìm kiếm thông minh.
+- **Xác thực**: Kiểm tra tính duy nhất của SĐT (không cho phép trùng lặp giữa các tài khoản).
+- **Cập nhật Session**: Tự động cập nhật trạng thái session ngay sau khi lưu thành công để người dùng có thể tiếp tục sử dụng hệ thống mà không cần đăng nhập lại.
+
+### Trạng thái
+- ✅ Luồng đăng ký Google hiện đã thu thập đủ Name + Phone.
+- ✅ Middleware bảo vệ nghiêm ngặt, không cho phép bỏ qua bước nhập liệu.
+- ✅ Trải nghiệm người dùng liền mạch (Tự động chuyển về trang chủ sau khi hoàn tất).
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+
+---
+
 ## ✅ PHẦN 25: TỐI ƯU LOGIC CẤP PHÁT ID (2026-05-22)
 
 ### Mục tiêu

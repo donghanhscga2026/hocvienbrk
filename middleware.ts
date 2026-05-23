@@ -22,11 +22,26 @@ const RESERVED_PATHS = new Set([
 ])
 
 export default auth(async function middleware(request: NextRequest & { auth: any }) {
-    const { nextUrl } = request
+    const { nextUrl, auth } = request
     
     // KHÔNG can thiệp vào các route auth để tránh lỗi PKCE/Cookies
     if (nextUrl.pathname.startsWith('/api/auth')) {
         return NextResponse.next()
+    }
+
+    const isLoggedIn = !!auth?.user
+    const hasPhone = !!auth?.user?.phone
+    const isCompleteProfilePage = nextUrl.pathname === '/complete-profile'
+    const isPublicPage = ['/login', '/register', '/forgot-password'].includes(nextUrl.pathname)
+
+    // ÉP HOÀN THÀNH PROFILE: Nếu đã đăng nhập nhưng chưa có SĐT và không phải đang ở trang complete-profile
+    if (isLoggedIn && !hasPhone && !isCompleteProfilePage && !nextUrl.pathname.startsWith('/api')) {
+        return NextResponse.redirect(new URL('/complete-profile', nextUrl))
+    }
+
+    // Nếu đã có SĐT mà cố vào lại trang complete-profile -> đẩy về home
+    if (isLoggedIn && hasPhone && isCompleteProfilePage) {
+        return NextResponse.redirect(new URL('/', nextUrl))
     }
 
     const response = NextResponse.next()

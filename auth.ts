@@ -162,6 +162,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     id: user.id.toString(),
                     name: user.name,
                     email: user.email,
+                    phone: user.phone,
                     role: user.role,
                     image: sessionImage,
                     affiliateCode: user.affiliateCode ?? undefined, 
@@ -195,31 +196,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
             return baseUrl;
         },
-        async jwt({ token, user, trigger, session }) {
-            if (user) {
-                token.sub = user.id;
-                token.role = (user as any).role;
-                token.needsPasswordChange = (user as any).needsPasswordChange;
-                token.isUnverifiedLegacy = (user as any).isUnverifiedLegacy;
-                token.affiliateCode = (user as any).affiliateCode;
-            }
-
-            if (trigger === "update" && session?.role) {
-                token.role = session.role;
-            }
-            
-            return token;
-        },
-        async session({ session, token }) {
-            if (token.sub && session.user) {
-                session.user.id = token.sub;
-                session.user.role = token.role as Role;
-                (session.user as any).needsPasswordChange = token.needsPasswordChange as boolean;
-                (session.user as any).isUnverifiedLegacy = token.isUnverifiedLegacy as boolean;
-                (session.user as any).affiliateCode = token.affiliateCode as string | undefined;
-            }
-            return session;
-        }
     },
     pages: {
         signIn: '/login',

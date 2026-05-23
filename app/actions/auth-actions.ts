@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache"
 import { addUserToClosure } from "@/lib/closure-helpers"
 import { trackAffiliateConversion } from "@/lib/affiliate/tracking"
 import { cookies } from "next/headers"
+import { auth } from "@/auth"
 
 function normalizePhone(phone: string): string {
   if (!phone) return '';
@@ -213,5 +214,52 @@ export async function registerUser(prevState: any, formData: FormData) {
         return {
             message: "Lỗi hệ thống: Không thể tạo tài khoản. Vui lòng thử lại.",
         }
+    }
+}
+
+export async function completeProfileAction(data: { name: string, phone: string, countryCode: string }) {
+    const session = await auth()
+    if (!session?.user?.id) {
+        return { success: false, message: "Bạn cần đăng nhập để thực hiện thao tác này." }
+    }
+
+    const userId = parseInt(session.user.id)
+    const { name, phone, countryCode } = data
+
+    try {
+        // Chuẩn hóa SĐT: Loại bỏ số 0 ở đầu nếu có
+        let cleanPhone = phone.trim().replace(/\s+/g, '')
+        if (cleanPhone.startsWith('0')) {
+            cleanPhone = cleanPhone.substring(1)
+        }
+        const fullPhone = `${countryCode}${cleanPhone}`
+
+        // Kiểm tra xem SĐT đã được dùng bởi tài khoản khác chưa
+        const existingUser = await prisma.user.findFirst({
+            where: { 
+                phone: fullPhone,
+                id: { not: userId }
+            }
+        })
+
+        if (existingUser) {
+            return { success: false, message: "Số điện thoại này đã được sử dụng bởi một tài khoản khác." }
+        }
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                name: name.trim(),
+                phone: fullPhone,
+                emailVerified: new Date() // Đã qua Google nên email đã được xác minh
+            }
+        })
+
+        revalidatePath('/')
+        return { success: true, message: "Cập nhật thông tin thành công!" }
+
+    } catch (error) {
+        console.error("[CompleteProfile] Error:", error)
+        return { success: false, message: "Đã xảy ra lỗi khi cập nhật thông tin." }
     }
 }
