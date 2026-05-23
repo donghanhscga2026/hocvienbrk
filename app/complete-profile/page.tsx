@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form"
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { Loader2, ChevronDown, CheckCircle2, User, Phone, Hash } from "lucide-react"
 import { COUNTRY_CODES } from "@/lib/country-codes"
@@ -11,6 +11,9 @@ import { completeProfileAction } from "../actions/auth-actions"
 export default function CompleteProfilePage() {
     const { data: session, update } = useSession()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const redirectSlug = searchParams.get('redirect')
+
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [isCountryOpen, setIsCountryOpen] = useState(false)
@@ -33,7 +36,7 @@ export default function CompleteProfilePage() {
     // Tự động kiểm tra: Nếu DB đã có SĐT thì update session và về Home luôn
     useEffect(() => {
         const checkExistingProfile = async () => {
-            if (session?.user && !session.user.phone) {
+            if (session?.user && !(session.user as any).phone) {
                 try {
                     const res = await fetch(`/api/user/${session.user.id}`)
                     const userData = await res.json()
@@ -41,7 +44,7 @@ export default function CompleteProfilePage() {
                     if (userData?.phone) {
                         console.log("✨ Phát hiện hồ sơ đã hoàn tất trong DB, đang đồng bộ session...")
                         await update({ phone: userData.phone })
-                        router.push('/')
+                        router.push(redirectSlug ? `/${redirectSlug}` : '/')
                         router.refresh()
                     }
                 } catch (e) {
@@ -50,7 +53,7 @@ export default function CompleteProfilePage() {
             }
         }
         checkExistingProfile()
-    }, [session, update, router])
+    }, [session, update, router, redirectSlug])
 
     // Sync name if session loads later
     useEffect(() => {
@@ -95,7 +98,7 @@ export default function CompleteProfilePage() {
             if (result.success) {
                 // Force session update to include the new phone number
                 await update({ phone: data.countryCode + data.phone.replace(/^0/, '') })
-                router.push('/')
+                router.push(redirectSlug ? `/${redirectSlug}` : '/')
                 router.refresh()
             } else {
                 setError(result.message)
