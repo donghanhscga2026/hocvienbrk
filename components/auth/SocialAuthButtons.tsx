@@ -10,7 +10,7 @@ interface SocialAuthButtonsProps {
     onLoading?: (loading: boolean) => void
 }
 
-export function SocialAuthButtons({ callbackUrl = "/", isLoading: externalLoading, onLoading }: SocialAuthButtonsProps) {
+export function SocialAuthButtons({ callbackUrl = "/complete-profile", isLoading: externalLoading, onLoading }: SocialAuthButtonsProps) {
     const [internalLoading, setInternalLoading] = useState(false)
     const isLoading = externalLoading || internalLoading
 

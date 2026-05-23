@@ -237,7 +237,7 @@ function LoginForm() {
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
                     {/* Google */}
                     <SocialAuthButtons 
-                        callbackUrl={redirectSlug ? `/${redirectSlug}` : "/"} 
+                        callbackUrl={redirectSlug ? `/complete-profile?redirect=${redirectSlug}` : "/complete-profile"} 
                         isLoading={isLoading}
                         onLoading={handleGoogleLoading}
                     />

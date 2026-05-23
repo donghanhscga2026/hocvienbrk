@@ -331,7 +331,7 @@ function RegisterForm() {
                 ) : (
                     <div className="space-y-4">
                         <SocialAuthButtons 
-                            callbackUrl={redirectSlug ? `/${redirectSlug}` : "/"} 
+                            callbackUrl={redirectSlug ? `/complete-profile?redirect=${redirectSlug}` : "/complete-profile"} 
                             isLoading={isLoading}
                             onLoading={(loading) => setIsLoading(loading)}
                         />

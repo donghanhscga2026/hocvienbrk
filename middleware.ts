@@ -30,20 +30,6 @@ export default auth(async function middleware(request: NextRequest & { auth: any
     }
 
     const isLoggedIn = !!auth?.user
-    const hasPhone = !!auth?.user?.phone
-    const isCompleteProfilePage = nextUrl.pathname === '/complete-profile'
-    const isPublicPage = ['/login', '/register', '/forgot-password'].includes(nextUrl.pathname)
-
-    // ÉP HOÀN THÀNH PROFILE: Nếu đã đăng nhập nhưng chưa có SĐT và không phải đang ở trang complete-profile
-    if (isLoggedIn && !hasPhone && !isCompleteProfilePage && !nextUrl.pathname.startsWith('/api')) {
-        return NextResponse.redirect(new URL('/complete-profile', nextUrl))
-    }
-
-    // Nếu đã có SĐT mà cố vào lại trang complete-profile -> đẩy về home
-    if (isLoggedIn && hasPhone && isCompleteProfilePage) {
-        return NextResponse.redirect(new URL('/', nextUrl))
-    }
-
     const response = NextResponse.next()
     
     const refCode = request.nextUrl.searchParams.get('ref')
