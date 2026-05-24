@@ -1699,3 +1699,28 @@ Mặc dù `SessionProvider` đã được bọc ở `RootLayout`, nhưng trong k
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
 
 *Tài liệu này được cập nhật **ngay sau mỗi thay đổi code**, không chờ cuối phiên.*
+
+---
+
+## ✅ PHẦN 30: CHUYỂN ĐỔI MIDDLEWARE SANG PROXY (NEXT.JS 16) (2026-05-24)
+
+### Mục tiêu
+Giải quyết cảnh báo deprecation: `The "middleware" file convention is deprecated. Please use "proxy" instead.` và tối ưu hóa logic interceptor.
+
+### Các file đã sửa/tạo
+
+#### 1. `proxy.ts` (Đổi tên từ `middleware.ts`)
+- **Rename**: Chuyển `middleware.ts` -> `proxy.ts` theo quy ước mới của Next.js 16.
+- **Export**: Cập nhật sang **named export** `export { proxyHandler as proxy }` kết hợp `default export` để đảm bảo tương thích tối đa.
+- **Optimization**: 
+    - Thêm kiểm tra `!potentialSlug.includes('.')` để chặn các request file tĩnh (ảnh, icon) không lọt vào logic query Database của Site Profile.
+    - Đổi tên hàm xử lý nội bộ từ `middleware` thành `proxy`.
+
+### Backup
+- Đã lưu bản gốc tại `plan_temp/middleware.backup_20260524_1530.ts`.
+
+### Trạng thái
+- ✅ Cảnh báo deprecation đã được xử lý.
+- ✅ Logic Affiliate và Site Profile hoạt động ổn định.
+- ✅ Hiệu năng được cải thiện nhờ loại bỏ query thừa cho static assets.
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
