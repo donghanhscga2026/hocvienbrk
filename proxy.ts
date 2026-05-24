@@ -22,7 +22,11 @@ const RESERVED_PATHS = new Set([
     'tca', 'ktc' // System paths
 ])
 
-export default auth(async function middleware(request: NextRequest & { auth: any }) {
+/**
+ * proxy.ts (Next.js 16+)
+ * Thay thế cho middleware.ts để xử lý routing, auth và affiliate.
+ */
+const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
     const { nextUrl } = request
     
     // 1. KHÔNG can thiệp vào các route auth để tránh lỗi PKCE/Cookies
@@ -38,12 +42,12 @@ export default auth(async function middleware(request: NextRequest & { auth: any
     
     // 2. Logic Affiliate Referral
     if (refCode) {
-        const landingSlug = potentialSlug && !RESERVED_PATHS.has(potentialSlug) ? potentialSlug : null
+        const landingSlug = potentialSlug && !RESERVED_PATHS.has(potentialSlug) && !potentialSlug.includes('.') ? potentialSlug : null
         saveRefCookie(response, refCode, landingSlug, landingSlug, null)
     }
 
-    // 3. Logic Site Profile Redirect (Khôi phục nguyên bản)
-    if (potentialSlug && !RESERVED_PATHS.has(potentialSlug)) {
+    // 3. Logic Site Profile Redirect
+    if (potentialSlug && !RESERVED_PATHS.has(potentialSlug) && !potentialSlug.includes('.')) {
         try {
             // Kiểm tra nếu là SiteProfile slug (từ database)
             // Lưu ý: Prisma có thể lỗi trên Edge, chúng ta bọc try-catch
@@ -58,6 +62,8 @@ export default auth(async function middleware(request: NextRequest & { auth: any
     
     return response
 })
+
+export { proxyHandler as proxy, proxyHandler as default }
 
 // Cache để tránh query database quá nhiều
 let profileSlugCache: Set<string> | null = null
