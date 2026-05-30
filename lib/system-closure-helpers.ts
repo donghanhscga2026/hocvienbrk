@@ -38,6 +38,13 @@ export async function addUserToSystemClosure(
         create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
     }).catch(() => { }) // Ignore if exists
 
+    // Delete old non-self closures before rebuilding (handles refSysId change + stale data)
+    if (existing) {
+        await prisma.systemClosure.deleteMany({
+            where: { descendantId: autoId, depth: { gt: 0 }, systemId }
+        })
+    }
+
     // 3. If upline exists (refSysId >= 0), copy all upline closures and update depth
     if (refSysId >= 0) {
         const uplineSystem = await prisma.system.findFirst({
