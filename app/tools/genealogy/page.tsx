@@ -111,7 +111,7 @@ const filterToActiveTree = (node: GenealogyNode): GenealogyNode | null => {
   const allFilteredChildren = [...filteredChildren, ...filteredGroupA, ...filteredGroupB]
 
   // Nếu node là Active → giữ lại với tất cả children đã lọc
-  if (node.groupName === "THÁI SƠN") {
+  if (node.personalScore != null && Number(node.personalScore) > 0) {
     return { ...node, children: filteredChildren, groupA: filteredGroupA, groupB: filteredGroupB }
   }
 
