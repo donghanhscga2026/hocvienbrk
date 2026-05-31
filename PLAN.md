@@ -1724,3 +1724,38 @@ Giải quyết cảnh báo deprecation: `The "middleware" file convention is dep
 - ✅ Logic Affiliate và Site Profile hoạt động ổn định.
 - ✅ Hiệu năng được cải thiện nhờ loại bỏ query thừa cho static assets.
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi.
+
+---
+
+## ✅ PHẦN 31: FIX SYSTEM CLOSURE DƯ THỪA KHI TCA THAY ĐỔI CẤU TRÚC (2026-05-31)
+
+### Mục tiêu
+Khi TCA thay đổi cấu trúc cây (đưa user từ F1 của A sang F1 của B), `addUserToSystemClosure` chỉ cập nhật `refSysId` trong System record nhưng **không xóa** closures cũ, dẫn đến SystemClosure có cả ancestors cũ lẫn mới (dư thừa).
+
+### Các file đã sửa
+
+#### `lib/system-closure-helpers.ts` (dòng 41-46)
+- **Vấn đề**: Hàm `addUserToSystemClosure` update `refSysId` nhưng không xóa SystemClosure depth>0 cũ.
+- **Fix**: Thêm `deleteMany` xóa toàn bộ closures cũ (`depth > 0`) của user trước khi rebuild từ upline mới.
+```typescript
+// Delete old non-self closures before rebuilding (handles refSysId change + stale data)
+if (existing) {
+    await prisma.systemClosure.deleteMany({
+        where: { descendantId: autoId, depth: { gt: 0 }, systemId }
+    })
+}
+```
+
+#### `scripts/fix-system-closure.ts` [NEW]
+- Script dọn dẹp 1 lần: scan toàn bộ System records, tìm closure depth=1 không khớp `refSysId`, rebuild lại đúng.
+- Mặc định dry-run, chạy với `--apply` để fix thật.
+- **Kết quả**: Phát hiện và fix đúng **1 user (ID #873 - LÊ LÊ QUẢNG)**, 64 user khác không bị ảnh hưởng.
+
+### Backup
+- `plan_temp/system-closure-helpers.backup_20260531_0010.patch`
+
+### Trạng thái
+- ✅ `addUserToSystemClosure` tự động cleanup closures cũ khi `refSysId` thay đổi
+- ✅ Không còn ancestors dư thừa trong SystemClosure
+- ✅ Chạy dry-run xác nhận: 65/65 records nhất quán
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi

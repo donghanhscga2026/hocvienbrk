@@ -420,7 +420,10 @@ async function buildStandardTree(
         const rootTca = tcaMemberMap.get(rootUser.id)
         const statsData = (isSystem && systemId === 1) ? {
             total: totalCount,
-            active: tcaMembers.filter((m: any) => m.groupName === 'THÁI SƠN').length,
+            active: tcaMembers.filter((m: any) => {
+                const score = m.personalScore != null ? Number(m.personalScore) : 0
+                return score > 0
+            }).length,
             bdh: tcaMembers.filter((m: any) => m.chuc_danh === 'C5' || m.chuc_danh === 'C20').length,
             dhtt: tcaMembers.filter((m: any) => m.chuc_danh === 'DHTT').length
         } : (isSystem ? { total: totalCount, active: 0, bdh: 0, dhtt: 0 } : null)
