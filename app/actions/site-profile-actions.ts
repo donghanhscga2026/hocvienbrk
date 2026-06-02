@@ -302,10 +302,13 @@ export async function getAllSurveys() {
  */
 export async function createSiteProfile(userId: number, slug: string) {
   try {
-    const existing = await prisma.siteProfile.findUnique({ where: { slug } })
-    if (existing) return { error: 'Slug đã được sử dụng' }
+        const existing = await prisma.siteProfile.findUnique({ where: { slug } })
+        if (existing) return { error: 'Slug đã được sử dụng' }
 
-    const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
+        const existingLanding = await prisma.landingPage.findUnique({ where: { slug } })
+        if (existingLanding) return { error: 'Slug đã được sử dụng bởi Landing Page' }
+
+        const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
     if (existingUser) return { error: 'User này đã có profile' }
 
     const profile = await prisma.siteProfile.create({
@@ -323,14 +326,17 @@ export async function createSiteProfile(userId: number, slug: string) {
  */
 export async function updateSiteProfile(id: number, data: any) {
   try {
-    if (data.slug) {
-      const existing = await prisma.siteProfile.findFirst({
-        where: { slug: data.slug, NOT: { id } }
-      })
-      if (existing) return { error: 'Slug đã được sử dụng' }
-    }
+        if (data.slug) {
+            const existing = await prisma.siteProfile.findFirst({
+                where: { slug: data.slug, NOT: { id } }
+            })
+            if (existing) return { error: 'Slug đã được sử dụng' }
 
-    if (data.isDefault) {
+            const existingLanding = await prisma.landingPage.findUnique({ where: { slug: data.slug } })
+            if (existingLanding) return { error: 'Slug đã được sử dụng bởi Landing Page' }
+        }
+
+        if (data.isDefault) {
       await prisma.siteProfile.updateMany({
         where: { isDefault: true, NOT: { id } },
         data: { isDefault: false }

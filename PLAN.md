@@ -1759,3 +1759,65 @@ if (existing) {
 - ✅ Không còn ancestors dư thừa trong SystemClosure
 - ✅ Chạy dry-run xác nhận: 65/65 records nhất quán
 - ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi
+
+---
+
+## ✅ PHẦN 32: THAY ĐỔI ĐIỀU KIỆN XÁC ĐỊNH ACTIVE TRONG GENEALOGY TREE (2026-05-31)
+
+### Mục tiêu
+Thay đổi điều kiện xác định thành viên **Active** từ `groupName === "THÁI SƠN"` sang `personalScore > 0` để phản ánh chính xác hơn trạng thái hoạt động thực tế.
+
+### Các file đã sửa
+
+#### `app/actions/admin-actions.ts` (dòng 423-426)
+- **Vấn đề**: `stats.active` đếm dựa trên `groupName === 'THÁI SƠN'`.
+- **Fix**: Đổi thành filter theo `personalScore > 0` (có null check, cast `Number()` vì là `Decimal`).
+```typescript
+active: tcaMembers.filter((m: any) => {
+    const score = m.personalScore != null ? Number(m.personalScore) : 0
+    return score > 0
+}).length,
+```
+
+#### `app/tools/genealogy/page.tsx` (dòng 114)
+- **Vấn đề**: `filterToActiveTree` giữ node nếu `groupName === "THÁI SƠN"`.
+- **Fix**: Đổi thành `personalScore != null && Number(node.personalScore) > 0`.
+```typescript
+if (node.personalScore != null && Number(node.personalScore) > 0) {
+```
+
+### Backup
+- `plan_temp/admin-actions.backup_20260531_0030.patch`
+- `plan_temp/page_genealogy.backup_20260531_0030.patch`
+
+### Trạng thái
+- ✅ `stats.active` đếm đúng theo `personalScore > 0`
+- ✅ `filterToActiveTree` lọc đúng theo `personalScore > 0`
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi
+
+---
+
+## ✅ Cross-table slug validation (2026-06-02)
+
+### Mục tiêu
+Ngăn tạo LandingPage và SiteProfile trùng slug, tránh lỗi route priority (LandingPage luôn được render trước SiteProfile trong `[slug]/page.tsx`).
+
+### Các file đã sửa
+
+#### `app/actions/landing-actions.ts`
+- **`createLandingPage()`**: Thêm `prisma.siteProfile.findUnique({ where: { slug } })` sau check slug trùng LandingPage.
+- **`updateLandingPage()`**: Thêm check tương tự trong khối `if (data.slug)`.
+
+#### `app/actions/site-profile-actions.ts`
+- **`createSiteProfile()`**: Thêm `prisma.landingPage.findUnique({ where: { slug } })` sau check slug trùng SiteProfile.
+- **`updateSiteProfile()`**: Thêm check tương tự trong khối `if (data.slug)`.
+
+### Backup
+- `plan_temp/landing-actions.ts.backup_20260602_1.ts`
+- `plan_temp/site-profile-actions.ts.backup_20260602_1.ts`
+
+### Trạng thái
+- ✅ Tạo LandingPage với slug đã tồn tại trong SiteProfile → báo lỗi
+- ✅ Tạo SiteProfile với slug đã tồn tại trong LandingPage → báo lỗi
+- ✅ Cập nhật slug LandingPage/SiteProfile → kiểm tra cả 2 bảng
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi

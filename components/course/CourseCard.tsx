@@ -6,7 +6,8 @@ import PaymentModal from './PaymentModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
 import ShareModal from '@/components/share/ShareModal'
-import { Share2 } from 'lucide-react'
+import LessonTocModal from './LessonTocModal'
+import { Share2, BookOpen } from 'lucide-react'
 
 // Chuyển URL thành link clickable (cho phần mô tả khóa học)
 const makeLinksClickable = (html: string): string => {
@@ -47,6 +48,7 @@ interface CourseCardProps {
 export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [showShare, setShowShare] = useState(false)
+    const [showToc, setShowToc] = useState(false)
     const [loading, setLoading] = useState(false)
     const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
 
@@ -161,10 +163,20 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                                 e.stopPropagation()
                                 setShowShare(true)
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-brk-surface px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
                         >
-                            <Share2 className="w-3 h-3" />
+                            <Share2 className="w-2.5 h-2.5" />
                             Chia sẻ
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setShowToc(true)
+                            }}
+                            className="ml-auto inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
+                        >
+                            Mục lục
                         </button>
                         {isActive && (
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-background-dark px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
@@ -260,6 +272,13 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
                 affiliateCode={affiliateCode}
                 profileSlug={profileSlug}
                 shareType="course"
+            />
+
+            <LessonTocModal
+                isOpen={showToc}
+                onClose={() => setShowToc(false)}
+                courseId={course.id}
+                courseName={course.name_lop}
             />
         </>
     )
