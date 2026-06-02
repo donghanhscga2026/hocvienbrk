@@ -644,3 +644,14 @@ export async function getTeachersAction() {
         return { success: false, error: error.message }
     }
 }
+
+// ==========================================
+// GET COURSE LESSONS - Lấy danh sách bài học của khóa học
+// ==========================================
+export async function getCourseLessonsAction(courseId: number) {
+    return await prisma.lesson.findMany({
+        where: { courseId },
+        orderBy: { order: 'asc' },
+        select: { id: true, title: true, order: true }
+    })
+}

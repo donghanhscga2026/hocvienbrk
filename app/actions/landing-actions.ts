@@ -49,13 +49,22 @@ export async function createLandingPage(data: {
     isActive?: boolean
 }) {
     try {
-        // Check if slug already exists
+        // Check if slug already exists in LandingPage
         const existing = await prisma.landingPage.findUnique({
             where: { slug: data.slug }
         })
         
         if (existing) {
             return { success: false, error: 'Slug đã tồn tại' }
+        }
+        
+        // Check if slug already exists in SiteProfile
+        const existingProfile = await prisma.siteProfile.findUnique({
+            where: { slug: data.slug }
+        })
+        
+        if (existingProfile) {
+            return { success: false, error: 'Slug đã được sử dụng bởi Site Profile' }
         }
         
         // Set default config if not provided
@@ -115,6 +124,15 @@ export async function updateLandingPage(id: number, data: {
             
             if (existing) {
                 return { success: false, error: 'Slug đã tồn tại' }
+            }
+            
+            // Check if slug already exists in SiteProfile
+            const existingProfile = await prisma.siteProfile.findUnique({
+                where: { slug: data.slug }
+            })
+            
+            if (existingProfile) {
+                return { success: false, error: 'Slug đã được sử dụng bởi Site Profile' }
             }
         }
         
