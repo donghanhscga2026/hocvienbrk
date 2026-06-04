@@ -384,55 +384,56 @@ export async function POST(request: Request) {
 
     const errors: { table: string; id: number; error: string }[] = []
 
-    // Delete in reverse dependency order
+    // Delete in reverse dependency order - BATCH operations
     // 1. Closures first (references System)
-    for (const closure of recordsToDelete.closures) {
+    if (recordsToDelete.closures.length > 0) {
+      const systemIds = recordsToDelete.closures.map(c => c.systemId);
       try {
-        await prisma.systemClosure.deleteMany({
-          where: {
-            descendantId: closure.systemId,
-            systemId: 1
-          }
-        })
-        deleted.closures++
+        const result = await prisma.systemClosure.deleteMany({
+          where: { descendantId: { in: systemIds }, systemId: 1 }
+        });
+        deleted.closures = result.count;
       } catch (e) {
-        errors.push({ table: 'SystemClosure', id: closure.systemId, error: String(e) })
+        errors.push({ table: 'SystemClosure', id: 0, error: String(e) });
       }
     }
 
     // 2. TCAMembers
-    for (const member of recordsToDelete.tcaMembers) {
+    if (recordsToDelete.tcaMembers.length > 0) {
+      const memberIds = recordsToDelete.tcaMembers.map(m => m.id);
       try {
-        await (prisma as any).tCAMember?.delete({
-          where: { id: member.id }
-        }).catch(() => { })
-        deleted.tcaMembers++
+        const result = await (prisma as any).tCAMember?.deleteMany({
+          where: { id: { in: memberIds } }
+        });
+        deleted.tcaMembers = result?.count || 0;
       } catch (e) {
-        errors.push({ table: 'TCAMember', id: member.id, error: String(e) })
+        errors.push({ table: 'TCAMember', id: 0, error: String(e) });
       }
     }
 
     // 3. Systems
-    for (const system of recordsToDelete.systems) {
+    if (recordsToDelete.systems.length > 0) {
+      const autoIds = recordsToDelete.systems.map(s => s.autoId);
       try {
-        await prisma.system.delete({
-          where: { autoId: system.autoId }
-        }).catch(() => { })
-        deleted.systems++
+        const result = await prisma.system.deleteMany({
+          where: { autoId: { in: autoIds } }
+        });
+        deleted.systems = result.count;
       } catch (e) {
-        errors.push({ table: 'System', id: system.autoId, error: String(e) })
+        errors.push({ table: 'System', id: 0, error: String(e) });
       }
     }
 
     // 4. Users (last - they might have other data)
-    for (const user of recordsToDelete.users) {
+    if (recordsToDelete.users.length > 0) {
+      const userIds = recordsToDelete.users.map(u => u.id);
       try {
-        await prisma.user.delete({
-          where: { id: user.id }
-        }).catch(() => { })
-        deleted.users++
+        const result = await prisma.user.deleteMany({
+          where: { id: { in: userIds } }
+        });
+        deleted.users = result.count;
       } catch (e) {
-        errors.push({ table: 'User', id: user.id, error: String(e) })
+        errors.push({ table: 'User', id: 0, error: String(e) });
       }
     }
 
