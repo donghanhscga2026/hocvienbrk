@@ -105,102 +105,82 @@ export async function POST(request: Request) {
 
     console.log('[API/staging-sync] Found', prodUsersMap.size, 'users in Production')
 
-    // Bước 3: Copy dữ liệu từ Production sang Test
+    // Bước 3: Copy dữ liệu từ Production sang Test (batch operations)
     let usersCopied = 0
     let systemsCopied = 0
     let tcaMembersCopied = 0
 
-    // Copy user → userTest
+    // Batch copy user → userTest (kiểm tra tồn tại trước, tạo batch sau)
+    const newUsers: any[] = []
     for (const [userId, prodUser] of prodUsersMap) {
-      try {
-        const existingTestUser = await (prisma as any).userTest.findUnique({
-          where: { id: userId }
+      const existingTestUser = await (prisma as any).userTest.findUnique({
+        where: { id: userId }
+      })
+      if (!existingTestUser) {
+        newUsers.push({
+          id: prodUser.id,
+          name: prodUser.name,
+          email: prodUser.email,
+          phone: prodUser.phone,
+          password: prodUser.password,
+          role: prodUser.role,
+          referrerId: prodUser.referrerId
         })
-        
-        if (!existingTestUser) {
-          await (prisma as any).userTest.create({
-            data: {
-              id: prodUser.id,
-              name: prodUser.name,
-              email: prodUser.email,
-              phone: prodUser.phone,
-              password: prodUser.password,
-              role: prodUser.role,
-              referrerId: prodUser.referrerId
-            }
-          })
-          usersCopied++
-          console.log('[API/staging-sync] Copied user', userId, prodUser.name)
-        }
-      } catch (e) {
-        console.log('[API/staging-sync] Error copy user', userId, String(e))
       }
     }
-
-    // Copy system → systemTest (cho các user đã copy)
-    for (const userId of prodUsersMap.keys()) {
-      try {
-        const prodSystems = await prisma.system.findMany({
-          where: { userId }
-        })
-        
-        for (const sys of prodSystems) {
-          const existingTest = await (prisma as any).systemTest.findFirst({
-            where: { userId: sys.userId, autoId: sys.autoId }
-          })
-          
-          if (!existingTest) {
-            await (prisma as any).systemTest.create({
-              data: {
-                userId: sys.userId,
-                autoId: sys.autoId,
-                onSystem: sys.onSystem
-              }
-            })
-            systemsCopied++
-          }
-        }
-      } catch (e) {
-        console.log('[API/staging-sync] Error copy system for user', userId, String(e))
-      }
+    if (newUsers.length > 0) {
+      await (prisma as any).userTest.createMany({ data: newUsers })
+      usersCopied = newUsers.length
+      console.log(`[API/staging-sync] Batch copied ${newUsers.length} users`)
     }
 
-    // Copy TCAMember → TCAMemberTest
-    for (const node of allNodes) {
-      try {
-        const prodTCAMember = await (prisma as any).tCAMember.findUnique({
-          where: { tcaId: node.id }
-        })
-        
-        if (prodTCAMember) {
-          const existingTest = await (prisma as any).tCAMemberTest.findUnique({
-            where: { tcaId: node.id }
-          })
-          
-          if (!existingTest) {
-            await (prisma as any).tCAMemberTest.create({
-              data: {
-                tcaId: prodTCAMember.tcaId,
-                userId: prodTCAMember.userId,
-                type: prodTCAMember.type,
-                groupName: prodTCAMember.groupName,
-                name: prodTCAMember.name,
-                personalScore: prodTCAMember.personalScore,
-                totalScore: prodTCAMember.totalScore,
-                level: prodTCAMember.level,
-                location: prodTCAMember.location,
-                phone: prodTCAMember.phone,
-                email: prodTCAMember.email,
-                parentTcaId: prodTCAMember.parentTcaId,
-                lastSyncedAt: prodTCAMember.lastSyncedAt
-              }
-            })
-            tcaMembersCopied++
-          }
-        }
-      } catch (e) {
-        console.log('[API/staging-sync] Error copy TCAMember', node.id, String(e))
-      }
+    // Batch copy system → systemTest
+    const allProdUserIds = [...prodUsersMap.keys()]
+    const prodSystems = await prisma.system.findMany({
+      where: { userId: { in: allProdUserIds } }
+    })
+    const existingSysAutoIds = await (prisma as any).systemTest.findMany({
+      where: { autoId: { in: prodSystems.map(s => s.autoId) } },
+      select: { autoId: true }
+    })
+    const existingSysSet = new Set(existingSysAutoIds.map((s: any) => s.autoId))
+    
+    const newSystems = prodSystems
+      .filter(s => !existingSysSet.has(s.autoId))
+      .map(s => ({ userId: s.userId, autoId: s.autoId, onSystem: s.onSystem }))
+    if (newSystems.length > 0) {
+      await (prisma as any).systemTest.createMany({ data: newSystems })
+      systemsCopied = newSystems.length
+      console.log(`[API/staging-sync] Batch copied ${newSystems.length} systems`)
+    }
+
+    // Batch copy TCAMember → TCAMemberTest
+    const nodeIds = allNodes.map(n => n.id)
+    const prodTCAMembers = await (prisma as any).tCAMember.findMany({
+      where: { tcaId: { in: nodeIds } }
+    })
+    const existingTCATcaIds = await (prisma as any).tCAMemberTest.findMany({
+      where: { tcaId: { in: prodTCAMembers.map((t: any) => t.tcaId) } },
+      select: { tcaId: true }
+    })
+    const existingTCASet = new Set(existingTCATcaIds.map((t: any) => t.tcaId))
+    
+    const newTCAMembers = prodTCAMembers
+      .filter((t: any) => !existingTCASet.has(t.tcaId))
+      .map((t: any) => ({
+        tcaId: t.tcaId, userId: t.userId, type: t.type, groupName: t.groupName,
+        name: t.name, personalScore: t.personalScore, totalScore: t.totalScore,
+        level: t.level, location: t.location, phone: t.phone, email: t.email,
+        parentTcaId: t.parentTcaId, lastSyncedAt: t.lastSyncedAt,
+        personalRate: t.personalRate, teamRate: t.teamRate,
+        hasBH: t.hasBH, hasTD: t.hasTD,
+        address: t.address, joinDate: t.joinDate,
+        contractDate: t.contractDate, promotionDate: t.promotionDate
+      }))
+    if (newTCAMembers.length > 0) {
+      await (prisma as any).tCAMemberTest.createMany({ data: newTCAMembers })
+      tcaMembersCopied = newTCAMembers.length
+      console.log(`[API/staging-sync] Batch copied ${newTCAMembers.length} TCAMembers`)
     }
 
     console.log('[API/staging-sync] Copied:', { usersCopied, systemsCopied, tcaMembersCopied })

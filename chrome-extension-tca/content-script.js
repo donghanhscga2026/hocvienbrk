@@ -16,7 +16,40 @@
   const PREVIEW_RESULT_KEY = 'tca_preview_result';
 
   // Ping localhost để kiểm tra server local có đang chạy không
+  // Cache kết quả trong localStorage để tránh timeout 1.5s mỗi lần
+  const API_CACHE_KEY = 'tca_api_base_cache';
+
+  function getCachedApiBase() {
+    try {
+      const cached = localStorage.getItem(API_CACHE_KEY);
+      if (cached) {
+        const { base, timestamp } = JSON.parse(cached);
+        const elapsed = Date.now() - timestamp;
+        if (elapsed < 300000) { // Cache 5 phút
+          return base;
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function setCachedApiBase(base) {
+    try {
+      localStorage.setItem(API_CACHE_KEY, JSON.stringify({ base, timestamp: Date.now() }));
+    } catch (e) {}
+  }
+
   async function detectApiBase() {
+    // Kiểm tra cache trước
+    const cached = getCachedApiBase();
+    if (cached) {
+      API_BASE = cached;
+      SYNC_ENDPOINT = cached + '/api/sync-tca';
+      PREVIEW_ENDPOINT = cached + '/api/sync-tca/preview';
+      console.log('[TCA Sync] 🟢 Dùng CACHED server:', cached);
+      return;
+    }
+
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 1500); // Timeout 1.5s
@@ -29,6 +62,7 @@
         API_BASE = LOCAL_API;
         SYNC_ENDPOINT = LOCAL_API + '/api/sync-tca';
         PREVIEW_ENDPOINT = LOCAL_API + '/api/sync-tca/preview';
+        setCachedApiBase(LOCAL_API);
         console.log('[TCA Sync] 🟢 Dùng LOCAL server:', LOCAL_API);
         addTcaLog(`✅ Kết nối LOCAL server: ${LOCAL_API}`);
         return;
@@ -36,6 +70,10 @@
     } catch (e) {
       // localhost không phản hồi → dùng production
     }
+    API_BASE = PROD_API;
+    SYNC_ENDPOINT = PROD_API + '/api/sync-tca';
+    PREVIEW_ENDPOINT = PROD_API + '/api/sync-tca/preview';
+    setCachedApiBase(PROD_API);
     console.log('[TCA Sync] 🔵 Dùng PRODUCTION server:', PROD_API);
     addTcaLog(`🌐 Kết nối PRODUCTION server: ${PROD_API}`);
   }
@@ -87,9 +125,14 @@
       // Build memberInfo format
       const memberInfo = {};
       nodes.forEach(n => {
+        const mi = memberInfoCache[n.id] || {};
         memberInfo[n.id] = {
-          phone: n.phone || null,
-          email: n.email || null
+          phone: n.phone || mi.phone || null,
+          email: n.email || mi.email || null,
+          address: mi.address || '',
+          joinDate: mi.joinDate || '',
+          contractDate: mi.contractDate || '',
+          promotionDate: mi.promotionDate || ''
         };
       });
 
@@ -185,11 +228,15 @@
       precheckDone = true;
       console.log(`[TCA Sync] === ALL MEMBER INFO FETCHED === (${fetchedCount}/${allNodesGlobal.length})`);
       
-      // Cập nhật allNodes với member info mới nhất
+      // Cập nhật allNodes với member info mới nhất (gồm address, joinDate, contractDate, promotionDate)
       allNodesGlobal.forEach(node => {
         if (memberInfoCache[node.id]) {
           node.email = memberInfoCache[node.id].email;
           node.phone = memberInfoCache[node.id].phone;
+          node.address = memberInfoCache[node.id].address;
+          node.joinDate = memberInfoCache[node.id].joinDate;
+          node.contractDate = memberInfoCache[node.id].contractDate;
+          node.promotionDate = memberInfoCache[node.id].promotionDate;
         }
       });
       
@@ -766,36 +813,16 @@
       // refSysId: TCA trước, fallback DB (như table display)
       const refSysId = row.refSysId != null ? Number(row.refSysId) : (row.db?.refSysId != null ? Number(row.db.refSysId) : 0);
       
-      // === FIX CLIENT-SIDE: Override action dựa trên match ===
-      // Production server có thể trả SKIP nhưng ta vẫn cần update điểm/email/phone
-      let action = row.action || 'SKIP';
-      const match = row.match || '';
-      
-      if (action === 'SKIP' || action === '') {
-        // Phân tích lại match type để xác định đúng action
-        if (match === 'PE S TCA' || match === 'S TCA PE' || match === 'PE TCA S') {
-          action = 'TCA';           // Đủ hết → chỉ cập nhật điểm TCAMember
-        } else if (match === 'Pe S TCA' || match === 'Pe TCA S' || match === 'S TCA Pe') {
-          action = 'E TCA';         // Đủ hết + email khác → update email + điểm
-        } else if (match === 'pE S TCA' || match === 'pE TCA S' || match === 'S TCA pE') {
-          action = 'P TCA';         // Đủ hết + phone khác → update phone + điểm
-        } else if (match === 'S TCA') {
-          action = 'TCA';           // Có System+TCA → chỉ cập nhật điểm
-        }
-        // Các trường hợp khác giữ SKIP (N, chưa có đủ thông tin)
-      }
+      // Action từ server preview là chính xác - KHÔNG override client-side
+      // Server đã xử lý match type, score change, new fields change, refSysId change
+      const action = row.action || 'SKIP';
       
       return {
-        id: row.id,
-        name: row.name,
+        ...row,
         userId: row.userId,
         referrerId: referrerId,
         refSysId: refSysId,
-        action: action,             // Dùng action đã override
-        match: match,
-        parentTcaId: row.parentTcaId,
-        email: row.email,
-        phone: row.phone
+        action: action
       };
     });
     
@@ -822,8 +849,9 @@
     addTcaLog('Bắt đầu đẩy dữ liệu thật vào DB...');
 
     try {
-      // GỬI syncRows (đã transform giống table display) lên API
-      // Gửi kèm allNodesGlobal để server lấy personalScore, totalScore, level
+      // GỬI syncRows (previewRows + spread = đầy đủ tcaScores, new fields) lên API
+      // previewRows đã chứa sẵn personalScore, totalScore, level, groupName, location, ...
+      // Không cần gửi allNodes riêng - server dùng dữ liệu từ previewRows
       const response = await fetch(SYNC_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -832,21 +860,6 @@
           timestamp: Date.now(),
           previewRows: syncRows,
           memberInfo: memberInfo,
-          // Gửi allNodes để server đọc điểm số khi upsert TCAMember
-          allNodes: allNodesGlobal.map(n => ({
-            id: n.id,
-            isRootNode: n.isRootNode || false,
-            personalScore: n.personalScore || '0',
-            totalScore: n.totalScore || '0',
-            level: n.level || '1',
-            groupName: n.groupName || '',
-            location: n.location || '',  // v8.9.0: Thêm location
-            hasBH: n.hasBH || false,
-            hasTD: n.hasTD || false,
-            personalRate: n.personalRate || '-',
-            teamRate: n.teamRate || '-'
-          })),
-          // Overview data - điểm tổng hệ thống từ dòng "Tổ chức phân nhánh"
           overviewData: window.tcaOverviewData || null
         })
       });
@@ -1126,11 +1139,15 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     // Merge member info
     memberInfoCache = data.memberInfo || {};
     
-    // Add email/phone to nodes
+    // Add member info to nodes (gồm address, joinDate, contractDate, promotionDate)
     allNodes.forEach(node => {
       if (memberInfoCache[node.id]) {
         node.email = memberInfoCache[node.id].email;
         node.phone = memberInfoCache[node.id].phone;
+        node.address = memberInfoCache[node.id].address;
+        node.joinDate = memberInfoCache[node.id].joinDate;
+        node.contractDate = memberInfoCache[node.id].contractDate;
+        node.promotionDate = memberInfoCache[node.id].promotionDate;
       }
     });
 
