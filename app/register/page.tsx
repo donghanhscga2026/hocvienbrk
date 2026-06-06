@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense, useRef } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2 } from "lucide-react"
+import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2, MessageCircle } from "lucide-react"
 import { registerUser } from "../actions/auth-actions"
 import { COUNTRY_CODES } from "@/lib/country-codes"
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
@@ -293,7 +293,29 @@ function RegisterForm() {
 
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
-                            <div className="relative flex justify-center text-xs"><span className="bg-brk-surface px-2 text-brk-muted uppercase tracking-wider">Hoặc xác minh qua</span></div>
+                            <div className="relative flex justify-center text-xs"><span className="bg-brk-surface px-2 text-brk-muted uppercase tracking-wider">Nhận mã OTP qua Telegram Bot</span></div>
+                        </div>
+
+                        <div className="rounded-lg bg-[#229ED9]/10 border border-[#229ED9]/30 p-4">
+                            <a
+                                href={`https://t.me/BrkPayCheckBot?start=otp_${registeredEmail}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-2 rounded-lg bg-[#229ED9] px-4 py-2.5 text-xs font-bold text-white hover:opacity-90 transition-opacity"
+                            >
+                                <MessageCircle className="h-4 w-4" />
+                                Nhận mã OTP qua Bot Telegram
+                            </a>
+                            <ol className="mt-3 space-y-1 text-xs text-brk-muted list-decimal list-inside">
+                                <li>Ấn nút trên để mở <strong className="text-brk-on-surface">@BrkPayCheckBot</strong> trên Telegram</li>
+                                <li>Gửi <strong className="text-brk-on-surface">/confirm</strong> để xác nhận nhận mã</li>
+                                <li>Bot gửi mã OTP → nhập vào ô bên trên</li>
+                            </ol>
+                        </div>
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
+                            <div className="relative flex justify-center text-xs"><span className="bg-brk-surface px-2 text-brk-muted uppercase tracking-wider">Hoặc xác minh qua Admin</span></div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
