@@ -26,7 +26,7 @@ export const FALLBACK_PROFILE = {
   textColor: '#333333',
   footerLinks: null,
   metaTitle: 'BRK Academy',
-  metaDescription: 'Học viện đào tạo kỹ năng thực chiến hàng đầu',
+  metaDescription: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
   metaImage: null,
   themeId: 'classic',
   viewCount: 0,
