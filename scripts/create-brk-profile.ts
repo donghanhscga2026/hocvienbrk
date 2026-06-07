@@ -40,10 +40,10 @@ async function main() {
       coursesTitle: 'Khóa học nổi bật',
       allCoursesTitle: 'Tất cả khóa học',
       footerText: '© 2026 Ngân hàng Phước Báu. Mọi quyền được bảo lưu.',
-      metaTitle: 'Học viện BRK - Ngân hàng Phước Báu',
+      metaTitle: 'BRK - Ngân hàng Phước Báu',
       metaDescription: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
       themeId: defaultTheme?.id || null,
-      affiliateCampaignId: defaultCampaign?.id || null,
+      ...(defaultCampaign?.id ? { affiliateCampaign: { connect: { id: defaultCampaign.id } } } : {}),
     }
   })
 
