@@ -110,34 +110,38 @@ export default function MessageCard({
                     />
                 </div>
 
-                <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[30px] md:pt-[70px] pb-[4%] text-center">
+                <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[28%] pb-[4%] text-center">
                     <div className="flex flex-col items-center shrink-0">
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
-                            {/* Dòng 1: title field */}
-                            <span
-                                className="uppercase drop-shadow-xl"
-                                style={{ 
-                                    fontSize: 'clamp(0.2rem, 5vw, 3rem)', 
-                                    color: '#ffffff',
-                                    textShadow: '0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.6), 2px 2px 4px rgba(0,0,0,0.8)',
-                                    WebkitTextStroke: '0.5px rgba(0,0,0,0.5)'
-                                }}
-                            >
-                                {displayLine1}
-                            </span>
+                            {/* Dòng 1: title field — tạm ẩn */}
+                            {false && (
+                                <span
+                                    className="uppercase drop-shadow-xl"
+                                    style={{ 
+                                        fontSize: 'clamp(0.2rem, 5vw, 3rem)', 
+                                        color: '#ffffff',
+                                        textShadow: '0 0 10px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.6), 2px 2px 4px rgba(0,0,0,0.8)',
+                                        WebkitTextStroke: '0.5px rgba(0,0,0,0.5)'
+                                    }}
+                                >
+                                    {displayLine1}
+                                </span>
+                            )}
 
-                            {/* Dòng 2: subtitle field */}
-                            <span
-                                className="uppercase drop-shadow-xl"
-                                style={{ 
-                                    fontSize: 'clamp(0.5rem, 5vw, 3rem)', 
-                                    color: accentColor, 
-                                    textShadow: `0 0 15px ${accentColor}80, 0 0 30px ${accentColor}50, 0 0 45px ${accentColor}30, 0 0 60px ${accentColor}20, 2px 2px 4px rgba(0,0,0,0.7)`,
-                                    WebkitTextStroke: '0.5px rgba(0,0,0,0.4)'
-                                }}
-                            >
-                                {displayLine2}
-                            </span>
+                            {/* Dòng 2: subtitle field — tạm ẩn */}
+                            {false && (
+                                <span
+                                    className="uppercase drop-shadow-xl"
+                                    style={{ 
+                                        fontSize: 'clamp(0.5rem, 5vw, 3rem)', 
+                                        color: accentColor, 
+                                        textShadow: `0 0 15px ${accentColor}80, 0 0 30px ${accentColor}50, 0 0 45px ${accentColor}30, 0 0 60px ${accentColor}20, 2px 2px 4px rgba(0,0,0,0.7)`,
+                                        WebkitTextStroke: '0.5px rgba(0,0,0,0.4)'
+                                    }}
+                                >
+                                    {displayLine2}
+                                </span>
+                            )}
 
                             {/* Dòng 3: greeting động - Tách thành 2 dòng */}
                             <span
@@ -176,7 +180,7 @@ export default function MessageCard({
                         </h1>
                     </div>
 
-                    <div className="flex-1 flex flex-col items-center justify-center min-h-0 w-full"
+                    <div className="flex flex-col items-center justify-center shrink-0 w-full"
                         style={{
                             gap: 'clamp(4px, 1.2%, 12px)',
                             paddingTop: '3%',
