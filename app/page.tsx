@@ -15,7 +15,7 @@ import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 
 export const metadata: Metadata = {
   title: 'BRK - Ngân hàng Phước Báu',
-  description: 'Học viện đào tạo kỹ năng thực chiến hàng đầu Việt Nam',
+  description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
 }
 
 export default async function Home() {
