@@ -16,6 +16,19 @@ import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 export const metadata: Metadata = {
   title: 'BRK - Ngân hàng Phước Báu',
   description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
+  openGraph: {
+    title: 'BRK - Ngân hàng Phước Báu',
+    description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
+    type: 'website',
+    locale: 'vi_VN',
+    url: 'https://giautoandien.io.vn',
+    siteName: 'BRK - Ngân hàng Phước Báu',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'BRK - Ngân hàng Phước Báu',
+    description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
+  },
 }
 
 export default async function Home() {
