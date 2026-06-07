@@ -15,6 +15,10 @@ import { getHeroMessageForProfile } from '@/app/actions/message-actions'
 // Import client components for landing pages
 import { LandingPageClient, CourseLandingClient } from '@/components/landing/LandingPageClient'
 
+const DEFAULT_OG_TITLE = 'BRK - Ngân hàng Phước Báu'
+const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
+const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
+
 interface PageProps {
     params: Promise<{ slug: string }>
 }
@@ -31,11 +35,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     if (landing) {
         return {
             title: landing.title,
-            description: landing.subtitle || landing.description || undefined,
+            description: landing.subtitle || landing.description || DEFAULT_OG_DESCRIPTION,
             openGraph: {
                 title: landing.title,
-                description: landing.subtitle || undefined,
-                images: landing.heroImage ? [landing.heroImage] : undefined,
+                description: landing.subtitle || landing.description || DEFAULT_OG_DESCRIPTION,
+                images: landing.heroImage ? [landing.heroImage] : [DEFAULT_OG_IMAGE],
+            },
+            twitter: {
+                card: 'summary_large_image',
+                title: landing.title,
+                description: landing.subtitle || landing.description || DEFAULT_OG_DESCRIPTION,
+                images: landing.heroImage ? [landing.heroImage] : [DEFAULT_OG_IMAGE],
             },
         }
     }
@@ -46,13 +56,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     })
     
     if (course) {
+        const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
         return {
             title: course.name_lop,
-            description: course.mo_ta_ngan || undefined,
+            description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
             openGraph: {
                 title: course.name_lop,
-                description: course.mo_ta_ngan || undefined,
-                images: course.link_anh_bia ? [course.link_anh_bia] : undefined,
+                description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+                images: courseImg ? [courseImg] : [DEFAULT_OG_IMAGE],
+            },
+            twitter: {
+                card: 'summary_large_image',
+                title: course.name_lop,
+                description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+                images: courseImg ? [courseImg] : [DEFAULT_OG_IMAGE],
             },
         }
     }
@@ -62,14 +79,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     
     if (!profile) return { title: 'Không tìm thấy' }
     
+    const ogTitle = profile.metaTitle || profile.title || DEFAULT_OG_TITLE
+    const ogDescription = profile.metaDescription || profile.subtitle || DEFAULT_OG_DESCRIPTION
+    const ogImage = profile.metaImage || profile.heroImage || DEFAULT_OG_IMAGE
+    
     return {
-        title: profile.metaTitle || profile.title || slug,
-        description: profile.metaDescription || profile.subtitle || undefined,
+        title: ogTitle,
+        description: ogDescription,
         openGraph: {
-            title: profile.metaTitle || profile.title || undefined,
-            description: profile.metaDescription || undefined,
-            images: profile.metaImage ? [profile.metaImage] :
-                profile.heroImage ? [profile.heroImage] : undefined,
+            title: ogTitle,
+            description: ogDescription,
+            images: [ogImage],
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: ogTitle,
+            description: ogDescription,
+            images: [ogImage],
         },
     }
 }
