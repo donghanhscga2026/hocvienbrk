@@ -97,7 +97,7 @@ INSERT INTO "SiteProfile" (
     'Bảng tin cộng đồng',
     'Khóa học nổi bật',
     'Tất cả khóa học',
-    'Học viện BRK - Ngân hàng Phước Báu',
+    'BRK - Ngân hàng Phước Báu',
     'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
     '© 2026 Ngân hàng Phước Báu. Mọi quyền được bảo lưu.'
 ) ON CONFLICT ("slug") DO NOTHING;
