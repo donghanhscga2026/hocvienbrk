@@ -330,6 +330,7 @@ export default async function DynamicSlugPage({ params }: PageProps) {
                 userId={userId !== null ? String(userId) : ''}
                 isDefault={profile.isDefault || false}
                 messageImageUrl={message?.imageUrl || null}
+                messageContent={(message as any)?.content || null}
             />
             
             {/* Home Page Client - Survey + Community + Courses */}

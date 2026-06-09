@@ -151,6 +151,7 @@ export default async function Home() {
         userId={userRecord?.id !== undefined ? String(userRecord.id) : ''}
         isDefault={profile?.isDefault || false}
         messageImageUrl={message?.imageUrl || null}
+        messageContent={(message as any)?.content || null}
       />
       
       <Suspense fallback={<div className="flex justify-center p-8">⏳ Đang tải...</div>}>
