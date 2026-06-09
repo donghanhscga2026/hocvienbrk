@@ -25,6 +25,7 @@ interface MessageCardProps {
     userId: string
     isDefault?: boolean
     messageImageUrl?: string | null
+    messageContent?: string | null
 }
 
 export default function MessageCard({
@@ -33,13 +34,14 @@ export default function MessageCard({
     userName,
     userId,
     isDefault = false,
-    messageImageUrl = null
+    messageImageUrl = null,
+    messageContent: messageContentProp = null
 }: MessageCardProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [greetingMessage, setGreetingMessage] = useState('') // Sửa lỗi hydration - chỉ tính greeting ở client
     const [greetingPrefix, setGreetingPrefix] = useState('') // Sửa lỗi hydration - chỉ tính prefix ở client
     
-    const heroImage = profile.heroImage || profile.messageImage || messageImageUrl || null
+    const heroImage = messageImageUrl || profile.heroImage || profile.messageImage || null
     const heroOverlay = profile.heroOverlay ?? 0.3
     const accentColor = profile.accentColor || '#f59e0b'
     
@@ -48,7 +50,7 @@ export default function MessageCard({
     const displayLine1 = isDefault ? 'BRK' : (profile.title || 'BRK')
     const displayLine2 = isDefault ? 'NGÂN HÀNG PHƯỚC BÁU' : (profile.subtitle || '')
     const subtitle = profile.subtitle || 'Mến chào bạn hữu đường xa!' // Giữ để dùng cho fallback
-    const messageContent = profile.messageContent || 'Học hôm nay, thành công ngày mai'
+    const messageContent = messageContentProp ?? profile.messageContent ?? 'Học hôm nay, thành công ngày mai'
     const messageDetail = profile.messageDetail || 'Tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp.'
     
     // Lấy greeting theo thời gian
@@ -110,7 +112,7 @@ export default function MessageCard({
                     />
                 </div>
 
-                <div className="absolute inset-0 z-10 flex flex-col px-[5%] pt-[28%] pb-[4%] text-center">
+                <div className="absolute inset-0 z-10 flex flex-col justify-end px-[5%] pb-[6%] text-center">
                     <div className="flex flex-col items-center shrink-0">
                         <h1 className="flex flex-col items-center font-black tracking-tighter leading-[1.2]">
                             {/* Dòng 1: title field — tạm ẩn */}
@@ -147,8 +149,8 @@ export default function MessageCard({
                             <span
                                 className="rounded-full backdrop-blur-md"
                                 style={{
-                                    padding: 'clamp(3px,0.8%,8px) clamp(8px,4%,20px)',
-                                    marginTop: 'clamp(10px, 2%, 16px)',
+                                    padding: 'clamp(2px,0.5%,6px) clamp(6px,3%,16px)',
+                                    marginTop: 'clamp(4px, 1%, 12px)',
                                     backgroundColor: 'rgba(255,255,255,0.1)',
                                     border: '1px solid rgba(255,255,255,0.2)'
                                 }}
@@ -157,7 +159,7 @@ export default function MessageCard({
                                 <span
                                     className="block font-semibold whitespace-nowrap"
                                     style={{ 
-                                        fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', 
+                                        fontSize: 'clamp(0.55rem, 1.5vw, 1.1rem)', 
                                         color: '#ffffff',
                                         textShadow: '0 0 8px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.8)'
                                     }}
@@ -168,7 +170,7 @@ export default function MessageCard({
                                 <span
                                     className="block font-semibold whitespace-nowrap"
                                     style={{ 
-                                        fontSize: 'clamp(0.7rem, 1.8vw, 1.2rem)', 
+                                        fontSize: 'clamp(0.55rem, 1.5vw, 1.1rem)', 
                                         color: '#ffffff',
                                         textShadow: '0 0 8px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,0.8)',
                                         marginTop: '2px'
@@ -182,15 +184,15 @@ export default function MessageCard({
 
                     <div className="flex flex-col items-center justify-center shrink-0 w-full"
                         style={{
-                            gap: 'clamp(4px, 1.2%, 12px)',
-                            paddingTop: '3%',
+                                    gap: 'clamp(2px, 0.8%, 10px)',
+                                    paddingTop: '1.5%',
                             paddingBottom: '1%'
                         }}>
                         <div className="flex items-center justify-center gap-[8px] max-w-[95%] md:max-w-[85%] w-full">
                             <p
                                 className="font-medium italic leading-tight drop-shadow-lg whitespace-pre-line overflow-visible"
                                 style={{
-                                    fontSize: `clamp(0.7rem, 2.5vw, 2rem)`,
+                                        fontSize: `clamp(0.55rem, 2vw, 1.8rem)`,
                                     color: accentColor
                                 }}
                             >
@@ -200,8 +202,8 @@ export default function MessageCard({
                             <div
                                 className="shrink-0 rounded-full flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity shadow-lg"
                                 style={{
-                                    width: 'clamp(1.4rem, 3.2vw, 2.6rem)',
-                                    height: 'clamp(1.4rem, 3.2vw, 2.6rem)',
+                                    width: 'clamp(1rem, 2.5vw, 2.2rem)',
+                                    height: 'clamp(1rem, 2.5vw, 2.2rem)',
                                     backgroundColor: accentColor
                                 }}
                             >
@@ -213,7 +215,7 @@ export default function MessageCard({
                         </div>
 
                         <p
-                            className="uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-1 group-hover:translate-y-0"
+                            className="hidden md:block uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-1 group-hover:translate-y-0"
                             style={{ fontSize: 'clamp(0.4rem, 0.75vw, 0.65rem)', color: 'rgba(255,255,255,0.4)' }}
                         >
                             Nhấn để xem chi tiết →

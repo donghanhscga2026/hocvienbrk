@@ -13,6 +13,7 @@ export async function getRandomMessage() {
         const random = Math.floor(Math.random() * count)
         return await prisma.message.findFirst({
             where: { isActive: true },
+            orderBy: { id: 'asc' },
             skip: random
         })
     } catch (error) {
