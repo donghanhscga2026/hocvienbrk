@@ -408,6 +408,18 @@ model Message {
   createdAt DateTime @default(now())
 }
 
+model BulkImportLog {
+  id          String   @id @default(uuid())
+  courseId    Int
+  userId      Int
+  summary     Json
+  createdAt   DateTime @default(now())
+  revertedAt  DateTime?
+
+  @@index([courseId])
+  @@index([createdAt])
+}
+
 model CourseLibAccess {
   id        Int      @id @default(autoincrement())
   courseId  Int

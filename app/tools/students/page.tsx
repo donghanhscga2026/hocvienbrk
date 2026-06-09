@@ -5,9 +5,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { getStudentsAction, getAdminCoursesAction } from '@/app/actions/admin-actions'
-import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
+import BulkEnrollModal from '@/components/admin/students/BulkEnrollModal'
 
 interface EnrollmentData {
   courseId: number
@@ -73,14 +74,13 @@ export default function ToolsStudentsPage() {
 
   const [courses, setCourses] = useState<{ id: number; name_lop: string }[]>([])
   const [selectedCourseId, setSelectedCourseId] = useState<number | undefined>(undefined)
+  const [showBulkEnroll, setShowBulkEnroll] = useState(false)
 
   useEffect(() => {
-    if (isTeacher) {
-      getAdminCoursesAction().then(res => {
-        if (res.success) setCourses((res.courses || []).map((c: any) => ({ id: c.id, name_lop: c.name_lop })))
-      })
-    }
-  }, [isTeacher])
+    getAdminCoursesAction().then(res => {
+      if (res.success) setCourses((res.courses || []).map((c: any) => ({ id: c.id, name_lop: c.name_lop })))
+    })
+  }, [])
 
   const fetchStudents = useCallback(async (pageNum: number = 0) => {
     setLoading(true)
@@ -230,6 +230,15 @@ export default function ToolsStudentsPage() {
               <ArrowUpDown className="w-4 h-4" />
               <span>{sortBy === 'id' ? 'ID' : (sortOrder === 'desc' ? 'Mới' : 'Cũ')}</span>
             </button>
+            {(isAdmin || isTeacher) && (
+              <button
+                onClick={() => setShowBulkEnroll(true)}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs bg-green-500 text-white hover:bg-green-600 transition-all"
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">Đăng ký khóa học từ danh sách</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100 border-t">
@@ -338,6 +347,16 @@ export default function ToolsStudentsPage() {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+      )}
+
+      {showBulkEnroll && (
+        <BulkEnrollModal
+          isOpen={showBulkEnroll}
+          onClose={() => setShowBulkEnroll(false)}
+          courses={courses}
+          isAdmin={isAdmin}
+          isTeacher={isTeacher}
+        />
       )}
     </div>
   )
