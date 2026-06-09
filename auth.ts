@@ -205,16 +205,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.phone = (user as any).phone;
             }
 
-            // Fetch phone from DB for OAuth if not in token
-            if (token.sub != null && !token.phone) {
+            // Luôn fetch role + phone mới từ DB để đồng bộ khi role thay đổi
+            if (token.sub != null) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: parseInt(token.sub as string) },
-                        select: { phone: true }
+                        select: { role: true, phone: true }
                     });
-                    if (dbUser) token.phone = dbUser.phone;
+                    if (dbUser) {
+                        token.role = dbUser.role;
+                        if (dbUser.phone) token.phone = dbUser.phone;
+                    }
                 } catch (e) {
-                    console.error("[Auth] Error fetching phone in JWT:", e);
+                    console.error("[Auth] Error fetching user in JWT:", e);
                 }
             }
 
