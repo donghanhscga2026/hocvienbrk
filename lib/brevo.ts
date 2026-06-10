@@ -130,6 +130,37 @@ export interface BrevoQuota {
   total: number
 }
 
+export interface BrevoTodayStats {
+  requests: number
+  delivered: number
+  hardBounces: number
+  softBounces: number
+  complaints: number
+  unsubscribed: number
+  invalid: number
+  blocked: number
+}
+
+export async function getBrevoTodayStats(apiKey: string): Promise<BrevoTodayStats> {
+  const today = new Date().toISOString().split('T')[0]
+  const result = await brevoFetch<{
+    requests?: number; delivered?: number; hardBounces?: number
+    softBounces?: number; complaints?: number; unsubscribed?: number
+    invalid?: number; blocked?: number
+  }>('GET', `/smtp/statistics/aggregatedReport?startDate=${today}&endDate=${today}`, undefined, apiKey)
+
+  return {
+    requests: result.requests ?? 0,
+    delivered: result.delivered ?? 0,
+    hardBounces: result.hardBounces ?? 0,
+    softBounces: result.softBounces ?? 0,
+    complaints: result.complaints ?? 0,
+    unsubscribed: result.unsubscribed ?? 0,
+    invalid: result.invalid ?? 0,
+    blocked: result.blocked ?? 0,
+  }
+}
+
 export async function getBrevoQuota(apiKey?: string): Promise<BrevoQuota> {
   const account = apiKey
     ? await brevoFetch<BrevoAccountInfo>('GET', '/account', undefined, apiKey)
@@ -138,7 +169,14 @@ export async function getBrevoQuota(apiKey?: string): Promise<BrevoQuota> {
   const sendLimit = account.plan.find(p => p.creditsType === 'sendLimit')
   const total = sendLimit?.credits ?? 300
 
-  return { remaining: total, used: 0, total }
+  const stats = apiKey
+    ? await getBrevoTodayStats(apiKey)
+    : { requests: 0, delivered: 0, hardBounces: 0, softBounces: 0, complaints: 0, unsubscribed: 0, invalid: 0, blocked: 0 }
+
+  const used = stats.requests
+  const remaining = Math.max(0, total - used)
+
+  return { remaining, used, total }
 }
 
 export interface BlockedContact {

@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật dự án HocVien-BRK
-> Cập nhật lần cuối: **2026-05-23 12:45**  
+> Cập nhật lần cuối: **2026-06-10 23:45**  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -2158,13 +2158,34 @@ Tích hợp Brevo làm provider gửi email chính, kiến trúc multi-Brevo (nh
 - `plan_temp/scan-bounces_backup_20260610/`
 - `plan_temp/stats-api-route_backup_20260610/`
 
+### Bug fixes (phiên 2026-06-10)
+| Bug | File | Fix |
+|---|---|---|
+| Webhook event names sai format | `app/api/webhooks/brevo/route.ts` | `hardBounce` → `hard_bounce`, `softBounce` → `soft_bounce` |
+| `validateApiKey()` không dùng API key được truyền | `lib/brevo.ts` | Thêm `apiKey` param vào `brevoFetch()` |
+
+### Test results (2026-06-10)
+- ✅ `sendTransactionalEmail()` (Brevo direct): Gửi thành công tới donghanhbrk@gmail.com
+- ✅ `sendGmail()` (notification chain Brevo→Gmail→Resend): Gửi thành công qua Brevo, không fallback
+- ✅ Webhook 7 events: hard_bounce, soft_bounce, delivered, opened, click, unsubscribed, spam — đều trả về `{"received":true}`
+
+### Brevo senders đã tạo
+| ID | Label | Email | Account |
+|---|---|---|---|
+| #60 | Brevo Main | hocvienbrk@gmail.com | BRK chính |
+| #63 | Brevo 2 | donghanh.scga2025@gmail.com | Học viện BRK - Ngân hàng phước bầu |
+| #64 | Brevo 3 | donghanhbrk@gmail.com | Học viện BRK - Giautoandien |
+| **Total** | | | **900 email/ngày** |
+
 ### Trạng thái
 - ✅ Core Brevo service (`lib/brevo.ts`) — gửi email, validate, webhook, contact
 - ✅ Schema: `provider`, `apiKeyEncrypted`, `senderName`, bỏ @unique email
 - ✅ Chain transactional: Brevo → Gmail → Resend
 - ✅ Campaign runner: routing Brevo/Gmail đúng, skip cooldown/warmup cho Brevo
 - ✅ Send-batch: provider routing + skip cooldown
-- ✅ Webhook handler: xử lý bounce/open/click/unsub/spam
+- ✅ Webhook handler: xử lý bounce/open/click/unsub/spam (event names đã fix)
 - ✅ UI: form thêm Brevo sender + provider badges
-- ✅ EmailSender Brevo đầu tiên (#60) đã tạo (email: hocvienbrk@gmail.com, label: "Brevo Main")
+- ✅ 3 Brevo senders (#60, #63, #64) active — 900 email/ngày
+- ✅ Deployed lên Vercel (giautoandien.io.vn)
+- ✅ Webhook URL: `https://giautoandien.io.vn/api/webhooks/brevo`
 - ✅ Build: `npx tsc --noEmit` — 0 lỗi
