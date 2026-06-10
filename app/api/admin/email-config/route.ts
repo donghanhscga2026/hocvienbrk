@@ -34,10 +34,10 @@ export async function GET() {
     const satellitesWithWarmup = satellites.map(s => {
       const days = Math.floor((Date.now() - s.createdAt.getTime()) / (1000 * 60 * 60 * 24))
       let warmupStage = "Ready"
-      if (days < 7) warmupStage = "W1 (10d)"
-      else if (days < 14) warmupStage = "W2 (25d)"
-      else if (days < 21) warmupStage = "W3 (50d)"
-      else if (days < 30) warmupStage = "W4 (100d)"
+      if (days < 7) warmupStage = "W1 (5d)"
+      else if (days < 14) warmupStage = "W2 (15d)"
+      else if (days < 21) warmupStage = "W3 (30d)"
+      else if (days < 30) warmupStage = "W4 (60d)"
 
       return {
         ...s,
@@ -81,8 +81,8 @@ export async function PUT(request: Request) {
 
     const configUpdates: any = {}
 
-    if (emailsBeforePauseMin !== undefined) configUpdates.emailsBeforePauseMin = Math.max(20, Math.min(100, emailsBeforePauseMin))
-    if (emailsBeforePauseMax !== undefined) configUpdates.emailsBeforePauseMax = Math.max(20, Math.min(100, emailsBeforePauseMax))
+    if (emailsBeforePauseMin !== undefined) configUpdates.emailsBeforePauseMin = Math.max(5, Math.min(100, emailsBeforePauseMin))
+    if (emailsBeforePauseMax !== undefined) configUpdates.emailsBeforePauseMax = Math.max(5, Math.min(100, emailsBeforePauseMax))
     if (pauseDurationMin !== undefined) configUpdates.pauseDurationMin = Math.max(5, Math.min(60, pauseDurationMin))
     if (pauseDurationMax !== undefined) configUpdates.pauseDurationMax = Math.max(5, Math.min(60, pauseDurationMax))
     if (interEmailDelayMin !== undefined) configUpdates.interEmailDelayMin = Math.max(1, Math.min(30, interEmailDelayMin))

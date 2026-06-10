@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { sendTransactionalEmail } from "@/lib/brevo";
 
 /**
  * ─── HỆ THỐNG THÔNG BÁO BACKEND (TELEGRAM & EMAIL) ──────────────────────────
@@ -232,15 +233,55 @@ async function sendViaResend(to: string, subject: string, htmlBody: string): Pro
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * CORE EMAIL FUNCTIONS
+ * BREVO (PRIMARY PROVIDER)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+async function sendViaBrevo(to: string, subject: string, htmlBody: string): Promise<{ success: boolean; message: string; emailId?: string }> {
+  try {
+    if (!process.env.BREVO_API_KEY) {
+      return { success: false, message: 'BREVO_API_KEY not configured' };
+    }
+
+    const result = await sendTransactionalEmail({
+      to: [{ email: to }],
+      subject,
+      htmlContent: htmlBody,
+    });
+
+    if (!result.success) {
+      return { success: false, message: 'Brevo API returned error' };
+    }
+
+    return { success: true, message: 'Email sent via Brevo', emailId: result.messageId };
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : 'Brevo error';
+    return { success: false, message: errMsg };
+  }
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * CORE EMAIL FUNCTIONS — Chain: Brevo → Gmail → Resend
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 /**
- * Hàm chung để gửi Email qua Gmail API
- * @returns { success: boolean, message: string }
+ * Hàm chung để gửi Email — thử Brevo trước, fallback Gmail, rồi Resend
  */
 async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string): Promise<{ success: boolean; message: string }> {
+  // Bước 1: Thử Brevo trước
+  if (process.env.BREVO_API_KEY) {
+    const brevoResult = await sendViaBrevo(to, subject, htmlBody);
+    if (brevoResult.success) {
+      console.log(`✅ Email sent via Brevo to ${to}: ${brevoResult.emailId}`);
+      await notifyEmailSuccess(to, subject, brevoResult.emailId || 'N/A', 'Brevo');
+      return { success: true, message: 'Email sent via Brevo' };
+    }
+    console.log(`⚠️ Brevo failed, falling back to Gmail: ${brevoResult.message}`);
+  }
+
+  // Bước 2: Fallback Gmail API
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
@@ -261,21 +302,19 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
     
     const result = await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encodedMessage } });
     const emailId = result.data.id as string;
-    console.log(`✅ Email sent to ${to}: ${emailId}`);
+    console.log(`✅ Email sent via Gmail to ${to}: ${emailId}`);
     
-    // Notify success via Telegram
     await notifyEmailSuccess(to, subject, emailId, 'Gmail API');
     
-    return { success: true, message: 'Email sent successfully' };
+    return { success: true, message: 'Email sent via Gmail' };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`❌ Email Error sending to ${to}:`, errorMsg);
+    console.error(`❌ Gmail Error sending to ${to}:`, errorMsg);
     
-    // Notify error via Telegram - Try fallback
     const hasResendKey = !!process.env.RESEND_API_KEY;
     await notifyEmailError(to, subject, errorMsg, 'Gmail API', hasResendKey);
     
-    // Try fallback to Resend if available
+    // Bước 3: Fallback Resend
     if (hasResendKey) {
       console.log(`🔄 Trying fallback to Resend for ${to}...`);
       const resendResult = await sendViaResend(to, subject, htmlBody);

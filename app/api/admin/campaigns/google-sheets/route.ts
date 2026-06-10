@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     // Lấy token của một sender bất kỳ đã kết nối để mượn quyền đọc Sheet
     // Hoặc tốt nhất là dùng một tài khoản đã kết nối
     const sender = await prisma.emailSender.findFirst({
-      where: { isActive: true }
+      where: { isActive: true, provider: 'gmail' }
     });
 
     if (!sender) {
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     const oauth2Client = getOAuth2Client();
     oauth2Client.setCredentials({
-      refresh_token: tryDecrypt(sender.refreshToken),
+      refresh_token: tryDecrypt(sender.refreshToken!),
     });
 
     const sheets = google.sheets({ version: "v4", auth: oauth2Client });

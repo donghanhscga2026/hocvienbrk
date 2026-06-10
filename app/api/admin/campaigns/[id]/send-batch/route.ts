@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { 
   resolveRecipients, 
   sendGmailFromSender, 
+  sendViaBrevo,
   getRandomMessageFooter, 
   injectFooter,
   getAvailableSender,
@@ -15,6 +16,15 @@ import { getEmailConfig, randomBetween } from "@/lib/email-config";
 import { sendEmailCampaignNotification } from "@/lib/notifications";
 import { exportCampaignToSheet } from "@/lib/email-campaign-export";
 import { NextResponse } from "next/server";
+
+async function upsertSenderLog(senderId: number, field: 'sentCount' | 'failedCount' | 'cooldownCount' | 'cooldownMinutes', value: number) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  await prisma.emailSenderLog.upsert({
+    where: { senderId_date: { senderId, date: today } },
+    update: { [field]: { increment: value } },
+    create: { senderId, date: today, sentCount: 0, failedCount: 0, bounceCount: 0, cooldownCount: 0, cooldownMinutes: 0, [field]: value }
+  })
+}
 
 let campaignStats: Map<number, { total: number; sent: number; success: number; failed: number; emailsInBatch: number }> = new Map();
 
@@ -208,7 +218,12 @@ export async function POST(
           </div>
         `;
         
-        await sendGmailFromSender(sender, recipient.email, subject, finalHtml);
+        // Gửi email theo provider
+        if (sender.provider === 'brevo') {
+          await sendViaBrevo(sender, recipient.email, subject, finalHtml);
+        } else {
+          await sendGmailFromSender(sender as any, recipient.email, subject, finalHtml);
+        }
 
         await prisma.emailCampaignLog.create({
           data: {
@@ -220,10 +235,18 @@ export async function POST(
         });
 
         await incrementSenderSentCount(sender.id);
+        await upsertSenderLog(sender.id, 'sentCount', 1);
         stats.sent++;
         stats.success++;
         stats.emailsInBatch++;
         results.sent++;
+
+        // Brevo không cần cooldown giữa batch (tự xử lý rate limit)
+        if (sender.provider === 'brevo') {
+          const delay = randomBetween(config.interEmailDelayMin, config.interEmailDelayMax);
+          await new Promise(resolve => setTimeout(resolve, delay * 1000));
+          continue;
+        }
 
         const batchStatus = await checkBatchStatus(stats.emailsInBatch);
 
@@ -233,6 +256,8 @@ export async function POST(
           stats.emailsInBatch = 0;
 
           await updateSenderCooldown(sender.id, batchStatus.pauseDuration);
+          await upsertSenderLog(sender.id, 'cooldownCount', 1);
+          await upsertSenderLog(sender.id, 'cooldownMinutes', batchStatus.pauseDuration);
 
           if (config.enableTelegramAlert) {
             await sendEmailCampaignNotification({
@@ -289,6 +314,7 @@ export async function POST(
             errorCode: error.message,
           }
         });
+        await upsertSenderLog(sender.id, 'failedCount', 1);
       }
     }
 

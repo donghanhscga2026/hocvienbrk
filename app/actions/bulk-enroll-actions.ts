@@ -338,12 +338,11 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
             }
         })
 
-        // Gửi email kích hoạt cho user mới và user đã tồn tại
-        const { sendActivationEmail, sendTelegram } = await import('@/lib/notifications')
+        // Auto-verify email + Telegram cho user mới (email gửi qua Email MKT campaign riêng)
+        const { sendTelegram } = await import('@/lib/notifications')
         for (const row of filteredRows) {
             if (!row.userId) continue
             try {
-                await sendActivationEmail(row.email, row.name, row.userId, course.name_lop, null)
                 if (row.status === 'NEW') {
                     await prisma.user.update({
                         where: { id: row.userId },

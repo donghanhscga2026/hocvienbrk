@@ -1,10 +1,11 @@
 import prisma from "@/lib/prisma";
 import { getOAuth2Client } from "@/lib/google-auth";
-import { tryDecrypt } from "@/lib/email-encryptor";
+import { tryDecrypt, decrypt } from "@/lib/email-encryptor";
 import { spinContent } from "@/lib/email-spin";
 import { google } from "googleapis";
 import { getEmailConfig, randomBetween, getEffectiveDailyLimit } from "@/lib/email-config";
 import { sendEmailCampaignNotification } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/brevo";
 
 export interface Recipient {
   email: string;
@@ -66,9 +67,12 @@ export function injectFooter(html: string, footer: string): string {
 export async function getAvailableSender(campaignId?: number): Promise<{
   id: number;
   email: string;
-  refreshToken: string;
+  provider: string;
+  refreshToken: string | null;
   clientId: string | null;
   clientSecret: string | null;
+  apiKeyEncrypted: string | null;
+  senderName: string | null;
   isActive: boolean;
   dailyLimit: number;
   sentToday: number;
@@ -80,10 +84,12 @@ export async function getAvailableSender(campaignId?: number): Promise<{
 } | null> {
   const now = new Date();
 
+  // Brevo senders không cần cooldown, nên luôn available (trừ khi hết quota)
   const availableSenders = await prisma.emailSender.findMany({
     where: {
       isActive: true,
       OR: [
+        { provider: 'brevo' },
         { cooldownUntil: null },
         { cooldownUntil: { lt: now } }
       ]
@@ -99,24 +105,34 @@ export async function getAvailableSender(campaignId?: number): Promise<{
   }
 
   const sendersWithQuota = availableSenders.filter(sender => {
-    const effectiveLimit = getEffectiveDailyLimit({
-      createdAt: sender.createdAt,
-      dailyLimit: sender.dailyLimit,
-      warmupPhase: sender.warmupPhase
-    });
-    return sender.sentToday < effectiveLimit;
-  });
+    let effectiveLimit: number
+    if (sender.provider === 'brevo') {
+      effectiveLimit = sender.dailyLimit
+    } else {
+      effectiveLimit = getEffectiveDailyLimit({
+        createdAt: sender.createdAt,
+        dailyLimit: sender.dailyLimit,
+        warmupPhase: sender.warmupPhase
+      })
+    }
+    return sender.sentToday < effectiveLimit
+  })
 
   if (sendersWithQuota.length === 0) {
     return null;
   }
 
   const weights = sendersWithQuota.map(sender => {
-    const effectiveLimit = getEffectiveDailyLimit({
-      createdAt: sender.createdAt,
-      dailyLimit: sender.dailyLimit,
-      warmupPhase: sender.warmupPhase
-    });
+    let effectiveLimit: number
+    if (sender.provider === 'brevo') {
+      effectiveLimit = sender.dailyLimit
+    } else {
+      effectiveLimit = getEffectiveDailyLimit({
+        createdAt: sender.createdAt,
+        dailyLimit: sender.dailyLimit,
+        warmupPhase: sender.warmupPhase
+      })
+    }
     return effectiveLimit - sender.sentToday;
   });
 
@@ -324,6 +340,29 @@ export async function sendGmailFromSender(
   }); 
 }
 
+export async function sendViaBrevo(
+  sender: { apiKeyEncrypted: string | null; senderName: string | null; email: string },
+  to: string,
+  subject: string,
+  html: string,
+): Promise<void> {
+  const apiKey = sender.apiKeyEncrypted ? decrypt(sender.apiKeyEncrypted) : process.env.BREVO_API_KEY
+  if (!apiKey) throw new Error('Brevo API key not found')
+
+  const result = await sendTransactionalEmail({
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    sender: {
+      name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Học Viện BRK',
+      email: sender.email || process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com',
+    },
+    tags: [],
+  })
+
+  if (!result.success) throw new Error('Brevo send failed')
+}
+
 /**
  * Lấy danh sách người nhận dựa trên cấu hình Campaign
  */
@@ -380,7 +419,7 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
 type EmailSenderRecord = {
   id: number;
   email: string;
-  refreshToken: string;
+  refreshToken: string | null;
   clientId: string | null;
   clientSecret: string | null;
   isActive: boolean;
@@ -482,6 +521,12 @@ async function scanSenderForBounces(
   };
 
   console.log(`\n[BOUNCE-SCAN] ===== Bắt đầu quét vệ tinh: ${sender.email} =====`);
+
+  if (!sender.refreshToken) {
+    result.error = 'Missing refreshToken (Brevo sender?)';
+    console.log(`[BOUNCE-SCAN] ❌ ${sender.email}: Không có refresh token`);
+    return result;
+  }
 
   try {
     const oauth2Client = getOAuth2Client();
@@ -600,14 +645,23 @@ async function scanSenderForBounces(
 
             console.log(`[BOUNCE-SCAN]   ✅ ${bounceType === 'HARD_BOUNCE' ? '🔴' : '🟡'} ${lowerEmail} - ${reason}`);
 
-            // Cập nhật log
+            // Cập nhật log + gắn sender gây bounce
             await prisma.emailCampaignLog.updateMany({
               where: { toEmail: { equals: lowerEmail, mode: 'insensitive' }, status: "SENT" },
               data: {
                 status: "BOUNCED",
                 errorType: bounceType,
-                errorCode: `${reason} (Quét vệ tinh: ${sender.email})`
+                errorCode: `${reason} (Quét vệ tinh: ${sender.email})`,
+                senderId: sender.id
               }
+            });
+
+            // Ghi bounce vào sender log
+            const today = new Date(); today.setHours(0, 0, 0, 0)
+            await prisma.emailSenderLog.upsert({
+              where: { senderId_date: { senderId: sender.id, date: today } },
+              update: { bounceCount: { increment: 1 } },
+              create: { senderId: sender.id, date: today, sentCount: 0, failedCount: 0, bounceCount: 1, cooldownCount: 0, cooldownMinutes: 0 }
             });
 
             // Chỉ hard bounce mới đánh dấu emailVerified = null
@@ -749,7 +803,7 @@ export async function processBounceEmails(scanDays: number = 3) {
   console.log(`[BOUNCE-SCAN] Tổng emails đã gửi trong ${scanDays} ngày: ${sentSet.size}`);
 
   const allSenders = await prisma.emailSender.findMany({
-    where: { isActive: true },
+    where: { isActive: true, provider: 'gmail' },
     select: {
       id: true,
       email: true,

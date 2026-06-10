@@ -28,6 +28,29 @@ export async function GET() {
     const invalidSenders: number[] = [];
 
     for (const sender of senders) {
+      // Bỏ qua Brevo senders (không dùng OAuth)
+      if ((sender as any).provider === 'brevo') {
+        results.push({
+          id: sender.id,
+          email: sender.email,
+          label: sender.label,
+          isValid: true,
+        });
+        continue
+      }
+
+      if (!sender.refreshToken) {
+        results.push({
+          id: sender.id,
+          email: sender.email,
+          label: sender.label,
+          isValid: false,
+          error: "Không có refresh token (Brevo sender?)",
+        });
+        invalidSenders.push(sender.id);
+        continue;
+      }
+
       try {
         const oauth2Client = getOAuth2Client();
         
