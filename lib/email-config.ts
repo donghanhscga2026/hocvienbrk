@@ -13,23 +13,23 @@ export interface EmailCampaignConfig {
 }
 
 export const DEFAULT_EMAIL_CONFIG: EmailCampaignConfig = {
-  emailsBeforePauseMin: 30,
-  emailsBeforePauseMax: 50,
-  pauseDurationMin: 10,
-  pauseDurationMax: 30,
-  interEmailDelayMin: 2,
-  interEmailDelayMax: 8,
+  emailsBeforePauseMin: 15,
+  emailsBeforePauseMax: 25,
+  pauseDurationMin: 15,
+  pauseDurationMax: 45,
+  interEmailDelayMin: 5,
+  interEmailDelayMax: 15,
   enableTelegramAlert: true,
   telegramChatId: process.env.TELEGRAM_CHAT_ID_EMAIL || "",
   enableRandomMessageFooter: false,
 };
 
 export const WARMUP_LIMITS = {
-  0: 10,
-  1: 25,
-  2: 50,
-  3: 100,
-  4: 200,
+  0: 5,
+  1: 15,
+  2: 30,
+  3: 60,
+  4: 100,
 };
 
 export async function getEmailConfig(): Promise<EmailCampaignConfig> {

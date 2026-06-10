@@ -91,8 +91,9 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
   const errors: string[] = [];
 
   try {
-    const senders = await prisma.emailSender.findMany({ where: { isActive: true } });
+    const senders = await prisma.emailSender.findMany({ where: { isActive: true, provider: 'gmail' } });
     for (const sender of senders) {
+      if (!sender.refreshToken) continue;
       try {
         const oauth2Client = getOAuth2Client();
         oauth2Client.setCredentials({ refresh_token: tryDecrypt(sender.refreshToken) });

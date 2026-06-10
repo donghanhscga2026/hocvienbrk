@@ -30,12 +30,12 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
   const [toast, setToast] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   const [config, setConfig] = useState<EmailConfig>(initialConfig || {
-    emailsBeforePauseMin: 30,
-    emailsBeforePauseMax: 50,
-    pauseDurationMin: 10,
-    pauseDurationMax: 30,
-    interEmailDelayMin: 2,
-    interEmailDelayMax: 8,
+    emailsBeforePauseMin: 15,
+    emailsBeforePauseMax: 25,
+    pauseDurationMin: 15,
+    pauseDurationMax: 45,
+    interEmailDelayMin: 5,
+    interEmailDelayMax: 15,
     enableTelegramAlert: true,
     telegramChatId: '-1003871041367',
     enableRandomMessageFooter: false
@@ -141,19 +141,19 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min={20}
+                  min={5}
                   max={100}
                   value={config.emailsBeforePauseMin}
-                  onChange={(e) => setConfig({ ...config, emailsBeforePauseMin: parseInt(e.target.value) || 30 })}
+                  onChange={(e) => setConfig({ ...config, emailsBeforePauseMin: parseInt(e.target.value) || 15 })}
                   className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
                 />
                 <span className="text-gray-400">-</span>
                 <input
                   type="number"
-                  min={20}
+                  min={5}
                   max={100}
                   value={config.emailsBeforePauseMax}
-                  onChange={(e) => setConfig({ ...config, emailsBeforePauseMax: parseInt(e.target.value) || 50 })}
+                  onChange={(e) => setConfig({ ...config, emailsBeforePauseMax: parseInt(e.target.value) || 25 })}
                   className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
                 />
               </div>
@@ -169,7 +169,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
                   min={5}
                   max={60}
                   value={config.pauseDurationMin}
-                  onChange={(e) => setConfig({ ...config, pauseDurationMin: parseInt(e.target.value) || 10 })}
+                  onChange={(e) => setConfig({ ...config, pauseDurationMin: parseInt(e.target.value) || 15 })}
                   className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
                 />
                 <span className="text-gray-400">-</span>
@@ -178,7 +178,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
                   min={5}
                   max={60}
                   value={config.pauseDurationMax}
-                  onChange={(e) => setConfig({ ...config, pauseDurationMax: parseInt(e.target.value) || 30 })}
+                  onChange={(e) => setConfig({ ...config, pauseDurationMax: parseInt(e.target.value) || 45 })}
                   className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
                 />
               </div>
@@ -196,7 +196,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
               min={1}
               max={30}
               value={config.interEmailDelayMin}
-              onChange={(e) => setConfig({ ...config, interEmailDelayMin: parseInt(e.target.value) || 2 })}
+                  onChange={(e) => setConfig({ ...config, interEmailDelayMin: parseInt(e.target.value) || 5 })}
               className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
             />
             <span className="text-gray-400">-</span>
@@ -205,7 +205,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
               min={1}
               max={30}
               value={config.interEmailDelayMax}
-              onChange={(e) => setConfig({ ...config, interEmailDelayMax: parseInt(e.target.value) || 8 })}
+                  onChange={(e) => setConfig({ ...config, interEmailDelayMax: parseInt(e.target.value) || 15 })}
               className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
             />
             <span className="text-gray-500 text-sm">giây</span>

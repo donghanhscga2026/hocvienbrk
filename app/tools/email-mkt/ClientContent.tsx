@@ -97,6 +97,11 @@ function SendersTab() {
   const [validating, setValidating] = useState(false)
   const [validationResults, setValidationResults] = useState<Record<number, SenderValidation>>({})
   const [validationSummary, setValidationSummary] = useState<{total: number; valid: number; invalid: number} | null>(null)
+  const [showBrevoForm, setShowBrevoForm] = useState(false)
+  const [brevoLabel, setBrevoLabel] = useState('')
+  const [brevoApiKey, setBrevoApiKey] = useState('')
+  const [brevoAdding, setBrevoAdding] = useState(false)
+  const [brevoError, setBrevoError] = useState('')
 
   useEffect(() => {
     fetch('/api/admin/senders/list')
@@ -104,6 +109,32 @@ function SendersTab() {
       .then(data => { setSenders(data); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
+
+  const addBrevoSender = async () => {
+    if (!brevoLabel.trim() || !brevoApiKey.trim()) return
+    setBrevoAdding(true)
+    setBrevoError('')
+    try {
+      const res = await fetch('/api/admin/senders/brevo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: brevoLabel.trim(), apiKey: brevoApiKey.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSenders(prev => [data.sender, ...prev])
+        setShowBrevoForm(false)
+        setBrevoLabel('')
+        setBrevoApiKey('')
+      } else {
+        setBrevoError(data.error || 'Lỗi không xác định')
+      }
+    } catch {
+      setBrevoError('Không thể kết nối server')
+    } finally {
+      setBrevoAdding(false)
+    }
+  }
 
   const validateAllTokens = async () => {
     setValidating(true)
@@ -146,9 +177,52 @@ function SendersTab() {
 
   return (
     <div className="space-y-4">
+      <button
+        onClick={() => setShowBrevoForm(!showBrevoForm)}
+        className="block w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl text-center"
+      >
+        {showBrevoForm ? '✕ Đóng' : '➕ Thêm Brevo Sender'}
+      </button>
+
+      {showBrevoForm && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+          <h3 className="font-bold text-blue-900">Thêm Brevo Sender</h3>
+          <input
+            type="text"
+            placeholder="Tên hiển thị (VD: Brevo #1)"
+            value={brevoLabel}
+            onChange={e => setBrevoLabel(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+          />
+          <input
+            type="password"
+            placeholder="API Key (xkeysib-...)"
+            value={brevoApiKey}
+            onChange={e => setBrevoApiKey(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+          />
+          <Button
+            onClick={addBrevoSender}
+            disabled={brevoAdding || !brevoLabel.trim() || !brevoApiKey.trim()}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2"
+          >
+            {brevoAdding ? <><Loader2 className="w-4 h-4 animate-spin" />Đang xác thực...</> : 'Xác thực & Thêm'}
+          </Button>
+          {brevoError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-2.5 rounded-lg">
+              {brevoError}
+            </div>
+          )}
+          <div className="text-xs text-blue-600/80 bg-blue-100/50 p-3 rounded-lg">
+            💡 API Key lấy từ Brevo Dashboard → Settings → API Keys.
+            Tài khoản Brevo free được 300 email/ngày.
+          </div>
+        </div>
+      )}
+
       <a href="/api/admin/auth/google"
         className="block w-full bg-yellow-400 hover:bg-yellow-500 text-black font-bold py-3 rounded-xl text-center">
-        + Kết Nối Tài Khoản
+        + Kết Nối Google Gmail
       </a>
 
       <Button 
@@ -206,9 +280,17 @@ function SendersTab() {
                 <div>
                   <h3 className="font-bold text-gray-900">{sender.label}</h3>
                   <p className="text-sm text-gray-400">{sender.email}</p>
-                  {sender.isMain && (
-                    <span className="mt-1 inline-block bg-black text-yellow-400 text-xs font-bold px-2 py-0.5 rounded">Main</span>
-                  )}
+                  <div className="flex gap-1.5 mt-1 flex-wrap">
+                    {sender.isMain && (
+                      <span className="inline-block bg-black text-yellow-400 text-xs font-bold px-2 py-0.5 rounded">Main</span>
+                    )}
+                    {sender.provider === 'brevo' && (
+                      <span className="inline-block bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded">Brevo</span>
+                    )}
+                    {(!sender.provider || sender.provider === 'gmail') && (
+                      <span className="inline-block bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded">Gmail</span>
+                    )}
+                  </div>
                 </div>
                 <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
                   sender.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -332,11 +414,84 @@ function SettingsTab() {
   )
 }
 
+function SenderPerformanceTab() {
+  const [senders, setSenders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/admin/senders/stats')
+      .then(res => res.ok ? res.json() : { senders: [] })
+      .then(data => { setSenders(data.senders || []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return <div className="text-center py-12 text-gray-400">Đang tải...</div>
+  }
+
+  return (
+    <div className="space-y-4">
+      {senders.length === 0 ? (
+        <div className="text-center py-8 text-gray-400">Chưa có dữ liệu</div>
+      ) : (
+        senders.map((s: any) => {
+          const total = s.totalSent + s.totalFailed
+          const deliverabilityNum = total > 0 ? ((total - s.totalBounced) / total * 100) : 0
+          const bounceRate = total > 0 ? (s.totalBounced / total * 100) : 0
+          const statusColor = deliverabilityNum >= 98 ? 'text-green-600' : deliverabilityNum >= 90 ? 'text-yellow-600' : 'text-red-600'
+          const barColor = deliverabilityNum >= 98 ? 'bg-green-500' : deliverabilityNum >= 90 ? 'bg-yellow-500' : 'bg-red-500'
+
+          return (
+            <div key={s.id} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="font-bold text-gray-900">{s.label}</h3>
+                  <p className="text-sm text-gray-400">{s.email}</p>
+                  {s.provider && (
+                    <span className={`mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded ${s.provider === 'brevo' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
+                      {s.provider === 'brevo' ? 'Brevo' : 'Gmail'}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-2xl font-black ${statusColor}`}>{s.deliverability}%</span>
+              </div>
+
+              <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(deliverabilityNum, 100)}%` }} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-lg font-bold text-gray-900">{s.totalSent}</div>
+                  <div className="text-xs text-gray-500">Đã gửi</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-lg font-bold text-red-600">{s.totalBounced}</div>
+                  <div className="text-xs text-gray-500">Bounce</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <div className="text-lg font-bold text-yellow-600">{s.totalFailed}</div>
+                  <div className="text-xs text-gray-500">Lỗi</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex justify-between text-xs text-gray-500">
+                <span>Quota: {s.sentToday}/{s.effectiveLimit}</span>
+                <span>Bounce: {bounceRate.toFixed(1)}%</span>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
 export default function ClientContent({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const initialTab = tabParam === 'senders' ? 'senders' : tabParam === 'settings' ? 'settings' : 'campaigns'
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'senders' | 'settings'>(initialTab)
+  const initialTab = tabParam === 'senders' ? 'senders' : tabParam === 'settings' ? 'settings' : tabParam === 'performance' ? 'performance' : 'campaigns'
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'senders' | 'settings' | 'performance'>(initialTab)
 
   return (
     <>
@@ -344,11 +499,13 @@ export default function ClientContent({ initialCampaigns }: { initialCampaigns: 
         <button onClick={() => setActiveTab('campaigns')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'campaigns' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📋 Chiến dịch</button>
         <button onClick={() => setActiveTab('senders')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'senders' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📡 Tài Khoản</button>
         <button onClick={() => setActiveTab('settings')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>⚙️ Cấu Hình</button>
+        <button onClick={() => setActiveTab('performance')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'performance' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📊 Hiệu suất</button>
       </div>
 
       {activeTab === 'campaigns' && <CampaignsList initialCampaigns={initialCampaigns} />}
       {activeTab === 'senders' && <SendersTab />}
       {activeTab === 'settings' && <SettingsTab />}
+      {activeTab === 'performance' && <SenderPerformanceTab />}
     </>
   )
 }

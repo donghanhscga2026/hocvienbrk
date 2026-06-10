@@ -75,11 +75,14 @@ model UserClosure {
 model EmailSender {
   id               Int                   @id @default(autoincrement())
   label            String
-  email            String                @unique
+  email            String
   isMain           Boolean               @default(false)
-  clientId         String
+  provider         String                @default("gmail")
+  clientId         String?
   clientSecret     String?
-  refreshToken     String
+  refreshToken     String?
+  apiKeyEncrypted  String?
+  senderName       String?
   dailyLimit       Int                   @default(480)
   sentToday        Int                   @default(0)
   lastResetAt      DateTime              @default(now())
@@ -94,6 +97,7 @@ model EmailSender {
   staggerDelayMin  Int                   @default(5)
   warmupPhase      Int                   @default(0)
   campaigns        EmailCampaignSender[]
+  senderLogs       EmailSenderLog[]
 }
 
 model EmailCampaign {
@@ -140,6 +144,20 @@ model EmailCampaignLog {
   errorType  String?
   sentAt     DateTime      @default(now())
   campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model EmailSenderLog {
+  id              Int           @id @default(autoincrement())
+  senderId        Int
+  sender          EmailSender   @relation(fields: [senderId], references: [id])
+  date            DateTime      @default(now())
+  sentCount       Int      @default(0)
+  failedCount     Int      @default(0)
+  bounceCount     Int      @default(0)
+  cooldownCount   Int      @default(0)
+  cooldownMinutes Int      @default(0)
+
+  @@unique([senderId, date])
 }
 
 model EmailBlacklist {

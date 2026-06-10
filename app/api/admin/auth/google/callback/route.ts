@@ -39,24 +39,32 @@ export async function GET(req: Request) {
     // Mã hóa refresh_token
     const encryptedRefreshToken = encrypt(tokens.refresh_token);
 
-    // Lưu hoặc cập nhật EmailSender
-    await prisma.emailSender.upsert({
-      where: { email },
-      update: {
-        refreshToken: encryptedRefreshToken,
-        clientId: process.env.GMAIL_CLIENT_ID || "",
-        // Không cập nhật label nếu đã có
-        isActive: true,
-      },
-      create: {
-        email,
-        label: `Vệ tinh ${email.split('@')[0]}`,
-        refreshToken: encryptedRefreshToken,
-        clientId: process.env.GMAIL_CLIENT_ID || "",
-        dailyLimit: 480,
-        isMain: email === "hocvienbrk@gmail.com", // Giả định email chính
-      },
-    });
+    // Tìm sender Gmail hiện tại theo email + provider
+    const existing = await prisma.emailSender.findFirst({
+      where: { email, provider: 'gmail' },
+    })
+
+    if (existing) {
+      await prisma.emailSender.update({
+        where: { id: existing.id },
+        data: {
+          refreshToken: encryptedRefreshToken,
+          clientId: process.env.GMAIL_CLIENT_ID || "",
+          isActive: true,
+        },
+      })
+    } else {
+      await prisma.emailSender.create({
+        data: {
+          email,
+          label: `Vệ tinh ${email.split('@')[0]}`,
+          refreshToken: encryptedRefreshToken,
+          clientId: process.env.GMAIL_CLIENT_ID || "",
+          dailyLimit: 480,
+          isMain: email === "hocvienbrk@gmail.com",
+        },
+      })
+    }
 
     // Quay lại trang quản lý (trang này sẽ được tạo ở bước sau)
     return NextResponse.redirect(new URL("/tools/email-mkt", req.url));

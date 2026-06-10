@@ -1953,3 +1953,218 @@ existingTCAMember && tcaAddress !== dbAddress
 - ✅ Member cũ được update đầy đủ ngay lần sync đầu tiên sau deploy
 - ✅ `parseDate()` helper xử lý format "DD/MM/YYYY" an toàn
 - ✅ Build: `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN 34: FIX BULK ENROLL + TỐI ƯU EMAIL MKT + SENDER PERFORMANCE (2026-06-10)
+
+### Mục tiêu
+1. Fix duplicate IDs khi bulk enroll nhiều user mới + đồng bộ ID preview với confirm
+2. Gửi email thông báo + auto-verify + Telegram cho user mới (sau đó chuyển sang Email MKT campaign)
+3. Điều chỉnh thông số an toàn cho Email MKT campaign
+4. Xây dựng hệ thống theo dõi hiệu suất sender (EmailSenderLog + bounce scan cron + UI)
+
+### Các file đã sửa/tạo
+
+#### 1. `app/actions/bulk-enroll-actions.ts` — Fix ID + email/Telegram
+- **Bug 1 (Preview)**: `maxUser` query không loại trừ reserved IDs → dự đoán ID sai lệch với `getNextAvailableId()`
+  - **Fix (dòng 198-202)**: Thêm `where: { id: { notIn: reservedIds } }` vào `maxUser` query
+- **Bug 2 (Confirm)**: `getNextAvailableId()` gọi trong vòng lặp → DB không đổi → trả về cùng ID cho nhiều user
+  - **Fix (dòng 254-268)**: Gọi `getNextAvailableId()` 1 lần duy nhất + `while(reservedSet.has(nextId))` pattern giống preview
+- **Tính năng mới (dòng 341-357)**: 
+  - `emailVerified = new Date()` cho NEW user (auto-verify)
+  - `sendTelegram` thông báo về group ACTIVATE
+  - Bỏ `sendActivationEmail` (sẽ gửi qua Email MKT campaign riêng)
+
+#### 2. `lib/email-config.ts` — Safe defaults
+| Tham số | Cũ | Mới |
+|---|---|---|
+| `emailsBeforePauseMin/Max` | 30–50 | 15–25 |
+| `pauseDurationMin/Max` | 10–30 phút | 15–45 phút |
+| `interEmailDelayMin/Max` | 2–8 giây | 5–15 giây |
+| Warmup P0 (< 7 ngày) | 10/ngày | 5/ngày |
+| Warmup P1 (7-13 ngày) | 25/ngày | 15/ngày |
+| Warmup P2 (14-20 ngày) | 50/ngày | 30/ngày |
+| Warmup P3 (21-29 ngày) | 100/ngày | 60/ngày |
+| Warmup P4 (≥ 30 ngày) | 200/ngày | 100/ngày |
+
+#### 3. `app/api/admin/email-config/route.ts` — Validation range
+- `emailsBeforePauseMin/Max`: clamp 20–100 → **5–100**
+- Warmup display strings: đồng bộ với limits mới
+
+#### 4. `app/tools/email-settings/EmailSettingsClient.tsx` — UI
+- Slider min: 20 → 5
+- Default values đồng bộ với config mới
+
+#### 5. `prisma/schema.prisma` — Model `EmailSenderLog` [NEW]
+```prisma
+model EmailSenderLog {
+  id              Int           @id @default(autoincrement())
+  senderId        Int
+  sender          EmailSender   @relation(fields: [senderId], references: [id])
+  date            DateTime      @default(now())
+  sentCount       Int           @default(0)
+  failedCount     Int           @default(0)
+  bounceCount     Int           @default(0)
+  cooldownCount   Int           @default(0)
+  cooldownMinutes Int           @default(0)
+  @@unique([senderId, date])
+}
+```
+
+#### 6. `app/api/admin/campaigns/[id]/send-batch/route.ts` — Ghi sender log
+- Thêm helper `upsertSenderLog()` — upsert theo `senderId_date`
+- Ghi `sentCount` sau mỗi lần gửi thành công
+- Ghi `failedCount` sau mỗi lần gửi thất bại
+- Ghi `cooldownCount` + `cooldownMinutes` sau mỗi cooldown
+
+#### 7. `lib/email-campaign-runner.ts` — Gắn sender vào bounce
+- **Bounce scan**: Thêm `senderId: sender.id` khi update `EmailCampaignLog` → BOUNCED
+- **Ghi bounce log**: Upsert `EmailSenderLog.bounceCount` cho sender đó
+
+#### 8. `app/api/cron/scan-bounces/route.ts` [NEW]
+- Cron endpoint, auth bằng `CRON_SECRET`
+- Gọi `processBounceEmails(3)` — quét bounce 3 ngày gần nhất
+- Trả về stats (scanned, hardBounced, softBounced, fakeEmails, senderDetails)
+
+#### 9. `vercel.json` — Thêm cron schedule
+```json
+{ "path": "/api/cron/scan-bounces", "schedule": "0 6 * * *" }
+// Chạy lúc 6:00 UTC = 13:00 Hà Nội mỗi ngày
+```
+
+#### 10. `app/api/admin/senders/stats/route.ts` [NEW]
+- API trả về hiệu suất từng sender (có auth ADMIN)
+- Tính: `deliverability = (totalSent - totalBounced) / totalSent * 100`
+- Trả về 30 log gần nhất + thông tin sender
+
+#### 11. `app/tools/email-mkt/ClientContent.tsx` — Tab hiệu suất [NEW]
+- **Component `SenderPerformanceTab`**: Fetch `/api/admin/senders/stats`
+- Hiển thị: deliverability % (xanh ≥98%, vàng ≥90%, đỏ <90%), sent/bounce/failed, quota usage, bounce rate
+- Thêm tab button `📊 Hiệu suất` thứ 4
+- State `activeTab` mở rộng: `'campaigns' | 'senders' | 'settings' | 'performance'`
+
+#### 12. DB updates
+- `EmailSender.dailyLimit` cho `hocvienbrk@gmail.com`: 480 → 100
+- `SystemConfig` key `emailCampaignConfig`: upsert giá trị mới
+
+### Backup
+- `plan_temp/bulk-enroll-actions.backup_20260610.patch`
+- `plan_temp/bulk-enroll-actions.backup_20260610_v2.patch`
+- `plan_temp/schema.backup_20260610.patch`
+- `plan_temp/send-batch.backup_20260610.patch`
+- `plan_temp/email-campaign-runner.backup_20260610.patch`
+- `plan_temp/client-content.backup_20260610.patch`
+- `plan_temp/vercel.backup_20260610.patch`
+
+### Trạng thái
+- ✅ Bulk enroll: không còn trùng ID, preview đồng bộ với confirm
+- ✅ NEW user: auto-verify email + Telegram
+- ✅ Email MKT campaign an toàn: batch nhỏ, delay lâu, warmup thấp
+- ✅ 9 sender, tổng quota ~320 email/ngày, 6 ngày sau ~560 email/ngày
+- ✅ `EmailSenderLog` ghi sent/failed/bounce/cooldown mỗi ngày
+- ✅ Bounce scan cron chạy 13:00 HN mỗi ngày, tự động blacklist + gắn senderId
+- ✅ Tab hiệu suất sender: deliverability %, sent/bounce/failed, quota
+- ✅ Build: `npx tsc --noEmit` — hoàn thành 0 lỗi
+- ✅ `npx prisma db push` — đồng bộ schema thành công
+
+---
+
+## ✅ PHẦN BREVO: TÍCH HỢP BREVO (SENDINBLUE) LÀM EMAIL PROVIDER (2026-06-10)
+
+### Mục tiêu
+Tích hợp Brevo làm provider gửi email chính, kiến trúc multi-Brevo (nhiều tài khoản free, 300 email/ngày mỗi tài khoản), routing tự động chia đều. Giữ nguyên Gmail + Resend làm fallback.
+
+### Các file đã tạo/sửa
+
+#### 1. `lib/brevo.ts` [NEW]
+- Core service: `sendTransactionalEmail()`, `sendBatchTransactionalEmail()`, `getBrevoAccount()`
+- Utility: `validateApiKey()`, `getBlockedContacts()`, `unblockContact()`
+- Webhook: `createWebhook()`, `getExistingWebhooks()`
+- Contact: `createBrevoContact()`
+
+#### 2. `prisma/schema.prisma` [MODIFIED]
+- `EmailSender`: thêm `provider` String @default("gmail"), `apiKeyEncrypted` String?, `senderName` String?
+- `clientId`, `clientSecret`, `refreshToken` → nullable (cho Brevo)
+- Bỏ `@unique` trên `email` (cho phép nhiều sender dùng chung email)
+- **Backup**: `plan_temp/schema.backup_20260610_phase2.patch`, `plan_temp/schema_backup_20260610.patch`
+
+#### 3. `lib/notifications.ts` [MODIFIED]
+- Chain mới: **Brevo → Gmail → Resend**
+- `sendViaBrevo()`: gọi `sendTransactionalEmail()`
+- `sendGmail()`: thử Brevo trước, fallback Gmail, fallback Resend
+- **Backup**: `plan_temp/notifications_backup_20260610.patch`
+
+#### 4. `lib/email-campaign-runner.ts` [MODIFIED]
+- `getAvailableSender()`: include Brevo senders, bỏ qua cooldown cho Brevo, dùng `dailyLimit` trực tiếp thay vì warmup limit
+- `sendViaBrevo()`: decrypt API key → gọi Brevo API
+- Bounce scan: filter `provider: 'gmail'` để skip Brevo senders
+- **Backup**: `plan_temp/email-campaign-runner_backup_20260610.patch`
+
+#### 5. `app/api/admin/campaigns/[id]/send-batch/route.ts` [MODIFIED]
+- Provider routing: `sender.provider === 'brevo'` → `sendViaBrevo()`, skip cooldown
+- **Backup**: `plan_temp/send-batch_backup_20260610.patch`
+
+#### 6. `app/api/admin/senders/brevo/route.ts` [NEW]
+- `POST`: nhận label + apiKey, validate qua Brevo, encrypt key, tạo EmailSender
+- `GET`: list Brevo senders kèm senderLogs
+
+#### 7. `app/api/webhooks/brevo/route.ts` [NEW]
+- Xử lý events: hardBounce, softBounce, delivered, opened, click, unsubscribed, spam
+- hardBounce: update EmailCampaignLog → BOUNCED, null emailVerified, add blacklist
+- unsubscribed/spam: add blacklist
+
+#### 8. `app/api/admin/auth/google/callback/route.ts` [MODIFIED]
+- Upsert → findFirst (vì bỏ @unique email), filter `provider: 'gmail'`
+- **Backup**: `plan_temp/google-callback_backup_20260610.patch`
+
+#### 9. `app/api/admin/senders/validate/route.ts` [MODIFIED]
+- Skip Brevo senders trong validate Gmail
+- **Backup**: `plan_temp/validate-route_backup_20260610.patch`
+
+#### 10. `app/api/admin/campaigns/google-sheets/route.ts` [MODIFIED]
+- Filter `provider: 'gmail'` để chỉ xử lý Gmail senders
+- **Backup**: `plan_temp/google-sheets_backup_20260610.patch`
+
+#### 11. `lib/email-campaign-export.ts` [MODIFIED]
+- Filter `provider: 'gmail'` + null check cho refreshToken
+- **Backup**: `plan_temp/email-campaign-export_backup_20260610.patch`
+
+#### 12. `app/tools/email-mkt/ClientContent.tsx` [MODIFIED]
+- Form "Thêm Brevo Sender" (collapsible) trong SendersTab
+- input label + API key, nút xác thực, hiển thị lỗi
+- Badge provider: **Brevo** (xanh) / **Gmail** (đỏ) trên sender card
+- SenderPerformanceTab: hiển thị provider badge
+- **Backup**: `plan_temp/ClientContent_backup_20260610.patch`
+
+#### 13. `lib/email-config.ts` [MODIFIED]
+- **Backup**: `plan_temp/email-config_backup_20260610.patch`
+
+#### 14. `app/api/admin/email-config/route.ts` [MODIFIED]
+- **Backup**: `plan_temp/email-config-route_backup_20260610.patch`
+
+#### 15. `app/tools/email-settings/EmailSettingsClient.tsx` [MODIFIED]
+- **Backup**: `plan_temp/EmailSettingsClient_backup_20260610.patch`
+
+### Các bước sau deploy
+1. **Setup webhook trên Brevo Dashboard**: Settings → Webhooks → tạo webhook trỏ tới `{APP_URL}/api/webhooks/brevo`, chọn events: hardBounce, softBounce, delivered, opened, click, unsubscribed, spam
+2. **Thêm Brevo sender thứ 2+** qua UI (Tools → Email MKT → Senders → "Thêm Brevo Sender")
+3. Theo dõi quota: Brevo free = 300 email/ngày/tài khoản
+
+### Backup files
+- `plan_temp/brevo.ts.backup_20260610.ts`
+- `plan_temp/brevo-api-route_backup_20260610/`
+- `plan_temp/webhooks-brevo_backup_20260610/`
+- `plan_temp/scan-bounces_backup_20260610/`
+- `plan_temp/stats-api-route_backup_20260610/`
+
+### Trạng thái
+- ✅ Core Brevo service (`lib/brevo.ts`) — gửi email, validate, webhook, contact
+- ✅ Schema: `provider`, `apiKeyEncrypted`, `senderName`, bỏ @unique email
+- ✅ Chain transactional: Brevo → Gmail → Resend
+- ✅ Campaign runner: routing Brevo/Gmail đúng, skip cooldown/warmup cho Brevo
+- ✅ Send-batch: provider routing + skip cooldown
+- ✅ Webhook handler: xử lý bounce/open/click/unsub/spam
+- ✅ UI: form thêm Brevo sender + provider badges
+- ✅ EmailSender Brevo đầu tiên (#60) đã tạo (email: hocvienbrk@gmail.com, label: "Brevo Main")
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi
