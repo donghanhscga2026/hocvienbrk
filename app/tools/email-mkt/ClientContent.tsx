@@ -475,9 +475,22 @@ function SenderPerformanceTab() {
                 </div>
               </div>
 
-              <div className="mt-3 flex justify-between text-xs text-gray-500">
-                <span>Quota: {s.sentToday}/{s.effectiveLimit}</span>
-                <span>Bounce: {bounceRate.toFixed(1)}%</span>
+              <div className="mt-3 space-y-1">
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Quota (hệ thống): {s.sentToday}/{s.effectiveLimit}</span>
+                  <span>Bounce: {bounceRate.toFixed(1)}%</span>
+                </div>
+                {s.provider === 'brevo' && s.realSentToday != null && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-600">Quota (Brevo thực tế):</span>
+                    <span className={`font-bold ${s.realRemaining !== null && s.realRemaining < 50 ? 'text-red-600' : 'text-blue-600'}`}>
+                      {s.realSentToday}/{s.realSentToday + (s.realRemaining ?? 0)}
+                      {s.realRemaining !== null && s.realRemaining < 50 && (
+                        <span className="ml-1">⚠️</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )
