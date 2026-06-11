@@ -45,9 +45,9 @@
     
     let groupName = '';
     let fullName = nameText.trim();
-    let personalScore = '0';
-    let totalScore = '0';
-    let level = '1';
+    let personalScore = null;
+    let totalScore = null;
+    let level = null;
     
     // Tìm pattern điểm số: số/số (có thể có số thập phân)
     const scorePattern = /([\d.]+)\s*\/\s*([\d.]+)/;

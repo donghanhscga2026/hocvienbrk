@@ -111,9 +111,9 @@
         parentFolderId: n.parentFolderId,
         // Điểm số và cấp bậc TCA (đã parse bởi injected-script.js)
         isRootNode: n.isRootNode || false,
-        personalScore: n.personalScore || '0',
-        totalScore: n.totalScore || '0',
-        level: n.level || '1',
+        personalScore: n.personalScore ?? null,
+        totalScore: n.totalScore ?? null,
+        level: n.level ?? null,
         hasBH: n.hasBH || false,
         hasTD: n.hasTD || false,
         groupName: n.groupName || '',
