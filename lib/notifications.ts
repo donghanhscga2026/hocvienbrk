@@ -269,14 +269,14 @@ async function sendViaBrevo(to: string, subject: string, htmlBody: string): Prom
 /**
  * Hàm chung để gửi Email — thử Brevo trước, fallback Gmail, rồi Resend
  */
-async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string): Promise<{ success: boolean; message: string }> {
+async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string): Promise<{ success: boolean; message: string; provider?: string; emailId?: string }> {
   // Bước 1: Thử Brevo trước
   if (process.env.BREVO_API_KEY) {
     const brevoResult = await sendViaBrevo(to, subject, htmlBody);
     if (brevoResult.success) {
       console.log(`✅ Email sent via Brevo to ${to}: ${brevoResult.emailId}`);
       await notifyEmailSuccess(to, subject, brevoResult.emailId || 'N/A', 'Brevo');
-      return { success: true, message: 'Email sent via Brevo' };
+      return { success: true, message: 'Email sent via Brevo', provider: 'brevo', emailId: brevoResult.emailId };
     }
     console.log(`⚠️ Brevo failed, falling back to Gmail: ${brevoResult.message}`);
   }
@@ -306,7 +306,7 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
     
     await notifyEmailSuccess(to, subject, emailId, 'Gmail API');
     
-    return { success: true, message: 'Email sent via Gmail' };
+    return { success: true, message: 'Email sent via Gmail', provider: 'gmail', emailId };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`❌ Gmail Error sending to ${to}:`, errorMsg);
@@ -321,7 +321,7 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
       
       if (resendResult.success) {
         await notifyEmailSuccess(to, subject, resendResult.emailId || 'N/A', 'Resend (fallback)');
-        return { success: true, message: 'Email sent via Resend fallback' };
+        return { success: true, message: 'Email sent via Resend fallback', provider: 'resend', emailId: resendResult.emailId };
       } else {
         await notifyEmailError(to, subject, resendResult.message, 'Resend (fallback)', false);
         return { success: false, message: `Gmail failed, Resend also failed: ${resendResult.message}` };
@@ -446,10 +446,19 @@ export async function sendWelcomeEmail(to: string, studentName: string, studentI
   return result;
 }
 
-export async function sendVerificationEmail(to: string, studentName: string, token: string) {
-  // Sử dụng template ngẫu nhiên với random subject và HTML
+export async function sendVerificationEmail(to: string, studentName: string, token: string, userId?: number) {
   const { subject, html } = getRandomVerificationTemplate(studentName, token);
   const result = await sendGmail(to, subject, html);
+  const { logEmail } = await import('@/lib/email-logger')
+  await logEmail({
+    userId,
+    email: to,
+    type: 'verification',
+    provider: result.provider || 'unknown',
+    status: result.success ? 'sent' : 'failed',
+    messageId: result.emailId,
+    error: result.success ? undefined : result.message,
+  })
   return result;
 }
 

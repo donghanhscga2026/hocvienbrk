@@ -42,6 +42,7 @@ model User {
   registrationPointsAsReferee  RegistrationPoint[]   @relation("RefereeRegistration")
   registrationPointsAsReferrer RegistrationPoint[]   @relation("ReferrerRegistration")
   sessions                     Session[]
+  emailLogs                    EmailLog[]
   siteProfile                  SiteProfile?
   referrer                     User?                 @relation("ReferrerToReferee", fields: [referrerId], references: [id])
   referrals                    User[]                @relation("ReferrerToReferee")
@@ -144,6 +145,20 @@ model EmailCampaignLog {
   errorType  String?
   sentAt     DateTime      @default(now())
   campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model EmailLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  email      String
+  type       String
+  provider   String
+  status     String
+  messageId  String?
+  error      String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [userId], references: [id])
 }
 
 model EmailSenderLog {

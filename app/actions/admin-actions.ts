@@ -573,7 +573,7 @@ export async function getUserSystemsAction() {
     } catch { return { success: false, error: "Lỗi DB" } }
 }
 
-export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc', courseId?: number) {
+export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS' | 'UNVERIFIED', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc', courseId?: number) {
     try {
         const session = await auth()
         if (!session?.user?.id) throw new Error("Unauthorized")
@@ -600,6 +600,8 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         if (isAdmin) {
             if (role === 'COURSE_86_DAYS') {
                 where.enrollments = { some: { courseId: 1 } }
+            } else if (role === 'UNVERIFIED') {
+                where.emailVerified = null
             } else if (role && role !== 'ALL') {
                 where.role = role
             }
@@ -655,8 +657,10 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         if (isAdmin) {
             roleCounts['ALL'] = await prisma.user.count()
             roleCounts['COURSE_86_DAYS'] = await prisma.enrollment.count({ where: { courseId: 1 } })
+            roleCounts['UNVERIFIED'] = await prisma.user.count({ where: { emailVerified: null } })
         } else {
             roleCounts['ALL'] = await prisma.user.count({ where: scopeWhere })
+            roleCounts['UNVERIFIED'] = await prisma.user.count({ where: { ...scopeWhere, emailVerified: null } })
         }
 
         const totalPages = Math.ceil(total / limit)
@@ -984,6 +988,7 @@ export async function getStudentDetailAction(studentId: number) {
             select: {
                 id: true, name: true, email: true, phone: true,
                 image: true, role: true, createdAt: true,
+                emailVerified: true,
                 enrollments: {
                     include: {
                         course: { select: { name_lop: true, teacherId: true } },
@@ -1001,6 +1006,135 @@ export async function getStudentDetailAction(studentId: number) {
 
         return { success: true, user }
     } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function getStudentEmailLogsAction(studentId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) throw new Error("Unauthorized")
+        const isAdmin = session.user.role === Role.ADMIN
+        const isTeacher = session.user.role === Role.TEACHER
+        if (!isAdmin && !isTeacher) throw new Error("Unauthorized")
+
+        const logs = await prisma.emailLog.findMany({
+            where: { userId: studentId },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+        })
+
+        return { success: true, logs }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function resendVerificationAction(studentId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { success: false, error: "Chưa đăng nhập" }
+        if (session.user.role !== Role.ADMIN && session.user.role !== Role.TEACHER) {
+            return { success: false, error: "Không có quyền" }
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: studentId },
+            select: { id: true, name: true, email: true, emailVerified: true },
+        })
+        if (!user) return { success: false, error: "Không tìm thấy học viên" }
+        if (!user.email) return { success: false, error: "Học viên không có email" }
+        if (user.emailVerified) return { success: false, error: "Email đã được xác minh" }
+
+        // Xóa token cũ
+        await prisma.verificationToken.deleteMany({
+            where: { identifier: user.email },
+        })
+
+        // Tạo OTP mới (24h)
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+        await prisma.verificationToken.create({
+            data: {
+                identifier: user.email,
+                token: otpCode,
+                expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+        })
+
+        // Gửi email
+        const { sendVerificationEmail } = await import('@/lib/notifications')
+        const result = await sendVerificationEmail(user.email, user.name || 'Học viên', otpCode, studentId)
+
+        if (!result.success) {
+            return { success: false, error: `Gửi email thất bại: ${result.message}` }
+        }
+
+        return {
+            success: true,
+            message: `Đã gửi mã OTP mới đến ${user.email}`,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleString('vi-VN'),
+        }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
+export async function resendAllVerificationAction() {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) {
+            return { success: false, error: "Chỉ Admin mới có quyền này" }
+        }
+
+        const unverifiedUsers = await prisma.user.findMany({
+            where: { emailVerified: null },
+            select: { id: true, name: true, email: true },
+        })
+
+        if (unverifiedUsers.length === 0) {
+            return { success: false, error: "Không có thành viên nào chưa xác minh email" }
+        }
+
+        let sent = 0
+        let failed = 0
+        const errors: string[] = []
+
+        for (const user of unverifiedUsers) {
+            try {
+                await prisma.verificationToken.deleteMany({
+                    where: { identifier: user.email! },
+                })
+
+                const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+                await prisma.verificationToken.create({
+                    data: {
+                        identifier: user.email!,
+                        token: otpCode,
+                        expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+                    },
+                })
+
+                const { sendVerificationEmail } = await import('@/lib/notifications')
+                const result = await sendVerificationEmail(user.email!, user.name || 'Học viên', otpCode, user.id)
+
+                if (result.success) {
+                    sent++
+                } else {
+                    failed++
+                    errors.push(`${user.email}: ${result.message}`)
+                }
+            } catch (err: any) {
+                failed++
+                errors.push(`${user.email}: ${err.message}`)
+            }
+        }
+
+        return {
+            success: true,
+            total: unverifiedUsers.length,
+            sent,
+            failed,
+            errors: errors.slice(0, 10),
+        }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
 }
 
 // ==========================================
