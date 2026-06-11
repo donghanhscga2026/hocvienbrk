@@ -27,6 +27,17 @@ interface MemberInfo {
   promotionDate?: string
 }
 
+function datesEqual(a: string | Date | null | undefined, b: string | Date | null | undefined): boolean {
+  const toComparable = (d: string | Date | null | undefined): string | null => {
+    if (!d) return null
+    if (d instanceof Date) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const parts = d.split('/')
+    if (parts.length !== 3) return null
+    return `${parts[2]}-${parts[1]}-${parts[0]}`
+  }
+  return toComparable(a) === toComparable(b)
+}
+
 export interface PreviewRow {
   id: number
   name: string
@@ -248,9 +259,9 @@ export async function generatePreview(allNodes: TCANode[], memberInfo: Record<nu
     const hasBHChanged = existingTCAMember && tcaHasBH !== dbHasBH
     const hasTDChanged = existingTCAMember && tcaHasTD !== dbHasTD
     const addressChanged = existingTCAMember && tcaAddress !== dbAddress
-    const joinDateChanged = existingTCAMember && tcaJoinDate !== dbJoinDate
-    const contractDateChanged = existingTCAMember && tcaContractDate !== dbContractDate
-    const promotionDateChanged = existingTCAMember && tcaPromotionDate !== dbPromotionDate
+    const joinDateChanged = existingTCAMember && !datesEqual(tcaJoinDate, dbJoinDate)
+    const contractDateChanged = existingTCAMember && !datesEqual(tcaContractDate, dbContractDate)
+    const promotionDateChanged = existingTCAMember && !datesEqual(tcaPromotionDate, dbPromotionDate)
 
     const hasNewFieldsChange = existingTCAMember && (
       groupNameChanged || locationChanged || personalRateChanged ||
@@ -417,8 +428,8 @@ export async function generatePreview(allNodes: TCANode[], memberInfo: Record<nu
     let hasRefSysIdChange = false;
     let dbRefSysId: number | null = null;
     if (existingSystem && parentSystemId !== null) {
-      dbRefSysId = existingSystem.refSysId || null;
-      if (dbRefSysId !== parentSystemId) {
+      dbRefSysId = existingSystem.refSysId;
+      if (dbRefSysId !== 0 && dbRefSysId !== parentSystemId) {
         hasRefSysIdChange = true;
         changes.push(`refSysId: ${dbRefSysId || 0} -> ${parentSystemId}`);
       }
