@@ -204,13 +204,13 @@ export async function generatePreview(allNodes: TCANode[], memberInfo: Record<nu
       if (!raw || raw === '-') return 0
       return parseFloat(raw.replace(',', '.')) || 0
     }
-    const tcaPersonalScore = parseScore(node.personalScore)
-    const tcaTotalScore = parseScore(node.totalScore)
-    const tcaLevel = node.level ? parseInt(node.level) : null
+    const tcaPersonalScore = node.personalScore != null ? parseScore(node.personalScore) : null
+    const tcaTotalScore = node.totalScore != null ? parseScore(node.totalScore) : null
+    const tcaLevel = node.level != null ? parseInt(node.level) : null
 
-    const dbPersonalScore = existingTCAMember?.personalScore ? Number(existingTCAMember.personalScore) : null
-    const dbTotalScore = existingTCAMember?.totalScore ? Number(existingTCAMember.totalScore) : null
-    const dbLevel = existingTCAMember?.level || null
+    const dbPersonalScore = existingTCAMember?.personalScore != null ? Number(existingTCAMember.personalScore) : null
+    const dbTotalScore = existingTCAMember?.totalScore != null ? Number(existingTCAMember.totalScore) : null
+    const dbLevel = existingTCAMember?.level ?? null
 
     const hasScoreChange = existingTCAMember && (
       tcaPersonalScore !== dbPersonalScore ||
