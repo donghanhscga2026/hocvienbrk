@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật dự án HocVien-BRK
-> Cập nhật lần cuối: **2026-06-10 23:45**  
+> Cập nhật lần cuối: **2026-06-11 14:30**  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -2186,6 +2186,179 @@ Tích hợp Brevo làm provider gửi email chính, kiến trúc multi-Brevo (nh
 - ✅ Webhook handler: xử lý bounce/open/click/unsub/spam (event names đã fix)
 - ✅ UI: form thêm Brevo sender + provider badges
 - ✅ 3 Brevo senders (#60, #63, #64) active — 900 email/ngày
+- ✅ `getBrevoTodayStats()` — lấy real quota từ Brevo API (kể cả gửi từ Dashboard)
+- ✅ Stats API: trả về `realSentToday` + `realRemaining` cho Brevo sender
+- ✅ UI hiệu suất: hiển thị "Quota (Brevo thực tế)" cạnh quota hệ thống
 - ✅ Deployed lên Vercel (giautoandien.io.vn)
 - ✅ Webhook URL: `https://giautoandien.io.vn/api/webhooks/brevo`
 - ✅ Build: `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN RESEND: GỬI LẠI EMAIL XÁC MINH (2026-06-10)
+
+### Mục tiêu
+Bổ sung tính năng gửi lại email xác minh (OTP) cho học viên chưa verify email, do lỗi sender bị limit ở lần đăng ký trước.
+
+### Các file đã sửa/tạo
+
+#### `app/actions/admin-actions.ts` [MODIFIED]
+- `getStudentDetailAction`: thêm `emailVerified: true` vào select
+- `resendVerificationAction(studentId)` [NEW]:
+  1. Kiểm tra quyền ADMIN/TEACHER
+  2. Kiểm tra user tồn tại, chưa verify
+  3. Xóa token cũ → tạo OTP 6 số mới (24h)
+  4. Gọi `sendVerificationEmail()` → gửi qua Brevo pool
+  5. Trả về success + thời gian hết hạn
+- **Backup**: `plan_temp/admin-actions_backup_20260610.patch`
+
+#### `app/tools/students/[id]/ResendVerificationButton.tsx` [NEW]
+- Client component: nút "Gửi lại mã xác minh"
+- 3 trạng thái: loading / success (xanh) / error (đỏ)
+- Gọi `resendVerificationAction` khi click
+
+#### `app/tools/students/[id]/page.tsx` [MODIFIED]
+- Thêm import `ShieldCheck, ShieldX` icons + `ResendVerificationButton`
+- Thêm row "Email xác minh" với badge: **Đã xác minh** (xanh) / **Chờ xác minh** (vàng)
+- Nếu chưa verify: hiện nút "Gửi lại mã xác minh" bên dưới
+- **Backup**: `plan_temp/student-detail_backup_20260610.patch`
+
+### Cách sử dụng
+1. Vào **Tools → Học viên** → chọn học viên
+2. Xem dòng "Email xác minh" — nếu hiển thị **Chờ xác minh**
+3. Bấm nút **"📧 Gửi lại mã xác minh"**
+4. Học viên kiểm tra email → nhập OTP → kích hoạt tài khoản
+
+### Trạng thái
+- ✅ Server action: tạo OTP + xóa token cũ + gọi sendVerificationEmail
+- ✅ UI student detail: hiển thị emailVerified status
+- ✅ Resend button: loading/success/error states
+- ✅ Rate limit: chưa có (có thể bổ sung sau nếu cần)
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN STUDENT LIST: EMAIL VERIFIED BADGE + FILTER + INLINE RESEND (2026-06-11)
+
+### Mục tiêu
+Hiển thị trạng thái xác minh email ngay trong danh sách thành viên, thêm bộ lọc "Chưa xác minh", và cho phép gửi lại email xác minh trực tiếp từ danh sách (không cần vào trang chi tiết).
+
+### Các file đã sửa
+
+#### `app/tools/students/page.tsx` [MODIFIED]
+- `StudentData` interface: thêm `emailVerified?: Date | null`
+- `roleConfig`: thêm `UNVERIFIED` (icon Mail, màu cam, label "Chưa xác minh")
+- `roleCardColors` / `roleTextColors`: thêm `UNVERIFIED`
+- Student card: thêm badge **Đã XM** (xanh) / **Chờ XM** (vàng) bên cạnh email
+- `ResendVerifyBtn` component [NEW]: nút "Gửi lại" nhỏ bên cạnh badge, click gọi `resendVerificationAction`, có loading/success/error, `stopPropagation` để không navigate
+- **Backup**: `plan_temp/students_page_backup_20260611.patch`
+
+#### `app/actions/admin-actions.ts` [MODIFIED]
+- `getStudentsAction`: thêm `'UNVERIFIED'` vào union type của `role` param
+- Khi `role === 'UNVERIFIED'` → `where.emailVerified = null`
+- `roleCounts['UNVERIFIED']` tính cho cả admin và teacher scope
+- **Backup**: `plan_temp/admin-actions_backup_20260611.patch`
+
+### Trạng thái
+- ✅ Badge xác minh hiển thị trong từng student card
+- ✅ Nút "Gửi lại" inline hoạt động (loading/success/error)
+- ✅ Filter "Chưa xác minh" trong role filter buttons
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN BULK RESEND: GỬI XÁC MINH HÀNG LOẠT (2026-06-11)
+
+### Mục tiêu
+Cho phép Admin gửi email xác minh lại cho **tất cả** thành viên chưa xác minh chỉ với 1 nút bấm.
+
+### Các file đã sửa
+
+#### `app/actions/admin-actions.ts` [MODIFIED]
+- `resendAllVerificationAction()` [NEW]:
+  - Admin-only, fetch tất cả users `emailVerified: null`
+  - Lặp qua từng user: xóa OTP cũ → tạo OTP 6 số mới (24h) → gọi `sendVerificationEmail(user.email, name, otpCode, user.id)`
+  - Trả về `{ total, sent, failed, errors[] }` (limit 10 lỗi đầu)
+- `resendVerificationAction`: thêm `studentId` → truyền vào `sendVerificationEmail` (chuẩn bị cho email log)
+
+#### `app/tools/students/page.tsx` [MODIFIED]
+- Import `resendAllVerificationAction`
+- State `bulkResend`: idle / loading / done
+- Nút **"Xác minh tất cả"** (màu cam, icon Mail) trong toolbar, chỉ Admin
+- Banner kết quả: "Đã gửi: X/Y" + "Xem lỗi" (nếu có) + nút đóng (X)
+
+### Test results (2026-06-11)
+- ✅ Gửi thành công 19 email qua Brevo cho 19 học viên chưa xác minh
+- ✅ Thời gian: ~14s cho 19 email
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN EMAIL LOG: LỊCH SỬ GỬI EMAIL TRONG STUDENT DETAIL (2026-06-11)
+
+### Mục tiêu
+Ghi lại lịch sử gửi email transactional (xác minh, kích hoạt...) vào database và hiển thị trong trang chi tiết học viên, giúp Admin tra cứu email đã gửi đi.
+
+### Các file đã tạo/sửa
+
+#### `prisma/schema.prisma` [MODIFIED]
+- Model `EmailLog` [NEW]:
+  ```prisma
+  model EmailLog {
+    id         Int      @id @default(autoincrement())
+    userId     Int?
+    email      String
+    type       String
+    provider   String
+    status     String
+    messageId  String?
+    error      String?
+    createdAt  DateTime @default(now())
+    user       User?    @relation(fields: [userId], references: [id])
+  }
+  ```
+- `User` model: thêm `emailLogs EmailLog[]`
+
+#### `lib/email-logger.ts` [NEW]
+- Helper `logEmail(params)`: ghi log vào DB, bọc try/catch để không ảnh hưởng luồng gửi email
+
+#### `lib/notifications.ts` [MODIFIED]
+- `sendGmail`: return type mở rộng `{ success, message, provider?, emailId? }`
+- Mỗi provider (Brevo/Gmail/Resend) trả về `provider` + `emailId` tương ứng
+- `sendVerificationEmail`: thêm param `userId?`, sau khi gửi xong gọi `logEmail()` để ghi log
+
+#### `app/actions/admin-actions.ts` [MODIFIED]
+- `getStudentEmailLogsAction(studentId)` [NEW]: fetch 50 log gần nhất của học viên
+- `resendVerificationAction`: truyền `studentId` vào `sendVerificationEmail`
+- `resendAllVerificationAction`: truyền `user.id` vào `sendVerificationEmail`
+
+#### `app/tools/students/[id]/page.tsx` [MODIFIED]
+- Import `getStudentEmailLogsAction` + icons `CheckCircle, XCircle, Clock`
+- Fetch logs bên cạnh student detail
+- Section **"Lịch sử gửi email"** dưới phần khóa học:
+  - Icon trạng thái (check xanh / x đỏ)
+  - Provider badge: Brevo (xanh) / Gmail (đỏ) / Resend (tím)
+  - Email người nhận + message ID (font monospace)
+  - Thời gian gửi (format vi-VN)
+  - Empty state: "Chưa có email nào được gửi"
+
+### Backup
+- `plan_temp/schema_prisma_backup_20260611_emaillog.patch`
+- `plan_temp/notifications_backup_20260611_emaillog.patch`
+- `plan_temp/student_detail_backup_20260611_emaillog.patch`
+- `plan_temp/admin_actions_backup_20260611_emaillog.patch`
+- `plan_temp/students_page_backup_20260611_v2.patch`
+- `plan_temp/admin-actions_backup_20260611_v2.patch`
+
+### Lưu ý
+- Chỉ log từ thời điểm deploy, không backfill dữ liệu cũ
+- Email log chỉ ghi cho transactional (verification/activation), không bao gồm campaign marketing
+- Logging bọc try/catch — lỗi log không ảnh hưởng đến việc gửi email
+
+### Trạng thái
+- ✅ Model `EmailLog` đã push lên DB thành công
+- ✅ Helper `logEmail()` hoạt động, xử lý lỗi an toàn
+- ✅ Mỗi lần gửi verification đều tự động ghi log (provider, status, messageId)
+- ✅ Student detail hiển thị lịch sử email, 50 log gần nhất
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi
+- ✅ `npx prisma db push` — đồng bộ schema thành công
