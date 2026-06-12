@@ -25,6 +25,8 @@ function RegisterForm() {
     const [otp, setOtp] = useState("")
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null)
     const [showPassword, setShowPassword] = useState(false)
+    const [skipCountdown, setSkipCountdown] = useState(15)
+    const [canSkip, setCanSkip] = useState(false)
     const [referrerName, setReferrerName] = useState<string | null>(null)
     const [isCountryOpen, setIsCountryOpen] = useState(false)
     const [selectedIso, setSelectedIso] = useState("VN")
@@ -165,6 +167,27 @@ function RegisterForm() {
         }
     }, [isCountryOpen])
 
+    // Countdown for skip-OTP button
+    useEffect(() => {
+        if (!registeredEmail) return
+
+        setSkipCountdown(15)
+        setCanSkip(false)
+
+        const timer = setInterval(() => {
+            setSkipCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer)
+                    setCanSkip(true)
+                    return 0
+                }
+                return prev - 1
+            })
+        }, 1000)
+
+        return () => clearInterval(timer)
+    }, [registeredEmail])
+
     const filteredCountries = COUNTRY_CODES.filter(c => 
         c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
         c.code.includes(countrySearch) || 
@@ -212,6 +235,40 @@ function RegisterForm() {
         }
     }
 
+    async function handleAutoLogin(msg: string) {
+        setSuccess(msg)
+
+        const signInResult = await signIn("credentials", {
+            identifier: registeredEmail,
+            password: savedPasswordRef.current,
+            redirect: false,
+        })
+
+        if (signInResult?.ok) {
+            const destination = redirectSlug ? `/${redirectSlug}` : '/'
+
+            // Auto-enroll nếu đến từ trang khóa học
+            if (redirectSlug?.startsWith('khoa-hoc/')) {
+                const idKhoa = redirectSlug.replace('khoa-hoc/', '')
+                fetch('/api/enroll-after-register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: registeredUserId, idKhoa })
+                }).catch(() => {})
+            }
+
+            setTimeout(() => {
+                router.push(destination)
+                router.refresh()
+            }, 1000)
+        } else {
+            setError("Đăng nhập tự động thất bại. Vui lòng đăng nhập thủ công.")
+            setTimeout(() => {
+                router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
+            }, 2000)
+        }
+    }
+
     async function handleVerifyOtp() {
         if (!otp || otp.length !== 6) {
             setError("Vui lòng nhập mã OTP 6 số")
@@ -231,42 +288,24 @@ function RegisterForm() {
             const result = await res.json()
 
             if (res.ok) {
-                setSuccess("Xác minh thành công! Đang đăng nhập...")
-
-                const signInResult = await signIn("credentials", {
-                    identifier: registeredEmail,
-                    password: savedPasswordRef.current,
-                    redirect: false,
-                })
-
-                if (signInResult?.ok) {
-                    const destination = redirectSlug ? `/${redirectSlug}` : '/'
-
-                    // Auto-enroll nếu đến từ trang khóa học
-                    if (redirectSlug?.startsWith('khoa-hoc/')) {
-                        const idKhoa = redirectSlug.replace('khoa-hoc/', '')
-                        fetch('/api/enroll-after-register', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: registeredUserId, idKhoa })
-                        }).catch(() => {})
-                    }
-
-                    setTimeout(() => {
-                        router.push(destination)
-                        router.refresh()
-                    }, 1000)
-                } else {
-                    setError("Đăng nhập tự động thất bại. Vui lòng đăng nhập thủ công.")
-                    setTimeout(() => {
-                        router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
-                    }, 2000)
-                }
+                await handleAutoLogin("Xác minh thành công! Đang đăng nhập...")
             } else {
                 setError(result.error || "Mã xác minh không chính xác")
             }
         } catch {
             setError("Đã xảy ra lỗi khi xác minh")
+        } finally {
+            setIsVerifying(false)
+        }
+    }
+
+    async function handleSkipOtp() {
+        setIsVerifying(true)
+        setError(null)
+        try {
+            await handleAutoLogin("Đăng ký thành công! Bạn có thể xác minh email sau.")
+        } catch {
+            setError("Đã xảy ra lỗi khi đăng nhập")
         } finally {
             setIsVerifying(false)
         }
@@ -359,6 +398,20 @@ function RegisterForm() {
                             >
                                 {isVerifying ? <Loader2 className="animate-spin h-5 w-5" /> : "Xác minh ngay"}
                             </button>
+
+                            {canSkip ? (
+                                <button
+                                    onClick={handleSkipOtp}
+                                    disabled={isVerifying}
+                                    className="flex w-full justify-center rounded-lg border border-brk-outline bg-transparent px-4 py-2.5 text-sm font-medium text-brk-muted hover:text-brk-on-surface transition-colors disabled:opacity-50"
+                                >
+                                    {isVerifying ? <Loader2 className="animate-spin h-5 w-5" /> : "Bỏ qua, xác minh sau"}
+                                </button>
+                            ) : (
+                                <p className="text-center text-xs text-brk-muted">
+                                    Có thể bỏ qua xác minh sau {skipCountdown}s
+                                </p>
+                            )}
                         </div>
 
                         <div className="relative py-2">

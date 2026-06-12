@@ -107,39 +107,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     throw new CustomLoginError("Tài khoản này chưa thiết lập mật khẩu.", "NO_PASSWORD");
                 }
 
-                // CHẶN ĐĂNG NHẬP NẾU CHƯA XÁC MINH EMAIL (Chỉ áp dụng cho tài khoản mới từ ngày 29/03/2026)
-                const featureDate = new Date("2026-03-29T00:00:00Z");
-                const isLegacy = user.createdAt <= featureDate;
-                
-                if (!user.emailVerified) {
-                    if (!isLegacy) {
-                        console.log(`❌ [Auth] Chặn user mới #${user.id} chưa xác minh email.`);
-                        throw new CustomLoginError("Vui lòng xác minh email trước khi đăng nhập.", "EMAIL_NOT_VERIFIED");
-                    } else {
-                        // Tài khoản cũ: Kiểm tra xem đã được gửi mã chưa
-                        const existingToken = await prisma.verificationToken.findFirst({
-                            where: { identifier: user.email }
-                        });
-
-                        if (existingToken) {
-                            if (existingToken.expires > new Date()) {
-                                console.log(`❌ [Auth] Chặn user cũ #${user.id} vì mã xác minh còn hạn.`);
-                                throw new CustomLoginError("Tài khoản của bạn cần được xác minh.", "EMAIL_VERIFICATION_PENDING");
-                            } else {
-                                console.log(`ℹ️ [Auth] Xóa mã xác minh hết hạn cho user cũ #${user.id}.`);
-                                await prisma.verificationToken.delete({
-                                    where: { 
-                                        identifier_token: { 
-                                            identifier: existingToken.identifier, 
-                                            token: existingToken.token 
-                                        } 
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }
-
                 const passwordsMatch = await bcrypt.compare(password, user.password);
                 
                 if (!passwordsMatch) {
@@ -169,7 +136,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     image: sessionImage,
                     affiliateCode: user.affiliateCode ?? undefined, 
                     needsPasswordChange: isDefault && !userAny.passwordChanged,
-                    isUnverifiedLegacy: !user.emailVerified && isLegacy, 
+                    isUnverified: !user.emailVerified,
                 } as any; 
             },
         }),
@@ -201,7 +168,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.sub = user.id;
                 token.role = (user as any).role;
                 token.needsPasswordChange = (user as any).needsPasswordChange;
-                token.isUnverifiedLegacy = (user as any).isUnverifiedLegacy;
+                token.isUnverified = (user as any).isUnverified;
                 token.affiliateCode = (user as any).affiliateCode;
                 token.phone = (user as any).phone;
             }
@@ -234,7 +201,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 session.user.id = token.sub as string;
                 session.user.role = token.role as Role;
                 (session.user as any).needsPasswordChange = token.needsPasswordChange as boolean;
-                (session.user as any).isUnverifiedLegacy = token.isUnverifiedLegacy as boolean;
+                (session.user as any).isUnverified = token.isUnverified as boolean;
                 (session.user as any).affiliateCode = token.affiliateCode as string | undefined;
                 (session.user as any).phone = token.phone as string | null | undefined;
             }
@@ -325,8 +292,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const userName = user.name || 'User';
                     await sendLoginNotification({ id: userIdNum, name: userName }, ip, userAgent);
 
-                    // GỬI THÔNG BÁO XÁC MINH CHO HỌC VIÊN CŨ CHƯA XÁC MINH
-                    if ((user as any).isUnverifiedLegacy) {
+                    // GỬI THÔNG BÁO XÁC MINH CHO HỌC VIÊN CHƯA XÁC MINH
+                    if ((user as any).isUnverified) {
                         console.log(`📧 Gửi nhắc nhở xác minh cho học viên cũ: ${user.email}`);
                         const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                         
