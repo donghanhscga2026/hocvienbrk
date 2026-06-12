@@ -17,6 +17,7 @@ function LoginForm() {
     const [showPassword, setShowPassword] = useState(false)
     const [showNewPassword, setShowNewPassword] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
+    const [warning, setWarning] = useState<string | null>(null)
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -26,6 +27,8 @@ function LoginForm() {
     // NextAuth CredentialsSignin trả về error qua URL params
     // Format: ?error=CredentialsSignin&code=USER_NOT_FOUND:Email
     const errorCode = searchParams.get('code')
+
+    const { update } = useSession()
 
     const { register, handleSubmit, setValue, formState: { errors } } = useForm({
         defaultValues: {
@@ -75,19 +78,38 @@ function LoginForm() {
     async function onSubmit(data: any) {
         setIsLoading(true)
         setError(null)
+        setWarning(null)
 
         try {
             const callbackUrl = redirectSlug ? `/${redirectSlug}` : "/"
             
-            await signIn("credentials", {
+            const result = await signIn("credentials", {
                 identifier: data.identifier,
                 password: data.password,
-                callbackUrl: callbackUrl, // Chuyển hướng về trang chủ hoặc trang yêu cầu sau khi thành công
-                redirect: true,
+                callbackUrl: callbackUrl,
+                redirect: false,
             })
+
+            if (result?.error) {
+                setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại.")
+                return
+            }
+
+            // Success — check if user is unverified
+            const updatedSession = await update()
+            const isUnverified = (updatedSession?.user as any)?.isUnverified
+
+            if (isUnverified) {
+                setWarning("Email của bạn chưa được xác minh. Vui lòng kiểm tra email để xác minh tài khoản.")
+                setTimeout(() => {
+                    router.push(callbackUrl)
+                    router.refresh()
+                }, 3000)
+            } else {
+                router.push(callbackUrl)
+                router.refresh()
+            }
         } catch (err: any) {
-            // Auth.js v5 ném lỗi khi redirect, đây là hành vi bình thường
-            if (err.message === 'NEXT_REDIRECT') throw err;
             console.error("Submit error:", err)
             setError("Đã xảy ra lỗi không mong muốn.")
         } finally {
@@ -258,6 +280,9 @@ function LoginForm() {
                     */}
 
                     <form onSubmit={handleSubmit(onSubmit)} method="POST" className="space-y-4">
+                        {warning && (
+                            <div className="rounded-lg bg-yellow-500/20 border border-yellow-500/50 p-3 text-sm text-yellow-300">{warning}</div>
+                        )}
                         {error && (
                             <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                         )}
