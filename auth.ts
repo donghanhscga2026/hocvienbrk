@@ -54,11 +54,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     adapter: customAdapter as any, 
     session: { strategy: "jwt" },
     providers: [
-        Google({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            allowDangerousEmailAccountLinking: true,
-        }),
+        // DISABLED: Google Auth
+        // Google({
+        //     clientId: process.env.GOOGLE_CLIENT_ID,
+        //     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        //     allowDangerousEmailAccountLinking: true,
+        // }),
         Credentials({
             credentials: {
                 identifier: { label: "Student ID / Email / Phone", type: "text" },

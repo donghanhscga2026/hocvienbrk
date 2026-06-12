@@ -6,8 +6,8 @@ import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
-import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
-import { useEmailPrefill } from "@/hooks/useEmailPrefill"
+// import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"  // DISABLED: Google Auth
+// import { useEmailPrefill } from "@/hooks/useEmailPrefill"  // DISABLED: Google Auth
 
 function LoginForm() {
     const { data: session } = useSession()
@@ -36,7 +36,7 @@ function LoginForm() {
         }
     })
 
-    const { email: prefillEmail } = useEmailPrefill()
+    // const { email: prefillEmail } = useEmailPrefill()  // DISABLED: Google Auth
 
     // Kiểm tra nếu cần đổi mật khẩu sau khi đăng nhập
     useEffect(() => {
@@ -45,11 +45,11 @@ function LoginForm() {
         }
     }, [session])
 
-    useEffect(() => {
-        if (prefillEmail) {
-            setValue("identifier", prefillEmail)
-        }
-    }, [prefillEmail, setValue])
+    // useEffect(() => {
+    //     if (prefillEmail) {
+    //         setValue("identifier", prefillEmail)
+    //     }
+    // }, [prefillEmail, setValue])  // DISABLED: Google Auth
 
     // Xử lý lỗi từ URL (NextAuth CredentialsSignin redirect về kèm ?code=...)
     useEffect(() => {
@@ -61,7 +61,7 @@ function LoginForm() {
             } else if (errorStr.includes("INVALID_PASSWORD")) {
                 setError("Mật khẩu không chính xác. Vui lòng thử lại.")
             } else if (errorStr.includes("NO_PASSWORD")) {
-                setError("Tài khoản này chưa thiết lập mật khẩu. Vui lòng đăng nhập bằng Google.")
+                setError("Tài khoản này chưa thiết lập mật khẩu. Vui lòng liên hệ Admin.")
             } else if (errorStr.includes("EMAIL_NOT_VERIFIED")) {
                 setError("Vui lòng xác minh email trước khi đăng nhập.")
             } else if (errorStr.includes("EMAIL_VERIFICATION_PENDING")) {
@@ -142,9 +142,9 @@ function LoginForm() {
         signOut({ callbackUrl: '/login' })
     }
 
-    const handleGoogleLoading = (loading: boolean) => {
-        setIsLoading(loading)
-    }
+    // const handleGoogleLoading = (loading: boolean) => {
+    //     setIsLoading(loading)
+    // }  // DISABLED: Google Auth
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // GIAO DIỆN ĐỔI MẬT KHẨU (KHI DÙNG MẬT KHẨU MẶC ĐỊNH)
@@ -244,7 +244,7 @@ function LoginForm() {
                 </div>
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
-                    {/* Google */}
+                    {/* DISABLED: Google Auth
                     <SocialAuthButtons 
                         callbackUrl={redirectSlug ? `/complete-profile?redirect=${redirectSlug}` : "/complete-profile"} 
                         isLoading={isLoading}
@@ -255,19 +255,20 @@ function LoginForm() {
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
                         <div className="relative flex justify-center text-xs"><span className="bg-transparent px-2 text-brk-accent">hoặc dùng tài khoản</span></div>
                     </div>
+                    */}
 
                     <form onSubmit={handleSubmit(onSubmit)} method="POST" className="space-y-4">
                         {error && (
                             <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                         )}
                         <div>
-                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Email / SĐT / Mã học viên</label>
+                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã học viên</label>
                             <input
-                                {...register("identifier", { required: "Vui lòng nhập thông tin" })}
+                                {...register("identifier", { required: "Vui lòng nhập mã học viên" })}
                                 type="text"
                                 autoComplete="email"
                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
-                                placeholder="Nhập email hoặc mã học viên"
+                                placeholder="Nhập mã học viên"
                             />
                             {errors.identifier && <p className="mt-1 text-xs text-brk-accent">{errors.identifier.message}</p>}
                         </div>
@@ -305,10 +306,12 @@ function LoginForm() {
                         </button>
                     </form>
 
+                    {/* DISABLED: Registration
                     <p className="text-center text-sm text-brk-accent">
                         Chưa có tài khoản?{' '}
                         <Link href={redirectSlug ? `/register?redirect=${redirectSlug}${refCode ? '&ref=' + refCode : ''}` : "/register"} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
+                    */}
                 </div>
             </div>
         </div>
