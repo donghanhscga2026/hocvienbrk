@@ -182,6 +182,7 @@ export default async function PageSlugPage({ params }: PageProps) {
                 roadmapPoints={roadmapPoints || []}
                 survey={survey}
                 resetSurveyAction={resetSurveyAction}
+                showAllCourses={true}
             />
 
             <FooterSection profile={profile} />

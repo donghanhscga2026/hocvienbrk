@@ -15,6 +15,7 @@ interface CourseCategoryGroupProps {
     userId: number | null
     darkMode?: boolean
     profileSlug?: string | null
+    showAllCourses?: boolean
 }
 
 function CourseCategoryGroup({
@@ -26,13 +27,13 @@ function CourseCategoryGroup({
     userPhone,
     userId,
     darkMode = false,
-    profileSlug = null
+    profileSlug = null,
+    showAllCourses = false
 }: CourseCategoryGroupProps) {
     const { isExpanded, countdown, handleActivity, setIsExpanded } = useExpandWithCountdown(10)
     const groupRef = React.useRef<HTMLDivElement>(null)
 
-    // Hiển thị 3 khóa khi thu gọn (cả mobile và desktop)
-    const displayCount = 3
+    const displayCount = showAllCourses ? (courses?.length || 0) : 3
     const visibleCourses = isExpanded ? courses : courses.slice(0, displayCount)
     const hasMore = courses.length > displayCount
 
@@ -94,7 +95,7 @@ function CourseCategoryGroup({
                         onClick={() => setIsExpanded(!isExpanded)}
                         className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ${
                             isExpanded 
-                            ? 'bg-brk-background text-brk-muted hover:bg-brk-surface' 
+                            ? 'bg-brk-background-dark text-brk-on-primary shadow-lg shadow-black/10' 
                             : 'bg-brk-background-dark text-brk-on-primary shadow-lg shadow-black/10'
                         }`}
                     >
@@ -122,6 +123,7 @@ interface CourseSectionProps {
     darkMode?: boolean
     accentColor?: string
     profileSlug?: string | null
+    showAllCourses?: boolean
 }
 
 export default function CourseSection({
@@ -135,7 +137,8 @@ export default function CourseSection({
     userId,
     darkMode = false,
     accentColor = 'bg-blue-600',
-    profileSlug = null
+    profileSlug = null,
+    showAllCourses = false
 }: CourseSectionProps) {
     const { isExpanded, countdown, handleActivity, setIsExpanded } = useExpandWithCountdown(10)
 
@@ -163,6 +166,7 @@ export default function CourseSection({
                             userId={userId}
                             darkMode={darkMode}
                             profileSlug={profileSlug}
+                            showAllCourses={showAllCourses}
                         />
                     ))}
                 </div>
@@ -170,8 +174,7 @@ export default function CourseSection({
         )
     }
 
-    // Hiển thị 3 khóa khi thu gọn (cả mobile và desktop)
-    const displayCount = 3
+    const displayCount = showAllCourses ? (courses?.length || 0) : 3
     const visibleCourses = isExpanded ? (courses || []) : (courses || []).slice(0, displayCount)
     const hasMore = (courses || []).length > displayCount
 
@@ -227,7 +230,7 @@ export default function CourseSection({
                         onClick={() => setIsExpanded(!isExpanded)}
                         className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
                             isExpanded 
-                            ? 'bg-brk-background text-brk-muted hover:bg-brk-surface' 
+                            ? 'bg-brk-background-dark text-brk-on-primary shadow-brk-primary/20' 
                             : 'bg-brk-background-dark text-brk-on-primary shadow-brk-primary/20'
                         }`}
                     >

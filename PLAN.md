@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật dự án HocVien-BRK
-> Cập nhật lần cuối: **2026-06-11 14:30**  
+> Cập nhật lần cuối: **2026-06-12 18:00**  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -2362,3 +2362,172 @@ Ghi lại lịch sử gửi email transactional (xác minh, kích hoạt...) và
 - ✅ Student detail hiển thị lịch sử email, 50 log gần nhất
 - ✅ Build: `npx tsc --noEmit` — 0 lỗi
 - ✅ `npx prisma db push` — đồng bộ schema thành công
+
+---
+
+## ✅ PHẦN TCA PREVIEW: FIX REFSYSID & DATE COMPARISON (2026-06-12)
+
+### Mục tiêu
+Fix bug "TCA Preview luôn chọn tất cả thành viên để đồng bộ" — nguyên nhân do `refSysId` default `0` luôn khác `parentSystemId`, và so sánh Date giữa string (`"DD/MM/YYYY"`) và Date object luôn sai.
+
+### Các file đã sửa
+
+#### `lib/tca-preview-logic.ts` [MODIFIED]
+- **Fix refSysId (dòng 431-432)**: Bỏ `|| null`, so sánh `dbRefSysId !== 0 && dbRefSysId !== parentSystemId` — bỏ qua khi chưa có referrer (default 0)
+- **Fix Date comparison (dòng 260-262)**: Thêm helper `datesEqual()` — normalizes string ↔ Date về `YYYY-MM-DD` trước khi so sánh
+- **Thêm helper `datesEqual()` (dòng 30-39)**: Xử lý cả string `"DD/MM/YYYY"` và Date object
+
+#### `chrome-extension-tca/injected-script.js` [MODIFIED]
+- Score/level null defaults (dòng 48-50)
+
+#### `chrome-extension-tca/content-script.js` [MODIFIED]
+- Nullish coalescing `?? null` thay vì `|| '0'` (dòng 114-116)
+
+#### `chrome-extension-tca/manifest.json` [MODIFIED]
+- Bump version 9.0.0 → 9.0.1
+
+### Backup
+- `plan_temp/tca-preview-logic_backup_20260611.patch`
+- `plan_temp/content-script_backup_20260611.patch`
+
+### Trạng thái
+- ✅ Fix refSysId: không còn override action thành `'S'` cho mọi member
+- ✅ Fix Date: so sánh đúng giữa string extension và Date Prisma
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN ẨN GOOGLE AUTH + CHỈ CHO ĐĂNG NHẬP BẰNG ID (2026-06-12)
+
+### Mục tiêu
+Tạm thời ẩn đăng nhập/đăng ký bằng Google, chỉ cho đăng nhập bằng Mã học viên + Mật khẩu.
+
+### Các file đã sửa
+
+#### `app/login/page.tsx` [MODIFIED]
+- Comment `SocialAuthButtons` (Google) và divider
+- Comment `useEmailPrefill` (Google One Tap)
+- Label: `"Email / SĐT / Mã học viên"` → `"Mã học viên"`
+- Placeholder: `"Nhập email hoặc mã học viên"` → `"Nhập mã học viên"`
+- Comment link "Đăng ký ngay"
+- Error message: Google → Admin
+
+#### `app/register/page.tsx` [MODIFIED]
+- Thêm flag `REGISTRATION_DISABLED = true` — render message "Đăng ký tạm thời đóng"
+- Code cũ giữ nguyên vẹn trong nhánh `false`
+
+#### `auth.ts` [MODIFIED]
+- Comment Google provider (dòng 57-62)
+
+### Trạng thái
+- ✅ Login chỉ còn 2 field: Mã học viên + Mật khẩu
+- ✅ Đăng ký tạm thời đóng (kèm message + nút quay lại login)
+- ✅ Google provider backend bị vô hiệu
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN TÁI CẤU TRÚC URL: PREFIX CHO KHÓA HỌC / LANDING / SITE PROFILE (2026-06-12)
+
+### Mục tiêu
+Phân biệt URL giữa các loại resource: khóa học, landing page, site profile. Mỗi loại có prefix riêng để tránh collision. Kèm auto-login sau đăng ký.
+
+### URL structure mới
+
+| Loại | Format |
+|------|--------|
+| Đăng ký chung | `/?ref=2` |
+| Khóa học | `/khoa-hoc/{id_khoa}?ref=2` |
+| Landing page | `/land/{slug}?ref=2` |
+| Site profile | `/page/{slug}?ref=2` |
+| Dự án (tương lai) | `/du-an/{slug}?ref=2` |
+
+### Các file đã tạo/sửa
+
+#### Route pages mới
+- **`app/khoa-hoc/[id]/page.tsx`** [NEW] — Route `/khoa-hoc/{id_khoa}`, render `<CourseLandingClient>`
+- **`app/land/[slug]/page.tsx`** [NEW] — Route `/land/{slug}`, render `<LandingPageClient>`
+- **`app/page/[slug]/page.tsx`** [NEW] — Route `/page/{slug}`, render site profile đầy đủ
+
+#### `proxy.ts` [MODIFIED]
+- Thêm `khoa-hoc`, `land`, `page`, `du-an` vào `RESERVED_PATHS`
+- Multi-segment slug extraction (`/khoa-hoc/X` → slug = X, type = 'khoa-hoc')
+- Thêm field `type` vào `AffiliateCookie`
+- Xoá `checkIsSiteProfile` (không cần backward compat)
+
+#### Link generation
+- **`components/share/ShareModal.tsx`**: `/{id_khoa}` → `/khoa-hoc/{id_khoa}`, `/{profileSlug}` → `/page/{profileSlug}`
+- **`components/landing/CourseLandingTemplate.tsx`**: redirect register `redirect={id}` → `redirect=khoa-hoc/{id}`
+- **`components/layout/MainHeader.tsx`**: home button `/{homeSlug}` → `/page/{homeSlug}`
+- **`components/home/HomePageClient.tsx`**: history.replace `/{slug}` → `/page/{slug}`
+
+#### Admin tools
+- **`app/tools/site-profiles/page.tsx`**: links `/slug` → `/page/slug`
+- **`app/tools/my-site/page.tsx`**: links `/slug` → `/page/slug`
+- **`app/tools/site-profiles/[id]/edit/page.tsx`**: "Xem trang" `/slug` → `/page/slug`
+- **`app/actions/site-profile-actions.ts`**: `revalidatePath` `/slug` → `/page/slug`
+- **`app/tools/landings/page.tsx`**: links `/slug` → `/land/slug`
+- **`components/tools/EditLandingForm.tsx`**: "Xem trang" `/slug` → `/land/slug`
+- **`components/admin/EditLandingForm.tsx`**: "Xem trang" `/slug` → `/land/slug`
+- **`app/actions/landing-actions.ts`**: `revalidatePath` `/slug` → `/land/slug`
+
+#### Cleanup
+- **`app/[slug]/page.tsx`** [SIMPLIFIED] — chỉ return 404 (không còn backward compat)
+
+#### Auto-login sau đăng ký
+- **`app/register/page.tsx`**: lưu password vào ref, sau OTP gọi `signIn("credentials")` → auto-login → redirect về destination
+- Mở lại đăng ký: `REGISTRATION_DISABLED = false`
+- **`app/login/page.tsx`**: bỏ comment link "Đăng ký ngay"
+
+### Backup
+- `plan_temp/proxy_ts_backup_20260612.patch`
+- `plan_temp/ShareModal_backup_20260612.patch`
+- `plan_temp/CourseLandingTemplate_backup_20260612.patch`
+- `plan_temp/register_page_backup_20260612b.patch`
+- `plan_temp/login_page_backup_20260612b.patch`
+- `plan_temp/affiliate_page_backup_20260612.patch`
+- `plan_temp/slug_page_backup_20260612.patch`
+- `plan_temp/MainHeader_backup_20260612.patch`
+- `plan_temp/HomePageClient_backup_20260612.patch`
+- `plan_temp/site_profiles_page_backup_20260612.patch`
+- `plan_temp/my_site_backup_20260612.patch`
+- `plan_temp/site_profile_edit_backup_20260612.patch`
+- `plan_temp/site_profile_actions_backup_20260612.patch`
+- `plan_temp/landings_page_backup_20260612.patch`
+- `plan_temp/EditLandingForm_backup_20260612.patch`
+- `plan_temp/EditLandingForm_admin_backup_20260612.patch`
+- `plan_temp/landing_actions_backup_20260612.patch`
+
+### Trạng thái
+- ✅ 3 route pages mới hoạt động với prefix riêng
+- ✅ proxy.ts xử lý multi-segment slug
+- ✅ Toàn bộ internal links cập nhật (16 files)
+- ✅ Auto-login sau OTP bằng signIn credentials
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## 🗓️ SESSION 2026-06-12: CourseSection mở rộng — showAllCourses cho site profile
+
+### Mục tiêu
+Thêm prop `showAllCourses` để cho phép hiển thị toàn bộ khóa học (không expand/collapse) trên các trang site profile (`/page/{slug}`).
+
+### Các file đã sửa
+
+#### `components/home/CourseSection.tsx`
+- Thêm prop `showAllCourses?: boolean`
+- Khi `true`: `displayCount = courses.length` (hiện hết, ẩn nút expand, tắt countdown, tắt ring)
+
+#### `components/home/HomePageClient.tsx`
+- Thêm `showAllCourses?: boolean` vào `HomePageClientProps`
+- Destructure với default `false`
+- Truyền xuống cả 3 `<CourseSection>` trong component
+
+#### `app/page/[slug]/page.tsx`
+- Truyền `showAllCourses={true}` vào `<HomePageClient>` (site profile pages)
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ✅ Button expand/collapse đã đồng bộ màu `bg-brk-background-dark text-brk-on-primary`
+- ✅ Site profile pages: hiện tất cả khóa học không expand/collapse
+- ✅ Main homepage: giữ nguyên hành vi cũ (mặc định `false`)
