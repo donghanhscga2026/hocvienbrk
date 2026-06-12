@@ -2,7 +2,6 @@ import NextAuth from "next-auth"
 import { authConfig } from "./auth.config"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import prisma from "@/lib/prisma"
 
 const { auth } = NextAuth(authConfig)
 
@@ -12,6 +11,7 @@ interface AffiliateCookie {
     c?: string | null
     s?: string | null
     t: number
+    type?: string | null
 }
 
 const RESERVED_PATHS = new Set([
@@ -19,8 +19,10 @@ const RESERVED_PATHS = new Set([
     'auth', 'dashboard', 'account', 'settings', 'profile',
     'user', 'checkout', 'payment', 'static', 'assets', '_next',
     'landing', 'forgot-password', 'tools', 'account-settings',
-    'tca', 'ktc' // System paths
+    'tca', 'ktc', 'khoa-hoc', 'land', 'page', 'du-an'
 ])
+
+const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
 
 /**
  * proxy.ts (Next.js 16+)
@@ -29,7 +31,6 @@ const RESERVED_PATHS = new Set([
 const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
     const { nextUrl } = request
     
-    // 1. KHÔNG can thiệp vào các route auth để tránh lỗi PKCE/Cookies
     if (nextUrl.pathname.startsWith('/api/auth')) {
         return NextResponse.next()
     }
@@ -38,26 +39,22 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
     
     const refCode = request.nextUrl.searchParams.get('ref')
     const pathParts = request.nextUrl.pathname.split('/').filter(Boolean)
-    const potentialSlug = pathParts.length > 0 ? pathParts[0] : null
-    
-    // 2. Logic Affiliate Referral
-    if (refCode) {
-        const landingSlug = potentialSlug && !RESERVED_PATHS.has(potentialSlug) && !potentialSlug.includes('.') ? potentialSlug : null
-        saveRefCookie(response, refCode, landingSlug, landingSlug, null)
+
+    let slug: string | null = null
+    let resourceType: string | null = null
+
+    if (pathParts.length >= 2 && RESOURCE_PREFIXES.has(pathParts[0])) {
+        slug = pathParts[1]
+        resourceType = pathParts[0]
+    } else if (pathParts.length === 1) {
+        const single = pathParts[0]
+        if (!RESERVED_PATHS.has(single) && !single.includes('.')) {
+            slug = single
+        }
     }
 
-    // 3. Logic Site Profile Redirect
-    if (potentialSlug && !RESERVED_PATHS.has(potentialSlug) && !potentialSlug.includes('.')) {
-        try {
-            // Kiểm tra nếu là SiteProfile slug (từ database)
-            // Lưu ý: Prisma có thể lỗi trên Edge, chúng ta bọc try-catch
-            const isSiteProfile = await checkIsSiteProfile(potentialSlug)
-            if (isSiteProfile) {
-                return response
-            }
-        } catch (e) {
-            // Bỏ qua nếu lỗi Prisma trên Edge
-        }
+    if (refCode) {
+        saveRefCookie(response, refCode, slug, slug, null, resourceType)
     }
     
     return response
@@ -65,41 +62,13 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
 
 export { proxyHandler as proxy, proxyHandler as default }
 
-// Cache để tránh query database quá nhiều
-let profileSlugCache: Set<string> | null = null
-let cacheTimestamp = 0
-const CACHE_TTL = 60 * 1000 // 1 phút
-
-async function checkIsSiteProfile(slug: string): Promise<boolean> {
-    // Check cache trước
-    if (profileSlugCache && Date.now() - cacheTimestamp < CACHE_TTL) {
-        return profileSlugCache.has(slug)
-    }
-    
-    try {
-        // Query database - Lưu ý: logic này có thể fail trên Edge Runtime
-        // Nếu dùng Supabase/Edge-ready DB thì OK.
-        const profiles = await prisma.siteProfile.findMany({
-            where: { isActive: true },
-            select: { slug: true }
-        })
-        
-        profileSlugCache = new Set(profiles.map((p: any) => p.slug))
-        cacheTimestamp = Date.now()
-        
-        return profileSlugCache.has(slug)
-    } catch (error) {
-        // Fallback: cho phép qua nếu lỗi (để tránh block pages hợp lệ)
-        return false
-    }
-}
-
 function saveRefCookie(
     response: NextResponse, 
     refCode: string, 
     landingSlug: string | null = null,
     courseSlug: string | null = null,
-    systemName: string | null = null
+    systemName: string | null = null,
+    resourceType: string | null = null
 ) {
     if (!refCode) return
     
@@ -111,6 +80,7 @@ function saveRefCookie(
     if (landingSlug) cookieData.l = landingSlug
     if (courseSlug) cookieData.c = courseSlug
     if (systemName) cookieData.s = systemName
+    if (resourceType) cookieData.type = resourceType
     
     response.cookies.set('aff_ref', JSON.stringify(cookieData), {
         maxAge: 30 * 24 * 60 * 60,

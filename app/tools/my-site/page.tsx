@@ -82,7 +82,7 @@ return (
         <div className="bg-gradient-to-br from-brk-accent to-orange-600 rounded-3xl p-6 text-white mb-6">
           <h1 className="text-xl font-bold mb-1">Trang chủ cá nhân</h1>
           <p className="text-white/80 text-sm">
-            Tùy chỉnh trang chủ riêng của bạn với URL <span className="font-mono">/{profile?.slug || 'your-slug'}</span>
+            Tùy chỉnh trang chủ riêng của bạn với URL <span className="font-mono">/page/{profile?.slug || 'your-slug'}</span>
           </p>
         </div>
 
@@ -135,11 +135,11 @@ return (
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-500">URL</span>
                   <Link
-                    href={`/${profile.slug}`}
+                    href={`/page/${profile.slug}`}
                     className="font-mono text-sm text-brk-accent hover:underline"
                     target="_blank"
                   >
-                    /{profile.slug}
+                    /page/{profile.slug}
                   </Link>
                 </div>
               </div>
@@ -147,7 +147,7 @@ return (
 
             <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
               <Link
-                href={`/${profile.slug}`}
+                href={`/page/${profile.slug}`}
                 className="flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors"
                 target="_blank"
               >

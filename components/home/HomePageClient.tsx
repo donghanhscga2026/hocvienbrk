@@ -58,7 +58,7 @@ function HomePageContent({
 
   const handleClosePayment = () => {
     setCourseToPay(null)
-    window.history.replaceState({}, '', `/${profile.slug || ''}`)
+    window.history.replaceState({}, '', `/page/${profile.slug || ''}`)
   }
 
   // Dynamic section titles từ profile

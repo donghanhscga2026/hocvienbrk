@@ -42,24 +42,21 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
   // Logic tạo shareUrl theo shareType:
   // - 'course': share khóa học → /{course.id_khoa}/?ref=7
   // - 'header': share từ header → /?ref=7 hoặc /{profileSlug}/?ref=7
-  const shareUrl = (() => {
-    if (shareType === 'course' && course?.id_khoa) {
-      // Share khóa học cụ thể
-      return affiliateCode
-        ? `${baseUrl}/${course.id_khoa}?ref=${encodeURIComponent(affiliateCode)}`
-        : `${baseUrl}/${course.id_khoa}`
-    }
-    // Share từ header (trang chủ hoặc profile)
-    if (profileSlug) {
-      return affiliateCode
-        ? `${baseUrl}/${profileSlug}?ref=${encodeURIComponent(affiliateCode)}`
-        : `${baseUrl}/${profileSlug}`
-    }
-    // Trang chủ mặc định
-    return affiliateCode
-      ? `${baseUrl}/?ref=${encodeURIComponent(affiliateCode)}`
-      : baseUrl
-  })()
+    const shareUrl = (() => {
+        if (shareType === 'course' && course?.id_khoa) {
+            return affiliateCode
+                ? `${baseUrl}/khoa-hoc/${course.id_khoa}?ref=${encodeURIComponent(affiliateCode)}`
+                : `${baseUrl}/khoa-hoc/${course.id_khoa}`
+        }
+        if (profileSlug) {
+            return affiliateCode
+                ? `${baseUrl}/page/${profileSlug}?ref=${encodeURIComponent(affiliateCode)}`
+                : `${baseUrl}/page/${profileSlug}`
+        }
+        return affiliateCode
+            ? `${baseUrl}/?ref=${encodeURIComponent(affiliateCode)}`
+            : baseUrl
+    })()
 
   // Title tùy theo shareType
   const shareTitle = shareType === 'course'

@@ -97,7 +97,7 @@ export default function CourseLandingTemplate({
     
     const handleEnroll = async () => {
         if (!session) {
-            router.push(`/register?redirect=${course.id_khoa}`)
+            router.push(`/register?redirect=khoa-hoc/${course.id_khoa}`)
             return
         }
         

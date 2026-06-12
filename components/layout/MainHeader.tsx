@@ -98,7 +98,7 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                         
                         {/* Home 3D Icon - Về trang profile đang là "Home" */}
                         <button
-                            onClick={() => router.push(hasCustomHome ? `/${homeSlug}` : '/brk')}
+                            onClick={() => router.push(hasCustomHome ? `/page/${homeSlug}` : '/page/brk')}
                             className="shrink-0 transition-opacity hover:opacity-80"
                             title={`Trang chủ: ${hasCustomHome ? homeSlug : 'brk'}`}
                         >
