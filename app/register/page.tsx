@@ -10,6 +10,10 @@ import { COUNTRY_CODES } from "@/lib/country-codes"
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 import { useEmailPrefill } from "@/hooks/useEmailPrefill"
 
+// ====== ĐĂNG KÝ TẠM THỜI ĐÓNG ======
+// Để mở lại: sửa REGISTRATION_DISABLED = false
+const REGISTRATION_DISABLED = true;
+
 function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false)
     const [isVerifying, setIsVerifying] = useState(false)
@@ -246,6 +250,34 @@ function RegisterForm() {
     const openTelegram = () => {
         const msg = `Chào Admin, tôi là ${userName}, mã #${registeredUserId}, vừa đăng ký bằng email ${registeredEmail}. Nhờ Admin xác minh tài khoản giúp tôi.`
         window.open(`https://t.me/hocvienbrk?text=${encodeURIComponent(msg)}`, '_blank')
+    }
+
+    // ====== TẠM THỜI ĐÓNG ĐĂNG KÝ ======
+    // Để mở lại: sửa REGISTRATION_DISABLED = false ở đầu file
+    if (REGISTRATION_DISABLED) {
+        return (
+            <div className="w-full max-w-md space-y-6 rounded-xl bg-brk-surface p-6 sm:p-8 shadow-lg">
+                <div className="text-center">
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-brk-on-surface">
+                        Đăng ký tạm thời đóng
+                    </h2>
+                    <p className="mt-4 text-sm text-brk-muted leading-relaxed">
+                        Tính năng đăng ký hiện đang tạm đóng để bảo trì.
+                    </p>
+                    <p className="mt-2 text-sm text-brk-muted">
+                        Vui lòng quay lại sau hoặc liên hệ Admin để được hỗ trợ.
+                    </p>
+                </div>
+                <div className="text-center mt-8">
+                    <Link
+                        href="/login"
+                        className="inline-block rounded-lg bg-brk-primary px-6 py-2.5 text-sm font-medium text-brk-on-primary hover:bg-brk-primary-hover transition-colors"
+                    >
+                        Quay lại đăng nhập
+                    </Link>
+                </div>
+            </div>
+        )
     }
 
     return (
