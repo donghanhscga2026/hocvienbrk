@@ -25,6 +25,7 @@ interface HomePageClientProps {
   roadmapPoints: any[]
   survey: any | null
   resetSurveyAction: () => Promise<any>
+  showAllCourses?: boolean
 }
 
 function HomePageContent({
@@ -43,7 +44,8 @@ function HomePageContent({
   targetPointId,
   roadmapPoints,
   survey,
-  resetSurveyAction
+  resetSurveyAction,
+  showAllCourses = false
 }: HomePageClientProps) {
   const searchParams = useSearchParams()
   const paymentCourseId = searchParams.get('paymentCourseId')
@@ -125,6 +127,7 @@ function HomePageContent({
                 darkMode={false}
                 accentColor="bg-brk-accent"
                 profileSlug={profile.slug}
+                showAllCourses={showAllCourses}
               />
             )}
 
@@ -139,6 +142,7 @@ function HomePageContent({
                 userId={userId}
                 accentColor="bg-blue-600"
                 profileSlug={profile.slug}
+                showAllCourses={showAllCourses}
               />
             )}
           </>
@@ -154,6 +158,7 @@ function HomePageContent({
               userId={userId}
               accentColor="bg-blue-600"
               profileSlug={profile.slug}
+              showAllCourses={showAllCourses}
             />
           )
         )}
