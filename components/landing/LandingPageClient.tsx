@@ -170,6 +170,8 @@ interface CourseLandingClientProps {
     userPhone: string | null
     userId: number | null
     session: any
+    totalHours: number
+    activeStudentCount: number
 }
 
 export function CourseLandingClient({
@@ -180,7 +182,9 @@ export function CourseLandingClient({
     isCourseOneActive,
     userPhone,
     userId,
-    session
+    session,
+    totalHours,
+    activeStudentCount
 }: CourseLandingClientProps) {
     return (
         <CourseLandingTemplate
@@ -192,6 +196,8 @@ export function CourseLandingClient({
             userPhone={userPhone}
             userId={userId}
             session={session}
+            totalHours={totalHours}
+            activeStudentCount={activeStudentCount}
         />
     )
 }

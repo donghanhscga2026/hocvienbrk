@@ -81,11 +81,69 @@ export default async function KhoaHocPage({ params }: PageProps) {
         select: { id: true, title: true, order: true }
     })
 
-    const testimonials = await (prisma as any).courseTestimonial.findMany({
-        where: { courseId, isActive: true },
-        take: 3,
-        orderBy: { isFeatured: 'desc' }
+    // Tổng thời lượng video từ lessonProgress.maxTime
+    const durationRows = await prisma.lessonProgress.groupBy({
+        by: ['lessonId'],
+        where: { lesson: { courseId }, maxTime: { gt: 0 } },
+        _max: { maxTime: true }
     })
+    const totalSeconds = durationRows.reduce((sum, r) => sum + (r._max.maxTime || 0), 0)
+    const totalHours = Math.max(1, Math.ceil(totalSeconds / 3600))
+
+    // Số học viên đang học
+    const activeStudentCount = await prisma.enrollment.count({
+        where: { courseId, status: 'ACTIVE' }
+    })
+
+    // Testimonials từ dữ liệu thật (LessonProgress.assignment.reflection + LessonComment)
+    const reflectionsLP = await prisma.lessonProgress.findMany({
+        where: { lesson: { courseId }, status: 'COMPLETED' },
+        include: {
+            enrollment: {
+                include: { user: { select: { id: true, name: true, image: true } } }
+            },
+            lesson: { select: { title: true, order: true } }
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 5
+    })
+
+    const lessonComments = await prisma.lessonComment.findMany({
+        where: { lesson: { courseId } },
+        include: {
+            user: { select: { id: true, name: true, image: true } },
+            lesson: { select: { title: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10
+    })
+
+    const testimonials = [
+        ...reflectionsLP
+            .filter(lp => {
+                if (!lp.assignment) return false
+                const a = lp.assignment as Record<string, unknown>
+                return typeof a.reflection === 'string' && a.reflection.trim().length > 0
+            })
+            .map(lp => ({
+                id: `ref-${lp.id}`,
+                name: lp.enrollment.user.name || 'Học viên',
+                content: ((lp.assignment as Record<string, unknown>).reflection as string).trim(),
+                avatar: lp.enrollment.user.image,
+                role: `Bài ${lp.lesson.order}`,
+                rating: Math.min(5, Math.max(1, Math.round(lp.totalScore / 2))) || 5,
+            })),
+        ...lessonComments
+            .filter(c => c.content && c.content.trim().length > 0)
+            .map(c => ({
+                id: `cmt-${c.id}`,
+                name: c.user.name || 'Học viên',
+                content: c.content.trim(),
+                avatar: c.user.image,
+                role: `Bình luận bài: ${c.lesson.title}`,
+                rating: 5,
+            }))
+    ].slice(0, 5)
 
     return (
         <CourseLandingClient
@@ -97,6 +155,8 @@ export default async function KhoaHocPage({ params }: PageProps) {
             userPhone={userPhone}
             userId={userId}
             session={session}
+            totalHours={totalHours}
+            activeStudentCount={activeStudentCount}
         />
     )
 }
