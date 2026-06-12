@@ -241,6 +241,17 @@ function RegisterForm() {
 
                 if (signInResult?.ok) {
                     const destination = redirectSlug ? `/${redirectSlug}` : '/'
+
+                    // Auto-enroll nếu đến từ trang khóa học
+                    if (redirectSlug?.startsWith('khoa-hoc/')) {
+                        const idKhoa = redirectSlug.replace('khoa-hoc/', '')
+                        fetch('/api/enroll-after-register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: registeredUserId, idKhoa })
+                        }).catch(() => {})
+                    }
+
                     setTimeout(() => {
                         router.push(destination)
                         router.refresh()
@@ -411,12 +422,14 @@ function RegisterForm() {
                     </div>
                 ) : (
                     <div className="space-y-4">
+                        {false && (
                         <SocialAuthButtons 
                             callbackUrl={redirectSlug ? `/complete-profile?redirect=${redirectSlug}` : "/complete-profile"} 
                             isLoading={isLoading}
                             onLoading={(loading) => setIsLoading(loading)}
                             buttonText="Đăng ký bằng Google"
                         />
+                        )}
 
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-brk-outline" /></div>
