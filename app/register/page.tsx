@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense, useRef } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2, MessageCircle } from "lucide-react"
+import { signIn } from "next-auth/react"
 import { registerUser } from "../actions/auth-actions"
 import { COUNTRY_CODES } from "@/lib/country-codes"
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
@@ -12,7 +13,7 @@ import { useEmailPrefill } from "@/hooks/useEmailPrefill"
 
 // ====== ĐĂNG KÝ TẠM THỜI ĐÓNG ======
 // Để mở lại: sửa REGISTRATION_DISABLED = false
-const REGISTRATION_DISABLED = true;
+const REGISTRATION_DISABLED = false;
 
 function RegisterForm() {
     const [isLoading, setIsLoading] = useState(false)
@@ -30,6 +31,7 @@ function RegisterForm() {
     const [countrySearch, setCountrySearch] = useState("")
     const countryRef = useRef<HTMLDivElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
+    const savedPasswordRef = useRef<string>("")
     
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -176,6 +178,7 @@ function RegisterForm() {
         setFieldErrors(null)
 
         try {
+            savedPasswordRef.current = data.password
             const formData = new FormData()
             formData.append("name", data.name)
             formData.append("email", data.email)
@@ -228,10 +231,26 @@ function RegisterForm() {
             const result = await res.json()
 
             if (res.ok) {
-                setSuccess("Xác minh thành công! Đang chuyển đến trang đăng nhập...")
-                setTimeout(() => {
-                    router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
-                }, 2000)
+                setSuccess("Xác minh thành công! Đang đăng nhập...")
+
+                const signInResult = await signIn("credentials", {
+                    identifier: registeredEmail,
+                    password: savedPasswordRef.current,
+                    redirect: false,
+                })
+
+                if (signInResult?.ok) {
+                    const destination = redirectSlug ? `/${redirectSlug}` : '/'
+                    setTimeout(() => {
+                        router.push(destination)
+                        router.refresh()
+                    }, 1000)
+                } else {
+                    setError("Đăng nhập tự động thất bại. Vui lòng đăng nhập thủ công.")
+                    setTimeout(() => {
+                        router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
+                    }, 2000)
+                }
             } else {
                 setError(result.error || "Mã xác minh không chính xác")
             }

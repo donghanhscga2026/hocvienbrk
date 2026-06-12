@@ -350,9 +350,8 @@ export async function updateSiteProfile(id: number, data: any) {
 
     const { revalidatePath } = await import('next/cache')
     revalidatePath(`/tools/site-profiles/${id}/edit`)
-    revalidatePath(`/${profile.slug}`)
-    revalidatePath('/')
-
+    revalidatePath(`/page/${profile.slug}`)
+    
     return { success: true, profile }
   } catch (error) {
     return { error: 'Lỗi cập nhật database' }
@@ -396,7 +395,7 @@ export async function addProfileMember(profileId: number, userId: number, role: 
     const { revalidatePath } = await import('next/cache')
     revalidatePath(`/tools/site-profiles/${profileId}/edit`)
     revalidatePath(`/tools/my-site/edit`)
-    revalidatePath(`/${profile.slug}`)
+    revalidatePath(`/page/${profile.slug}`)
 
     return { success: true, member }
   } catch (error) {
@@ -420,7 +419,7 @@ export async function removeProfileMember(profileId: number, userId: number) {
     const { revalidatePath } = await import('next/cache')
     revalidatePath(`/tools/site-profiles/${profileId}/edit`)
     revalidatePath(`/tools/my-site/edit`)
-    revalidatePath(`/${profile.slug}`)
+    revalidatePath(`/page/${profile.slug}`)
 
     return { success: true }
   } catch (error) {

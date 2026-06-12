@@ -568,7 +568,7 @@ export default function EditSiteProfilePage({ params }: PageProps) {
           {/* Actions */}
           <div className="flex gap-4">
             <a
-              href={`/${profile.slug}`}
+              href={`/page/${profile.slug}`}
               target="_blank"
               className="flex-1 bg-white border border-gray-200 text-gray-800 py-4 rounded-xl font-black uppercase text-center hover:bg-gray-50 transition-colors"
             >

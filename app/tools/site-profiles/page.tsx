@@ -115,8 +115,8 @@ export default function SiteProfilesPage() {
                         {profile.isDefault && (
                           <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-500 rounded text-[10px] font-bold">BRK</span>
                         )}
-                        <Link href={`/${profile.slug}`} className="text-orange-500 hover:underline font-mono text-sm" target="_blank">
-                          /{profile.slug}
+                        <Link href={`/page/${profile.slug}`} className="text-orange-500 hover:underline font-mono text-sm" target="_blank">
+                          /page/{profile.slug}
                         </Link>
                       </div>
                     </td>
@@ -147,7 +147,7 @@ export default function SiteProfilesPage() {
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <Link
-                          href={`/${profile.slug}`}
+                          href={`/page/${profile.slug}`}
                           target="_blank"
                           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                           title="Xem trang"

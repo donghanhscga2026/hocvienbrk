@@ -84,11 +84,11 @@ export default function LandingsPage() {
                                         <td className="px-4 py-3">
                                             <div>
                                                 <Link 
-                                                    href={`/${landing.slug}`}
+                                                    href={`/land/${landing.slug}`}
                                                     target="_blank"
                                                     className="font-medium text-blue-600 hover:underline"
                                                 >
-                                                    /{landing.slug}
+                                                    /land/{landing.slug}
                                                 </Link>
                                                 <p className="text-sm text-gray-500 mt-0.5">{landing.title}</p>
                                             </div>
@@ -123,7 +123,7 @@ export default function LandingsPage() {
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <a
-                                                    href={`/${landing.slug}`}
+                                                    href={`/land/${landing.slug}`}
                                                     target="_blank"
                                                     className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                     title="Xem trang"

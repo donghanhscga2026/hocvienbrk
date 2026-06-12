@@ -306,12 +306,10 @@ function LoginForm() {
                         </button>
                     </form>
 
-                    {/* DISABLED: Registration
                     <p className="text-center text-sm text-brk-accent">
                         Chưa có tài khoản?{' '}
                         <Link href={redirectSlug ? `/register?redirect=${redirectSlug}${refCode ? '&ref=' + refCode : ''}` : "/register"} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
-                    */}
                 </div>
             </div>
         </div>

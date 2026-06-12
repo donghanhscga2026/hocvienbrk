@@ -396,7 +396,7 @@ export function EditLandingForm({ landing, courses }: EditLandingFormProps) {
             {/* Actions */}
             <div className="flex items-center justify-between mt-6">
                 <a
-                    href={`/${landing.slug}`}
+                    href={`/land/${landing.slug}`}
                     target="_blank"
                     className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 font-medium"
                 >
