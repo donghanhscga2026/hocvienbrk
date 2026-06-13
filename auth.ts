@@ -73,33 +73,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (!parsedCredentials.success) return null;
 
                 const { identifier, password } = parsedCredentials.data
+
                 const isNumeric = /^\d+$/.test(identifier);
-                const isEmail = identifier.includes("@");
+                if (!isNumeric) {
+                    console.log(`❌ [Auth] Mã học viên không hợp lệ: ${identifier}`);
+                    throw new CustomLoginError("Sai mã học viên", "USER_NOT_FOUND:Mã học viên");
+                }
 
-                let identifierType = "thông tin đăng nhập";
-                if (isEmail) identifierType = "Email";
-                else if (isNumeric && identifier.length < 10) identifierType = "Mã học viên";
-                else if (isNumeric) identifierType = "Số điện thoại";
+                const potentialId = parseInt(identifier);
+                if (potentialId < 0 || potentialId >= 2147483647 || isNaN(potentialId)) {
+                    console.log(`❌ [Auth] Mã học viên không hợp lệ: ${identifier}`);
+                    throw new CustomLoginError("Sai mã học viên", "USER_NOT_FOUND:Mã học viên");
+                }
 
-                console.log(`🔍 [Auth] Đang kiểm tra đăng nhập cho: ${identifier.replace(/^(...).*(...)$/, "$1***$2")} (Loại: ${identifierType})`);
+                console.log(`🔍 [Auth] Đang kiểm tra đăng nhập cho mã học viên: #${potentialId}`);
 
-                // GIỚI HẠN INT4: 2,147,483,647. Nếu identifier là số quá lớn (như SĐT), không parse sang ID.
-                const potentialId = isNumeric ? parseInt(identifier) : -1;
-                const isValidId = potentialId >= 0 && potentialId < 2147483647;
-
-                const user = await prisma.user.findFirst({
-                    where: {
-                        OR: [
-                            ...(isValidId ? [{ id: potentialId }] : []),
-                            { email: identifier },
-                            { phone: identifier }
-                        ]
-                    }
+                const user = await prisma.user.findUnique({
+                    where: { id: potentialId }
                 });
 
                 if (!user) {
-                    console.log(`❌ [Auth] Không tìm thấy người dùng với identifier: ${identifier}`);
-                    throw new CustomLoginError(`Sai ${identifierType}`, `USER_NOT_FOUND:${identifierType}`);
+                    console.log(`❌ [Auth] Không tìm thấy học viên với mã: #${potentialId}`);
+                    throw new CustomLoginError("Sai mã học viên", "USER_NOT_FOUND:Mã học viên");
                 }
 
                 if (!user.password) {

