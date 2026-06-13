@@ -266,7 +266,7 @@ export default function ToolsStudentsPage() {
               <ArrowUpDown className="w-4 h-4" />
               <span>{sortBy === 'id' ? 'ID' : (sortOrder === 'desc' ? 'Mới' : 'Cũ')}</span>
             </button>
-            {(isAdmin || isTeacher) && (
+            {isAdmin && (
               <button
                 onClick={() => setShowBulkEnroll(true)}
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-xs bg-green-500 text-white hover:bg-green-600 transition-all"

@@ -15,7 +15,8 @@ export async function GET(
 
   const id = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  if (session.user.role !== "ADMIN" && session.user.role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

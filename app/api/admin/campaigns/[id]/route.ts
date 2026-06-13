@@ -18,9 +18,12 @@ export async function GET(
 
   const id = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+  const userId = parseInt(session.user.id || "0");
 
   try {
     const campaign = await prisma.emailCampaign.findUnique({
@@ -34,6 +37,11 @@ export async function GET(
     if (!campaign) {
       console.log(`❌ [GET Campaign] Không tìm thấy ID: ${id} trong Database`);
       return new NextResponse("Chiến dịch không tồn tại", { status: 404 });
+    }
+
+    // TEACHER chỉ xem được campaign của mình
+    if (role === "TEACHER" && campaign.createdBy !== userId) {
+      return new NextResponse("Không có quyền xem chiến dịch này", { status: 403 });
     }
 
     return NextResponse.json(campaign);
@@ -51,11 +59,22 @@ export async function PATCH(
   const { id: idStr } = await params;
   const id = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role2 = session.user.role;
+  if (role2 !== "ADMIN" && role2 !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+  const userId2 = parseInt(session.user.id || "0");
 
   try {
+    // TEACHER chỉ sửa được campaign của mình
+    if (role2 === "TEACHER") {
+      const own = await prisma.emailCampaign.findUnique({ where: { id }, select: { createdBy: true } });
+      if (!own || own.createdBy !== userId2) {
+        return new NextResponse("Không có quyền sửa chiến dịch này", { status: 403 });
+      }
+    }
+
     const data = await req.json();
     const updated = await prisma.emailCampaign.update({
       where: { id },
@@ -85,11 +104,22 @@ export async function DELETE(
   const { id: idStr } = await params;
   const id = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+  const userId = parseInt(session.user.id || "0");
 
   try {
+    // TEACHER chỉ xóa được campaign của mình
+    if (role === "TEACHER") {
+      const own = await prisma.emailCampaign.findUnique({ where: { id }, select: { createdBy: true } });
+      if (!own || own.createdBy !== userId) {
+        return new NextResponse("Không có quyền xóa chiến dịch này", { status: 403 });
+      }
+    }
+
     await prisma.emailCampaign.delete({
       where: { id }
     });

@@ -500,7 +500,7 @@ function SenderPerformanceTab() {
   )
 }
 
-export default function ClientContent({ initialCampaigns }: { initialCampaigns: Campaign[] }) {
+export default function ClientContent({ initialCampaigns, isTeacher }: { initialCampaigns: Campaign[]; isTeacher?: boolean }) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const initialTab = tabParam === 'senders' ? 'senders' : tabParam === 'settings' ? 'settings' : tabParam === 'performance' ? 'performance' : 'campaigns'
@@ -510,15 +510,19 @@ export default function ClientContent({ initialCampaigns }: { initialCampaigns: 
     <>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex">
         <button onClick={() => setActiveTab('campaigns')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'campaigns' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📋 Chiến dịch</button>
-        <button onClick={() => setActiveTab('senders')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'senders' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📡 Tài Khoản</button>
-        <button onClick={() => setActiveTab('settings')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>⚙️ Cấu Hình</button>
-        <button onClick={() => setActiveTab('performance')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'performance' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📊 Hiệu suất</button>
+        {!isTeacher && (
+          <>
+            <button onClick={() => setActiveTab('senders')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'senders' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📡 Tài Khoản</button>
+            <button onClick={() => setActiveTab('settings')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>⚙️ Cấu Hình</button>
+            <button onClick={() => setActiveTab('performance')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'performance' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📊 Hiệu suất</button>
+          </>
+        )}
       </div>
 
       {activeTab === 'campaigns' && <CampaignsList initialCampaigns={initialCampaigns} />}
-      {activeTab === 'senders' && <SendersTab />}
-      {activeTab === 'settings' && <SettingsTab />}
-      {activeTab === 'performance' && <SenderPerformanceTab />}
+      {!isTeacher && activeTab === 'senders' && <SendersTab />}
+      {!isTeacher && activeTab === 'settings' && <SettingsTab />}
+      {!isTeacher && activeTab === 'performance' && <SenderPerformanceTab />}
     </>
   )
 }

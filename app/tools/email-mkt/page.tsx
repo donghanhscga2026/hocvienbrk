@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { auth } from '@/auth'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import MainHeader from '@/components/layout/MainHeader'
@@ -17,7 +18,15 @@ interface Campaign {
 }
 
 export default async function EmailMktPage() {
+  const session = await auth()
+  const isAdmin = session?.user?.role === 'ADMIN'
+  const userId = parseInt(session?.user?.id || '0')
+  const isTeacher = session?.user?.role === 'TEACHER'
+
+  const campaignWhere = isTeacher ? { createdBy: userId } : {}
+
   const campaigns = await prisma.emailCampaign.findMany({
+    where: campaignWhere,
     select: {
       id: true,
       title: true,
@@ -44,7 +53,7 @@ export default async function EmailMktPage() {
           </Link>
         </div>
         <Suspense fallback={<div className="text-center py-12">Đang tải...</div>}>
-          <ClientContent initialCampaigns={campaigns} />
+          <ClientContent initialCampaigns={campaigns} isTeacher={isTeacher} />
         </Suspense>
       </div>
     </div>

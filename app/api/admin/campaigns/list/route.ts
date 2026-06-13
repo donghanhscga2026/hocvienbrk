@@ -5,12 +5,18 @@ import { NextResponse } from "next/server";
 export async function GET() {
   const session = await auth();
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  const userId = parseInt(session.user.id || "0");
+
   try {
+    const where = role === "TEACHER" ? { createdBy: userId } : {};
     const campaigns = await prisma.emailCampaign.findMany({
+      where,
       select: {
         id: true,
         title: true,

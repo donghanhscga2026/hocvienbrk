@@ -8,11 +8,20 @@ export async function GET(req: Request) {
   const source = searchParams.get("source");
   const courseId = searchParams.get("courseId");
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  const userId = parseInt(session.user.id || "0");
+
   try {
+    // TEACHER không được preview DB_ALL
+    if (role === "TEACHER" && source === "DB_ALL") {
+      return new NextResponse("Không có quyền", { status: 403 });
+    }
+
     let users: any[] = [];
 
     if (source === "DB_ALL") {
@@ -25,6 +34,16 @@ export async function GET(req: Request) {
         orderBy: { createdAt: "desc" }
       });
     } else if (source === "DB_ACTIVE" && courseId) {
+      // TEACHER chỉ preview được course của mình
+      if (role === "TEACHER") {
+        const course = await prisma.course.findFirst({
+          where: { id: parseInt(courseId), teacherId: userId }
+        });
+        if (!course) {
+          return new NextResponse("Không có quyền xem khóa học này", { status: 403 });
+        }
+      }
+
       const enrollments = await prisma.enrollment.findMany({
         where: { 
           courseId: parseInt(courseId),

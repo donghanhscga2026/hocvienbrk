@@ -6,9 +6,13 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   const session = await auth();
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+
+  const userId = parseInt(session.user.id || "0");
 
   try {
     const data = await req.json();
@@ -22,6 +26,11 @@ export async function POST(req: Request) {
       htmlContent 
     } = data;
 
+    // TEACHER không được dùng DB_ALL
+    if (role === "TEACHER" && recipientSource === "DB_ALL") {
+      return new NextResponse("Không có quyền gửi đến tất cả học viên", { status: 403 });
+    }
+
     // Tạo chiến dịch DRAFT trước để lấy ID
     const campaign = await prisma.emailCampaign.create({
       data: {
@@ -32,7 +41,7 @@ export async function POST(req: Request) {
         recipientCsvData,
         subject,
         htmlContent,
-        createdBy: parseInt(session.user.id || "0"),
+        createdBy: userId,
         status: "DRAFT",
       }
     });

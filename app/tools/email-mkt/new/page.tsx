@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Eye, Image, Shuffle, User, Hash, Link2 } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
@@ -9,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { previewSpin } from '@/lib/email-spin'
 
 function CreateCampaignContent() {
+  const { data: session } = useSession()
+  const isTeacher = session?.user?.role === 'TEACHER'
   const router = useRouter()
   const searchParams = useSearchParams()
   const campaignId = searchParams.get('id')
@@ -117,11 +120,16 @@ function CreateCampaignContent() {
     { value: 'CHUC_MUNG', label: 'Chúc mừng' },
   ]
 
-  const getRecipientSources = () => [
-    { value: 'DB_ALL', label: 'Tất cả học viên (đã xác thực email)' },
-    { value: 'DB_ACTIVE', label: 'Học viên đang học trong khóa' },
-    { value: 'CSV', label: 'Danh sách CSV/JSON tự nhập' },
-  ]
+  const getRecipientSources = () => {
+    const sources = [
+      { value: 'DB_ACTIVE', label: 'Học viên đang học trong khóa' },
+      { value: 'CSV', label: 'Danh sách CSV/JSON tự nhập' },
+    ]
+    if (!isTeacher) {
+      sources.unshift({ value: 'DB_ALL', label: 'Tất cả học viên (đã xác thực email)' })
+    }
+    return sources
+  }
 
   const handlePreviewRecipients = async () => {
     setPreviewLoading(true)

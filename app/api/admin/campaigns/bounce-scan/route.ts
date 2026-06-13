@@ -5,7 +5,8 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   const session = await auth();
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  if (session.user.role !== "ADMIN") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 

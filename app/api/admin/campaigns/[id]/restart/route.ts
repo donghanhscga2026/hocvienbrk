@@ -10,11 +10,22 @@ export async function POST(
   const { id: idStr } = await params;
   const id = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  if (session.user.role !== "ADMIN" && session.user.role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
+  const userId = parseInt(session.user.id || "0");
+
   try {
+    // TEACHER chỉ restart được campaign của mình
+    if (session.user.role === "TEACHER") {
+      const own = await prisma.emailCampaign.findUnique({ where: { id }, select: { createdBy: true } });
+      if (!own || own.createdBy !== userId) {
+        return new NextResponse("Không có quyền", { status: 403 });
+      }
+    }
+
     // 1. Xóa toàn bộ nhật ký cũ của chiến dịch này
     await prisma.emailCampaignLog.deleteMany({
       where: { campaignId: id }
