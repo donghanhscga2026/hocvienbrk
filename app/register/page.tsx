@@ -25,7 +25,7 @@ function RegisterForm() {
     const [otp, setOtp] = useState("")
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null)
     const [showPassword, setShowPassword] = useState(false)
-    const [skipCountdown, setSkipCountdown] = useState(15)
+    const [skipCountdown, setSkipCountdown] = useState(180)
     const [canSkip, setCanSkip] = useState(false)
     const [referrerName, setReferrerName] = useState<string | null>(null)
     const [isCountryOpen, setIsCountryOpen] = useState(false)
@@ -34,6 +34,7 @@ function RegisterForm() {
     const countryRef = useRef<HTMLDivElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
     const savedPasswordRef = useRef<string>("")
+    const hasAutoLoggedRef = useRef(false)
     
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -167,11 +168,12 @@ function RegisterForm() {
         }
     }, [isCountryOpen])
 
-    // Countdown for skip-OTP button
+    // Countdown for auto-login after registration (3 phút)
     useEffect(() => {
         if (!registeredEmail) return
 
-        setSkipCountdown(15)
+        hasAutoLoggedRef.current = false
+        setSkipCountdown(180)
         setCanSkip(false)
 
         const timer = setInterval(() => {
@@ -187,6 +189,14 @@ function RegisterForm() {
 
         return () => clearInterval(timer)
     }, [registeredEmail])
+
+    // Auto-login khi countdown kết thúc
+    useEffect(() => {
+        if (canSkip && registeredEmail && !hasAutoLoggedRef.current) {
+            hasAutoLoggedRef.current = true
+            handleSkipOtp()
+        }
+    }, [canSkip])
 
     const filteredCountries = COUNTRY_CODES.filter(c => 
         c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
@@ -238,8 +248,16 @@ function RegisterForm() {
     async function handleAutoLogin(msg: string) {
         setSuccess(msg)
 
+        if (!registeredUserId) {
+            setError("Không tìm thấy mã học viên. Vui lòng đăng nhập thủ công.")
+            setTimeout(() => {
+                router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
+            }, 2000)
+            return
+        }
+
         const signInResult = await signIn("credentials", {
-            identifier: registeredEmail,
+            identifier: registeredUserId.toString(),
             password: savedPasswordRef.current,
             redirect: false,
         })
@@ -300,6 +318,8 @@ function RegisterForm() {
     }
 
     async function handleSkipOtp() {
+        if (hasAutoLoggedRef.current) return
+        hasAutoLoggedRef.current = true
         setIsVerifying(true)
         setError(null)
         try {
@@ -373,6 +393,11 @@ function RegisterForm() {
                                 {success}
                             </p>
                             <p className="mt-2 text-sm font-bold text-brk-on-surface">{registeredEmail}</p>
+                            {registeredUserId && (
+                                <p className="mt-1 text-xs text-brk-accent">
+                                    Mã học viên: <span className="font-bold text-brk-on-surface">#{registeredUserId}</span>
+                                </p>
+                            )}
                         </div>
 
                         {error && (
@@ -399,17 +424,16 @@ function RegisterForm() {
                                 {isVerifying ? <Loader2 className="animate-spin h-5 w-5" /> : "Xác minh ngay"}
                             </button>
 
-                            {canSkip ? (
-                                <button
-                                    onClick={handleSkipOtp}
-                                    disabled={isVerifying}
-                                    className="flex w-full justify-center rounded-lg border border-brk-outline bg-transparent px-4 py-2.5 text-sm font-medium text-brk-muted hover:text-brk-on-surface transition-colors disabled:opacity-50"
-                                >
-                                    {isVerifying ? <Loader2 className="animate-spin h-5 w-5" /> : "Bỏ qua, xác minh sau"}
-                                </button>
-                            ) : (
+                            <button
+                                onClick={handleSkipOtp}
+                                disabled={isVerifying}
+                                className="flex w-full justify-center rounded-lg border border-brk-outline bg-transparent px-4 py-2.5 text-sm font-medium text-brk-muted hover:text-brk-on-surface transition-colors disabled:opacity-50"
+                            >
+                                {isVerifying ? <Loader2 className="animate-spin h-5 w-5" /> : "Bỏ qua xác minh, đăng nhập ngay"}
+                            </button>
+                            {!canSkip && (
                                 <p className="text-center text-xs text-brk-muted">
-                                    Có thể bỏ qua xác minh sau {skipCountdown}s
+                                    Tự động đăng nhập sau {skipCountdown}s
                                 </p>
                             )}
                         </div>
