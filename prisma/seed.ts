@@ -134,7 +134,7 @@ async function main() {
                 description: 'bgOrange500|Quản lý email marketing',
                 icon: 'Mail',
                 url: '/tools/email-mkt',
-                roles: [Role.ADMIN],
+                roles: [Role.ADMIN, Role.TEACHER],
                 order: 2,
                 isActive: true,
             },

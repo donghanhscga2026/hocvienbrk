@@ -11,9 +11,12 @@ export async function POST(
   const { id: idStr } = await params;
   const id = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  if (session.user.role !== "ADMIN" && session.user.role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+
+  const userId = parseInt(session.user.id || "0");
 
   try {
     const campaign = await prisma.emailCampaign.findUnique({
@@ -23,6 +26,14 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json({ error: "Không tìm thấy chiến dịch" }, { status: 404 });
+    }
+
+    // TEACHER chỉ export campaign của mình
+    if (session.user.role === "TEACHER") {
+      const own = await prisma.emailCampaign.findUnique({ where: { id }, select: { createdBy: true } });
+      if (!own || own.createdBy !== userId) {
+        return new NextResponse("Không có quyền", { status: 403 });
+      }
     }
 
     const { statusFilter } = await req.json().catch(() => ({}));

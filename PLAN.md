@@ -2531,3 +2531,51 @@ Thêm prop `showAllCourses` để cho phép hiển thị toàn bộ khóa học 
 - ✅ Button expand/collapse đã đồng bộ màu `bg-brk-background-dark text-brk-on-primary`
 - ✅ Site profile pages: hiện tất cả khóa học không expand/collapse
 - ✅ Main homepage: giữ nguyên hành vi cũ (mặc định `false`)
+
+---
+
+## ✅ PHẦN BỎ CHẶN EMAIL + SKIP OTP + LOGIN WARNING (2026-06-12)
+
+### Mục tiêu
+1. Cho phép tất cả học viên đăng nhập kể cả khi chưa xác minh email (bỏ block trong auth.ts).
+2. Thêm nút "Bỏ qua, xác minh sau" trên màn hình OTP sau 15s đếm ngược.
+3. Hiển thị cảnh báo trên trang login khi học viên chưa xác minh email.
+
+### Các file đã sửa
+
+#### 1. `auth.ts`
+- **Vấn đề**: `authorize` chặn user mới (post 29/03/2026) nếu `!emailVerified`; chặn user cũ nếu verification token còn hạn. `isUnverifiedLegacy` chỉ flag user cũ chưa verify.
+- **Fix**:
+  - Xóa toàn bộ block `if (!user.emailVerified) { ... }` (dòng 110-141 cũ) — ai cũng login được
+  - `isUnverified: !user.emailVerified` — flag tất cả user chưa xác minh (thay vì chỉ legacy)
+  - JWT/session: `isUnverifiedLegacy` → `isUnverified` (3 callbacks)
+  - SignIn event: gửi email xác minh cho tất cả `isUnverified` (không chỉ legacy)
+
+#### 2. `app/register/page.tsx`
+- **Vấn đề**: OTP bắt buộc, không có cách thoát nếu email không nhận được hoặc OTP sai nhiều lần.
+- **Fix**:
+  - Thêm state `skipCountdown` (15s) + `canSkip`
+  - `useEffect` countdown khi OTP screen xuất hiện: setInterval 1s → 0 → `canSkip = true`
+  - Nút "Bỏ qua, xác minh sau" hiện khi `canSkip = true` — gọi `handleAutoLogin()`
+  - Tách `handleAutoLogin()` từ `handleVerifyOtp()` để dùng chung cho OTP success và skip
+
+#### 3. `app/login/page.tsx`
+- **Vấn đề**: `redirect: true` — lỗi chỉ hiển thị qua URL params, không thể kiểm tra `isUnverified` từ session.
+- **Fix**:
+  - `redirect: true` → `false`, xử lý kết quả trực tiếp
+  - Success: gọi `update()` lấy session mới → kiểm tra `isUnverified` → warning banner 3s rồi redirect
+  - Error: hiển thị inline message
+  - Thêm state `warning` + banner vàng cho unverified users
+
+### Backup
+- `plan_temp/auth.ts.backup_20260612_001.ts`
+- `plan_temp/login_page.tsx.backup_20260612_001.tsx`
+- `plan_temp/register_page.tsx.backup_20260612_001.tsx`
+
+### Trạng thái
+- ✅ Mọi user (kể cả chưa verify) đều có thể login với mật khẩu đúng
+- ✅ OTP screen: 15s countdown → nút "Bỏ qua, xác minh sau" xuất hiện
+- ✅ Skip OTP → auto-login + auto-enroll (giống OTP success)
+- ✅ Login page: warning vàng 3s "Email chưa xác minh" rồi redirect
+- ✅ Email xác minh gửi cho tất cả unverified users khi login (không chỉ legacy)
+- ✅ `npx tsc --noEmit` — 0 lỗi

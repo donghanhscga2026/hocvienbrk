@@ -84,28 +84,18 @@ function checkToolAccess(userRole: string, toolRoles: Role[]): AccessCheckResult
     return { hasAccess: false, reason: 'login' }
   }
   
-  if (toolRoles.includes('ADMIN' as Role)) {
-    if (userRole !== 'ADMIN') {
-      return { hasAccess: false, reason: 'admin' }
-    }
+  // Direct match: user's role is in allowed roles
+  if (toolRoles.includes(userRole as Role)) {
     return { hasAccess: true, reason: null }
   }
   
-  if (toolRoles.includes('TEACHER' as Role)) {
-    if (userRole !== 'TEACHER' && userRole !== 'ADMIN') {
-      return { hasAccess: false, reason: 'role', requiredRole: 'TEACHER' }
-    }
+  // ADMIN superset: admin can access TEACHER/AFFILIATE/STUDENT tools
+  if (userRole === 'ADMIN' && (toolRoles.includes('TEACHER' as Role) || toolRoles.includes('AFFILIATE' as Role) || toolRoles.includes('STUDENT' as Role))) {
     return { hasAccess: true, reason: null }
   }
   
-  if (toolRoles.includes('AFFILIATE' as Role)) {
-    if (!['STUDENT', 'TEACHER', 'ADMIN', 'AFFILIATE'].includes(userRole)) {
-      return { hasAccess: false, reason: 'role', requiredRole: 'Học viên' }
-    }
-    return { hasAccess: true, reason: null }
-  }
-  
-  if (toolRoles.includes('STUDENT' as Role)) {
+  // TEACHER superset: teacher can access STUDENT/AFFILIATE tools
+  if (userRole === 'TEACHER' && (toolRoles.includes('STUDENT' as Role) || toolRoles.includes('AFFILIATE' as Role))) {
     return { hasAccess: true, reason: null }
   }
   

@@ -36,9 +36,12 @@ export async function POST(
   const { id: idStr } = await params;
   const campaignId = parseInt(idStr);
 
-  if (session?.user?.role !== "ADMIN") {
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
     return new NextResponse("Unauthorized", { status: 401 });
   }
+  const userId = parseInt(session.user.id || "0");
 
   try {
     const { batchSize = 20 } = await req.json();
@@ -55,6 +58,16 @@ export async function POST(
 
     if (!campaign) {
       return new NextResponse("Campaign not found", { status: 404 });
+    }
+
+    // TEACHER chỉ gửi được campaign của mình, và không được gửi DB_ALL
+    if (role === "TEACHER") {
+      if (campaign.createdBy !== userId) {
+        return new NextResponse("Không có quyền gửi chiến dịch này", { status: 403 });
+      }
+      if (campaign.recipientSource === "DB_ALL") {
+        return new NextResponse("Không có quyền gửi đến tất cả học viên", { status: 403 });
+      }
     }
 
     const allRecipients = await resolveRecipients(campaignId);

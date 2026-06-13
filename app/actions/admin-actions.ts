@@ -591,10 +591,8 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
             const enrollFilter: any = { course: { teacherId: userId } }
             if (courseId) enrollFilter.courseId = courseId
             where.enrollments = { some: enrollFilter }
-            where.role = Role.STUDENT
 
             scopeWhere.enrollments = { some: { course: { teacherId: userId } } }
-            scopeWhere.role = Role.STUDENT
         }
 
         if (isAdmin) {
@@ -688,6 +686,21 @@ export async function getAdminCoursesAction() {
         const where = isAdmin ? {} : { teacherId: userId }
         const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true }, orderBy: { id: 'asc' } })
         return { success: true, courses, isAdmin }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function bulkToggleCourseStatusAction(courseIds: number[], newStatus: boolean) {
+    try {
+        const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+        const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
+        if (!isAdmin) return { success: false, error: "Only admin can perform bulk actions" }
+
+        await prisma.course.updateMany({
+            where: { id: { in: courseIds } },
+            data: { status: newStatus }
+        })
+
+        return { success: true }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
