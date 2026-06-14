@@ -15,6 +15,8 @@ interface EmailConfig {
   pauseDurationMax: number
   interEmailDelayMin: number
   interEmailDelayMax: number
+  brevoInterEmailDelayMin: number
+  brevoInterEmailDelayMax: number
   enableTelegramAlert: boolean
   telegramChatId: string
   enableRandomMessageFooter: boolean
@@ -36,6 +38,8 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
     pauseDurationMax: 45,
     interEmailDelayMin: 5,
     interEmailDelayMax: 15,
+    brevoInterEmailDelayMin: 0.5,
+    brevoInterEmailDelayMax: 1.5,
     enableTelegramAlert: true,
     telegramChatId: '-1003871041367',
     enableRandomMessageFooter: false
@@ -188,7 +192,7 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
 
         {/* Delay Settings */}
         <div className="bg-white rounded-2xl border border-gray-100 p-2">
-          <h2 className="font-bold text-gray-900 mb-4">⏱️ Delay giữa emails</h2>
+          <h2 className="font-bold text-gray-900 mb-4">⏱️ Delay giữa emails (Gmail)</h2>
           
           <div className="flex items-center gap-2">
             <input
@@ -206,6 +210,35 @@ export default function EmailSettingsClient({ initialConfig }: EmailSettingsClie
               max={30}
               value={config.interEmailDelayMax}
                   onChange={(e) => setConfig({ ...config, interEmailDelayMax: parseInt(e.target.value) || 15 })}
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
+            />
+            <span className="text-gray-500 text-sm">giây</span>
+          </div>
+        </div>
+
+        {/* Brevo Delay Settings */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-2">
+          <h2 className="font-bold text-gray-900 mb-4">⚡ Delay giữa emails (Brevo)</h2>
+          <p className="text-xs text-gray-500 mb-3">Brevo không yêu cầu delay, chỉ cần cách nhau 0.5-1.5 giây</p>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0.1}
+              max={10}
+              step={0.1}
+              value={config.brevoInterEmailDelayMin}
+              onChange={(e) => setConfig({ ...config, brevoInterEmailDelayMin: parseFloat(e.target.value) || 0.5 })}
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
+            />
+            <span className="text-gray-400">-</span>
+            <input
+              type="number"
+              min={0.1}
+              max={10}
+              step={0.1}
+              value={config.brevoInterEmailDelayMax}
+              onChange={(e) => setConfig({ ...config, brevoInterEmailDelayMax: parseFloat(e.target.value) || 1.5 })}
               className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm"
             />
             <span className="text-gray-500 text-sm">giây</span>

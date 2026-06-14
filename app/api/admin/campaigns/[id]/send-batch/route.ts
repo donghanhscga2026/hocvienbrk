@@ -254,9 +254,11 @@ export async function POST(
         stats.emailsInBatch++;
         results.sent++;
 
-        // Brevo không cần cooldown giữa batch (tự xử lý rate limit)
+        // Brevo không cần cooldown giữa batch, delay rất ngắn
         if (sender.provider === 'brevo') {
-          const delay = randomBetween(config.interEmailDelayMin, config.interEmailDelayMax);
+          const min = config.brevoInterEmailDelayMin ?? 0.5;
+          const max = config.brevoInterEmailDelayMax ?? 1.5;
+          const delay = +(min + Math.random() * (max - min)).toFixed(1);
           await new Promise(resolve => setTimeout(resolve, delay * 1000));
           continue;
         }

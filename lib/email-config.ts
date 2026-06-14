@@ -7,6 +7,8 @@ export interface EmailCampaignConfig {
   pauseDurationMax: number;
   interEmailDelayMin: number;
   interEmailDelayMax: number;
+  brevoInterEmailDelayMin: number;
+  brevoInterEmailDelayMax: number;
   enableTelegramAlert: boolean;
   telegramChatId: string;
   enableRandomMessageFooter: boolean;
@@ -19,6 +21,8 @@ export const DEFAULT_EMAIL_CONFIG: EmailCampaignConfig = {
   pauseDurationMax: 45,
   interEmailDelayMin: 5,
   interEmailDelayMax: 15,
+  brevoInterEmailDelayMin: 0.5,
+  brevoInterEmailDelayMax: 1.5,
   enableTelegramAlert: true,
   telegramChatId: process.env.TELEGRAM_CHAT_ID_EMAIL || "",
   enableRandomMessageFooter: false,
