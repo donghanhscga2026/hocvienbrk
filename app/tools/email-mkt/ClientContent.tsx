@@ -101,7 +101,7 @@ function SendersTab() {
   const [validationSummary, setValidationSummary] = useState<{total: number; valid: number; invalid: number} | null>(null)
   const [showBrevoForm, setShowBrevoForm] = useState(false)
   const [brevoLabel, setBrevoLabel] = useState('')
-  const [brevoApiKey, setBrevoApiKey] = useState('')
+  const [brevoEnvVar, setBrevoEnvVar] = useState('')
   const [brevoAdding, setBrevoAdding] = useState(false)
   const [brevoError, setBrevoError] = useState('')
 
@@ -113,21 +113,21 @@ function SendersTab() {
   }, [])
 
   const addBrevoSender = async () => {
-    if (!brevoLabel.trim() || !brevoApiKey.trim()) return
+    if (!brevoLabel.trim() || !brevoEnvVar.trim()) return
     setBrevoAdding(true)
     setBrevoError('')
     try {
       const res = await fetch('/api/admin/senders/brevo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: brevoLabel.trim(), apiKey: brevoApiKey.trim() }),
+        body: JSON.stringify({ label: brevoLabel.trim(), envVarName: brevoEnvVar.trim() }),
       })
       const data = await res.json()
       if (res.ok) {
         setSenders(prev => [data.sender, ...prev])
         setShowBrevoForm(false)
         setBrevoLabel('')
-        setBrevoApiKey('')
+        setBrevoEnvVar('')
       } else {
         setBrevoError(data.error || 'Lỗi không xác định')
       }
@@ -197,15 +197,15 @@ function SendersTab() {
             className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
           />
           <input
-            type="password"
-            placeholder="API Key (xkeysib-...)"
-            value={brevoApiKey}
-            onChange={e => setBrevoApiKey(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm"
+            type="text"
+            placeholder="Tên biến môi trường (VD: BREVO_API_KEY_2)"
+            value={brevoEnvVar}
+            onChange={e => setBrevoEnvVar(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm font-mono"
           />
           <Button
             onClick={addBrevoSender}
-            disabled={brevoAdding || !brevoLabel.trim() || !brevoApiKey.trim()}
+            disabled={brevoAdding || !brevoLabel.trim() || !brevoEnvVar.trim()}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg flex items-center justify-center gap-2"
           >
             {brevoAdding ? <><Loader2 className="w-4 h-4 animate-spin" />Đang xác thực...</> : 'Xác thực & Thêm'}
@@ -216,8 +216,9 @@ function SendersTab() {
             </div>
           )}
           <div className="text-xs text-blue-600/80 bg-blue-100/50 p-3 rounded-lg">
-            💡 API Key lấy từ Brevo Dashboard → Settings → API Keys.
-            Tài khoản Brevo free được 300 email/ngày.
+            💡 Tạo biến môi trường trên Vercel (Settings → Environment Variables) với tên như BREVO_API_KEY_2,
+            BREVO_API_KEY_3... Giá trị là API key lấy từ Brevo Dashboard → Settings → API Keys.
+            Sau đó nhập tên biến vào ô trên. Mỗi tài khoản Brevo free được 300 email/ngày.
           </div>
         </div>
       )}
@@ -288,6 +289,9 @@ function SendersTab() {
                     )}
                     {sender.provider === 'brevo' && (
                       <span className="inline-block bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded">Brevo</span>
+                    )}
+                    {sender.provider === 'brevo' && sender.apiKeyEnvVar && (
+                      <span className="inline-block bg-gray-100 text-gray-600 text-xs font-mono px-2 py-0.5 rounded">{sender.apiKeyEnvVar}</span>
                     )}
                     {(!sender.provider || sender.provider === 'gmail') && (
                       <span className="inline-block bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded">Gmail</span>

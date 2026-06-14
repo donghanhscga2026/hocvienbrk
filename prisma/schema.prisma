@@ -83,6 +83,7 @@ model EmailSender {
   clientSecret     String?
   refreshToken     String?
   apiKeyEncrypted  String?
+  apiKeyEnvVar     String?
   senderName       String?
   dailyLimit       Int                   @default(480)
   sentToday        Int                   @default(0)

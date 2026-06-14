@@ -72,6 +72,7 @@ export async function getAvailableSender(campaignId?: number): Promise<{
   clientId: string | null;
   clientSecret: string | null;
   apiKeyEncrypted: string | null;
+  apiKeyEnvVar: string | null;
   senderName: string | null;
   isActive: boolean;
   dailyLimit: number;
@@ -84,69 +85,43 @@ export async function getAvailableSender(campaignId?: number): Promise<{
 } | null> {
   const now = new Date();
 
-  // Brevo senders không cần cooldown, nên luôn available (trừ khi hết quota)
-  const availableSenders = await prisma.emailSender.findMany({
+  // 1. Brevo pool — round-robin theo sentToday (thấp nhất trước)
+  const brevoSenders = await prisma.emailSender.findMany({
+    where: { isActive: true, provider: 'brevo' },
+    orderBy: { id: 'asc' },
+  });
+  const brevoWithQuota = brevoSenders.filter(s => s.sentToday < s.dailyLimit);
+  if (brevoWithQuota.length > 0) {
+    brevoWithQuota.sort((a, b) => a.sentToday - b.sentToday);
+    return brevoWithQuota[0] as any;
+  }
+
+  // 2. Gmail pool — chỉ vào đây khi Brevo đã hết quota
+  const gmailSenders = await prisma.emailSender.findMany({
     where: {
       isActive: true,
+      provider: { not: 'brevo' },
       OR: [
-        { provider: 'brevo' },
         { cooldownUntil: null },
         { cooldownUntil: { lt: now } }
-      ]
+      ],
     },
-    orderBy: [
-      { cooldownUntil: 'asc' },
-      { sentToday: 'asc' }
-    ],
+    orderBy: { id: 'asc' },
   });
-
-  if (availableSenders.length === 0) {
-    return null;
-  }
-
-  const sendersWithQuota = availableSenders.filter(sender => {
-    let effectiveLimit: number
-    if (sender.provider === 'brevo') {
-      effectiveLimit = sender.dailyLimit
-    } else {
-      effectiveLimit = getEffectiveDailyLimit({
-        createdAt: sender.createdAt,
-        dailyLimit: sender.dailyLimit,
-        warmupPhase: sender.warmupPhase
-      })
-    }
-    return sender.sentToday < effectiveLimit
-  })
-
-  if (sendersWithQuota.length === 0) {
-    return null;
-  }
-
-  const weights = sendersWithQuota.map(sender => {
-    let effectiveLimit: number
-    if (sender.provider === 'brevo') {
-      effectiveLimit = sender.dailyLimit
-    } else {
-      effectiveLimit = getEffectiveDailyLimit({
-        createdAt: sender.createdAt,
-        dailyLimit: sender.dailyLimit,
-        warmupPhase: sender.warmupPhase
-      })
-    }
-    return effectiveLimit - sender.sentToday;
+  const gmailWithQuota = gmailSenders.filter(s => {
+    const limit = getEffectiveDailyLimit({
+      createdAt: s.createdAt,
+      dailyLimit: s.dailyLimit,
+      warmupPhase: s.warmupPhase,
+    });
+    return s.sentToday < limit;
   });
-
-  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-  let random = Math.random() * totalWeight;
-
-  for (let i = 0; i < sendersWithQuota.length; i++) {
-    random -= weights[i];
-    if (random <= 0) {
-      return sendersWithQuota[i] as any;
-    }
+  if (gmailWithQuota.length > 0) {
+    gmailWithQuota.sort((a, b) => a.sentToday - b.sentToday);
+    return gmailWithQuota[0] as any;
   }
 
-  return sendersWithQuota[0] as any;
+  return null;
 }
 
 export async function updateSenderCooldown(senderId: number, minutes: number): Promise<void> {
@@ -341,12 +316,28 @@ export async function sendGmailFromSender(
 }
 
 export async function sendViaBrevo(
-  sender: { apiKeyEncrypted: string | null; senderName: string | null; email: string },
+  sender: { apiKeyEncrypted: string | null; apiKeyEnvVar: string | null; senderName: string | null; email: string },
   to: string,
   subject: string,
   html: string,
 ): Promise<void> {
-  const apiKey = sender.apiKeyEncrypted ? decrypt(sender.apiKeyEncrypted) : process.env.BREVO_API_KEY
+  let apiKey: string | null = null
+
+  if (sender.apiKeyEnvVar) {
+    apiKey = process.env[sender.apiKeyEnvVar] || null
+    if (!apiKey) {
+      console.warn(`[Brevo] Env var "${sender.apiKeyEnvVar}" not set, falling back...`)
+    }
+  }
+
+  if (!apiKey && sender.apiKeyEncrypted) {
+    apiKey = decrypt(sender.apiKeyEncrypted)
+  }
+
+  if (!apiKey) {
+    apiKey = process.env.BREVO_API_KEY || null
+  }
+
   if (!apiKey) throw new Error('Brevo API key not found')
 
   const result = await sendTransactionalEmail({
