@@ -74,6 +74,8 @@ export async function PUT(request: Request) {
       pauseDurationMax,
       interEmailDelayMin,
       interEmailDelayMax,
+      brevoInterEmailDelayMin,
+      brevoInterEmailDelayMax,
       enableTelegramAlert,
       telegramChatId,
       enableRandomMessageFooter
@@ -87,6 +89,8 @@ export async function PUT(request: Request) {
     if (pauseDurationMax !== undefined) configUpdates.pauseDurationMax = Math.max(5, Math.min(60, pauseDurationMax))
     if (interEmailDelayMin !== undefined) configUpdates.interEmailDelayMin = Math.max(1, Math.min(30, interEmailDelayMin))
     if (interEmailDelayMax !== undefined) configUpdates.interEmailDelayMax = Math.max(1, Math.min(30, interEmailDelayMax))
+    if (brevoInterEmailDelayMin !== undefined) configUpdates.brevoInterEmailDelayMin = Math.max(0.1, Math.min(10, brevoInterEmailDelayMin))
+    if (brevoInterEmailDelayMax !== undefined) configUpdates.brevoInterEmailDelayMax = Math.max(0.1, Math.min(10, brevoInterEmailDelayMax))
     if (enableTelegramAlert !== undefined) configUpdates.enableTelegramAlert = Boolean(enableTelegramAlert)
     if (telegramChatId !== undefined) configUpdates.telegramChatId = telegramChatId
     if (enableRandomMessageFooter !== undefined) configUpdates.enableRandomMessageFooter = Boolean(enableRandomMessageFooter)
