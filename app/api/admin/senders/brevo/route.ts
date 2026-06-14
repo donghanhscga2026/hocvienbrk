@@ -1,6 +1,5 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { encrypt } from "@/lib/email-encryptor";
 import { validateApiKey } from "@/lib/brevo";
 import { NextResponse } from "next/server";
 
@@ -11,11 +10,19 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { label, apiKey } = await req.json();
+    const { label, envVarName } = await req.json();
 
-    if (!label || !apiKey) {
+    if (!label || !envVarName) {
       return NextResponse.json(
-        { error: "Thiếu label hoặc apiKey" },
+        { error: "Thiếu label hoặc tên biến môi trường" },
+        { status: 400 },
+      );
+    }
+
+    const apiKey = process.env[envVarName];
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: `Biến môi trường "${envVarName}" chưa được cấu hình trên server` },
         { status: 400 },
       );
     }
@@ -24,15 +31,14 @@ export async function POST(req: Request) {
     const email = account.email;
     const senderName = `${account.firstName} ${account.lastName}`.trim() || label;
 
-    const encrypted = encrypt(apiKey);
-
     const sender = await prisma.emailSender.create({
       data: {
         label,
         email,
         senderName,
         provider: 'brevo',
-        apiKeyEncrypted: encrypted,
+        apiKeyEnvVar: envVarName,
+        apiKeyEncrypted: null,
         dailyLimit: 300,
         isMain: false,
       },
@@ -46,6 +52,7 @@ export async function POST(req: Request) {
         email: sender.email,
         senderName: sender.senderName,
         provider: sender.provider,
+        apiKeyEnvVar: sender.apiKeyEnvVar,
       },
       account: {
         email: account.email,
@@ -78,6 +85,7 @@ export async function GET() {
         email: true,
         senderName: true,
         provider: true,
+        apiKeyEnvVar: true,
         isActive: true,
         dailyLimit: true,
         sentToday: true,
