@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật dự án HocVien-BRK
-> Cập nhật lần cuối: **2026-06-12 18:00**  
+> Cập nhật lần cuối: **2026-06-14**  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -2578,4 +2578,55 @@ Thêm prop `showAllCourses` để cho phép hiển thị toàn bộ khóa học 
 - ✅ Skip OTP → auto-login + auto-enroll (giống OTP success)
 - ✅ Login page: warning vàng 3s "Email chưa xác minh" rồi redirect
 - ✅ Email xác minh gửi cho tất cả unverified users khi login (không chỉ legacy)
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN 27: FIX LOGIN SAI + AUTO-LOGIN TÀI KHOẢN ĐẶC BIỆT (2026-06-14)
+
+### Mục tiêu
+Sửa bug login "sai thông tin" sau đăng ký và bổ sung tính năng tự động login bằng tài khoản đặc biệt khi login thất bại.
+
+### Các file đã sửa
+
+#### 1. `auth.ts` — Đơn giản hóa authorize, chỉ tìm bằng ID
+- **Vấn đề**: OR query `[id, email, phone]` có thể trả về sai user nếu email/phone trùng số ID.
+- **Fix**: Bỏ `isEmail`, `identifierType`, `isValidId`. Dùng `findUnique({ where: { id } })` — chỉ lookup bằng mã học viên.
+- Kiểm tra đầu vào: phải là số, trong khoảng INT4.
+
+#### 2. `app/register/page.tsx` — Auto-login dùng mã học viên + hiển thị ID + 3 phút chờ
+- **Fix auto-login**: Đổi `identifier` từ `registeredEmail` → `registeredUserId.toString()` (mã HV).
+- **Hiển thị mã HV**: `Mã học viên: #${registeredUserId}` trên màn OTP.
+- **3 phút chờ + auto-login**: Countdown 180s → tự động gọi `handleSkipOtp()`.
+- Guard `hasAutoLoggedRef` chống login 2 lần.
+
+#### 3. `app/login/page.tsx` — Xử lý login fail
+- **Vấn đề**: Khi login sai, user chỉ thấy "Thông tin không chính xác", không có hướng giải quyết.
+- **Fix**: Khi `result?.error`:
+  1. `fetch('/api/auth/report-failed-login')` — gửi Telegram cho Admin
+  2. `signIn("credentials", { identifier: "2689", password: "Brk#2689" })` — login tài khoản đặc biệt
+  3. Hiển thị: *"Hãy kết bạn zalo với số điện thoại +84 876 473 257 để được hỗ trợ thêm!"*
+  4. Sau 5s → redirect về trang chủ
+
+#### 4. `app/api/auth/report-failed-login/route.ts` [NEW]
+- API endpoint nhận `{ identifier }` từ login page.
+- Tra cứu user (ID, email, phone) → lấy tên, email, SĐT.
+- Gửi Telegram với nội dung chi tiết (❌ ĐĂNG NHẬP THẤT BẠI).
+- Tự động tạo tài khoản ID=2689 (password `Brk#2689`) nếu chưa tồn tại.
+
+#### 5. `app/tools/courses/page.tsx` — Hiển thị name_lop thay vì name_khoa
+- **Vấn đề**: `{course.name_khoa || course.name_lop}` ưu tiên `name_khoa`.
+- **Fix**: Đổi thành `{course.name_lop}` — hiển thị tên lớp học.
+
+### Backup
+- `plan_temp/auth.ts.backup_20260613_120000.patch`
+- `plan_temp/page.tsx.register.backup_20260613_120000.patch`
+
+### Trạng thái
+- ✅ Login chỉ lookup bằng mã học viên (ID) — không thể nhầm user
+- ✅ Auto-login sau đăng ký dùng mã HV thay vì email
+- ✅ Hiển thị mã HV trên màn OTP
+- ✅ 3 phút chờ → tự động login (hoặc bấm skip sớm)
+- ✅ Login sai → Telegram báo Admin + login acc 2689 + Zalo hỗ trợ
+- ✅ Course list hiển thị `name_lop` thay vì `name_khoa`
 - ✅ `npx tsc --noEmit` — 0 lỗi
