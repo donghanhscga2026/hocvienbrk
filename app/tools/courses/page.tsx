@@ -169,7 +169,7 @@ export default function ToolsCoursesPage() {
                                                         )}
                                                     </div>
                                                     <div className="font-black text-orange-600 text-sm leading-tight uppercase tracking-tight truncate">
-                                                        {course.name_khoa || course.name_lop}
+                                                        {course.name_lop}
                                                     </div>
                                                 </div>
                                                 <Link
