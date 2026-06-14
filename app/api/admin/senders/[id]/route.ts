@@ -22,12 +22,17 @@ export async function DELETE(
       data: { senderId: null }
     });
 
-    // 2. Xóa các bản ghi trong bảng trung gian EmailCampaignSender
+    // 2. Xóa sender logs (EmailSenderLog có FK constraint)
+    await prisma.emailSenderLog.deleteMany({
+      where: { senderId: id }
+    });
+
+    // 3. Xóa các bản ghi trong bảng trung gian EmailCampaignSender
     await prisma.emailCampaignSender.deleteMany({
       where: { senderId: id }
     });
 
-    // 3. Cuối cùng mới xóa Sender
+    // 4. Cuối cùng mới xóa Sender
     await prisma.emailSender.delete({
       where: { id }
     });

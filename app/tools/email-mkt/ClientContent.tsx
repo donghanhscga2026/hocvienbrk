@@ -160,6 +160,9 @@ function SendersTab() {
       if (res.ok) {
         setSenders(prev => prev.filter(s => s.id !== id))
         setValidationResults(prev => { const n = {...prev}; delete n[id]; return n })
+      } else {
+        const text = await res.text()
+        alert('Xóa thất bại: ' + text)
       }
     } catch (error) { console.error(error) }
   }
