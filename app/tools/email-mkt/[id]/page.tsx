@@ -261,6 +261,15 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       const data = await res.json()
       if (data.success && data.sheetUrl) {
         window.open(data.sheetUrl, '_blank')
+      } else if (data.csvContent) {
+        const blob = new Blob([data.csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.fileName || 'export.csv'
+        a.click()
+        URL.revokeObjectURL(url)
+        setExportError(`⚠️ Không thể xuất Google Sheets. Đã tải file CSV thay thế (${data.totalRows} dòng).`)
       } else {
         setExportError(data.error || 'Lỗi không xác định')
       }

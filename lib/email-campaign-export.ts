@@ -3,7 +3,7 @@ import { getOAuth2Client } from "@/lib/google-auth";
 import { tryDecrypt } from "@/lib/email-encryptor";
 import { google } from "googleapis";
 
-function getServiceAccountAuth() {
+async function getServiceAccountAuth() {
   const keyJson = process.env.GOOGLE_SHEETS_SERVICE_KEY;
   if (!keyJson) return null;
   try {
@@ -11,11 +11,16 @@ function getServiceAccountAuth() {
     const auth = new google.auth.JWT({
       email: key.client_email,
       key: key.private_key,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      scopes: [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive',
+      ],
     });
+    const tokens = await auth.authorize();
+    console.log(`[CampaignExport] Service account authorized: ${key.client_email}, scopes: ${tokens.scope}`);
     return auth;
-  } catch (e) {
-    console.error('[CampaignExport] Service account auth failed:', e);
+  } catch (e: any) {
+    console.error('[CampaignExport] Service account auth failed:', e.message);
     return null;
   }
 }
@@ -106,14 +111,20 @@ export async function exportCampaignToSheet(campaignId: number, campaignTitle: s
 
 async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: string): Promise<{ sheetUrl?: string; error?: string }> {
   // Thử Service Account trước — không expire, không cần re-auth
-  const saAuth = getServiceAccountAuth();
+  const saAuth = await getServiceAccountAuth();
   if (saAuth) {
     try {
       const sheets = google.sheets({ version: "v4", auth: saAuth });
-      const url = await doCreateSheet(sheets, rows, headers, safeTitle);
+      const drive = google.drive({ version: "v3", auth: saAuth });
+      const url = await doCreateSheet(sheets, drive, rows, headers, safeTitle);
       return { sheetUrl: url };
     } catch (err: any) {
       console.warn(`[CampaignExport] Service account thất bại: ${err.message}. Fallback sang OAuth...`);
+
+      // Ghi log chi tiết để debug
+      if (err.response?.data?.error) {
+        console.error(`[CampaignExport]   Chi tiết: ${JSON.stringify(err.response.data.error)}`);
+      }
     }
   }
 
@@ -127,7 +138,8 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
         const oauth2Client = getOAuth2Client();
         oauth2Client.setCredentials({ refresh_token: tryDecrypt(sender.refreshToken) });
         const sheets = google.sheets({ version: "v4", auth: oauth2Client });
-        const url = await doCreateSheet(sheets, rows, headers, safeTitle);
+        const drive = google.drive({ version: "v3", auth: oauth2Client });
+        const url = await doCreateSheet(sheets, drive, rows, headers, safeTitle);
         return { sheetUrl: url };
       } catch (err: any) {
         const msg = `Sender #${sender.id} ${sender.email}: ${err.message}`;
@@ -143,7 +155,8 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
         const oauth2Client = getOAuth2Client();
         oauth2Client.setCredentials({ refresh_token: mainRt });
         const sheets = google.sheets({ version: "v4", auth: oauth2Client });
-        const url = await doCreateSheet(sheets, rows, headers, safeTitle);
+        const drive = google.drive({ version: "v3", auth: oauth2Client });
+        const url = await doCreateSheet(sheets, drive, rows, headers, safeTitle);
         return { sheetUrl: url };
       } catch (err: any) {
         const msg = `Main token: ${err.message}`;
@@ -160,20 +173,55 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
   return { error: errors.join(" | ") };
 }
 
-async function doCreateSheet(sheets: any, rows: string[][], headers: string[], safeTitle: string): Promise<string> {
-  const createResponse = await sheets.spreadsheets.create({
+async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers: string[], safeTitle: string): Promise<string> {
+  // Dọn dẹp file export cũ để tránh đầy Drive quota
+  try {
+    const listResponse = await drive.files.list({
+      q: "mimeType='application/vnd.google-apps.spreadsheet' and name contains '[Email Campaign]'",
+      fields: "files(id, name, createdTime)",
+      orderBy: "createdTime desc",
+    });
+    const files = listResponse.data.files || [];
+    for (let i = 1; i < files.length; i++) {
+      await drive.files.delete({ fileId: files[i].id! }).catch(() => {});
+    }
+    console.log(`[CampaignExport] Đã dọn ${Math.max(0, files.length - 1)} file cũ`);
+  } catch (err: any) {
+    console.warn(`[CampaignExport] Không thể dọn file cũ: ${err.message}`);
+  }
+
+  // Tạo file spreadsheet trong folder user (tránh quota SA)
+  const folderId = process.env.GOOGLE_SHEETS_FOLDER_ID;
+  const createResponse = await drive.files.create({
     requestBody: {
-      properties: {
-        title: `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`,
-      },
+      name: `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`,
+      mimeType: "application/vnd.google-apps.spreadsheet",
+      ...(folderId ? { parents: [folderId] } : {}),
     },
   });
 
-  const spreadsheetId = createResponse.data.spreadsheetId;
+  const spreadsheetId = createResponse.data.id;
   if (!spreadsheetId) throw new Error("Không thể tạo Google Sheet");
 
-  // Lấy sheetId và title của sheet đầu tiên (locale VN tạo "Trang tính1" thay vì "Sheet1")
-  const firstSheet = createResponse.data.sheets?.[0];
+  // Share với user chính để visible trong Drive
+  await drive.permissions.create({
+    fileId: spreadsheetId,
+    requestBody: {
+      type: "user",
+      role: "writer",
+      emailAddress: "hocvienbrk@gmail.com",
+    },
+  }).catch((err: any) => {
+    console.warn(`[CampaignExport] Không thể share sheet: ${err.message}. Sheet vẫn tồn tại.`);
+  });
+
+  // Lấy sheetId và title của sheet đầu tiên (Drive API không trả sheets array)
+  const sheetInfo = await sheets.spreadsheets.get({
+    spreadsheetId,
+    ranges: [],
+    includeGridData: false,
+  });
+  const firstSheet = sheetInfo.data.sheets?.[0];
   const firstSheetId = firstSheet?.properties?.sheetId || 0;
   const firstSheetTitle = firstSheet?.properties?.title || "Sheet1";
   let targetRange = `${firstSheetTitle}!A1`;
@@ -218,21 +266,6 @@ async function doCreateSheet(sheets: any, rows: string[][], headers: string[], s
   });
 
   const sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
-
-  // Thêm quyền public cho bất kỳ ai có link (reader) để admin không bị chặn access
-  try {
-    const drive = google.drive({ version: "v3", auth: sheets.context._options.auth });
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: {
-        role: "reader",
-        type: "anyone",
-      },
-    });
-    console.log(`[CampaignExport] 🔓 Đã mở quyền truy cập công khai cho Sheet: ${spreadsheetId}`);
-  } catch (err: any) {
-    console.error(`[CampaignExport] Không thể mở quyền truy cập: ${err.message}`);
-  }
 
   console.log(`[CampaignExport] ✅ Đã tạo Google Sheet: ${sheetUrl}`);
   return sheetUrl;
