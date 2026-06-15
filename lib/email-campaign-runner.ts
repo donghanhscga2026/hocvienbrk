@@ -349,6 +349,7 @@ export async function sendViaBrevo(
       email: sender.email || process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com',
     },
     tags: [],
+    apiKey,
   })
 
   if (!result.success) throw new Error('Brevo send failed')
