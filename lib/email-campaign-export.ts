@@ -3,6 +3,23 @@ import { getOAuth2Client } from "@/lib/google-auth";
 import { tryDecrypt } from "@/lib/email-encryptor";
 import { google } from "googleapis";
 
+function getServiceAccountAuth() {
+  const keyJson = process.env.GOOGLE_SHEETS_SERVICE_KEY;
+  if (!keyJson) return null;
+  try {
+    const key = JSON.parse(keyJson);
+    const auth = new google.auth.JWT({
+      email: key.client_email,
+      key: key.private_key,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+    return auth;
+  } catch (e) {
+    console.error('[CampaignExport] Service account auth failed:', e);
+    return null;
+  }
+}
+
 const STATUS_LABELS: Record<string, string> = {
   SENT: "Đã gửi",
   FAILED: "Thất bại",
@@ -88,6 +105,18 @@ export async function exportCampaignToSheet(campaignId: number, campaignTitle: s
 }
 
 async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: string): Promise<{ sheetUrl?: string; error?: string }> {
+  // Thử Service Account trước — không expire, không cần re-auth
+  const saAuth = getServiceAccountAuth();
+  if (saAuth) {
+    try {
+      const sheets = google.sheets({ version: "v4", auth: saAuth });
+      const url = await doCreateSheet(sheets, rows, headers, safeTitle);
+      return { sheetUrl: url };
+    } catch (err: any) {
+      console.warn(`[CampaignExport] Service account thất bại: ${err.message}. Fallback sang OAuth...`);
+    }
+  }
+
   const errors: string[] = [];
 
   try {
@@ -108,7 +137,6 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
       }
     }
 
-    // Fallback: thử dùng main GMAIL_REFRESH_TOKEN
     const mainRt = process.env.GMAIL_REFRESH_TOKEN;
     if (mainRt) {
       try {
