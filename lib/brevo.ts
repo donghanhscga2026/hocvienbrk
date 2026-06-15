@@ -53,6 +53,7 @@ export interface SendEmailParams {
   replyTo?: BrevoRecipient
   tags?: string[]
   headers?: Record<string, string>
+  apiKey?: string
 }
 
 export interface SendEmailResult {
@@ -74,7 +75,7 @@ export async function sendTransactionalEmail(
     ...(params.headers ? { headers: params.headers } : {}),
   }
 
-  const result = await brevoFetch<{ messageId: string }>('POST', '/smtp/email', body)
+  const result = await brevoFetch<{ messageId: string }>('POST', '/smtp/email', body, params.apiKey)
   return { messageId: result.messageId, success: true }
 }
 
