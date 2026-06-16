@@ -174,36 +174,44 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
 }
 
 async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers: string[], safeTitle: string): Promise<string> {
-  // Dọn dẹp file export cũ để tránh đầy Drive quota
+  const folderId = process.env.GOOGLE_SHEETS_FOLDER_ID;
+  const title = `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`;
+
+  // Thử Sheets API trước (có thể hoạt động với quyền Editor hiện tại)
   try {
-    const listResponse = await drive.files.list({
-      q: "mimeType='application/vnd.google-apps.spreadsheet' and name contains '[Email Campaign]'",
-      fields: "files(id, name, createdTime)",
-      orderBy: "createdTime desc",
+    const createResponse = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: { title },
+      },
     });
-    const files = listResponse.data.files || [];
-    for (let i = 1; i < files.length; i++) {
-      await drive.files.delete({ fileId: files[i].id! }).catch(() => {});
-    }
-    console.log(`[CampaignExport] Đã dọn ${Math.max(0, files.length - 1)} file cũ`);
+    const spreadsheetId = createResponse.data.spreadsheetId;
+    if (!spreadsheetId) throw new Error("No spreadsheetId");
+    console.log(`[CampaignExport] ✅ Tạo thành công qua Sheets API: ${spreadsheetId}`);
+    return await populateSheet(sheets, drive, spreadsheetId, rows, headers, folderId);
   } catch (err: any) {
-    console.warn(`[CampaignExport] Không thể dọn file cũ: ${err.message}`);
+    const detail = err.response?.data?.error || err.message;
+    console.error(`[CampaignExport] Sheets API thất bại: ${JSON.stringify(detail)}`);
   }
 
-  // Tạo file spreadsheet trong folder user (tránh quota SA)
-  const folderId = process.env.GOOGLE_SHEETS_FOLDER_ID;
+  // Fallback: Drive API (tạo file spreadsheet trong folder user)
+  console.log(`[CampaignExport] Thử tạo qua Drive API... folderId=${folderId || '(none)'}`);
   const createResponse = await drive.files.create({
     requestBody: {
-      name: `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`,
+      name: title,
       mimeType: "application/vnd.google-apps.spreadsheet",
       ...(folderId ? { parents: [folderId] } : {}),
     },
   });
 
   const spreadsheetId = createResponse.data.id;
-  if (!spreadsheetId) throw new Error("Không thể tạo Google Sheet");
+  if (!spreadsheetId) throw new Error("Không thể tạo Google Sheet qua Drive API");
+  console.log(`[CampaignExport] ✅ Tạo thành công qua Drive API: ${spreadsheetId}`);
 
-  // Share với user chính để visible trong Drive
+  return await populateSheet(sheets, drive, spreadsheetId, rows, headers, folderId);
+}
+
+async function populateSheet(sheets: any, drive: any, spreadsheetId: string, rows: string[][], headers: string[], folderId?: string): Promise<string> {
+  // Share với user để visible
   await drive.permissions.create({
     fileId: spreadsheetId,
     requestBody: {
@@ -212,10 +220,10 @@ async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers:
       emailAddress: "hocvienbrk@gmail.com",
     },
   }).catch((err: any) => {
-    console.warn(`[CampaignExport] Không thể share sheet: ${err.message}. Sheet vẫn tồn tại.`);
+    console.warn(`[CampaignExport] Không thể share: ${err.message}`);
   });
 
-  // Lấy sheetId và title của sheet đầu tiên (Drive API không trả sheets array)
+  // Lấy sheet info
   const sheetInfo = await sheets.spreadsheets.get({
     spreadsheetId,
     ranges: [],
@@ -226,7 +234,7 @@ async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers:
   const firstSheetTitle = firstSheet?.properties?.title || "Sheet1";
   let targetRange = `${firstSheetTitle}!A1`;
 
-  // Thử rename sheet sang "Data" cho đẹp
+  // Rename sang "Data"
   try {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
@@ -241,9 +249,10 @@ async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers:
     });
     targetRange = "Data!A1";
   } catch (err: any) {
-    console.warn(`[CampaignExport] Không thể rename sheet: ${err.message}. Sẽ dùng tên gốc: ${firstSheetTitle}`);
+    console.warn(`[CampaignExport] Không thể rename sheet: ${err.message}`);
   }
 
+  // Ghi dữ liệu
   const values = [headers, ...rows];
   await sheets.spreadsheets.values.update({
     spreadsheetId,
@@ -252,21 +261,19 @@ async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers:
     requestBody: { values },
   });
 
+  // Auto resize
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: {
-      requests: [
-        {
-          autoResizeDimensions: {
-            dimensions: { dimension: "COLUMNS", startIndex: 0, endIndex: headers.length },
-          },
+      requests: [{
+        autoResizeDimensions: {
+          dimensions: { dimension: "COLUMNS", startIndex: 0, endIndex: headers.length },
         },
-      ],
+      }],
     },
   });
 
   const sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
-
-  console.log(`[CampaignExport] ✅ Đã tạo Google Sheet: ${sheetUrl}`);
+  console.log(`[CampaignExport] ✅ Sheet sẵn sàng: ${sheetUrl}`);
   return sheetUrl;
 }
