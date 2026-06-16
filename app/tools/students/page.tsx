@@ -341,7 +341,7 @@ export default function ToolsStudentsPage() {
         ) : (
           <div className="space-y-3">
             {students.map((student) => {
-              const isCoach = student.enrollments?.some((e: any) => e.courseId === 1)
+              const isCoach = student.enrollments?.some((e: any) => e.courseId === 1 && e.status === 'ACTIVE')
               const displayRole = isCoach ? 'COURSE_86_DAYS' : student.role
               const bgColor = roleCardColors[displayRole] || 'bg-gray-100'
               const textColor = roleTextColors[displayRole] || 'text-gray-900'

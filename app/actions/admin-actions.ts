@@ -597,7 +597,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
 
         if (isAdmin) {
             if (role === 'COURSE_86_DAYS') {
-                where.enrollments = { some: { courseId: 1 } }
+                where.enrollments = { some: { courseId: 1, status: 'ACTIVE' } }
             } else if (role === 'UNVERIFIED') {
                 where.emailVerified = null
             } else if (role && role !== 'ALL') {
@@ -654,7 +654,7 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
 
         if (isAdmin) {
             roleCounts['ALL'] = await prisma.user.count()
-            roleCounts['COURSE_86_DAYS'] = await prisma.enrollment.count({ where: { courseId: 1 } })
+            roleCounts['COURSE_86_DAYS'] = await prisma.enrollment.count({ where: { courseId: 1, status: 'ACTIVE' } })
             roleCounts['UNVERIFIED'] = await prisma.user.count({ where: { emailVerified: null } })
         } else {
             roleCounts['ALL'] = await prisma.user.count({ where: scopeWhere })
