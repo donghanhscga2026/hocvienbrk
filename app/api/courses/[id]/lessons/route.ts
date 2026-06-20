@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }
 
         const body = await request.json()
-        const { title, videoUrl, order, type, content } = body
+        const { title, videoUrl, order, type, content, isDailyChallenge } = body
 
         if (!title?.trim()) {
             return NextResponse.json({ error: "Tiêu đề là bắt buộc" }, { status: 400 })
@@ -51,7 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 videoUrl: videoUrl || null,
                 order: parseInt(order) || 1,
                 type: type as any || 'VIDEO',
-                content: content || null
+                content: content || null,
+                isDailyChallenge: isDailyChallenge ?? false
             }
         })
 

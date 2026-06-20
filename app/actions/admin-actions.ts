@@ -916,7 +916,8 @@ export async function updateLessonAction(lessonId: string, data: {
     content?: string | null,
     videoUrl?: string | null,
     order?: number,
-    type?: any
+    type?: any,
+    isDailyChallenge?: boolean
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
