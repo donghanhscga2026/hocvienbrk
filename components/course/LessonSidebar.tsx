@@ -9,6 +9,7 @@ interface Lesson {
     id: string
     title: string
     order: number
+    isDailyChallenge?: boolean
 }
 
 interface LessonSidebarProps {
@@ -35,7 +36,7 @@ function toInputValue(date: Date | null): string {
 }
 
 function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<string, any>, courseType?: string) {
-    if (courseType === 'LIB') return true
+    if (courseType === 'LIB' || courseType === 'NORMAL') return true
     if (lesson.order === 1) return true
     const prev = lessons.find(l => l.order === lesson.order - 1)
     if (!prev) return true
@@ -173,6 +174,9 @@ export default function LessonSidebar({
                             <div className="flex-1 min-w-0">
                                 <p className={cn("text-sm font-medium line-clamp-2", isActive ? "text-white" : "text-zinc-400")}>
                                     {lesson.title}
+                                    {lesson.isDailyChallenge && (
+                                        <span className="ml-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full align-middle">📝 Bài tập</span>
+                                    )}
                                 </p>
                                 {prog?.totalScore !== undefined && (
                                     <span className={cn("text-[10px] font-bold", prog.totalScore >= 5 ? "text-emerald-500" : "text-orange-400")}>

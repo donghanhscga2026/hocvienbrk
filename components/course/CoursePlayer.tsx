@@ -19,6 +19,7 @@ import {
     submitAssignmentAction,
     updateLastLessonAction
 } from "@/app/actions/course-actions"
+import { hasUserCommentedOnLesson } from "@/app/actions/comment-actions"
 
 // Chuyển URL thành link clickable
 const makeLinksClickable = (text: string): string => {
@@ -62,6 +63,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const lastSavedPercentRef = useRef<number>(-1)
     const videoProgressRef = useRef<{ maxTime: number; duration: number } | null>(null)
     const prevMobileTabRef = useRef(mobileTab)
+    const [showCommentReminder, setShowCommentReminder] = useState(false)
+    const [showDailyChallengeReminder, setShowDailyChallengeReminder] = useState(false)
+    const [pendingLessonId, setPendingLessonId] = useState<string | null>(null)
 
     // [HYDRATION FIX] Đảm bảo component đã mount trên client mới thực hiện các tính toán logic và render giao diện chính
     useEffect(() => {
@@ -118,7 +122,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         handleTabChange()
     }, [mobileTab])
 
-    const handleLessonSelect = async (lessonId: string) => {
+    const handleLessonSelect = async (lessonId: string, skipCommentCheck = false) => {
         if (isSubmittingRef.current) return
 
         if (assignmentFormRef.current) {
@@ -132,6 +136,28 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 maxTime: videoProgressRef.current.maxTime,
                 duration: videoProgressRef.current.duration
             }).catch(() => { })
+        }
+
+        const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
+
+        // isDailyChallenge check — mandatory assignment before switching
+        if (course.type !== 'LIB' && currentLessonData?.isDailyChallenge && currentLessonId && currentLessonId !== lessonId) {
+            const currentProg = progressMap[currentLessonId]
+            if (!currentProg || currentProg.status !== 'COMPLETED') {
+                setPendingLessonId(lessonId)
+                setShowDailyChallengeReminder(true)
+                return
+            }
+        }
+
+        // Comment reminder (all course types except LIB)
+        if (course.type !== 'LIB' && !skipCommentCheck && currentLessonId && currentLessonId !== lessonId) {
+            const hasComment = await hasUserCommentedOnLesson(currentLessonId)
+            if (!hasComment) {
+                setPendingLessonId(lessonId)
+                setShowCommentReminder(true)
+                return
+            }
         }
 
         setCurrentLessonId(lessonId)
@@ -196,7 +222,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             if (res.totalScore >= 5 && !isUpdate) {
                 const currentIndex = course.lessons.findIndex((l: any) => l.id === currentLessonId)
                 if (currentIndex < course.lessons.length - 1) {
-                    setTimeout(() => handleLessonSelect(course.lessons[currentIndex + 1].id), 2000)
+                    setTimeout(() => handleLessonSelect(course.lessons[currentIndex + 1].id, true), 2000)
                 }
             }
         } catch (error: any) {
@@ -432,6 +458,50 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 </div>
             )}
 
+            {showCommentReminder && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowCommentReminder(false); setPendingLessonId(null) }}>
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="text-center mb-2 text-3xl">🙏</div>
+                        <p className="text-white text-sm leading-relaxed text-center">
+                            Rất là biết ơn tương tác của <span className="font-bold text-orange-400">{session?.user?.name || 'bạn'}</span> với ít nhất 1 bình luận chia sẻ cảm nhận hoặc bài học của bạn cho nội dung vừa học trước khi sang bài học khác
+                        </p>
+                        <div className="flex gap-3 mt-5">
+                            <button
+                                onClick={() => { setShowCommentReminder(false); setPendingLessonId(null) }}
+                                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm transition-colors"
+                            >
+                                ✍️ Viết bình luận
+                            </button>
+                            <button
+                                onClick={async () => { setShowCommentReminder(false); if (pendingLessonId) await handleLessonSelect(pendingLessonId, true) }}
+                                className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm transition-colors"
+                            >
+                                Bỏ qua
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showDailyChallengeReminder && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowDailyChallengeReminder(false); setPendingLessonId(null) }}>
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="text-center mb-2 text-3xl">📝</div>
+                        <p className="text-white text-sm leading-relaxed text-center">
+                            Bài <span className="font-bold text-orange-400">{currentLesson?.title}</span> yêu cầu hoàn thành bài tập trước khi chuyển sang bài học khác
+                        </p>
+                        <div className="flex gap-3 mt-5">
+                            <button
+                                onClick={() => { setShowDailyChallengeReminder(false); setPendingLessonId(null); if (isMobile) setMobileTab('record') }}
+                                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm transition-colors"
+                            >
+                                📝 Làm bài tập
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <StartDateModal isOpen={!enrollment.startedAt} onConfirm={async (d) => { await confirmStartDateAction(course.id, d); window.location.reload(); }} />
         </div>
     )
@@ -526,7 +596,7 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                 {lessons.map((lesson: any) => {
                     const prog = filteredProgress[lesson.id]
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = courseType === 'LIB' || lesson.order === 1 || (filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]?.status === 'COMPLETED')
+                    const unlocked = courseType === 'LIB' || courseType === 'NORMAL' || lesson.order === 1 || (filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]?.status === 'COMPLETED')
                     return (
                         <button
                             key={lesson.id}
@@ -542,7 +612,11 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                                 {prog?.status === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5 text-brk-accent" /> : isActive ? <PlayCircle className="w-5 h-5 text-brk-accent animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-brk-muted" /> : <div className="w-4 h-4 rounded-full border border-brk-outline flex items-center justify-center text-[8px] text-brk-muted">{lesson.order}</div>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={cn('text-sm leading-snug', isActive ? 'text-brk-on-primary font-black' : 'text-brk-muted font-medium')}>{lesson.title}</p>
+                                <p className={cn('text-sm leading-snug', isActive ? 'text-brk-on-primary font-black' : 'text-brk-muted font-medium')}>{lesson.title}
+                                    {lesson.isDailyChallenge && (
+                                        <span className="ml-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full align-middle">📝 Bài tập</span>
+                                    )}
+                                </p>
                                 {prog?.totalScore !== undefined && <p className={cn('text-[10px] mt-1 font-bold', prog.totalScore >= 5 ? 'text-brk-accent' : 'text-brk-accent')}>{prog.totalScore >= 5 ? '✓' : '✗'} Kết quả: {prog.totalScore}/10đ</p>}
                             </div>
                         </button>

@@ -56,6 +56,19 @@ export async function getCommentsByLesson(lessonId: string) {
     })
 }
 
+export async function hasUserCommentedOnLesson(lessonId: string) {
+    const session = await auth()
+    if (!session?.user?.id) return false
+
+    const userId = parseInt(session.user.id as string)
+
+    const comment = await prisma.lessonComment.findFirst({
+        where: { lessonId, userId }
+    })
+
+    return !!comment
+}
+
 export async function createComment(lessonId: string, content: string) {
     const session = await auth()
     if (!session?.user?.id) {
@@ -101,6 +114,43 @@ export async function createComment(lessonId: string, content: string) {
             const facebookAccount = comment.user.accounts.find((a: any) => a.provider === 'facebook')
             if (facebookAccount) {
                 avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture?type=large`
+            }
+        }
+
+        // Auto-complete lesson for NORMAL course type
+        const lesson = await prisma.lesson.findUnique({
+            where: { id: lessonId },
+            select: {
+                course: {
+                    select: { type: true }
+                }
+            }
+        })
+
+        if (lesson?.course?.type === 'NORMAL') {
+            const enrollment = await prisma.enrollment.findFirst({
+                where: {
+                    userId,
+                    course: { lessons: { some: { id: lessonId } } },
+                    status: 'ACTIVE'
+                }
+            })
+
+            if (enrollment) {
+                await prisma.lessonProgress.upsert({
+                    where: {
+                        enrollmentId_lessonId: { enrollmentId: enrollment.id, lessonId }
+                    },
+                    create: {
+                        enrollmentId: enrollment.id,
+                        lessonId,
+                        status: 'COMPLETED',
+                        totalScore: 0
+                    },
+                    update: {
+                        status: 'COMPLETED'
+                    }
+                })
             }
         }
 

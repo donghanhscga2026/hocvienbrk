@@ -9,6 +9,7 @@ export function AddLessonModal({ courseId, onClose, onComplete }: { courseId: st
     const [order, setOrder] = useState(1)
     const [lessonType, setLessonType] = useState('VIDEO')
     const [content, setContent] = useState('')
+    const [isDailyChallenge, setIsDailyChallenge] = useState(false)
     const [saving, setSaving] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +21,7 @@ export function AddLessonModal({ courseId, onClose, onComplete }: { courseId: st
             const res = await fetch(`/api/courses/${courseId}/lessons`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, videoUrl, order: parseInt(order.toString()), type: lessonType, content })
+                body: JSON.stringify({ title, videoUrl, order: parseInt(order.toString()), type: lessonType, content, isDailyChallenge })
             }).then(r => r.json())
             
             if (res.success) {
@@ -71,6 +72,13 @@ export function AddLessonModal({ courseId, onClose, onComplete }: { courseId: st
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Thứ tự hiển thị</label>
                         <input type="number" value={order} onChange={(e) => setOrder(parseInt(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" required />
                     </div>
+                    <label className="flex items-center gap-3 cursor-pointer bg-orange-50 rounded-2xl px-4 py-3 border border-orange-200">
+                        <input type="checkbox" checked={isDailyChallenge} onChange={(e) => setIsDailyChallenge(e.target.checked)} className="w-5 h-5 rounded accent-orange-500" />
+                        <div>
+                            <span className="text-sm font-black text-orange-700">📝 Bài tập bắt buộc</span>
+                            <p className="text-[10px] text-orange-500/70">Học viên phải ghi nhận (làm bài tập) trước khi chuyển sang bài khác</p>
+                        </div>
+                    </label>
                     <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">
                         {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                         Tạo bài học
