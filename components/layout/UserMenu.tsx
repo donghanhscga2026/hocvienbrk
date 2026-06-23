@@ -5,9 +5,11 @@ import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
 import { Settings, LogOut, ChevronDown, LogIn, Check } from 'lucide-react'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
+import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 
 export default function UserMenu() {
     const { data: session } = useSession()
+    const { openAssistant } = useAccountAssistant()
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [userImage, setUserImage] = useState<string | null>(null)
     const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('default')
@@ -71,13 +73,13 @@ export default function UserMenu() {
     }, [])
 
     if (!session) return (
-        <Link
-            href="/login"
+        <button
+            onClick={openAssistant}
             className="flex items-center gap-1.5 rounded-full bg-brk-primary px-3 py-1.5 text-xs font-bold text-brk-on-primary hover:opacity-90 transition-opacity"
         >
             <LogIn className="h-3.5 w-3.5" />
             <span>Đăng nhập</span>
-        </Link>
+        </button>
     )
 
     return (
