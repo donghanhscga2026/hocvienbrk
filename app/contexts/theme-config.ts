@@ -72,7 +72,7 @@ export const presetThemes: Theme[] = [
       surface: '#FFFFFF',
       background: '#FAE0C7',
       onSurface: '#333333',
-      muted: '#FFB6AF',
+      muted: '#765F5C',
       accent: '#F28076',
       outline: '#FBC193'
     },

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useOptimistic, useTransition } from 'react'
 import { getCommentsByLesson, createComment } from '@/app/actions/comment-actions'
 import { Send, LogIn, Loader2, MessageCircle } from 'lucide-react'
-import Link from 'next/link'
+import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 
 interface Comment {
     id: number | string
@@ -73,6 +73,7 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [newComment, setNewComment] = useState('')
     const [error, setError] = useState('')
     const commentsEndRef = useRef<HTMLDivElement>(null)
+    const { openAssistant } = useAccountAssistant()
 
     // Optimistic UI: Hiển thị ngay lập tức khi nhấn gửi
     const [optimisticComments, addOptimisticComment] = useOptimistic(
@@ -240,13 +241,13 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
                     </form>
                 ) : (
                     <div className="bg-zinc-800/50 rounded-xl py-3 px-4 border border-zinc-700/50 text-center">
-                        <Link
-                            href="/login"
+                        <button
+                            onClick={openAssistant}
                             className="inline-flex items-center gap-2 text-sm font-semibold text-yellow-400 hover:text-yellow-300 transition-colors"
                         >
                             <LogIn className="h-4 w-4" />
                             Đăng nhập để tham gia tương tác
-                        </Link>
+                        </button>
                     </div>
                 )}
                 {error && (

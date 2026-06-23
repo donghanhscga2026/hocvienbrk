@@ -1106,6 +1106,20 @@ model SyncLog {
   @@index([syncId])
 }
 
+model AccountAssistantStep {
+  id             Int      @id @default(autoincrement())
+  stepKey        String   @unique
+  question       String?
+  agentVideoUrl  String?
+  guideVideoUrl  String?
+  guideTitle     String?
+  options        Json?
+  order          Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 enum CampaignStatus {
   DRAFT
   ACTIVE
