@@ -248,6 +248,7 @@ function StepCard({
               MP4
             </button>
           </div>
+          <p className="text-[10px] text-gray-400 mt-1">Nén về 360p-720p, H.264, CRF 23-28, &lt; 5MB, 10-30 giây để tải nhanh nhất</p>
         </div>
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">Video Hướng dẫn (MP4/YouTube URL)</label>

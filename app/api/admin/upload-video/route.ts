@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
+import { v2 as cloudinary } from "cloudinary"
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 export async function POST(request: Request) {
   const session = await auth()
@@ -20,29 +27,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Chỉ chấp nhận file MP4 hoặc WebM" }, { status: 400 })
     }
 
-    const maxSize = 200 * 1024 * 1024
+    const maxSize = 100 * 1024 * 1024
     if (file.size > maxSize) {
-      return NextResponse.json({ error: "File quá lớn (tối đa 200 MB)" }, { status: 400 })
+      return NextResponse.json({ error: "File quá lớn (tối đa 100 MB)" }, { status: 400 })
     }
 
-    const catboxForm = new FormData()
-    catboxForm.append('reqtype', 'fileupload')
-    catboxForm.append('fileToUpload', file)
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
-    const catboxRes = await fetch('https://catbox.moe/user/api.php', {
-      method: 'POST',
-      body: catboxForm,
+    const result = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'video',
+          folder: 'account-assistant',
+          public_id: `vid_${Date.now()}`,
+          eager: [
+            { width: 300, crop: 'fill', quality: 'auto' },
+          ],
+          eager_async: false,
+        },
+        (error, result) => {
+          if (error) reject(error)
+          else resolve(result)
+        },
+      )
+      uploadStream.end(buffer)
     })
 
-    if (!catboxRes.ok) {
-      return NextResponse.json({ error: "Lỗi khi upload lên catbox.moe" }, { status: 502 })
-    }
-
-    const url = (await catboxRes.text()).trim()
+    const url = result.eager?.[0]?.secure_url || result.secure_url
 
     return NextResponse.json({ url })
   } catch (error: any) {
     console.error("Upload video error:", error)
-    return NextResponse.json({ error: "Lỗi server" }, { status: 500 })
+    return NextResponse.json({ error: "Lỗi upload video" }, { status: 500 })
   }
 }

@@ -8,7 +8,10 @@ interface VideoPlayerProps {
   autoplay?: boolean
   muted?: boolean
   loop?: boolean
+  preload?: 'none' | 'metadata' | 'auto'
   onEnded?: () => void
+  onLoadStart?: () => void
+  onCanPlay?: () => void
 }
 
 function isYouTubeUrl(url: string): boolean {
@@ -24,7 +27,7 @@ export function getYouTubeId(url: string): string | null {
   return null
 }
 
-export default function VideoPlayer({ url, className = '', autoplay = false, muted = false, loop = false, onEnded }: VideoPlayerProps) {
+export default function VideoPlayer({ url, className = '', autoplay = false, muted = false, loop = false, preload = 'metadata', onEnded, onLoadStart, onCanPlay }: VideoPlayerProps) {
   const isYt = useMemo(() => isYouTubeUrl(url), [url])
   const videoId = useMemo(() => isYt ? getYouTubeId(url) : null, [url, isYt])
 
@@ -64,9 +67,12 @@ export default function VideoPlayer({ url, className = '', autoplay = false, mut
         autoPlay={autoplay}
         loop={loop}
         muted={muted}
+        preload={preload}
         playsInline
         disablePictureInPicture
         onEnded={onEnded}
+        onLoadStart={onLoadStart}
+        onCanPlay={onCanPlay}
         className="w-full h-full object-cover pointer-events-none"
         style={{ WebkitMediaControls: 'none' } as any}
       />
