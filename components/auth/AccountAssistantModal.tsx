@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import { registerUser } from '@/app/actions/auth-actions'
-import { COUNTRY_CODES } from '@/lib/country-codes'
+import { parsePhoneNumber } from 'libphonenumber-js'
 import { Loader2, Eye, EyeOff, X, CheckCircle2, PlayCircle, ArrowLeft } from 'lucide-react'
 import AgentAvatar from './AgentAvatar'
 import GuideVideoPopup from './GuideVideoPopup'
@@ -41,10 +41,12 @@ interface WizardData {
 
 function detectCountryCode(input: string): string {
   const cleaned = input.replace(/\s/g, '')
-  if (cleaned.startsWith('+')) {
-    const match = COUNTRY_CODES.find(c => cleaned.startsWith(c.code))
-    if (match) return match.code
-  }
+  try {
+    const phoneNumber = cleaned.startsWith('+')
+      ? parsePhoneNumber(cleaned)
+      : parsePhoneNumber(cleaned, 'VN')
+    if (phoneNumber) return '+' + phoneNumber.countryCallingCode
+  } catch {}
   return '+84'
 }
 
@@ -64,13 +66,6 @@ function maskPhone(phone: string): string {
   return `${first}***${last}`
 }
 
-function generatePassword(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%'
-  let pw = 'Brk@'
-  for (let i = 0; i < 8; i++) pw += chars[Math.floor(Math.random() * chars.length)]
-  pw += 'A1!'
-  return pw
-}
 
 function getAffiliateRefFromStorage(): string | null {
   if (typeof window === 'undefined') return null
@@ -134,6 +129,9 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false)
+  const [registeredUserId, setRegisteredUserId] = useState<number | null>(null)
   const [guideVideo, setGuideVideo] = useState<{ url: string; title: string | null } | null>(null)
 
   const currentStep = steps.find(s => s.stepKey === step)
@@ -142,6 +140,10 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setData(prev => ({ ...prev, originalUrl: window.location.href }))
+      const saved = localStorage.getItem('assistant_user_contact')
+      if (saved) {
+        setData(prev => ({ ...prev, email: saved }))
+      }
     }
   }, [])
 
@@ -232,6 +234,10 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         case 'action:register_name': handleRegisterName(); break
         case 'action:register_email': handleRegisterEmail(); break
         case 'action:register_phone': handleRegisterPhone(); break
+        case 'action:register_password': handleRegisterPassword(); break
+        case 'action:register_confirm': handleRegisterConfirm(); break
+        case 'action:verify_register_otp': handleVerifyRegisterOtp(); break
+        case 'action:skip_register_otp': handleSkipRegisterOtp(); break
         case 'action:send_otp': handleSendOtp(); break
         case 'action:verify_otp': handleVerifyOtp(); break
         case 'action:reset_password': handleResetPassword(); break
@@ -239,7 +245,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         default: break
       }
     }
-  }, [data, password, otp, newPassword, confirmNewPassword, isLoading])
+  }, [data, password, otp, newPassword, confirmNewPassword, isLoading, registerPassword, registeredUserId])
 
   // ─── LOGIN: Check student ID ───
   const handleCheckStudentId = async () => {
@@ -289,11 +295,12 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     if (!query) { setError('Vui lòng nhập số điện thoại hoặc email'); return }
     setIsLoading(true); setError(null)
     try {
+      localStorage.setItem('assistant_user_contact', query)
       const res = await fetch('/api/auth/check-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) })
       const json = await res.json()
       if (json.found) {
         updateField('studentId', json.id.toString()); updateField('email', json.email); updateField('phone', json.phone)
-        goToStep('found_account')
+        goToStep('login_password')
       } else goToStep('register_name')
     } catch { setError('Có lỗi xảy ra. Vui lòng thử lại.')
     } finally { setIsLoading(false) }
@@ -313,34 +320,75 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     goToStep('register_phone')
   }
 
-  // ─── REGISTER: Submit phone + create account ───
-  const handleRegisterPhone = async () => {
+  // ─── REGISTER: Submit phone → go to password step ───
+  const handleRegisterPhone = () => {
     const phoneRaw = data.phone.replace(/\s/g, '')
     if (!phoneRaw) { setError('Vui lòng nhập số điện thoại'); return }
     if (phoneRaw.length < 7) { setError('Số điện thoại không hợp lệ'); return }
+    goToStep('register_password')
+  }
+
+  // ─── REGISTER: Submit password → go to confirm ───
+  const handleRegisterPassword = () => {
+    if (!registerPassword) { setError('Vui lòng nhập mật khẩu'); return }
+    if (registerPassword.length < 8) { setError('Mật khẩu phải có ít nhất 8 ký tự'); return }
+    if (!/[A-Z]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 chữ hoa (A-Z)'); return }
+    if (!/[a-z]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 chữ thường (a-z)'); return }
+    if (!/[0-9]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 chữ số (0-9)'); return }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 ký tự đặc biệt (!@#$...)'); return }
+    goToStep('register_confirm')
+  }
+
+  // ─── REGISTER: Confirm + create account ───
+  const handleRegisterConfirm = async () => {
     setIsLoading(true); setError(null)
-    const pw = generatePassword()
+    const phoneRaw = data.phone.replace(/\s/g, '')
     try {
       const formData = new FormData()
       formData.append('name', data.name.trim())
       formData.append('email', data.email.trim())
       formData.append('countryCode', data.countryCode)
       formData.append('phone', phoneRaw)
-      formData.append('password', pw)
+      formData.append('password', registerPassword)
       if (data.referrerId) formData.append('referrerId', data.referrerId)
       const result = await registerUser(null, formData)
       if (result?.success && result.userId) {
-        const signInResult = await signIn('credentials', { identifier: result.userId.toString(), password: pw, redirect: false })
-        if (signInResult?.ok) {
-          setSuccess('Đăng ký thành công! Đang đăng nhập...')
-          setTimeout(() => window.location.href = data.originalUrl || '/', 1500)
-        } else {
-          setError('Đăng ký thành công nhưng đăng nhập tự động thất bại.')
-          setTimeout(() => window.location.href = '/login', 2000)
-        }
+        setRegisteredUserId(result.userId)
+        goToStep('register_otp')
       } else setError(result?.message || 'Đăng ký thất bại.')
     } catch { setError('Có lỗi xảy ra khi đăng ký.')
     } finally { setIsLoading(false) }
+  }
+
+  const autoLoginAfterRegister = async (message: string) => {
+    if (!registeredUserId) return
+    const signInResult = await signIn('credentials', { identifier: registeredUserId.toString(), password: registerPassword, redirect: false })
+    if (signInResult?.ok) {
+      setSuccess(message)
+      setTimeout(() => window.location.href = data.originalUrl || '/', 1500)
+    } else {
+      setError('Đăng nhập tự động thất bại.')
+      setTimeout(() => window.location.href = '/login', 2000)
+    }
+  }
+
+  const handleVerifyRegisterOtp = async () => {
+    if (!otp || otp.length !== 6) { setError('Vui lòng nhập mã OTP 6 số'); return }
+    setIsLoading(true); setError(null)
+    try {
+      const res = await fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: data.email, otp }) })
+      const json = await res.json()
+      if (res.ok) {
+        await autoLoginAfterRegister('Xác minh thành công! Đang đăng nhập...')
+      } else setError(json.error || 'Mã OTP không chính xác')
+    } catch { setError('Có lỗi xảy ra khi xác minh OTP')
+    } finally { setIsLoading(false) }
+  }
+
+  const handleSkipRegisterOtp = async () => {
+    setIsLoading(true)
+    await autoLoginAfterRegister('Đăng ký thành công! Bạn có thể xác minh email sau.')
+    setIsLoading(false)
   }
 
   // ─── FORGOT PASSWORD: Send OTP ───
@@ -416,18 +464,25 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         )
       case 'login_password':
         return (
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoFocus
-              className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
-            />
-            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface">
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
+          <div className="space-y-2">
+            {data.studentId && (
+              <p className="text-center text-sm text-brk-muted">
+                Mã học viên: <span className="font-semibold text-brk-on-surface">#{data.studentId}</span>
+              </p>
+            )}
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoFocus
+                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+              />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface">
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
         )
       case 'check':
@@ -513,6 +568,62 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             />
           </>
         )
+      case 'register_password':
+        return (
+          <>
+            <div className="relative">
+              <input
+                type={showRegisterPassword ? 'text' : 'password'}
+                value={registerPassword}
+                onChange={e => setRegisterPassword(e.target.value)}
+                placeholder="Ít nhất 8 ký tự, chữ hoa, số, ký tự đặc biệt"
+                autoFocus
+                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+              />
+              <button type="button" onClick={() => setShowRegisterPassword(!showRegisterPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface">
+                {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+            <p className="text-[10px] text-brk-accent italic text-center">
+              Cần đáp ứng: ≥ 8 ký tự, chữ Hoa, chữ thường, số và ký tự đặc biệt (VD: Brk$9319)
+            </p>
+          </>
+        )
+      case 'register_confirm':
+        return (
+          <div className="rounded-xl border border-brk-outline/20 bg-brk-background/5 p-4 space-y-2">
+            <p className="text-xs font-semibold text-brk-on-surface text-center mb-3">Vui lòng ghi lại thông tin đăng nhập</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-brk-muted">Email:</span>
+              <span className="font-medium text-brk-on-surface break-all text-right">{data.email}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-brk-muted">SĐT:</span>
+              <span className="font-medium text-brk-on-surface">{data.phone}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-brk-muted">Mật khẩu:</span>
+              <span className="font-medium text-brk-primary font-mono">{registerPassword}</span>
+            </div>
+          </div>
+        )
+      case 'register_otp':
+        return (
+          <>
+            <div className="rounded-xl border border-brk-outline/20 bg-brk-background/5 p-4 text-center">
+              <p className="text-sm text-brk-muted mb-1">Mã OTP đã gửi đến:</p>
+              <p className="text-sm font-bold text-brk-on-surface">{maskEmail(data.email)}</p>
+            </div>
+            <input
+              type="text"
+              value={otp}
+              onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              autoFocus
+              className="w-full text-center text-2xl font-mono tracking-[0.5em] rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+            />
+          </>
+        )
       case 'forgot_otp':
         return (
           <>
@@ -553,7 +664,9 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       action === 'action:check_student_id' ||
       action === 'action:submit_login' ||
       action === 'action:check_user' ||
-      action === 'action:register_phone' ||
+      action === 'action:register_confirm' ||
+      action === 'action:verify_register_otp' ||
+      action === 'action:skip_register_otp' ||
       action === 'action:send_otp' ||
       action === 'action:reset_password'
     )
@@ -673,7 +786,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
         {/* Body */}
         <div className="p-5 max-h-[70vh] overflow-y-auto">
-          {success && step !== 'forgot_otp' && (
+          {success && step !== 'forgot_otp' && step !== 'register_otp' && (
             <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-emerald-500/20 border border-emerald-500/50 text-sm text-emerald-500">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               {success}

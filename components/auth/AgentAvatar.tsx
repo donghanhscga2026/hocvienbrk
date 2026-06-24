@@ -33,28 +33,30 @@ export default function AgentAvatar({ videoUrl }: AgentAvatarProps) {
               muted={muted}
               onEnded={handleEnded}
             />
-            {videoEnded && (
-              <button
-                onClick={handleReplay}
-                className="absolute -bottom-1 -left-1 z-20 w-8 h-8 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
-                title="Phát lại video"
-              >
-                <Play className="w-4 h-4" />
-              </button>
-            )}
           </div>
         ) : (
           <User className="w-16 h-16 text-brk-muted/40" />
         )}
       </div>
       {videoUrl && (
-        <button
-          onClick={() => setMuted(!muted)}
-          className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
-          title={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
-        >
-          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-        </button>
+        <>
+          {videoEnded && (
+            <button
+              onClick={handleReplay}
+              className="absolute -bottom-1 -left-1 z-20 w-8 h-8 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
+              title="Phát lại video"
+            >
+              <Play className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => setMuted(!muted)}
+            className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
+            title={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+          >
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        </>
       )}
     </div>
   )

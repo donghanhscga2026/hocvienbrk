@@ -32,6 +32,16 @@ const defaultOptions: Record<string, any[]> = {
   register_phone: [
     { label: 'Tiếp tục', action: 'action:register_phone' },
   ],
+  register_password: [
+    { label: 'Tiếp tục', action: 'action:register_password' },
+  ],
+  register_confirm: [
+    { label: 'Xác nhận và đăng nhập', action: 'action:register_confirm' },
+  ],
+  register_otp: [
+    { label: 'Bỏ qua xác minh', action: 'action:skip_register_otp' },
+    { label: 'Xác minh ngay', action: 'action:verify_register_otp' },
+  ],
   forgot_otp: [
     { label: 'Quay lại đăng nhập', action: 'next_step:login_password' },
     { label: 'Xác nhận OTP', action: 'action:verify_otp' },
@@ -51,6 +61,9 @@ const defaultQuestions: Record<string, string> = {
   register_name: 'Nhập vào họ tên của bạn',
   register_email: 'Nhập vào địa chỉ email của bạn',
   register_phone: 'Nhập số điện thoại của bạn',
+  register_password: 'Đặt mật khẩu cho tài khoản của bạn',
+  register_confirm: 'Ghi lại thông tin đăng nhập để tránh quên. Nhấn "Xác nhận" để hoàn tất đăng ký!',
+  register_otp: 'Nhập mã OTP đã gửi đến email của bạn để xác minh tài khoản, hoặc bỏ qua để đăng nhập ngay.',
   forgot_otp: 'Bạn hãy kiểm tra lại email để nhập mã OTP gửi về cho bạn',
   forgot_new_password: 'Nhập mật khẩu mới của bạn',
 }
@@ -66,6 +79,9 @@ export async function seedAccountAssistantSteps() {
     { stepKey: 'register_name', order: 60 },
     { stepKey: 'register_email', order: 70 },
     { stepKey: 'register_phone', order: 80 },
+    { stepKey: 'register_password', order: 85 },
+    { stepKey: 'register_confirm', order: 87 },
+    { stepKey: 'register_otp', order: 89 },
     { stepKey: 'forgot_otp', order: 90 },
     { stepKey: 'forgot_new_password', order: 100 },
   ]
@@ -114,6 +130,12 @@ export async function seedAccountAssistantSteps() {
       order: 99,
       isActive: true,
     },
+  })
+
+  // found_account không còn được dùng (check → login_password trực tiếp)
+  await prisma.accountAssistantStep.update({
+    where: { stepKey: 'found_account' },
+    data: { isActive: false },
   })
 
   console.log('✅ Seed AccountAssistantSteps done')
