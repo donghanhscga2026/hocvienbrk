@@ -163,6 +163,21 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     fetchSteps()
   }, [])
 
+  // Preload tất cả agent videos khi steps loaded
+  useEffect(() => {
+    if (steps.length === 0) return
+    const isYouTube = (url: string) => /(?:youtube\.com|youtu\.be)/i.test(url)
+    steps.forEach(step => {
+      if (step.agentVideoUrl && !isYouTube(step.agentVideoUrl)) {
+        const link = document.createElement('link')
+        link.rel = 'preload'
+        link.as = 'video'
+        link.href = step.agentVideoUrl
+        document.head.appendChild(link)
+      }
+    })
+  }, [steps])
+
   // Xử lý ref từ URL và localStorage
   useEffect(() => {
     const resolveRef = async () => {

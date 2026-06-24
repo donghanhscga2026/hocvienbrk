@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import VideoPlayer from './VideoPlayer'
 import { Volume2, VolumeX, User, Play } from 'lucide-react'
 
@@ -12,12 +12,21 @@ export default function AgentAvatar({ videoUrl }: AgentAvatarProps) {
   const [muted, setMuted] = useState(false)
   const [videoEnded, setVideoEnded] = useState(false)
   const [playCount, setPlayCount] = useState(0)
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    setLoading(true)
+    setVideoEnded(false)
+  }, [videoUrl])
+
+  const handleLoadStart = useCallback(() => setLoading(true), [])
+  const handleCanPlay = useCallback(() => setLoading(false), [])
   const handleEnded = useCallback(() => setVideoEnded(true), [])
 
   const handleReplay = useCallback(() => {
     setPlayCount(c => c + 1)
     setVideoEnded(false)
+    setLoading(true)
   }, [])
 
   return (
@@ -25,13 +34,19 @@ export default function AgentAvatar({ videoUrl }: AgentAvatarProps) {
       <div className="w-[150px] h-[150px] rounded-full overflow-hidden border-4 border-brk-primary shadow-lg shadow-brk-primary/20 bg-brk-background/20 flex items-center justify-center">
         {videoUrl ? (
           <div className="relative w-full h-full">
+            {loading && (
+              <div className="absolute inset-0 z-10 rounded-full bg-gradient-to-br from-brk-primary/5 via-brk-primary/10 to-brk-primary/5 animate-pulse transition-opacity duration-500" />
+            )}
             <VideoPlayer
               key={playCount}
               url={videoUrl}
               className="w-full h-full"
               autoplay
               muted={muted}
+              preload="auto"
               onEnded={handleEnded}
+              onLoadStart={handleLoadStart}
+              onCanPlay={handleCanPlay}
             />
           </div>
         ) : (
