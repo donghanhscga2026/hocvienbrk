@@ -717,7 +717,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       <div className="space-y-5">
         {/* Agent Avatar */}
         <div className="flex justify-center">
-          <AgentAvatar videoUrl={currentStep.agentVideoUrl} />
+          <AgentAvatar key={step} videoUrl={currentStep.agentVideoUrl} />
         </div>
 
         {/* Guide Video Button */}
