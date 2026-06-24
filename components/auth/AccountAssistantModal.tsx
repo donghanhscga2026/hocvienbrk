@@ -403,10 +403,18 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     } finally { setIsLoading(false) }
   }
 
-  // ─── Verify OTP (check 6 digits, advance) ───
-  const handleVerifyOtp = () => {
+  // ─── Verify OTP (check with server before advancing) ───
+  const handleVerifyOtp = async () => {
     if (!otp || otp.length !== 6) { setError('Vui lòng nhập mã OTP 6 số'); return }
-    goToStep('forgot_new_password')
+    setIsLoading(true); setError(null)
+    try {
+      const res = await fetch('/api/auth/verify-forgot-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: data.email, otp }) })
+      const json = await res.json()
+      if (res.ok) {
+        goToStep('forgot_new_password')
+      } else setError(json.error || 'Mã OTP không chính xác')
+    } catch { setError('Có lỗi xảy ra khi xác minh OTP')
+    } finally { setIsLoading(false) }
   }
 
   // ─── FORGOT PASSWORD: Reset password ───
@@ -665,6 +673,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       action === 'action:submit_login' ||
       action === 'action:check_user' ||
       action === 'action:register_confirm' ||
+      action === 'action:verify_otp' ||
       action === 'action:verify_register_otp' ||
       action === 'action:skip_register_otp' ||
       action === 'action:send_otp' ||
