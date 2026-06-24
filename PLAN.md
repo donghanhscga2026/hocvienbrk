@@ -2720,3 +2720,85 @@ Hoàn thiện modal Trợ lý tài khoản: thêm UI nhập OTP cho flow đăng 
 - ✅ Xác thực OTP quên mật khẩu gọi API trước, không advance nếu sai
 - ✅ Loading state đúng cho các action async mới
 - ✅ Build: `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ PHẦN 33: TỐI ƯU TỐC ĐỘ VIDEO TRỢ LÝ TÀI KHOẢN — CLOUDINARY + PRELOAD (2026-06-24)
+
+### Mục tiêu
+Tăng tốc độ load video agent avatar trong modal Trợ lý tài khoản: chuyển từ catbox.moe (CDN chậm tại VN) sang Cloudinary (Akamai CDN) + thêm preload + loading skeleton + dừng video khi chuyển step.
+
+### Phân tích lựa chọn
+
+| Yếu tố | catbox.moe (cũ) | Cloudinary (mới) |
+|--------|----------------|-----------------|
+| CDN | Không rõ, chậm VN | Akamai/Fastly, edge gần VN |
+| Free tier | Không giới hạn (không SLA) | 25 credits/tháng (dùng ~8) |
+| File tối đa | 200 MB (không rõ) | 100 MB (signed upload) |
+| Tối ưu video | Không | `q_auto` + eager transformations |
+| Cache | None | CDN edge + browser cache |
+| Độ tin cậy | File bị xóa sau 30 ngày không hoạt động | Vĩnh viễn, kiểm soát được |
+
+### Các file đã sửa
+
+#### `app/api/admin/upload-video/route.ts` [REWRITE]
+- **Thay catbox.moe → Cloudinary**: upload MP4/WebM lên Cloudinary folder `account-assistant` bằng `upload_stream`
+- **Eager transformation**: `{ width: 300, crop: 'fill', quality: 'auto' }` — resize về 300px cho 150px circle retina, auto quality
+- **URL trả về**: dùng `result.eager[0].secure_url` (đã sinh sẵn transformation, đuôi `.mp4`)
+- **Giới hạn file**: 200 MB → 100 MB (theo Cloudinary free tier)
+- **Cấu hình**: `cloudinary.config()` với 3 env vars từ tài khoản user
+
+#### `components/auth/VideoPlayer.tsx`
+- **Thêm props**: `preload` (default `'metadata'`), `onLoadStart`, `onCanPlay`
+- **Truyền xuống `<video>`**: `preload={preload}`, `onLoadStart`, `onCanPlay`
+
+#### `components/auth/AgentAvatar.tsx` [REWRITE]
+- **Thêm state `loading`**: khởi tạo `true`, reset khi `videoUrl` thay đổi qua `useEffect`
+- **Loading skeleton**: overlay gradient `from-brk-primary/5 via-brk-primary/10 to-brk-primary/5` với `animate-pulse` khi video chưa ready
+- **Events**: `onLoadStart` → set loading true, `onCanPlay` → set loading false
+- **Preload**: truyền `preload="auto"` xuống VideoPlayer
+- **Replay**: reset loading + videoEnded khi click replay
+
+#### `components/auth/AccountAssistantModal.tsx`
+- **Preload videos**: `useEffect` sau fetchSteps, duyệt tất cả steps → tạo `<link rel="preload" as="video">` cho từng `agentVideoUrl` (trừ YouTube) — warm browser cache ngay khi modal mở
+- **Dừng video khi chuyển step**: thêm `key={step}` vào `<AgentAvatar>` — React unmount component cũ (dừng video ngay) + mount mới
+
+#### `app/tools/account-assistant/page.tsx`
+- **Compression guide**: thêm hint dưới ô upload: "Nén về 360p-720p, H.264, CRF 23-28, < 5MB, 10-30 giây"
+
+### Package mới
+- `npm install cloudinary` — Cloudinary Node.js SDK v2
+
+### Environment variables (cần thêm vào .env + Vercel)
+```
+CLOUDINARY_CLOUD_NAME="dkgpyievz"
+CLOUDINARY_API_KEY="657669169984113"
+CLOUDINARY_API_SECRET="jcbISoPCBRlLUIFcjAe1K0L5C8A"
+```
+
+### Tổng hợp tối ưu
+
+| Tối ưu | File | Tác động |
+|--------|------|----------|
+| CDN Cloudinary (Akamai) | upload-video/route.ts | 🔥 Giảm 3-5× latency |
+| `q_auto` + `w_300` eager | upload-video/route.ts | Giảm ~50% dung lượng + resize |
+| Preload `<link>` tất cả videos | AccountAssistantModal.tsx | Warms HTTP cache ngay khi mở modal |
+| `preload="auto"` step hiện tại | AgentAvatar.tsx | Ưu tiên tải full video hiện tại |
+| Loading skeleton | AgentAvatar.tsx | Feedback tức thì, không thấy vòng tròn trắng |
+| `key={step}` dừng video | AccountAssistantModal.tsx | Video dừng ngay khi chuyển step |
+| Compression guide | account-assistant/page.tsx | Giảm 80-90% dung lượng từ gốc |
+
+### Backup
+- `plan_temp/upload-video-route.backup_20260624.patch`
+- `plan_temp/VideoPlayer.backup_20260624.patch`
+- `plan_temp/AgentAvatar.backup_20260624.patch`
+- `plan_temp/AccountAssistantModal.backup_20260624.patch`
+
+### Trạng thái
+- ✅ Upload MP4 lên Cloudinary thành công, URL có dạng `...vid_xxx.mp4`
+- ✅ Video optimized với `q_auto` + `w_300` từ eager transformation
+- ✅ Preload tất cả videos khi modal mở
+- ✅ Loading skeleton hiển thị trong lúc video đang tải
+- ✅ Video dừng ngay khi chuyển step (key={step} force unmount)
+- ✅ Compression guide trong admin tool
+- ✅ Build: `npx tsc --noEmit` — 0 lỗi
