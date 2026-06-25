@@ -746,7 +746,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
         {/* Options / Buttons */}
         {options.length > 0 && (
-          <div className="space-y-3">
+          <div className={options.length === 2 ? 'grid grid-cols-2 gap-2' : 'space-y-3'}>
             {options.map((opt, idx) => {
               const isPrimary = idx === options.length - 1
               const isLoadingBtn = isLoadingAction(opt.action)
