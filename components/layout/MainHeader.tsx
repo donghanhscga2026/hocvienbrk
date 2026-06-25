@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react'
 import { getToolHelpAction, ToolHelpData } from '@/app/actions/help-actions'
 import { useHomeSlug } from '@/hooks/useHomeSlug'
 import UserMenu from './UserMenu'
+import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
 import dynamic from 'next/dynamic'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
@@ -149,6 +150,9 @@ export default function MainHeader({ title, toolSlug }: MainHeaderProps) {
                                 <span className="text-xs font-medium hidden sm:inline">Hỗ trợ</span>
                             </button>
                         )}
+
+                        {/* Floating Assistant Icon - Thứ 3 từ phải */}
+                        <AssistantHeaderIcon />
 
                         {/* Share Button - Chỉ hiện khi đã đăng nhập */}
                         {userId && (

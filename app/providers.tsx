@@ -3,6 +3,7 @@
 import { SessionProvider } from 'next-auth/react'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AccountAssistantProvider } from '@/components/auth/AccountAssistantContext'
+import { AssistantProvider } from '@/components/assistant/AssistantProvider'
 import { Session } from 'next-auth'
 
 export default function Providers({ 
@@ -16,7 +17,9 @@ export default function Providers({
     <SessionProvider session={session}>
       <ThemeProvider>
         <AccountAssistantProvider>
-          {children}
+          <AssistantProvider>
+            {children}
+          </AssistantProvider>
         </AccountAssistantProvider>
       </ThemeProvider>
     </SessionProvider>
