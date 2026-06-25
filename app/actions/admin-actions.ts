@@ -596,7 +596,9 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
         }
 
         if (isAdmin) {
-            if (role === 'COURSE_86_DAYS') {
+            if (courseId) {
+                where.enrollments = { some: { courseId } }
+            } else if (role === 'COURSE_86_DAYS') {
                 where.enrollments = { some: { courseId: 1, status: 'ACTIVE' } }
             } else if (role === 'UNVERIFIED') {
                 where.emailVerified = null
@@ -685,7 +687,7 @@ export async function getAdminCoursesAction() {
         const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
         const where = isAdmin ? {} : { teacherId: userId }
         const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true }, orderBy: { id: 'asc' } })
-        return { success: true, courses, isAdmin }
+        return { success: true, courses, isAdmin, userId }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 

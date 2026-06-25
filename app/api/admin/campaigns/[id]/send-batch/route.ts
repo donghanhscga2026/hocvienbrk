@@ -76,13 +76,22 @@ export async function POST(
       where: { campaignId, status: { in: ['SENT', 'SKIPPED', 'FAILED'] } },
       select: { toEmail: true }
     });
-    const sentEmails = new Set(existingLogs.map(l => l.toEmail));
+    const sentEmails = new Set(existingLogs.map(l => l.toEmail.toLowerCase().trim()));
 
-    const unsentRecipients = allRecipients.filter(r => !sentEmails.has(r.email));
+    const unsentRecipients = allRecipients.filter(r => !sentEmails.has(r.email.toLowerCase().trim()));
     const recipientsBatch = unsentRecipients.slice(0, batchSize);
 
     if (recipientsBatch.length === 0) {
-      return NextResponse.json({ success: true, finished: true });
+      const stats = campaignStats.get(campaignId) || { total: allRecipients.length, sent: allRecipients.length, success: 0, failed: 0 };
+      return NextResponse.json({ 
+        success: true, 
+        finished: true,
+        stats: {
+          totalSent: stats.sent,
+          totalSuccess: stats.success,
+          totalFailed: stats.failed
+        }
+      });
     }
 
     if (campaign.totalRecipients !== allRecipients.length) {
@@ -173,7 +182,7 @@ export async function POST(
         }
 
         const isBlacklisted = await prisma.emailBlacklist.findUnique({
-          where: { email: recipient.email }
+          where: { email: recipient.email.toLowerCase().trim() }
         });
 
         if (isBlacklisted) {
@@ -190,13 +199,17 @@ export async function POST(
           continue;
         }
 
+        const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+
         let subject = spinContent(campaign.subject || "").trim();
         subject = subject.replace(/\[Tên\]/g, recipient.name || "Học viên");
         subject = subject.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
+        subject = subject.replace(/\[NgauNhien\]/g, randomCode).replace(/\[Random\]/g, randomCode);
 
         let rawHtml = spinContent(campaign.htmlContent || "").trim();
         rawHtml = rawHtml.replace(/\[Tên\]/g, recipient.name || "bạn");
         rawHtml = rawHtml.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
+        rawHtml = rawHtml.replace(/\[NgauNhien\]/g, randomCode).replace(/\[Random\]/g, randomCode);
         
         if (!rawHtml.includes('<p>') && !rawHtml.includes('<br')) {
           rawHtml = rawHtml.replace(/\n/g, '<br/>');
@@ -330,6 +343,7 @@ export async function POST(
           }
         });
         await upsertSenderLog(sender.id, 'failedCount', 1);
+        await incrementSenderSentCount(sender.id);
       }
     }
 
@@ -350,9 +364,13 @@ export async function POST(
     if (isCompleted) {
       campaignStats.delete(campaignId);
 
-      const exportResult = await exportCampaignToSheet(campaignId, campaign.title);
-      if (exportResult?.sheetUrl) {
-        console.log(`[EmailCampaign] 📊 Sheet kết quả: ${exportResult.sheetUrl}`);
+      let sheetUrl: string | undefined;
+      if (campaign.notificationType !== "VERIFY_TEST") {
+        const exportResult = await exportCampaignToSheet(campaignId, campaign.title);
+        sheetUrl = exportResult?.sheetUrl || undefined;
+        if (exportResult?.sheetUrl) {
+          console.log(`[EmailCampaign] 📊 Sheet kết quả: ${exportResult.sheetUrl}`);
+        }
       }
 
       if (config.enableTelegramAlert) {
@@ -363,7 +381,7 @@ export async function POST(
           sent: allRecipients.length,
           success: stats.success,
           failed: stats.failed,
-          sheetUrl: exportResult?.sheetUrl || undefined,
+          sheetUrl,
         });
       }
     }

@@ -42,25 +42,30 @@ async function main() {
   console.log('Seeding assistant guides...')
 
   for (const guide of guides) {
-    await prisma.assistantGuide.upsert({
-      where: { pagePath: guide.pagePath },
-      update: {
-        title: guide.title,
-        script: guide.script,
-        textContent: guide.textContent,
-        videoUrl: guide.videoUrl,
-        isActive: true,
-      },
-      create: {
-        pagePath: guide.pagePath,
-        title: guide.title,
-        script: guide.script,
-        textContent: guide.textContent,
-        videoUrl: guide.videoUrl,
-        isActive: true,
-      },
-    })
-    console.log(`  ✓ Guide for "${guide.pagePath}"`)
+    const existing = await prisma.assistantGuide.findFirst({ where: { pagePath: guide.pagePath } })
+    if (existing) {
+      await prisma.assistantGuide.update({
+        where: { id: existing.id },
+        data: {
+          title: guide.title,
+          script: guide.script,
+          textContent: guide.textContent,
+          videoUrl: guide.videoUrl,
+          isActive: true,
+        },
+      })
+    } else {
+      await prisma.assistantGuide.create({
+        data: {
+          pagePath: guide.pagePath,
+          title: guide.title,
+          script: guide.script,
+          textContent: guide.textContent,
+          videoUrl: guide.videoUrl,
+          isActive: true,
+        },
+      })
+    }
   }
 
   console.log('Seeding assistant guides completed!')

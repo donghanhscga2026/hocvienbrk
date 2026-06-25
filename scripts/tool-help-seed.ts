@@ -5,12 +5,13 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function seedToolHelp() {
-  console.log('Seeding ToolHelp...')
+  console.log('Seeding ToolHelp into AssistantGuide...')
 
-  const genealogyHelp = {
-    toolSlug: 'genealogy',
+  const genealogyGuide = {
+    pagePath: '/tools/genealogy',
     title: 'Hướng dẫn Nhân mạch',
-    content: [
+    toolSlug: 'genealogy',
+    sections: [
       {
         type: 'color_legend',
         title: 'Ý nghĩa màu sắc',
@@ -42,22 +43,22 @@ async function seedToolHelp() {
         ]
       }
     ],
-    order: 1,
     isActive: true
   }
 
-  // Check if exists
-  const existing = await prisma.toolHelp.findUnique({
+  const existing = await prisma.assistantGuide.findFirst({
     where: { toolSlug: 'genealogy' }
   })
 
   if (!existing) {
-    await prisma.toolHelp.create({
-      data: genealogyHelp
-    })
-    console.log('Created: genealogy help')
+    await prisma.assistantGuide.create({ data: genealogyGuide })
+    console.log('Created: genealogy tool guide')
   } else {
-    console.log('Already exists: genealogy help')
+    await prisma.assistantGuide.update({
+      where: { id: existing.id },
+      data: genealogyGuide
+    })
+    console.log('Updated: genealogy tool guide')
   }
 
   console.log('Seed completed!')

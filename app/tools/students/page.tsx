@@ -152,6 +152,14 @@ export default function ToolsStudentsPage() {
     fetchStudents(0)
   }, [searchQuery, selectedRole, sortBy, sortOrder, selectedCourseId])
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const courseIdParam = params.get('courseId')
+    if (courseIdParam) {
+      setSelectedCourseId(Number(courseIdParam))
+    }
+  }, [])
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchStudents(0)
@@ -192,28 +200,42 @@ export default function ToolsStudentsPage() {
       <div className="shrink-0 bg-white border-b shadow-sm">
         <div className="p-4 space-y-3">
           {isAdmin ? (
-            <div className="flex gap-2">
-              {Object.entries(roleConfig).map(([key, config]) => {
-                const Icon = config.icon
-                const isSelected = selectedRole === key
-                const count = roleCounts[key] ?? 0
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleRoleChange(key)}
-                    className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl transition-all border-2 ${
-                      isSelected
-                        ? `${config.bgColor} ${config.textColor} shadow-lg ring-2 ring-yellow-400 ring-offset-1 border-yellow-400`
-                        : `${config.bgColor} ${config.textColor} border-transparent hover:shadow-md`
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[9px] font-black uppercase tracking-tight leading-tight">{config.label}</span>
-                    <span className="text-[10px] font-bold">{count}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <>
+              <div className="flex gap-2">
+                {Object.entries(roleConfig).map(([key, config]) => {
+                  const Icon = config.icon
+                  const isSelected = selectedRole === key
+                  const count = roleCounts[key] ?? 0
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => handleRoleChange(key)}
+                      className={`flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl transition-all border-2 ${
+                        isSelected
+                          ? `${config.bgColor} ${config.textColor} shadow-lg ring-2 ring-yellow-400 ring-offset-1 border-yellow-400`
+                          : `${config.bgColor} ${config.textColor} border-transparent hover:shadow-md`
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="text-[9px] font-black uppercase tracking-tight leading-tight">{config.label}</span>
+                      <span className="text-[10px] font-bold">{count}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {courses.length > 0 && (
+                <select
+                  value={selectedCourseId ?? ''}
+                  onChange={(e) => setSelectedCourseId(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Tất cả các khóa</option>
+                  {courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.name_lop}</option>
+                  ))}
+                </select>
+              )}
+            </>
           ) : (
             <div className="flex gap-2">
               <div className="flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl bg-gray-100 text-gray-600 border-2 border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 shadow-lg">

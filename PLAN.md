@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật & Lịch sử cập nhật HocVien-BRK
-> Cập nhật lần cuối: **2026-06-25**  
+> Cập nhật lần cuối: **2026-06-25** (phiên 2: Hợp nhất Trợ lý ảo)  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -210,4 +210,89 @@ npx prisma db push
 
 # Chạy test kiểm tra
 npm run test
+```
+
+---
+
+## ✅ Hợp nhất Trợ lý ảo — Hệ thống trợ giúp tình huống (2026-06-25)
+
+### Mục tiêu
+Hợp nhất 2 hệ thống trợ giúp song song (Floating Assistant + Tool Help "Hỗ trợ") thành 1 Trợ lý tình huống duy nhất, gọn nhẹ, thông minh.
+
+### Kiến trúc mới
+```
+AssistantGuide (duy nhất)
+  ├── type="PAGE" → hướng dẫn trang (text, video, TTS)
+  └── toolSlug set → hướng dẫn tool (sections: color_legend, features, tips)
+
+AssistantPopup (1 popup duy nhất)
+  ├── Tab "Hướng dẫn" — textContent + video + TTS (từ PAGE guide)
+  └── Tab "Tính năng" — color_legend + features + tips (từ TOOL guide)
+
+Cơ chế tự động (Toast)
+  └── Lần đầu vào trang → sau 2s hiện toast nhỏ góc phải → 5s tự tắt
+  └── Đã xem → chỉ hiện ❓, không toast
+  └── Lưu vết bằng localStorage
+```
+
+### Các file đã sửa
+
+#### `prisma/schema.prisma`
+- Xóa model `ToolHelp` (1017-1028)
+- Mở rộng `AssistantGuide`: thêm `toolSlug String?`, `sections Json?`, `pagePath` chuyển `String?` (nullable)
+
+#### `app/api/assistant-guide/route.ts`
+- GET: khi có `pagePath`, trả về cả `{ pageGuide, toolGuide }` (tự động tìm toolGuide theo toolSlug từ path)
+- POST: hỗ trợ upsert theo pagePath hoặc toolSlug
+
+#### `components/assistant/AssistantProvider.tsx`
+- Thêm `toolGuideData` state, `activeTab`, `showToast`
+- Fetch API → nhận cả pageGuide + toolGuide
+- Auto-toast: sau 2s nếu có guide + chưa xem → toast 5s
+- Lưu vết bằng localStorage `assist_toast_seen`
+- Toast component (`AssistantToast`) dạng slide-up
+
+#### `components/assistant/AssistantPopup.tsx`
+- Thêm tab navigation khi có cả pageGuide + toolGuide
+- Tab "Hướng dẫn": textContent, video, TTS
+- Tab "Tính năng": sections (color_legend, features, tips) — 8 màu
+- Nếu chỉ có 1 loại → hiển thị full không tab
+
+#### `components/layout/MainHeader.tsx`
+- Xóa nút "Hỗ trợ" + inline modal (~90 dòng)
+- Xóa import `help-actions`, `HelpCircle`, `X`
+- Chỉ giữ `AssistantHeaderIcon` (❓)
+
+#### `components/tools/ToolHeader.tsx`
+- Xóa nút "Hỗ trợ" + inline modal (~90 dòng)
+- Xóa import `help-actions`, `useState`, `useEffect`, `HelpCircle`, `X`
+
+#### `scripts/tool-help-seed.ts`
+- Chuyển từ `prisma.toolHelp` → `prisma.assistantGuide`
+- Seed genealogy tool guide với `toolSlug`, `sections`
+
+#### `prisma/seed-assistant-guide.ts`
+- Chuyển `findUnique` → `findFirst` (vì pagePath không còn @unique)
+
+#### File đã xóa
+- `app/actions/help-actions.ts` (không còn dùng)
+- `components/help/HelpModal.tsx` (orphan)
+
+### Kiến trúc tổng thể sau merge
+```
+providers.tsx
+  └── AssistantProvider (global)
+       ├── fetchGuide(pathname) → { pageGuide, toolGuide }
+       ├── Auto toast (lần đầu vào trang)
+       ├── AssistantHeaderIcon (❓) trong MainHeader
+       └── AssistantPopup (tabs: Hướng dẫn / Tính năng)
+```
+
+### Trạng thái
+- ✅ 1 popup duy nhất cho mọi trang
+- ✅ Tabs: Hướng dẫn + Tính năng
+- ✅ Auto-toast lần đầu vào trang (2s delay, 5s tự tắt)
+- ✅ Lưu vết localStorage
+- ✅ Build sạch TypeScript (0 lỗi)
+- ✅ Xóa sạch code duplicate + orphan
 ```

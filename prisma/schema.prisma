@@ -1014,19 +1014,6 @@ model Tool {
   @@index([slug])
 }
 
-model ToolHelp {
-  id        Int      @id @default(autoincrement())
-  toolSlug  String   @unique
-  title     String
-  content   Json
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([toolSlug])
-}
-
 model SiteProfile {
   id                   Int                @id @default(autoincrement())
   userId               Int?               @unique
@@ -1122,17 +1109,20 @@ model AccountAssistantStep {
 
 model AssistantGuide {
   id            Int      @id @default(autoincrement())
-  pagePath      String   @unique
+  pagePath      String?
   title         String
   script        String?
   textContent   String?
   videoUrl      String?
   agentVideoUrl String?
+  toolSlug      String?
+  sections      Json?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([pagePath])
+  @@index([toolSlug])
 }
 
 enum CampaignStatus {
