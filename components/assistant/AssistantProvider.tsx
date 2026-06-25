@@ -2,9 +2,9 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
-import FloatingAssistant from './FloatingAssistant'
+import AssistantPopup from './AssistantPopup'
 
-export type AssistantMode = 'minimized' | 'floating' | 'popup'
+export type DisplayMode = 'icon' | 'avatar'
 
 export interface AssistantGuideData {
   id: number
@@ -13,15 +13,14 @@ export interface AssistantGuideData {
   script: string | null
   textContent: string | null
   videoUrl: string | null
+  agentVideoUrl: string | null
 }
 
 interface AssistantContextType {
-  mode: AssistantMode
-  setMode: (mode: AssistantMode) => void
-  position: { x: number; y: number }
-  setPosition: (pos: { x: number; y: number }) => void
+  isOpen: boolean
+  setIsOpen: (open: boolean) => void
+  displayMode: DisplayMode
   guideData: AssistantGuideData | null
-  fetchGuide: (pagePath: string) => Promise<void>
 }
 
 const AssistantContext = createContext<AssistantContextType | null>(null)
@@ -34,8 +33,8 @@ export function useFloatingAssistant() {
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const [mode, setMode] = useState<AssistantMode>('minimized')
-  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [isOpen, setIsOpen] = useState(false)
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('icon')
   const [guideData, setGuideData] = useState<AssistantGuideData | null>(null)
 
   const fetchGuide = useCallback(async (pagePath: string) => {
@@ -56,10 +55,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     fetchGuide(pathname)
   }, [pathname, fetchGuide])
 
+  useEffect(() => {
+    fetch('/api/assistant-guide/config').then(r => r.json()).then(json => {
+      if (json.success) setDisplayMode(json.data.displayMode)
+    }).catch(() => {})
+  }, [])
+
   return (
-    <AssistantContext.Provider value={{ mode, setMode, position, setPosition, guideData, fetchGuide }}>
+    <AssistantContext.Provider value={{ isOpen, setIsOpen, displayMode, guideData }}>
       {children}
-      <FloatingAssistant />
+      {isOpen && <AssistantPopup />}
     </AssistantContext.Provider>
   )
 }

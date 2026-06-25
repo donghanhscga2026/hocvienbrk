@@ -15,12 +15,12 @@ function speak(text: string) {
 }
 
 export default function AssistantPopup() {
-  const { guideData, setMode } = useFloatingAssistant()
+  const { guideData, setIsOpen } = useFloatingAssistant()
 
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-      onClick={() => setMode('floating')}
+      onClick={() => setIsOpen(false)}
     >
       <div
         className="bg-white w-[80vw] max-w-4xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
@@ -45,7 +45,7 @@ export default function AssistantPopup() {
               </button>
             )}
             <button
-              onClick={() => setMode('floating')}
+              onClick={() => setIsOpen(false)}
               className="p-2 rounded-lg hover:bg-white/20 transition-colors"
               title="Đóng"
             >
@@ -62,14 +62,12 @@ export default function AssistantPopup() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Text content */}
               {guideData.textContent && (
                 <div className="prose prose-sm max-w-none text-slate-700 leading-relaxed whitespace-pre-line">
                   {guideData.textContent}
                 </div>
               )}
 
-              {/* Video */}
               {guideData.videoUrl && (
                 <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
                   <video
@@ -87,7 +85,7 @@ export default function AssistantPopup() {
         {/* Footer */}
         <div className="px-6 py-3 bg-slate-50 border-t shrink-0">
           <button
-            onClick={() => setMode('floating')}
+            onClick={() => setIsOpen(false)}
             className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors"
           >
             Đóng
