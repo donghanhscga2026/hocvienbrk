@@ -1121,15 +1121,16 @@ model AccountAssistantStep {
 }
 
 model AssistantGuide {
-  id          Int      @id @default(autoincrement())
-  pagePath    String   @unique
-  title       String
-  script      String?
-  textContent String?
-  videoUrl    String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  pagePath      String   @unique
+  title         String
+  script        String?
+  textContent   String?
+  videoUrl      String?
+  agentVideoUrl String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([pagePath])
 }

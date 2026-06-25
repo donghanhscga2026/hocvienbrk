@@ -17,6 +17,7 @@ BRK - Ngân hàng Phước Báu là nền tảng đào tạo trực tuyến, nơ
 
 Hãy sử dụng menu điều hướng phía trên để bắt đầu!`,
     videoUrl: null,
+    agentVideoUrl: null,
   },
   {
     pagePath: '/tools',
@@ -33,6 +34,7 @@ Hãy sử dụng menu điều hướng phía trên để bắt đầu!`,
 
 Chọn một công cụ từ menu bên trái hoặc danh sách bên dưới.`,
     videoUrl: null,
+    agentVideoUrl: null,
   },
 ]
 
