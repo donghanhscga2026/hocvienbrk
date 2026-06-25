@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
+import EmailVerifierTab from './EmailVerifierTab'
 
 interface Campaign {
   id: number
@@ -524,18 +525,19 @@ function SenderPerformanceTab() {
 export default function ClientContent({ initialCampaigns, isTeacher }: { initialCampaigns: Campaign[]; isTeacher?: boolean }) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const initialTab = tabParam === 'senders' ? 'senders' : tabParam === 'settings' ? 'settings' : tabParam === 'performance' ? 'performance' : 'campaigns'
-  const [activeTab, setActiveTab] = useState<'campaigns' | 'senders' | 'settings' | 'performance'>(initialTab)
+  const initialTab = tabParam === 'senders' ? 'senders' : tabParam === 'settings' ? 'settings' : tabParam === 'performance' ? 'performance' : tabParam === 'verifier' ? 'verifier' : 'campaigns'
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'senders' | 'settings' | 'performance' | 'verifier'>(initialTab)
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex">
-        <button onClick={() => setActiveTab('campaigns')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'campaigns' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📋 Chiến dịch</button>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex flex-wrap gap-y-1">
+        <button onClick={() => setActiveTab('campaigns')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'campaigns' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📋 Chiến dịch</button>
         {!isTeacher && (
           <>
-            <button onClick={() => setActiveTab('senders')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'senders' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📡 Tài Khoản</button>
-            <button onClick={() => setActiveTab('settings')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>⚙️ Cấu Hình</button>
-            <button onClick={() => setActiveTab('performance')} className={`flex-1 py-3 rounded-xl font-bold text-xs ${activeTab === 'performance' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📊 Hiệu suất</button>
+            <button onClick={() => setActiveTab('senders')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'senders' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📡 Tài Khoản</button>
+            <button onClick={() => setActiveTab('settings')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'settings' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>⚙️ Cấu Hình</button>
+            <button onClick={() => setActiveTab('performance')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'performance' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>📊 Hiệu suất</button>
+            <button onClick={() => setActiveTab('verifier')} className={`flex-1 min-w-[80px] py-3 rounded-xl font-bold text-xs ${activeTab === 'verifier' ? 'bg-orange-500 text-white' : 'text-gray-500'}`}>🔍 Xác thực Email</button>
           </>
         )}
       </div>
@@ -544,6 +546,7 @@ export default function ClientContent({ initialCampaigns, isTeacher }: { initial
       {!isTeacher && activeTab === 'senders' && <SendersTab />}
       {!isTeacher && activeTab === 'settings' && <SettingsTab />}
       {!isTeacher && activeTab === 'performance' && <SenderPerformanceTab />}
+      {!isTeacher && activeTab === 'verifier' && <EmailVerifierTab />}
     </>
   )
 }
