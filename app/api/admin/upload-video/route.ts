@@ -42,7 +42,7 @@ export async function POST(request: Request) {
           folder: 'account-assistant',
           public_id: `vid_${Date.now()}`,
           eager: [
-            { width: 300, crop: 'fill', quality: 'auto' },
+            { width: 200, crop: 'fill', quality: 'auto' },
           ],
           eager_async: false,
         },

@@ -214,16 +214,16 @@ function StepCard({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">Video Agent (MP4/YouTube URL)</label>
           <div className="flex gap-2">
-            <input
-              type="text"
+            <textarea
+              rows={2}
               value={form.agentVideoUrl || ''}
               onChange={e => setForm(f => ({ ...f, agentVideoUrl: e.target.value }))}
               placeholder="URL video..."
-              className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
+              className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-xs focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 resize-none"
             />
             <input
               type="file"
@@ -253,12 +253,12 @@ function StepCard({
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">Video Hướng dẫn (MP4/YouTube URL)</label>
           <div className="flex gap-2">
-            <input
-              type="text"
+            <textarea
+              rows={2}
               value={form.guideVideoUrl || ''}
               onChange={e => setForm(f => ({ ...f, guideVideoUrl: e.target.value }))}
               placeholder="URL video..."
-              className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400"
+              className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-xs focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 resize-none"
             />
             <input
               type="file"

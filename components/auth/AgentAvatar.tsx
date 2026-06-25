@@ -31,7 +31,7 @@ export default function AgentAvatar({ videoUrl }: AgentAvatarProps) {
 
   return (
     <div className="relative shrink-0">
-      <div className="w-[150px] h-[150px] rounded-full overflow-hidden border-4 border-brk-primary shadow-lg shadow-brk-primary/20 bg-brk-background/20 flex items-center justify-center">
+      <div className="w-[100px] h-[100px] rounded-full overflow-hidden border-4 border-brk-primary shadow-lg shadow-brk-primary/20 bg-brk-background/20 flex items-center justify-center">
         {videoUrl ? (
           <div className="relative w-full h-full">
             {loading && (
@@ -50,7 +50,7 @@ export default function AgentAvatar({ videoUrl }: AgentAvatarProps) {
             />
           </div>
         ) : (
-          <User className="w-16 h-16 text-brk-muted/40" />
+          <User className="w-10 h-10 text-brk-muted/40" />
         )}
       </div>
       {videoUrl && (
@@ -58,18 +58,18 @@ export default function AgentAvatar({ videoUrl }: AgentAvatarProps) {
           {videoEnded && (
             <button
               onClick={handleReplay}
-              className="absolute -bottom-1 -left-1 z-20 w-8 h-8 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
+              className="absolute -bottom-1 -left-1 z-20 w-6 h-6 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
               title="Phát lại video"
             >
-              <Play className="w-4 h-4" />
+              <Play className="w-3 h-3" />
             </button>
           )}
           <button
             onClick={() => setMuted(!muted)}
-            className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
+            className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brk-surface border-2 border-brk-primary flex items-center justify-center text-brk-on-surface hover:bg-brk-primary/20 transition-colors shadow-md"
             title={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
           >
-            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
           </button>
         </>
       )}
