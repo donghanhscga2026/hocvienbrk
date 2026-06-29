@@ -101,9 +101,6 @@ export default function MainHeader({ title }: MainHeaderProps) {
                         )}
                     </div>
 
-                    <h1 className="text-sm font-bold uppercase absolute left-1/2 -translate-x-1/2 truncate max-w-[40%]">
-                        {title}
-                    </h1>
 
                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                         <AssistantHeaderIcon />
