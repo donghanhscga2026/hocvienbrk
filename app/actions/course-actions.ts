@@ -53,8 +53,8 @@ export async function enrollInCourseAction(courseId: number) {
             // Bypass phi_coc, chuyển thẳng trạng thái ACTIVE
             effectivePhiCoc = 0
             isLibAllowed = true
-        } else {
-            // Kiểm tra xem user có active course 1 không (Chỉ áp dụng khóa thường/Challenge)
+        } else if (course.type !== 'SYS') {
+            // Kiểm tra xem user có active course 1 không (Chỉ áp dụng khóa thường/Challenge, không áp dụng SYS)
             const vipEnrollment = await prisma.enrollment.findFirst({
                 where: {
                     userId,
@@ -80,8 +80,8 @@ export async function enrollInCourseAction(courseId: number) {
             }
         })
 
-        // Auto-sync vào hệ thống YTB (onSystem=3) nếu là khóa của teacher 327
-        if (course.teacherId === 327) {
+        // Auto-sync vào hệ thống YTB (onSystem=3) nếu là khóa của teacher 327 (không áp dụng SYS)
+        if (course.teacherId === 327 && course.type !== 'SYS') {
             const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
             await syncUserToYtbSystem(userId, course.teacherId)
         }

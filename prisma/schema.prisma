@@ -52,6 +52,8 @@ model User {
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   profileMemberships           SiteProfileMember[]
+  brkWallet                    BrkWallet?
+  brkSystemsCreated            SystemTree[]
 
   @@index([email])
   @@index([phone])
@@ -355,6 +357,7 @@ model Course {
   enrollments   Enrollment[]
   landingPages  LandingPage[]
   lessons       Lesson[]
+  systemTree    SystemTree?
 
   @@index([teacherId])
 }
@@ -505,7 +508,23 @@ model SystemTree {
   onSystem   Int      @unique
   createdAt  DateTime @default(now())
   nameSystem String   @map("name_system")
+  courseId   Int?     @unique
+  course     Course?  @relation(fields: [courseId], references: [id])
+  creatorId  Int?
+  creator    User?    @relation(fields: [creatorId], references: [id])
+  fee        Decimal  @default(1) @db.Decimal(12, 2)
+  durationDays    Int  @default(30)
+  graceDays       Int  @default(7)
+  returnPct       Decimal @default(21.0) @db.Decimal(5, 2)
+  revenueSharePct Decimal @default(2.0) @db.Decimal(5, 2)
+  revenueShareIntervalDays Int @default(3)
+  pointsPerDollar Decimal @default(17) @db.Decimal(10, 2)
+  brkLevelConfigs BrkLevelConfig[]
+  brkRevenuePools BrkRevenuePool[]
+  systems         System[]
 
+  @@index([courseId])
+  @@index([creatorId])
   @@map("system_tree")
 }
 
@@ -515,9 +534,19 @@ model System {
   onSystem             Int
   refSysId             Int             @default(0)
   createdAt            DateTime        @default(now())
+  status               BrkMemberStatus @default(PENDING)
+  activatedAt          DateTime?
+  expiresAt            DateTime?
+  gracePeriodEnd       DateTime?
+  level                Int             @default(1)
+  totalPoints          Decimal         @default(0) @db.Decimal(14, 2)
+  giftClaimed          Boolean         @default(false)
   user                 User            @relation(fields: [userId], references: [id])
+  systemTree           SystemTree      @relation(fields: [onSystem], references: [onSystem])
   closuresAsAncestor   SystemClosure[] @relation("SystemClosureAncestor")
   closuresAsDescendant SystemClosure[] @relation("SystemClosureDescendant")
+  brkLevelUpRecords    BrkLevelUpRecord[]
+  brkReferralBonuses   BrkReferralBonus[]
 
   @@unique([userId, onSystem])
   @@index([userId])
@@ -540,6 +569,127 @@ model SystemClosure {
   @@index([systemId])
   @@index([depth])
   @@map("system_closure")
+}
+
+model BrkLevelConfig {
+  id              Int       @id @default(autoincrement())
+  systemId        Int
+  level           Int
+  pointsRequired  Decimal   @db.Decimal(14, 2)
+  personalFeePct  Decimal   @db.Decimal(5, 2)
+  giftValue       Int       @default(0)
+  timeLimitDays   Int?
+  systemTree      SystemTree @relation(fields: [systemId], references: [onSystem])
+  branchReqs      BrkLevelBranchReq[]
+
+  @@unique([systemId, level])
+  @@index([systemId])
+  @@map("brk_level_config")
+}
+
+model BrkLevelBranchReq {
+  id          Int            @id @default(autoincrement())
+  configId    Int
+  branchLevel Int
+  count       Int
+  config      BrkLevelConfig @relation(fields: [configId], references: [id])
+
+  @@index([configId])
+  @@map("brk_level_branch_req")
+}
+
+model BrkWallet {
+  id             Int       @id @default(autoincrement())
+  userId         Int       @unique
+  balance        Decimal   @default(0) @db.Decimal(14, 2)
+  totalEarned    Decimal   @default(0) @db.Decimal(14, 2)
+  totalWithdrawn Decimal   @default(0) @db.Decimal(14, 2)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id])
+  transactions   BrkTransaction[]
+
+  @@index([userId])
+  @@map("brk_wallet")
+}
+
+model BrkTransaction {
+  id            Int               @id @default(autoincrement())
+  walletId      Int
+  amount        Decimal           @db.Decimal(14, 2)
+  type          BrkTransactionType
+  description   String
+  refId         String?
+  balanceBefore Decimal           @db.Decimal(14, 2)
+  balanceAfter  Decimal           @db.Decimal(14, 2)
+  createdAt     DateTime          @default(now())
+  wallet        BrkWallet         @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, createdAt])
+  @@index([type])
+  @@map("brk_transaction")
+}
+
+model BrkRevenuePool {
+  id             Int                  @id @default(autoincrement())
+  systemId       Int
+  roundNumber    Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  totalRevenue   Decimal              @db.Decimal(14, 2)
+  poolAmount     Decimal              @db.Decimal(14, 2)
+  qualifiedCount Int                  @default(0)
+  status         BrkRevenuePoolStatus @default(PENDING)
+  distributedAt  DateTime?
+  createdAt      DateTime             @default(now())
+  systemTree     SystemTree           @relation(fields: [systemId], references: [onSystem])
+  awards         BrkRevenueAward[]
+
+  @@unique([systemId, roundNumber])
+  @@index([systemId])
+  @@map("brk_revenue_pool")
+}
+
+model BrkRevenueAward {
+  id     Int            @id @default(autoincrement())
+  poolId Int
+  userId Int
+  amount Decimal        @db.Decimal(14, 2)
+  paid   Boolean        @default(false)
+  pool   BrkRevenuePool @relation(fields: [poolId], references: [id])
+
+  @@index([poolId])
+  @@index([userId])
+  @@map("brk_revenue_award")
+}
+
+model BrkLevelUpRecord {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  onSystem     Int
+  fromLevel    Int
+  toLevel      Int
+  promotedAt   DateTime @default(now())
+  giftClaimed  Boolean  @default(false)
+  giftClaimedAt DateTime?
+  system       System   @relation(fields: [userId, onSystem], references: [userId, onSystem])
+
+  @@index([userId, onSystem])
+  @@map("brk_level_up_record")
+}
+
+model BrkReferralBonus {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  onSystem  Int
+  f1Count   Int      @default(2)
+  courseId  Int?
+  claimed   Boolean  @default(false)
+  claimedAt DateTime?
+  system    System   @relation(fields: [userId, onSystem], references: [userId, onSystem])
+
+  @@index([userId, onSystem])
+  @@map("brk_referral_bonus")
 }
 
 model TCAMember {
@@ -1157,6 +1307,7 @@ enum CourseType {
   NORMAL
   CHALLENGE
   LIB
+  SYS
 }
 
 enum AffiliateStatus {
@@ -1232,6 +1383,29 @@ enum ProductType {
 enum SystemType {
   TCA
   KTC
+}
+
+enum BrkMemberStatus {
+  PENDING
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+enum BrkTransactionType {
+  RETURN_FEE
+  REVENUE_SHARE
+  COMMISSION
+  LEVEL_BONUS
+  REFERRAL_BONUS
+  WITHDRAWAL
+  ADJUSTMENT
+}
+
+enum BrkRevenuePoolStatus {
+  PENDING
+  DISTRIBUTED
+  CANCELLED
 }
 
 enum PaymentStatus {

@@ -126,15 +126,29 @@ export async function verifyPaymentAction(
         await syncUserToYtbSystem(enrollment.userId, enrollment.course.teacherId)
     }
 
-    // Xử lý affiliate commission cho người giới thiệu
-    const commissionResult = await processEnrollmentCommission(
-      enrollment.userId,
-      enrollmentId,
-      enrollment.payment?.amount || 0
-    )
-    
-    if (commissionResult.success) {
-      console.log('[Payment] Affiliate commission processed:', commissionResult)
+    // Kích hoạt BRK member nếu course là type SYS
+    if (enrollment.course.type === 'SYS') {
+      const brkTree = await prisma.systemTree.findFirst({
+        where: { courseId: enrollment.courseId }
+      })
+      if (brkTree) {
+        const { activateBrkMember } = await import("@/lib/brk/activation-service")
+        await activateBrkMember(enrollment.userId, brkTree.onSystem)
+        console.log(`[BRK] Activated user ${enrollment.userId} in system ${brkTree.onSystem}`)
+      }
+    }
+
+    // Xử lý affiliate commission cho người giới thiệu (chỉ áp dụng cho course không phải SYS)
+    if (enrollment.course.type !== 'SYS') {
+      const commissionResult = await processEnrollmentCommission(
+        enrollment.userId,
+        enrollmentId,
+        enrollment.payment?.amount || 0
+      )
+      
+      if (commissionResult.success) {
+        console.log('[Payment] Affiliate commission processed:', commissionResult)
+      }
     }
 
     revalidatePath('/')

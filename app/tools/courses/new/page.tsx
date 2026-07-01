@@ -382,6 +382,7 @@ function CreateCourseContent() {
                                 <option value="NORMAL">Bình thường</option>
                                 <option value="CHALLENGE">Thử thách</option>
                                 <option value="LIB">Tài liệu (LIB)</option>
+                                <option value="SYS">Hệ thống (SYS)</option>
                             </select>
                         </div>
                         <div className="space-y-1.5">

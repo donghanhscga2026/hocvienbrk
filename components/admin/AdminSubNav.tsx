@@ -2,12 +2,12 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LucideIcon } from 'lucide-react'
+import * as LucideIcons from 'lucide-react'
 
 interface NavItem {
   label: string
   href: string
-  icon?: LucideIcon | any
+  icon?: string
 }
 
 interface AdminSubNavProps {
@@ -22,7 +22,7 @@ export function AdminSubNav({ title, items }: AdminSubNavProps) {
     <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="flex items-center gap-2 p-3 overflow-x-auto">
         {items.map((item) => {
-          const Icon = item.icon
+          const Icon = item.icon ? (LucideIcons as any)[item.icon] : null
           const active = pathname === item.href
           
           return (
