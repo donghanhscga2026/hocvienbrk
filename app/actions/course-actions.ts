@@ -18,16 +18,16 @@ export async function enrollInCourseAction(courseId: number) {
 
         const course = await prisma.course.findUnique({
             where: { id: courseId },
-            select: { 
+            select: {
                 phi_coc: true,
                 id_khoa: true,
                 name_lop: true,
-                stk: true,
-                name_stk: true,
-                bank_stk: true,
                 noidung_email: true,
                 type: true,
-                teacherId: true
+                teacherId: true,
+                teacherBankAccount: {
+                    select: { accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true }
+                }
             }
         })
 
@@ -42,14 +42,14 @@ export async function enrollInCourseAction(courseId: number) {
         // Xử lý riêng cho loại khóa học LIB
         let effectivePhiCoc = course.phi_coc
         let isLibAllowed = false
-        
+
         if (course.type === 'LIB') {
             if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")
             const libAccess = await prisma.courseLibAccess.findUnique({
                 where: { courseId_email: { courseId, email: user.email } }
             })
             if (!libAccess) throw new Error("Bạn chưa được cấp quyền truy cập tài liệu này. Vui lòng liên hệ Admin.")
-            
+
             // Bypass phi_coc, chuyển thẳng trạng thái ACTIVE
             effectivePhiCoc = 0
             isLibAllowed = true
@@ -91,9 +91,9 @@ export async function enrollInCourseAction(courseId: number) {
         if (isAutoActive) {
             // Gửi thông báo kích hoạt MIỄN PHÍ
             const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ</b>\n\n` +
-                             `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
-                             `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
-                             `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+                `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
+                `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
+                `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
             await sendTelegram(msgAdmin, 'ACTIVATE');
 
             if (user?.email) {
@@ -101,21 +101,21 @@ export async function enrollInCourseAction(courseId: number) {
             }
         }
 
-        if (effectivePhiCoc > 0 && course.stk && course.name_stk) {
+        const bankAcc = course.teacherBankAccount
+        if (effectivePhiCoc > 0 && bankAcc?.accountNumber && bankAcc?.accountHolder) {
             let qrCodeUrl = null
             let transferContent = null
 
-            // Tạo QR code nếu có đủ thông tin
-            if (user?.phone && course.stk) {
+            if (user?.phone && bankAcc.accountNumber) {
                 try {
                     const qrResult = await createPaymentQR({
                         phone: user.phone,
                         userId: userId,
                         courseId: courseId,
                         courseCode: course.id_khoa,
-                        accountNo: course.stk,
-                        accountName: course.name_stk,
-                        acqId: course.bank_stk || 'SACOMBANK',
+                        accountNo: bankAcc.accountNumber,
+                        accountName: bankAcc.accountHolder,
+                        acqId: bankAcc.bankName || 'SACOMBANK',
                         amount: effectivePhiCoc
                     })
                     qrCodeUrl = qrResult.qrCodeUrl
@@ -125,12 +125,10 @@ export async function enrollInCourseAction(courseId: number) {
                 }
             }
 
-            // Fallback content nếu không tạo được qua API
             if (!transferContent) {
                 const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
                 transferContent = `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase()
             }
-
 
             await prisma.payment.create({
                 data: {
@@ -139,9 +137,9 @@ export async function enrollInCourseAction(courseId: number) {
                     status: 'PENDING',
                     transferContent: transferContent,
                     qrCodeUrl: qrCodeUrl,
-                    bankName: course.bank_stk || 'Sacombank',
-                    accountNumber: course.stk,
-                    phone: user?.phone // Lưu thêm phone vào Payment record
+                    bankName: bankAcc.bankName || 'Sacombank',
+                    accountNumber: bankAcc.accountNumber,
+                    phone: user?.phone
                 }
             })
         }
@@ -191,7 +189,7 @@ export async function confirmStartDateAction(courseId: number, date: any) {
         try {
             revalidatePath(`/courses`)
             revalidatePath(`/courses/${courseId}/learn`)
-        } catch (e) {}
+        } catch (e) { }
 
         return { success: true }
     } catch (error: any) {
@@ -236,9 +234,9 @@ export async function saveVideoProgressAction({
         })
 
         const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as any ?? {})
-        
-        const updatedScores = { 
-            ...existingScores, 
+
+        const updatedScores = {
+            ...existingScores,
             video: vidScore,
             lastVideoIndex: lastIndex ?? existingScores.lastVideoIndex ?? 0,
             playlist: playlistScores ?? existingScores.playlist ?? null
@@ -300,7 +298,7 @@ export async function submitAssignmentAction({
                 const deadlineLocal = new Date(deadlineStr);
                 deadlineLocal.setDate(deadlineLocal.getDate() + (lessonOrder - 1));
                 deadlineLocal.setHours(23, 59, 59, 999);
-                
+
                 const isCurrentlyOnTime = nowLocal.getTime() <= deadlineLocal.getTime();
 
                 if (isUpdate) {
@@ -342,7 +340,7 @@ export async function submitAssignmentAction({
                 select: { scores: true, maxTime: true, duration: true }
             })
             const scoresJson = (currentProg?.scores as any) || {}
-            
+
             // ƯU TIÊN 1: Tính từ Playlist detail nếu có
             if (scoresJson.playlist) {
                 let totalMax = 0
@@ -353,7 +351,7 @@ export async function submitAssignmentAction({
                 })
                 const percent = totalDur > 0 ? totalMax / totalDur : 0
                 videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
-            } 
+            }
             // ƯU TIÊN 2: Nếu mất playlist detail nhưng có maxTime/duration tổng ở ngoài (trường hợp bị ghi đè)
             else if (currentProg?.duration && currentProg.duration > 0) {
                 const percent = currentProg.maxTime / currentProg.duration
@@ -396,7 +394,7 @@ export async function submitAssignmentAction({
                 const { sendTelegram } = await import("@/lib/notifications")
                 const enrollment = await prisma.enrollment.findUnique({
                     where: { id: enrollmentId },
-                    include: { 
+                    include: {
                         user: { select: { name: true, id: true } },
                         course: { select: { name_lop: true } }
                     }
@@ -407,12 +405,12 @@ export async function submitAssignmentAction({
                 })
 
                 const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
-                                 `👤 Học viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
-                                 `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
-                                 `📖 Bài học: <b>${lesson?.title}</b>\n` +
-                                 `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
-                                 `📅 Thời gian: ${now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
-                
+                    `👤 Học viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
+                    `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
+                    `📖 Bài học: <b>${lesson?.title}</b>\n` +
+                    `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
+                    `📅 Thời gian: ${now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+
                 console.log(`📡 Đang gửi thông báo Telegram LESSON đến ChatID: ${process.env.TELEGRAM_CHAT_ID_LESSON}`);
                 await sendTelegram(msgAdmin, 'LESSON');
                 console.log(`✅ Đã gửi thông báo Telegram LESSON thành công!`);
@@ -430,7 +428,7 @@ export async function submitAssignmentAction({
             if (enrollment?.course?.id_khoa) {
                 revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`, 'page')
             }
-        } catch (e) {}
+        } catch (e) { }
 
         return { success: true, totalScore }
     } catch (error: any) {
@@ -481,7 +479,7 @@ export async function updateLastLessonAction(enrollmentId: number, lessonId: str
             where: { id: enrollmentId },
             data: { lastLessonId: lessonId }
         })
-    } catch (error) {}
+    } catch (error) { }
 }
 
 // ==========================================
@@ -490,36 +488,45 @@ export async function updateLastLessonAction(enrollmentId: number, lessonId: str
 export async function createCourseAction(formData: FormData) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
     const userId = parseInt(session.user.id)
-    
+
     // ✅ Validate required fields
     const id_khoa = formData.get('id_khoa') as string
     const name_lop = formData.get('name_lop') as string
-    
+
     if (!id_khoa?.trim()) return { success: false, error: "Mã khóa học là bắt buộc" }
     if (!name_lop?.trim()) return { success: false, error: "Tên lớp học là bắt buộc" }
-    
+
     // ✅ Xác định teacherId: Mặc định là chính mình, cho phép chọn người khác nếu là ADMIN/TEACHER
     let teacherId: number | null = userId
     const teacherIdFromForm = formData.get('teacherId') as string
-    
+
     if (teacherIdFromForm) {
         teacherId = parseInt(teacherIdFromForm)
     }
-    
+
     try {
         // ✅ Check unique id_khoa
         const existing = await prisma.course.findUnique({ where: { id_khoa } })
         if (existing) return { success: false, error: `Mã khóa "${id_khoa}" đã tồn tại` }
-        
+
         // ✅ Parse all 21 fields từ FormData
+        const categoryIdStr = formData.get('categoryId') as string
+        const categoryId = categoryIdStr ? parseInt(categoryIdStr) : null
+        let categoryName = 'Khác'
+        if (categoryId) {
+            const cat = await prisma.courseCategory.findUnique({ where: { id: categoryId } })
+            if (cat) categoryName = cat.name
+        }
+
         const courseData: any = {
             id_khoa: id_khoa.toUpperCase(),
             name_lop,
             name_khoa: formData.get('name_khoa') as string || null,
-            category: formData.get('category') as string || 'Khác',
+            category: categoryName,
+            categoryId,
             type: (formData.get('type') as any) || 'NORMAL',
             status: formData.get('status') === 'true',
             pin: parseInt(formData.get('pin') as string) || 0,
@@ -528,30 +535,31 @@ export async function createCourseAction(formData: FormData) {
             mo_ta_dai: formData.get('mo_ta_dai') as string || null,
             link_anh_bia: formData.get('link_anh_bia') as string || null,
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
-            stk: formData.get('stk') as string || null,
-            name_stk: formData.get('name_stk') as string || null,
-            bank_stk: formData.get('bank_stk') as string || null,
             noidung_stk: formData.get('noidung_stk') as string || null,
-            link_qrcode: formData.get('link_qrcode') as string || null,
             link_zalo: formData.get('link_zalo') as string || null,
             file_email: formData.get('file_email') as string || null,
             noidung_email: formData.get('noidung_email') as string || null,
         }
-        
-        // ✅ Gán teacherId nếu có
-        if (teacherId) {
-            courseData.teacherId = teacherId
-        }
-        
+
+            // ✅ Gán teacherId nếu có
+            if (teacherId) {
+                courseData.teacherId = teacherId
+            }
+
+            const teacherBankAccountIdStr = formData.get('teacherBankAccountId') as string
+            if (teacherBankAccountIdStr) {
+                courseData.teacherBankAccountId = parseInt(teacherBankAccountIdStr)
+            }
+
         const newCourse = await prisma.course.create({
             data: courseData
         })
-        
+
         revalidatePath('/tools/courses')
-        
+
         // ✅ Auto-create first lesson (TEXT type with course info template)
         try {
-            const defaultContent = `📌 THÔNG TIN KHAI GIẢNG & LỊU Ý
+            const defaultContent = `📌 THÔNG TIN KHAI GIẢNG & LƯU Ý
 
 🗓 Ngày khai giảng: [Điền ngày]
 ⏰ Giờ học: [Điền giờ]
@@ -581,7 +589,7 @@ export async function createCourseAction(formData: FormData) {
             console.error('Failed to create default lesson:', lessonError.message)
             // Don't fail course creation if lesson creation fails
         }
-        
+
         return { success: true, course: newCourse, message: 'Đã tạo khóa học thành công!' }
     } catch (error: any) {
         return { success: false, error: error.message || 'Lỗi khi tạo khóa học' }
@@ -594,27 +602,27 @@ export async function createCourseAction(formData: FormData) {
 export async function deleteCourseAction(courseId: number) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
     const userId = parseInt(session.user.id)
-    
+
     try {
         // ✅ Check course tồn tại + quyền xóa
-        const course = await prisma.course.findUnique({ 
+        const course = await prisma.course.findUnique({
             where: { id: courseId },
             select: { teacherId: true, name_lop: true }
         })
-        
+
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
-        
+
         // ✅ TEACHER chỉ được xóa course của mình
         if (!isAdmin && course.teacherId !== userId) {
             return { success: false, error: "Bạn không có quyền xóa khóa học này" }
         }
-        
+
         // ✅ Xóa course (cascade xóa lessons, enrollments...)
         await prisma.course.delete({ where: { id: courseId } })
-        
+
         revalidatePath('/tools/courses')
         return { success: true, message: `Đã xóa khóa học "${course.name_lop}"` }
     } catch (error: any) {
@@ -628,12 +636,12 @@ export async function deleteCourseAction(courseId: number) {
 export async function getTeachersAction() {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
     const isTeacher = session.user.role === Role.TEACHER
 
     if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
-    
+
     try {
         const teachers = await prisma.user.findMany({
             where: { role: { in: [Role.TEACHER, Role.ADMIN] } },

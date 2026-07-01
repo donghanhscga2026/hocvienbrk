@@ -23,9 +23,6 @@ export async function POST(request: NextRequest) {
         name_lop: true,
         type: true,
         teacherId: true,
-        stk: true,
-        name_stk: true,
-        bank_stk: true,
         noidung_email: true,
       }
     })

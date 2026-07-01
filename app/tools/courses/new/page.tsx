@@ -11,6 +11,10 @@ import MainHeader from '@/components/layout/MainHeader'
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
 import { AddLessonModal } from '@/components/admin/courses/AddLessonModal'
+
+function isValidDateFormat(str: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(str)
+}
 function CreateCourseContent() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
@@ -34,7 +38,7 @@ function CreateCourseContent() {
     const [idKhoa, setIdKhoa] = useState('')
     const [nameLop, setNameLop] = useState('')
     const [nameKhoa, setNameKhoa] = useState('')
-    const [category, setCategory] = useState('Khác')
+    const [categoryId, setCategoryId] = useState<number | null>(null)
     const [type, setType] = useState('NORMAL')
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
@@ -48,11 +52,7 @@ function CreateCourseContent() {
     
     // Section3: Học phí & Thanh toán
     const [phiCoc, setPhiCoc] = useState(0)
-    const [stk, setStk] = useState('')
-    const [nameStk, setNameStk] = useState('')
-    const [bankStk, setBankStk] = useState('')
     const [noidungStk, setNoidungStk] = useState('')
-    const [linkQrcode, setLinkQrcode] = useState('')
     
     // Section4: Email & Zalo
     const [linkZalo, setLinkZalo] = useState('')
@@ -60,8 +60,10 @@ function CreateCourseContent() {
     const [noidungEmail, setNoidungEmail] = useState('')
     
     // ✅ NEW: Categories & Upload state
-    const [categories, setCategories] = useState<string[]>([])
+    const [categories, setCategories] = useState<any[]>([])
     const [uploadingImage, setUploadingImage] = useState(false)
+    const [teacherBankAccounts, setTeacherBankAccounts] = useState<any[]>([])
+    const [teacherBankAccountId, setTeacherBankAccountId] = useState<number | null>(null)
     
     // ✅ NEW: Handle image upload
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,16 +109,13 @@ function CreateCourseContent() {
         }
     }
     
-    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc courseId)
+    // ✅ Fetch categories (CourseCategory objects from API)
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    // ✅ Đảm bảo unique categories (tránh duplicate keys)
-                    const uniqueCategories = Array.from(new Set<string>(catRes.categories))
-                    console.log('Categories loaded:', uniqueCategories)
-                    setCategories(uniqueCategories)
+                    setCategories(catRes.categories)
                 }
             } catch (err) {
                 console.error("Fetch categories error:", err)
@@ -155,12 +154,11 @@ function CreateCourseContent() {
                          setIdKhoa(courseRes.id_khoa || '')
                          setNameLop(courseRes.name_lop || '')
                          setNameKhoa(courseRes.name_khoa || '')
-                          const currentCategory = courseRes.category || 'Khác'
-                          setCategory(currentCategory)
+                          setCategoryId(courseRes.categoryId || null)
                           setType(courseRes.type || 'NORMAL')
                         setStatus(courseRes.status ?? true)
                         setPin(courseRes.pin || 0)
-                        setDateJoin(courseRes.date_join || '')
+                        setDateJoin(isValidDateFormat(courseRes.date_join || '') ? courseRes.date_join : '')
                         setTeacherId(courseRes.teacherId?.toString() || '')
                         
                         setMoTaNgan(courseRes.mo_ta_ngan || '')
@@ -168,11 +166,7 @@ function CreateCourseContent() {
                         setLinkAnhBia(courseRes.link_anh_bia || '')
                         
                         setPhiCoc(courseRes.phi_coc || 0)
-                        setStk(courseRes.stk || '')
-                        setNameStk(courseRes.name_stk || '')
-                        setBankStk(courseRes.bank_stk || '')
                         setNoidungStk(courseRes.noidung_stk || '')
-                        setLinkQrcode(courseRes.link_qrcode || '')
                         
                         setLinkZalo(courseRes.link_zalo || '')
                         setFileEmail(courseRes.file_email || '')
@@ -193,19 +187,38 @@ function CreateCourseContent() {
         }
         fetchData()
     }, [courseId])
-    
+
+    // ✅ Fetch teacher bank accounts when teacherId changes
+    useEffect(() => {
+        async function fetchTeacherAccounts() {
+            if (!teacherId) {
+                setTeacherBankAccounts([])
+                return
+            }
+            try {
+                const res = await fetch(`/api/user/bank-accounts?userId=${teacherId}`)
+                const data = await res.json()
+                if (data.accounts) setTeacherBankAccounts(data.accounts)
+            } catch (err) {
+                console.error("Fetch teacher bank accounts error:", err)
+            }
+        }
+        fetchTeacherAccounts()
+    }, [teacherId])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setMessage(null)
         
-        if (isEditMode && courseId) {
-            // ✅ EDIT MODE: Gọi updateCourseAction (THÊM MỚI)
-            const updateData: any = {
-                id_khoa: idKhoa,
+            if (isEditMode && courseId) {
+                // ✅ EDIT MODE: Gọi updateCourseAction (THÊM MỚI)
+                const updateData: any = {
+                    id_khoa: idKhoa,
+                    teacherBankAccountId,
                 name_lop: nameLop,
                 name_khoa: nameKhoa || null,
-                category,
+                categoryId,
                 type,
                 status,
                 pin,
@@ -214,11 +227,7 @@ function CreateCourseContent() {
                 mo_ta_dai: moTaDai || null,
                 link_anh_bia: linkAnhBia || null,
                 phi_coc: phiCoc,
-                stk: stk || null,
-                name_stk: nameStk || null,
-                bank_stk: bankStk || null,
                 noidung_stk: noidungStk || null,
-                link_qrcode: linkQrcode || null,
                 link_zalo: linkZalo || null,
                 file_email: fileEmail || null,
                 noidung_email: noidungEmail || null,
@@ -243,7 +252,7 @@ function CreateCourseContent() {
             formData.append('id_khoa', idKhoa)
             formData.append('name_lop', nameLop)
             if (nameKhoa) formData.append('name_khoa', nameKhoa)
-            formData.append('category', category)
+            if (categoryId) formData.append('categoryId', categoryId.toString())
             formData.append('type', type)
             formData.append('status', status.toString())
             formData.append('pin', pin.toString())
@@ -252,11 +261,8 @@ function CreateCourseContent() {
             if (moTaDai) formData.append('mo_ta_dai', moTaDai)
             if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
             formData.append('phi_coc', phiCoc.toString())
-            if (stk) formData.append('stk', stk)
-            if (nameStk) formData.append('name_stk', nameStk)
-            if (bankStk) formData.append('bank_stk', bankStk)
+            if (teacherBankAccountId) formData.append('teacherBankAccountId', teacherBankAccountId.toString())
             if (noidungStk) formData.append('noidung_stk', noidungStk)
-            if (linkQrcode) formData.append('link_qrcode', linkQrcode)
             if (linkZalo) formData.append('link_zalo', linkZalo)
             if (fileEmail) formData.append('file_email', fileEmail)
             if (noidungEmail) formData.append('noidung_email', noidungEmail)
@@ -324,17 +330,6 @@ function CreateCourseContent() {
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học *</label>
-                            <input 
-                                type="text" 
-                                value={idKhoa} 
-                                onChange={(e) => setIdKhoa(e.target.value.toUpperCase())} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="VD: KH001" 
-                                required 
-                            />
-                        </div>
-                        <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
                             <input 
                                 type="text" 
@@ -362,15 +357,15 @@ function CreateCourseContent() {
                              <div className="space-y-1.5">
                              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
                              <select 
-                                 value={category} 
-                                 onChange={(e) => setCategory(e.target.value)}
-                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                             >
-                                 <option value="Khác">Khác</option>
-                                 {Array.from(new Set(categories)).map((cat: string) => (
-                                     <option key={cat} value={cat}>{cat}</option>
-                                 ))}
-                             </select>
+                                  value={categoryId ?? ''} 
+                                  onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+                                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                              >
+                                  <option value="">Khác</option>
+                                  {categories.map((cat: any) => (
+                                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                  ))}
+                              </select>
                          </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
@@ -504,6 +499,26 @@ function CreateCourseContent() {
                         <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
                     </h2>
                     
+                    {teacherBankAccounts.length > 0 && (
+                        <div className="space-y-1.5 mb-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Chọn từ tài khoản đã lưu</label>
+                            <select
+                                value={teacherBankAccountId ?? ''}
+                                onChange={(e) => {
+                                    const id = e.target.value ? parseInt(e.target.value) : null
+                                    setTeacherBankAccountId(id)
+                                }}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                            >
+                                <option value="">Chọn tài khoản...</option>
+                                {teacherBankAccounts.map((acc: any) => (
+                                    <option key={acc.id} value={acc.id}>
+                                        {acc.accountHolder} - {acc.accountNumber} {acc.bankName ? `(${acc.bankName})` : ''} {acc.isDefault ? '(Mặc định)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
@@ -512,39 +527,6 @@ function CreateCourseContent() {
                                 value={phiCoc} 
                                 onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} 
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản</label>
-                            <input 
-                                type="text" 
-                                value={stk} 
-                                onChange={(e) => setStk(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Số TK..." 
-                            />
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên chủ TK</label>
-                            <input 
-                                type="text" 
-                                value={nameStk} 
-                                onChange={(e) => setNameStk(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên..." 
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
-                            <input 
-                                type="text" 
-                                value={bankStk} 
-                                onChange={(e) => setBankStk(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                                placeholder="Tên NH..." 
                             />
                         </div>
                     </div>
@@ -557,17 +539,6 @@ function CreateCourseContent() {
                             onChange={(e) => setNoidungStk(e.target.value)} 
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
                             placeholder="Nội dung..." 
-                        />
-                    </div>
-                    
-                    <div className="space-y-1.5 mt-4">
-                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link QR code</label>
-                        <input 
-                            type="url" 
-                            value={linkQrcode} 
-                            onChange={(e) => setLinkQrcode(e.target.value)} 
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            placeholder="https://..." 
                         />
                     </div>
                 </div>

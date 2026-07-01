@@ -109,39 +109,63 @@ export async function POST(
     let updated = 0;
     let skipped = 0;
 
-    for (const lesson of lessons) {
-      const existingLesson = await prisma.lesson.findFirst({
-        where: { courseId, order: lesson.order }
+    if (mode === 'append') {
+      const maxLesson = await prisma.lesson.findFirst({
+        where: { courseId },
+        orderBy: { order: 'desc' },
+        select: { order: true }
       });
+      const startOrder = (maxLesson?.order ?? 0) + 1;
 
-      if (existingLesson) {
-        if (mode === 'skip') {
-          skipped++;
-          continue;
-        }
-        
-        await prisma.lesson.update({
-          where: { id: existingLesson.id },
-          data: {
-            title: lesson.title,
-            videoUrl: lesson.videoUrl || null,
-            content: lesson.content || null,
-            isDailyChallenge: lesson.isDailyChallenge,
-          }
-        });
-        updated++;
-      } else {
+      for (let i = 0; i < lessons.length; i++) {
+        const lesson = lessons[i];
         await prisma.lesson.create({
           data: {
             courseId,
             title: lesson.title,
             videoUrl: lesson.videoUrl || null,
             content: lesson.content || null,
-            order: lesson.order,
+            order: startOrder + i,
             isDailyChallenge: lesson.isDailyChallenge,
           }
         });
         created++;
+      }
+    } else {
+      for (const lesson of lessons) {
+        const existingLesson = await prisma.lesson.findFirst({
+          where: { courseId, order: lesson.order }
+        });
+
+        if (existingLesson) {
+          if (mode === 'skip') {
+            skipped++;
+            continue;
+          }
+          
+          await prisma.lesson.update({
+            where: { id: existingLesson.id },
+            data: {
+              title: lesson.title,
+              videoUrl: lesson.videoUrl || null,
+              content: lesson.content || null,
+              isDailyChallenge: lesson.isDailyChallenge,
+            }
+          });
+          updated++;
+        } else {
+          await prisma.lesson.create({
+            data: {
+              courseId,
+              title: lesson.title,
+              videoUrl: lesson.videoUrl || null,
+              content: lesson.content || null,
+              order: lesson.order,
+              isDailyChallenge: lesson.isDailyChallenge,
+            }
+          });
+          created++;
+        }
       }
     }
 

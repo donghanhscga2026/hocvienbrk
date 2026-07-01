@@ -120,7 +120,7 @@ export default async function PageSlugPage({ params }: PageProps) {
     const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
 
     const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
-        const category = course.category || "Khác"
+        const category = course.courseCategory?.name || course.category || "Khác"
         const existingGroup = acc.find(g => g.category === category)
         if (existingGroup) {
             existingGroup.courses.push(course)
@@ -128,7 +128,11 @@ export default async function PageSlugPage({ params }: PageProps) {
             acc.push({ category, courses: [course] })
         }
         return acc
-    }, [])
+    }, []).sort((a: any, b: any) => {
+        const orderA = a.courses[0]?.courseCategory?.order ?? 0
+        const orderB = b.courses[0]?.courseCategory?.order ?? 0
+        return orderA - orderB
+    })
 
     const userName = userRecord?.name ?? null
     const userId = userRecord?.id ?? null

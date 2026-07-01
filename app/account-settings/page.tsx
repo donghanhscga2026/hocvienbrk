@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getUserWithAccounts, updateUserProfile, changePassword } from '@/app/actions/account-actions'
-import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, Hash } from 'lucide-react'
+import { getUserWithAccounts, updateUserProfile, changePassword, getUserBankAccountsAction, createUserBankAccountAction, updateUserBankAccountAction, deleteUserBankAccountAction } from '@/app/actions/account-actions'
+import { Camera, User, Phone, Mail, Key, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, Hash, Plus, Pencil, Trash2, Banknote, Building2, CreditCard, Smartphone } from 'lucide-react'
 import Link from 'next/link'
+import { getVietnamBanks, BankInfo } from '@/lib/vietnam-banks'
 
 interface UserData {
     id: number
@@ -38,6 +39,14 @@ export default function AccountSettingsPage() {
     const [showNewPwd, setShowNewPwd] = useState(false)
     const [showConfirmPwd, setShowConfirmPwd] = useState(false)
 
+    // Bank account states
+    const [bankAccounts, setBankAccounts] = useState<any[]>([])
+    const [showBankForm, setShowBankForm] = useState(false)
+    const [editingBankId, setEditingBankId] = useState<number | null>(null)
+    const [bankForm, setBankForm] = useState({ accountType: 'BANK', accountHolder: '', accountNumber: '', bankName: '', qrCodeUrl: '', isDefault: false })
+    const [savingBank, setSavingBank] = useState(false)
+    const [bankList, setBankList] = useState<BankInfo[]>([])
+
     useEffect(() => {
         async function fetchUser() {
             setLoading(true)
@@ -49,9 +58,14 @@ export default function AccountSettingsPage() {
                 setPhone(userData.phone || '')
                 setAvatarUrl(userData.image || '')
             }
+            const bankRes = await getUserBankAccountsAction()
+            if (bankRes.success) {
+                setBankAccounts(bankRes.accounts || [])
+            }
             setLoading(false)
         }
         fetchUser()
+        getVietnamBanks().then(setBankList)
     }, [])
 
     // Kiểm tra user có password thật không (an toàn, không expose hash)
@@ -239,6 +253,69 @@ export default function AccountSettingsPage() {
         }
         setIsSavingPassword(false)
     }
+
+    // Bank account handlers
+    function openBankForm(account?: any) {
+        if (account) {
+            setEditingBankId(account.id)
+            setBankForm({
+                accountType: account.accountType || 'BANK',
+                accountHolder: account.accountHolder || '',
+                accountNumber: account.accountNumber || '',
+                bankName: account.bankName || '',
+                qrCodeUrl: account.qrCodeUrl || '',
+                isDefault: account.isDefault || false,
+            })
+        } else {
+            setEditingBankId(null)
+            setBankForm({ accountType: 'BANK', accountHolder: '', accountNumber: '', bankName: '', qrCodeUrl: '', isDefault: false })
+        }
+        setShowBankForm(true)
+    }
+
+    async function handleSaveBank(e: React.FormEvent) {
+        e.preventDefault()
+        setSavingBank(true)
+        setMessage(null)
+
+        if (editingBankId) {
+            const res = await updateUserBankAccountAction(editingBankId, bankForm)
+            if (res.success) {
+                const refresh = await getUserBankAccountsAction()
+                if (refresh.success) setBankAccounts(refresh.accounts || [])
+                setMessage({ type: 'success', text: 'Đã cập nhật tài khoản nhận tiền' })
+                setShowBankForm(false)
+            } else {
+                setMessage({ type: 'error', text: res.error || 'Lỗi cập nhật' })
+            }
+        } else {
+            const res = await createUserBankAccountAction(bankForm)
+            if (res.success) {
+                const refresh = await getUserBankAccountsAction()
+                if (refresh.success) setBankAccounts(refresh.accounts || [])
+                setMessage({ type: 'success', text: 'Đã thêm tài khoản nhận tiền' })
+                setShowBankForm(false)
+            } else {
+                setMessage({ type: 'error', text: res.error || 'Lỗi tạo mới' })
+            }
+        }
+        setSavingBank(false)
+    }
+
+    async function handleDeleteBank(id: number) {
+        if (!window.confirm('Xóa tài khoản nhận tiền này?')) return
+        const res = await deleteUserBankAccountAction(id)
+        if (res.success) {
+            const refresh = await getUserBankAccountsAction()
+            if (refresh.success) setBankAccounts(refresh.accounts || [])
+            setMessage({ type: 'success', text: 'Đã xóa tài khoản nhận tiền' })
+        } else {
+            setMessage({ type: 'error', text: res.error || 'Lỗi xóa' })
+        }
+    }
+
+    const accountTypeLabels: Record<string, string> = { BANK: 'Ngân hàng', MOMO: 'Ví Momo', ZALOPAY: 'Ví ZaloPay', OTHER: 'Khác' }
+    const accountTypeIcons: Record<string, any> = { BANK: Building2, MOMO: Smartphone, ZALOPAY: Smartphone, OTHER: CreditCard }
 
     const hasGoogle = accounts.some(a => a.provider === 'google')
 
@@ -428,6 +505,115 @@ export default function AccountSettingsPage() {
                 </div>
 
                 {/* Change Password */}
+                {/* Bank Accounts */}
+                <div className="bg-brk-background rounded-2xl border border-brk-outline p-6 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-brk-on-surface">Tài khoản nhận tiền</h2>
+                        <button onClick={() => openBankForm()} className="flex items-center gap-2 px-4 py-2 bg-brk-primary text-brk-on-surface text-sm font-bold rounded-xl hover:bg-brk-primary-hover transition-colors">
+                            <Plus className="h-4 w-4" /> Thêm
+                        </button>
+                    </div>
+
+                    {bankAccounts.length === 0 && (
+                        <p className="text-sm text-brk-muted">Chưa có tài khoản nhận tiền nào.</p>
+                    )}
+
+                    {bankAccounts.map((acc: any) => {
+                        const Icon = accountTypeIcons[acc.accountType] || Banknote
+                        return (
+                            <div key={acc.id} className="flex items-center justify-between p-4 bg-brk-background rounded-xl border border-brk-outline mb-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-brk-primary/10 rounded-full flex items-center justify-center">
+                                        <Icon className="h-5 w-5 text-brk-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-brk-on-surface font-medium text-sm">{accountTypeLabels[acc.accountType] || acc.accountType}</p>
+                                        <p className="text-xs text-brk-muted">{acc.accountHolder} - {acc.accountNumber}</p>
+                                        {acc.bankName && <p className="text-xs text-brk-muted">{acc.bankName}</p>}
+                                        {acc.isDefault && <span className="text-[10px] text-brk-accent font-bold">Mặc định</span>}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => openBankForm(acc)} className="w-9 h-9 rounded-lg bg-brk-background hover:bg-brk-surface flex items-center justify-center text-brk-muted hover:text-brk-on-surface transition-colors">
+                                        <Pencil className="h-4 w-4" />
+                                    </button>
+                                    <button onClick={() => handleDeleteBank(acc.id)} className="w-9 h-9 rounded-lg bg-brk-background hover:bg-red-50 flex items-center justify-center text-brk-muted hover:text-red-500 transition-colors">
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )
+                    })}
+
+                    {/* Bank account form modal */}
+                    {showBankForm && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowBankForm(false)}>
+                            <div className="bg-brk-background rounded-2xl p-6 max-w-md w-full border border-brk-outline" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-lg font-semibold text-brk-on-surface mb-4">
+                                    {editingBankId ? 'Sửa tài khoản' : 'Thêm tài khoản nhận tiền'}
+                                </h3>
+                                <form onSubmit={handleSaveBank} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm text-brk-muted mb-2">Loại tài khoản</label>
+                                        <select value={bankForm.accountType} onChange={(e) => setBankForm({ ...bankForm, accountType: e.target.value })}
+                                            className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-brk-primary">
+                                            <option value="BANK">Ngân hàng</option>
+                                            <option value="MOMO">Ví Momo</option>
+                                            <option value="ZALOPAY">Ví ZaloPay</option>
+                                            <option value="OTHER">Khác</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-brk-muted mb-2">Chủ tài khoản *</label>
+                                        <input type="text" required value={bankForm.accountHolder} onChange={(e) => setBankForm({ ...bankForm, accountHolder: e.target.value })}
+                                            className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-brk-primary" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-brk-muted mb-2">Số tài khoản *</label>
+                                        <input type="text" required value={bankForm.accountNumber} onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                                            className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-brk-primary" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-brk-muted mb-2">Tên ngân hàng</label>
+                                        {bankForm.accountType === 'BANK' ? (
+                                            <select value={bankForm.bankName} onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                                                className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-brk-primary">
+                                                <option value="">Chọn ngân hàng...</option>
+                                                {bankList.map((bank) => (
+                                                    <option key={bank.code} value={bank.name}>{bank.shortName} ({bank.code}) - {bank.name}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input type="text" value={bankForm.bankName} onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                                                className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-brk-primary" placeholder="Tên đơn vị nhận..." />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-brk-muted mb-2">Link QR Code</label>
+                                        <input type="url" value={bankForm.qrCodeUrl} onChange={(e) => setBankForm({ ...bankForm, qrCodeUrl: e.target.value })}
+                                            className="w-full bg-brk-background border border-brk-outline rounded-lg px-4 py-3 text-brk-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-brk-primary" />
+                                    </div>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" checked={bankForm.isDefault} onChange={(e) => setBankForm({ ...bankForm, isDefault: e.target.checked })} className="w-5 h-5 rounded" />
+                                        <span className="text-sm text-brk-on-surface font-medium">Đặt làm mặc định</span>
+                                    </label>
+                                    <div className="flex gap-3 pt-2">
+                                        <button type="button" onClick={() => setShowBankForm(false)}
+                                            className="flex-1 bg-brk-background hover:bg-brk-surface text-brk-on-surface font-medium py-3 rounded-xl transition-colors border border-brk-outline">
+                                            Hủy
+                                        </button>
+                                        <button type="submit" disabled={savingBank}
+                                            className="flex-1 bg-brk-primary hover:bg-brk-primary-hover text-brk-on-surface font-bold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                                            {savingBank ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+                                            Lưu
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {hasPassword && (
                     <div className="bg-brk-background rounded-2xl border border-brk-outline p-6">
                         <h2 className="text-lg font-semibold text-brk-on-surface mb-4">Đổi mật khẩu</h2>
