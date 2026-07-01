@@ -10,6 +10,10 @@ import MainHeader from '@/components/layout/MainHeader'
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
 import { AddLessonModal } from '@/components/admin/courses/AddLessonModal'
+
+function isValidDateFormat(str: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(str)
+}
 export default function EditCoursePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const [course, setCourse] = useState<any>(null)
@@ -28,11 +32,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     
     // ✅ NEW: Section 1 - Basic info (16 more fields to have 21 total)
     const [nameKhoa, setNameKhoa] = useState('')
-    const [category, setCategory] = useState('Khác')
+    const [categoryId, setCategoryId] = useState<number | null>(null)
     const [status, setStatus] = useState(true)
     const [pin, setPin] = useState(0)
     const [dateJoin, setDateJoin] = useState('')
-    const [teacherId, setTeacherId] = useState<number | null>(null)
+    const [teacherId, setTeacherId] = useState<string>('')
     const [isAdmin, setIsAdmin] = useState(false)
     const [isTeacher, setIsTeacher] = useState(false)
     const [teachers, setTeachers] = useState<any[]>([])
@@ -41,30 +45,25 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [moTaNgan, setMoTaNgan] = useState('')
     const [moTaDai, setMoTaDai] = useState('')
     const [linkAnhBia, setLinkAnhBia] = useState('')
-    const [categories, setCategories] = useState<string[]>([])
+    const [categories, setCategories] = useState<any[]>([])
     const [uploadingImage, setUploadingImage] = useState(false)
+    const [teacherBankAccounts, setTeacherBankAccounts] = useState<any[]>([])
+    const [teacherBankAccountId, setTeacherBankAccountId] = useState<number | null>(null)
     
     // ✅ NEW: Section 3 - Fee & Payment
-    const [stk, setStk] = useState('')
-    const [nameStk, setNameStk] = useState('')
-    const [bankStk, setBankStk] = useState('')
     const [noidungStk, setNoidungStk] = useState('')
-    const [linkQrcode, setLinkQrcode] = useState('')
     
     // ✅ NEW: Section 4 - Email & Zalo
     const [linkZalo, setLinkZalo] = useState('')
     const [fileEmail, setFileEmail] = useState('')
     
-    // ✅ NEW: Fetch categories independently (chạy ngay khi mount, không phụ thuộc category)
+    // ✅ Fetch categories (CourseCategory objects from API)
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const catRes = await fetch('/api/courses/categories').then(r => r.json())
                 if (catRes.categories && Array.isArray(catRes.categories)) {
-                    // ✅ Đảm bảo unique categories từ API (tránh duplicate keys)
-                    const uniqueCategories = Array.from(new Set<string>(catRes.categories))
-                    console.log('Categories loaded:', uniqueCategories)
-                    setCategories(uniqueCategories)
+                    setCategories(catRes.categories)
                 }
             } catch (err) {
                 console.error("Fetch categories error:", err)
@@ -116,6 +115,24 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         }
     }
     
+    // ✅ Fetch teacher bank accounts when teacherId changes
+    useEffect(() => {
+        async function fetchTeacherAccounts() {
+            if (!teacherId) {
+                setTeacherBankAccounts([])
+                return
+            }
+            try {
+                const res = await fetch(`/api/user/bank-accounts?userId=${teacherId}`)
+                const data = await res.json()
+                if (data.accounts) setTeacherBankAccounts(data.accounts)
+            } catch (err) {
+                console.error("Fetch teacher bank accounts error:", err)
+            }
+        }
+        fetchTeacherAccounts()
+    }, [teacherId])
+
     const fetchData = async () => {
         setLoading(true)
         try {
@@ -127,7 +144,6 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             setIsTeacher(isTeacherUser)
             
             if (isAdminUser || isTeacherUser) {
-                const { getTeachersAction } = await import('@/app/actions/course-actions')
                 const teachersRes = await getTeachersAction()
                 if (teachersRes.success) {
                     setTeachers(teachersRes.teachers || [])
@@ -144,24 +160,19 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
                 
-                 // ✅ NEW: Populate all 21 fields
-                  setNameKhoa(res.name_khoa || '')
-                  const currentCategory = res.category || 'Khác'
-                  setCategory(currentCategory)
+                 // ✅ NEW: Populate all fields
+                   setNameKhoa(res.name_khoa || '')
+                   setCategoryId(res.categoryId || null)
                   setStatus(res.status ?? true)
                 setPin(res.pin || 0)
-                setDateJoin(res.date_join || '')
-                setTeacherId(res.teacherId || null)
+                setDateJoin(isValidDateFormat(res.date_join || '') ? res.date_join : '')
+                setTeacherId(res.teacherId?.toString() || '')
                 
                 setMoTaNgan(res.mo_ta_ngan || '')
                 setMoTaDai(res.mo_ta_dai || '')
                 setLinkAnhBia(res.link_anh_bia || '')
                 
-                setStk(res.stk || '')
-                setNameStk(res.name_stk || '')
-                setBankStk(res.bank_stk || '')
                 setNoidungStk(res.noidung_stk || '')
-                setLinkQrcode(res.link_qrcode || '')
                 
                 setLinkZalo(res.link_zalo || '')
                 setFileEmail(res.file_email || '')
@@ -181,9 +192,10 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         // ✅ Send all fields to updateCourseAction
         const updateData: any = {
             id_khoa: idKhoa,
+            teacherBankAccountId,
             name_lop: nameLop,
             name_khoa: nameKhoa || null,
-            category,
+            categoryId,
             type,
             status,
             pin,
@@ -192,11 +204,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             mo_ta_dai: moTaDai || null,
             link_anh_bia: linkAnhBia || null,
             phi_coc: phiCoc,
-            stk: stk || null,
-            name_stk: nameStk || null,
-            bank_stk: bankStk || null,
             noidung_stk: noidungStk || null,
-            link_qrcode: linkQrcode || null,
             link_zalo: linkZalo || null,
             file_email: fileEmail || null,
             noidung_email: noidungEmail || null,
@@ -204,11 +212,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
 
         // Cho phép Admin/Teacher thay đổi Giáo viên
         if (isAdmin || isTeacher) {
-            updateData.teacherId = teacherId ? parseInt(teacherId as any) : null
+            updateData.teacherId = teacherId ? parseInt(teacherId) : null
         }
 
         const res = await updateCourseAction(parseInt(id), updateData)
-        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học (21 trường)!' })
+        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học!' })
         else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
         setSaving(false)
     }
@@ -283,15 +291,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                              <div className="space-y-1.5">
                                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
                                  <select 
-                                     value={category} 
-                                     onChange={(e) => setCategory(e.target.value)}
-                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                                 >
-                                     <option value="Khác">Khác</option>
-                                     {Array.from(new Set(categories)).map((cat: string) => (
-                                         <option key={cat} value={cat}>{cat}</option>
-                                     ))}
-                                 </select>
+                                      value={categoryId ?? ''} 
+                                      onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
+                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                  >
+                                      <option value="">Khác</option>
+                                      {categories.map((cat: any) => (
+                                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                      ))}
+                                  </select>
                              </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
@@ -324,7 +332,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             {(isAdmin || isTeacher) && (
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
-                                    <select value={teacherId || ''} onChange={(e) => setTeacherId(parseInt(e.target.value) || null)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                    <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                                         <option value="">Chọn giáo viên...</option>
                                         {teachers.map((t: any) => (
                                             <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
@@ -387,37 +395,37 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
                         </h2>
                         
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
-                                <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số tài khoản</label>
-                                <input type="text" value={stk} onChange={(e) => setStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                            </div>
+                        {teacherBankAccounts.length > 0 && (
+                        <div className="space-y-1.5 mb-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Chọn từ tài khoản đã lưu</label>
+                            <select
+                                value={teacherBankAccountId ?? ''}
+                                onChange={(e) => {
+                                    const id = e.target.value ? parseInt(e.target.value) : null
+                                    setTeacherBankAccountId(id)
+                                }}
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                            >
+                                <option value="">Chọn tài khoản...</option>
+                                {teacherBankAccounts.map((acc: any) => (
+                                    <option key={acc.id} value={acc.id}>
+                                        {acc.accountHolder} - {acc.accountNumber} {acc.bankName ? `(${acc.bankName})` : ''} {acc.isDefault ? '(Mặc định)' : ''}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên chủ TK</label>
-                                <input type="text" value={nameStk} onChange={(e) => setNameStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngân hàng</label>
-                                <input type="text" value={bankStk} onChange={(e) => setBankStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                            </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
+                            <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
-                        
-                        <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chuyển khoản</label>
-                            <input type="text" value={noidungStk} onChange={(e) => setNoidungStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                        </div>
-                        
-                        <div className="space-y-1.5 mt-4">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link QR code</label>
-                            <input type="url" value={linkQrcode} onChange={(e) => setLinkQrcode(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
-                        </div>
+                    </div>
+                    
+                    <div className="space-y-1.5 mt-4">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung chuyển khoản</label>
+                        <input type="text" value={noidungStk} onChange={(e) => setNoidungStk(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder="Nội dung..." />
+                    </div>
                     </div>
 
                     {/* PHẦN 4: EMAIL & ZALO */}

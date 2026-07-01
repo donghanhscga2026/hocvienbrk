@@ -48,11 +48,11 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
     const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-6) : ''
     const effectiveContent = payment?.transferContent || `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase().slice(0, 50)
     
-    // Mã BIN ngân hàng (Sacombank mặc định)
+    const bankAcc = course.teacherBankAccount
     const bankMap: Record<string, string> = { 'SACOMBANK': '970403', 'VCB': '970436', 'ACB': '970416', 'MB': '970422', 'TCB': '970407' }
-    const bankId = bankMap[course.bank_stk?.toUpperCase()] || '970403'
+    const bankId = bankAcc?.bankName ? bankMap[bankAcc.bankName.toUpperCase()] || '970403' : '970403'
 
-    const qrCodeUrl = payment?.qrCodeUrl || course.link_qrcode || `https://img.vietqr.io/image/${bankId}-${course.stk}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(effectiveContent)}&accountName=${encodeURIComponent(course.name_stk || '')}`
+    const qrCodeUrl = payment?.qrCodeUrl || bankAcc?.qrCodeUrl || `https://img.vietqr.io/image/${bankId}-${bankAcc?.accountNumber || ''}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(effectiveContent)}&accountName=${encodeURIComponent(bankAcc?.accountHolder || '')}`
     
     const handleUploadSuccess = () => {
         setUploaded(true)
@@ -141,16 +141,16 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="flex flex-col">
                                         <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Ngân hàng</span>
-                                        <span className="text-xs sm:text-sm font-bold text-gray-800 truncate">{payment?.bankName || course.bank_stk || 'N/A'}</span>
+                                        <span className="text-xs sm:text-sm font-bold text-gray-800 truncate">{payment?.bankName || bankAcc?.bankName || 'N/A'}</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Số tài khoản</span>
-                                        <span className="text-xs sm:text-sm font-bold text-gray-800 select-all">{payment?.accountNumber || course.stk || 'N/A'}</span>
+                                        <span className="text-xs sm:text-sm font-bold text-gray-800 select-all">{payment?.accountNumber || bankAcc?.accountNumber || 'N/A'}</span>
                                     </div>
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Chủ tài khoản</span>
-                                    <span className="text-xs sm:text-sm font-bold text-gray-800">{course.name_stk || 'N/A'}</span>
+                                    <span className="text-xs sm:text-sm font-bold text-gray-800">{bankAcc?.accountHolder || 'N/A'}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none shrink-0">Nội dung:</span>

@@ -395,3 +395,136 @@ Xây dựng hệ thống backup/restore toàn diện với 2 phương án (JSON 
 - ✅ Tool registered in Database
 - ✅ tsc --noEmit: pass
 
+---
+
+## ✅ UserBankAccount & TeacherBankAccount — Quản lý tài khoản nhận tiền (2026-07-01)
+
+### Mục tiêu
+Thêm model `UserBankAccount` cho phép user tự quản lý nhiều tài khoản nhận tiền (ngân hàng, Momo, ZaloPay), thêm `teacherBankAccountId` trên Course để gắn tài khoản giáo viên, CRUD UI trong account-settings và admin tool.  
+Cập nhật Phase 2: Loại bỏ các trường nhập tay (`stk`, `name_stk`, `bank_stk`, `link_qrcode`) khỏi Course model, chuyển hoàn toàn sang cơ chế tham chiếu `teacherBankAccountId` + cho phép Admin CRUD tài khoản ngân hàng qua tool.
+
+### Các file đã tạo/sửa
+
+#### `prisma/schema.prisma`
+- Đã có: `enum BankAccountType` (BANK, MOMO, ZALOPAY, OTHER), `model UserBankAccount` (userId, accountType, accountHolder, accountNumber, bankName, qrCodeUrl, isDefault)
+- **Thêm mới**: `teacherBankAccountId Int?` + `teacherBankAccount UserBankAccount?` trên `Course`, relation name `CourseTeacherBank`
+- **Thêm mới**: `courses Course[] @relation("CourseTeacherBank")` trên `UserBankAccount`
+- **Xóa**: Các trường `stk`, `name_stk`, `bank_stk`, `link_qrcode` khỏi model `Course` (chỉ giữ `noidung_stk`)
+
+#### `app/api/user/bank-accounts/route.ts` (Tạo mới)
+- GET: Lấy danh sách TK của user hiện tại (hỗ trợ `?userId=` cho ADMIN xem của người khác)
+- POST: Tạo TK mới (tự động bỏ mặc định cũ nếu `isDefault=true`)
+- PUT: Sửa TK (kiểm tra quyền sở hữu)
+- DELETE: Xóa TK (kiểm tra quyền sở hữu)
+
+#### `app/api/admin/bank-accounts/route.ts` (Tạo mới, sau đó cập nhật)
+- Vấn đề (Phase 1): Chỉ có GET list, thiếu CRUD cho Admin
+- Fix (Phase 2): Thêm POST (tạo cho user bất kỳ), PUT (sửa), DELETE (xóa) — đều yêu cầu ADMIN role
+
+#### `app/actions/account-actions.ts`
+- Thêm: `getUserBankAccountsAction()`, `createUserBankAccountAction()`, `updateUserBankAccountAction()`, `deleteUserBankAccountAction()`
+
+#### `app/actions/course-actions.ts`
+- `createCourseAction`: Nhận thêm `teacherBankAccountId` từ FormData
+- Xóa các trường `stk`, `name_stk`, `bank_stk`, `link_qrcode` khỏi create handler (chỉ giữ `noidung_stk`)
+
+#### `app/actions/admin-actions.ts`
+- `updateCourseAction`: Thêm `teacherBankAccountId?: number | null` vào type + tự động lưu
+- Xóa các trường `stk`, `name_stk`, `bank_stk`, `link_qrcode` khỏi type
+
+#### `app/account-settings/page.tsx`
+- Thêm section "Tài khoản nhận tiền" sau profile info
+- CRUD modal: Loại TK (Bank/Momo/ZaloPay/Khác), chủ TK, số TK, ngân hàng, QR code, mặc định
+
+#### `app/tools/bank-accounts/page.tsx` (Tạo mới, sau đó cập nhật)
+- Vấn đề (Phase 1): Chỉ danh sách read-only, không có thao tác
+- Fix (Phase 2): 
+  - Thêm cột "Thao tác" với nút Sửa (xanh) / Xóa (đỏ)
+  - Modal Thêm/Sửa với: search user (gọi API `/api/admin/users/list?search=`), loại TK, chủ TK, số TK, ngân hàng, QR code, mặc định
+  - Xóa có confirm dialog
+  - Tất cả gọi API admin CRUD
+
+#### `app/api/admin/users/list/route.ts` (Cập nhật)
+- Vấn đề: Chỉ list tất cả users, không hỗ trợ search
+- Fix: Thêm query params `?search=` (tìm theo name/email/phone/id) + `?limit=` (mặc định 50, tối đa 100)
+
+#### `app/tools/courses/new/page.tsx`
+- Thêm: Select "Chọn từ tài khoản đã lưu" trong phần thanh toán
+- Xóa các input nhập tay stk/name_stk/bank_stk/link_qrcode (chỉ giữ `teacherBankAccountId` select + `noidung_stk`)
+- Gửi `teacherBankAccountId` lên server thay vì các trường rời rạc
+
+#### `app/tools/courses/[id]/page.tsx`
+- Thêm: Select "Chọn từ tài khoản đã lưu" trong phần thanh toán
+- Xóa các state `stk`, `nameStk`, `bankStk`, `linkQrcode` 
+- Xóa các input nhập tay stk/name_stk/bank_stk/link_qrcode (chỉ giữ `teacherBankAccountId` select + `noidung_stk`)
+- Cập nhật `fetchData` và `handleSubmit` tương ứng
+
+#### `app/api/courses/route.ts`
+- Xóa các trường stk/name_stk/bank_stk/link_qrcode khỏi POST handler (tạo course)
+
+#### `app/api/enroll-after-register/route.ts`
+- Xóa các trường stk/name_stk/bank_stk/link_qrcode khỏi select query
+
+#### `app/actions/site-profile-actions.ts`
+- Thêm `teacherBankAccount` vào include khi fetch course (sử dụng relation mới)
+
+#### `components/course/PaymentModal.tsx`
+- Cập nhật UI: hiển thị thông tin TK từ `teacherBankAccount` (accountHolder, accountNumber, bankName, qrCodeUrl) thay vì các trường direct trên Course
+
+### Trạng thái
+- ✅ `UserBankAccount` model + enum + relations (schema)
+- ✅ User API CRUD + Admin API full CRUD (GET/POST/PUT/DELETE)
+- ✅ Server actions CRUD (account-actions) + update course actions
+- ✅ Account settings UI: thêm/sửa/xóa TK nhận tiền
+- ✅ Admin tool page: xem + thêm + sửa + xóa TK, search user
+- ✅ Course new/edit: chọn từ TK đã lưu, không còn nhập tay
+- ✅ Loại bỏ các trường redundant `stk`, `name_stk`, `bank_stk`, `link_qrcode` khỏi Course model
+- ✅ `npx prisma db push` — Đồng bộ DB
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ Hợp nhất & Tái cấu trúc Tools (2026-07-02)
+
+### Mục tiêu
+Gộp các tool riêng lẻ thành các tool tabs để đơn giản hóa navigation và giảm số lượng entry trong `/tools`.
+
+### Các thay đổi
+
+#### 1. Email Settings → tab trong Email Marketing
+- `email-settings` đã có tab "Cấu Hình" trong email-mkt (`ClientContent.tsx`)
+- Trang standalone `app/tools/email-settings/` không còn cần thiết
+
+#### 2. Quản trị hệ thống → tab trong Genealogy
+- **`components/genealogy/AdminTab.tsx`** (Tạo mới): Component admin system management (stats, table, create/delete system)
+- **`app/tools/genealogy/page.tsx`** (Sửa): Thêm tab bar "🌳 Nhân Mạch" / "⚙️ Quản trị" ở default export, conditionally render `GenealogyFlow` hoặc `GenealogyAdminTab`
+
+#### 3. Gộp Trợ lý tài khoản + Trợ lý ảo → tool "Hỗ trợ" (`/tools/ho-tro`)
+- **`app/tools/ho-tro/page.tsx`** (Tạo mới): Tab bar "🤖 Trợ lý tài khoản" / "🧭 Trợ lý ảo"
+- **`app/tools/ho-tro/AccountAssistantTab.tsx`** (Tạo mới): Quản lý steps trợ lý tài khoản (copy từ account-assistant)
+- **`app/tools/ho-tro/AssistantGuideTab.tsx`** (Tạo mới): Quản lý guide + cấu hình hiển thị (copy từ assistant-guide)
+- Giữ nguyên các trang cũ (`account-assistant`, `assistant-guide`) để tương thích ngược
+
+#### 4. Gộp Trang của tôi + Landing Page + Site Profile → tool "Page" (`/tools/pages`)
+- **`app/tools/pages/page.tsx`** (Tạo mới): Tab bar "🏠 Trang của tôi" / "🚀 Landing Page" / "📄 Site Profile"
+- **`app/tools/pages/MySiteTab.tsx`** (Tạo mới): Hiển thị profile user hiện tại
+- **`app/tools/pages/LandingsTab.tsx`** (Tạo mới): CRUD landing pages
+- **`app/tools/pages/SiteProfilesTab.tsx`** (Tạo mới): Admin quản lý site profiles
+- Xóa các trang cũ khỏi file system (`account-assistant`, `assistant-guide`, `admin`, `email-settings`, `my-site/page.tsx`, `landings/page.tsx`, `site-profiles/page.tsx`)
+- Xóa 7 tool records khỏi DB (`DELETE FROM "Tool"`) — site-profiles, my-site, landings, assistant-guide, email-settings, account-assistant, system-admin
+
+#### 6. Cải thiện tìm kiếm user trong `/tools/bank-accounts`
+- **`app/api/admin/users/list/route.ts`**: Cải thiện search — tách riêng điều kiện `id` khỏi `.filter(Boolean)`, dùng `parseInt` rõ ràng
+- **`app/tools/bank-accounts/page.tsx`**: 
+  - Placeholder: "Nhập mã HV, tên, email..."
+  - Kết quả hiển thị badge `#ID` nổi bật + email dòng phụ
+- Khi nhập số → tìm đúng user theo mã học viên, hiện tên + email
+
+### Trạng thái
+- ✅ Genealogy có tab "Nhân Mạch" + "Quản trị"
+- ✅ Tool "Hỗ trợ" gộp account-assistant + assistant-guide
+- ✅ Tool "Page" gộp my-site + landings + site-profiles
+- ✅ Đã xóa 7 tool records cũ khỏi DB
+- ✅ Tìm kiếm user trong bank-accounts hỗ trợ mã HV (ID)
+- ✅ `npx tsc --noEmit` — 0 lỗi
+

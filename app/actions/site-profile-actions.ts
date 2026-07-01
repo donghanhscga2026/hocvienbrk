@@ -173,6 +173,7 @@ export async function getCoursesForProfile(profile: any) {
     if (profile.courseIds && Array.isArray(profile.courseIds) && profile.courseIds.length > 0) {
       return await prisma.course.findMany({
         where: { id: { in: profile.courseIds }, status: true },
+        include: { courseCategory: true, teacherBankAccount: true },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
     }
@@ -184,6 +185,7 @@ export async function getCoursesForProfile(profile: any) {
 
       return await prisma.course.findMany({
         where: { teacherId: { in: allTeacherIds }, status: true },
+        include: { courseCategory: true, teacherBankAccount: true },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
     }
@@ -191,6 +193,7 @@ export async function getCoursesForProfile(profile: any) {
     // BRK gốc → tất cả khóa học
     return await prisma.course.findMany({
       where: { status: true },
+      include: { courseCategory: true },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
   } catch (error) {

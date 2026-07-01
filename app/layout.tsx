@@ -88,8 +88,6 @@ export default async function RootLayout({
 
   return (
     <html lang="vi" suppressHydrationWarning>
-      <head>
-      </head>
       <body
         className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
         suppressHydrationWarning

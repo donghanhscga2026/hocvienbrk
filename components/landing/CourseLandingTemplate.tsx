@@ -37,6 +37,7 @@ interface CourseLandingTemplateProps {
         link_anh_bia?: string | null
         phi_coc: number
         category?: string | null
+        courseCategory?: { name: string } | null
     }
     lessons: CourseLesson[]
     testimonials: CourseTestimonial[]
@@ -238,10 +239,10 @@ export default function CourseLandingTemplate({
                                         <span>{activeStudentCount} học viên</span>
                                     </div>
                                 </div>
-                                {course.category && (
+                                {(course.courseCategory?.name || course.category) && (
                                     <div className="flex items-center justify-center gap-2 mt-3">
                                         <span className="px-3 py-1 bg-brk-primary/10 text-brk-primary text-xs font-bold uppercase rounded-full">
-                                            {course.category}
+                                            {course.courseCategory?.name || course.category}
                                         </span>
                                     </div>
                                 )}

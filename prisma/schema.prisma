@@ -23,10 +23,6 @@ model User {
   updatedAt                    DateTime              @updatedAt
   passwordChanged              Boolean               @default(false)
   affiliateCode                String?               @unique
-  bankAccount                  String?
-  bankHolder                   String?
-  bankName                     String?
-  idCardNumber                 String?
   accounts                     Account[]
   commissions                  AffiliateCommission[]
   affiliateLinks               AffiliateLink[]
@@ -54,6 +50,7 @@ model User {
   profileMemberships           SiteProfileMember[]
   brkWallet                    BrkWallet?
   brkSystemsCreated            SystemTree[]
+  bankAccounts                 UserBankAccount[]
 
   @@index([email])
   @@index([phone])
@@ -326,6 +323,17 @@ model ReservedId {
   createdAt DateTime @default(now())
 }
 
+model CourseCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  order     Int      @default(0)
+  color     String   @default("#6366f1")
+  icon      String?
+  createdAt DateTime @default(now())
+  courses   Course[]
+}
+
 model Course {
   id            Int                 @id @default(autoincrement())
   id_khoa       String              @unique
@@ -338,11 +346,7 @@ model Course {
   link_anh_bia  String?             @map("link_anh_bia_khoa")
   link_zalo     String?
   phi_coc       Int                 @default(0)
-  stk           String?
-  name_stk      String?
-  bank_stk      String?
   noidung_stk   String?
-  link_qrcode   String?
   file_email    String?
   noidung_email String?
   createdAt     DateTime            @default(now())
@@ -350,8 +354,12 @@ model Course {
   type          CourseType          @default(NORMAL)
   pin           Int                 @default(0)
   category      String              @default("Khác")
+  categoryId    Int?
+  courseCategory CourseCategory?    @relation(fields: [categoryId], references: [id])
   teacherId     Int?
   teacher       User?               @relation(fields: [teacherId], references: [id])
+  teacherBankAccountId Int?
+  teacherBankAccount   UserBankAccount? @relation("CourseTeacherBank", fields: [teacherBankAccountId], references: [id])
   libAccesses   CourseLibAccess[]
   testimonials  CourseTestimonial[]
   enrollments   Enrollment[]
@@ -1413,4 +1421,28 @@ enum PaymentStatus {
   VERIFIED
   REJECTED
   CANCELLED
+}
+
+enum BankAccountType {
+  BANK
+  MOMO
+  ZALOPAY
+  OTHER
+}
+
+model UserBankAccount {
+  id             Int             @id @default(autoincrement())
+  userId         Int
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountType    BankAccountType @default(BANK)
+  accountHolder  String
+  accountNumber  String
+  bankName       String?
+  qrCodeUrl      String?
+  isDefault      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  courses        Course[] @relation("CourseTeacherBank")
+
+  @@index([userId])
 }

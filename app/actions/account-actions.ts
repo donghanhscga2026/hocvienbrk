@@ -87,3 +87,120 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
     return { success: true, message: "Đổi mật khẩu thành công" }
 }
+
+// ==========================================
+// USER BANK ACCOUNT CRUD
+// ==========================================
+export async function getUserBankAccountsAction() {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const userId = parseInt(session.user.id)
+    try {
+        const accounts = await prisma.userBankAccount.findMany({
+            where: { userId },
+            orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        })
+        return { success: true, accounts }
+    } catch (error: any) {
+        console.error("Get bank accounts error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function createUserBankAccountAction(data: {
+    accountType?: string
+    accountHolder: string
+    accountNumber: string
+    bankName?: string
+    qrCodeUrl?: string
+    isDefault?: boolean
+}) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const userId = parseInt(session.user.id)
+    try {
+        if (data.isDefault) {
+            await prisma.userBankAccount.updateMany({
+                where: { userId, isDefault: true },
+                data: { isDefault: false },
+            })
+        }
+
+        const account = await prisma.userBankAccount.create({
+            data: {
+                userId,
+                accountType: (data.accountType as any) || 'BANK',
+                accountHolder: data.accountHolder.trim(),
+                accountNumber: data.accountNumber.trim(),
+                bankName: data.bankName || null,
+                qrCodeUrl: data.qrCodeUrl || null,
+                isDefault: data.isDefault || false,
+            },
+        })
+        revalidatePath('/account-settings')
+        return { success: true, account }
+    } catch (error: any) {
+        console.error("Create bank account error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateUserBankAccountAction(id: number, data: {
+    accountType?: string
+    accountHolder?: string
+    accountNumber?: string
+    bankName?: string
+    qrCodeUrl?: string
+    isDefault?: boolean
+}) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const userId = parseInt(session.user.id)
+    try {
+        const existing = await prisma.userBankAccount.findFirst({ where: { id, userId } })
+        if (!existing) return { success: false, error: "Không tìm thấy tài khoản" }
+
+        if (data.isDefault) {
+            await prisma.userBankAccount.updateMany({
+                where: { userId, isDefault: true, id: { not: id } },
+                data: { isDefault: false },
+            })
+        }
+
+        const updateData: any = {}
+        if (data.accountType) updateData.accountType = data.accountType
+        if (data.accountHolder?.trim()) updateData.accountHolder = data.accountHolder.trim()
+        if (data.accountNumber?.trim()) updateData.accountNumber = data.accountNumber.trim()
+        if (data.bankName !== undefined) updateData.bankName = data.bankName
+        if (data.qrCodeUrl !== undefined) updateData.qrCodeUrl = data.qrCodeUrl
+        if (data.isDefault !== undefined) updateData.isDefault = data.isDefault
+
+        const account = await prisma.userBankAccount.update({ where: { id }, data: updateData })
+        revalidatePath('/account-settings')
+        return { success: true, account }
+    } catch (error: any) {
+        console.error("Update bank account error:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function deleteUserBankAccountAction(id: number) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+
+    const userId = parseInt(session.user.id)
+    try {
+        const existing = await prisma.userBankAccount.findFirst({ where: { id, userId } })
+        if (!existing) return { success: false, error: "Không tìm thấy tài khoản" }
+
+        await prisma.userBankAccount.delete({ where: { id } })
+        revalidatePath('/account-settings')
+        return { success: true }
+    } catch (error: any) {
+        console.error("Delete bank account error:", error)
+        return { success: false, error: error.message }
+    }
+}

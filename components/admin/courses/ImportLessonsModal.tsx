@@ -5,7 +5,7 @@ import { Loader2, X, Upload, FileSpreadsheet, Download } from 'lucide-react'
 
 export function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
     const [file, setFile] = useState<any>(null)
-    const [mode, setMode] = useState<'upsert' | 'skip'>('upsert')
+    const [mode, setMode] = useState<'upsert' | 'skip' | 'append'>('append')
     const [sourceType, setSourceType] = useState<'file' | 'sheet'>('file')
     const [sheetUrl, setSheetUrl] = useState('')
     const [importing, setImporting] = useState(false)
@@ -98,10 +98,14 @@ export function ImportLessonsModal({ courseId, onClose, onComplete }: { courseId
 
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Khi bài học đã tồn tại</label>
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
+                            <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'append' ? 'border-green-500 bg-green-50' : 'border-gray-100'}`}>
+                                <input type="radio" name="mode" value="append" checked={mode === 'append'} onChange={() => setMode('append')} className="hidden" />
+                                <span className={`text-xs font-bold ${mode === 'append' ? 'text-green-700' : 'text-gray-500'}`}>Thêm mới</span>
+                            </label>
                             <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'upsert' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
                                 <input type="radio" name="mode" value="upsert" checked={mode === 'upsert'} onChange={() => setMode('upsert')} className="hidden" />
-                                <span className={`text-xs font-bold ${mode === 'upsert' ? 'text-purple-700' : 'text-gray-500'}`}>Cập nhật</span>
+                                <span className={`text-xs font-bold ${mode === 'upsert' ? 'text-purple-700' : 'text-gray-500'}`}>Ghi đè</span>
                             </label>
                             <label className={`flex-1 p-3 rounded-xl border cursor-pointer transition-all ${mode === 'skip' ? 'border-purple-500 bg-purple-50' : 'border-gray-100'}`}>
                                 <input type="radio" name="mode" value="skip" checked={mode === 'skip'} onChange={() => setMode('skip')} className="hidden" />

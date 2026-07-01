@@ -686,7 +686,7 @@ export async function getAdminCoursesAction() {
         const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
         const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
         const where = isAdmin ? {} : { teacherId: userId }
-        const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true }, orderBy: { id: 'asc' } })
+        const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
         return { success: true, courses, isAdmin, userId }
     } catch (error: any) { return { success: false, error: error.message } }
 }
@@ -777,7 +777,7 @@ export async function getMemberDetailsAction(userId: number) {
 export async function getReservedIds() {
     await checkAdmin()
     return await prisma.reservedId.findMany({
-        orderBy: { id: 'asc' }
+orderBy: { id: 'desc' }
     })
 }
 
@@ -862,9 +862,7 @@ export async function updateCourseAction(courseId: number, data: {
     phi_coc?: number,
     id_khoa?: string,
     noidung_email?: string | null,
-    stk?: string | null,
-    name_stk?: string | null,
-    bank_stk?: string | null,
+    categoryId?: number | null,
     category?: string,
     type?: any,
     status?: boolean,
@@ -874,10 +872,10 @@ export async function updateCourseAction(courseId: number, data: {
     mo_ta_dai?: string | null,
     link_anh_bia?: string | null,
     noidung_stk?: string | null,
-    link_qrcode?: string | null,
     link_zalo?: string | null,
     file_email?: string | null,
-    teacherId?: number | null
+    teacherId?: number | null,
+    teacherBankAccountId?: number | null
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
@@ -898,6 +896,16 @@ export async function updateCourseAction(courseId: number, data: {
         const isTeacherOwner = session.user.role === Role.TEACHER && course.teacherId === userId
         if (!isAdmin && !isTeacherOwner) {
             return { success: false, error: "Bạn không có quyền sửa khóa học này" }
+        }
+
+        // ✅ Auto-resolve category name from categoryId
+        if (data.categoryId !== undefined) {
+            if (data.categoryId) {
+                const cat = await prisma.courseCategory.findUnique({ where: { id: data.categoryId } })
+                if (cat) data.category = cat.name
+            } else {
+                data.category = 'Khác'
+            }
         }
 
         const updatedCourse = await prisma.course.update({

@@ -1615,9 +1615,36 @@ function InfoItem({ icon, label, value }: { icon: any, label: string, value: str
 }
 
 export default function GenealogyPage() {
+  const [pageTab, setPageTab] = useState<'genealogy' | 'admin'>('genealogy')
+
+  if (pageTab === 'admin') return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="flex items-center gap-1 px-4 py-3 bg-white border-b border-gray-100">
+        <button onClick={() => setPageTab('genealogy')} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
+          🌳 Nhân Mạch
+        </button>
+        <button onClick={() => setPageTab('admin')} className="px-4 py-2 rounded-xl text-xs font-bold bg-black text-yellow-400 shadow-sm transition-all">
+          ⚙️ Quản trị
+        </button>
+      </div>
+      <GenealogyAdminTab />
+    </div>
+  )
+
   return (
     <ReactFlowProvider>
+      <div className="flex items-center gap-1 px-4 py-3 bg-white border-b border-gray-100 z-10 relative">
+        <button onClick={() => setPageTab('genealogy')} className="px-4 py-2 rounded-xl text-xs font-bold bg-black text-yellow-400 shadow-sm transition-all">
+          🌳 Nhân Mạch
+        </button>
+        <button onClick={() => setPageTab('admin')} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
+          ⚙️ Quản trị
+        </button>
+      </div>
       <GenealogyFlow />
     </ReactFlowProvider>
   )
 }
+
+// Dynamically import AdminTab để tránh circular dependency
+import GenealogyAdminTab from '@/components/genealogy/AdminTab'

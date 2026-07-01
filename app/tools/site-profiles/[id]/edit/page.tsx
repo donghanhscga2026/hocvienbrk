@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { Shield, AlertCircle } from 'lucide-react'
+import { Shield, AlertCircle, ArrowLeft } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { getSiteProfileAdminById, updateSiteProfile } from '@/app/actions/site-profile-actions'
 import ProfileMemberManager from '@/components/admin/ProfileMemberManager'
@@ -220,6 +220,9 @@ export default function EditSiteProfilePage({ params }: PageProps) {
       <MainHeader title={`CHỈNH SỬA: ${profile.slug}`} />
 
       <div className="max-w-4xl mx-auto p-6">
+        <Link href="/tools/site-profiles" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors mb-6">
+          <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
+        </Link>
         <form onSubmit={handleSubmit} className="space-y-8">
           {message && (
             <div className={`rounded-xl p-4 text-sm ${
