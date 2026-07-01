@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { useState, useEffect, Suspense } from 'react'
-import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings, Layout, Loader2, Share2, Copy, X } from 'lucide-react'
+import { CreditCard, Users, BookOpen, Map, FileText, Gem, Mail, ArrowLeft, Youtube, DollarSign, Lock, Settings, Layout, Loader2, Share2, Copy, X, Globe, Wallet } from 'lucide-react'
 import { Role } from '@prisma/client'
 
 import MainHeader from '@/components/layout/MainHeader'
@@ -41,6 +41,8 @@ const iconMap: Record<string, any> = {
   Map,
   Mail,
   Layout,
+  Globe,
+  Wallet,
 }
 
 const colorMap: Record<string, string> = {
@@ -57,6 +59,8 @@ const colorMap: Record<string, string> = {
   bgTeal500: 'bg-teal-500',
   bgPink500: 'bg-pink-500',
   bgRed400: 'bg-red-400',
+  bgViolet500: 'bg-violet-500',
+  bgAmber500: 'bg-amber-500',
 }
 
 function getIconComponent(iconName: string | null) {

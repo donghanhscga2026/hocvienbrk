@@ -1,7 +1,9 @@
 # ============================================================
-#  backup.ps1 - HocVien-BRK Project Backup Script (Git-Sync Version)
+#  backup.ps1 - HocVien-BRK Project Backup Script (Full)
 #  Usage: .\scripts\backup.ps1
-#  Creates a timestamped ZIP of all Git-tracked files + sensitive configs.
+#  Backs up:
+#    1. Git-tracked files + sensitive configs → backup_*.zip
+#    2. Database (via npx tsx scripts/backup-db.ts) → db_*/
 # ============================================================
 
 $ProjectRoot = (Resolve-Path "$PSScriptRoot\..").Path
@@ -116,14 +118,28 @@ $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 2)
 
 Write-Host ""
 Write-Host "======================================" -ForegroundColor Green
-Write-Host "  Backup complete!" -ForegroundColor Green
+Write-Host "  File backup complete!" -ForegroundColor Green
 Write-Host "  File : $ZipName" -ForegroundColor Green
 Write-Host "  Size : ${sizeMB} MB" -ForegroundColor Green
 Write-Host "  Files: $($FilesToBackup.Count)" -ForegroundColor Green
 Write-Host "======================================" -ForegroundColor Green
 Write-Host ""
 
-# 7. Rotation: Keep only the 5 most recent backups
+# 7. Database backup (via Prisma → JSON)
+Write-Host ""
+Write-Host "[*] Backing up database..." -ForegroundColor Yellow
+Push-Location $ProjectRoot
+try {
+    $dbOutput = npx tsx scripts/backup-db.ts 2>&1
+    Write-Host $dbOutput -ForegroundColor Gray
+    Write-Host "[+] Database backup complete!" -ForegroundColor Green
+} catch {
+    Write-Host "[!] Database backup failed: $_" -ForegroundColor Yellow
+    Write-Host "[!] You can run it separately: npx tsx scripts/backup-db.ts" -ForegroundColor Yellow
+}
+Pop-Location
+
+# 8. Rotation: Keep only the 5 most recent backups
 $OldBackups = Get-ChildItem -Path $BackupDir -Filter "backup_*.zip" |
     Sort-Object LastWriteTime -Descending |
     Select-Object -Skip 5
