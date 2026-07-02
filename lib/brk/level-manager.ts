@@ -65,7 +65,18 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
   if (!config || config.giftValue <= 0) throw new Error('No gift available for this level')
 
   if (config.timeLimitDays) {
-    const deadline = new Date(lastRecord.promotedAt.getTime() + config.timeLimitDays * 24 * 60 * 60 * 1000)
+    let baseDate: Date
+    if (config.level === 2) {
+      baseDate = systemRec.activatedAt!
+    } else {
+      const prevLevelUp = await prisma.brkLevelUpRecord.findFirst({
+        where: { userId, onSystem, toLevel: config.level - 1 },
+        orderBy: { promotedAt: 'desc' }
+      })
+      if (!prevLevelUp) throw new Error('Previous level-up record not found')
+      baseDate = prevLevelUp.promotedAt
+    }
+    const deadline = new Date(baseDate.getTime() + config.timeLimitDays * 24 * 60 * 60 * 1000)
     if (new Date() > deadline) throw new Error('Gift claim period has expired')
   }
 

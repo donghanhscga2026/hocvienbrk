@@ -5,6 +5,7 @@ import { ensureBrkWallet } from './wallet-service'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
 import { distributeCommission } from './commission-calculator'
 import { checkAndPromoteLevel } from './level-manager'
+import { resolvePlacement } from './placement-rules'
 
 export async function activateBrkMember(
   userId: number,
@@ -31,15 +32,7 @@ export async function activateBrkMember(
     }
   }
 
-  let refSysId = 0
-  if (user.referrerId) {
-    const referrerSystem = await prisma.system.findUnique({
-      where: { userId_onSystem: { userId: user.referrerId, onSystem } }
-    })
-    if (referrerSystem) {
-      refSysId = referrerSystem.autoId
-    }
-  }
+  const refSysId = await resolvePlacement(onSystem, user.referrerId)
 
   const system = await prisma.system.upsert({
     where: { userId_onSystem: { userId, onSystem } },
@@ -67,8 +60,7 @@ export async function activateBrkMember(
 
   await ensureBrkWallet(userId)
 
-  const initialPoints = fee * Number(systemTree.pointsPerDollar)
-  const selfPoints = fee * Number(systemTree.pointsPerDollar)
+  const selfPoints = Math.round((fee * Number(systemTree.pointsPerDollar)) / 1000)
   await prisma.system.update({
     where: { autoId: system.autoId },
     data: { totalPoints: { increment: selfPoints } }

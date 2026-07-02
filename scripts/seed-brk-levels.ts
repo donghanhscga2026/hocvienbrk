@@ -22,7 +22,7 @@ async function main() {
         returnPct: 21.0,
         revenueSharePct: 2.0,
         revenueShareIntervalDays: 3,
-        pointsPerDollar: 17,
+        pointsPerDollar: 0.56,
       }
     })
     console.log(`✅ Tạo SystemTree: ${systemTree.nameSystem} (onSystem=${systemId})`)

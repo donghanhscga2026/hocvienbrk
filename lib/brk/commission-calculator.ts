@@ -45,7 +45,7 @@ export async function distributeCommission(
 
     const commissionAmount = (fee * earnPct) / 100
 
-    const pointsEarned = fee * Number(systemTree.pointsPerDollar)
+    const pointsEarned = Math.round((fee * Number(systemTree.pointsPerDollar)) / 1000)
     await prisma.system.update({
       where: { autoId: uplineSystem.autoId },
       data: { totalPoints: { increment: pointsEarned } }
