@@ -13,7 +13,8 @@ interface PageProps {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-    const { id } = await params
+    let { id } = await params
+    id = id.replace(/\$+$/, '')
 
     const course = await prisma.course.findUnique({
         where: { id_khoa: id }
@@ -40,10 +41,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function KhoaHocPage({ params }: PageProps) {
-    const { id } = await params
+    let { id } = await params
     const session = await auth()
 
-    const course = await prisma.course.findUnique({
+    id = id.replace(/\$+$/, '')
+
+    let course = await prisma.course.findUnique({
         where: { id_khoa: id }
     })
 
