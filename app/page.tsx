@@ -93,7 +93,7 @@ export default async function Home() {
             courseId: true,
             status: true,
             startedAt: true,
-            payment: { select: { id: true, status: true, proofImage: true } },
+            payment: { select: { id: true, status: true, proofImage: true, qrCodeUrl: true, transferContent: true, amount: true, bankName: true, accountNumber: true } },
             course: { select: { _count: { select: { lessons: true } } } },
             _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
           }

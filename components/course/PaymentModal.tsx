@@ -4,6 +4,7 @@
 import React, { useState } from 'react'
 import Image from 'next/image'
 import UploadProofModal from '@/components/payment/UploadProofModal'
+import { resolveBankBin } from '@/lib/bank-bin'
 
 interface PaymentModalProps {
     course: any
@@ -49,10 +50,9 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
     const effectiveContent = payment?.transferContent || `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase().slice(0, 50)
     
     const bankAcc = course.teacherBankAccount
-    const bankMap: Record<string, string> = { 'SACOMBANK': '970403', 'VCB': '970436', 'ACB': '970416', 'MB': '970422', 'TCB': '970407' }
-    const bankId = bankAcc?.bankName ? bankMap[bankAcc.bankName.toUpperCase()] || '970403' : '970403'
+    const bankId = resolveBankBin(bankAcc?.bankName)
 
-    const qrCodeUrl = payment?.qrCodeUrl || bankAcc?.qrCodeUrl || `https://img.vietqr.io/image/${bankId}-${bankAcc?.accountNumber || ''}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(effectiveContent)}&accountName=${encodeURIComponent(bankAcc?.accountHolder || '')}`
+    const qrCodeUrl = payment?.qrCodeUrl || `https://img.vietqr.io/image/${bankId}-${bankAcc?.accountNumber || ''}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(effectiveContent)}&accountName=${encodeURIComponent(bankAcc?.accountHolder || '')}` || bankAcc?.qrCodeUrl
     
     const handleUploadSuccess = () => {
         setUploaded(true)
@@ -138,19 +138,19 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
                             </div>
 
                             <div className="space-y-1.5 sm:space-y-2 px-1">
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Ngân hàng</span>
+                                    <span className="text-xs sm:text-sm font-bold text-gray-800 truncate">{payment?.bankName || bankAcc?.bankName || 'N/A'}</span>
+                                </div>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Ngân hàng</span>
-                                        <span className="text-xs sm:text-sm font-bold text-gray-800 truncate">{payment?.bankName || bankAcc?.bankName || 'N/A'}</span>
-                                    </div>
                                     <div className="flex flex-col">
                                         <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Số tài khoản</span>
                                         <span className="text-xs sm:text-sm font-bold text-gray-800 select-all">{payment?.accountNumber || bankAcc?.accountNumber || 'N/A'}</span>
                                     </div>
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Chủ tài khoản</span>
-                                    <span className="text-xs sm:text-sm font-bold text-gray-800">{bankAcc?.accountHolder || 'N/A'}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none mb-0.5">Chủ tài khoản</span>
+                                        <span className="text-xs sm:text-sm font-bold text-gray-800">{bankAcc?.accountHolder || 'N/A'}</span>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase leading-none shrink-0">Nội dung:</span>

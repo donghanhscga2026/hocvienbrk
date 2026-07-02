@@ -193,7 +193,7 @@ export async function getCoursesForProfile(profile: any) {
     // BRK gốc → tất cả khóa học
     return await prisma.course.findMany({
       where: { status: true },
-      include: { courseCategory: true },
+      include: { courseCategory: true, teacherBankAccount: true },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
   } catch (error) {

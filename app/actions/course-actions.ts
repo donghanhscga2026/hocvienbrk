@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { createPaymentQR } from "@/lib/vietqr"
+import { resolveBankBin } from "@/lib/bank-bin"
 
 /**
  * Đăng ký khóa học mới
@@ -70,7 +71,23 @@ export async function enrollInCourseAction(courseId: number) {
             where: { userId_courseId: { userId, courseId } }
         })
 
-        if (existing) return { success: true, status: existing.status }
+        if (existing) {
+            const existingWithPayment = await prisma.enrollment.findUnique({
+                where: { id: existing.id },
+                select: {
+                    id: true,
+                    status: true,
+                    payment: {
+                        select: {
+                            id: true, status: true, amount: true,
+                            qrCodeUrl: true, transferContent: true,
+                            bankName: true, accountNumber: true, proofImage: true
+                        }
+                    }
+                }
+            })
+            return { success: true, status: existing.status, enrollment: existingWithPayment }
+        }
 
         const isAutoActive = effectivePhiCoc === 0
         const newEnrollment = await prisma.enrollment.create({
@@ -107,10 +124,10 @@ export async function enrollInCourseAction(courseId: number) {
             let qrCodeUrl = null
             let transferContent = null
 
-            if (user?.phone && bankAcc.accountNumber) {
+            if (bankAcc.accountNumber) {
                 try {
                     const qrResult = await createPaymentQR({
-                        phone: user.phone,
+                        phone: user?.phone || '',
                         userId: userId,
                         courseId: courseId,
                         courseCode: course.id_khoa,
@@ -126,9 +143,14 @@ export async function enrollInCourseAction(courseId: number) {
                 }
             }
 
+            const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
             if (!transferContent) {
-                const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
                 transferContent = `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase()
+            }
+
+            if (!qrCodeUrl) {
+                const bankId = resolveBankBin(bankAcc.bankName)
+                qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectivePhiCoc}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
             }
 
             await prisma.payment.create({
@@ -145,9 +167,30 @@ export async function enrollInCourseAction(courseId: number) {
             })
         }
 
+        // Lấy enrollment + payment đầy đủ để trả về cho client
+        const enrolledData = await prisma.enrollment.findUnique({
+            where: { id: newEnrollment.id },
+            select: {
+                id: true,
+                status: true,
+                payment: {
+                    select: {
+                        id: true,
+                        status: true,
+                        amount: true,
+                        qrCodeUrl: true,
+                        transferContent: true,
+                        bankName: true,
+                        accountNumber: true,
+                        proofImage: true
+                    }
+                }
+            }
+        })
+
         revalidatePath('/')
         revalidatePath('/courses')
-        return { success: true, status: newEnrollment.status }
+        return { success: true, status: newEnrollment.status, enrollment: enrolledData }
     } catch (error: any) {
         console.error("Enroll Course Error:", error)
         return { success: false, message: error.message || "Không thể đăng ký khóa học." }
