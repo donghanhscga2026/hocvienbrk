@@ -1,0 +1,70 @@
+const BIN_MAP: Record<string, string> = {
+  '970403': '970403', 'SACOMBANK': '970403', 'STB': '970403',
+  'NGÂN HÀNG TMCP SÀI GÒN THƯƠNG TÍN': '970403',
+  'SAIGON THUONG TIN': '970403',
+
+  '970436': '970436', 'VIETCOMBANK': '970436', 'VCB': '970436',
+
+  '970416': '970416', 'ACB': '970416',
+  'NGÂN HÀNG TMCP Á CHÂU': '970416',
+
+  '970422': '970422', 'MBBANK': '970422', 'MB': '970422',
+  'NGÂN HÀNG TMCP QUÂN ĐỘI': '970422',
+
+  '970407': '970407', 'TECHCOMBANK': '970407', 'TCB': '970407',
+  'NGÂN HÀNG TMCP KỸ THƯƠNG VIỆT NAM': '970407',
+
+  '970415': '970415', 'VIETINBANK': '970415', 'CTG': '970415',
+
+  '970418': '970418', 'BIDV': '970418',
+
+  '970405': '970405', 'AGRIBANK': '970405',
+
+  '970423': '970423', 'TPBANK': '970423', 'TPB': '970423',
+  'NGÂN HÀNG TMCP TIÊN PHONG': '970423',
+
+  '970432': '970432', 'VPBANK': '970432', 'VPB': '970432',
+  'NGÂN HÀNG TMCP VIỆT NAM THỊNH VƯỢNG': '970432',
+
+  '970441': '970441', 'VIB': '970441',
+  'NGÂN HÀNG TMCP QUỐC TẾ VIỆT NAM': '970441',
+
+  '970449': '970449', 'LPB': '970449', 'LPBANK': '970449',
+  'NGÂN HÀNG TMCP LỘC PHÁT VIỆT NAM': '970449',
+
+  '970437': '970437', 'HDB': '970437', 'HDBANK': '970437',
+  'NGÂN HÀNG TMCP PHÁT TRIỂN THÀNH PHỐ HỒ CHÍ MINH': '970437',
+
+  '970425': '970425', 'ABB': '970425', 'ABBANK': '970425',
+  'NGÂN HÀNG TMCP AN BÌNH': '970425',
+
+  '970431': '970431', 'EIB': '970431', 'EXIMBANK': '970431',
+  'NGÂN HÀNG TMCP XUẤT NHẬP KHẨU VIỆT NAM': '970431',
+
+  '970426': '970426', 'MSB': '970426',
+  'NGÂN HÀNG TMCP HÀNG HẢI VIỆT NAM': '970426',
+
+  '970438': '970438', 'BVB': '970438', 'BAOVIETBANK': '970438',
+  'NGÂN HÀNG TMCP BẢO VIỆT': '970438',
+
+  '970443': '970443', 'SHB': '970443',
+  'NGÂN HÀNG TMCP SÀI GÒN - HÀ NỘI': '970443',
+
+  '970408': '970408', 'GPB': '970408', 'GPBANK': '970408',
+
+  '970406': '970406', 'VIKKI': '970406',
+
+  '970414': '970414', 'MBV': '970414',
+
+  '970454': '970454', 'VCCB': '970454', 'VIETCAPITALBANK': '970454',
+
+  '970409': '970409', 'BAB': '970409', 'BACABANK': '970409',
+
+  '970452': '970452', 'KLB': '970452', 'KIENLONGBANK': '970452',
+}
+
+export function resolveBankBin(bankName: string | null | undefined): string {
+  if (!bankName) return '970403'
+  const key = bankName.toUpperCase().trim()
+  return BIN_MAP[key] || '970403'
+}

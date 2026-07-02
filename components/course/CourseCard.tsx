@@ -45,9 +45,11 @@ interface CourseCardProps {
     profileSlug?: string | null
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [showShare, setShowShare] = useState(false)
+    const [localEnrollment, setLocalEnrollment] = useState<any>(null)
+    const enrollment = localEnrollment || propEnrollment
     const [showToc, setShowToc] = useState(false)
     const [loading, setLoading] = useState(false)
     const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
@@ -106,11 +108,11 @@ export default function CourseCard({ course, isLoggedIn, enrollment, isCourseOne
             } else {
                 setLoading(true)
                 try {
-                    const res = await enrollInCourseAction(course.id)
+                    const res: any = await enrollInCourseAction(course.id)
                     if (res.success) {
-                        // Sau khi enroll thành công, component sẽ re-render do revalidatePath.
-                        // Chúng ta cần đảm bảo setShowPayment(true) được giữ lại.
-                        // Sử dụng timeout nhỏ để chạy sau chu kỳ re-render của Next.js
+                        if (res.enrollment) {
+                            setLocalEnrollment(res.enrollment)
+                        }
                         setTimeout(() => setShowPayment(true), 100)
                     }
                 } catch (err: any) {

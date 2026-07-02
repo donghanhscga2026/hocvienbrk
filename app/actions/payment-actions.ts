@@ -194,19 +194,16 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
       return { success: false, error: "Forbidden" }
     }
 
-    const payment = await prisma.payment.update({
-      where: { enrollmentId },
-      data: {
-        status: 'REJECTED',
-        note: reason,
-        verifyMethod: 'MANUAL_ADMIN'
-      }
+    // Xóa enrollment (cascade sẽ xóa luôn payment) để học viên có thể kích hoạt lại từ đầu
+    await prisma.enrollment.delete({
+      where: { id: enrollmentId }
     })
 
     revalidatePath('/')
     revalidatePath('/courses')
+    revalidatePath('/tools/payments')
 
-    return { success: true, payment }
+    return { success: true }
   } catch (error: any) {
     console.error("Reject Payment Error:", error)
     return { success: false, error: error.message }
