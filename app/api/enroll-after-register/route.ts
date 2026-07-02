@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const isAutoActive = effectivePhiCoc === 0
 
-    await prisma.enrollment.create({
+    const newEnrollment = await prisma.enrollment.create({
       data: {
         userId: userIdNum,
         courseId: course.id,
@@ -83,6 +83,14 @@ export async function POST(request: NextRequest) {
 
       if (user?.email) {
         await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email)
+      }
+
+      // Xử lý commission cho enrollment miễn phí
+      try {
+        const { processEnrollmentCommission } = await import("@/lib/affiliate/commission-calculator")
+        await processEnrollmentCommission(userIdNum, newEnrollment.id, course.phi_coc)
+      } catch (e) {
+        console.error("[EnrollAfterRegister] Commission error:", e)
       }
     }
 

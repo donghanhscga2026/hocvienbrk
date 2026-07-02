@@ -8,6 +8,7 @@ import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { addUserToClosure } from "@/lib/closure-helpers"
 import { trackAffiliateConversion } from "@/lib/affiliate/tracking"
+import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { cookies } from "next/headers"
 import { auth } from "@/auth"
 
@@ -114,7 +115,13 @@ export async function registerUser(prevState: any, formData: FormData) {
             try {
                 const affData = JSON.parse(decodeURIComponent(affRefCookie.value));
                 if (affData.r) {
+                    // Thử parse trực tiếp số
                     refId = parseInt(affData.r);
+                    // Nếu không phải số (custom alias), resolve qua DB
+                    if (isNaN(refId) || refId <= 0) {
+                        const resolved = await resolveRefToUserId(affData.r);
+                        refId = resolved;
+                    }
                 }
             } catch (e) {
                 console.error("[Affiliate] Lỗi parse cookie aff_ref:", e);

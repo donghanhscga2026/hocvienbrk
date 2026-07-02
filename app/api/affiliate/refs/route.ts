@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 
-// Validation: max 10 chars, a-z0-9 only
 function isValidRefKey(key: string): boolean {
   return /^[a-z0-9]{1,10}$/.test(key)
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // For testing: bypass auth and use userId=0
-    const userId = 0
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const userId = parseInt(session.user.id)
 
     const refs = await prisma.affiliateRef.findMany({
       where: { userId },
@@ -36,7 +39,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { refKey, description, type } = body
 
-    // Validate refKey
     if (!refKey) {
       return NextResponse.json({ error: "refKey is required" }, { status: 400 })
     }
@@ -49,7 +51,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check if refKey already exists
     const existing = await prisma.affiliateRef.findUnique({
       where: { refKey: normalizedKey }
     })
@@ -60,7 +61,6 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    // Also check in User table for duplicate
     if (!isNaN(parseInt(normalizedKey))) {
       const userExists = await prisma.user.findUnique({
         where: { id: parseInt(normalizedKey) }
@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    // Create the ref
     const newRef = await prisma.affiliateRef.create({
       data: {
         refKey: normalizedKey,
@@ -119,7 +118,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "refId is required" }, { status: 400 })
     }
 
-    // Verify ownership
     const existing = await prisma.affiliateRef.findFirst({
       where: { id: refId, userId }
     })
@@ -159,7 +157,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
 
-    // Verify ownership
     const existing = await prisma.affiliateRef.findFirst({
       where: { id: parseInt(refId), userId }
     })

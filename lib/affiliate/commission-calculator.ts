@@ -22,6 +22,15 @@ export async function processEnrollmentCommission(
 ) {
     const { landingSlug } = options || {}
     try {
+        // 0. Check idempotency: tránh tạo duplicate conversion cho cùng enrollment
+        const existingConversion = await prisma.affiliateConversion.findFirst({
+            where: { enrollmentId }
+        })
+        if (existingConversion) {
+            console.log(`[Commission] Duplicate enrollment #${enrollmentId} skipped`)
+            return { success: true, message: 'Already processed' }
+        }
+
         // 1. Tìm thông tin user và referrer
         const user = await prisma.user.findUnique({
             where: { id: userId },
