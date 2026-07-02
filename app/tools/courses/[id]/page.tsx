@@ -51,6 +51,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [teacherBankAccountId, setTeacherBankAccountId] = useState<number | null>(null)
     
     // ✅ NEW: Section 3 - Fee & Payment
+    const [vipExempt, setVipExempt] = useState(false)
     const [noidungStk, setNoidungStk] = useState('')
     
     // ✅ NEW: Section 4 - Email & Zalo
@@ -173,6 +174,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setLinkAnhBia(res.link_anh_bia || '')
                 
                 setNoidungStk(res.noidung_stk || '')
+                setVipExempt(res.vipExempt ?? false)
                 
                 setLinkZalo(res.link_zalo || '')
                 setFileEmail(res.file_email || '')
@@ -204,6 +206,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             mo_ta_dai: moTaDai || null,
             link_anh_bia: linkAnhBia || null,
             phi_coc: phiCoc,
+            vipExempt,
             noidung_stk: noidungStk || null,
             link_zalo: linkZalo || null,
             file_email: fileEmail || null,
@@ -419,6 +422,13 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
                             <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">VIP</label>
+                            <label className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
+                                <input type="checkbox" checked={vipExempt} onChange={(e) => setVipExempt(e.target.checked)} className="w-5 h-5 rounded" />
+                                <span className="text-sm font-bold text-gray-700">Không áp dụng VIP</span>
+                            </label>
                         </div>
                     </div>
                     

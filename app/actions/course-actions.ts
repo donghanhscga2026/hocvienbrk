@@ -20,6 +20,7 @@ export async function enrollInCourseAction(courseId: number) {
             where: { id: courseId },
             select: {
                 phi_coc: true,
+                vipExempt: true,
                 id_khoa: true,
                 name_lop: true,
                 noidung_email: true,
@@ -62,7 +63,7 @@ export async function enrollInCourseAction(courseId: number) {
                     status: 'ACTIVE'
                 }
             })
-            if (vipEnrollment) effectivePhiCoc = 0
+            if (vipEnrollment && !course.vipExempt) effectivePhiCoc = 0
         }
 
         const existing = await prisma.enrollment.findUnique({
@@ -149,7 +150,7 @@ export async function enrollInCourseAction(courseId: number) {
         return { success: true, status: newEnrollment.status }
     } catch (error: any) {
         console.error("Enroll Course Error:", error)
-        throw new Error(error.message || "Không thể đăng ký khóa học.")
+        return { success: false, message: error.message || "Không thể đăng ký khóa học." }
     }
 }
 
@@ -535,6 +536,7 @@ export async function createCourseAction(formData: FormData) {
             mo_ta_dai: formData.get('mo_ta_dai') as string || null,
             link_anh_bia: formData.get('link_anh_bia') as string || null,
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
+            vipExempt: formData.get('vipExempt') === 'true',
             noidung_stk: formData.get('noidung_stk') as string || null,
             link_zalo: formData.get('link_zalo') as string || null,
             file_email: formData.get('file_email') as string || null,

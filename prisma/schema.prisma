@@ -346,6 +346,7 @@ model Course {
   link_anh_bia  String?             @map("link_anh_bia_khoa")
   link_zalo     String?
   phi_coc       Int                 @default(0)
+  vipExempt     Boolean             @default(false)
   noidung_stk   String?
   file_email    String?
   noidung_email String?
