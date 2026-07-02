@@ -45,8 +45,8 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
     const shareUrl = (() => {
         if (shareType === 'course' && course?.id_khoa) {
             return affiliateCode
-                ? `${baseUrl}/khoa-hoc/${course.id_khoa}?ref=${encodeURIComponent(affiliateCode)}`
-                : `${baseUrl}/khoa-hoc/${course.id_khoa}`
+                ? `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}?ref=${encodeURIComponent(affiliateCode)}`
+                : `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}`
         }
         if (profileSlug) {
             return affiliateCode

@@ -10,6 +10,7 @@ import {
 import { enrollInCourseAction } from '@/app/actions/course-actions'
 import { useRouter } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
+import PaymentModal from '@/components/course/PaymentModal'
 
 interface CourseLesson {
     id: string
@@ -67,9 +68,12 @@ export default function CourseLandingTemplate({
     const [loading, setLoading] = useState(false)
     const [showAllLessons, setShowAllLessons] = useState(false)
     const [copied, setCopied] = useState(false)
+    const [showPayment, setShowPayment] = useState(false)
+    const [localEnrollment, setLocalEnrollment] = useState<any>(null)
     
-    const isEnrolled = enrollment?.status === 'ACTIVE'
-    const isPending = enrollment?.status === 'PENDING'
+    const effectiveEnrollment = localEnrollment || enrollment
+    const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
+    const isPending = effectiveEnrollment?.status === 'PENDING'
     const effectivePhiCoc = (isCourseOneActive && !course.vipExempt) ? 0 : course.phi_coc
     
     const displayLessons = showAllLessons ? lessons : lessons.slice(0, 3)
@@ -83,9 +87,16 @@ export default function CourseLandingTemplate({
         
         setLoading(true)
         try {
-            const res = await enrollInCourseAction(course.id)
+            const res: any = await enrollInCourseAction(course.id)
             if (res.success) {
-                router.push(`/courses/${course.id_khoa}/learn`)
+                if (res.enrollment) {
+                    setLocalEnrollment(res.enrollment)
+                }
+                if (effectivePhiCoc === 0) {
+                    router.push(`/courses/${course.id_khoa}/learn`)
+                } else {
+                    setTimeout(() => setShowPayment(true), 100)
+                }
             } else {
                 alert((res as any).message || 'Có lỗi xảy ra')
             }
@@ -98,7 +109,7 @@ export default function CourseLandingTemplate({
     
     const handleCopyShareLink = async () => {
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-        const link = `${baseUrl}/khoa-hoc/${course.id_khoa}${userId ? `?ref=${userId}` : ''}`
+        const link = `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}${userId ? `?ref=${userId}` : ''}`
         try {
             await navigator.clipboard.writeText(link)
             setCopied(true)
@@ -433,6 +444,17 @@ export default function CourseLandingTemplate({
             <footer className="py-8 text-center text-brk-muted text-sm">
                 <p>© 2026 Học viện BRK. All rights reserved.</p>
             </footer>
+
+            {showPayment && (
+                <PaymentModal
+                    course={course}
+                    enrollment={effectiveEnrollment}
+                    isCourseOneActive={isCourseOneActive}
+                    userPhone={userPhone}
+                    userId={userId}
+                    onClose={() => setShowPayment(false)}
+                />
+            )}
         </div>
     )
 }
