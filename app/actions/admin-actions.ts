@@ -875,7 +875,8 @@ export async function updateCourseAction(courseId: number, data: {
     link_zalo?: string | null,
     file_email?: string | null,
     teacherId?: number | null,
-    teacherBankAccountId?: number | null
+    teacherBankAccountId?: number | null,
+    vipExempt?: boolean
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }

@@ -36,6 +36,7 @@ interface CourseLandingTemplateProps {
         mo_ta_dai?: string | null
         link_anh_bia?: string | null
         phi_coc: number
+        vipExempt: boolean
         category?: string | null
         courseCategory?: { name: string } | null
     }
@@ -69,7 +70,7 @@ export default function CourseLandingTemplate({
     
     const isEnrolled = enrollment?.status === 'ACTIVE'
     const isPending = enrollment?.status === 'PENDING'
-    const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
+    const effectivePhiCoc = (isCourseOneActive && !course.vipExempt) ? 0 : course.phi_coc
     
     const displayLessons = showAllLessons ? lessons : lessons.slice(0, 3)
     const hasMoreLessons = lessons.length > 3

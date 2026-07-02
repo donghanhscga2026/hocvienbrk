@@ -52,6 +52,7 @@ function CreateCourseContent() {
     
     // Section3: Học phí & Thanh toán
     const [phiCoc, setPhiCoc] = useState(0)
+    const [vipExempt, setVipExempt] = useState(false)
     const [noidungStk, setNoidungStk] = useState('')
     
     // Section4: Email & Zalo
@@ -166,6 +167,7 @@ function CreateCourseContent() {
                         setLinkAnhBia(courseRes.link_anh_bia || '')
                         
                         setPhiCoc(courseRes.phi_coc || 0)
+                        setVipExempt(courseRes.vipExempt ?? false)
                         setNoidungStk(courseRes.noidung_stk || '')
                         
                         setLinkZalo(courseRes.link_zalo || '')
@@ -227,6 +229,7 @@ function CreateCourseContent() {
                 mo_ta_dai: moTaDai || null,
                 link_anh_bia: linkAnhBia || null,
                 phi_coc: phiCoc,
+                vipExempt,
                 noidung_stk: noidungStk || null,
                 link_zalo: linkZalo || null,
                 file_email: fileEmail || null,
@@ -261,6 +264,7 @@ function CreateCourseContent() {
             if (moTaDai) formData.append('mo_ta_dai', moTaDai)
             if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
             formData.append('phi_coc', phiCoc.toString())
+            formData.append('vipExempt', vipExempt.toString())
             if (teacherBankAccountId) formData.append('teacherBankAccountId', teacherBankAccountId.toString())
             if (noidungStk) formData.append('noidung_stk', noidungStk)
             if (linkZalo) formData.append('link_zalo', linkZalo)
@@ -392,8 +396,15 @@ function CreateCourseContent() {
                                     />
                                     <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
                                 </label>
-                            </div>
                         </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">VIP</label>
+                            <label className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
+                                <input type="checkbox" checked={vipExempt} onChange={(e) => setVipExempt(e.target.checked)} className="w-5 h-5 rounded" />
+                                <span className="text-sm font-bold text-gray-700">Không áp dụng VIP</span>
+                            </label>
+                        </div>
+                    </div>
                     </div>
                     
                     <div className="grid grid-cols-3 gap-4 mt-4">

@@ -118,7 +118,7 @@ export default async function CourseLearnPage({
   })
 
   if (!enrollment || enrollment.status !== "ACTIVE") {
-    redirect(`/courses/${id}`)
+    redirect(`/khoa-hoc/${id}`)
   }
 
   return (
