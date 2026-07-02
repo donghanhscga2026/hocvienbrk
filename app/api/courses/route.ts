@@ -31,11 +31,19 @@ export async function POST(request: NextRequest) {
             ? Number(session.user.id) 
             : (body.teacherId ? Number(body.teacherId) : undefined)
 
+        let categoryName = body.category || 'Khác'
+        const categoryId = body.categoryId ? Number(body.categoryId) : null
+        if (categoryId) {
+            const cat = await prisma.courseCategory.findUnique({ where: { id: categoryId } })
+            if (cat) categoryName = cat.name
+        }
+
         const courseData: any = {
             id_khoa: body.id_khoa.toUpperCase(),
             name_lop: body.name_lop,
             name_khoa: body.name_khoa || null,
-            category: body.category || 'Khác',
+            category: categoryName,
+            categoryId,
             type: body.type || 'NORMAL',
             status: body.status !== undefined ? body.status : true,
             pin: Number(body.pin) || 0,
@@ -44,6 +52,7 @@ export async function POST(request: NextRequest) {
             mo_ta_dai: body.mo_ta_dai || null,
             link_anh_bia: body.link_anh_bia || null,
             phi_coc: Number(body.phi_coc) || 0,
+            vipExempt: body.vipExempt === true,
             noidung_stk: body.noidung_stk || null,
             link_zalo: body.link_zalo || null,
             file_email: body.file_email || null,
@@ -52,6 +61,11 @@ export async function POST(request: NextRequest) {
         
         if (teacherIdValue !== undefined) {
             courseData.teacherId = teacherIdValue
+        }
+
+        const teacherBankAccountId = body.teacherBankAccountId ? Number(body.teacherBankAccountId) : null
+        if (teacherBankAccountId) {
+            courseData.teacherBankAccountId = teacherBankAccountId
         }
 
         const course = await prisma.course.create({

@@ -46,6 +46,13 @@ function RegisterForm() {
     const getAffiliateRef = () => {
         if (typeof window === 'undefined') return null
         try {
+            // Ưu tiên đọc từ cookie aff_ref (do proxy.ts set)
+            const cookieMatch = document.cookie.match(/(?:^|;\s*)aff_ref=([^;]*)/)
+            if (cookieMatch) {
+                const data = JSON.parse(decodeURIComponent(cookieMatch[1]))
+                if (data.r) return data.r
+            }
+            // Fallback: localStorage (cho các phiên cũ)
             const stored = localStorage.getItem('affiliate_ref')
             if (!stored) return null
             const data = JSON.parse(stored)

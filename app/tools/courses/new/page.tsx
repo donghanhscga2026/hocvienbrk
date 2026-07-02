@@ -344,6 +344,17 @@ function CreateCourseContent() {
                                 required 
                             />
                         </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mã khóa học *</label>
+                            <input 
+                                type="text" 
+                                value={idKhoa} 
+                                onChange={(e) => setIdKhoa(e.target.value.toUpperCase())} 
+                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
+                                placeholder="VD: SK_NP5" 
+                                required 
+                            />
+                        </div>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">

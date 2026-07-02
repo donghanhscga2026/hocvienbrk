@@ -221,8 +221,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     try {
                         const affData = JSON.parse(decodeURIComponent(affRefCookie.value));
                         if (affData.r) {
-                            refId = parseInt(affData.r);
-                        }
+                    // Thử parse trực tiếp số
+                    refId = parseInt(affData.r);
+                    // Nếu không phải số (custom alias), resolve qua DB
+                    if (isNaN(refId) || refId <= 0) {
+                        const { resolveRefToUserId } = await import("@/lib/affiliate/resolve-ref-helper");
+                        refId = await resolveRefToUserId(affData.r);
+                    }
+                }
                         landingSlug = affData.l || affData.c || null;
                     } catch (e) {
                         console.error("[Auth] Lỗi parse cookie aff_ref trong createUser:", e);
