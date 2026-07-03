@@ -528,3 +528,98 @@ Gộp các tool riêng lẻ thành các tool tabs để đơn giản hóa naviga
 - ✅ Tìm kiếm user trong bank-accounts hỗ trợ mã HV (ID)
 - ✅ `npx tsc --noEmit` — 0 lỗi
 
+---
+
+### 6. HỆ THỐNG BRK (BUILD CÂY NHÂN MẠCH SYSTEM #4)
+
+#### Mục tiêu
+Tạo cây hệ thống BRK (onSystem=4) cho 22 học viên đã kích hoạt khóa #22, áp dụng đúng quy tắc FORCED_4WIDE (max 4 F1/node, BFS ưu tiên chiều rộng).
+
+#### Các file đã sửa/tạo
+
+##### `lib/brk/placement-rules.ts`
+- **Bug**: `findPlacement4Wide` khi referrer có tồn tại (truthy) nhưng chưa trong hệ thống → trả về 0 (tạo root mới)
+- **Fix**: Kiểm tra referrer có trong system không trước. Nếu chưa → fallback BFS từ root của hệ thống
+
+##### `scripts/rebuild-brk-system4.ts` (mới)
+- Xoá sạch dữ liệu cũ: system_closure, system, brk_transaction cho onSystem=4
+- Backfill 22 enrollment theo thứ tự `createdAt ASC`, gọi `resolvePlacement(4, referrerId)` đã fix
+- Tự động: tạo System record + Closure table + Wallet + Commission + Level check
+
+#### Các file đã sửa bổ sung
+
+##### `lib/auto-verify.ts`
+- Thêm extract trường `Ngày/Date` từ email Sacombank → `transferTime`
+- Lưu `transferTime` vào Payment record khi auto-verify
+
+##### `scripts/auto-verify-payment.ts`
+- Cập nhật `parseSacombankEmail()` tương tự: extract Date + trả về `transferTime`
+- Lưu `transferTime` vào Payment record
+
+##### `scripts/backfill-transfer-time.ts` (mới)
+- Scan Gmail tìm 31 email Sacombank, match với 22 enrollment khóa #22
+- Cập nhật `Payment.transferTime` cho 18/22 records (4 records không tìm thấy email)
+
+##### `scripts/rebuild-brk-system4.ts`
+- Đổi thứ tự xếp cây: `transferTime` → `verifiedAt` → `createdAt`
+
+#### Kết quả cây BRK System #4 (đã rebuild lần 2)
+```
+22 Systems, 1 Root (user#3773), 62 Closures
+Cấu trúc 4 tầng, width-4, xếp theo thời gian giao dịch ngân hàng
+```
+
+#### Trạng thái
+- ✅ Bug `findPlacement4Wide` đã fix (fallback về root BFS khi referrer không trong system)
+- ✅ `parseSacombankEmail()` đã extract `Ngày/Date` → `transferTime`
+- ✅ Backfill 18/22 Payment records với transferTime từ email lịch sử
+- ✅ Cây BRK System #4 đã rebuild theo thứ tự `transferTime` → `verifiedAt` → `createdAt`
+
+---
+
+### 7. AUTO-VERIFY CONFIG & BRK ACTIVATION
+
+#### Mục tiêu
+Tạo hệ thống cấu hình tự động xác nhận thanh toán theo từng khóa học, hỗ trợ nhiều ngân hàng/email khác nhau và tự động kích hoạt BRK.
+
+#### Các file đã sửa/tạo
+
+##### `prisma/schema.prisma` (mới)
+- Thêm model `AutoVerifyConfig`: cấu hình auto-verify cho từng khóa học
+  - `courseId` → khóa học
+  - `emailFrom` → địa chỉ gửi email TBGD (VD: info@sacombank.com.vn)
+  - `bankName` → tên ngân hàng
+  - `emailQuery` → câu query Gmail
+  - `onSystem` → BRK system ID để auto-activate (null = không kích hoạt)
+  - `enabled` → bật/tắt
+
+##### `lib/auto-verify.ts`
+- Gmail query được build động từ tất cả `AutoVerifyConfig.enabled = true`
+- Thay thế hardcode `teacherId === 327` bằng lookup `AutoVerifyConfig.onSystem`
+- BRK activation dùng `activateBrkMember()` từ `lib/brk/activation-service`
+
+##### `scripts/auto-verify-payment.ts`
+- Tương tự: bỏ hardcode YTB, dùng AutoVerifyConfig + gọi `activateBrkMember`
+
+##### `scripts/auto-verify-payment.js`
+- Thêm extract `transferTime` từ email
+- Thêm BRK activation dùng `AutoVerifyConfig`
+- Gmail query build từ config
+
+##### `scripts/seed-auto-verify-config.ts` (mới)
+- Seed config cho course #22: email=Sacombank, onSystem=4
+
+#### Cơ chế hoạt động
+```
+Config (AutoVerifyConfig) → build Gmail query → scan email → parse
+  → match enrollment PENDING → verify payment → activate enrollment
+    → nếu config.onSystem != null → activateBrkMember(userId, onSystem)
+```
+
+#### Trạng thái
+- ✅ Model `AutoVerifyConfig` + migration (db push)
+- ✅ `lib/auto-verify.ts` dùng config thay vì hardcode
+- ✅ `scripts/auto-verify-payment.ts` + `.js` được cập nhật
+- ✅ Seed config cho course #22 (BRK onSystem=4)
+- ✅ `npx tsc --noEmit` — 0 lỗi
+

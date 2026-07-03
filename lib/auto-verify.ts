@@ -16,7 +16,6 @@ function extractTextFromHtml(html: string): string {
 }
 
 function parseSacombankEmail(htmlContent: string) {
-// ... (giữ nguyên hàm này)
   const text = extractTextFromHtml(htmlContent);
   const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i);
   const description = contentMatch ? contentMatch[1].trim() : '';
@@ -31,12 +30,22 @@ function parseSacombankEmail(htmlContent: string) {
     amount = parseInt(amountStr) || 0;
   }
   
+  // Extract actual bank transaction time from "Ngày/Date dd/mm/yyyy HH:MM"
+  let transferTime: Date | null = null
+  const dateMatch = text.match(/(?:Ngày|Date)\s*\/?\s*[Dt]ate\s*[:\t\s]*(\d{2})[\/\-](\d{2})[\/\-](\d{4})\s+(\d{1,2}):(\d{2})/i)
+  if (dateMatch) {
+    const [, dd, mm, yyyy, hh, min] = dateMatch
+    // Bank timestamp is in Vietnam timezone (UTC+7)
+    transferTime = new Date(`${yyyy}-${mm}-${dd}T${hh.padStart(2, '0')}:${min}:00+07:00`)
+  }
+  
   return {
     phone: phoneMatch ? phoneMatch[1] : null,
     userId: userIdMatch ? parseInt(userIdMatch[1]) : null,
     courseCode: courseCodeMatch ? courseCodeMatch[1].toUpperCase() : null,
     amount: amount,
     content: description,
+    transferTime,
   };
 }
 
@@ -49,9 +58,15 @@ export async function processPaymentEmails() {
   oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
   const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
+  // Load tất cả cấu hình auto-verify đang enabled
+  const configs = await prisma.autoVerifyConfig.findMany({ where: { enabled: true } });
+  if (configs.length === 0) return { processed: 0, matched: 0 };
+
+  // Build query Gmail tổng hợp từ tất cả config
+  const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ');
   const response = await gmail.users.messages.list({
     userId: 'me',
-    q: 'from:info@sacombank.com.vn "thong bao giao dich" is:unread',
+    q: `(${emailQueries}) is:unread`,
     maxResults: 10
   });
 
@@ -98,7 +113,8 @@ export async function processPaymentEmails() {
           where: { enrollmentId: enrollment.id },
           data: {
             amount: parsed.amount, phone: parsed.phone, content: parsed.content,
-            bankName: 'Sacombank', status: 'VERIFIED', verifiedAt: new Date(), verifyMethod: 'AUTO_EMAIL'
+            bankName: 'Sacombank', status: 'VERIFIED', verifiedAt: new Date(), verifyMethod: 'AUTO_EMAIL',
+            transferTime: parsed.transferTime,
           }
         });
         await prisma.enrollment.update({
@@ -106,14 +122,18 @@ export async function processPaymentEmails() {
           data: { status: 'ACTIVE' }
         });
 
-        // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327
-        const { syncUserToYtbSystem } = await import("./system-closure-helpers");
-        const course = await prisma.course.findUnique({
-          where: { id: enrollment.courseId },
-          select: { teacherId: true }
+        // [BRK ACTIVATION] Kiểm tra cấu hình auto-verify của khóa học
+        const brkConfig = await prisma.autoVerifyConfig.findUnique({
+          where: { courseId: enrollment.courseId }
         });
-        if (course?.teacherId === 327) {
-          await syncUserToYtbSystem(enrollment.userId, 327);
+        if (brkConfig?.enabled && brkConfig.onSystem != null) {
+          try {
+            const { activateBrkMember } = await import("@/lib/brk/activation-service");
+            await activateBrkMember(enrollment.userId, brkConfig.onSystem);
+            console.log(`  ✅ BRK activated for user#${enrollment.userId} on system ${brkConfig.onSystem}`);
+          } catch (err) {
+            console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);
+          }
         }
 
         await gmail.users.messages.modify({

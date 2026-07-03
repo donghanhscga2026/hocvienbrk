@@ -1016,7 +1016,7 @@ function GenealogyFlow() {
       u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
       String(u.id).includes(userSearch)
     )
-    : usersList.slice(0, 50)
+    : usersList
 
   // Handle add child
   const handleAddChild = async (childId: number) => {

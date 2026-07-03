@@ -4,12 +4,13 @@ import prisma from '@/lib/prisma'
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const qSearch = searchParams.get('search')
+    const limit = parseInt(searchParams.get('limit') || '200')
+    const maxLimit = Math.min(limit, 2000)
 
     const where: any = {}
-    if (search?.trim()) {
-      const q = search.trim()
+    if (qSearch?.trim()) {
+      const q = qSearch.trim()
       const numId = parseInt(q)
       const isPureNumeric = /^\d+$/.test(q)
 
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
       where: Object.keys(where).length ? where : undefined,
       select: { id: true, name: true, email: true },
       orderBy: { id: 'asc' },
-      take: Math.min(limit, 100),
+      take: maxLimit,
     })
 
     return NextResponse.json({ users })

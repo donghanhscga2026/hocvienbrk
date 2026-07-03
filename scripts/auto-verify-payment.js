@@ -19,16 +19,12 @@ function extractTextFromHtml(html) {
 function parseSacombankEmail(htmlContent) {
   const text = extractTextFromHtml(htmlContent)
   
-  // Tìm nội dung chuyển khoản
   const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i)
   const description = contentMatch ? contentMatch[1].trim() : ''
   
-  // Format: SDT 123456 HV 8286 COC LS03
   const phoneMatch = description.match(/SDT[\s\._]*(\d{6})/i)
   const userIdMatch = description.match(/HV[\s\._]*(\d+)/i)
   const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i)
-  
-  // Tìm số tiền - format: 386,868 VND
   const amountMatch = text.match(/(?:Transaction|Phát sinh)[\s:+]*([\d,\.]+)\s*VND/i)
   
   let amount = 0
@@ -37,12 +33,21 @@ function parseSacombankEmail(htmlContent) {
     amount = parseInt(amountStr) || 0
   }
   
+  // Extract actual bank transaction time
+  let transferTime = null
+  const dateMatch = text.match(/(?:Ngày|Date)\s*\/?\s*[Dt]ate\s*[:\t\s]*(\d{2})[\/\-](\d{2})[\/\-](\d{4})\s+(\d{1,2}):(\d{2})/i)
+  if (dateMatch) {
+    const dd = dateMatch[1], mm = dateMatch[2], yyyy = dateMatch[3], hh = dateMatch[4], min = dateMatch[5]
+    transferTime = new Date(`${yyyy}-${mm}-${dd}T${hh.padStart(2, '0')}:${min}:00+07:00`)
+  }
+  
   return {
     phone: phoneMatch ? phoneMatch[1] : null,
     userId: userIdMatch ? parseInt(userIdMatch[1]) : null,
     courseCode: courseCodeMatch ? courseCodeMatch[1].toUpperCase() : null,
     amount: amount,
     content: description,
+    transferTime,
     rawText: text
   }
 }
@@ -60,10 +65,18 @@ async function getGmailClient() {
 async function processBankEmails() {
   const gmail = await getGmailClient()
 
-  // Tìm email Sacombank TRƯA ĐỌC trong 7 ngày gần nhất
+  // Load tất cả cấu hình auto-verify đang enabled
+  const configs = await prisma.autoVerifyConfig.findMany({ where: { enabled: true } })
+  if (configs.length === 0) {
+    console.log('📝 Không có cấu hình auto-verify nào.')
+    return
+  }
+
+  // Build query Gmail tổng hợp từ tất cả config
+  const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ')
   const response = await gmail.users.messages.list({
     userId: 'me',
-    q: 'sacombank thong bao giao dich is:unread',
+    q: `(${emailQueries}) is:unread`,
     maxResults: 20
   })
 
@@ -118,7 +131,8 @@ async function processBankEmails() {
           where: { enrollmentId: enrollment.id },
           data: {
             amount: parsed.amount, phone: parsed.phone, content: parsed.content,
-            bankName: 'Sacombank', status: 'VERIFIED', verifiedAt: new Date(), verifyMethod: 'AUTO_EMAIL'
+            bankName: 'Sacombank', status: 'VERIFIED', verifiedAt: new Date(), verifyMethod: 'AUTO_EMAIL',
+            transferTime: parsed.transferTime,
           }
         })
 
@@ -126,6 +140,20 @@ async function processBankEmails() {
           where: { id: enrollment.id },
           data: { status: 'ACTIVE' }
         })
+
+        // [BRK ACTIVATION] Kiểm tra cấu hình BRK của khóa học
+        try {
+          const brkConfig = await prisma.autoVerifyConfig.findUnique({
+            where: { courseId: enrollment.courseId }
+          })
+          if (brkConfig && brkConfig.enabled && brkConfig.onSystem != null) {
+            const { activateBrkMember } = await import('../lib/brk/activation-service')
+            await activateBrkMember(enrollment.userId, brkConfig.onSystem)
+            console.log(`   🔗 Đã kích hoạt BRK system #${brkConfig.onSystem}`)
+          }
+        } catch (brkErr) {
+          console.error(`   ⚠️ Lỗi kích hoạt BRK:`, brkErr.message || brkErr)
+        }
 
         // Đánh dấu đã đọc
         await gmail.users.messages.modify({
