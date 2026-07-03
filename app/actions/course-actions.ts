@@ -4,8 +4,10 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
 import { createPaymentQR } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
+import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 
 /**
  * Đăng ký khóa học mới
@@ -89,12 +91,23 @@ export async function enrollInCourseAction(courseId: number) {
             return { success: true, status: existing.status, enrollment: existingWithPayment }
         }
 
+        let enrollmentReferrerId: number | null = null
+        try {
+            const cookieStore = await cookies()
+            const refCookie = cookieStore.get('aff_ref')
+            if (refCookie?.value) {
+                const refUserId = await resolveRefToUserId(refCookie.value)
+                if (refUserId > 0) enrollmentReferrerId = refUserId
+            }
+        } catch { }
+
         const isAutoActive = effectivePhiCoc === 0
         const newEnrollment = await prisma.enrollment.create({
             data: {
                 userId,
                 courseId,
-                status: isAutoActive ? "ACTIVE" : "PENDING"
+                status: isAutoActive ? "ACTIVE" : "PENDING",
+                referrerId: enrollmentReferrerId,
             }
         })
 

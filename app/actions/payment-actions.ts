@@ -133,7 +133,7 @@ export async function verifyPaymentAction(
       })
       if (brkTree) {
         const { activateBrkMember } = await import("@/lib/brk/activation-service")
-        await activateBrkMember(enrollment.userId, brkTree.onSystem)
+        await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId)
         console.log(`[BRK] Activated user ${enrollment.userId} in system ${brkTree.onSystem}`)
       }
     }

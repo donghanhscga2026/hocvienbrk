@@ -22,6 +22,7 @@ export interface GenealogyNode {
     name: string | null
     image?: string | null
     referrerId: number | null
+    seq?: number  // 0-based join order trong hệ thống (chỉ có ở SYSTEM tree)
     totalSubCount: number
     f1aCount: number
     f1bCount: number
@@ -145,7 +146,7 @@ async function buildStandardTree(
                 id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
                 totalSubCount: 1, f1aCount: 0, f1bCount: 0, f1cCount: 0,
                 groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                groupA: [], groupB: [], children: [], isRoot: true
+                groupA: [], groupB: [], children: [], isRoot: true, seq: 0
             }
         }
 
@@ -364,6 +365,7 @@ async function buildStandardTree(
                     tcaName: tcaData?.name ?? null,
                     groupName: tcaData?.groupName ?? null,
                     chucDanh: tcaData?.chucDanh ?? null,
+                    seq: child.autoId - rootAutoId,
                 }
             })
         }
@@ -389,6 +391,7 @@ async function buildStandardTree(
                     totalScore: f2tca?.totalScore ?? null,
                     groupName: f2tca?.groupName ?? null,
                     chucDanh: f2tca?.chucDanh ?? null,
+                    seq: f2.autoId - rootAutoId,
                 }
             })
 
@@ -414,6 +417,7 @@ async function buildStandardTree(
                 groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
                 groupA: gA, groupB: gB, children: f2Subtrees,
                 level: f1tca?.level ?? null, personalScore: f1tca?.personalScore ?? null, totalScore: f1tca?.totalScore ?? null, chucDanh: f1tca?.chucDanh ?? null,
+                seq: (f1Record?.autoId || 0) - rootAutoId,
             }
         })
 
@@ -434,7 +438,7 @@ async function buildStandardTree(
             groupATotalSub, groupBTotalSub, groupCTotalSub,
             children: forceFull ? buildFullSubtree(rootAutoId) : children,
             groupA: forceFull ? [] : groupA, groupB: forceFull ? [] : groupB,
-            isRoot: true,
+            isRoot: true, seq: 0,
             level: rootTca?.level ?? null, personalScore: rootTca?.personalScore ?? null, totalScore: rootTca?.totalScore ?? null,
             tcaName: rootTca?.name ?? null, groupName: rootTca?.groupName ?? null, chucDanh: rootTca?.chucDanh ?? null,
             stats: statsData 

@@ -31,7 +31,8 @@ model User {
   wallet                       AffiliateWallet?
   courses                      Course[]
   emailCampaigns               EmailCampaign[]       @relation("UserToEmailCampaign")
-  enrollments                  Enrollment[]
+  enrollments                  Enrollment[]       @relation("StudentEnrollment")
+  enrollmentReferrals          Enrollment[]       @relation("EnrollmentReferrer")
   lessonComments               LessonComment[]       @relation("UserToLessonComment")
   posts                        Post[]                @relation("UserToPost")
   postComments                 PostComment[]         @relation("UserToPostComment")
@@ -404,26 +405,29 @@ model Lesson {
 }
 
 model Enrollment {
-  id             Int              @id @default(autoincrement())
-  userId         Int
-  courseId       Int
-  status         EnrollmentStatus @default(PENDING)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  link_anh_coc   String?
-  phi_coc        Int              @default(0)
-  startedAt      DateTime?
-  challengeDays  Int?
-  resetAt        DateTime?
-  lastLessonId   String?
-  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lessonProgress LessonProgress[]
-  payment        Payment?
+  id               Int              @id @default(autoincrement())
+  userId           Int
+  courseId         Int
+  status           EnrollmentStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  link_anh_coc     String?
+  phi_coc          Int              @default(0)
+  startedAt        DateTime?
+  challengeDays    Int?
+  resetAt          DateTime?
+  lastLessonId     String?
+  referrerId       Int?
+  course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user             User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
+  referrer         User?            @relation("EnrollmentReferrer", fields: [referrerId], references: [id])
+  lessonProgress   LessonProgress[]
+  payment          Payment?
 
   @@unique([userId, courseId])
   @@index([userId])
   @@index([courseId])
+  @@index([referrerId])
 }
 
 model LessonProgress {

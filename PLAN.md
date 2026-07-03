@@ -623,3 +623,68 @@ Config (AutoVerifyConfig) → build Gmail query → scan email → parse
 - ✅ Seed config cho course #22 (BRK onSystem=4)
 - ✅ `npx tsc --noEmit` — 0 lỗi
 
+---
+
+## ✅ BRK System #4 — Rebuild & Placement Rules Fix (2026-07-03)
+
+### Mục tiêu
+Rebuild cây BRK (onSystem=4) với placement logic hybrid mới:
+- **Phase 1**: Lấp ngang F1+F2 (BFS từ root, depth < 2), không quan tâm referrer
+- **Phase 2**: Khi F1+F2 đã full (depth ≥ 2), ưu tiên referrer xếp dọc theo subtree
+
+Thêm `referrerId` vào Enrollment model để capture course-level referrer (ai gửi link khóa học).
+
+### Các file đã sửa
+
+#### `prisma/schema.prisma`
+- Thêm field `referrerId Int?` vào Enrollment model
+- Thêm relation `EnrollmentReferrer` → User
+- Thêm index `enrollment_referrer_idx` trên `referrerId`
+
+#### `app/actions/course-actions.ts`
+- Đọc cookie `aff_ref` tại thời điểm enroll → resolve → lưu `enrollment.referrerId`
+
+#### `app/api/enroll-after-register/route.ts`
+- Dùng `user.referrerId` làm enrollment referrer (cho flow pre-register enroll)
+
+#### `lib/brk/activation-service.ts`
+- Thêm tham số `enrollmentReferrerId?`
+- Ưu tiên `enrollment.referrerId` hơn `user.referrerId`
+
+#### `lib/brk/placement-rules.ts`
+- Phase 1: BFS từ root, fill 4-wide ngang đến hết depth 1
+- Phase 2: referrer cụ thể (≠ root, trong hệ thống) → BFS trong subtree referrer
+
+#### `lib/auto-verify.ts`, `app/actions/payment-actions.ts`, `scripts/auto-verify-payment.ts`
+- Thêm `enrollment.referrerId` vào `activateBrkMember()` call
+
+#### `scripts/rebuild-brk-system4.ts`
+- Dùng `enrollment.referrerId || enrollment.user.referrerId` làm effective referrer
+- **Root guard**: enrollment đầu tiên luôn được set làm root (refSysId=0) để tránh race condition với auto-verify
+
+### Kết quả rebuild (27 members)
+```
+Root: #3773 Coach Nguyễn Biên Cương
+├── F1 #1010 (BÙI THỊ PHƯƠNG ANH)
+│   ├── F2 #229 → #379, #1068, #617, #1023
+│   ├── F2 #965
+│   ├── F2 #976
+│   └── F2 #1059
+├── F1 #1035 (ĐẶNG THỊ HIỀN)
+│   ├── F2 #914 → #1044
+│   ├── F2 #26
+│   ├── F2 #828
+│   └── F2 #496 → #1066
+├── F1 #1057 (Vũ Thị Thao)
+│   ├── F2 #1063, #1060, #478, #962
+└── F1 #1061 (Nguyễn Huyền)
+    ├── F2 #1062, #1008, #330, #1029
+```
+- Phase 1: 21 members (1 root + 4 F1 + 16 F2) — BFS horizontal
+- Phase 2: 6 members placed by referrer — 4 under #229 (ref=229/3773/861), 1 under #914 (ref=914), 1 under #496 (ref=496)
+- Closures: 81 records (27 self + 54 ancestor links)
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+### Lưu ý
+- LSP errors về `referrerId` là do TypeScript server cache chưa cập nhật Prisma schema — `tsc --noEmit` vẫn pass
+- `enrollment.referrerId` hiện tại đều null (chưa có user nào enroll qua referral link sau khi deployment) — chỉ dùng `user.referrerId`

@@ -2,13 +2,10 @@
 
 import prisma from '@/lib/prisma'
 
-// Map system → áp dụng quy tắc placement
-// Mở rộng bằng cách thêm entry mới: [onSystem]: 'FORCED_4WIDE'
 const PLACEMENT_RULES: Record<number, 'REFERRAL' | 'FORCED_4WIDE'> = {
   4: 'FORCED_4WIDE',
 }
 
-// Tìm root của system (người kích hoạt đầu tiên) — trả về userId
 async function findSystemRootUser(onSystem: number): Promise<number | null> {
   const root = await prisma.system.findFirst({
     where: { onSystem, refSysId: 0 },
@@ -17,34 +14,27 @@ async function findSystemRootUser(onSystem: number): Promise<number | null> {
   return root?.userId || null
 }
 
-// BFS tìm node đầu tiên còn chỗ (< 4 F1)
-// ưu tiên chiều rộng, theo thứ tự thời gian kích hoạt
-// startUserId: userId của người bắt đầu BFS (referrer)
-// Trả về: userId của node được chọn (0 = root mới)
-async function findPlacement4Wide(
+async function getDepthFromRoot(
   onSystem: number,
-  startUserId: number | null
+  autoId: number,
+  rootAutoId: number
 ): Promise<number> {
-  // Xác định userId xuất phát: nếu có referrer và referrer đã trong hệ thống → dùng luôn
-  // Nếu không → fallback về root của hệ thống
-  let startUserIdResolved: number | null = null
-
-  if (startUserId) {
-    const sys = await prisma.system.findUnique({
-      where: { userId_onSystem: { userId: startUserId, onSystem } }
-    })
-    if (sys) startUserIdResolved = startUserId
-  }
-
-  if (!startUserIdResolved) {
-    startUserIdResolved = await findSystemRootUser(onSystem)
-  }
-  if (!startUserIdResolved) return 0
-
-  const startSys = await prisma.system.findUnique({
-    where: { userId_onSystem: { userId: startUserIdResolved, onSystem } }
+  const result = await prisma.systemClosure.findFirst({
+    where: { systemId: onSystem, descendantId: autoId, ancestorId: rootAutoId }
   })
-  if (!startSys) return 0
+  return result?.depth ?? 999
+}
+
+// BFS từ startUserId, trả về parentUserId + depth từ root
+async function bfsFirstAvailable(
+  onSystem: number,
+  startUserId: number,
+  rootAutoId: number
+): Promise<{ userId: number; depth: number }> {
+  const startSys = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId: startUserId, onSystem } }
+  })
+  if (!startSys) return { userId: startUserId, depth: 0 }
 
   const queue = [startSys.autoId]
   const visited = new Set<number>()
@@ -60,7 +50,9 @@ async function findPlacement4Wide(
 
     if (f1Count < 4) {
       const node = await prisma.system.findUnique({ where: { autoId: currentId } })
-      return node?.userId || 0
+      if (!node) continue
+      const depth = await getDepthFromRoot(onSystem, currentId, rootAutoId)
+      return { userId: node.userId, depth }
     }
 
     const f1Closures = await prisma.systemClosure.findMany({
@@ -79,11 +71,46 @@ async function findPlacement4Wide(
     }
   }
 
-  return startUserIdResolved
+  return { userId: startUserId, depth: 0 }
 }
 
-// Dispatcher: chọn quy tắc placement theo system
-// Trả về: userId của upline (0 = root)
+async function findPlacement4Wide(
+  onSystem: number,
+  referrerUserId: number | null
+): Promise<number> {
+  const rootUserId = await findSystemRootUser(onSystem)
+  if (!rootUserId) return 0
+
+  const rootSys = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId: rootUserId, onSystem } }
+  })
+  if (!rootSys) return 0
+  const rootAutoId = rootSys.autoId
+
+  // Phase 1: BFS từ root, tìm slot đầu tiên
+  const globalSlot = await bfsFirstAvailable(onSystem, rootUserId, rootAutoId)
+
+  // Nếu depth < 3 → F1/F2/F3 chưa full → lấp ngang từ root, ko quan tâm referrer
+  if (globalSlot.depth < 2) {
+    return globalSlot.userId
+  }
+
+  // Phase 2: F1-F2-F3 đã full
+  // Nếu có referrer cụ thể (khác root) và đang trong hệ thống → xếp dọc theo referrer
+  if (referrerUserId && referrerUserId !== rootUserId) {
+    const refSys = await prisma.system.findUnique({
+      where: { userId_onSystem: { userId: referrerUserId, onSystem } }
+    })
+    if (refSys) {
+      const refSlot = await bfsFirstAvailable(onSystem, referrerUserId, rootAutoId)
+      return refSlot.userId
+    }
+  }
+
+  // Fallback: BFS từ root (bao gồm ref=root hoặc ref ko trong hệ thống)
+  return globalSlot.userId
+}
+
 export async function resolvePlacement(
   onSystem: number,
   referrerUserId: number | null
@@ -94,7 +121,6 @@ export async function resolvePlacement(
     return findPlacement4Wide(onSystem, referrerUserId)
   }
 
-  // REFERRAL: trực tiếp dưới người giới thiệu
   if (!referrerUserId) return 0
   return referrerUserId
 }
