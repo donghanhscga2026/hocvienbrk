@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userIdNum },
-      select: { id: true, name: true, phone: true, email: true }
+      select: { id: true, name: true, phone: true, email: true, referrerId: true }
     })
 
     if (!user) {
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
       data: {
         userId: userIdNum,
         courseId: course.id,
-        status: isAutoActive ? "ACTIVE" : "PENDING"
+        status: isAutoActive ? "ACTIVE" : "PENDING",
+        referrerId: user?.referrerId || null,
       }
     })
 

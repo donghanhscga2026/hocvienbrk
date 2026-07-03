@@ -7,6 +7,9 @@ import { checkAndPromoteLevel } from '../lib/brk/level-manager'
 
 const prisma = new PrismaClient()
 
+// HoW MANY PROCESSED SO FAR (for logging)
+let processedCount = 0
+
 async function cleanup() {
   console.log('🧹 Cleaning up old data for onSystem=4...')
 
@@ -82,14 +85,23 @@ async function backfill() {
   for (const enrollment of enrollments) {
     const userId = enrollment.userId
     const userName = enrollment.user.name || `#${userId}`
+    const activatedAt = enrollment.payment?.transferTime || enrollment.payment?.verifiedAt || enrollment.createdAt
 
     try {
-      const now = new Date()
-      const graceEnd = new Date(now.getTime() + systemTree.graceDays * 24 * 60 * 60 * 1000)
-      const expiresAt = new Date(now.getTime() + systemTree.durationDays * 24 * 60 * 60 * 1000)
+      const graceEnd = new Date(activatedAt.getTime() + systemTree.graceDays * 24 * 60 * 60 * 1000)
+      const expiresAt = new Date(activatedAt.getTime() + systemTree.durationDays * 24 * 60 * 60 * 1000)
 
-      const refSysId = await resolvePlacement(4, enrollment.user.referrerId)
-      console.log(`  🔗 user#${userId} ${userName} → refSysId=${refSysId}`)
+      // Root guard: first enrollment ALWAYS becomes root
+      processedCount++
+      let refSysId: number
+      if (processedCount === 1) {
+        refSysId = 0
+        console.log(`  👑 user#${userId} ${userName} → FORCED ROOT`)
+      } else {
+        const effectiveReferrer = enrollment.referrerId || enrollment.user.referrerId
+        refSysId = await resolvePlacement(4, effectiveReferrer)
+        console.log(`  🔗 user#${userId} ${userName} → refSysId=${refSysId}`)
+      }
 
       const system = await prisma.system.create({
         data: {
@@ -97,7 +109,7 @@ async function backfill() {
           onSystem: 4,
           refSysId,
           status: 'ACTIVE',
-          activatedAt: now,
+          activatedAt,
           gracePeriodEnd: graceEnd,
           expiresAt,
           level: 1,

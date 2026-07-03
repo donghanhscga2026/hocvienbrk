@@ -129,7 +129,7 @@ export async function processPaymentEmails() {
         if (brkConfig?.enabled && brkConfig.onSystem != null) {
           try {
             const { activateBrkMember } = await import("@/lib/brk/activation-service");
-            await activateBrkMember(enrollment.userId, brkConfig.onSystem);
+            await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId);
             console.log(`  ✅ BRK activated for user#${enrollment.userId} on system ${brkConfig.onSystem}`);
           } catch (err) {
             console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);

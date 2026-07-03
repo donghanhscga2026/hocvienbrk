@@ -250,6 +250,13 @@ const GenealogyCard = (props: NodeProps) => {
         onClick={(e) => { e.stopPropagation(); data.onSearchNode?.(data.id); }}
         className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all`}
       >
+        {/* Số thứ tự tham gia hệ thống (góc trên bên trái) */}
+        {data.seq != null && (
+          <div className="absolute -top-2.5 -left-1.5 z-20 px-1.5 py-0.5 bg-indigo-500 text-white text-[10px] font-black rounded-full shadow-md leading-none">
+            @{data.seq}
+          </div>
+        )}
+
         {/* Tên thành viên */}
         <div className="font-bold text-[20px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px font-sans">
           {data.name || 'Học viên'}

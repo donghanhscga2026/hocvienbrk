@@ -10,6 +10,7 @@ import { resolvePlacement } from './placement-rules'
 export async function activateBrkMember(
   userId: number,
   onSystem: number,
+  enrollmentReferrerId?: number | null,
 ) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
   if (!systemTree) throw new Error('System not found')
@@ -32,7 +33,8 @@ export async function activateBrkMember(
     }
   }
 
-  const refSysId = await resolvePlacement(onSystem, user.referrerId)
+  const effectiveReferrer = enrollmentReferrerId ?? user.referrerId
+  const refSysId = await resolvePlacement(onSystem, effectiveReferrer)
 
   const system = await prisma.system.upsert({
     where: { userId_onSystem: { userId, onSystem } },

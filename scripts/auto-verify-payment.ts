@@ -171,7 +171,7 @@ async function processBankEmails() {
           })
           if (brkConfig?.enabled && brkConfig.onSystem != null) {
             const { activateBrkMember } = await import('../lib/brk/activation-service')
-            await activateBrkMember(enrollment.userId, brkConfig.onSystem)
+            await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId)
             console.log(`   🔗 Đã kích hoạt BRK system #${brkConfig.onSystem} cho user #${enrollment.userId}`)
           }
         } catch (brkErr) {
