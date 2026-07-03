@@ -367,8 +367,24 @@ model Course {
   landingPages  LandingPage[]
   lessons       Lesson[]
   systemTree    SystemTree?
+  autoVerifyConfig AutoVerifyConfig?
 
   @@index([teacherId])
+}
+
+model AutoVerifyConfig {
+  id         Int      @id @default(autoincrement())
+  courseId   Int      @unique
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  emailFrom  String   // địa chỉ gửi email TBGD, VD: info@sacombank.com.vn
+  bankName   String   // tên ngân hàng, VD: Sacombank
+  emailQuery String   // câu query Gmail, VD: "sacombank thong bao giao dich"
+  onSystem   Int?     // BRK system ID để auto-activate (null = không kích hoạt BRK)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([enabled])
+  @@map("auto_verify_config")
 }
 
 model Lesson {

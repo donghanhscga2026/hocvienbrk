@@ -262,12 +262,12 @@ async function sendViaBrevo(to: string, subject: string, htmlBody: string): Prom
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
- * CORE EMAIL FUNCTIONS — Chain: Brevo → Gmail → Resend
+ * CORE EMAIL FUNCTIONS — Chain: Brevo → Resend → Gmail
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
 /**
- * Hàm chung để gửi Email — thử Brevo trước, fallback Gmail, rồi Resend
+ * Hàm chung để gửi Email — thử Brevo trước, fallback Resend, rồi cuối cùng là Gmail API
  */
 async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: string): Promise<{ success: boolean; message: string; provider?: string; emailId?: string }> {
   // Bước 1: Thử Brevo trước
@@ -278,10 +278,26 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
       await notifyEmailSuccess(to, subject, brevoResult.emailId || 'N/A', 'Brevo');
       return { success: true, message: 'Email sent via Brevo', provider: 'brevo', emailId: brevoResult.emailId };
     }
-    console.log(`⚠️ Brevo failed, falling back to Gmail: ${brevoResult.message}`);
+    console.log(`⚠️ Brevo failed: ${brevoResult.message}`);
+    const hasNext = !!process.env.RESEND_API_KEY || !!process.env.GMAIL_REFRESH_TOKEN;
+    await notifyEmailError(to, subject, brevoResult.message, 'Brevo', hasNext);
   }
 
-  // Bước 2: Fallback Gmail API
+  // Bước 2: Fallback Resend
+  if (process.env.RESEND_API_KEY) {
+    console.log(`🔄 Trying fallback to Resend for ${to}...`);
+    const resendResult = await sendViaResend(to, subject, htmlBody);
+    if (resendResult.success) {
+      console.log(`✅ Email sent via Resend to ${to}: ${resendResult.emailId}`);
+      await notifyEmailSuccess(to, subject, resendResult.emailId || 'N/A', 'Resend (fallback)');
+      return { success: true, message: 'Email sent via Resend fallback', provider: 'resend', emailId: resendResult.emailId };
+    }
+    console.log(`⚠️ Resend failed: ${resendResult.message}`);
+    const hasNext = !!process.env.GMAIL_REFRESH_TOKEN;
+    await notifyEmailError(to, subject, resendResult.message, 'Resend (fallback)', hasNext);
+  }
+
+  // Bước 3: Fallback Gmail API (OAuth2) làm chốt chặn cuối cùng
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
@@ -304,31 +320,14 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
     const emailId = result.data.id as string;
     console.log(`✅ Email sent via Gmail to ${to}: ${emailId}`);
     
-    await notifyEmailSuccess(to, subject, emailId, 'Gmail API');
+    await notifyEmailSuccess(to, subject, emailId, 'Gmail API (fallback)');
     
-    return { success: true, message: 'Email sent via Gmail', provider: 'gmail', emailId };
+    return { success: true, message: 'Email sent via Gmail fallback', provider: 'gmail', emailId };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`❌ Gmail Error sending to ${to}:`, errorMsg);
-    
-    const hasResendKey = !!process.env.RESEND_API_KEY;
-    await notifyEmailError(to, subject, errorMsg, 'Gmail API', hasResendKey);
-    
-    // Bước 3: Fallback Resend
-    if (hasResendKey) {
-      console.log(`🔄 Trying fallback to Resend for ${to}...`);
-      const resendResult = await sendViaResend(to, subject, htmlBody);
-      
-      if (resendResult.success) {
-        await notifyEmailSuccess(to, subject, resendResult.emailId || 'N/A', 'Resend (fallback)');
-        return { success: true, message: 'Email sent via Resend fallback', provider: 'resend', emailId: resendResult.emailId };
-      } else {
-        await notifyEmailError(to, subject, resendResult.message, 'Resend (fallback)', false);
-        return { success: false, message: `Gmail failed, Resend also failed: ${resendResult.message}` };
-      }
-    }
-    
-    return { success: false, message: errorMsg };
+    await notifyEmailError(to, subject, errorMsg, 'Gmail API (fallback)', false);
+    return { success: false, message: `All providers (Brevo, Resend, Gmail) failed. Gmail error: ${errorMsg}` };
   }
 }
 

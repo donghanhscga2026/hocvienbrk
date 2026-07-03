@@ -19,21 +19,12 @@ function extractTextFromHtml(html: string): string {
 function parseSacombankEmail(htmlContent: string) {
   const text = extractTextFromHtml(htmlContent)
   
-  // Tìm nội dung chuyển khoản
   const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i)
   const description = contentMatch ? contentMatch[1].trim() : ''
   
-  // Format mới: SDT 123456 HV 8286 COC LS03
-  // Tìm 6 số điện thoại cuối sau "SDT" (linh hoạt khoảng trống/kí tự đặc biệt)
   const phoneMatch = description.match(/SDT[\s\._]*(\d{6})/i)
-  
-  // Tìm mã học viên sau "HV" 
   const userIdMatch = description.match(/HV[\s\._]*(\d+)/i)
-  
-  // Tìm mã khóa học sau "COC"
   const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i)
-  
-  // Tìm số tiền - format: 386,868 VND
   const amountMatch = text.match(/(?:Transaction|Phát sinh)[\s:+]*([\d,\.]+)\s*VND/i)
   
   let amount = 0
@@ -42,12 +33,21 @@ function parseSacombankEmail(htmlContent: string) {
     amount = parseInt(amountStr) || 0
   }
   
+  // Extract actual bank transaction time from "Ngày/Date dd/mm/yyyy HH:MM"
+  let transferTime: Date | null = null
+  const dateMatch = text.match(/(?:Ngày|Date)\s*\/?\s*[Dt]ate\s*[:\t\s]*(\d{2})[\/\-](\d{2})[\/\-](\d{4})\s+(\d{1,2}):(\d{2})/i)
+  if (dateMatch) {
+    const [, dd, mm, yyyy, hh, min] = dateMatch
+    transferTime = new Date(`${yyyy}-${mm}-${dd}T${hh.padStart(2, '0')}:${min}:00+07:00`)
+  }
+  
   return {
     phone: phoneMatch ? phoneMatch[1] : null,
     userId: userIdMatch ? parseInt(userIdMatch[1]) : null,
     courseCode: courseCodeMatch ? courseCodeMatch[1].toUpperCase() : null,
     amount: amount,
     content: description,
+    transferTime,
     rawText: text
   }
 }
@@ -154,7 +154,8 @@ async function processBankEmails() {
             bankName: 'Sacombank',
             status: 'VERIFIED',
             verifiedAt: new Date(),
-            verifyMethod: 'AUTO_EMAIL'
+            verifyMethod: 'AUTO_EMAIL',
+            transferTime: parsed.transferTime,
           }
         })
 
@@ -163,66 +164,18 @@ async function processBankEmails() {
           data: { status: 'ACTIVE' }
         })
 
-        // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327
-        if (enrollment.course.teacherId === 327) {
-          try {
-            // Import logic directly here since it's a script
-            const systemId = 3
-            const userId = enrollment.userId
-            
-            // Tìm refSysId
-            let currentId = userId
-            let depth = 0
-            let refSysId = 0
-            while (currentId && depth < 50) {
-                const existing = await prisma.system.findFirst({
-                    where: { userId: currentId, onSystem: systemId }
-                })
-                if (existing && currentId !== 922) {
-                    refSysId = currentId
-                    break
-                }
-                const user = await prisma.user.findUnique({
-                    where: { id: currentId },
-                    select: { referrerId: true }
-                })
-                if (!user || !user.referrerId) break
-                currentId = user.referrerId
-                depth++
-            }
-
-            // Add to system
-            const existingSys = await prisma.system.findFirst({ where: { userId, onSystem: systemId } })
-            let sysRec
-            if (existingSys) {
-                sysRec = await prisma.system.update({ where: { autoId: existingSys.autoId }, data: { refSysId } })
-            } else {
-                sysRec = await prisma.system.create({ data: { userId, onSystem: systemId, refSysId } })
-            }
-
-            // Self closure
-            await prisma.systemClosure.upsert({
-                where: { ancestorId_descendantId_systemId: { ancestorId: sysRec.autoId, descendantId: sysRec.autoId, systemId } },
-                update: { depth: 0 },
-                create: { ancestorId: sysRec.autoId, descendantId: sysRec.autoId, depth: 0, systemId }
-            }).catch(() => {})
-
-            // Ancestor closures
-            if (refSysId >= 0) {
-                const upline = await prisma.system.findFirst({ where: { userId: refSysId, onSystem: systemId } })
-                if (upline) {
-                    const ancestors = await prisma.systemClosure.findMany({ where: { systemId, descendantId: upline.autoId } })
-                    for (const anc of ancestors) {
-                        await prisma.systemClosure.create({
-                            data: { ancestorId: anc.ancestorId, descendantId: sysRec.autoId, depth: anc.depth + 1, systemId }
-                        }).catch(() => {})
-                    }
-                }
-            }
-            console.log(`   🔗 Đã đồng bộ #${userId} vào hệ thống YTB (refSysId=${refSysId})`)
-          } catch (syncErr) {
-            console.error(`   ❌ Lỗi đồng bộ YTB:`, syncErr)
+        // [BRK ACTIVATION] Kiểm tra cấu hình auto-verify của khóa học
+        try {
+          const brkConfig = await prisma.autoVerifyConfig.findUnique({
+            where: { courseId: enrollment.courseId }
+          })
+          if (brkConfig?.enabled && brkConfig.onSystem != null) {
+            const { activateBrkMember } = await import('../lib/brk/activation-service')
+            await activateBrkMember(enrollment.userId, brkConfig.onSystem)
+            console.log(`   🔗 Đã kích hoạt BRK system #${brkConfig.onSystem} cho user #${enrollment.userId}`)
           }
+        } catch (brkErr) {
+          console.error(`   ❌ Lỗi kích hoạt BRK:`, brkErr)
         }
 
         console.log(`   ✅ Đã kích hoạt khóa học!`)

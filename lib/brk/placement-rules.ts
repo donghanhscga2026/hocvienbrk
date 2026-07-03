@@ -8,18 +8,45 @@ const PLACEMENT_RULES: Record<number, 'REFERRAL' | 'FORCED_4WIDE'> = {
   4: 'FORCED_4WIDE',
 }
 
+// Tìm root của system (người kích hoạt đầu tiên) — trả về userId
+async function findSystemRootUser(onSystem: number): Promise<number | null> {
+  const root = await prisma.system.findFirst({
+    where: { onSystem, refSysId: 0 },
+    orderBy: { activatedAt: 'asc' }
+  })
+  return root?.userId || null
+}
+
 // BFS tìm node đầu tiên còn chỗ (< 4 F1)
 // ưu tiên chiều rộng, theo thứ tự thời gian kích hoạt
+// startUserId: userId của người bắt đầu BFS (referrer)
+// Trả về: userId của node được chọn (0 = root mới)
 async function findPlacement4Wide(
   onSystem: number,
-  referrerUserId: number
+  startUserId: number | null
 ): Promise<number> {
-  const referrerSystem = await prisma.system.findUnique({
-    where: { userId_onSystem: { userId: referrerUserId, onSystem } }
-  })
-  if (!referrerSystem) return 0
+  // Xác định userId xuất phát: nếu có referrer và referrer đã trong hệ thống → dùng luôn
+  // Nếu không → fallback về root của hệ thống
+  let startUserIdResolved: number | null = null
 
-  const queue = [referrerSystem.autoId]
+  if (startUserId) {
+    const sys = await prisma.system.findUnique({
+      where: { userId_onSystem: { userId: startUserId, onSystem } }
+    })
+    if (sys) startUserIdResolved = startUserId
+  }
+
+  if (!startUserIdResolved) {
+    startUserIdResolved = await findSystemRootUser(onSystem)
+  }
+  if (!startUserIdResolved) return 0
+
+  const startSys = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId: startUserIdResolved, onSystem } }
+  })
+  if (!startSys) return 0
+
+  const queue = [startSys.autoId]
   const visited = new Set<number>()
 
   while (queue.length > 0) {
@@ -31,7 +58,10 @@ async function findPlacement4Wide(
       where: { ancestorId: currentId, depth: 1, systemId: onSystem }
     })
 
-    if (f1Count < 4) return currentId
+    if (f1Count < 4) {
+      const node = await prisma.system.findUnique({ where: { autoId: currentId } })
+      return node?.userId || 0
+    }
 
     const f1Closures = await prisma.systemClosure.findMany({
       where: { ancestorId: currentId, depth: 1, systemId: onSystem },
@@ -49,16 +79,15 @@ async function findPlacement4Wide(
     }
   }
 
-  return referrerSystem.autoId
+  return startUserIdResolved
 }
 
 // Dispatcher: chọn quy tắc placement theo system
+// Trả về: userId của upline (0 = root)
 export async function resolvePlacement(
   onSystem: number,
   referrerUserId: number | null
 ): Promise<number> {
-  if (!referrerUserId) return 0
-
   const rule = PLACEMENT_RULES[onSystem] || 'REFERRAL'
 
   if (rule === 'FORCED_4WIDE') {
@@ -66,8 +95,6 @@ export async function resolvePlacement(
   }
 
   // REFERRAL: trực tiếp dưới người giới thiệu
-  const refSys = await prisma.system.findUnique({
-    where: { userId_onSystem: { userId: referrerUserId, onSystem } }
-  })
-  return refSys?.autoId || 0
+  if (!referrerUserId) return 0
+  return referrerUserId
 }
