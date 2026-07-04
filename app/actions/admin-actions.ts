@@ -1201,11 +1201,54 @@ export async function previewDeleteUsersAction(condition: UserDeleteCondition) {
         const ids = users.map(u => u.id)
 
         // Count related records
-        const [userClosures, systems, tcaMembers, registrationPoints] = await Promise.all([
+        const [
+            userClosures,
+            systems,
+            tcaMembers,
+            registrationPoints,
+            brkWalletCount,
+            brkTransactionCount,
+            affiliateWalletCount,
+            affiliateTransactionCount,
+            affiliateCommissionCount,
+            affiliatePayoutCount,
+            affiliateLinkCount,
+            affiliateRefCount,
+            enrollmentCount,
+            paymentCount,
+            lessonProgressCount,
+            lessonCommentCount,
+            userRoadmapCount,
+            siteProfileMemberCount,
+            siteProfileCount,
+            userBankAccountCount,
+            accountCount,
+            sessionCount,
+            emailLogCount
+        ] = await Promise.all([
             prisma.userClosure.count({ where: { descendantId: { in: ids } } }),
             prisma.system.findMany({ where: { userId: { in: ids } }, select: { autoId: true } }),
             prisma.tCAMember.count({ where: { OR: [{ userId: { in: ids } }, { tcaId: { in: ids } }] } }),
-            prisma.registrationPoint.count({ where: { refereeId: { in: ids } } })
+            prisma.registrationPoint.count({ where: { refereeId: { in: ids } } }),
+            prisma.brkWallet.count({ where: { userId: { in: ids } } }),
+            prisma.brkTransaction.count({ where: { wallet: { userId: { in: ids } } } }),
+            prisma.affiliateWallet.count({ where: { userId: { in: ids } } }),
+            prisma.affiliateTransaction.count({ where: { wallet: { userId: { in: ids } } } }),
+            prisma.affiliateCommission.count({ where: { affiliateId: { in: ids } } }),
+            prisma.affiliatePayout.count({ where: { userId: { in: ids } } }),
+            prisma.affiliateLink.count({ where: { userId: { in: ids } } }),
+            prisma.affiliateRef.count({ where: { userId: { in: ids } } }),
+            prisma.enrollment.count({ where: { OR: [{ userId: { in: ids } }, { referrerId: { in: ids } }] } }),
+            prisma.payment.count({ where: { enrollment: { OR: [{ userId: { in: ids } }, { referrerId: { in: ids } }] } } }),
+            prisma.lessonProgress.count({ where: { enrollment: { OR: [{ userId: { in: ids } }, { referrerId: { in: ids } }] } } }),
+            prisma.lessonComment.count({ where: { userId: { in: ids } } }),
+            prisma.userRoadmap.count({ where: { userId: { in: ids } } }),
+            prisma.siteProfileMember.count({ where: { userId: { in: ids } } }),
+            prisma.siteProfile.count({ where: { userId: { in: ids } } }),
+            prisma.userBankAccount.count({ where: { userId: { in: ids } } }),
+            prisma.account.count({ where: { userId: { in: ids } } }),
+            prisma.session.count({ where: { userId: { in: ids } } }),
+            prisma.emailLog.count({ where: { userId: { in: ids } } }),
         ])
 
         const systemIds = systems.map(s => s.autoId)
@@ -1242,6 +1285,47 @@ export async function bulkDeleteUsersAction(condition: UserDeleteCondition) {
         const result = { users: 0, systems: 0, tcaMembers: 0, registrationPoints: 0, systemClosures: 0, userClosures: 0 }
 
         await prisma.$transaction(async (tx) => {
+            // A. Dọn dẹp ví BRK & các giao dịch ví BRK
+            const brkWallets = await tx.brkWallet.findMany({
+                where: { userId: { in: ids } },
+                select: { id: true }
+            })
+            const brkWalletIds = brkWallets.map(w => w.id)
+            if (brkWalletIds.length > 0) {
+                await tx.brkTransaction.deleteMany({ where: { walletId: { in: brkWalletIds } } })
+            }
+            await tx.brkWallet.deleteMany({ where: { userId: { in: ids } } })
+
+            // B. Dọn dẹp ví Affiliate & các giao dịch ví Affiliate
+            const affWallets = await tx.affiliateWallet.findMany({
+                where: { userId: { in: ids } },
+                select: { id: true }
+            })
+            const affWalletIds = affWallets.map(w => w.id)
+            if (affWalletIds.length > 0) {
+                await tx.affiliateTransaction.deleteMany({ where: { walletId: { in: affWalletIds } } })
+            }
+            await tx.affiliateWallet.deleteMany({ where: { userId: { in: ids } } })
+
+            // C. Dọn dẹp hoa hồng, thanh toán, link, ref của Affiliate
+            await tx.affiliateCommission.deleteMany({ where: { affiliateId: { in: ids } } })
+            await tx.affiliatePayout.deleteMany({ where: { userId: { in: ids } } })
+            await tx.affiliateLink.deleteMany({ where: { userId: { in: ids } } })
+            await tx.affiliateRef.deleteMany({ where: { userId: { in: ids } } })
+
+            // D. Dọn dẹp đăng ký học khóa học (tự động cascade xóa Payments & LessonProgress)
+            await tx.enrollment.deleteMany({ where: { OR: [{ userId: { in: ids } }, { referrerId: { in: ids } }] } })
+
+            // E. Dọn dẹp các mối quan hệ bổ sung
+            await tx.lessonComment.deleteMany({ where: { userId: { in: ids } } })
+            await tx.userRoadmap.deleteMany({ where: { userId: { in: ids } } })
+            await tx.siteProfileMember.deleteMany({ where: { userId: { in: ids } } })
+            await tx.siteProfile.deleteMany({ where: { userId: { in: ids } } })
+            await tx.userBankAccount.deleteMany({ where: { userId: { in: ids } } })
+            await tx.account.deleteMany({ where: { userId: { in: ids } } })
+            await tx.session.deleteMany({ where: { userId: { in: ids } } })
+            await tx.emailLog.deleteMany({ where: { userId: { in: ids } } })
+
             // 1. User Closures
             const uc = await tx.userClosure.deleteMany({ where: { descendantId: { in: ids } } })
             result.userClosures = uc.count

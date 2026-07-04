@@ -126,6 +126,47 @@ export async function POST(request: NextRequest) {
     console.log('[TCA-Delete] Starting transaction with ids:', ids.length, 'systemIds:', systemIds.length)
     
     await prisma.$transaction(async (tx) => {
+      // A. Dọn dẹp ví BRK & các giao dịch ví BRK
+      const brkWallets = await tx.brkWallet.findMany({
+        where: { userId: { in: ids } },
+        select: { id: true }
+      })
+      const brkWalletIds = brkWallets.map(w => w.id)
+      if (brkWalletIds.length > 0) {
+        await tx.brkTransaction.deleteMany({ where: { walletId: { in: brkWalletIds } } })
+      }
+      await tx.brkWallet.deleteMany({ where: { userId: { in: ids } } })
+
+      // B. Dọn dẹp ví Affiliate & các giao dịch ví Affiliate
+      const affWallets = await tx.affiliateWallet.findMany({
+        where: { userId: { in: ids } },
+        select: { id: true }
+      })
+      const affWalletIds = affWallets.map(w => w.id)
+      if (affWalletIds.length > 0) {
+        await tx.affiliateTransaction.deleteMany({ where: { walletId: { in: affWalletIds } } })
+      }
+      await tx.affiliateWallet.deleteMany({ where: { userId: { in: ids } } })
+
+      // C. Dọn dẹp hoa hồng, thanh toán, link, ref của Affiliate
+      await tx.affiliateCommission.deleteMany({ where: { affiliateId: { in: ids } } })
+      await tx.affiliatePayout.deleteMany({ where: { userId: { in: ids } } })
+      await tx.affiliateLink.deleteMany({ where: { userId: { in: ids } } })
+      await tx.affiliateRef.deleteMany({ where: { userId: { in: ids } } })
+
+      // D. Dọn dẹp đăng ký học khóa học (tự động cascade xóa Payments & LessonProgress)
+      await tx.enrollment.deleteMany({ where: { OR: [{ userId: { in: ids } }, { referrerId: { in: ids } }] } })
+
+      // E. Dọn dẹp các mối quan hệ bổ sung
+      await tx.lessonComment.deleteMany({ where: { userId: { in: ids } } })
+      await tx.userRoadmap.deleteMany({ where: { userId: { in: ids } } })
+      await tx.siteProfileMember.deleteMany({ where: { userId: { in: ids } } })
+      await tx.siteProfile.deleteMany({ where: { userId: { in: ids } } })
+      await tx.userBankAccount.deleteMany({ where: { userId: { in: ids } } })
+      await tx.account.deleteMany({ where: { userId: { in: ids } } })
+      await tx.session.deleteMany({ where: { userId: { in: ids } } })
+      await tx.emailLog.deleteMany({ where: { userId: { in: ids } } })
+
       const uc = await tx.userClosure.deleteMany({ where: { descendantId: { in: ids } } })
       deleted.userClosures = uc.count || 0
 
