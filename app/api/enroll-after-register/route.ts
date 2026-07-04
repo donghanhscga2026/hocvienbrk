@@ -14,6 +14,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid userId" }, { status: 400 })
     }
 
+    // Tài khoản test hệ thống không được phép tham gia khóa học
+    if (userIdNum === 2689) {
+      return NextResponse.json({ error: "Tài khoản test này không được phép tham gia khóa học." }, { status: 403 })
+    }
+
     const course = await prisma.course.findUnique({
       where: { id_khoa: idKhoa },
       select: {

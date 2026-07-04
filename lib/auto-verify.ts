@@ -60,14 +60,14 @@ export async function processPaymentEmails() {
 
   const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ');
 
-  // Query emails trong 7 ngày gần nhất (thay vì is:unread — tránh mất email nếu đã đọc)
+  // Query emails trong 7 ngày gần nhất (dùng Unix epoch seconds — Gmail API không chấp nhận ISO date string)
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  const afterDate = sevenDaysAgo.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+  const afterEpoch = Math.floor(sevenDaysAgo.getTime() / 1000)
 
   const response = await gmail.users.messages.list({
     userId: 'me',
-    q: `(${emailQueries}) after:${afterDate}`,
+    q: `(${emailQueries}) after:${afterEpoch}`,
     maxResults: 50
   });
 
@@ -105,12 +105,15 @@ export async function processPaymentEmails() {
       if (!parsed.amount || (!parsed.userId && !parsed.phone)) continue;
 
       for (const enrollment of pendingEnrollments) {
+        // Bỏ qua enrollment của tài khoản test hệ thống
+        if (enrollment.userId === 2689) continue;
         try {
           const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
           const emailPhone = parsed.phone || '';
           const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
           const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
-          const courseCodeMatch = parsed.courseCode && enrollment.course.id_khoa.toUpperCase().includes(parsed.courseCode);
+          const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+          const courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
           const amountMatch = parsed.amount >= enrollment.course.phi_coc;
 
           if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
