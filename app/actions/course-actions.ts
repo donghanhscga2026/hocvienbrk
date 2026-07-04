@@ -19,6 +19,11 @@ export async function enrollInCourseAction(courseId: number) {
 
         const userId = Number(session.user.id)
 
+        // Tài khoản test #2689 không được phép tham gia hay kích hoạt khóa học
+        if (userId === 2689) {
+            throw new Error("Tài khoản test này không được phép tham gia hay kích hoạt khóa học.")
+        }
+
         const course = await prisma.course.findUnique({
             where: { id: courseId },
             select: {

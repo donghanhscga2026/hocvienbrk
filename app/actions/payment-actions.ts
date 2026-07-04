@@ -96,6 +96,11 @@ export async function verifyPaymentAction(
       return { success: false, error: "Enrollment not found" }
     }
 
+    // Tài khoản test #2689 không được phép kích hoạt khóa học
+    if (enrollment.userId === 2689) {
+      return { success: false, error: "Tài khoản test này không được phép kích hoạt khóa học." }
+    }
+
     if (isTeacher && enrollment.course.teacherId !== userId) {
       return { success: false, error: "Forbidden" }
     }
@@ -303,6 +308,11 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
       where: { id: enrollmentId },
       include: { user: true, course: { select: { teacherId: true } } }
     })
+
+    // Tài khoản test #2689 không được phép kích hoạt khóa học
+    if (enrollmentInfo?.userId === 2689) {
+      return { success: false, error: "Tài khoản test này không được phép kích hoạt khóa học." }
+    }
 
     const payment = await prisma.payment.update({
       where: { enrollmentId },

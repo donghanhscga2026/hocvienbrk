@@ -36,6 +36,11 @@ export async function updateUserProfile(data: {
 
     const userId = parseInt(session.user.id as string)
 
+    // Bảo vệ tài khoản test #2689 khỏi bị sửa đổi profile bởi người khác
+    if (userId === 2689 && session.user.role !== 'ADMIN') {
+        return { success: false, message: "Không thể cập nhật thông tin của tài khoản test hệ thống này." }
+    }
+
     try {
         let finalImageUrl = data.image;
         if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
@@ -64,6 +69,12 @@ export async function changePassword(currentPassword: string, newPassword: strin
     if (!session?.user?.id) return { success: false, message: "Unauthorized" }
 
     const userId = parseInt(session.user.id as string)
+
+    // Bảo vệ tài khoản test #2689 khỏi bị đổi mật khẩu bởi người khác
+    if (userId === 2689 && session.user.role !== 'ADMIN') {
+        return { success: false, message: "Không thể đổi mật khẩu của tài khoản test hệ thống này." }
+    }
+
     const bcrypt = await import('bcryptjs')
 
     const user = await prisma.user.findUnique({

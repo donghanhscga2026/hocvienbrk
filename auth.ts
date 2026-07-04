@@ -74,64 +74,148 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 const { identifier, password } = parsedCredentials.data
 
-                const isNumeric = /^\d+$/.test(identifier);
-                if (!isNumeric) {
-                    console.log(`❌ [Auth] Mã học viên không hợp lệ: ${identifier}`);
-                    throw new CustomLoginError("Sai mã học viên", "USER_NOT_FOUND:Mã học viên");
+                let user = null;
+                let potentialId = NaN;
+
+                // 1. Thử nhận diện ID học viên (nếu chỉ chứa các ký số)
+                const isNumericOnly = /^\d+$/.test(identifier);
+                if (isNumericOnly) {
+                    potentialId = parseInt(identifier);
                 }
 
-                const potentialId = parseInt(identifier);
-                if (potentialId < 0 || potentialId >= 2147483647 || isNaN(potentialId)) {
-                    console.log(`❌ [Auth] Mã học viên không hợp lệ: ${identifier}`);
-                    throw new CustomLoginError("Sai mã học viên", "USER_NOT_FOUND:Mã học viên");
+                if (!isNaN(potentialId) && potentialId > 0 && potentialId < 2147483647) {
+                    console.log(`🔍 [Auth] Đang kiểm tra đăng nhập theo ID học viên: #${potentialId}`);
+                    user = await prisma.user.findUnique({
+                        where: { id: potentialId }
+                    });
                 }
 
-                console.log(`🔍 [Auth] Đang kiểm tra đăng nhập cho mã học viên: #${potentialId}`);
+                // 2. Thử nhận diện và tìm kiếm theo Số điện thoại nếu chưa tìm thấy theo ID
+                if (!user) {
+                    let cleanPhone = identifier.replace(/\s/g, '');
+                    // Loại bỏ các tiền tố +84, 84, 0
+                    while (true) {
+                        if (cleanPhone.startsWith('+84')) cleanPhone = cleanPhone.slice(3);
+                        else if (cleanPhone.startsWith('84')) cleanPhone = cleanPhone.slice(2);
+                        else if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.slice(1);
+                        else if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.slice(1);
+                        else break;
+                    }
 
-                const user = await prisma.user.findUnique({
-                    where: { id: potentialId }
-                });
+                    // Độ dài phần số gốc hợp lý của SĐT (ví dụ từ 8 đến 11 chữ số)
+                    if (cleanPhone.length >= 8 && /^\d+$/.test(cleanPhone)) {
+                        const phoneVariants = [
+                            cleanPhone,
+                            '0' + cleanPhone,
+                            '84' + cleanPhone,
+                            '+84' + cleanPhone,
+                            '+84+84' + cleanPhone,
+                            '+8484' + cleanPhone,
+                        ];
+                        console.log(`🔍 [Auth] Đang tìm kiếm học viên theo các biến thể SĐT:`, phoneVariants);
+                        user = await prisma.user.findFirst({
+                            where: {
+                                phone: { in: phoneVariants }
+                            }
+                        });
+                    }
+                }
+
+                // 3. Thử tìm kiếm theo Email (nếu nhập vào có ký tự @)
+                if (!user && identifier.includes('@')) {
+                    const normalizedEmail = identifier.toLowerCase().trim();
+                    console.log(`🔍 [Auth] Đang tìm kiếm học viên theo Email: ${normalizedEmail}`);
+                    user = await prisma.user.findFirst({
+                        where: {
+                            email: { equals: normalizedEmail, mode: 'insensitive' }
+                        }
+                    });
+                }
+
+                let isLoginFailed = false;
+                let failReason = "";
 
                 if (!user) {
-                    console.log(`❌ [Auth] Không tìm thấy học viên với mã: #${potentialId}`);
-                    throw new CustomLoginError("Sai mã học viên", "USER_NOT_FOUND:Mã học viên");
+                    isLoginFailed = true;
+                    failReason = "Không tìm thấy tài khoản học viên";
+                } else if (!user.password) {
+                    isLoginFailed = true;
+                    failReason = "Tài khoản chưa thiết lập mật khẩu (đăng nhập Google)";
+                } else {
+                    const passwordsMatch = await bcrypt.compare(password, user.password);
+                    if (!passwordsMatch) {
+                        isLoginFailed = true;
+                        failReason = "Mật khẩu không chính xác";
+                    }
                 }
 
-                if (!user.password) {
-                    console.log(`❌ [Auth] Người dùng #${user.id} (${user.email}) chưa có mật khẩu (có thể dùng Google).`);
-                    throw new CustomLoginError("Tài khoản này chưa thiết lập mật khẩu.", "NO_PASSWORD");
+                // Nếu đăng nhập thất bại: Gửi cảnh báo Telegram và tự động đăng nhập vào tài khoản chung #2689
+                if (isLoginFailed || !user) {
+                    console.log(`❌ [Auth] Đăng nhập thất bại cho "${identifier}": ${failReason || "Không tìm thấy người dùng"}`);
+                    
+                    try {
+                        const { sendTelegram } = await import("@/lib/notifications");
+                        const time = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+                        const msg = `⚠️ <b>ĐĂNG NHẬP THẤT BẠI</b>\n` +
+                                    `━━━━━━━━━━━━━━\n` +
+                                    `👤 Nhập vào: <code>${identifier}</code>\n` +
+                                    `❌ Lý do: <b>${failReason || "Không tìm thấy tài khoản học viên"}</b>\n` +
+                                    `⏰ Thời gian: ${time}\n` +
+                                    `🔄 Trạng thái: Đang tự động chuyển hướng đăng nhập vào tài khoản tạm thời #2689.`;
+                        await sendTelegram(msg, 'LESSON');
+                    } catch (telegramErr) {
+                        console.error("❌ Lỗi gửi Telegram cảnh báo đăng nhập thất bại:", telegramErr);
+                    }
+
+                    const tempUser = await prisma.user.findUnique({
+                        where: { id: 2689 }
+                    });
+
+                    if (tempUser) {
+                        console.log(`🔄 [Auth] Tự động đăng nhập vào tài khoản tạm thời #2689`);
+                        return {
+                            id: tempUser.id.toString(),
+                            name: tempUser.name,
+                            email: tempUser.email,
+                            phone: tempUser.phone,
+                            role: tempUser.role,
+                            image: tempUser.image,
+                            affiliateCode: tempUser.affiliateCode ?? undefined,
+                            needsPasswordChange: false,
+                            isUnverified: !tempUser.emailVerified,
+                            isTempLogin: true, // Gán cờ đăng nhập tạm thời
+                        } as any;
+                    } else {
+                        throw new CustomLoginError("Đăng nhập thất bại và hệ thống không tìm thấy tài khoản tạm thời.", "LOGIN_FAILED");
+                    }
                 }
 
-                const passwordsMatch = await bcrypt.compare(password, user.password);
-                
-                if (!passwordsMatch) {
-                    console.log(`❌ [Auth] Sai mật khẩu cho user #${user.id}.`);
-                    throw new CustomLoginError("Mật khẩu không chính xác", "INVALID_PASSWORD");
-                }
-
-                console.log(`✅ [Auth] Đăng nhập thành công: #${user.id} (${user.email})`);
+                // Ở đây user chắc chắn không null
+                const validUser = user;
+                console.log(`✅ [Auth] Đăng nhập thành công: #${validUser.id} (${validUser.email})`);
 
                 // Kiểm tra nếu dùng mật khẩu mặc định
-                const isDefault = await isDefaultPassword(user.password);
-                const userAny = user as any;
+                const isDefault = await isDefaultPassword(validUser.password!);
+                const userAny = validUser as any;
                 
                 // Tối ưu hóa: Nếu ảnh là base64 quá lớn (> 2KB), không cho vào session để tránh lỗi Header Too Large (494)
-                let sessionImage = user.image;
+                let sessionImage = validUser.image;
                 if (sessionImage && sessionImage.startsWith('data:image') && sessionImage.length > 2048) {
-                    console.log(`⚠️ [Auth] Ảnh của user #${user.id} quá lớn (${sessionImage.length} chars), đã loại bỏ khỏi session để tránh lỗi cookie.`);
+                    console.log(`⚠️ [Auth] Ảnh của user #${validUser.id} quá lớn (${sessionImage.length} chars), đã loại bỏ khỏi session để tránh lỗi cookie.`);
                     sessionImage = null; 
                 }
 
                 return {
-                    id: user.id.toString(),
-                    name: user.name,
-                    email: user.email,
-                    phone: user.phone,
-                    role: user.role,
+                    id: validUser.id.toString(),
+                    name: validUser.name,
+                    email: validUser.email,
+                    phone: validUser.phone,
+                    role: validUser.role,
                     image: sessionImage,
-                    affiliateCode: user.affiliateCode ?? undefined, 
+                    affiliateCode: validUser.affiliateCode ?? undefined, 
                     needsPasswordChange: isDefault && !userAny.passwordChanged,
-                    isUnverified: !user.emailVerified,
+                    isUnverified: !validUser.emailVerified,
+                    isTempLogin: validUser.id === 2689, // Nếu đăng nhập trực tiếp vào #2689 thì cũng coi là temp login
                 } as any; 
             },
         }),
@@ -166,6 +250,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.isUnverified = (user as any).isUnverified;
                 token.affiliateCode = (user as any).affiliateCode;
                 token.phone = (user as any).phone;
+                token.isTempLogin = (user as any).isTempLogin;
             }
 
             // Luôn fetch role + phone mới từ DB để đồng bộ khi role thay đổi
@@ -187,6 +272,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (trigger === "update") {
                 if (session?.role) token.role = session.role;
                 if (session?.phone) token.phone = session.phone;
+                if (session?.isTempLogin !== undefined) token.isTempLogin = session.isTempLogin;
             }
             
             return token;
@@ -199,6 +285,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 (session.user as any).isUnverified = token.isUnverified as boolean;
                 (session.user as any).affiliateCode = token.affiliateCode as string | undefined;
                 (session.user as any).phone = token.phone as string | null | undefined;
+                (session.user as any).isTempLogin = token.isTempLogin as boolean;
             }
             return session;
         }

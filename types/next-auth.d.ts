@@ -11,6 +11,7 @@ declare module "next-auth" {
             id: string
             role: Role
             affiliateCode?: string
+            isTempLogin?: boolean
         } & DefaultSession["user"]
     }
 
@@ -18,6 +19,7 @@ declare module "next-auth" {
         id?: string
         role: Role
         affiliateCode?: string
+        isTempLogin?: boolean
     }
 }
 
@@ -31,5 +33,6 @@ declare module "next-auth/jwt" {
     interface JWT {
         id: string
         role: Role
+        isTempLogin?: boolean
     }
 }
