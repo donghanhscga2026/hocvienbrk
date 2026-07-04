@@ -305,6 +305,10 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         }
                     }
 
+                    if (row.userId && row.userId === 2689) {
+                        errors.push(`Dòng #${row.rowIndex}: Tài khoản test #2689 không được phép tham gia khóa học`)
+                        continue
+                    }
                     if (row.userId) {
                         await tx.enrollment.upsert({
                             where: { userId_courseId: { userId: row.userId, courseId } },

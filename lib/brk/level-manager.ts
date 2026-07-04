@@ -86,6 +86,9 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
     throw new Error(`Course fee (${course.phi_coc}) exceeds gift value (${config.giftValue})`)
   }
 
+  // Tài khoản test hệ thống không được nhận quà tặng
+  if (userId === 2689) throw new Error('Tài khoản test không được nhận quà tặng level')
+
   await prisma.enrollment.create({
     data: {
       userId,
