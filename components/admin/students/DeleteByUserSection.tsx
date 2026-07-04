@@ -171,13 +171,13 @@ export default function DeleteByUserSection() {
 
       {preview && preview.stats && (
         <div className="mt-6 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Users</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Học viên</p>
               <p className="text-lg font-black text-red-600">{preview.stats.users}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Systems</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Hệ thống (Systems)</p>
               <p className="text-lg font-black text-red-600">{preview.stats.systems}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
@@ -185,16 +185,42 @@ export default function DeleteByUserSection() {
               <p className="text-lg font-black text-red-600">{preview.stats.tcaMembers}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Closure Recs</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Cây hệ thống (Closures)</p>
               <p className="text-lg font-black text-red-600">{preview.stats.userClosures + preview.stats.systemClosures}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Reg Points</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ví BRK & Giao dịch</p>
+              <p className="text-sm font-bold text-red-600">{preview.stats.brkWalletCount} ví / {preview.stats.brkTransactionCount} gd</p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-red-100">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ví Aff & Giao dịch</p>
+              <p className="text-sm font-bold text-red-600">{preview.stats.affiliateWalletCount} ví / {preview.stats.affiliateTransactionCount} gd</p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-red-100">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Affiliate Stats</p>
+              <p className="text-xs font-bold text-red-600">
+                {preview.stats.affiliateCommissionCount} hoa hồng / {preview.stats.affiliatePayoutCount} payout / {preview.stats.affiliateLinkCount} link / {preview.stats.affiliateRefCount} ref
+              </p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-red-100">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Khóa học & Bài học</p>
+              <p className="text-xs font-bold text-red-600">
+                {preview.stats.enrollmentCount} lớp / {preview.stats.paymentCount} bill / {preview.stats.lessonProgressCount} bài học / {preview.stats.lessonCommentCount} cmt
+              </p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-red-100 col-span-2">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Thông tin khác</p>
+              <p className="text-xs font-semibold text-red-600 leading-tight">
+                {preview.stats.userBankAccountCount} bank / {preview.stats.siteProfileCount} profile / {preview.stats.userRoadmapCount} roadmap / {preview.stats.accountCount} mxh / {preview.stats.sessionCount} phiên / {preview.stats.emailLogCount} mail
+              </p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-red-100">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Điểm đăng ký</p>
               <p className="text-lg font-black text-red-600">{preview.stats.registrationPoints}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">TỔNG CỘNG</p>
-              <p className="text-xl font-black text-red-700">{preview.stats.total}</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">TỔNG BẢN GHI</p>
+              <p className="text-lg font-black text-red-700">{preview.stats.total}</p>
             </div>
           </div>
 

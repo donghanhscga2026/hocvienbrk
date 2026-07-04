@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật & Lịch sử cập nhật HocVien-BRK
-> Cập nhật lần cuối: **2026-07-01** (phiên 3: Hệ thống Sao lưu CSDL)  
+> Cập nhật lần cuối: **2026-07-04** (phiên 5: Fix auto-verify + Build BRK 29 members)  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -688,3 +688,78 @@ Root: #3773 Coach Nguyễn Biên Cương
 ### Lưu ý
 - LSP errors về `referrerId` là do TypeScript server cache chưa cập nhật Prisma schema — `tsc --noEmit` vẫn pass
 - `enrollment.referrerId` hiện tại đều null (chưa có user nào enroll qua referral link sau khi deployment) — chỉ dùng `user.referrerId`
+
+---
+
+## ✅ Phiên 5: Fix auto-verify + Đối chiếu course #22 + Build BRK 29 members (2026-07-04)
+
+### Mục tiêu
+Fix toàn diện pipeline auto-verify payment, chặn user #2689, đối chiếu 100% email Sacombank vs enrollment, rebuild cây BRK.
+
+### Các file đã sửa
+
+#### `lib/auto-verify.ts`
+- **Fix `after:` filter**: ISO date string → Unix epoch seconds (Gmail API không chấp nhận ISO)
+- **Fix so khớp course code**: Thêm `normalizeCode()` loại bỏ ký tự đặc biệt (`_`, `.`) trước khi so sánh — email `XDHETHONGUP1000` khớp với DB `XD_HETHONG_UP1000`
+- **Block #2689**: Thêm `if (enrollment.userId === 2689) continue` — bỏ qua auto-activate cho tài khoản test
+- **Try-catch isolation**: Mỗi enrollment + mỗi message đều có try-catch riêng
+
+#### `app/api/enroll-after-register/route.ts`
+- Thêm check `userIdNum === 2689` → trả về 403 — chặn enrollment cho tài khoản test
+
+#### `lib/brk/level-manager.ts`
+- Thêm check `userId === 2689` → throw error — chặn nhận quà tặng level
+
+#### `app/actions/bulk-enroll-actions.ts`
+- Thêm filter `row.userId === 2689` → báo lỗi + continue — chặn bulk enroll
+
+### Kết quả đối chiếu course #22 (XD_HETHONG_UP1000)
+
+| Mục | Số lượng |
+|-----|:--------:|
+| Email Sacombank tìm thấy | **29 email** |
+| HV đúng (không bị gán sai) | 23 email |
+| HV2689 bị gán sai | 6 email |
+| → Đã map đúng user | 6/6 ✅ |
+| ACTIVE enrollments | **29 members** |
+| PENDING còn lại | 0 |
+| BRK systems | **29** |
+| BRK closures | 89 |
+
+### 6 user bị gán sai #2689 đã map lại
+
+| Email ghi | Người chuyển | Map vào | Trạng thái |
+|:---------:|:------------:|:-------:|:----------:|
+| HV2689 | KIM VAN MUOI | #976 Kim Văn Mười | ✅ active |
+| HV2689 | NGUYEN THI YEN | #974 Nguyễn Thị Yến | ✅ active |
+| HV2689 | TRA THI NGA | #1053 Trà Thị Nga | ✅ active |
+| HV2689 | NGUYEN THI THANH HUYEN | #1029 Nguyễn Thị Thanh Huyền | ✅ active |
+| HV2689 | NGUYEN THI THU LOAN | #607 HOÀNG LOAN 5* | ✅ active |
+| HV2689 | NGUYEN THI MY LE | #1023 Nguyen My Le | ✅ active |
+
+### Cấu trúc cây BRK System 4 (29 members)
+
+```
+👑 #3773 Coach Nguyễn Biên Cương (ROOT)
+│
+├─ F1 #1010 → #229, #965, #976, #974
+│   ├─ #229 → #1068, #617, #1023, #1070
+│   └─ #965 → #26
+│
+├─ F1 #1035 → #1059, #914, #828, #496
+│   ├─ #914 → #1044, #1071
+│   └─ #496 → #1066
+│
+├─ F1 #1057 → #1063, #1060, #962, #330
+│
+└─ F1 #1061 → #1029, #379, #1053, #607
+```
+
+- **Phase 1**: 29 members (1 root + 4 F1 + 24 sub) — BFS horizontal + referrer-based
+- **Root forced**: #3773 (enrollment đầu tiên)
+
+### Trạng thái
+- ✅ Auto-verify hoạt động với epoch seconds
+- ✅ #2689 bị chặn ở mọi đường dẫn
+- ✅ 29 email = 29 members BRK
+- ✅ `npx tsc --noEmit` — 0 lỗi
