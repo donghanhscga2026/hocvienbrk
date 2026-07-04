@@ -24,16 +24,37 @@ function getAllPhoneVariants(fullPhone: string): string[] {
   const variants = [normalized];
   
   if (normalized.startsWith('+84')) {
-    variants.push('0' + normalized.slice(3));
-    variants.push(normalized.slice(1));
+    const rawNumber = normalized.slice(3);
+    variants.push('0' + rawNumber);
+    variants.push('84' + rawNumber);
+    variants.push(rawNumber);
+    variants.push('+' + '84' + rawNumber);
   } else if (normalized.startsWith('+')) {
     const withoutPlus = normalized.slice(1);
     variants.push(withoutPlus);
     if (withoutPlus.startsWith('84')) {
-      variants.push('0' + withoutPlus.slice(2));
+      const rawNumber = withoutPlus.slice(2);
+      variants.push('0' + rawNumber);
+      variants.push(rawNumber);
     }
   } else {
     variants.push('+' + normalized);
+  }
+
+  // Luôn thêm biến thể làm sạch hoàn toàn mọi prefix để đối chiếu với legacy data
+  let clean = normalized.replace(/\s/g, '');
+  while (true) {
+    if (clean.startsWith('+84')) clean = clean.slice(3);
+    else if (clean.startsWith('84')) clean = clean.slice(2);
+    else if (clean.startsWith('0')) clean = clean.slice(1);
+    else if (clean.startsWith('+')) clean = clean.slice(1);
+    else break;
+  }
+  if (clean) {
+    variants.push(clean);
+    variants.push('0' + clean);
+    variants.push('84' + clean);
+    variants.push('+84' + clean);
   }
   
   return [...new Set(variants)];
@@ -67,7 +88,22 @@ export async function registerUser(prevState: any, formData: FormData) {
 
     const { name, email, countryCode, phone, password, referrerId } = validatedFields.data
     
-    const cleanPhone = phone.replace(/\s/g, '').replace(/^0/, '');
+    // Chuẩn hóa loại bỏ khoảng trắng và các mã quốc gia trùng lặp nếu người dùng nhập thừa
+    let cleanPhone = phone.replace(/\s/g, '');
+    const cleanCountryCode = countryCode.replace('+', '');
+    
+    while (true) {
+        if (cleanPhone.startsWith('+' + cleanCountryCode)) {
+            cleanPhone = cleanPhone.slice(('+' + cleanCountryCode).length);
+        } else if (cleanPhone.startsWith(cleanCountryCode)) {
+            cleanPhone = cleanPhone.slice(cleanCountryCode.length);
+        } else if (cleanPhone.startsWith('0')) {
+            cleanPhone = cleanPhone.slice(1);
+        } else {
+            break;
+        }
+    }
+    
     const fullPhone = `${countryCode}${cleanPhone}`;
     
     const phoneVariants = getAllPhoneVariants(fullPhone);
