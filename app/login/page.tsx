@@ -312,13 +312,13 @@ function LoginForm() {
                             <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
                         )}
                         <div>
-                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã học viên</label>
+                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã học viên / Số điện thoại</label>
                             <input
-                                {...register("identifier", { required: "Vui lòng nhập mã học viên" })}
+                                {...register("identifier", { required: "Vui lòng nhập mã học viên hoặc số điện thoại" })}
                                 type="text"
-                                autoComplete="email"
+                                autoComplete="username"
                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
-                                placeholder="Nhập mã học viên"
+                                placeholder="Nhập mã học viên hoặc số điện thoại"
                             />
                             {errors.identifier && <p className="mt-1 text-xs text-brk-accent">{errors.identifier.message}</p>}
                         </div>

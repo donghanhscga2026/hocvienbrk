@@ -68,6 +68,18 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Tạo Payment record cho enrollment cần thu phí (auto-verify cần Payment để update)
+    if (effectivePhiCoc > 0) {
+      await prisma.payment.create({
+        data: {
+          enrollmentId: newEnrollment.id,
+          amount: effectivePhiCoc,
+          status: 'PENDING',
+          phone: user?.phone,
+        }
+      })
+    }
+
     if (course.teacherId === 327) {
       const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
       await syncUserToYtbSystem(userIdNum, course.teacherId)
