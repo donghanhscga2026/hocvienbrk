@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile } from 'lucide-react'
+import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile, Award, Star, Coins, Sparkles, Gift, ArrowUpRight } from 'lucide-react'
 import {
   ReactFlow,
   Node,
@@ -48,8 +48,12 @@ interface MemberDetailInfo {
       seq: number | null;
       status: string | null;
       teamTotalBrkd: number;
+      teamTotalVnd: number;
       joinedAt: Date | string | null;
       levelUpdatedAt?: Date | string | null;
+      teamSize?: number;
+      upline1?: { id: number; name: string | null } | null;
+      upline2?: { id: number; name: string | null } | null;
       wallet: {
         balance: number;
         brkd: number;
@@ -858,7 +862,7 @@ function GenealogyFlow() {
         setShowMyTeamCheckbox(true)
         setShowMyTeamOnly(true)
         shouldShowMyTeamLocal = true // Mặc định là Đội của tôi cho C5 và User thường
-        
+
         if (roleResult.canViewFull) {
           // Nếu có quyền xem Full (C5 hoặc Admin) -> Cho phép bỏ tích
           setCanToggleMyTeam(true)
@@ -1307,7 +1311,7 @@ function GenealogyFlow() {
                 }
                 return null;
               };
-              
+
               const activeStats = targetIdForStats ? findNodeStats(fullTree, targetIdForStats) : fullTree.stats;
 
               if (!activeStats) return null;
@@ -1549,12 +1553,12 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
         <div className={`rounded-t-[24px] sm:rounded-t-[32px] bg-gradient-to-r ${isBrk ? 'from-teal-600 to-emerald-600' : tca ? 'from-indigo-600 to-violet-600' : 'from-emerald-600 to-teal-600'} relative`}>
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 sm:p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-all text-white backdrop-blur-sm z-10"
+            className="absolute top-1 right-1 sm:top-4 sm:right-4 p-1.5 sm:p-2 bg-rose-500 hover:bg-rose-600 rounded-full transition-all text-white shadow-md z-20"
           >
             <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
-          <div className="flex items-start gap-1.5 sm:gap-2 px-3 sm:px-4 pt-3 sm:pt-4 pb-3 sm:pb-4">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white p-0.5 border-2 border-white shadow-lg shrink-0 -mb-10 sm:-mb-12">
+          <div className="flex items-start gap-1.5 sm:gap-2 px-3 sm:px-4 pt-3 sm:pt-4 pb-2 sm:pb-3">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white p-0.5 border-2 border-white shadow-lg shrink-0 -mb-10 sm:-mb-12">
               <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden ${isBrk ? 'bg-emerald-500' : tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
                 {user?.image ? (
                   <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
@@ -1563,23 +1567,29 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
                 )}
               </div>
             </div>
-            <div className="flex flex-col min-w-0 flex-1 pt-0.5">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300">
-                {isBrk ? 'HỆ THỐNG: BRK - NGÂN HÀNG PHƯỚC BÁU' : 'HỆ THỐNG'}
+            <div className="flex-1 flex flex-col min-w-0 pt-0.5">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300 mb-1">
+                {isBrk ? 'BRK - Ngân hàng phước báu' : 'Hệ thống'}
               </span>
-              <h3 className="text-white text-sm sm:text-base font-black leading-tight truncate">
-                {tca?.name || user?.name || 'Học viên'}
-                <span className="text-white/80 font-bold text-[10px] sm:text-xs ml-1.5">#{info.userId}</span>
-              </h3>
-              <span className="text-white/90 text-[10px] sm:text-xs font-semibold truncate mt-0.5">
-                {user?.email || 'Chưa cập nhật email'}
-              </span>
+              <div className="flex items-center justify-between gap-2 w-full pr-3 sm:pr-10">
+                <div className="flex flex-col min-w-0">
+                  <h3 className="text-white text-sm sm:text-base font-black leading-tight truncate">
+                    {tca?.name || user?.name || 'Học viên'}
+                  </h3>
+                  <span className="text-white/80 text-[10px] sm:text-xs font-medium truncate mt-1">
+                    {user?.email || 'Chưa cập nhật email'}
+                  </span>
+                </div>
+                <div className="bg-yellow-400 text-teal-950 font-black text-xs sm:text-sm px-1 py-1 rounded-xl shadow-md border border-yellow-300 select-all shrink-0 self-end mb-0.5">
+                  #{info.userId}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Content Section */}
-        <div className="px-3 sm:px-4 pb-5 sm:pb-6 flex flex-col overflow-y-auto pt-7 sm:pt-9 relative z-10">
+        <div className="px-3 sm:px-4 pb-5 sm:pb-6 flex flex-col overflow-y-auto pt-3 sm:pt-4 relative z-10">
           {isLoading ? (
             <div className="py-8 sm:py-12 flex flex-col items-center justify-center gap-3 sm:gap-4">
               <div className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-indigo-500 border-t-transparent animate-spin rounded-full"></div>
@@ -1588,19 +1598,43 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
           ) : (
             <>
               <div className="space-y-1.5 sm:space-y-2">
+                {/* Upline Leaders */}
+                {isBrk && (systemData?.upline1 || systemData?.upline2) && (
+                  <div className="p-2 sm:p-2.5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl mb-2">
+                    <div className="flex flex-col gap-1 text-[10px] sm:text-xs">
+                      {systemData.upline1 && (
+                        <div className="flex items-center justify-between text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-lg shadow-sm border border-indigo-100/20">
+                          <span>Nhân mạch:</span>
+                          <span className="font-black text-indigo-900">{systemData.upline1.name} <code className="bg-indigo-50 px-1 py-0.2 rounded text-[9px]">#{systemData.upline1.id}</code></span>
+                        </div>
+                      )}
+                      {systemData.upline2 && (
+                        <div className="flex items-center justify-between text-indigo-600 font-bold bg-white px-2 py-0.5 rounded-lg shadow-sm border border-indigo-100/20">
+                          <span>Nhân mạch upline:</span>
+                          <span className="font-black text-indigo-900">{systemData.upline2.name} <code className="bg-indigo-50 px-1 py-0.2 rounded text-[9px]">#{systemData.upline2.id}</code></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {isBrk ? (
                   <>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Cấp bậc" value={systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có'} />
+                      <InfoItem icon={<Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Cấp bậc thăng tiến" value={systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có'} />
                       <InfoItem icon={<Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                       <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày kích hoạt" value={systemData?.joinedAt ? new Date(systemData.joinedAt).toLocaleDateString('vi-VN') : '---'} />
-                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
+                      <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm đội nhóm" value={systemData?.totalPoints != null ? systemData.totalPoints.toLocaleString('vi') : '0'} />
-                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Doanh số đội nhóm" value={systemData?.teamTotalBrkd != null ? `${systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD` : '0 BRKD'} />
+                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng" value={systemData?.totalPoints != null ? systemData.totalPoints.toLocaleString('vi') : '0'} />
+                      <InfoItem icon={<Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />} label="Số thành viên nhóm" value={systemData?.teamSize != null ? `${systemData.teamSize.toLocaleString('vi')}` : '0'} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <InfoItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Doanh số (VNĐ)" value={systemData?.teamTotalVnd != null ? systemData.teamTotalVnd.toLocaleString('vi') : '0'} valueClassName="text-emerald-600 font-extrabold" />
+                      <InfoItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="DS đối ứng (BRKD)" value={systemData?.teamTotalBrkd != null ? systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 }) : '0'} valueClassName="text-rose-600 font-extrabold" />
                     </div>
                   </>
                 ) : (
@@ -1621,10 +1655,10 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
               {isBrk && systemData?.wallet && (
                 <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100">
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                    <WalletItem label="Thu nhập" value={systemData.wallet.balance} suffix="VND" />
-                    <WalletItem label="BRKD" value={systemData.wallet.brkd} suffix="BRKD" />
-                    <WalletItem label="Voucher" value={systemData.wallet.voucherBalance} />
-                    <WalletItem label="Đã rút" value={systemData.wallet.totalWithdrawn} suffix="VND" />
+                    <WalletItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Thu nhập (VNĐ)" value={systemData.wallet.balance} valueClassName="text-emerald-600 font-extrabold" />
+                    <WalletItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Thu nhập đối ứng" value={systemData.wallet.brkd} valueClassName="text-rose-600 font-extrabold" />
+                    <WalletItem icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Voucher" value={systemData.wallet.voucherBalance} />
+                    <WalletItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Đã rút (VNĐ)" value={systemData.wallet.totalWithdrawn} />
                   </div>
                 </div>
               )}
@@ -1636,25 +1670,30 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
   );
 }
 
-function InfoItem({ icon, label, value }: { icon: any, label: string, value: string }) {
+function InfoItem({ icon, label, value, valueClassName }: { icon: any, label: string, value: string, valueClassName?: string }) {
   return (
     <div className="flex items-start gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
       <div className="mt-0.5 p-1 sm:p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
         {icon}
       </div>
       <div className="flex flex-col min-w-0">
-        <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5 sm:mb-1">{label}</span>
-        <span className="text-xs sm:text-sm font-black text-slate-700 truncate">{value}</span>
+        <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-widest leading-none mb-0.5 sm:mb-1">{label}</span>
+        <span className={`text-xs sm:text-sm font-black truncate ${valueClassName || 'text-slate-700'}`}>{value}</span>
       </div>
     </div>
   );
 }
 
-function WalletItem({ label, value, suffix }: { label: string, value: number, suffix?: string }) {
+function WalletItem({ icon, label, value, valueClassName }: { icon: any, label: string, value: number, valueClassName?: string }) {
   return (
-    <div className="flex flex-col p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
-      <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</span>
-      <span className="text-xs sm:text-sm font-black text-slate-700">{value.toLocaleString('vi', { maximumFractionDigits: 0 })} {suffix || ''}</span>
+    <div className="flex items-start gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
+      <div className="mt-0.5 p-1 sm:p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
+        {icon}
+      </div>
+      <div className="flex flex-col min-w-0">
+        <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-widest leading-none mb-0.5 sm:mb-1">{label}</span>
+        <span className={`text-xs sm:text-sm font-black truncate ${valueClassName || 'text-slate-700'}`}>{value.toLocaleString('vi', { maximumFractionDigits: 0 })}</span>
+      </div>
     </div>
   );
 }

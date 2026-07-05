@@ -18,7 +18,7 @@ async function main() {
         nameSystem: 'BRK',
         fee: 1,
         durationDays: 30,
-        graceDays: 7,
+        graceDays: 3,
         returnPct: 21.0,
         revenueSharePct: 2.0,
         revenueShareIntervalDays: 3,
