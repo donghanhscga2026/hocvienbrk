@@ -26,7 +26,7 @@
     },
     {
       "path": "/api/cron/brk-level-check",
-      "schedule": "0 4 * * *"
+      "schedule": "0 4 */3 * *"
     }
   ]
 }
