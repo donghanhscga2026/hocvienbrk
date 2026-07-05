@@ -1,11 +1,14 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { ensureBrkWallet } from './wallet-service'
+import { ensureBrkWallet, creditBrkWallet, creditBrkdWallet, creditVoucherWallet } from './wallet-service'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
 import { distributeCommission } from './commission-calculator'
-import { checkAndPromoteLevel } from './level-manager'
+import { checkAndPromoteLevel, create2F1Voucher } from './level-manager'
 import { resolvePlacement } from './placement-rules'
+
+const BRKP_PER_ACTIVATION = 17
+const BRKD_PER_ACTIVATION = 12_868_686
 
 export async function activateBrkMember(
   userId: number,
@@ -62,15 +65,30 @@ export async function activateBrkMember(
 
   await ensureBrkWallet(userId)
 
-  const selfPoints = Math.round((fee * Number(systemTree.pointsPerDollar)) / 1000)
+  // BRKP for self-activation
   await prisma.system.update({
     where: { autoId: system.autoId },
-    data: { totalPoints: { increment: selfPoints } }
+    data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
   })
 
+  // BRKD for self-activation
+  await creditBrkdWallet(
+    userId,
+    BRKD_PER_ACTIVATION,
+    `BRKD tự kích hoạt hệ thống BRK`,
+    `self_activate_sys_${onSystem}`
+  )
+
+  // Distribute commissions to ancestors
   await distributeCommission(userId, onSystem, fee, systemTree)
 
+  // Check level-up
   await checkAndPromoteLevel(userId, onSystem)
+
+  // Check 2F1 voucher for the referrer
+  if (refSysId > 0) {
+    await create2F1Voucher(refSysId, onSystem)
+  }
 
   return system
 }
@@ -85,6 +103,25 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
     throw new Error('Grace period has ended')
   }
 
+  const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
+  const fee = systemTree ? Number(systemTree.fee) : 0
+
+  // 1. Transfer all F1s to upline
+  const f1Closures = await prisma.systemClosure.findMany({
+    where: { ancestorId: systemRec.autoId, depth: 1, systemId: onSystem }
+  })
+  for (const f1 of f1Closures) {
+    const f1System = await prisma.system.findUnique({ where: { autoId: f1.descendantId } })
+    if (f1System && f1System.status === 'ACTIVE') {
+      await prisma.system.update({
+        where: { autoId: f1.descendantId },
+        data: { refSysId: systemRec.refSysId }
+      })
+      await addUserToSystemClosure(f1System.userId, systemRec.refSysId, onSystem)
+    }
+  }
+
+  // 2. Delete systemClosure records for cancelled member
   await prisma.systemClosure.deleteMany({
     where: {
       OR: [
@@ -95,10 +132,29 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
     }
   })
 
+  // 3. Set status to CANCELLED
   await prisma.system.update({
     where: { autoId: systemRec.autoId },
     data: { status: 'CANCELLED' }
   })
+
+  // 4. Refund 100% fee to wallet (cash)
+  if (fee > 0) {
+    await creditBrkWallet(
+      userId,
+      fee,
+      'RETURN_FEE',
+      `Hoàn 100% phí tham gia BRK (hủy trong thời gian cân nhắc)`,
+      `cancel_grace_sys_${onSystem}`
+    )
+    // BRKD refund equal to self BRKD
+    await creditBrkdWallet(
+      userId,
+      BRKD_PER_ACTIVATION,
+      `BRKD hoàn trả khi hủy trong thời gian cân nhắc`,
+      `cancel_grace_sys_${onSystem}`
+    )
+  }
 
   return { success: true }
 }
@@ -126,13 +182,22 @@ export async function processGracePeriodExpirations() {
     if (member.gracePeriodEnd && member.gracePeriodEnd <= now) {
       const returnAmount = (fee * returnPct) / 100
       if (returnAmount > 0) {
-        const { creditBrkWallet } = await import('./wallet-service')
+        // Cash refund
         await creditBrkWallet(
           member.userId,
           returnAmount,
           'RETURN_FEE',
           `Hoàn ${returnPct}% phí tham gia sau ${systemTree.graceDays} ngày cân nhắc`
         )
+        // BRKD refund (proportional)
+        const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
+        if (brkdReturn > 0) {
+          await creditBrkdWallet(
+            member.userId,
+            brkdReturn,
+            `BRKD hoàn ${returnPct}% sau ${systemTree.graceDays} ngày cân nhắc`
+          )
+        }
         count++
       }
     }

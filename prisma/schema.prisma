@@ -628,14 +628,16 @@ model BrkLevelBranchReq {
 }
 
 model BrkWallet {
-  id             Int       @id @default(autoincrement())
-  userId         Int       @unique
-  balance        Decimal   @default(0) @db.Decimal(14, 2)
-  totalEarned    Decimal   @default(0) @db.Decimal(14, 2)
-  totalWithdrawn Decimal   @default(0) @db.Decimal(14, 2)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  user           User      @relation(fields: [userId], references: [id])
+  id             Int               @id @default(autoincrement())
+  userId         Int               @unique
+  balance        Decimal           @default(0) @db.Decimal(14, 2)
+  brkd           Decimal           @default(0) @db.Decimal(14, 2)
+  voucherBalance Decimal           @default(0) @db.Decimal(14, 2)
+  totalEarned    Decimal           @default(0) @db.Decimal(14, 2)
+  totalWithdrawn Decimal           @default(0) @db.Decimal(14, 2)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id])
   transactions   BrkTransaction[]
 
   @@index([userId])
@@ -649,6 +651,7 @@ model BrkTransaction {
   type          BrkTransactionType
   description   String
   refId         String?
+  balanceType   BalanceType       @default(CASH)
   balanceBefore Decimal           @db.Decimal(14, 2)
   balanceAfter  Decimal           @db.Decimal(14, 2)
   createdAt     DateTime          @default(now())
@@ -1429,6 +1432,15 @@ enum BrkTransactionType {
   REFERRAL_BONUS
   WITHDRAWAL
   ADJUSTMENT
+  BRKD_CREDIT
+  VOUCHER_CREDIT
+  BRKD_RETURN
+}
+
+enum BalanceType {
+  CASH
+  BRKD
+  VOUCHER
 }
 
 enum BrkRevenuePoolStatus {

@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
 import { processAllBrkRevenueShares } from '@/lib/brk/revenue-share-service'
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const results = await processAllBrkRevenueShares()
     return NextResponse.json({ success: true, results })
   } catch (error) {

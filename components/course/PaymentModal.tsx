@@ -175,17 +175,16 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
                                         </p>
                                         {!isVerified && (
                                             <p className="text-[10px] sm:text-xs text-yellow-600 mt-0.5">
-                                                Chuyển khoản đúng nội dung hoặc upload biên lai
+                                                Vui lòng chuyển khoản đúng nội dung để hệ thống tự động nhận diện.
                                             </p>
                                         )}
                                     </div>
                                     {!isVerified && (
                                         <button
-                                            onClick={handleUploadClick}
-                                            disabled={uploading}
-                                            className="w-full sm:w-auto px-3 py-1.5 bg-[#7c3aed] text-white rounded-lg text-xs font-bold hover:bg-[#6d28d9] transition-colors disabled:opacity-50"
+                                            onClick={onClose}
+                                            className="w-full sm:w-auto px-4 py-1.5 bg-gray-200 text-gray-800 rounded-lg text-xs font-bold hover:bg-gray-300 transition-colors"
                                         >
-                                            {uploading ? '...' : '📤 Upload biên lai'}
+                                            CHỜ PHÊ DUYỆT TỰ ĐỘNG - ĐÓNG LẠI
                                         </button>
                                     )}
                                 </div>
@@ -202,14 +201,6 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
                 </div>
             </div>
         </div>
-
-        {showUploadModal && enrollment && enrollment.id && (
-            <UploadProofModal
-                enrollmentId={enrollment.id}
-                onClose={() => setShowUploadModal(false)}
-                onSuccess={handleUploadSuccess}
-            />
-        )}
 
         {/* Modal Phóng to QR */}
         {showFullQR && (

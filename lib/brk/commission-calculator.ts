@@ -2,8 +2,11 @@
 
 import prisma from '@/lib/prisma'
 import type { SystemTree } from '@prisma/client'
-import { creditBrkWallet } from './wallet-service'
+import { creditBrkWallet, creditBrkdWallet } from './wallet-service'
 import { getLevelConfig } from './config-service'
+
+const BRKP_PER_ACTIVATION = 17
+const BRKD_PER_ACTIVATION = 12_868_686
 
 export async function distributeCommission(
   newMemberUserId: number,
@@ -41,15 +44,16 @@ export async function distributeCommission(
     const earnPct = uplinePct - previousPct
     previousPct = Math.max(previousPct, uplinePct)
 
+    // BRKP: 17 to ALL ancestors (full amount, NOT affected by differential)
+    await prisma.system.update({
+      where: { autoId: uplineSystem.autoId },
+      data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
+    })
+
+    // Cash + BRKD: differential (only if earnPct > 0)
     if (earnPct <= 0) continue
 
     const commissionAmount = (fee * earnPct) / 100
-
-    const pointsEarned = Math.round((fee * Number(systemTree.pointsPerDollar)) / 1000)
-    await prisma.system.update({
-      where: { autoId: uplineSystem.autoId },
-      data: { totalPoints: { increment: pointsEarned } }
-    })
 
     if (commissionAmount > 0) {
       await creditBrkWallet(
@@ -57,6 +61,16 @@ export async function distributeCommission(
         commissionAmount,
         'COMMISSION',
         `Hoa hồng cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
+        `sys_${onSystem}_member_${newMemberUserId}`
+      )
+    }
+
+    const brkdAmount = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100)
+    if (brkdAmount > 0) {
+      await creditBrkdWallet(
+        uplineSystem.userId,
+        brkdAmount,
+        `BRKD cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
         `sys_${onSystem}_member_${newMemberUserId}`
       )
     }
