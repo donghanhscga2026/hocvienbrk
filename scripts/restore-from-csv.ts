@@ -261,7 +261,7 @@ async function main() {
         nameSystem: 'BRK',
         fee: 1,
         durationDays: 30,
-        graceDays: 7,
+        graceDays: 3,
         returnPct: 21,
         courseId: sysCourse.id,
       }

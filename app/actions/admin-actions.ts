@@ -783,16 +783,48 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
 
         const rootSys = await prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } })
-        const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true } })
+        const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true, fee: true } })
         const seq = rootSys && sysRec ? sysRec.autoId - rootSys.autoId : null
         // Doanh số đội nhóm = tổng BRKD của member + downline (dùng closure table)
         const descendantClosures = sysRec ? await prisma.systemClosure.findMany({ where: { ancestorId: sysRec.autoId, systemId } }) : []
         const descendantIds = descendantClosures.map(c => c.descendantId)
-        const teamMembers = descendantIds.length > 0 ? await prisma.system.findMany({ where: { autoId: { in: descendantIds } }, select: { userId: true } }) : []
+        const teamMembers = descendantIds.length > 0 ? await prisma.system.findMany({ where: { autoId: { in: descendantIds } }, select: { userId: true, status: true } }) : []
         const teamUserIds = teamMembers.map(m => m.userId)
         const teamWallets = teamUserIds.length > 0 ? await prisma.brkWallet.findMany({ where: { userId: { in: teamUserIds } }, select: { brkd: true } }) : []
         const teamTotalBrkd = teamWallets.reduce((sum, w) => sum + Number(w.brkd), 0)
+
+        // Doanh số đội nhóm VNĐ = tổng số thành viên ACTIVE trong đội nhóm (bao gồm cả bản thân) * fee
+        const activeTeamMembers = teamMembers.filter(m => m.status === 'ACTIVE')
+        const systemFee = systemTree?.fee ? Number(systemTree.fee) : 0
+        const teamTotalVnd = activeTeamMembers.length * systemFee
+
         const latestLevelUp = sysRec ? await prisma.brkLevelUpRecord.findFirst({ where: { userId, onSystem: systemId }, orderBy: { promotedAt: 'desc' }, select: { promotedAt: true } }) : null
+
+        let upline1: { id: number; name: string | null } | null = null
+        let upline2: { id: number; name: string | null } | null = null
+
+        if (sysRec && sysRec.refSysId > 0) {
+            const up1 = await prisma.user.findUnique({
+                where: { id: sysRec.refSysId },
+                select: { id: true, name: true }
+            })
+            if (up1) {
+                upline1 = { id: up1.id, name: up1.name }
+                const up1Sys = await prisma.system.findUnique({
+                    where: { userId_onSystem: { userId: up1.id, onSystem: systemId } },
+                    select: { refSysId: true }
+                })
+                if (up1Sys && up1Sys.refSysId > 0) {
+                    const up2 = await prisma.user.findUnique({
+                        where: { id: up1Sys.refSysId },
+                        select: { id: true, name: true }
+                    })
+                    if (up2) {
+                        upline2 = { id: up2.id, name: up2.name }
+                    }
+                }
+            }
+        }
 
         return {
             success: true,
@@ -808,6 +840,10 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
                 joinedAt: enrollment?.updatedAt ?? sysRec?.activatedAt ?? null,
                 levelUpdatedAt: latestLevelUp?.promotedAt ?? null,
                 teamTotalBrkd,
+                teamTotalVnd,
+                teamSize: descendantClosures.filter(c => c.depth > 0).length,
+                upline1,
+                upline2,
                 wallet: wallet ? {
                     balance: Number(wallet.balance),
                     brkd: Number(wallet.brkd),

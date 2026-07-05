@@ -71,19 +71,16 @@ export async function activateBrkMember(
     data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
   })
 
-  // BRKD for self-activation
-  await creditBrkdWallet(
-    userId,
-    BRKD_PER_ACTIVATION,
-    `BRKD tự kích hoạt hệ thống BRK`,
-    `self_activate_sys_${onSystem}`
-  )
 
   // Distribute commissions to ancestors
   await distributeCommission(userId, onSystem, fee, systemTree)
 
   // Check level-up
-  await checkAndPromoteLevel(userId, onSystem)
+  const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
+  const isOptionB = promoConfig?.value === 'B'
+  if (!isOptionB) {
+    await checkAndPromoteLevel(userId, onSystem)
+  }
 
   // Check 2F1 voucher for the referrer
   if (refSysId > 0) {

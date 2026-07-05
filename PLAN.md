@@ -893,3 +893,25 @@ Hiển thị trạng thái chi tiết 34 members thật **cuối ngày 5/7** (sa
 ### Trạng thái
 - ✅ `npx tsc --noEmit` — 0 lỗi
 - ⚠️ Dữ liệu 36 member cũ vẫn giữ totalPoints 15-75 (cần chạy script fix data nếu muốn)
+
+---
+
+## ✅ Cải tiến Modal chi tiết thành viên Genealogy & Bổ sung thông tin Nhân mạch (2026-07-05)
+
+### Mục tiêu
+Nâng cấp và làm đẹp Modal chi tiết thành viên khi click vào avatar: thêm tuyến trên 2 tầng (Nhân mạch), tổng số thành viên đội nhóm, sắp xếp mã số to rõ cạnh tên, dịch sang trái tránh che nút Close (X), bỏ nhãn thừa và chuẩn hóa hiển thị số.
+
+### Các file đã sửa
+#### `app/actions/admin-actions.ts`
+- Cập nhật `getMemberDetailsAction` để lấy thêm Upline 1 (upline1), Upline 2 (upline2) qua `refSysId` và `teamSize` (tổng số downlines).
+
+#### `app/tools/genealogy/page.tsx`
+- Sửa layout Header: đưa mã số học viên `#...` sang bên phải tên, hiển thị nổi bật dạng chữ Trắng trên nền Vàng hổ phách (`bg-amber-500`), chừa khoảng trống an toàn bên phải tránh va chạm nút Close (X).
+- Hiển thị thông tin Nhân mạch và Nhân mạch của Nhân mạch mượt mà, trực quan.
+- Tinh chỉnh các nhãn thông tin viết chữ thường: "Điểm đội (BRKP)", "Doanh số (BRKD)", "Số thành viên" (chiếm toàn dòng).
+- Bỏ phần nhãn phụ "Nhóm tự động" gây bối rối cho người dùng.
+- Cập nhật các nhãn ví (Thu nhập (VNĐ), Thu nhập vinh dự (BRKD), Đã rút (VNĐ)) và loại bỏ các suffix để dữ liệu chỉ gồm số thuần túy.
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ✅ Giao diện Modal hiển thị chuẩn mực và gọn gàng, tránh tuyệt đối va chạm nút Close (X).

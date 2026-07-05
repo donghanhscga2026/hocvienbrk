@@ -543,7 +543,7 @@ model SystemTree {
   creator    User?    @relation(fields: [creatorId], references: [id])
   fee        Decimal  @default(1) @db.Decimal(12, 2)
   durationDays    Int  @default(30)
-  graceDays       Int  @default(7)
+  graceDays       Int  @default(3)
   returnPct       Decimal @default(21.0) @db.Decimal(5, 2)
   revenueSharePct Decimal @default(2.0) @db.Decimal(5, 2)
   revenueShareIntervalDays Int @default(3)
