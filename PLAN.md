@@ -763,3 +763,113 @@ Fix toàn diện pipeline auto-verify payment, chặn user #2689, đối chiếu
 - ✅ #2689 bị chặn ở mọi đường dẫn
 - ✅ 29 email = 29 members BRK
 - ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ BRK Wallet 3 Balances + Migration + Config Fix (2026-07-04)
+
+### Mục tiêu
+Thêm 2 balance mới (BRKD, Voucher) vào BrkWallet, tạo Prisma migration chính thức thay `db push`, fix DB level config values.
+
+### Các file đã sửa/tạo
+
+#### `prisma/schema.prisma`
+- Thêm `brkd Decimal` và `voucherBalance Decimal` vào `BrkWallet`
+- Thêm `balanceType BalanceType` (enum: CASH, BRKD, VOUCHER) vào `BrkTransaction`
+- Thêm enum values `BRKD_CREDIT`, `VOUCHER_CREDIT`, `BRKD_RETURN` vào `BrkTransactionType`
+
+#### `prisma/migrations/20260704_add_brk_wallet_balances/migration.sql` (Tạo mới)
+- Migration file chính thức: ALTER TABLE thêm cột, CREATE TYPE BalanceType, ALTER TYPE BrkTransactionType
+
+#### `lib/brk/wallet-service.ts`
+- `creditBrkdWallet()`: Ghi BRKD vào ví + transaction với balanceType=BRKD
+- `creditVoucherWallet()`: Ghi voucher vào ví + transaction với balanceType=VOUCHER
+- `creditBalance()`: Generic credit, tham số `balanceType` để phân biệt CASH/BRKD/VOUCHER
+
+#### `lib/brk/commission-calculator.ts`
+- **BRKP luôn 17 cho ALL ancestors** trước check `earnPct <= 0` — fix bug mất BRKP
+- Cash + BRKD differential: chỉ phân phối khi `earnPct > 0`
+
+#### `lib/brk/level-manager.ts`
+- Multi-level promotion loop (while)
+- `create2F1Voucher()`: tự động credit 386,000 VND vào voucherBalance
+- Xóa `createReferralBonus`
+
+#### `lib/brk/activation-service.ts`
+- `activateBrkMember()`: BRKP self + ancestors; BRKD self; gọi `create2F1Voucher` cho referrer
+- `cancelBrkMemberWithinGrace()`: refund 100% cash + full BRKD; chuyển F1 lên upline
+- `processGracePeriodExpirations()`: refund 21% cash + proportional BRKD
+
+#### `lib/brk/revenue-share-service.ts`
+- Thêm BRKD distribution proportional to bonus pool
+
+#### `app/actions/brk-actions.ts`
+- Sửa import: bỏ `createReferralBonus`, thêm `brkd`, `voucherBalance` vào wallet data
+
+#### DB Config (raw SQL)
+- Level 1 `pointsRequired`: 15 → **17** (khớp BRKP_PER_ACTIVATION)
+- Level 2 `giftValue`: 500,000 → **386,000** (khớp simulation)
+
+### Kết quả simulation (3,122 members)
+```
+Root: Lv6 — BRKP=53,074 — Cash=10,664,186 — Voucher=15,772,000
+Level distribution: Lv1=2,342 / Lv2=585 / Lv3=163 / Lv4=22 / Lv5=6 / Lv6=1
+Total vouchers awarded: 1,783
+```
+
+### Trạng thái
+- ✅ DB data fixed (Level 1: 15→17, Level 2 gift: 500k→386k)
+- ✅ Prisma migration created & resolved
+- ✅ All 3 migrations applied, DB schema up to date
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ✅ Simulation runs successfully
+
+---
+
+## ✅ Thêm checkpoint cuối ngày 5/7 trong BRK Simulation (2026-07-04)
+
+### Mục tiêu
+Hiển thị trạng thái chi tiết 34 members thật **cuối ngày 5/7** (sau growth, level-up, voucher 2F1, bonus pool) theo yêu cầu "kết quả ngày mai".
+
+### Các file đã sửa
+#### `scripts/_simulate_brk.ts`
+- Thêm checkpoint `printDetailedMemberReport` với label `'NGAY MAI (5/7) - CUOI NGAY (SAU TANG TRUONG, LEVEL-UP, VOUCHER, BONUS POOL)'` tại dòng 600-602, sau khi day 5 processing hoàn tất trong vòng lặp.
+- Checkpoint cũ (dòng 547, `'NGAY MAI (5/7) - TRUOC KHI TANG TRUONG'`) giữ nguyên.
+
+### Trạng thái
+- ✅ Checkpoint "cuối ngày 5/7" hiển thị đúng: Levels tăng, BRKP=2,533, Cash=259,532, Voucher=10,492,000
+- ✅ `npx tsx scripts/_simulate_brk.ts` — 0 lỗi
+
+---
+
+## ✅ Kích hoạt 3 cron BRK + thêm CRON_SECRET auth (2026-07-04)
+
+### Mục tiêu
+- Thêm xác thực `CRON_SECRET` cho 4 BRK cron routes để tránh bị gọi trái phép
+- Đăng ký 3 cron mới (grace processing, expiration, level check) vào `vercel.json` để chạy hàng ngày
+
+### Các file đã sửa
+#### `app/api/cron/brk-revenue-share/route.ts`
+- Thêm `request: Request` param
+- Thêm auth check `Authorization: Bearer ${process.env.CRON_SECRET}`
+
+#### `app/api/cron/brk-grace-processing/route.ts`
+- Thêm `request: Request` param + auth check CRON_SECRET
+
+#### `app/api/cron/brk-expiration/route.ts`
+- Thêm `request: Request` param + auth check CRON_SECRET
+
+#### `app/api/cron/brk-level-check/route.ts`
+- Thêm `request: Request` param + auth check CRON_SECRET
+
+#### `vercel.json`
+- Thêm 3 cron entries:
+  - `brk-grace-processing`: Daily 2AM
+  - `brk-expiration`: Daily 3AM
+  - `brk-level-check`: Daily 4AM
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ✅ 4 routes có CRON_SECRET auth
+- ✅ 3 cron mới đã đăng ký trong vercel.json
+- ⚠️ Cần deploy lên Vercel để cron bắt đầu chạy

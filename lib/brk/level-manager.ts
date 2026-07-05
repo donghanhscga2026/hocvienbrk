@@ -1,8 +1,9 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { getNextLevelConfig } from './config-service'
+import { getLevelConfig, getAllLevelConfigs } from './config-service'
 import { validateBranchRequirements } from './branch-validator'
+import { creditVoucherWallet } from './wallet-service'
 
 export async function checkAndPromoteLevel(userId: number, onSystem: number) {
   const systemRec = await prisma.system.findUnique({
@@ -10,40 +11,53 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number) {
   })
   if (!systemRec) return null
 
-  const currentLevel = systemRec.level || 1
-  const nextConfig = await getNextLevelConfig(onSystem, currentLevel)
-  if (!nextConfig) return null
-
   const totalPoints = Number(systemRec.totalPoints || 0)
-  if (totalPoints < Number(nextConfig.pointsRequired)) return null
+  let currentLevel = systemRec.level || 1
+  let maxPromotedLevel = currentLevel
 
-  if (nextConfig.branchReqs.length > 0) {
-    const branchCheck = await validateBranchRequirements(userId, onSystem, nextConfig.id)
-    if (!branchCheck.passed) return null
-  }
+  // Multi-level promotion: keep promoting while eligible
+  while (currentLevel < 8) {
+    const nextConfig = await getLevelConfig(onSystem, currentLevel + 1)
+    if (!nextConfig) break
 
-  const promoted = await prisma.system.update({
-    where: { autoId: systemRec.autoId },
-    data: { level: nextConfig.level }
-  })
+    if (totalPoints < Number(nextConfig.pointsRequired)) break
 
-  await prisma.brkLevelUpRecord.create({
-    data: {
-      userId,
-      onSystem,
-      fromLevel: currentLevel,
-      toLevel: nextConfig.level,
+    if (nextConfig.branchReqs.length > 0) {
+      const branchCheck = await validateBranchRequirements(userId, onSystem, nextConfig.id)
+      if (!branchCheck.passed) break
     }
-  })
 
-  if (nextConfig.giftValue > 0) {
-    await prisma.system.update({
-      where: { autoId: systemRec.autoId },
-      data: { giftClaimed: false }
-    })
+    currentLevel++
+    if (currentLevel > maxPromotedLevel) maxPromotedLevel = currentLevel
+
+    await prisma.brkLevelUpRecord.create({
+      data: {
+        userId,
+        onSystem,
+        fromLevel: currentLevel - 1,
+        toLevel: currentLevel,
+      }
+    }).catch(() => {})
+
+    if (nextConfig.giftValue > 0) {
+      await creditVoucherWallet(
+        userId,
+        nextConfig.giftValue,
+        `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue} VND)`,
+        `level_${currentLevel}_sys_${onSystem}`
+      )
+    }
   }
 
-  return promoted
+  if (maxPromotedLevel > (systemRec.level || 1)) {
+    const promoted = await prisma.system.update({
+      where: { autoId: systemRec.autoId },
+      data: { level: maxPromotedLevel }
+    })
+    return promoted
+  }
+
+  return systemRec
 }
 
 export async function claimLevelGift(userId: number, onSystem: number, courseId: number) {
@@ -51,7 +65,6 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
     where: { userId_onSystem: { userId, onSystem } }
   })
   if (!systemRec) throw new Error('Not a member')
-  if (systemRec.giftClaimed) throw new Error('Gift already claimed')
 
   const lastRecord = await prisma.brkLevelUpRecord.findFirst({
     where: { userId, onSystem },
@@ -59,9 +72,7 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
   })
   if (!lastRecord) throw new Error('No level up record found')
 
-  const config = await prisma.brkLevelConfig.findUnique({
-    where: { systemId_level: { systemId: onSystem, level: lastRecord.toLevel } }
-  })
+  const config = await getLevelConfig(onSystem, lastRecord.toLevel)
   if (!config || config.giftValue <= 0) throw new Error('No gift available for this level')
 
   if (config.timeLimitDays) {
@@ -86,7 +97,6 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
     throw new Error(`Course fee (${course.phi_coc}) exceeds gift value (${config.giftValue})`)
   }
 
-  // Tài khoản test hệ thống không được nhận quà tặng
   if (userId === 2689) throw new Error('Tài khoản test không được nhận quà tặng level')
 
   await prisma.enrollment.create({
@@ -97,11 +107,6 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
       phi_coc: 0,
       startedAt: new Date(),
     }
-  })
-
-  await prisma.system.update({
-    where: { autoId: systemRec.autoId },
-    data: { giftClaimed: true }
   })
 
   return { success: true, courseId }
@@ -116,11 +121,7 @@ export async function getLevelProgress(userId: number, onSystem: number) {
   const currentLevel = systemRec.level || 1
   const totalPoints = Number(systemRec.totalPoints || 0)
 
-  const allConfigs = await prisma.brkLevelConfig.findMany({
-    where: { systemId: onSystem },
-    include: { branchReqs: true },
-    orderBy: { level: 'asc' }
-  })
+  const allConfigs = await getAllLevelConfigs(onSystem)
 
   const nextConfig = allConfigs.find(c => c.level === currentLevel + 1)
   const currentConfig = allConfigs.find(c => c.level === currentLevel)
@@ -151,7 +152,7 @@ export async function getLevelProgress(userId: number, onSystem: number) {
   }
 }
 
-export async function createReferralBonus(userId: number, onSystem: number) {
+export async function create2F1Voucher(userId: number, onSystem: number) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -172,7 +173,17 @@ export async function createReferralBonus(userId: number, onSystem: number) {
   })
   if (existing) return existing
 
-  return prisma.brkReferralBonus.create({
+  const bonus = await prisma.brkReferralBonus.create({
     data: { userId, onSystem, f1Count }
   })
+
+  // Auto-credit voucher to wallet
+  await creditVoucherWallet(
+    userId,
+    386_000,
+    `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
+    `referral_2f1_sys_${onSystem}`
+  )
+
+  return bonus
 }

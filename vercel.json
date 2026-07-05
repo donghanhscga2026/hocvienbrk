@@ -15,6 +15,18 @@
     {
       "path": "/api/cron/brk-revenue-share",
       "schedule": "0 0 */3 * *"
+    },
+    {
+      "path": "/api/cron/brk-grace-processing",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/brk-expiration",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/brk-level-check",
+      "schedule": "0 4 * * *"
     }
   ]
 }

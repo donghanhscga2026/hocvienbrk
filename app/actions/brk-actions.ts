@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { activateBrkMember, cancelBrkMemberWithinGrace, processGracePeriodExpirations } from '@/lib/brk/activation-service'
 import { getBrkWallet, getBrkTransactionHistory } from '@/lib/brk/wallet-service'
-import { getLevelProgress, claimLevelGift, createReferralBonus } from '@/lib/brk/level-manager'
+import { getLevelProgress, claimLevelGift } from '@/lib/brk/level-manager'
 import { getSystemTreeByCourseId, getAllLevelConfigs } from '@/lib/brk/config-service'
 import { getRevenueShareHistory } from '@/lib/brk/revenue-share-service'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
@@ -155,6 +155,8 @@ export async function getBrkWalletData() {
   return {
     wallet: wallet ? {
       balance: Number(wallet.balance),
+      brkd: Number(wallet.brkd),
+      voucherBalance: Number(wallet.voucherBalance),
       totalEarned: Number(wallet.totalEarned),
       totalWithdrawn: Number(wallet.totalWithdrawn),
     } : null,

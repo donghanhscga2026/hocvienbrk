@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { creditBrkWallet } from './wallet-service'
+import { creditBrkWallet, creditBrkdWallet } from './wallet-service'
 
 export async function processRevenueShareForSystem(onSystem: number) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
@@ -107,6 +107,8 @@ export async function processRevenueShareForSystem(onSystem: number) {
     }
   })
 
+  const BRKD_PER_ACTIVATION = 12_868_686
+
   for (const member of qualified) {
     await creditBrkWallet(
       member.userId,
@@ -115,6 +117,17 @@ export async function processRevenueShareForSystem(onSystem: number) {
       `Chia đều doanh thu kỳ ${roundNumber} (${sharePct}% của ${totalRevenue}$)`,
       `pool_${pool.id}`
     )
+
+    // BRKD proportional to bonus share
+    const brkdShare = Math.round((BRKD_PER_ACTIVATION * amountPerPerson) / Number(systemTree.fee))
+    if (brkdShare > 0) {
+      await creditBrkdWallet(
+        member.userId,
+        brkdShare,
+        `BRKD chia doanh thu kỳ ${roundNumber}`,
+        `pool_${pool.id}`
+      )
+    }
 
     await prisma.brkRevenueAward.create({
       data: {

@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import type { BrkTransactionType } from '@prisma/client'
+import type { BrkTransactionType, BalanceType } from '@prisma/client'
 
 export async function ensureBrkWallet(userId: number) {
   let wallet = await prisma.brkWallet.findUnique({ where: { userId } })
@@ -17,23 +17,29 @@ export async function getBrkWallet(userId: number) {
   return prisma.brkWallet.findUnique({ where: { userId } })
 }
 
-export async function creditBrkWallet(
+async function creditBalance(
   userId: number,
   amount: number,
+  balanceType: BalanceType,
   type: BrkTransactionType,
   description: string,
   refId?: string
 ) {
   const wallet = await ensureBrkWallet(userId)
-  const newBalance = Number(wallet.balance) + amount
+  const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : 'balance'
+
+  const oldVal = Number(wallet[field])
+  const newVal = oldVal + amount
+
+  const updateData: Record<string, any> = { [field]: newVal }
+  if (balanceType === 'CASH') {
+    updateData.totalEarned = { increment: amount }
+  }
 
   const [updated] = await prisma.$transaction([
     prisma.brkWallet.update({
       where: { userId },
-      data: {
-        balance: newBalance,
-        totalEarned: { increment: amount }
-      }
+      data: updateData
     }),
     prisma.brkTransaction.create({
       data: {
@@ -42,13 +48,42 @@ export async function creditBrkWallet(
         type,
         description,
         refId,
-        balanceBefore: Number(wallet.balance),
-        balanceAfter: newBalance,
+        balanceType,
+        balanceBefore: oldVal,
+        balanceAfter: newVal,
       }
     })
   ])
 
   return updated
+}
+
+export async function creditBrkWallet(
+  userId: number,
+  amount: number,
+  type: BrkTransactionType,
+  description: string,
+  refId?: string
+) {
+  return creditBalance(userId, amount, 'CASH', type, description, refId)
+}
+
+export async function creditBrkdWallet(
+  userId: number,
+  amount: number,
+  description: string,
+  refId?: string
+) {
+  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId)
+}
+
+export async function creditVoucherWallet(
+  userId: number,
+  amount: number,
+  description: string,
+  refId?: string
+) {
+  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId)
 }
 
 export async function debitBrkWallet(
@@ -79,6 +114,7 @@ export async function debitBrkWallet(
         type,
         description,
         refId,
+        balanceType: 'CASH',
         balanceBefore: Number(wallet.balance),
         balanceAfter: newBalance,
       }
