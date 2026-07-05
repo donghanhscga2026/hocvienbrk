@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role, Prisma } from "@prisma/client"
+import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
 import { revalidatePath } from "next/cache"
 
 // Helper to check admin permission
@@ -1443,4 +1444,285 @@ export async function bulkDeleteUsersAction(condition: UserDeleteCondition) {
         revalidatePath('/tools/students')
         return { success: true, result, message: `Đã xóa: ${result.users} users, ${result.systems} systems, ${result.tcaMembers} TCA, ${result.userClosures} closures.` }
     } catch (error: any) { return { success: false, error: error.message } }
+}
+
+export async function getSystemPromotionLogicAction(systemId: number) {
+    try {
+        if (systemId !== 4) return { success: true, logic: 'A' }
+        const config = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
+        return { success: true, logic: config?.value || 'A' }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
+export async function switchSystemPromotionLogicAction(systemId: number, method: 'A' | 'B') {
+    try {
+        await checkAdmin()
+        if (systemId !== 4) {
+            throw new Error("Hệ thống này hiện không hỗ trợ thay đổi phương án thăng tiến.")
+        }
+        await rebuildSystem4Data(method)
+        revalidatePath('/tools/genealogy')
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
+async function getPathFromAncestorToDescendant(ancestorId: number, descendantId: number, systemId: number) {
+    const path: { userId: number; name: string }[] = [];
+    let currentId = descendantId;
+    let depth = 0;
+    
+    while (currentId !== ancestorId && depth < 20) {
+        const node = await prisma.system.findUnique({
+            where: { userId_onSystem: { userId: currentId, onSystem: systemId } },
+            select: { refSysId: true }
+        });
+        if (!node || node.refSysId === 0 || node.refSysId === ancestorId) break;
+        
+        const parentUser = await prisma.user.findUnique({
+            where: { id: node.refSysId },
+            select: { name: true }
+        });
+        
+        path.push({
+            userId: node.refSysId,
+            name: parentUser?.name || 'Unknown'
+        });
+        currentId = node.refSysId;
+        depth++;
+    }
+    return path.reverse();
+}
+
+export async function getMemberPromotionHistoryAction(userId: number, systemId: number) {
+    try {
+        const events: any[] = []
+
+        // 1. Lấy thông tin kích hoạt hệ thống của thành viên
+        const sysNode = await prisma.system.findFirst({
+            where: { userId, onSystem: systemId }
+        })
+        if (sysNode && sysNode.activatedAt) {
+            events.push({
+                type: 'ACTIVATION',
+                time: sysNode.activatedAt,
+                title: 'Kích hoạt hệ thống thành công',
+                description: `Bắt đầu tham gia hệ thống BRK tại Cấp 1.`,
+                details: { toLevel: 1 }
+            })
+        }
+
+        // 2. Lấy các mốc thăng cấp
+        const levelRecords = await prisma.brkLevelUpRecord.findMany({
+            where: { userId, onSystem: systemId },
+            orderBy: { promotedAt: 'asc' }
+        })
+        for (const rec of levelRecords) {
+            events.push({
+                type: 'LEVEL_UP',
+                time: rec.promotedAt,
+                title: 'Thăng cấp bậc mới',
+                description: `Thăng cấp từ Cấp ${rec.fromLevel} lên Cấp ${rec.toLevel}`,
+                details: { fromLevel: rec.fromLevel, toLevel: rec.toLevel }
+            })
+        }
+
+        // 3. Lấy tất cả biến động dòng tiền (Giao dịch ví)
+        const wallet = await prisma.brkWallet.findUnique({
+            where: { userId }
+        })
+        if (wallet) {
+            const txs = await prisma.brkTransaction.findMany({
+                where: { walletId: wallet.id },
+                orderBy: { createdAt: 'asc' }
+            })
+
+            const normalizeDesc = (desc: string) => {
+                const lower = desc.toLowerCase();
+                
+                // 1. Chuẩn hóa Hoàn phí 21%
+                if (lower.includes('hoàn 21%') || lower.includes('hoàn phí 21%')) {
+                    const matchDay = lower.match(/sau (\d+) ngày/);
+                    const days = matchDay ? matchDay[1] : '1';
+                    return `hoàn phí 21% sau ${days} ngày`;
+                }
+                
+                // 2. Chuẩn hóa Đồng chia 2%
+                if (lower.includes('chia doanh thu kỳ') || lower.includes('chia đều doanh thu kỳ')) {
+                    const matchPeriod = lower.match(/kỳ (\d+)/);
+                    const period = matchPeriod ? matchPeriod[1] : '1';
+                    return `đồng chia kỳ ${period}`;
+                }
+                
+                // 3. Chuẩn hóa Hoa hồng phát sinh
+                if (lower.includes('từ thành viên mới')) {
+                    const matchId = lower.match(/#(\d+)/);
+                    if (matchId) {
+                        return `phát sinh mới từ thành viên #${matchId[1]}`;
+                    }
+                }
+                
+                return desc
+                    .replace(/^BRKD\s+/, '')
+                    .replace(/^Hoa hồng\s+/, '')
+                    .trim();
+            };
+
+            // Gộp các giao dịch phát sinh cùng lúc (lệch nhau <= 5 giây) và chung description sau khi chuẩn hóa
+            const groupedTxs: any[] = [];
+            for (const tx of txs) {
+                const txTime = new Date(tx.createdAt).getTime();
+                const normTxDesc = normalizeDesc(tx.description || '');
+                const existing = groupedTxs.find(g => {
+                    const gTime = new Date(g.createdAt).getTime();
+                    const normGDesc = normalizeDesc(g.description || '');
+                    const isSimilarDesc = normGDesc === normTxDesc;
+                    const isTimeClose = Math.abs(gTime - txTime) < 5000;
+                    return isSimilarDesc && isTimeClose;
+                });
+                
+                if (existing) {
+                    if (tx.balanceType === 'CASH') {
+                        existing.amountCash = Number(tx.amount);
+                        existing.description = tx.description;
+                        existing.type = tx.type;
+                    } else if (tx.balanceType === 'BRKD') {
+                        existing.amountBrkd = Number(tx.amount);
+                    } else if (tx.balanceType === 'VOUCHER') {
+                        existing.amountVoucher = Number(tx.amount);
+                    }
+                } else {
+                    const newGroupObj = {
+                        createdAt: tx.createdAt,
+                        type: tx.type,
+                        description: tx.description,
+                        amountCash: tx.balanceType === 'CASH' ? Number(tx.amount) : 0,
+                        amountBrkd: tx.balanceType === 'BRKD' ? Number(tx.amount) : 0,
+                        amountVoucher: tx.balanceType === 'VOUCHER' ? Number(tx.amount) : 0,
+                    };
+                    groupedTxs.push(newGroupObj);
+                }
+            }
+
+            for (const gtx of groupedTxs) {
+                let txTitle = 'Biến động số dư'
+                let txDesc = gtx.description || ''
+                if (gtx.type === 'COMMISSION') {
+                    txTitle = 'Phát sinh mới'
+                } else if (gtx.type === 'RETURN_FEE') {
+                    txTitle = 'Hoàn phí 21%'
+                } else if (gtx.type === 'REVENUE_SHARE') {
+                    txTitle = 'Đồng chia 2%'
+                } else if (gtx.type === 'VOUCHER_CREDIT') {
+                    txTitle = 'Thưởng thăng cấp'
+                }
+
+                let targetMemberName = '';
+                let targetMemberId: number | null = null;
+                let pathStr = '';
+                
+                const match = txDesc.match(/#(\d+)/);
+                if (match && match[1]) {
+                    targetMemberId = parseInt(match[1]);
+                    const targetUser = await prisma.user.findUnique({
+                        where: { id: targetMemberId },
+                        select: { name: true }
+                    });
+                    if (targetUser) {
+                        targetMemberName = targetUser.name || '';
+                        
+                        const pctMatch = txDesc.match(/\((\d+(\.\d+)?%)\)/);
+                        const pct = pctMatch ? ` (${pctMatch[1]})` : '';
+                        
+                        if (gtx.type === 'COMMISSION') {
+                            txDesc = `Hoa hồng từ thành viên mới #${targetMemberId} - ${targetMemberName}${pct}`;
+                        } else if (gtx.type === 'RETURN_FEE') {
+                            txDesc = `Hoàn phí 21% cho thành viên #${targetMemberId} - ${targetMemberName}`;
+                        }
+
+                        if (targetMemberId !== userId) {
+                            const path = await getPathFromAncestorToDescendant(userId, targetMemberId, systemId);
+                            const pathParts: string[] = [];
+                            
+                            for (let idx = 0; idx < path.length; idx++) {
+                                pathParts.push(`${path[idx].name} (#${path[idx].userId}) (F${idx + 1})`);
+                            }
+                            pathParts.push(`${targetMemberName} (#${targetMemberId}) (F${path.length + 1})`);
+                            
+                            pathStr = pathParts.join(' ➔ ');
+                        }
+                    }
+                } else {
+                    if (gtx.type === 'RETURN_FEE') {
+                        const matchDay = txDesc.match(/sau (\d+) ngày/);
+                        const days = matchDay ? matchDay[1] : '1';
+                        txDesc = `Hoàn phí 21% phí tham gia sau ${days} ngày`;
+                    } else if (gtx.type === 'REVENUE_SHARE') {
+                        const matchPeriod = txDesc.match(/kỳ (\d+)/);
+                        const period = matchPeriod ? matchPeriod[1] : '1';
+                        txDesc = `Đồng chia 2% kỳ ${period}`;
+                    }
+                }
+
+                events.push({
+                    type: 'TRANSACTION',
+                    time: gtx.createdAt,
+                    title: txTitle,
+                    description: txDesc,
+                    details: {
+                        amountCash: gtx.amountCash,
+                        amountBrkd: gtx.amountBrkd,
+                        amountVoucher: gtx.amountVoucher,
+                        txType: gtx.type,
+                        targetMemberId,
+                        targetMemberName,
+                        pathStr
+                    }
+                })
+            }
+        }
+
+        // Sắp xếp tất cả các sự kiện theo mốc thời gian tăng dần
+        events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+
+        const myNode = await prisma.system.findUnique({
+            where: { userId_onSystem: { userId, onSystem: systemId } },
+            select: { autoId: true }
+        });
+        const myAutoId = myNode?.autoId || 0;
+
+        // Tính lũy kế số dư VNĐ, BRKD, Team Size và Điểm BRKP theo thời gian
+        let accumCash = 0
+        let accumBrkd = 0
+        for (const ev of events) {
+            if (ev.type === 'TRANSACTION') {
+                accumCash += ev.details?.amountCash || 0
+                accumBrkd += ev.details?.amountBrkd || 0
+            }
+            ev.accumulatedCash = accumCash
+            ev.accumulatedBrkd = accumBrkd
+
+            // Đếm số thành viên nhóm kích hoạt tính đến thời điểm ev.time
+            const teamSizeAtTime = await prisma.systemClosure.count({
+                where: {
+                    ancestorId: myAutoId,
+                    depth: { gt: 0 },
+                    systemId: systemId,
+                    descendant: {
+                        activatedAt: { lte: ev.time },
+                        status: 'ACTIVE'
+                    }
+                }
+            })
+            ev.accumulatedTeamSize = 1 + teamSizeAtTime
+            ev.accumulatedBrkp = 17 * (1 + teamSizeAtTime)
+        }
+
+        return { success: true, history: events }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
 }

@@ -19,7 +19,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, getSystemPromotionLogicAction, switchSystemPromotionLogicAction, getMemberPromotionHistoryAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import { Role } from '@prisma/client'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
@@ -433,6 +433,8 @@ function GenealogyFlow() {
   const [canToggleMyTeam, setCanToggleMyTeam] = useState<boolean>(true)
   const [showMyTeamCheckbox, setShowMyTeamCheckbox] = useState<boolean>(true)
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [promotionLogic, setPromotionLogic] = useState<'A' | 'B'>('B')
+  const [switchingLogic, setSwitchingLogic] = useState<boolean>(false)
 
   // v8.4.0: Computed tree - lọc tại nguồn data khi showActiveOnly thay đổi
   const filteredTree = useMemo(() => {
@@ -455,6 +457,46 @@ function GenealogyFlow() {
   // Focus Subtree Mode: tạm dùng 1 node làm root, hiển thị toàn bộ cây con
   const [focusedSubtreeNode, setFocusedSubtreeNode] = useState<GenealogyNode | null>(null)
   const [focusedNodeName, setFocusedNodeName] = useState<string | null>(null)
+
+  // Load Promotion Logic configuration when system changes
+  useEffect(() => {
+    if (selectedSystem) {
+      getSystemPromotionLogicAction(selectedSystem).then(res => {
+        if (res.success && res.logic) {
+          setPromotionLogic(res.logic as 'A' | 'B')
+        }
+      })
+    }
+  }, [selectedSystem])
+
+  const handleSwitchPromotionLogic = async (method: 'A' | 'B') => {
+    if (!selectedSystem || selectedSystem !== 4) return
+    if (switchingLogic) return
+
+    const confirmMsg = `Bạn có chắc chắn muốn chuyển sang ${
+      method === 'A'
+        ? 'Phương án A (Real-time thăng cấp & 3 ngày cân nhắc)'
+        : 'Phương án B (Daily thăng cấp lúc 00:00 & 24h cân nhắc)'
+    }? Hệ thống sẽ tiến hành xóa sạch và tính toán lại toàn bộ dữ liệu từ ngày 02/07/2026.`
+
+    if (!confirm(confirmMsg)) return
+
+    setSwitchingLogic(true)
+    try {
+      const res = await switchSystemPromotionLogicAction(selectedSystem, method)
+      if (res.success) {
+        setPromotionLogic(method)
+        alert("Đã chuyển đổi phương án và tính toán lại toàn bộ dữ liệu thành công!")
+        window.location.reload()
+      } else {
+        alert("Lỗi: " + (res.error || "Không thể chuyển đổi."))
+      }
+    } catch (err: any) {
+      alert("Lỗi hệ thống: " + err.message)
+    } finally {
+      setSwitchingLogic(false)
+    }
+  }
 
   // Load available systems from database
   useEffect(() => {
@@ -1267,6 +1309,30 @@ function GenealogyFlow() {
           </div>
         </div>
 
+        {/* Promotion Logic Switch Dropdown (Chỉ hiển thị cho ADMIN và khi chọn Hệ thống BRK = 4) */}
+        {isAdmin && selectedSystem === 4 && (
+          <div className="relative shrink-0 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-300 transition-all">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter shrink-0">
+              Phương án:
+            </span>
+            <div className="relative">
+              <select
+                disabled={switchingLogic}
+                value={promotionLogic}
+                onChange={(e) => handleSwitchPromotionLogic(e.target.value as 'A' | 'B')}
+                className="appearance-none bg-transparent text-slate-700 text-[10px] font-black pl-2 pr-6 py-1 rounded-lg outline-none cursor-pointer disabled:opacity-50"
+              >
+                <option value="B">Phương án B (Mặc định)</option>
+                <option value="A">Phương án A (Real-time)</option>
+              </select>
+              <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            </div>
+            {switchingLogic && (
+              <div className="w-3.5 h-3.5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin ml-1" />
+            )}
+          </div>
+        )}
+
         {/* v8.8.1: Khối thống kê - Tối ưu v9.4: Fix số liệu nhảy theo đúng Đội của tôi */}
         {fullTree && (
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 ml-0 sm:ml-2 sm:border-l sm:border-slate-200 sm:pl-3 shrink-0">
@@ -1533,14 +1599,30 @@ function GenealogyFlow() {
         </div>
       )}
       {/* Member Details Modal */}
-      <MemberDetailsModal info={memberDetail} onClose={() => setMemberDetail(prev => ({ ...prev, show: false }))} />
+      <MemberDetailsModal info={memberDetail} onClose={() => setMemberDetail(prev => ({ ...prev, show: false }))} selectedSystem={selectedSystem} />
 
     </div>
   )
 }
 
-function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose: () => void }) {
+function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDetailInfo, onClose: () => void, selectedSystem: number | null }) {
   if (!info.show) return null;
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (showHistory && info.userId && selectedSystem) {
+      setLoadingHistory(true);
+      getMemberPromotionHistoryAction(info.userId, selectedSystem).then(res => {
+        if (res.success && res.history) {
+          setHistoryRecords(res.history);
+        }
+        setLoadingHistory(false);
+      });
+    }
+  }, [showHistory, info.userId, selectedSystem]);
 
   const { user, tca, systemData } = info.data || {};
   const isLoading = info.loading;
@@ -1662,10 +1744,253 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
                   </div>
                 </div>
               )}
+
+              {/* Promotion History Button */}
+              {isBrk && (
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-center">
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-md hover:scale-[1.02] transition-all uppercase tracking-wider"
+                  >
+                    Xem lịch sử thăng tiến
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {/* History Modal Popup */}
+      {showHistory && (
+        <div className="fixed inset-0 bg-slate-955/70 backdrop-blur-sm z-[350] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-[90%] max-w-md md:max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[60vh] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0 rounded-t-3xl">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-yellow-400" />
+                <h4 className="text-sm font-black uppercase tracking-wider">Lịch sử thăng tiến</h4>
+              </div>
+              <button
+                onClick={() => setShowHistory(false)}
+                className="p-1 bg-slate-800 hover:bg-slate-700 rounded-full transition-all text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 p-5 overflow-y-auto bg-slate-50/50">
+              {loadingHistory ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent animate-spin rounded-full"></div>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Đang tải lịch sử...</span>
+                </div>
+              ) : historyRecords.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <Smile className="w-10 h-10 opacity-40" />
+                  <span className="text-xs font-black uppercase tracking-wide">Chưa ghi nhận lịch sử thăng tiến</span>
+                </div>
+              ) : (
+                <div className="relative pl-6 border-l border-slate-200 space-y-5">
+                  {(() => {
+                    const getLevelDetails = (lvl: number) => {
+                      switch (lvl) {
+                        case 1: return { pct: '21%', gift: 0 };
+                        case 2: return { pct: '30%', gift: 386000 };
+                        case 3: return { pct: '39%', gift: 1000000 };
+                        case 4: return { pct: '52.5%', gift: 2000000 };
+                        case 5: return { pct: '64.5%', gift: 4000000 };
+                        default: return { pct: '21%', gift: 0 };
+                      }
+                    };
+
+                    return historyRecords.map((rec, i) => {
+                      if (rec.type === 'ACTIVATION') {
+                        return (
+                          <div key={i} className="relative">
+                            {/* Timeline dot */}
+                            <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-blue-500 border-4 border-white shadow-md" />
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-black text-blue-600">Tham gia hệ thống</span>
+                                <span className="text-[10px] font-medium text-slate-400">
+                                  {new Date(rec.time).toLocaleString('vi-VN')}
+                                </span>
+                              </div>
+                              <span className="text-slate-800 text-xs font-black">{rec.title}</span>
+                              <span className="text-slate-500 text-[11px] font-medium leading-normal">{rec.description}</span>
+                              
+                              {/* Thông số tăng trưởng tích lũy */}
+                              <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-400">Điểm BRKP:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-400">Thành viên nhóm:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
+                                </div>
+                                <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
+                                  <span>Thu nhập VNĐ:</span>
+                                  <span>{rec.accumulatedCash?.toLocaleString('vi')} VNĐ</span>
+                                </div>
+                                <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
+                                  <span>Thu nhập BRKD:</span>
+                                  <span>{rec.accumulatedBrkd?.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (rec.type === 'LEVEL_UP') {
+                        const fromLvlDetails = getLevelDetails(rec.details?.fromLevel ?? 1);
+                        const toLvlDetails = getLevelDetails(rec.details?.toLevel ?? 1);
+                        return (
+                          <div key={i} className="relative">
+                            {/* Timeline dot */}
+                            <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-amber-500 border-4 border-white shadow-md" />
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-black text-amber-600">Thăng tiến cấp bậc</span>
+                                <span className="text-[10px] font-medium text-slate-400">
+                                  {new Date(rec.time).toLocaleString('vi-VN')}
+                                </span>
+                              </div>
+                              <span className="text-slate-800 text-xs font-black">
+                                Cấp {rec.details?.fromLevel} ➔ Cấp {rec.details?.toLevel} <span className="text-[10px] text-slate-400 font-normal">({rec.accumulatedBrkp?.toLocaleString('vi')} BRKP)</span>
+                              </span>
+                              <div className="mt-1 pt-1.5 border-t border-slate-50 flex flex-col gap-1 text-[11px]">
+                                <div className="flex items-center justify-between text-slate-500">
+                                  <span>Tỷ lệ hoa hồng:</span>
+                                  <span className="font-extrabold text-slate-700">
+                                    {fromLvlDetails.pct} ➔ <span className="text-emerald-600 font-black">{toLvlDetails.pct}</span>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Thông số tăng trưởng tích lũy */}
+                              <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-400">Điểm BRKP:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-400">Thành viên nhóm:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
+                                </div>
+                                <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
+                                  <span>Thu nhập VNĐ:</span>
+                                  <span>{rec.accumulatedCash?.toLocaleString('vi')} VNĐ</span>
+                                </div>
+                                <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
+                                  <span>Thu nhập BRKD:</span>
+                                  <span>{rec.accumulatedBrkd?.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // TRANSACTION
+                      const amountCash = rec.details?.amountCash ?? 0;
+                      const amountBrkd = rec.details?.amountBrkd ?? 0;
+                      const amountVoucher = rec.details?.amountVoucher ?? 0;
+                      
+                      let dotColor = 'bg-emerald-500';
+                      let badgeColor = 'text-emerald-600 bg-emerald-50 border-emerald-100';
+
+                      if (amountBrkd > 0 && amountCash === 0) {
+                        dotColor = 'bg-rose-500';
+                        badgeColor = 'text-rose-600 bg-rose-50 border-rose-100';
+                      } else if (amountVoucher > 0 && amountCash === 0) {
+                        dotColor = 'bg-amber-500';
+                        badgeColor = 'text-amber-600 bg-amber-50 border-amber-100';
+                      }
+
+                      return (
+                        <div key={i} className="relative">
+                          {/* Timeline dot */}
+                          <div className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full ${dotColor} border-4 border-white shadow-md`} />
+                          <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md border ${badgeColor}`}>
+                                {rec.title}
+                              </span>
+                              <span className="text-[10px] font-medium text-slate-400">
+                                {new Date(rec.time).toLocaleString('vi-VN')}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-start justify-between gap-4 mt-1">
+                              <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                <span className="text-slate-500 text-[11px] font-medium leading-normal">
+                                  {rec.description}
+                                </span>
+                                {rec.details?.pathStr && (
+                                  <div className="text-[9px] text-slate-500 font-medium bg-slate-50 p-1.5 rounded-lg border border-slate-100/50 mt-1 leading-relaxed">
+                                    Nhánh bảo trợ: {rec.details.pathStr}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex flex-col items-end shrink-0 gap-0.5 text-right font-black text-xs">
+                                {amountCash !== 0 && (
+                                  <span className={amountCash > 0 ? "text-emerald-600" : "text-rose-600"}>
+                                    {amountCash > 0 ? '+' : ''}{amountCash.toLocaleString('vi')} VNĐ
+                                  </span>
+                                )}
+                                {amountBrkd !== 0 && (
+                                  <span className={amountBrkd > 0 ? "text-rose-600" : "text-rose-700"}>
+                                    {amountBrkd > 0 ? '+' : ''}{amountBrkd.toLocaleString('vi')} BRKD
+                                  </span>
+                                )}
+                                {amountVoucher !== 0 && (
+                                  <span className="text-amber-600">
+                                    +{amountVoucher.toLocaleString('vi')} VNĐ Voucher
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Thông số tăng trưởng tích lũy */}
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-400">Điểm BRKP:</span>
+                                <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-400">Thành viên nhóm:</span>
+                                <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
+                              </div>
+                              <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
+                                <span>Thu nhập VNĐ:</span>
+                                <span>{rec.accumulatedCash?.toLocaleString('vi')} VNĐ</span>
+                              </div>
+                              <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
+                                <span>Thu nhập BRKD:</span>
+                                <span>{rec.accumulatedBrkd?.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-white border-t border-slate-100 flex justify-end shrink-0 rounded-b-3xl">
+              <button
+                onClick={() => setShowHistory(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black transition-all"
+              >
+                ĐÓNG
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

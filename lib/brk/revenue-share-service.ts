@@ -118,8 +118,10 @@ export async function processRevenueShareForSystem(onSystem: number) {
       `pool_${pool.id}`
     )
 
-    // BRKD proportional to bonus share
-    const brkdShare = Math.round((BRKD_PER_ACTIVATION * amountPerPerson) / Number(systemTree.fee))
+    // BRKD calculated directly from BRKD pool
+    const totalBrkdRevenue = newActivations.length * BRKD_PER_ACTIVATION
+    const brkdPoolAmount = (totalBrkdRevenue * sharePct) / 100
+    const brkdShare = Math.round(brkdPoolAmount / qualifiedCount)
     if (brkdShare > 0) {
       await creditBrkdWallet(
         member.userId,
