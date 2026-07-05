@@ -177,6 +177,19 @@ export async function processGracePeriodExpirations() {
 
   for (const member of expiredGrace) {
     if (member.gracePeriodEnd && member.gracePeriodEnd <= now) {
+      // KIỂM TRA CHỐNG TRÙNG LẶP:
+      const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
+      if (wallet) {
+        const existingRefund = await prisma.brkTransaction.findFirst({
+          where: {
+            walletId: wallet.id,
+            type: 'RETURN_FEE',
+            balanceType: 'CASH'
+          }
+        })
+        if (existingRefund) continue // Đã hoàn phí rồi, bỏ qua
+      }
+
       const returnAmount = (fee * returnPct) / 100
       if (returnAmount > 0) {
         // Cash refund
