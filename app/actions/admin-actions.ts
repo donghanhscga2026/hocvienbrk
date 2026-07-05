@@ -113,8 +113,9 @@ async function buildStandardTree(
         if (!rootUser) return null
 
         let rootAutoId = rootId
+        let rootSys: any = null
         if (isSystem) {
-            const rootSys = await prisma.system.findFirst({ where: { userId: rootId, onSystem: systemId } })
+            rootSys = await prisma.system.findFirst({ where: { userId: rootId, onSystem: systemId } })
             if (!rootSys) return null
             rootAutoId = rootSys.autoId
         }
@@ -269,7 +270,9 @@ async function buildStandardTree(
                 userId: user.id,
                 name: user.name,
                 image: user.image,
-                autoId: isSystem ? c.descendantId : user.id
+                autoId: isSystem ? c.descendantId : user.id,
+                level: isSystem ? c.descendant.level : null,
+                totalPoints: isSystem ? Number(c.descendant.totalPoints) : null,
             })
         }
 
@@ -288,9 +291,9 @@ async function buildStandardTree(
                 const f2tca = tcaMemberMap.get(c.userId) ?? tcaMemberMap.get(c.autoId)
                 return { 
                     id: c.userId, name: c.name, image: c.image,
-                    level: f2tca?.level ?? null,
-                    personalScore: f2tca?.personalScore ?? null,
-                    totalScore: f2tca?.totalScore ?? null,
+                    level: f2tca?.level ?? c.level ?? null,
+                    personalScore: f2tca?.personalScore ?? (isSystem ? 17 : null),
+                    totalScore: f2tca?.totalScore ?? (c as any).totalPoints ?? null,
                     tcaName: f2tca?.name ?? null,
                     groupName: f2tca?.groupName ?? null,
                     chucDanh: f2tca?.chucDanh ?? null
@@ -300,9 +303,9 @@ async function buildStandardTree(
             const f1tca = tcaMemberMap.get(user.id) ?? tcaMemberMap.get(f1.autoId)
             const fData = { 
                 id: user.id, name: user.name, image: user.image, totalSubCount: closures.length, children: f2s,
-                level: f1tca?.level ?? null,
-                personalScore: f1tca?.personalScore ?? null,
-                totalScore: f1tca?.totalScore ?? null,
+                level: f1tca?.level ?? (isSystem ? f1.level : null),
+                personalScore: f1tca?.personalScore ?? (isSystem ? 17 : null),
+                totalScore: f1tca?.totalScore ?? (isSystem ? Number(f1.totalPoints) : null),
                 tcaName: f1tca?.name ?? null,
                 groupName: f1tca?.groupName ?? null,
                 chucDanh: f1tca?.chucDanh ?? null
@@ -336,9 +339,9 @@ async function buildStandardTree(
                     const gcData = {
                         id: gc.userId, name: gc.name, image: gc.image,
                         totalSubCount: gcClosures.length,
-                        level: gcTca?.level ?? null,
-                        personalScore: gcTca?.personalScore ?? null,
-                        totalScore: gcTca?.totalScore ?? null,
+                        level: gcTca?.level ?? gc.level ?? null,
+                        personalScore: gcTca?.personalScore ?? (isSystem ? 17 : null),
+                        totalScore: gcTca?.totalScore ?? (gc as any).totalPoints ?? null,
                         groupName: gcTca?.groupName ?? null,
                         chucDanh: gcTca?.chucDanh ?? null,
                     }
@@ -359,9 +362,9 @@ async function buildStandardTree(
                     groupBTotalSub: gB.reduce((sum: number, n: any) => sum + n.totalSubCount, 0),
                     groupCTotalSub: grandchildren.reduce((sum: number, n: GenealogyNode) => sum + n.totalSubCount, 0),
                     groupA: gA, groupB: gB, children: grandchildren,
-                    level: tcaData?.level ?? null,
-                    personalScore: tcaData?.personalScore ?? null,
-                    totalScore: tcaData?.totalScore ?? null,
+                    level: tcaData?.level ?? child.level ?? null,
+                    personalScore: tcaData?.personalScore ?? (isSystem ? 17 : null),
+                    totalScore: tcaData?.totalScore ?? (child as any).totalPoints ?? null,
                     tcaName: tcaData?.name ?? null,
                     groupName: tcaData?.groupName ?? null,
                     chucDanh: tcaData?.chucDanh ?? null,
@@ -378,17 +381,17 @@ async function buildStandardTree(
             if (!f1Record) return null as any
             const f1Closures = closureByAncestor.get(f1Record.autoId) || []
             const f2s = f1Closures.filter(c => c.depth === 1)
-            const f2Subtrees = f2s.map(f2 => {
-                const grandchildren = buildFullSubtree(f2.autoId, 5)
-                const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
-                return {
-                    id: f2.userId, name: f2.name, image: f2.image, referrerId: null,
-                    totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
-                    f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                    groupA: [], groupB: [], children: grandchildren,
-                    level: f2tca?.level ?? null,
-                    personalScore: f2tca?.personalScore ?? null,
-                    totalScore: f2tca?.totalScore ?? null,
+                const f2Subtrees = f2s.map(f2 => {
+                    const grandchildren = buildFullSubtree(f2.autoId, 5)
+                    const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
+                    return {
+                        id: f2.userId, name: f2.name, image: f2.image, referrerId: null,
+                        totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
+                        f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                        groupA: [], groupB: [], children: grandchildren,
+                        level: f2tca?.level ?? f2.level ?? null,
+                    personalScore: f2tca?.personalScore ?? (isSystem ? 17 : null),
+                    totalScore: f2tca?.totalScore ?? (f2 as any).totalPoints ?? null,
                     groupName: f2tca?.groupName ?? null,
                     chucDanh: f2tca?.chucDanh ?? null,
                     seq: f2.autoId - rootAutoId,
@@ -404,7 +407,7 @@ async function buildStandardTree(
                 const gHasF2 = gf1Closures.some(c => c.depth === 1)
                 const gHasF3 = gf1Closures.some(c => c.depth === 2)
                 const gf1tca = tcaMemberMap.get(gf1.userId) ?? tcaMemberMap.get(gf1.autoId)
-                const gfData = { id: gf1.userId, name: gf1.name, image: gf1.image, totalSubCount: gf1Closures.length, groupName: gf1tca?.groupName ?? null, chucDanh: gf1tca?.chucDanh ?? null }
+                const gfData = { id: gf1.userId, name: gf1.name, image: gf1.image, totalSubCount: gf1Closures.length, level: gf1tca?.level ?? gf1.level ?? null, personalScore: gf1tca?.personalScore ?? (isSystem ? 17 : null), groupName: gf1tca?.groupName ?? null, chucDanh: gf1tca?.chucDanh ?? null }
                 if (!gHasF2) { gA.push(gfData); gATotal += gf1Closures.length }
                 else if (!gHasF3) { gB.push(gfData); gBTotal += gf1Closures.length }
                 else { gC.push(gfData); gCTotal += gf1Closures.length }
@@ -416,7 +419,7 @@ async function buildStandardTree(
                 totalSubCount: f1Closures.length, f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
                 groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
                 groupA: gA, groupB: gB, children: f2Subtrees,
-                level: f1tca?.level ?? null, personalScore: f1tca?.personalScore ?? null, totalScore: f1tca?.totalScore ?? null, chucDanh: f1tca?.chucDanh ?? null,
+                level: f1tca?.level ?? (isSystem ? f1Record?.level : null) ?? null, personalScore: f1tca?.personalScore ?? (isSystem ? 17 : null), totalScore: f1tca?.totalScore ?? (isSystem ? Number(f1Record?.totalPoints) : null) ?? null, chucDanh: f1tca?.chucDanh ?? null,
                 seq: (f1Record?.autoId || 0) - rootAutoId,
             }
         })
@@ -439,7 +442,7 @@ async function buildStandardTree(
             children: forceFull ? buildFullSubtree(rootAutoId) : children,
             groupA: forceFull ? [] : groupA, groupB: forceFull ? [] : groupB,
             isRoot: true, seq: 0,
-            level: rootTca?.level ?? null, personalScore: rootTca?.personalScore ?? null, totalScore: rootTca?.totalScore ?? null,
+            level: rootTca?.level ?? (isSystem ? rootSys?.level : null) ?? null, personalScore: rootTca?.personalScore ?? (isSystem ? 17 : null), totalScore: rootTca?.totalScore ?? (isSystem ? Number(rootSys?.totalPoints) : null) ?? null,
             tcaName: rootTca?.name ?? null, groupName: rootTca?.groupName ?? null, chucDanh: rootTca?.chucDanh ?? null,
             stats: statsData 
         }
@@ -762,15 +765,58 @@ export async function getCurrentUserRoleAction(systemId?: number) {
     } catch { return { success: false, role: null } }
 }
 
-export async function getMemberDetailsAction(userId: number) {
+export async function getMemberDetailsAction(userId: number, systemId?: number) {
     try {
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-        const [user, tcaRaw] = await Promise.all([
-            prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true, createdAt: true, image: true } }),
-            prisma.tCAMember.findFirst({ where: { userId }, select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true } })
-        ])
-        const tca = tcaRaw ? { ...tcaRaw, personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0, totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0 } : null
-        return { success: true, user, tca }
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true, createdAt: true, image: true } })
+
+        // TCA system — keep existing logic
+        if (!systemId || systemId === 1) {
+            const tcaRaw = await prisma.tCAMember.findFirst({ where: { userId }, select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true } })
+            const tca = tcaRaw ? { ...tcaRaw, personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0, totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0 } : null
+            return { success: true, user, tca, systemData: null }
+        }
+
+        // Non-TCA system (BRK / KTC / YTB)
+        const sysRec = await prisma.system.findUnique({ where: { userId_onSystem: { userId, onSystem: systemId } } })
+        const enrollment = await prisma.enrollment.findFirst({ where: { userId, courseId: 22 }, select: { updatedAt: true } })
+        const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
+
+        const rootSys = await prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } })
+        const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true } })
+        const seq = rootSys && sysRec ? sysRec.autoId - rootSys.autoId : null
+        // Doanh số đội nhóm = tổng BRKD của member + downline (dùng closure table)
+        const descendantClosures = sysRec ? await prisma.systemClosure.findMany({ where: { ancestorId: sysRec.autoId, systemId } }) : []
+        const descendantIds = descendantClosures.map(c => c.descendantId)
+        const teamMembers = descendantIds.length > 0 ? await prisma.system.findMany({ where: { autoId: { in: descendantIds } }, select: { userId: true } }) : []
+        const teamUserIds = teamMembers.map(m => m.userId)
+        const teamWallets = teamUserIds.length > 0 ? await prisma.brkWallet.findMany({ where: { userId: { in: teamUserIds } }, select: { brkd: true } }) : []
+        const teamTotalBrkd = teamWallets.reduce((sum, w) => sum + Number(w.brkd), 0)
+        const latestLevelUp = sysRec ? await prisma.brkLevelUpRecord.findFirst({ where: { userId, onSystem: systemId }, orderBy: { promotedAt: 'desc' }, select: { promotedAt: true } }) : null
+
+        return {
+            success: true,
+            user,
+            tca: null,
+            systemData: {
+                systemName: systemTree?.nameSystem || `Hệ thống ${systemId}`,
+                level: sysRec?.level ?? null,
+                totalPoints: sysRec?.totalPoints != null ? Number(sysRec.totalPoints) : null,
+                personalScore: 17,
+                seq,
+                status: sysRec?.status ?? null,
+                joinedAt: enrollment?.updatedAt ?? sysRec?.activatedAt ?? null,
+                levelUpdatedAt: latestLevelUp?.promotedAt ?? null,
+                teamTotalBrkd,
+                wallet: wallet ? {
+                    balance: Number(wallet.balance),
+                    brkd: Number(wallet.brkd),
+                    voucherBalance: Number(wallet.voucherBalance),
+                    totalEarned: Number(wallet.totalEarned),
+                    totalWithdrawn: Number(wallet.totalWithdrawn),
+                } : null
+            }
+        }
     } catch (e: any) { return { success: false, error: e.message } }
 }
 

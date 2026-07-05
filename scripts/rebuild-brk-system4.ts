@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { resolvePlacement } from '../lib/brk/placement-rules'
 import { ensureBrkWallet } from '../lib/brk/wallet-service'
 import { addUserToSystemClosure } from '../lib/system-closure-helpers'
@@ -46,6 +47,12 @@ async function cleanup() {
       where: { walletId: { in: wallets.map(w => w.id) } }
     })
     console.log(`  Deleted ${txnDel.count} brk_transaction records`)
+
+    // 4b. Reset wallet balances to 0 (keep wallet records, just zero out)
+    await prisma.$executeRaw(
+      Prisma.sql`UPDATE "brk_wallet" SET balance = 0, brkd = 0, "voucherBalance" = 0, "totalEarned" = 0, "totalWithdrawn" = 0 WHERE id IN (${Prisma.join(wallets.map(w => w.id))})`
+    )
+    console.log(`  Reset ${wallets.length} wallet balances to 0`)
   }
 
   // 5. Delete system records (onSystem=4)

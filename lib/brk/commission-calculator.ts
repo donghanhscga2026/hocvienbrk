@@ -31,7 +31,9 @@ export async function distributeCommission(
     }
   })
 
-  let previousPct = 0
+  const newMemberLevel = newMemberSys.level || 1
+  const newMemberConfig = await getLevelConfig(onSystem, newMemberLevel)
+  let previousPct = newMemberConfig ? Number(newMemberConfig.personalFeePct) : 0
 
   for (const closure of ancestors) {
     const uplineSystem = closure.ancestor

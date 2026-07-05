@@ -40,6 +40,24 @@ interface MemberDetailInfo {
   data?: {
     user: any;
     tca: any;
+    systemData?: {
+      systemName: string;
+      level: number | null;
+      totalPoints: number | null;
+      personalScore: number;
+      seq: number | null;
+      status: string | null;
+      teamTotalBrkd: number;
+      joinedAt: Date | string | null;
+      levelUpdatedAt?: Date | string | null;
+      wallet: {
+        balance: number;
+        brkd: number;
+        voucherBalance: number;
+        totalEarned: number;
+        totalWithdrawn: number;
+      } | null;
+    };
   };
   loading: boolean;
 }
@@ -513,13 +531,13 @@ function GenealogyFlow() {
 
   const handleShowDetails = useCallback(async (userId: number) => {
     setMemberDetail({ show: true, userId, loading: true })
-    const res = await getMemberDetailsAction(userId)
+    const res = await getMemberDetailsAction(userId, selectedSystem || undefined)
     if (res.success) {
-      setMemberDetail({ show: true, userId, data: { user: res.user, tca: res.tca }, loading: false })
+      setMemberDetail({ show: true, userId, data: { user: res.user, tca: res.tca, systemData: res.systemData || undefined }, loading: false })
     } else {
       setMemberDetail(prev => ({ ...prev, loading: false }))
     }
-  }, [])
+  }, [selectedSystem])
 
   const mergeSubtree = useCallback((root: GenealogyNode, subtree: GenealogyNode): GenealogyNode => {
     if (root.id === subtree.id) return { ...root, ...subtree }
@@ -1517,88 +1535,99 @@ function GenealogyFlow() {
   )
 }
 
-// v8.5.0: Popup Modal hiển thị thông tin chi tiết thành viên
 function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose: () => void }) {
   if (!info.show) return null;
 
-  const { user, tca } = info.data || {};
+  const { user, tca, systemData } = info.data || {};
   const isLoading = info.loading;
+  const isBrk = !!systemData;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex items-center justify-center p-4 transition-all duration-300">
-      <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col animate-in fade-in zoom-in duration-300">
-        {/* Header với Gradient & Avatar */}
-        <div className={`h-32 bg-gradient-to-r ${tca ? 'from-indigo-600 to-violet-600' : 'from-emerald-600 to-teal-600'} relative`}>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex items-center justify-center p-3 sm:p-4 transition-all duration-300">
+      <div className="bg-white w-full max-w-sm sm:max-w-lg rounded-[24px] sm:rounded-[32px] shadow-2xl border border-slate-100 flex flex-col animate-in fade-in zoom-in duration-300 max-h-[80vh] overflow-hidden">
+        {/* Header Gradient mỏng - avatar góc trái chồm xuống dưới, text bên phải */}
+        <div className={`rounded-t-[24px] sm:rounded-t-[32px] bg-gradient-to-r ${isBrk ? 'from-teal-600 to-emerald-600' : tca ? 'from-indigo-600 to-violet-600' : 'from-emerald-600 to-teal-600'} relative`}>
           <button
             onClick={onClose}
-            className="absolute top-6 right-6 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all text-white backdrop-blur-sm"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 sm:p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-all text-white backdrop-blur-sm z-10"
           >
-            <X className="w-5 h-5" />
+            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
-
-          {/* Avatar Profile */}
-          <div className="absolute -bottom-12 left-8 flex items-end gap-3">
-            <div className="w-24 h-24 rounded-full bg-white p-1.5 shadow-2xl relative z-10 border-4 border-white">
-              <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden ${tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
+          <div className="flex items-start gap-1.5 sm:gap-2 px-3 sm:px-4 pt-3 sm:pt-4 pb-3 sm:pb-4">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white p-0.5 border-2 border-white shadow-lg shrink-0 -mb-10 sm:-mb-12">
+              <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden ${isBrk ? 'bg-emerald-500' : tca ? 'bg-indigo-500' : 'bg-emerald-500'}`}>
                 {user?.image ? (
                   <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
                 ) : (
-                  <Smile className="w-12 h-12 text-white/80" />
+                  <Smile className="w-7 h-7 sm:w-8 sm:h-8 text-white/80" />
                 )}
               </div>
             </div>
-            <div className="mb-2 px-3 py-1 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 rotate-[-2deg]">
-              <span className={`font-black text-[20px] tracking-tighter ${tca ? 'text-indigo-600' : 'text-emerald-600'}`}>
-                #{info.userId}
+            <div className="flex flex-col min-w-0 flex-1 pt-0.5">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300">
+                {isBrk ? 'HỆ THỐNG: BRK - NGÂN HÀNG PHƯỚC BÁU' : 'HỆ THỐNG'}
+              </span>
+              <h3 className="text-white text-sm sm:text-base font-black leading-tight truncate">
+                {tca?.name || user?.name || 'Học viên'}
+                <span className="text-white/80 font-bold text-[10px] sm:text-xs ml-1.5">#{info.userId}</span>
+              </h3>
+              <span className="text-white/90 text-[10px] sm:text-xs font-semibold truncate mt-0.5">
+                {user?.email || 'Chưa cập nhật email'}
               </span>
             </div>
           </div>
         </div>
 
         {/* Content Section */}
-        <div className="pt-14 px-8 pb-8 flex flex-col">
+        <div className="px-3 sm:px-4 pb-5 sm:pb-6 flex flex-col overflow-y-auto pt-7 sm:pt-9 relative z-10">
           {isLoading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent animate-spin rounded-full"></div>
-              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Đang tải thông tin...</span>
+            <div className="py-8 sm:py-12 flex flex-col items-center justify-center gap-3 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-indigo-500 border-t-transparent animate-spin rounded-full"></div>
+              <span className="text-xs sm:text-sm font-bold text-slate-400 uppercase tracking-widest">Đang tải thông tin...</span>
             </div>
           ) : (
             <>
-              <div className="mb-6">
-                <h3 className="text-3xl font-black text-slate-800 leading-tight">
-                  {tca?.name || user?.name || 'Học viên'}
-                </h3>
-                {tca?.chuc_danh && (
-                  <div className="inline-block mt-1 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest border border-amber-100">
-                    {tca.chuc_danh}
-                  </div>
+              <div className="space-y-1.5 sm:space-y-2">
+                {isBrk ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Cấp bậc" value={systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có'} />
+                      <InfoItem icon={<Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày kích hoạt" value={systemData?.joinedAt ? new Date(systemData.joinedAt).toLocaleDateString('vi-VN') : '---'} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm đội nhóm" value={systemData?.totalPoints != null ? systemData.totalPoints.toLocaleString('vi') : '0'} />
+                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Doanh số đội nhóm" value={systemData?.teamTotalBrkd != null ? `${systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD` : '0 BRKD'} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <InfoItem icon={<User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
+                      <InfoItem icon={<Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} label="Cấp bậc" value={tca?.level ? `Cấp ${tca.level}` : 'Học viên'} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
+                    </div>
+                  </>
                 )}
               </div>
 
-              {/* Grid Thông tin */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoItem icon={<User className="w-4 h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
-                  <InfoItem icon={<Phone className="w-4 h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
+              {/* Wallet Section (BRK only) */}
+              {isBrk && systemData?.wallet && (
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <WalletItem label="Thu nhập" value={systemData.wallet.balance} suffix="VND" />
+                    <WalletItem label="BRKD" value={systemData.wallet.brkd} suffix="BRKD" />
+                    <WalletItem label="Voucher" value={systemData.wallet.voucherBalance} />
+                    <WalletItem label="Đã rút" value={systemData.wallet.totalWithdrawn} suffix="VND" />
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InfoItem icon={<Zap className="w-4 h-4" />} label="Cấp bậc" value={tca?.level ? `Cấp ${tca.level}` : 'Học viên'} />
-                  <InfoItem icon={<Calendar className="w-4 h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
-                </div>
-                <div className="w-full">
-                  <InfoItem icon={<Mail className="w-4 h-4 text-indigo-500" />} label="Email" value={user?.email || 'Chưa cập nhật'} />
-                </div>
-              </div>
-
-              {/* Footer Button */}
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <button
-                  onClick={onClose}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg active:scale-[0.98]"
-                >
-                  Xác nhận
-                </button>
-              </div>
+              )}
             </>
           )}
         </div>
@@ -1609,14 +1638,23 @@ function MemberDetailsModal({ info, onClose }: { info: MemberDetailInfo, onClose
 
 function InfoItem({ icon, label, value }: { icon: any, label: string, value: string }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100/50">
-      <div className="mt-0.5 p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
+    <div className="flex items-start gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
+      <div className="mt-0.5 p-1 sm:p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
         {icon}
       </div>
       <div className="flex flex-col min-w-0">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{label}</span>
-        <span className="text-sm font-black text-slate-700 truncate">{value}</span>
+        <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5 sm:mb-1">{label}</span>
+        <span className="text-xs sm:text-sm font-black text-slate-700 truncate">{value}</span>
       </div>
+    </div>
+  );
+}
+
+function WalletItem({ label, value, suffix }: { label: string, value: number, suffix?: string }) {
+  return (
+    <div className="flex flex-col p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
+      <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</span>
+      <span className="text-xs sm:text-sm font-black text-slate-700">{value.toLocaleString('vi', { maximumFractionDigits: 0 })} {suffix || ''}</span>
     </div>
   );
 }
