@@ -873,3 +873,23 @@ Hiển thị trạng thái chi tiết 34 members thật **cuối ngày 5/7** (sa
 - ✅ 4 routes có CRON_SECRET auth
 - ✅ 3 cron mới đã đăng ký trong vercel.json
 - ⚠️ Cần deploy lên Vercel để cron bắt đầu chạy
+
+---
+
+## ✅ Đồng bộ selfPoints về 17 (BRKP_PER_ACTIVATION) — Fix scripts rebuild/backfill (2026-07-05)
+
+### Vấn đề
+`rebuild-brk-system4.ts` và `backfill-brk-system4.ts` dùng công thức `Math.round((fee * pointsPerDollar) / 1000)` → selfPoints = **15**, không khớp với `BRKP_PER_ACTIVATION = 17` dùng trong `activation-service.ts` và `commission-calculator.ts`.
+
+### Các file đã sửa
+#### `scripts/rebuild-brk-system4.ts`
+- Thêm `const BRKP_PER_ACTIVATION = 17`
+- Thay `selfPoints = Math.round(...)` bằng `totalPoints: { increment: BRKP_PER_ACTIVATION }`
+
+#### `scripts/backfill-brk-system4.ts`
+- Thêm `const BRKP_PER_ACTIVATION = 17`
+- Thay `selfPoints = Math.round(...)` bằng `totalPoints: { increment: BRKP_PER_ACTIVATION }`
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi
+- ⚠️ Dữ liệu 36 member cũ vẫn giữ totalPoints 15-75 (cần chạy script fix data nếu muốn)

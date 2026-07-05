@@ -5,6 +5,8 @@ import { addUserToSystemClosure } from '../lib/system-closure-helpers'
 import { distributeCommission } from '../lib/brk/commission-calculator'
 import { checkAndPromoteLevel } from '../lib/brk/level-manager'
 
+const BRKP_PER_ACTIVATION = 17
+
 const prisma = new PrismaClient()
 
 // HoW MANY PROCESSED SO FAR (for logging)
@@ -119,16 +121,15 @@ async function backfill() {
       await addUserToSystemClosure(userId, refSysId, 4)
       await ensureBrkWallet(userId)
 
-      const selfPoints = Math.round((fee * Number(systemTree.pointsPerDollar)) / 1000)
       await prisma.system.update({
         where: { autoId: system.autoId },
-        data: { totalPoints: { increment: selfPoints } }
+        data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
       })
 
       await distributeCommission(userId, 4, fee, systemTree)
       await checkAndPromoteLevel(userId, 4)
 
-      console.log(`  ✅ user#${userId} ${userName} — activated (autoId=${system.autoId}, level=1, ${selfPoints}pts)`)
+      console.log(`  ✅ user#${userId} ${userName} — activated (autoId=${system.autoId}, level=1, +${BRKP_PER_ACTIVATION}pts)`)
     } catch (err: any) {
       console.error(`  ❌ user#${userId} ${userName} — error:`, err.message)
     }
