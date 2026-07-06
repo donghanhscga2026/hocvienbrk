@@ -51,7 +51,8 @@ async function distributeRevenueSharePeriod(
   periodEnd: Date,
   roundNumber: number,
   fee: number,
-  sharePct: number
+  sharePct: number,
+  distributedAt?: Date
 ) {
   const newActivations = await prisma.system.findMany({
     where: {
@@ -67,6 +68,8 @@ async function distributeRevenueSharePeriod(
   const totalRevenue = newActivations.length * fee;
   const poolAmount = (totalRevenue * sharePct) / 100;
 
+  const distDate = distributedAt || periodEnd;
+
   if (totalRevenue <= 0) {
     await prisma.brkRevenuePool.create({
       data: {
@@ -78,7 +81,7 @@ async function distributeRevenueSharePeriod(
         poolAmount: 0,
         qualifiedCount: 0,
         status: 'DISTRIBUTED',
-        distributedAt: periodEnd
+        distributedAt: distDate
       }
     });
     return;
@@ -118,7 +121,7 @@ async function distributeRevenueSharePeriod(
         poolAmount,
         qualifiedCount: 0,
         status: 'DISTRIBUTED',
-        distributedAt: periodEnd
+        distributedAt: distDate
       }
     });
     return;
@@ -136,7 +139,7 @@ async function distributeRevenueSharePeriod(
       poolAmount,
       qualifiedCount,
       status: 'DISTRIBUTED',
-      distributedAt: periodEnd
+      distributedAt: distDate
     }
   });
 
@@ -145,7 +148,8 @@ async function distributeRevenueSharePeriod(
       member.userId,
       amountPerPerson,
       'REVENUE_SHARE',
-      `Chia đều doanh thu kỳ ${roundNumber} (${sharePct}% của ${totalRevenue.toLocaleString('vi')} VND)`
+      `Chia đều doanh thu kỳ ${roundNumber} (${sharePct}% của ${totalRevenue.toLocaleString('vi')} VND)`,
+      distDate
     );
 
     const totalBrkdRevenue = newActivations.length * BRKD_PER_ACTIVATION;
@@ -156,7 +160,8 @@ async function distributeRevenueSharePeriod(
         member.userId,
         brkdShare,
         'BRKD_CREDIT',
-        `BRKD chia doanh thu kỳ ${roundNumber}`
+        `BRKD chia doanh thu kỳ ${roundNumber}`,
+        distDate
       );
     }
 
@@ -181,7 +186,7 @@ async function ensureWallet(userId: number) {
   return wallet;
 }
 
-async function creditBrkWallet(userId: number, amount: number, type: any, description: string) {
+async function creditBrkWallet(userId: number, amount: number, type: any, description: string, createdAt?: Date) {
   const wallet = await ensureWallet(userId);
   const oldBalance = Number(wallet.balance);
   const newBalance = oldBalance + amount;
@@ -201,12 +206,13 @@ async function creditBrkWallet(userId: number, amount: number, type: any, descri
       description,
       balanceType: 'CASH',
       balanceBefore: oldBalance,
-      balanceAfter: newBalance
+      balanceAfter: newBalance,
+      createdAt
     }
   });
 }
 
-async function creditBrkdWallet(userId: number, amount: number, type: any, description: string) {
+async function creditBrkdWallet(userId: number, amount: number, type: any, description: string, createdAt?: Date) {
   const wallet = await ensureWallet(userId);
   const oldBrkd = Number(wallet.brkd);
   const newBrkd = oldBrkd + amount;
@@ -224,12 +230,13 @@ async function creditBrkdWallet(userId: number, amount: number, type: any, descr
       description,
       balanceType: 'BRKD',
       balanceBefore: oldBrkd,
-      balanceAfter: newBrkd
+      balanceAfter: newBrkd,
+      createdAt
     }
   });
 }
 
-async function creditVoucherWallet(userId: number, amount: number, type: any, description: string) {
+async function creditVoucherWallet(userId: number, amount: number, type: any, description: string, createdAt?: Date) {
   const wallet = await ensureWallet(userId);
   const oldVoucher = Number(wallet.voucherBalance);
   const newVoucher = oldVoucher + amount;
@@ -247,7 +254,8 @@ async function creditVoucherWallet(userId: number, amount: number, type: any, de
       description,
       balanceType: 'VOUCHER',
       balanceBefore: oldVoucher,
-      balanceAfter: newVoucher
+      balanceAfter: newVoucher,
+      createdAt
     }
   });
 }
@@ -506,7 +514,8 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
       const period1Start = new Date(2026, 6, 2, 0, 0, 0); // 02/07/2026
       const period1End = new Date(2026, 6, 5, 0, 0, 0); // 05/07/2026
       const sharePct = Number(systemTree.revenueSharePct || 2.0);
-      await distributeRevenueSharePeriod(4, period1Start, period1End, 1, fee, sharePct);
+      const distributedAt = new Date(2026, 6, 5, 1, 0, 0); // 05/07/2026 01:00:00
+      await distributeRevenueSharePeriod(4, period1Start, period1End, 1, fee, sharePct, distributedAt);
     }
   }
 }
@@ -525,7 +534,7 @@ export async function rebuildSystem4Data(method: 'A' | 'B') {
   const graceDays = method === 'A' ? 3 : 1;
   await prisma.systemTree.update({
     where: { onSystem: 4 },
-    data: { graceDays }
+    data: { nameSystem: 'MB - Ngân hàng phước báu', graceDays }
   });
 
   // 3. Load enrollments

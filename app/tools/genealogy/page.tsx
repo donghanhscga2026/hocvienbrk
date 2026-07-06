@@ -1599,15 +1599,15 @@ function GenealogyFlow() {
         </div>
       )}
       {/* Member Details Modal */}
-      <MemberDetailsModal info={memberDetail} onClose={() => setMemberDetail(prev => ({ ...prev, show: false }))} selectedSystem={selectedSystem} />
+      {memberDetail.show && (
+        <MemberDetailsModal info={memberDetail} onClose={() => setMemberDetail(prev => ({ ...prev, show: false }))} selectedSystem={selectedSystem} />
+      )}
 
     </div>
   )
 }
 
 function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDetailInfo, onClose: () => void, selectedSystem: number | null }) {
-  if (!info.show) return null;
-
   const [showHistory, setShowHistory] = useState(false);
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -1623,6 +1623,8 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
       });
     }
   }, [showHistory, info.userId, selectedSystem]);
+
+  if (!info.show) return null;
 
   const { user, tca, systemData } = info.data || {};
   const isLoading = info.loading;
@@ -1651,7 +1653,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
             </div>
             <div className="flex-1 flex flex-col min-w-0 pt-0.5">
               <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300 mb-1">
-                {isBrk ? 'BRK - Ngân hàng phước báu' : 'Hệ thống'}
+                {isBrk ? 'MB - Ngân hàng phước báu' : 'Hệ thống'}
               </span>
               <div className="flex items-center justify-between gap-2 w-full pr-3 sm:pr-10">
                 <div className="flex flex-col min-w-0">
@@ -1711,12 +1713,12 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng" value={systemData?.totalPoints != null ? systemData.totalPoints.toLocaleString('vi') : '0'} />
+                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng (MP)" value={systemData?.totalPoints != null ? systemData.totalPoints.toLocaleString('vi') : '0'} />
                       <InfoItem icon={<Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />} label="Số thành viên nhóm" value={systemData?.teamSize != null ? `${systemData.teamSize.toLocaleString('vi')}` : '0'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                       <InfoItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Doanh số (VNĐ)" value={systemData?.teamTotalVnd != null ? systemData.teamTotalVnd.toLocaleString('vi') : '0'} valueClassName="text-emerald-600 font-extrabold" />
-                      <InfoItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="DS đối ứng (BRKD)" value={systemData?.teamTotalBrkd != null ? systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 }) : '0'} valueClassName="text-rose-600 font-extrabold" />
+                      <InfoItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="DS đối ứng (MDT)" value={systemData?.teamTotalBrkd != null ? systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 }) : '0'} valueClassName="text-rose-600 font-extrabold" />
                     </div>
                   </>
                 ) : (
@@ -1738,7 +1740,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100">
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <WalletItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Thu nhập (VNĐ)" value={systemData.wallet.balance} valueClassName="text-emerald-600 font-extrabold" />
-                    <WalletItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Thu nhập đối ứng" value={systemData.wallet.brkd} valueClassName="text-rose-600 font-extrabold" />
+                    <WalletItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Đối ứng (MDT)" value={systemData.wallet.brkd} valueClassName="text-rose-600 font-extrabold" />
                     <WalletItem icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Voucher" value={systemData.wallet.voucherBalance} />
                     <WalletItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Đã rút (VNĐ)" value={systemData.wallet.totalWithdrawn} />
                   </div>
@@ -1821,20 +1823,20 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                               {/* Thông số tăng trưởng tích lũy */}
                               <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
                                 <div className="flex items-center gap-1">
-                                  <span className="text-slate-400">Điểm BRKP:</span>
-                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')}</span>
+                                  <span className="text-slate-400">Điểm:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MP</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-slate-400">Thành viên nhóm:</span>
                                   <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
                                 </div>
                                 <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
-                                  <span>Thu nhập VNĐ:</span>
-                                  <span>{rec.accumulatedCash?.toLocaleString('vi')} VNĐ</span>
+                                  <span>Thu nhập:</span>
+                                  <span>{Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ</span>
                                 </div>
                                 <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
-                                  <span>Thu nhập BRKD:</span>
-                                  <span>{rec.accumulatedBrkd?.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD</span>
+                                  <span>Đối ứng:</span>
+                                  <span>{Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')} MDT</span>
                                 </div>
                               </div>
                             </div>
@@ -1857,7 +1859,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                 </span>
                               </div>
                               <span className="text-slate-800 text-xs font-black">
-                                Cấp {rec.details?.fromLevel} ➔ Cấp {rec.details?.toLevel} <span className="text-[10px] text-slate-400 font-normal">({rec.accumulatedBrkp?.toLocaleString('vi')} BRKP)</span>
+                                Cấp {rec.details?.fromLevel} (+{rec.accumulatedBrkp?.toLocaleString('vi')} MP) ➔ Cấp {rec.details?.toLevel}
                               </span>
                               <div className="mt-1 pt-1.5 border-t border-slate-50 flex flex-col gap-1 text-[11px]">
                                 <div className="flex items-center justify-between text-slate-500">
@@ -1871,20 +1873,20 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                               {/* Thông số tăng trưởng tích lũy */}
                               <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
                                 <div className="flex items-center gap-1">
-                                  <span className="text-slate-400">Điểm BRKP:</span>
-                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')}</span>
+                                  <span className="text-slate-400">Điểm:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MP</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-slate-400">Thành viên nhóm:</span>
                                   <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
                                 </div>
                                 <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
-                                  <span>Thu nhập VNĐ:</span>
-                                  <span>{rec.accumulatedCash?.toLocaleString('vi')} VNĐ</span>
+                                  <span>Thu nhập:</span>
+                                  <span>{Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ</span>
                                 </div>
                                 <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
-                                  <span>Thu nhập BRKD:</span>
-                                  <span>{rec.accumulatedBrkd?.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD</span>
+                                  <span>Đối ứng:</span>
+                                  <span>{Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')} MDT</span>
                                 </div>
                               </div>
                             </div>
@@ -1927,49 +1929,50 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                 <span className="text-slate-500 text-[11px] font-medium leading-normal">
                                   {rec.description}
                                 </span>
-                                {rec.details?.pathStr && (
-                                  <div className="text-[9px] text-slate-500 font-medium bg-slate-50 p-1.5 rounded-lg border border-slate-100/50 mt-1 leading-relaxed">
-                                    Nhánh bảo trợ: {rec.details.pathStr}
-                                  </div>
-                                )}
                               </div>
                               
                               <div className="flex flex-col items-end shrink-0 gap-0.5 text-right font-black text-xs">
                                 {amountCash !== 0 && (
                                   <span className={amountCash > 0 ? "text-emerald-600" : "text-rose-600"}>
-                                    {amountCash > 0 ? '+' : ''}{amountCash.toLocaleString('vi')} VNĐ
+                                    {amountCash > 0 ? '+' : ''}{Math.round(amountCash).toLocaleString('vi')} VNĐ
                                   </span>
                                 )}
                                 {amountBrkd !== 0 && (
                                   <span className={amountBrkd > 0 ? "text-rose-600" : "text-rose-700"}>
-                                    {amountBrkd > 0 ? '+' : ''}{amountBrkd.toLocaleString('vi')} BRKD
+                                    {amountBrkd > 0 ? '+' : ''}{Math.round(amountBrkd).toLocaleString('vi')} MDT
                                   </span>
                                 )}
                                 {amountVoucher !== 0 && (
                                   <span className="text-amber-600">
-                                    +{amountVoucher.toLocaleString('vi')} VNĐ Voucher
+                                    +{Math.round(amountVoucher).toLocaleString('vi')} VNĐ Voucher
                                   </span>
                                 )}
                               </div>
                             </div>
 
+                            {rec.details?.pathStr && (
+                              <div className="text-[9px] text-slate-500 font-medium bg-slate-50 p-1.5 rounded-lg border border-slate-100/50 mt-1 leading-relaxed w-full">
+                                Nhánh bảo trợ: {rec.details.pathStr}
+                              </div>
+                            )}
+
                             {/* Thông số tăng trưởng tích lũy */}
                             <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
                               <div className="flex items-center gap-1">
-                                <span className="text-slate-400">Điểm BRKP:</span>
-                                <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')}</span>
+                                <span className="text-slate-400">Điểm:</span>
+                                <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MP</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <span className="text-slate-400">Thành viên nhóm:</span>
                                 <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
                               </div>
                               <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
-                                <span>Thu nhập VNĐ:</span>
-                                <span>{rec.accumulatedCash?.toLocaleString('vi')} VNĐ</span>
+                                <span>Thu nhập:</span>
+                                <span>{Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ</span>
                               </div>
                               <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
-                                <span>Thu nhập BRKD:</span>
-                                <span>{rec.accumulatedBrkd?.toLocaleString('vi', { maximumFractionDigits: 0 })} BRKD</span>
+                                <span>Đối ứng:</span>
+                                <span>{Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')} MDT</span>
                               </div>
                             </div>
                           </div>
