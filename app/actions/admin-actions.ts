@@ -1618,6 +1618,10 @@ export async function getMemberPromotionHistoryAction(userId: number, systemId: 
                     txTitle = 'Đồng chia 2%'
                 } else if (gtx.type === 'VOUCHER_CREDIT') {
                     txTitle = 'Thưởng thăng cấp'
+                    const matchLvl = txDesc.match(/cấp (\d+)/);
+                    if (matchLvl) {
+                        txDesc = `Quà tặng lên cấp ${matchLvl[1]}`;
+                    }
                 }
 
                 let targetMemberName = '';
@@ -1638,7 +1642,7 @@ export async function getMemberPromotionHistoryAction(userId: number, systemId: 
                         const pct = pctMatch ? ` (${pctMatch[1]})` : '';
                         
                         if (gtx.type === 'COMMISSION') {
-                            txDesc = `Hoa hồng từ thành viên mới #${targetMemberId} - ${targetMemberName}${pct}`;
+                            txDesc = `Hoa hồng${pct} từ thành viên mới #${targetMemberId} - ${targetMemberName}`;
                         } else if (gtx.type === 'RETURN_FEE') {
                             txDesc = `Hoàn phí 21% cho thành viên #${targetMemberId} - ${targetMemberName}`;
                         }
