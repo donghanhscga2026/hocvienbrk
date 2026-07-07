@@ -18,9 +18,38 @@ function parseSacombankEmail(htmlContent: string) {
   const text = extractTextFromHtml(htmlContent);
   const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i);
   const description = contentMatch ? contentMatch[1].trim() : '';
-  const phoneMatch = description.match(/SDT[\s\._]*(\d{6})/i);
+
+  let phone = null;
+  const phoneMatch = description.match(/SDT[\s\._]*(\d{6,11})/i);
+  if (phoneMatch) {
+    phone = phoneMatch[1];
+  } else {
+    // Fallback: Tìm số điện thoại di động Việt Nam dạng 9-11 chữ số
+    const mobileMatch = description.match(/\b(0\d{9,10}|[1-9]\d{8,9})\b/);
+    if (mobileMatch) {
+      phone = mobileMatch[1];
+    }
+  }
+
+  let userId = null;
   const userIdMatch = description.match(/HV[\s\._]*(\d+)/i);
+  if (userIdMatch) {
+    userId = parseInt(userIdMatch[1]);
+  }
+
+  let courseCode = null;
   const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i);
+  if (courseCodeMatch) {
+    courseCode = courseCodeMatch[1].toUpperCase();
+  } else {
+    // Fallback: Tự động phát hiện mã hệ thống MB hoặc BRK
+    if (/BRK/i.test(description)) {
+      courseCode = 'BRK';
+    } else if (/MB/i.test(description)) {
+      courseCode = 'MB';
+    }
+  }
+
   const amountMatch = text.match(/(?:Transaction|Phát sinh)[\s:+]*([\d,\.]+)\s*VND/i);
 
   let amount = 0;
@@ -37,13 +66,27 @@ function parseSacombankEmail(htmlContent: string) {
   }
 
   return {
-    phone: phoneMatch ? phoneMatch[1] : null,
-    userId: userIdMatch ? parseInt(userIdMatch[1]) : null,
-    courseCode: courseCodeMatch ? courseCodeMatch[1].toUpperCase() : null,
+    phone,
+    userId,
+    courseCode,
     amount: amount,
     content: description,
     transferTime,
   };
+}
+
+// Helper wrapper to safely call Gmail API with exponential backoff retry on 429
+async function callGmailWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (error.code === 429 && retries > 0) {
+      console.warn(`[GMAIL API] Rate Limit 429. Retrying in ${delayMs}ms... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      return callGmailWithRetry(fn, retries - 1, delayMs * 2);
+    }
+    throw error;
+  }
 }
 
 export async function processPaymentEmails() {
@@ -65,11 +108,11 @@ export async function processPaymentEmails() {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const afterEpoch = Math.floor(sevenDaysAgo.getTime() / 1000)
 
-  const response = await gmail.users.messages.list({
+  const response = await callGmailWithRetry(() => gmail.users.messages.list({
     userId: 'me',
     q: `(${emailQueries}) after:${afterEpoch}`,
     maxResults: 50
-  });
+  }));
 
   const messages = response.data.messages || [];
   if (messages.length === 0) return { processed: 0, matched: 0 };
@@ -86,8 +129,10 @@ export async function processPaymentEmails() {
   if (pendingEnrollments.length === 0) return { processed: messages.length, matched: 0 };
 
   for (const msg of messages) {
+    // Nghỉ 200ms giữa các email để giảm tải dồn dập cho API
+    await new Promise(resolve => setTimeout(resolve, 200));
     try {
-      const message = await gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' });
+      const message = await callGmailWithRetry(() => gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' }));
       let body = '';
       const payload = message.data.payload;
       if (payload?.body?.data) {
@@ -113,7 +158,14 @@ export async function processPaymentEmails() {
           const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
           const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
           const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-          const courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
+          
+          let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
+          
+          // Hỗ trợ đặc biệt cho khóa học #22 (Merit Bank / MB / BRK)
+          if (!courseCodeMatch && enrollment.courseId === 22 && (parsed.courseCode === 'BRK' || parsed.courseCode === 'MB')) {
+            courseCodeMatch = true;
+          }
+
           const amountMatch = parsed.amount >= enrollment.course.phi_coc;
 
           if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
@@ -164,10 +216,10 @@ export async function processPaymentEmails() {
           }
 
           // Mark email as read
-          await gmail.users.messages.modify({
+          await callGmailWithRetry(() => gmail.users.messages.modify({
             userId: 'me', id: msg.id || '',
             requestBody: { removeLabelIds: ['UNREAD'] }
-          });
+          }));
 
           // Telegram admin notification
           const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +

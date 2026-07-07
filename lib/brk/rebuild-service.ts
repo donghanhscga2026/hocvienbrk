@@ -537,6 +537,11 @@ export async function rebuildSystem4Data(method: 'A' | 'B') {
     data: { nameSystem: 'MB - Ngân hàng phước báu', graceDays }
   });
 
+  await prisma.course.update({
+    where: { id: 22 },
+    data: { noidung_stk: 'MB {SDT} {HOTEN}' }
+  });
+
   // 3. Load enrollments
   const enrollments = await prisma.enrollment.findMany({
     where: { courseId: 22, status: 'ACTIVE' },
