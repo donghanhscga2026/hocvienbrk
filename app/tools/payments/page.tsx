@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getPendingPayments, getAllPayments, verifyPaymentAction, rejectPaymentAction, triggerAutoVerifyManual } from '@/app/actions/payment-actions'
+import { getPendingPayments, getAllPayments, verifyPaymentAction, rejectPaymentAction, triggerAutoVerifyManual, getGmailStatus } from '@/app/actions/payment-actions'
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import Image from 'next/image'
 import MainHeader from '@/components/layout/MainHeader'
@@ -44,6 +44,7 @@ export default function PaymentsPage() {
   const [filter, setFilter] = useState<'PENDING' | 'ALL'>('PENDING')
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [gmailStatus, setGmailStatus] = useState<{ penalized: boolean; retryAfter?: string }>({ penalized: false })
 
   async function handleManualScan() {
     setScanning(true)
@@ -81,6 +82,14 @@ export default function PaymentsPage() {
     
     if (result.success) {
       setPayments(result.payments as PaymentData[])
+    }
+
+    const statusRes = await getGmailStatus() as any
+    if (statusRes.success) {
+      setGmailStatus({
+        penalized: !!statusRes.penalized,
+        retryAfter: statusRes.retryAfter
+      })
     }
     setLoading(false)
   }
@@ -136,6 +145,17 @@ export default function PaymentsPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <MainHeader title="THANH TOÁN" toolSlug="payments" />
 
+      {gmailStatus.penalized && (
+        <div className="bg-amber-50 border-b border-amber-200 p-3 flex items-center gap-2.5 shadow-inner">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <p className="text-xs text-amber-700 font-bold leading-normal">
+            ⚠️ Gmail API đang bị Google tạm khóa hạn mức đến:{' '}
+            <span className="text-red-600 font-extrabold underline">{new Date(gmailStatus.retryAfter!).toLocaleString('vi-VN')}</span>.
+            Hệ thống đã tự động bỏ qua toàn bộ yêu cầu quét Gmail để bảo vệ hòm thư.
+          </p>
+        </div>
+      )}
+
       <div className="text-xs font-medium text-gray-500 text-center py-2 bg-gray-100">
         {payments.length} yêu cầu
       </div>
@@ -161,14 +181,22 @@ export default function PaymentsPage() {
             </div>
 
             <button
-              disabled={scanning}
+              disabled={scanning || gmailStatus.penalized}
               onClick={handleManualScan}
-              className="flex items-center gap-1 px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black shadow-md transition-all uppercase tracking-wider disabled:opacity-50 shrink-0"
+              className={`flex items-center gap-1 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-md transition-all uppercase tracking-wider shrink-0 ${
+                gmailStatus.penalized
+                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed shadow-none'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white'
+              }`}
             >
               {scanning ? (
                 <>
                   <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1" />
                   Đang quét...
+                </>
+              ) : gmailStatus.penalized ? (
+                <>
+                  ⚠️ Đang bị khóa
                 </>
               ) : (
                 <>

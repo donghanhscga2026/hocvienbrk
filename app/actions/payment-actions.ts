@@ -374,3 +374,22 @@ export async function triggerAutoVerifyManual() {
     return { success: false, error: error.message }
   }
 }
+
+export async function getGmailStatus() {
+  try {
+    const penaltyKey = 'gmail_rate_limit_until';
+    const existingPenalty = await prisma.systemConfig.findUnique({
+      where: { key: penaltyKey }
+    });
+    
+    if (existingPenalty && existingPenalty.value) {
+      const penaltyTime = new Date(String(existingPenalty.value)).getTime();
+      if (Date.now() < penaltyTime) {
+        return { success: true, penalized: true, retryAfter: String(existingPenalty.value) };
+      }
+    }
+    return { success: true, penalized: false };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
