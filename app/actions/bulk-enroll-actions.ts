@@ -353,7 +353,7 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         data: { emailVerified: new Date() }
                     })
                     const teleMsg = `🎓 <b>BULK ENROLL - TẠO TÀI KHOẢN MỚI</b>\n👤 Học viên: <b>${row.name}</b> (#${row.userId})\n📧 Email: ${row.email}\n📚 Khóa học: <b>${course.name_lop}</b>`
-                    await sendTelegram(teleMsg, 'ACTIVATE')
+                    await sendTelegram(teleMsg, 'REGISTER')
                 }
             } catch (e) {
                 // non-critical

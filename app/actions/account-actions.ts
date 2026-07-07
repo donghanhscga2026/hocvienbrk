@@ -47,7 +47,7 @@ export async function updateUserProfile(data: {
             finalImageUrl = await saveBase64Image(finalImageUrl);
         }
 
-        await prisma.user.update({
+        const user = await prisma.user.update({
             where: { id: userId },
             data: {
                 name: data.name,
@@ -57,6 +57,21 @@ export async function updateUserProfile(data: {
         })
 
         revalidatePath('/account-settings')
+
+        try {
+            const { sendTelegram } = await import("@/lib/notifications");
+            const changed: string[] = [];
+            if (data.name) changed.push(`tên: "${user.name}"`);
+            if (data.phone) changed.push(`SĐT: ${user.phone}`);
+            if (data.image) changed.push(`ảnh đại diện`);
+            if (changed.length > 0) {
+                const msg = `✏️ <b>THAY ĐỔI THÔNG TIN</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📝 Thay đổi: ${changed.join(', ')}`;
+                await sendTelegram(msg, 'CHANGE');
+            }
+        } catch (e) {
+            console.error("Telegram notification error:", e);
+        }
+
         return { success: true, message: "Cập nhật thành công" }
     } catch (error) {
         console.error("Update profile error:", error)

@@ -253,6 +253,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         case 'action:register_confirm': handleRegisterConfirm(); break
         case 'action:verify_register_otp': handleVerifyRegisterOtp(); break
         case 'action:skip_register_otp': handleSkipRegisterOtp(); break
+        case 'action:register_success': handleRegisterSuccess(); break
         case 'action:send_otp': handleSendOtp(); break
         case 'action:verify_otp': handleVerifyOtp(); break
         case 'action:reset_password': handleResetPassword(); break
@@ -260,7 +261,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         default: break
       }
     }
-  }, [data, password, otp, newPassword, confirmNewPassword, isLoading, registerPassword, registeredUserId])
+  }, [data, password, otp, newPassword, confirmNewPassword, isLoading, registerPassword, registeredUserId, success])
 
   // ─── LOGIN: Check student ID ───
   const handleCheckStudentId = async () => {
@@ -432,7 +433,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       const res = await fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: data.email, otp }) })
       const json = await res.json()
       if (res.ok) {
-        await autoLoginAfterRegister('Xác minh thành công! Đang đăng nhập...')
+        setSuccess('Xác minh thành công!')
+        goToStep('register_success')
       } else setError(json.error || 'Mã OTP không chính xác')
     } catch { setError('Có lỗi xảy ra khi xác minh OTP')
     } finally { setIsLoading(false) }
@@ -440,7 +442,15 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
   const handleSkipRegisterOtp = async () => {
     setIsLoading(true)
-    await autoLoginAfterRegister('Đăng ký thành công! Bạn có thể xác minh email sau.')
+    setSuccess('Đăng ký thành công! Bạn có thể xác minh email sau.')
+    goToStep('register_success')
+    setIsLoading(false)
+  }
+
+  const handleRegisterSuccess = async () => {
+    setIsLoading(true)
+    const msg = success || 'Đăng ký thành công! Đang đăng nhập...'
+    await autoLoginAfterRegister(msg)
     setIsLoading(false)
   }
 
@@ -685,6 +695,46 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             />
           </>
         )
+      case 'register_success':
+        return (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-brk-accent/20 bg-brk-accent/10 p-4 text-center space-y-2">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-brk-accent/20">
+                <CheckCircle2 className="h-5 w-5 text-brk-accent" />
+              </div>
+              <p className="text-sm font-semibold text-brk-on-surface">
+                {success || 'Đăng ký tài khoản thành công!'}
+              </p>
+              <p className="text-xs text-brk-muted">
+                Mã học viên: <span className="font-bold text-brk-primary">#{registeredUserId}</span>
+              </p>
+            </div>
+            <div className="rounded-xl border border-brk-primary/20 bg-brk-primary/5 p-3 space-y-2">
+              <p className="text-xs font-semibold text-brk-primary text-center">
+                📞 Kết nối với Admin để được hỗ trợ nhanh nhất!
+              </p>
+              <div className="flex items-center justify-center gap-3 text-xs text-brk-muted">
+                <a href="https://zalo.me/0876473257" target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-brk-primary hover:text-brk-primary/80 font-medium underline">
+                  📱 Kết bạn Zalo: 0876473257
+                </a>
+                <span className="text-brk-outline">|</span>
+                <span className="text-brk-muted">💬 Telegram: nhóm hỗ trợ</span>
+              </div>
+              <p className="text-[10px] text-brk-muted text-center">
+                Nhắn tin qua Zalo/Telegram để được hướng dẫn và hỗ trợ tài khoản.
+              </p>
+            </div>
+            <button
+              onClick={() => handleAction('action:register_success')}
+              disabled={isLoading}
+              className="w-full rounded-xl bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Tiếp tục vào Học viện
+            </button>
+          </div>
+        )
       case 'forgot_otp':
         return (
           <>
@@ -729,6 +779,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       action === 'action:verify_otp' ||
       action === 'action:verify_register_otp' ||
       action === 'action:skip_register_otp' ||
+      action === 'action:register_success' ||
       action === 'action:send_otp' ||
       action === 'action:reset_password'
     )
@@ -788,6 +839,19 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
           >
             🔍 Tìm tài khoản bằng email hoặc số điện thoại
           </button>
+        )}
+        {error && (
+          <div className="rounded-xl border border-brk-primary/20 bg-brk-primary/5 p-3 space-y-2">
+            <p className="text-xs font-semibold text-brk-primary text-center">Cần hỗ trợ?</p>
+            <div className="flex items-center justify-center gap-3 text-xs text-brk-muted">
+              <a href="https://zalo.me/0876473257" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-brk-primary hover:text-brk-primary/80 font-medium underline">
+                📱 Zalo: 0876473257
+              </a>
+              <span className="text-brk-outline">|</span>
+              <span className="text-brk-muted">💬 Telegram: nhóm hỗ trợ</span>
+            </div>
+          </div>
         )}
 
         {/* Options / Buttons */}

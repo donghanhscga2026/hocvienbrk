@@ -393,6 +393,21 @@ function LoginForm() {
                                 </Link>
                             </div>
                         )}
+                        {error && (
+                            <div className="rounded-xl border border-brk-primary/20 bg-brk-primary/5 p-3 space-y-2">
+                                <p className="text-xs font-semibold text-brk-primary text-center">Cần hỗ trợ?</p>
+                                <div className="flex items-center justify-center gap-3 text-xs text-brk-muted">
+                                    <a href="https://zalo.me/0876473257" target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 text-brk-primary hover:text-brk-primary/80 font-medium underline">
+                                        📱 Zalo: 0876473257
+                                    </a>
+                                    <span className="text-brk-outline">|</span>
+                                    <span className="text-brk-muted">
+                                        💬 Telegram: nhóm hỗ trợ
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                         <div>
                             <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã học viên / Số điện thoại</label>
                             <input

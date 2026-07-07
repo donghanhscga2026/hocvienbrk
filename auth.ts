@@ -159,24 +159,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     }
                 }
 
-                // Nếu đăng nhập thất bại: Gửi cảnh báo Telegram và báo lỗi cụ thể
                 if (isLoginFailed || !user) {
                     console.log(`❌ [Auth] Đăng nhập thất bại cho "${identifier}": ${failReason || "Không tìm thấy người dùng"}`);
-
-                    try {
-                        const { sendTelegram } = await import("@/lib/notifications");
-                        const time = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-                        const msg = `⚠️ <b>ĐĂNG NHẬP THẤT BẠI</b>\n` +
-                                    `━━━━━━━━━━━━━━\n` +
-                                    `👤 Nhập vào: <code>${identifier}</code>\n` +
-                                    `❌ Lý do: <b>${failReason || "Không tìm thấy tài khoản học viên"}</b>\n` +
-                                    `⏰ Thời gian: ${time}\n` +
-                                    `🔄 Trạng thái: Từ chối đăng nhập — không fallback vào tài khoản chung.`;
-                        await sendTelegram(msg, 'FAILED_LOGIN');
-                    } catch (telegramErr) {
-                        console.error("❌ Lỗi gửi Telegram cảnh báo đăng nhập thất bại:", telegramErr);
-                    }
-
                     throw new CustomLoginError(failReason, errorCode);
                 }
 

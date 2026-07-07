@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         try {
             const { sendTelegram } = await import("@/lib/notifications")
             const msg = `🔐 <b>ĐẶT LẠI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đặt lại mật khẩu thành công qua chức năng Quên mật khẩu.`
-            await sendTelegram(msg, 'LESSON')
+            await sendTelegram(msg, 'CHANGE')
         } catch (error) {
             console.error("Telegram notification error:", error)
         }

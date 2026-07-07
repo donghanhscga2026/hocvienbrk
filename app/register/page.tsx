@@ -340,11 +340,11 @@ function RegisterForm() {
 
     const openZalo = () => {
         const msg = `Chào Admin, tôi là ${userName}, mã #${registeredUserId}, vừa đăng ký bằng email ${registeredEmail}. Nhờ Admin xác minh tài khoản giúp tôi.`
-        window.open(`https://zalo.me/0388625868?text=${encodeURIComponent(msg)}`, '_blank')
+        window.open(`https://zalo.me/0876473257?text=${encodeURIComponent(msg)}`, '_blank')
     }
 
     const openTelegram = () => {
-        const msg = `Chào Admin, tôi là ${userName}, mã #${registeredUserId}, vừa đăng ký bằng email ${registeredEmail}. Nhờ Admin xác minh tài khoản giúp tôi.`
+        const msg = `Chào Admin, tôi là ${userName}, mã #${registeredUserId}, vừa đăng ký bằng email ${registeredEmail}. Nhờ Admin hỗ trợ tài khoản giúp tôi.`
         window.open(`https://t.me/hocvienbrk?text=${encodeURIComponent(msg)}`, '_blank')
     }
 

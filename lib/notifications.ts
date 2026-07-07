@@ -63,7 +63,7 @@ function randomPick<T>(arr: T[]): T {
 /**
  * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
  */
-export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' | 'FAILED_LOGIN' = 'ACTIVATE') {
+export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' | 'FAILED_LOGIN' | 'CHANGE' = 'ACTIVATE') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIdMap = {
     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
@@ -71,6 +71,7 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
     LESSON: process.env.TELEGRAM_CHAT_ID_LESSON || process.env.TELEGRAM_CHAT_ID,
     TOOL_CLICK: process.env.TELEGRAM_CHAT_ID_AFFILIATE || process.env.TELEGRAM_CHAT_ID,
     FAILED_LOGIN: process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID,
+    CHANGE: process.env.TELEGRAM_CHAT_ID_CHANGE || process.env.TELEGRAM_CHAT_ID,
   };
   const chatId = chatIdMap[type];
   if (!token || !chatId) return;
@@ -471,12 +472,12 @@ export async function sendActivationEmail(to: string, studentName: string, stude
 
 export async function sendLoginNotification(user: { id: number; name: string }, _ip: string, _userAgent: string) {
   const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})`;
-  await sendTelegram(msg, 'LESSON');
+  await sendTelegram(msg, 'FAILED_LOGIN');
 }
 
 export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }) {
   const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
-  await sendTelegram(msg, 'LESSON');
+  await sendTelegram(msg, 'CHANGE');
 }
 
 interface GoalConfig {
