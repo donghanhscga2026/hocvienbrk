@@ -15,17 +15,40 @@ function extractTextFromHtml(html) {
 
 function parseSacombankEmail(htmlContent) {
   const text = extractTextFromHtml(htmlContent)
-  
-  // Tìm nội dung chuyển khoản
   const contentMatch = text.match(/(?:Description|Nội dung)[\s\/]*(.+?)(?=\s{2,}|$)/i)
   const description = contentMatch ? contentMatch[1].trim() : ''
   
-  // Format mới: SDT 123456 HV 8286 COC LS03
-  const phoneMatch = description.match(/SDT[\s\._]*(\d{6})/i)
+  let phone = null
+  const phoneMatch = description.match(/SDT[\s\._]*(\d{6,11})/i)
+  if (phoneMatch) {
+    phone = phoneMatch[1]
+  } else {
+    // Fallback: Tìm số điện thoại di động Việt Nam dạng 9-11 chữ số
+    const mobileMatch = description.match(/\b(0\d{9,10}|[1-9]\d{8,9})\b/)
+    if (mobileMatch) {
+      phone = mobileMatch[1]
+    }
+  }
+
+  let userId = null
   const userIdMatch = description.match(/HV[\s\._]*(\d+)/i)
+  if (userIdMatch) {
+    userId = parseInt(userIdMatch[1])
+  }
+
+  let courseCode = null
   const courseCodeMatch = description.match(/COC[\s\._]*(\w+)/i)
-  
-  // Tìm số tiền - format: 386,868 VND
+  if (courseCodeMatch) {
+    courseCode = courseCodeMatch[1].toUpperCase()
+  } else {
+    // Fallback: Tự động phát hiện mã hệ thống MB hoặc BRK
+    if (/BRK/i.test(description)) {
+      courseCode = 'BRK'
+    } else if (/MB/i.test(description)) {
+      courseCode = 'MB'
+    }
+  }
+
   const amountMatch = text.match(/(?:Transaction|Phát sinh)[\s:+]*([\d,\.]+)\s*VND/i)
   
   let amount = 0
@@ -35,9 +58,9 @@ function parseSacombankEmail(htmlContent) {
   }
   
   return {
-    phone: phoneMatch ? phoneMatch[1] : null,
-    userId: userIdMatch ? parseInt(userIdMatch[1]) : null,
-    courseCode: courseCodeMatch ? courseCodeMatch[1].toUpperCase() : null,
+    phone,
+    userId,
+    courseCode,
     amount: amount,
     content: description,
     rawText: text

@@ -203,8 +203,16 @@ export default function PaymentsPage() {
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div className="bg-gray-50 rounded-xl p-3">
                       <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Học viên</p>
-                      <p className="font-bold text-sm text-gray-900 truncate">{payment.enrollment.user.name || 'N/A'}</p>
-                      <p className="text-xs text-gray-500 truncate">{payment.enrollment.user.email}</p>
+                      <p className="font-bold text-sm text-gray-900 truncate">
+                        {payment.enrollment.user.name || 'N/A'}{' '}
+                        <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded">
+                          HV#{payment.enrollment.user.id}
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-500 truncate mb-1">{payment.enrollment.user.email}</p>
+                      <p className="text-[9px] text-slate-400 font-bold">
+                        Đề nghị: <span className="font-black text-slate-600">{new Date(payment.createdAt).toLocaleString('vi-VN')}</span>
+                      </p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-3">
                       <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Khóa học</p>

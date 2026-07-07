@@ -90,168 +90,208 @@ async function callGmailWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs 
 }
 
 export async function processPaymentEmails() {
-  const oAuth2Client = new google.auth.OAuth2(
-    process.env.GMAIL_CLIENT_ID,
-    process.env.GMAIL_CLIENT_SECRET,
-    'http://localhost'
-  );
-  oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
-  const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
-
-  const configs = await prisma.autoVerifyConfig.findMany({ where: { enabled: true } });
-  if (configs.length === 0) return { processed: 0, matched: 0 };
-
-  const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ');
-
-  // Query emails trong 7 ngày gần nhất (dùng Unix epoch seconds — Gmail API không chấp nhận ISO date string)
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-  const afterEpoch = Math.floor(sevenDaysAgo.getTime() / 1000)
-
-  const response = await callGmailWithRetry(() => gmail.users.messages.list({
-    userId: 'me',
-    q: `(${emailQueries}) after:${afterEpoch}`,
-    maxResults: 50
-  }));
-
-  const messages = response.data.messages || [];
-  if (messages.length === 0) return { processed: 0, matched: 0 };
-
-  let matchedCount = 0;
-  const pendingEnrollments = await prisma.enrollment.findMany({
-    where: { status: 'PENDING' },
-    include: {
-      course: { select: { id_khoa: true, phi_coc: true, name_lop: true } },
-      user: { select: { id: true, name: true, phone: true, email: true } }
+  // 1. Kiểm tra database lock để tránh chạy song song trùng lặp (giới hạn 1 tiến trình chạy tại một thời điểm)
+  const lockKey = 'gmail_scan_lock';
+  const nowMs = Date.now();
+  try {
+    const existingLock = await prisma.systemConfig.findUnique({
+      where: { key: lockKey }
+    });
+    
+    if (existingLock && existingLock.value) {
+      const lockTime = parseInt(String(existingLock.value));
+      // Nếu lock được tạo cách đây dưới 30 giây, bỏ qua để tránh chạy song song
+      if (nowMs - lockTime < 30000) {
+        console.log('🔒 Gmail scan is locked by another active thread. Skipping to avoid 429 Rate Limit...');
+        return { processed: 0, matched: 0, locked: true };
+      }
     }
-  });
+    
+    // Tạo/Cập nhật lock mới
+    await prisma.systemConfig.upsert({
+      where: { key: lockKey },
+      update: { value: nowMs.toString() },
+      create: { key: lockKey, value: nowMs.toString() }
+    });
+  } catch (lockErr) {
+    console.error('⚠️ Lỗi kiểm tra database lock:', lockErr);
+  }
 
-  if (pendingEnrollments.length === 0) return { processed: messages.length, matched: 0 };
+  try {
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GMAIL_CLIENT_ID,
+      process.env.GMAIL_CLIENT_SECRET,
+      'http://localhost'
+    );
+    oAuth2Client.setCredentials({ refresh_token: process.env.GMAIL_REFRESH_TOKEN });
+    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 
-  for (const msg of messages) {
-    // Nghỉ 200ms giữa các email để giảm tải dồn dập cho API
-    await new Promise(resolve => setTimeout(resolve, 200));
+    const configs = await prisma.autoVerifyConfig.findMany({ where: { enabled: true } });
+    if (configs.length === 0) return { processed: 0, matched: 0 };
+
+    const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ');
+
+    // Query emails trong 7 ngày gần nhất (dùng Unix epoch seconds — Gmail API không chấp nhận ISO date string)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const afterEpoch = Math.floor(sevenDaysAgo.getTime() / 1000)
+
+    const response = await callGmailWithRetry(() => gmail.users.messages.list({
+      userId: 'me',
+      q: `(${emailQueries}) after:${afterEpoch}`,
+      maxResults: 50
+    }));
+
+    const messages = response.data.messages || [];
+    if (messages.length === 0) return { processed: 0, matched: 0 };
+
+    let matchedCount = 0;
+    const pendingEnrollments = await prisma.enrollment.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        course: { select: { id_khoa: true, phi_coc: true, name_lop: true } },
+        user: { select: { id: true, name: true, phone: true, email: true } }
+      }
+    });
+
+    if (pendingEnrollments.length === 0) return { processed: messages.length, matched: 0 };
+
+    for (const msg of messages) {
+      // Nghỉ 200ms giữa các email để giảm tải dồn dập cho API
+      await new Promise(resolve => setTimeout(resolve, 200));
+      try {
+        const message = await callGmailWithRetry(() => gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' }));
+        let body = '';
+        const payload = message.data.payload;
+        if (payload?.body?.data) {
+          body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+        } else if (payload?.parts) {
+          for (const part of payload.parts) {
+            if (part.mimeType === 'text/html' && part.body?.data) {
+              body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+              break;
+            }
+          }
+        }
+
+        const parsed = parseSacombankEmail(body);
+        if (!parsed.amount || (!parsed.userId && !parsed.phone)) continue;
+
+        for (const enrollment of pendingEnrollments) {
+          // Bỏ qua enrollment của tài khoản test hệ thống
+          if (enrollment.userId === 2689) continue;
+          try {
+            const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
+            const emailPhone = parsed.phone || '';
+            const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
+            const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
+            const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+            
+            let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
+            
+            // Hỗ trợ đặc biệt cho khóa học #22 (Merit Bank / MB / BRK)
+            if (!courseCodeMatch && enrollment.courseId === 22 && (parsed.courseCode === 'BRK' || parsed.courseCode === 'MB')) {
+              courseCodeMatch = true;
+            }
+
+            const amountMatch = parsed.amount >= enrollment.course.phi_coc;
+
+            if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
+
+            // Tìm hoặc tạo Payment record (upsert — xử lý cả trường hợp payment chưa tồn tại)
+            await prisma.payment.upsert({
+              where: { enrollmentId: enrollment.id },
+              create: {
+                enrollmentId: enrollment.id,
+                amount: parsed.amount,
+                phone: parsed.phone,
+                content: parsed.content,
+                bankName: 'Sacombank',
+                status: 'VERIFIED',
+                verifiedAt: new Date(),
+                verifyMethod: 'AUTO_EMAIL',
+                transferTime: parsed.transferTime,
+              },
+              update: {
+                amount: parsed.amount,
+                phone: parsed.phone,
+                content: parsed.content,
+                bankName: 'Sacombank',
+                status: 'VERIFIED',
+                verifiedAt: new Date(),
+                verifyMethod: 'AUTO_EMAIL',
+                transferTime: parsed.transferTime,
+              }
+            });
+
+            await prisma.enrollment.update({
+              where: { id: enrollment.id },
+              data: { status: 'ACTIVE' }
+            });
+
+            // [BRK ACTIVATION]
+            const brkConfig = await prisma.autoVerifyConfig.findUnique({
+              where: { courseId: enrollment.courseId }
+            });
+            if (brkConfig?.enabled && brkConfig.onSystem != null) {
+              try {
+                const { activateBrkMember } = await import("@/lib/brk/activation-service");
+                await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId);
+                console.log(`  ✅ BRK activated for user#${enrollment.userId} on system ${brkConfig.onSystem}`);
+              } catch (err) {
+                console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);
+              }
+            }
+
+            // Mark email as read
+            await callGmailWithRetry(() => gmail.users.messages.modify({
+              userId: 'me', id: msg.id || '',
+              requestBody: { removeLabelIds: ['UNREAD'] }
+            }));
+
+            // Telegram admin notification
+            const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +
+              `👤 Học viên: <b>${enrollment.user.name}</b>\n` +
+              `📞 SĐT: ${enrollment.user.phone}\n` +
+              `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
+              `💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
+              `🏦 Ngân hàng: Sacombank\n` +
+              `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+            await sendTelegramAdmin(msgAdmin);
+
+            // Activation email
+            if (enrollment.user.email) {
+              const { sendActivationEmail } = await import("./notifications");
+              await sendActivationEmail(
+                enrollment.user.email,
+                enrollment.user.name || 'Bạn',
+                enrollment.user.id,
+                enrollment.course.name_lop || enrollment.course.id_khoa,
+                null
+              );
+            }
+
+            matchedCount++;
+            break; // Mỗi email chỉ match 1 enrollment
+          } catch (innerErr) {
+            console.error(`  ⚠️ Lỗi xử lý enrollment #${enrollment.id}:`, innerErr);
+          }
+        }
+      } catch (msgErr) {
+        console.error(`  ⚠️ Lỗi xử lý message ${msg.id}:`, msgErr);
+      }
+    }
+    return { processed: messages.length, matched: matchedCount };
+  } finally {
+    // 2. Giải phóng database lock
     try {
-      const message = await callGmailWithRetry(() => gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' }));
-      let body = '';
-      const payload = message.data.payload;
-      if (payload?.body?.data) {
-        body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
-      } else if (payload?.parts) {
-        for (const part of payload.parts) {
-          if (part.mimeType === 'text/html' && part.body?.data) {
-            body = Buffer.from(part.body.data, 'base64').toString('utf-8');
-            break;
-          }
-        }
-      }
-
-      const parsed = parseSacombankEmail(body);
-      if (!parsed.amount || (!parsed.userId && !parsed.phone)) continue;
-
-      for (const enrollment of pendingEnrollments) {
-        // Bỏ qua enrollment của tài khoản test hệ thống
-        if (enrollment.userId === 2689) continue;
-        try {
-          const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
-          const emailPhone = parsed.phone || '';
-          const userIdMatch = parsed.userId && parsed.userId === enrollment.userId;
-          const phoneMatch = userPhone && emailPhone && userPhone.includes(emailPhone);
-          const normalizeCode = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-          
-          let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
-          
-          // Hỗ trợ đặc biệt cho khóa học #22 (Merit Bank / MB / BRK)
-          if (!courseCodeMatch && enrollment.courseId === 22 && (parsed.courseCode === 'BRK' || parsed.courseCode === 'MB')) {
-            courseCodeMatch = true;
-          }
-
-          const amountMatch = parsed.amount >= enrollment.course.phi_coc;
-
-          if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
-
-          // Tìm hoặc tạo Payment record (upsert — xử lý cả trường hợp payment chưa tồn tại)
-          await prisma.payment.upsert({
-            where: { enrollmentId: enrollment.id },
-            create: {
-              enrollmentId: enrollment.id,
-              amount: parsed.amount,
-              phone: parsed.phone,
-              content: parsed.content,
-              bankName: 'Sacombank',
-              status: 'VERIFIED',
-              verifiedAt: new Date(),
-              verifyMethod: 'AUTO_EMAIL',
-              transferTime: parsed.transferTime,
-            },
-            update: {
-              amount: parsed.amount,
-              phone: parsed.phone,
-              content: parsed.content,
-              bankName: 'Sacombank',
-              status: 'VERIFIED',
-              verifiedAt: new Date(),
-              verifyMethod: 'AUTO_EMAIL',
-              transferTime: parsed.transferTime,
-            }
-          });
-
-          await prisma.enrollment.update({
-            where: { id: enrollment.id },
-            data: { status: 'ACTIVE' }
-          });
-
-          // [BRK ACTIVATION]
-          const brkConfig = await prisma.autoVerifyConfig.findUnique({
-            where: { courseId: enrollment.courseId }
-          });
-          if (brkConfig?.enabled && brkConfig.onSystem != null) {
-            try {
-              const { activateBrkMember } = await import("@/lib/brk/activation-service");
-              await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId);
-              console.log(`  ✅ BRK activated for user#${enrollment.userId} on system ${brkConfig.onSystem}`);
-            } catch (err) {
-              console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);
-            }
-          }
-
-          // Mark email as read
-          await callGmailWithRetry(() => gmail.users.messages.modify({
-            userId: 'me', id: msg.id || '',
-            requestBody: { removeLabelIds: ['UNREAD'] }
-          }));
-
-          // Telegram admin notification
-          const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +
-            `👤 Học viên: <b>${enrollment.user.name}</b>\n` +
-            `📞 SĐT: ${enrollment.user.phone}\n` +
-            `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
-            `💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
-            `🏦 Ngân hàng: Sacombank\n` +
-            `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
-          await sendTelegramAdmin(msgAdmin);
-
-          // Activation email
-          if (enrollment.user.email) {
-            const { sendActivationEmail } = await import("./notifications");
-            await sendActivationEmail(
-              enrollment.user.email,
-              enrollment.user.name || 'Bạn',
-              enrollment.user.id,
-              enrollment.course.name_lop || enrollment.course.id_khoa,
-              null
-            );
-          }
-
-          matchedCount++;
-          break; // Mỗi email chỉ match 1 enrollment
-        } catch (innerErr) {
-          console.error(`  ⚠️ Lỗi xử lý enrollment #${enrollment.id}:`, innerErr);
-        }
-      }
-    } catch (msgErr) {
-      console.error(`  ⚠️ Lỗi xử lý message ${msg.id}:`, msgErr);
+      await prisma.systemConfig.update({
+        where: { key: lockKey },
+        data: { value: '' }
+      });
+      console.log('🔓 Released Gmail scan lock.');
+    } catch (unlockErr) {
+      console.error('⚠️ Lỗi giải phóng database lock:', unlockErr);
     }
   }
-  return { processed: messages.length, matched: matchedCount };
 }
