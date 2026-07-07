@@ -137,9 +137,13 @@ export async function verifyPaymentAction(
         where: { courseId: enrollment.courseId }
       })
       if (brkTree) {
-        const { activateBrkMember } = await import("@/lib/brk/activation-service")
-        await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId)
-        console.log(`[BRK] Activated user ${enrollment.userId} in system ${brkTree.onSystem}`)
+        try {
+          const { activateBrkMember } = await import("@/lib/brk/activation-service")
+          await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId)
+          console.log(`[BRK] Activated user ${enrollment.userId} in system ${brkTree.onSystem}`)
+        } catch (brkErr) {
+          console.error(`[BRK ERROR] Kích hoạt thành viên ${enrollment.userId} thất bại:`, brkErr)
+        }
       }
     }
 
@@ -159,6 +163,8 @@ export async function verifyPaymentAction(
     revalidatePath('/')
     revalidatePath('/courses')
     revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`)
+    revalidatePath('/tools/genealogy')
+    revalidatePath('/tools/brk')
 
     return { 
       success: true, 

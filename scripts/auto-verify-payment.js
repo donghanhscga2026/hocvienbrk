@@ -191,9 +191,14 @@ async function processBankEmails() {
     // Build query Gmail tổng hợp từ tất cả config
     const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ')
 
+    // Query emails chưa đọc trong 2 ngày gần nhất để tối ưu hóa quota (dùng Unix epoch seconds)
+    const scanDaysAgo = new Date()
+    scanDaysAgo.setDate(scanDaysAgo.getDate() - 2)
+    const afterEpoch = Math.floor(scanDaysAgo.getTime() / 1000)
+
     const response = await callGmailWithRetry(() => gmail.users.messages.list({
       userId: 'me',
-      q: `(${emailQueries}) is:unread`,
+      q: `(${emailQueries}) is:unread after:${afterEpoch}`,
       maxResults: 20
     }))
 

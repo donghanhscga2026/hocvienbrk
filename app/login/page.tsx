@@ -14,6 +14,7 @@ function LoginForm() {
     const [isLoading, setIsLoading] = useState(false)
     const [isChangingPassword, setIsChangingPassword] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [actionType, setActionType] = useState<string | null>(null)
     const [showPassword, setShowPassword] = useState(false)
     const [showNewPassword, setShowNewPassword] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -79,6 +80,7 @@ function LoginForm() {
         setIsLoading(true)
         setError(null)
         setWarning(null)
+        setActionType(null)
 
         try {
             const callbackUrl = redirectSlug ? `/${redirectSlug}` : "/"
@@ -91,7 +93,55 @@ function LoginForm() {
             })
 
             if (result?.error) {
-                // Gửi thông báo Telegram + đảm bảo tài khoản 2689 tồn tại (await để đồng bộ)
+                let errorMsg = "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại."
+                let extraAction = ""
+
+                try {
+                    const errRes = await fetch('/api/auth/report-failed-login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ identifier: data.identifier })
+                    })
+                    const errData = await errRes.json()
+
+                    switch (errData.errorType) {
+                        case 'NOT_FOUND':
+                            if (errData.identifierType === 'student_id') {
+                                errorMsg = `Mã học viên này không tồn tại.`
+                                extraAction = 'forgot_id'
+                            } else if (errData.identifierType === 'email') {
+                                errorMsg = `Email này chưa đăng ký tài khoản.`
+                                extraAction = 'register'
+                            } else {
+                                errorMsg = `Số điện thoại này chưa đăng ký tài khoản.`
+                                extraAction = 'register'
+                            }
+                            break
+                        case 'INVALID_PASSWORD':
+                            errorMsg = `Mật khẩu không chính xác.`
+                            extraAction = 'forgot_password'
+                            break
+                        case 'NO_PASSWORD':
+                            errorMsg = `Tài khoản này chưa thiết lập mật khẩu.`
+                            extraAction = 'forgot_password'
+                            break
+                    }
+                } catch {
+                    // report-failed-login thất bại, dùng thông tin cơ bản
+                    const identifier = data.identifier
+                    if (/^\d+$/.test(identifier)) {
+                        errorMsg = "Mã học viên không tồn tại hoặc mật khẩu không chính xác."
+                    } else if (identifier.includes('@')) {
+                        errorMsg = "Email không tồn tại hoặc mật khẩu không chính xác."
+                    } else {
+                        errorMsg = "Số điện thoại không tồn tại hoặc mật khẩu không chính xác."
+                    }
+                }
+
+                /*
+                // OLD - Shared Account #2689 Fallback START
+                // Code cũ: tự động đăng nhập vào tài khoản chung #2689
+                // Giữ lại phòng sau này cần chuyển đổi linh hoạt
                 try {
                     await fetch('/api/auth/report-failed-login', {
                         method: 'POST',
@@ -99,24 +149,22 @@ function LoginForm() {
                         body: JSON.stringify({ identifier: data.identifier })
                     })
                 } catch {}
-
-                // Tự động đăng nhập bằng tài khoản đặc biệt để user vẫn vào được web
                 const specialResult = await signIn("credentials", {
                     identifier: "2689",
                     password: "Brk#2689",
                     redirect: false,
                 })
-
                 if (specialResult?.ok) {
                     setError("Hãy kết bạn zalo với số điện thoại +84 876 473 257 để được hỗ trợ thêm!")
-                    setTimeout(() => {
-                        router.push(callbackUrl)
-                        router.refresh()
-                    }, 5000)
+                    setTimeout(() => { router.push(callbackUrl); router.refresh() }, 5000)
                     return
                 }
+                // OLD - Shared Account #2689 Fallback END
+                */
 
-                setError("Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại.")
+                setError(errorMsg)
+                setActionType(extraAction || null)
+                setIsLoading(false)
                 return
             }
 
@@ -310,6 +358,40 @@ function LoginForm() {
                         )}
                         {error && (
                             <div className="rounded-lg bg-brk-accent/30 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
+                        )}
+                        {actionType === 'forgot_password' && (
+                            <div className="flex items-center gap-2 justify-center">
+                                <Link href="/forgot-password" className="text-xs font-semibold text-brk-primary hover:text-brk-primary underline">
+                                    Quên mật khẩu?
+                                </Link>
+                                <span className="text-brk-muted text-xs">|</span>
+                                <Link
+                                    href={redirectSlug ? `/register?redirect=${redirectSlug}${refCode ? '&ref=' + refCode : ''}` : "/register"}
+                                    className="text-xs font-semibold text-brk-primary hover:text-brk-primary underline"
+                                >
+                                    Đăng ký tài khoản mới
+                                </Link>
+                            </div>
+                        )}
+                        {actionType === 'forgot_id' && (
+                            <div className="flex items-center gap-2 justify-center">
+                                <Link
+                                    href="/login?redirect=tools"
+                                    className="text-xs font-semibold text-brk-primary hover:text-brk-primary underline"
+                                >
+                                    Quên mã học viên? (Tìm bằng email/SĐT)
+                                </Link>
+                            </div>
+                        )}
+                        {actionType === 'register' && (
+                            <div className="flex items-center gap-2 justify-center">
+                                <Link
+                                    href={redirectSlug ? `/register?redirect=${redirectSlug}${refCode ? '&ref=' + refCode : ''}` : "/register"}
+                                    className="text-xs font-semibold text-brk-primary hover:text-brk-primary underline"
+                                >
+                                    Đăng ký tài khoản mới
+                                </Link>
+                            </div>
                         )}
                         <div>
                             <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã học viên / Số điện thoại</label>

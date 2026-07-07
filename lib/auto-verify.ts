@@ -173,10 +173,10 @@ export async function processPaymentEmails() {
 
     const emailQueries = configs.map(c => `from:${c.emailFrom} ${c.emailQuery}`).join(' OR ');
 
-    // Query emails trong 7 ngày gần nhất (dùng Unix epoch seconds — Gmail API không chấp nhận ISO date string)
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const afterEpoch = Math.floor(sevenDaysAgo.getTime() / 1000)
+    // Query emails trong 2 ngày gần nhất để giảm thiểu quota sử dụng của Gmail API (dùng Unix epoch seconds)
+    const scanDaysAgo = new Date()
+    scanDaysAgo.setDate(scanDaysAgo.getDate() - 2)
+    const afterEpoch = Math.floor(scanDaysAgo.getTime() / 1000)
 
     const response = await callGmailWithRetry(() => gmail.users.messages.list({
       userId: 'me',

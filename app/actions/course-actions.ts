@@ -101,8 +101,20 @@ export async function enrollInCourseAction(courseId: number) {
             const cookieStore = await cookies()
             const refCookie = cookieStore.get('aff_ref')
             if (refCookie?.value) {
-                const refUserId = await resolveRefToUserId(refCookie.value)
-                if (refUserId > 0) enrollmentReferrerId = refUserId
+                let rawRef = refCookie.value
+                try {
+                    const affData = JSON.parse(decodeURIComponent(refCookie.value))
+                    if (affData?.r) {
+                        rawRef = affData.r
+                    }
+                } catch { }
+
+                let refId = parseInt(rawRef)
+                if (isNaN(refId) || refId <= 0) {
+                    const resolved = await resolveRefToUserId(rawRef)
+                    if (resolved) refId = resolved
+                }
+                if (refId > 0) enrollmentReferrerId = refId
             }
         } catch { }
 
