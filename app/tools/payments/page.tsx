@@ -50,7 +50,10 @@ export default function PaymentsPage() {
     try {
       const result = await triggerAutoVerifyManual() as any
       if (result.success) {
-        if (result.locked) {
+        if (result.penalized) {
+          const penaltyDate = new Date(result.retryAfter).toLocaleString('vi-VN');
+          alert(`⚠️ TÀI KHOẢN ĐANG BỊ GOOGLE PHẠT RATE LIMIT!\n- Thời gian phạt đến: ${penaltyDate}\n- Vui lòng KHÔNG quét tay hoặc chạy script local lúc này để tránh bị Google khóa lâu hơn!`);
+        } else if (result.locked) {
           alert('🔒 Hệ thống đang có tiến trình quét Gmail chạy ngầm. Vui lòng thử lại sau 30 giây.')
         } else {
           alert(`⚡ Quét thành công!\n- Số email đã quét: ${result.processed}\n- Số giao dịch được kích hoạt tự động: ${result.matched}`)

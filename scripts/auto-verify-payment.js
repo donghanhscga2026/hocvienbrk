@@ -94,21 +94,62 @@ async function getGmailClient() {
 }
 
 // Helper wrapper to safely call Gmail API with exponential backoff retry on 429
+// Helper wrapper to safely call Gmail API with exponential backoff retry on 429
 async function callGmailWithRetry(fn, retries = 3, delayMs = 1000) {
   try {
     return await fn()
   } catch (error) {
-    if (error.code === 429 && retries > 0) {
-      console.warn(`[GMAIL API] Rate Limit 429. Retrying in ${delayMs}ms... (${retries} attempts left)`)
-      await new Promise(resolve => setTimeout(resolve, delayMs))
-      return callGmailWithRetry(fn, retries - 1, delayMs * 2)
+    const errorMsg = error.message || ''
+    const causeMsg = error.cause?.message || ''
+    const fullMsg = `${errorMsg} ${causeMsg}`
+
+    if (error.code === 429) {
+      // Trích xuất mốc phạt rate limit của Google
+      const match = fullMsg.match(/Retry after\s+([^\s]+)/i)
+      if (match) {
+        const penaltyTimeStr = match[1]
+        try {
+          await prisma.systemConfig.upsert({
+            where: { key: 'gmail_rate_limit_until' },
+            update: { value: penaltyTimeStr },
+            create: { key: 'gmail_rate_limit_until', value: penaltyTimeStr }
+          })
+          console.log(`⏳ Đã ghi nhận mốc phạt Rate Limit của Google đến: ${penaltyTimeStr}`)
+        } catch (dbErr) {
+          console.error('⚠️ Lỗi ghi nhận mốc phạt vào DB:', dbErr)
+        }
+      }
+
+      if (retries > 0) {
+        console.warn(`[GMAIL API] Rate Limit 429. Retrying in ${delayMs}ms... (${retries} attempts left)`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        return callGmailWithRetry(fn, retries - 1, delayMs * 2)
+      }
     }
     throw error
   }
 }
 
 async function processBankEmails() {
-  // 1. Kiểm tra database lock để tránh chạy song song trùng lặp (giới hạn 1 tiến trình chạy tại một thời điểm)
+  // 1. Kiểm tra database penalty rate-limit để tránh bị Google cộng dồn hình phạt
+  const penaltyKey = 'gmail_rate_limit_until'
+  try {
+    const existingPenalty = await prisma.systemConfig.findUnique({
+      where: { key: penaltyKey }
+    })
+    if (existingPenalty && existingPenalty.value) {
+      const penaltyTime = new Date(String(existingPenalty.value)).getTime()
+      if (Date.now() < penaltyTime) {
+        const diffSec = Math.ceil((penaltyTime - Date.now()) / 1000)
+        console.log(`⏳ Gmail API is currently penalized by Google. Skipping scan for another ${diffSec} seconds to avoid penalty extension...`)
+        return
+      }
+    }
+  } catch (penaltyErr) {
+    console.error('⚠️ Lỗi kiểm tra database penalty lock:', penaltyErr)
+  }
+
+  // 2. Kiểm tra database lock để tránh chạy song song trùng lặp (giới hạn 1 tiến trình chạy tại một thời điểm)
   const lockKey = 'gmail_scan_lock';
   const nowMs = Date.now();
   try {
@@ -117,7 +158,7 @@ async function processBankEmails() {
     });
     
     if (existingLock && existingLock.value) {
-      const lockTime = parseInt(existingLock.value);
+      const lockTime = parseInt(String(existingLock.value));
       // Nếu lock được tạo cách đây dưới 30 giây, bỏ qua để tránh chạy song song
       if (nowMs - lockTime < 30000) {
         console.log('🔒 Gmail scan is locked by another active thread. Skipping to avoid 429 Rate Limit...');
