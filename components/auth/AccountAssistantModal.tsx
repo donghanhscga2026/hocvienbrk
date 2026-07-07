@@ -278,6 +278,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     } finally { setIsLoading(false) }
   }
 
+  const goToFindAccount = () => { goToStep('check') }
+
   // ─── LOGIN: Submit password ───
   const handleLogin = async () => {
     if (!password) { setError('Vui lòng nhập mật khẩu'); return }
@@ -286,6 +288,27 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       const callbackUrl = data.originalUrl || '/'
       const result = await signIn('credentials', { identifier: data.studentId.trim(), password, redirect: false, callbackUrl })
       if (result?.error) {
+        let errorMsg = 'Đăng nhập thất bại. Vui lòng thử lại.'
+        let canRetryOrForgot = false
+
+        try {
+          const errRes = await fetch('/api/auth/report-failed-login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifier: data.studentId.trim() })
+          })
+          const errData = await errRes.json()
+          if (errData.errorType === 'INVALID_PASSWORD') {
+            errorMsg = 'Mật khẩu không chính xác.'
+            canRetryOrForgot = true
+          } else if (errData.errorType === 'NO_PASSWORD') {
+            errorMsg = 'Tài khoản này chưa thiết lập mật khẩu.'
+            canRetryOrForgot = true
+          }
+        } catch {}
+
+        /*
+        // OLD - Shared Account #2689 Fallback START
+        // Giữ lại code cũ fallback vào tài khoản chung để dùng khi cần
         try { await fetch('/api/auth/report-failed-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: data.studentId.trim() }) }) } catch {}
         const specialResult = await signIn('credentials', { identifier: '2689', password: 'Brk#2689', redirect: false })
         if (specialResult?.ok) {
@@ -293,6 +316,21 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
           setTimeout(() => window.location.href = callbackUrl, 5000); return
         }
         setError('Mật khẩu không chính xác. Vui lòng thử lại.'); return
+        // OLD - Shared Account #2689 Fallback END
+        */
+
+        setError(errorMsg)
+        setIsLoading(false)
+
+        if (canRetryOrForgot && data.email) {
+          // Thêm nút "Quên mật khẩu?" sau 1s để user có thể đặt lại qua OTP
+          setTimeout(() => {
+            if (confirm('Bạn có muốn đặt lại mật khẩu qua email không?')) {
+              goToStep('forgot_otp')
+            }
+          }, 500)
+        }
+        return
       }
       const updatedSession = await update()
       const isUnverified = (updatedSession?.user as any)?.isUnverified
@@ -742,6 +780,14 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         {/* Error */}
         {error && (
           <div className="rounded-lg bg-brk-accent/20 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
+        )}
+        {error && step === 'login_id' && error.includes('Không tìm thấy mã học viên') && (
+          <button
+            onClick={goToFindAccount}
+            className="w-full rounded-xl border border-brk-primary/40 bg-brk-primary/10 px-4 py-2.5 text-sm font-semibold text-brk-primary hover:bg-brk-primary/20 transition-colors"
+          >
+            🔍 Tìm tài khoản bằng email hoặc số điện thoại
+          </button>
         )}
 
         {/* Options / Buttons */}

@@ -134,25 +134,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 let isLoginFailed = false;
                 let failReason = "";
+                let errorCode = "";
 
                 if (!user) {
                     isLoginFailed = true;
                     failReason = "Không tìm thấy tài khoản học viên";
+                    if (/^\d+$/.test(identifier)) {
+                        errorCode = "STUDENT_ID_NOT_FOUND";
+                    } else if (identifier.includes('@')) {
+                        errorCode = "EMAIL_NOT_FOUND";
+                    } else {
+                        errorCode = "PHONE_NOT_FOUND";
+                    }
                 } else if (!user.password) {
                     isLoginFailed = true;
                     failReason = "Tài khoản chưa thiết lập mật khẩu (đăng nhập Google)";
+                    errorCode = "NO_PASSWORD";
                 } else {
                     const passwordsMatch = await bcrypt.compare(password, user.password);
                     if (!passwordsMatch) {
                         isLoginFailed = true;
                         failReason = "Mật khẩu không chính xác";
+                        errorCode = "INVALID_PASSWORD";
                     }
                 }
 
-                // Nếu đăng nhập thất bại: Gửi cảnh báo Telegram và tự động đăng nhập vào tài khoản chung #2689
+                // Nếu đăng nhập thất bại: Gửi cảnh báo Telegram và báo lỗi cụ thể
                 if (isLoginFailed || !user) {
                     console.log(`❌ [Auth] Đăng nhập thất bại cho "${identifier}": ${failReason || "Không tìm thấy người dùng"}`);
-                    
+
                     try {
                         const { sendTelegram } = await import("@/lib/notifications");
                         const time = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -161,33 +171,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                                     `👤 Nhập vào: <code>${identifier}</code>\n` +
                                     `❌ Lý do: <b>${failReason || "Không tìm thấy tài khoản học viên"}</b>\n` +
                                     `⏰ Thời gian: ${time}\n` +
-                                    `🔄 Trạng thái: Đang tự động chuyển hướng đăng nhập vào tài khoản tạm thời #2689.`;
-                        await sendTelegram(msg, 'LESSON');
+                                    `🔄 Trạng thái: Từ chối đăng nhập — không fallback vào tài khoản chung.`;
+                        await sendTelegram(msg, 'FAILED_LOGIN');
                     } catch (telegramErr) {
                         console.error("❌ Lỗi gửi Telegram cảnh báo đăng nhập thất bại:", telegramErr);
                     }
 
-                    const tempUser = await prisma.user.findUnique({
-                        where: { id: 2689 }
-                    });
-
-                    if (tempUser) {
-                        console.log(`🔄 [Auth] Tự động đăng nhập vào tài khoản tạm thời #2689`);
-                        return {
-                            id: tempUser.id.toString(),
-                            name: tempUser.name,
-                            email: tempUser.email,
-                            phone: tempUser.phone,
-                            role: tempUser.role,
-                            image: tempUser.image,
-                            affiliateCode: tempUser.affiliateCode ?? undefined,
-                            needsPasswordChange: false,
-                            isUnverified: !tempUser.emailVerified,
-                            isTempLogin: true, // Gán cờ đăng nhập tạm thời
-                        } as any;
-                    } else {
-                        throw new CustomLoginError("Đăng nhập thất bại và hệ thống không tìm thấy tài khoản tạm thời.", "LOGIN_FAILED");
-                    }
+                    throw new CustomLoginError(failReason, errorCode);
                 }
 
                 // Ở đây user chắc chắn không null

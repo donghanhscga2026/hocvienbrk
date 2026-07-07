@@ -63,13 +63,14 @@ function randomPick<T>(arr: T[]): T {
 /**
  * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
  */
-export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' = 'ACTIVATE') {
+export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' | 'FAILED_LOGIN' = 'ACTIVATE') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIdMap = {
     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
     ACTIVATE: process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID,
     LESSON: process.env.TELEGRAM_CHAT_ID_LESSON || process.env.TELEGRAM_CHAT_ID,
     TOOL_CLICK: process.env.TELEGRAM_CHAT_ID_AFFILIATE || process.env.TELEGRAM_CHAT_ID,
+    FAILED_LOGIN: process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID,
   };
   const chatId = chatIdMap[type];
   if (!token || !chatId) return;

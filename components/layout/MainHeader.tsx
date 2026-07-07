@@ -127,11 +127,13 @@ export default function MainHeader({ title }: MainHeaderProps) {
                 </div>
             </header>
 
+            {/* OLD - Temp Login Banner START
             {session?.user && ((session.user as any).isTempLogin || session.user.id === '2689') && (
                 <div className="bg-amber-600 text-white text-center py-2 px-4 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 relative z-40 shadow-inner animate-pulse">
                     <span>⚠️ Đây chỉ là tài khoản tạm thời. Vui lòng liên hệ Admin/Hỗ trợ để được xử lý tài khoản hoặc Đăng xuất và Đăng nhập lại bằng tài khoản chính xác của bạn.</span>
                 </div>
             )}
+            OLD - Temp Login Banner END */}
 
             {showShare && (
                 <ShareModal

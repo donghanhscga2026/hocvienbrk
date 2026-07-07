@@ -915,3 +915,31 @@ Nâng cấp và làm đẹp Modal chi tiết thành viên khi click vào avatar:
 ### Trạng thái
 - ✅ `npx tsc --noEmit` — 0 lỗi
 - ✅ Giao diện Modal hiển thị chuẩn mực và gọn gàng, tránh tuyệt đối va chạm nút Close (X).
+
+---
+
+## ✅ Sửa lỗi duyệt tay không cập nhật phả đồ & Cải tiến ghi nhận link Affiliate khóa học (2026-07-07)
+
+### Mục tiêu
+- Khắc phục lỗi cache Next.js Router khiến phả đồ và hệ thống không cập nhật ngay sau khi admin duyệt tay thanh toán.
+- Sửa lỗi giải mã cookie `aff_ref` khiến luồng đăng ký khóa học thủ công (gọi `enrollInCourseAction`) không nhận dạng được mã giới thiệu JSON, dẫn đến lưu `referrerId = null` trong bảng `Enrollment`.
+- Khôi phục (Rollback) trạng thái của học viên Dương Văn Mẫn về lại `PENDING` theo đúng yêu cầu kiểm soát của Admin.
+
+### Các file đã sửa
+#### `app/actions/payment-actions.ts`
+- Thêm `revalidatePath('/tools/genealogy')` và `revalidatePath('/tools/brk')` ở cuối hàm `verifyPaymentAction` để xóa cache client-side, ép trình duyệt tải dữ liệu phả đồ và đối tác mới nhất sau khi duyệt.
+- Bọc khối gọi `activateBrkMember` vào block `try-catch` riêng biệt để bảo vệ luồng duyệt chính không bị crash dở dang nếu có lỗi phát sinh trong quá trình tính toán phả đồ.
+
+#### `app/actions/course-actions.ts`
+- Cập nhật hàm `enrollInCourseAction` để hỗ trợ tương thích ngược 100%: Tự động phát hiện và parse chuỗi JSON của cookie `aff_ref` (đối với học viên đi qua proxy.ts) hoặc đọc trực tiếp chuỗi thô (đối với học viên đi qua landing page ngoài).
+
+### Công việc đã thực hiện
+- Rà soát cơ sở dữ liệu và xử lý kích hoạt thành công cho học viên **Hồng Hạnh** (#1086 - Đăng ký: #1351) do bị kẹt rate-limit Gmail API sáng nay.
+- Thực hiện Rollback toàn bộ dữ liệu của học viên **Dương Văn Mẫn** (#1008 - Đăng ký: #1256) về trạng thái **`PENDING`**, thu hồi ví (CASH & BRKD) và trừ điểm upline đã cộng nhầm trước đó.
+- Sau khi xử lý, số lượng `Enrollment ACTIVE` và `System 4 ACTIVE` khớp nhau hoàn hảo ở con số **46** (Học viên Hồng Hạnh đã được active, Dương Văn Mẫn đã trở lại PENDING).
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi biên dịch.
+- ✅ Ghi nhận affiliate khóa học hoạt động chính xác cho cả cookie JSON lẫn text thô.
+
+
