@@ -259,6 +259,19 @@ Mô tả ngắn gọn vấn đề và mục đích thay đổi.
 ## 📁 TÀI LIỆU QUAN TRỌNG
 
 - `PLAN.md` — Lịch sử thay đổi & kế hoạch kỹ thuật
-- `GEMINI.md` — Hướng dẫn nền tảng cho AI agent
+- `GEMINI.md` — Hướng dẫn nền tảng cho AI agent (file này)
+- `docs/SESSION_LOG.md` — Nhật ký phiên làm việc (BẮT BUỘC đọc đầu mỗi phiên)
+- `docs/LOGIN_FAILED_ALERT_SYSTEM.md` — Tài liệu hệ thống cảnh báo đăng nhập
 - `docs/AFFILIATE_SYSTEM.md` — Tài liệu hệ thống Affiliate
 - `plan_temp/` — Backup files (tra cứu khi cần restore)
+
+### 📋 QUY TẮC SESSION LOG (BỔ SUNG)
+
+> Bắt buộc áp dụng cho MỌI phiên làm việc từ 2026-07-07 trở đi.
+
+1. **ĐẦU phiên**: Đọc `docs/SESSION_LOG.md` để biết lịch sử làm việc trước đó
+2. **CUỐI phiên**: Ghi 1 entry mới vào `docs/SESSION_LOG.md` với format:
+   - Session ID: `YYYY-MM-DD_ses_NN` (VD: `2026-07-07_ses_01`)
+   - Mục tiêu, các file đã sửa, kiến trúc, trạng thái
+3. **Khi có tính năng mới**: Tạo file `docs/{TINH_NANG}.md` + cập nhật `PLAN.md`
+4. **Backup patches**: Luôn lưu vào `plan_temp/` trước khi edit

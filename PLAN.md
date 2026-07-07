@@ -942,4 +942,64 @@ Nâng cấp và làm đẹp Modal chi tiết thành viên khi click vào avatar:
 - ✅ `npx tsc --noEmit` — 0 lỗi biên dịch.
 - ✅ Ghi nhận affiliate khóa học hoạt động chính xác cho cả cookie JSON lẫn text thô.
 
+---
+
+## ✅ [2026-07-07] Loại bỏ fallback tài khoản chung #2689 + Hệ thống cảnh báo Telegram FAILED_LOGIN
+
+### Mục tiêu
+Thay đổi cơ chế xử lý đăng nhập thất bại:
+- **Không** tự động fallback vào tài khoản chung #2689
+- Hiển thị lỗi cụ thể (sai mã HV / email / SĐT / mật khẩu)
+- Gửi Telegram vào group `FAILED_LOGIN` riêng cho bộ phận hỗ trợ
+- Có link hành động: Quên mật khẩu?, Tìm tài khoản, Đăng ký
+- Code cũ giữ lại dạng comment để dễ kích hoạt lại
+
+### Các file đã sửa
+
+#### `lib/notifications.ts`
+- Thêm type `FAILED_LOGIN` vào `sendTelegram()`
+
+#### `.env` & `.env.local`
+- Thêm `TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240`
+
+#### `app/api/auth/report-failed-login/route.ts`
+- Viết lại hoàn toàn: phân tích identifier type, lookup user, trả về error type
+- Bỏ tạo/tìm user #2689
+- Gửi Telegram vào `FAILED_LOGIN` group
+
+#### `auth.ts`
+- Server authorize: throw `CustomLoginError` với code cụ thể
+- Gửi Telegram type `FAILED_LOGIN` thay vì `LESSON`
+- Bỏ fallback #2689
+
+#### `app/login/page.tsx`
+- Client: bỏ signIn lần 2 với #2689
+- Gọi API `/api/auth/report-failed-login`, hiển thị lỗi + link hành động
+- Thêm contact card: Zalo 0876473257 + Telegram nhóm hỗ trợ khi login fail
+- Code cũ comment lại (`/* OLD - Shared Account #2689 Fallback */`)
+
+#### `components/auth/AccountAssistantModal.tsx`
+- `handleLogin`: bỏ signIn #2689, thêm gợi ý đặt lại mật khẩu qua OTP
+- `handleCheckStudentId`: thêm nút "Tìm tài khoản bằng email/SĐT" khi không tìm thấy mã HV
+- Thêm contact card khi login fail
+- Thêm step `register_success`: hiển thị contact Zalo + Tele sau đăng ký, có nút "Tiếp tục"
+- Code cũ comment lại
+
+#### `components/layout/MainHeader.tsx`
+- Comment banner `isTempLogin` (code cũ giữ lại)
+
+#### `app/register/page.tsx`
+- Cập nhật số Zalo hỗ trợ từ `0388625868` → `0876473257`
+
+### Tài liệu mới
+- `docs/LOGIN_FAILED_ALERT_SYSTEM.md` — Đặc tả kỹ thuật chi tiết
+- `docs/SESSION_LOG.md` — Nhật ký phiên làm việc (dùng cho mọi session sau này)
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi biên dịch
+- ✅ API test thành công cho cả 3 loại identifier
+- ✅ Login fail: hiển thị Zalo 0876473257 + Telegram
+- ✅ Register success: hiển thị contact + nút "Tiếp tục vào Học viện"
+- ⏳ Chờ deploy Vercel + add bot vào group Telegram
+- ⏳ Bot cần được add vào group `-1004466932240` trước khi Telegram hoạt động
 

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     try {
         const { sendTelegram } = await import("@/lib/notifications");
         const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
-        await sendTelegram(msg, 'ACTIVATE');
+        await sendTelegram(msg, 'REGISTER');
     } catch (e) {
         console.error("Telegram notification error:", e);
     }
