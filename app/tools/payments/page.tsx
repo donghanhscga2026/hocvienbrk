@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getPendingPayments, getAllPayments, verifyPaymentAction, rejectPaymentAction } from '@/app/actions/payment-actions'
+import { getPendingPayments, getAllPayments, verifyPaymentAction, rejectPaymentAction, triggerAutoVerifyManual } from '@/app/actions/payment-actions'
 import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import Image from 'next/image'
 import MainHeader from '@/components/layout/MainHeader'
@@ -43,6 +43,28 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'PENDING' | 'ALL'>('PENDING')
   const [actionLoading, setActionLoading] = useState<number | null>(null)
+  const [scanning, setScanning] = useState(false)
+
+  async function handleManualScan() {
+    setScanning(true)
+    try {
+      const result = await triggerAutoVerifyManual() as any
+      if (result.success) {
+        if (result.locked) {
+          alert('🔒 Hệ thống đang có tiến trình quét Gmail chạy ngầm. Vui lòng thử lại sau 30 giây.')
+        } else {
+          alert(`⚡ Quét thành công!\n- Số email đã quét: ${result.processed}\n- Số giao dịch được kích hoạt tự động: ${result.matched}`)
+          await loadPayments()
+        }
+      } else {
+        alert(`❌ Lỗi quét email: ${result.error}`)
+      }
+    } catch (err: any) {
+      alert(`❌ Lỗi hệ thống: ${err.message}`)
+    } finally {
+      setScanning(false)
+    }
+  }
 
   useEffect(() => {
     loadPayments()
@@ -119,19 +141,38 @@ export default function PaymentsPage() {
       <div className="sticky top-16 z-40 bg-white border-b shadow-sm">
         <div className="p-4 space-y-4">
           {/* Stats Row */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 rounded-lg shrink-0">
-              <Clock className="w-4 h-4 text-yellow-600" />
-              <span className="text-xs font-bold text-yellow-700">{stats.pending} Chờ</span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 rounded-lg shrink-0">
+                <Clock className="w-4 h-4 text-yellow-600" />
+                <span className="text-xs font-bold text-yellow-700">{stats.pending} Chờ</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg shrink-0">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <span className="text-xs font-bold text-green-700">{stats.verified} OK</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-lg shrink-0">
+                <XCircle className="w-4 h-4 text-red-600" />
+                <span className="text-xs font-bold text-red-700">{stats.rejected} Từ chối</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg shrink-0">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-xs font-bold text-green-700">{stats.verified} OK</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-lg shrink-0">
-              <XCircle className="w-4 h-4 text-red-600" />
-              <span className="text-xs font-bold text-red-700">{stats.rejected} Từ chối</span>
-            </div>
+
+            <button
+              disabled={scanning}
+              onClick={handleManualScan}
+              className="flex items-center gap-1 px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black shadow-md transition-all uppercase tracking-wider disabled:opacity-50 shrink-0"
+            >
+              {scanning ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1" />
+                  Đang quét...
+                </>
+              ) : (
+                <>
+                  ⚡ Quét Gmail
+                </>
+              )}
+            </button>
           </div>
 
           {/* Filter Buttons */}

@@ -356,3 +356,21 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
     return { success: false, error: error.message }
   }
 }
+
+export async function triggerAutoVerifyManual() {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: "Quyền truy cập bị từ chối. Chỉ Admin mới được phép kích hoạt tính năng này." }
+    }
+    
+    const { processPaymentEmails } = await import("@/lib/auto-verify")
+    const result = await processPaymentEmails()
+    
+    revalidatePath('/tools/payments')
+    return { success: true, ...result }
+  } catch (error: any) {
+    console.error("Manual auto-verify trigger error:", error)
+    return { success: false, error: error.message }
+  }
+}
