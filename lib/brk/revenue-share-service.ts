@@ -3,15 +3,19 @@
 import prisma from '@/lib/prisma'
 import { creditBrkWallet, creditBrkdWallet } from './wallet-service'
 
-export async function processRevenueShareForSystem(onSystem: number) {
+export async function processRevenueShareForSystem(onSystem: number, distributedAt?: Date) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
   if (!systemTree) return { processed: false, reason: 'System not found' }
 
+  const distDate = distributedAt || new Date()
   const intervalDays = systemTree.revenueShareIntervalDays || 3
   const sharePct = Number(systemTree.revenueSharePct || 2.0)
-  const now = new Date()
-  const periodStart = new Date(now.getTime() - intervalDays * 24 * 60 * 60 * 1000)
-  const periodEnd = now
+  const periodStart = new Date(distDate.getTime() - intervalDays * 24 * 60 * 60 * 1000)
+  const periodEnd = distDate
+
+  // Check if Method B (need to filter by gracePeriodEnd)
+  const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
+  const isOptionB = promoConfig?.value === 'B'
 
   const lastPool = await prisma.brkRevenuePool.findFirst({
     where: { systemId: onSystem },
@@ -19,15 +23,20 @@ export async function processRevenueShareForSystem(onSystem: number) {
   })
   const roundNumber = (lastPool?.roundNumber || 0) + 1
 
-  const newActivations = await prisma.system.findMany({
-    where: {
-      onSystem,
-      status: 'ACTIVE',
-      activatedAt: {
-        gte: periodStart,
-        lte: periodEnd
-      }
+  const newActivationsQuery: any = {
+    onSystem,
+    status: 'ACTIVE',
+    activatedAt: {
+      gte: periodStart,
+      lt: periodEnd
     }
+  }
+  if (isOptionB) {
+    newActivationsQuery.gracePeriodEnd = { lt: distDate }
+  }
+
+  const newActivations = await prisma.system.findMany({
+    where: newActivationsQuery
   })
 
   const totalRevenue = newActivations.length * Number(systemTree.fee)
@@ -42,7 +51,7 @@ export async function processRevenueShareForSystem(onSystem: number) {
         poolAmount: 0,
         qualifiedCount: 0,
         status: 'DISTRIBUTED',
-        distributedAt: now,
+        distributedAt: distDate,
       }
     })
     return { processed: true, poolAmount: 0, qualifiedCount: 0 }
@@ -85,7 +94,7 @@ export async function processRevenueShareForSystem(onSystem: number) {
         poolAmount,
         qualifiedCount: 0,
         status: 'DISTRIBUTED',
-        distributedAt: now,
+        distributedAt: distDate,
       }
     })
     return { processed: true, poolAmount, qualifiedCount: 0 }
@@ -103,7 +112,7 @@ export async function processRevenueShareForSystem(onSystem: number) {
       poolAmount,
       qualifiedCount,
       status: 'DISTRIBUTED',
-      distributedAt: now,
+      distributedAt: distDate,
     }
   })
 
