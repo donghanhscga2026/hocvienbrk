@@ -5,6 +5,7 @@ import Image from 'next/image'
 import PaymentModal from './PaymentModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
+import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
 import { Share2, BookOpen } from 'lucide-react'
@@ -93,7 +94,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         if (effectivePhiCoc === 0) {
             setLoading(true)
             try {
-                const res = await enrollInCourseAction(course.id)
+                const res = await enrollInCourseAction(course.id, getClientRef())
                 if (res.success) {
                     window.location.href = `/courses/${course.id_khoa}/learn`
                 }
@@ -108,7 +109,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
             } else {
                 setLoading(true)
                 try {
-                    const res: any = await enrollInCourseAction(course.id)
+                    const res: any = await enrollInCourseAction(course.id, getClientRef())
                     if (res.success) {
                         if (res.enrollment) {
                             setLocalEnrollment(res.enrollment)

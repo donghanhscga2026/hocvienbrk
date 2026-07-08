@@ -5,6 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Flag, Lock, CheckCircle2, ChevronRight, Play, Info, Sparkles, Trophy, Target, ArrowRight, X, PlayCircle, BookOpen, RefreshCw, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
+import { getClientRef } from '@/lib/affiliate/get-client-ref'
 
 interface RealityMapProps {
     customPath: number[]
@@ -111,7 +112,7 @@ export default function RealityMap({ customPath, enrollmentsMap, allCourses, use
         } else {
             setEnrollingCourseId(course.id)
             try {
-                const res = await enrollInCourseAction(course.id)
+                const res = await enrollInCourseAction(course.id, getClientRef())
                 if (res.success) {
                     if (res.status === 'ACTIVE') {
                         window.location.href = `/courses/${course.id_khoa}/learn`

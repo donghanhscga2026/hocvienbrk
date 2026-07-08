@@ -275,17 +275,19 @@ function RegisterForm() {
             // Auto-enroll nếu đến từ trang khóa học
             if (redirectSlug?.startsWith('khoa-hoc/')) {
                 const idKhoa = redirectSlug.replace('khoa-hoc/', '')
-                fetch('/api/enroll-after-register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: registeredUserId, idKhoa })
-                }).catch(() => {})
+                try {
+                    await fetch('/api/enroll-after-register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: registeredUserId, idKhoa })
+                    })
+                } catch (e) {
+                    console.error('[AutoEnroll] Fetch error:', e)
+                }
             }
 
-            setTimeout(() => {
-                router.push(destination)
-                router.refresh()
-            }, 1000)
+            router.push(destination)
+            router.refresh()
         } else {
             setError("Đăng nhập tự động thất bại. Vui lòng đăng nhập thủ công.")
             setTimeout(() => {

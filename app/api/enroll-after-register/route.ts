@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     let effectivePhiCoc = course.phi_coc
 
-    if (course.type !== 'LIB') {
+    if (course.type !== 'LIB' && course.type !== 'SYS') {
       const vipEnrollment = await prisma.enrollment.findFirst({
         where: { userId: userIdNum, courseId: 1, status: 'ACTIVE' }
       })

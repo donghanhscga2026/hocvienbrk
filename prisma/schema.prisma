@@ -724,6 +724,28 @@ model BrkReferralBonus {
   @@map("brk_referral_bonus")
 }
 
+model BrkSystemLog {
+  id           Int      @id @default(autoincrement())
+  action       String   // 'MOVE_MEMBER'
+  onSystem     Int
+  sourceUserId Int
+  oldRefSysId  Int
+  newRefSysId  Int
+  oldChain     Json?
+  newChain     Json?
+  subtree      Json?
+  affectedCount Int     @default(0)
+  reason       String?
+  adminId      Int
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([action])
+  @@index([sourceUserId])
+  @@index([createdAt])
+  @@map("brk_system_log")
+}
+
 model TCAMember {
   id            Int       @id @default(autoincrement())
   tcaId         Int       @unique

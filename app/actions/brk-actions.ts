@@ -200,6 +200,38 @@ export async function getBrkRevenueShare(onSystem: number) {
   return getRevenueShareHistory(userId, onSystem)
 }
 
+export async function previewMoveMemberAction(
+  sourceUserId: number,
+  newReferrerUserId: number
+) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Unauthorized')
+  const admin = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { role: true } })
+  if (admin?.role !== 'ADMIN') throw new Error('Only admins can perform this action')
+
+  const { previewMove } = await import('@/lib/brk/tree-surgery-service')
+  return previewMove(sourceUserId, newReferrerUserId)
+}
+
+export async function moveBrkMemberAction(
+  sourceUserId: number,
+  newReferrerUserId: number,
+  reason: string
+) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Unauthorized')
+  const admin = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { role: true } })
+  if (admin?.role !== 'ADMIN') throw new Error('Only admins can perform this action')
+
+  const { moveBrkMember } = await import('@/lib/brk/tree-surgery-service')
+  const result = await moveBrkMember(sourceUserId, newReferrerUserId, reason, Number(session.user.id))
+
+  if (result.success) {
+    revalidatePath('/tools/brk')
+  }
+  return result
+}
+
 export async function getAvailableBrkSystems() {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
