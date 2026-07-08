@@ -386,6 +386,13 @@ function getEvalTime(year: number, month: number, day: number): Date {
   return new Date(Date.UTC(year, month, day - 1, 23, 8, 0));
 }
 
+// Returns the most recent 06:08 AM Vietnam time that is <= now
+function getCurrentEvalTime(): Date {
+  const now = new Date();
+  const todayEval = getEvalTime(now.getFullYear(), now.getMonth(), now.getDate());
+  return todayEval <= now ? todayEval : getEvalTime(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+}
+
 interface PendingMember {
   userId: number;
   activatedAt: Date;
@@ -469,6 +476,7 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
   }
 
   const sortedDays = Array.from(enrollByDay.keys());
+  const now = new Date();
   let processedCount = 0;
 
   const state: Map<number, StateItem> = new Map();
@@ -519,6 +527,7 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
 
     // 2. Process confirmations at 06:08 AM next day (Vietnam time)
     const evalTime = getEvalTime(Number(y), Number(m) - 1, Number(d) + 1);
+    if (evalTime > now) break; // Skip future evaluations — not yet confirmed in real life
     const due: PendingMember[] = [];
     const remaining: PendingMember[] = [];
 
@@ -576,21 +585,18 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
     }
   }
 
-  // 5. Final: process remaining pending members
+  // 5. Final: process remaining pending members whose 24h has passed by now
   if (pending.length > 0) {
-    const lastDay = sortedDays[sortedDays.length - 1];
-    const [d, m, y] = lastDay.split('/');
-    const finalEval = getEvalTime(Number(y), Number(m) - 1, Number(d) + 2);
-
     const due: PendingMember[] = [];
     for (const p of pending) {
-      if (p.activatedAt.getTime() + 24 * 60 * 60 * 1000 <= finalEval.getTime()) {
+      if (p.activatedAt.getTime() + 24 * 60 * 60 * 1000 <= now.getTime()) {
         due.push(p);
       }
     }
 
     if (due.length > 0) {
-      await processConfirmations(due, state, fee, finalEval);
+      const latestEval = getCurrentEvalTime();
+      await processConfirmations(due, state, fee, latestEval);
 
       let hasLevelUp = true;
       while (hasLevelUp) {
@@ -606,12 +612,12 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
               data: { level: nextConfig.level }
             });
             await prisma.brkLevelUpRecord.create({
-              data: { userId: st.userId, onSystem: 4, fromLevel: currentLvl, toLevel: nextConfig.level, promotedAt: finalEval }
+              data: { userId: st.userId, onSystem: 4, fromLevel: currentLvl, toLevel: nextConfig.level, promotedAt: latestEval }
             });
             if (nextConfig.gift > 0) {
               await creditVoucherWallet(st.userId, nextConfig.gift, 'VOUCHER_CREDIT',
                 `Quà tặng lên cấp ${nextConfig.level} (${nextConfig.gift.toLocaleString('vi')} VND)`,
-                finalEval
+                latestEval
               );
             }
           }
