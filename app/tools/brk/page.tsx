@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import BrkWalletCard from '@/components/brk/BrkWalletCard'
 import BrkLevelProgress from '@/components/brk/BrkLevelProgress'
 import BrkRevenueHistory from '@/components/brk/BrkRevenueHistory'
-import { getBrkDashboard, getAvailableBrkSystems, joinBrkSystem, cancelBrkMembership, getBrkRevenueShare, previewMoveMemberAction, moveBrkMemberAction } from '@/app/actions/brk-actions'
+import { getBrkDashboard, getAvailableBrkSystems, joinBrkSystem, cancelBrkMembership, getBrkRevenueShare, previewMoveMemberAction, moveBrkMemberAction, rebuildBrkSubtreeAction } from '@/app/actions/brk-actions'
 
 interface BrkSystemInfo {
   onSystem: number
@@ -73,13 +73,26 @@ interface MoveResult {
   warnings: string[]
 }
 
+interface RebuildSubtreeResult {
+  success: boolean
+  logId?: number
+  membersProcessed: number
+  details: {
+    reversedCount: number
+    creditedCount: number
+    levelsChecked: number
+    levelsChanged: number
+  }
+  warnings: string[]
+}
+
 export default function BrkDashboardPage() {
   const [walletBalance, setWalletBalance] = useState(0)
   const [systems, setSystems] = useState<BrkSystemInfo[]>([])
   const [availableSystems, setAvailableSystems] = useState<AvailableSystem[]>([])
   const [revenueAwards, setRevenueAwards] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'systems' | 'revenue' | 'move'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'systems' | 'revenue' | 'move' | 'rebuild'>('dashboard')
 
   const [sourceUserId, setSourceUserId] = useState('')
   const [newReferrerUserId, setNewReferrerUserId] = useState('')
@@ -90,6 +103,13 @@ export default function BrkDashboardPage() {
   const [executing, setExecuting] = useState(false)
   const [execResult, setExecResult] = useState<MoveResult | null>(null)
   const [execError, setExecError] = useState('')
+
+  const [rebuildParentUserId, setRebuildParentUserId] = useState('')
+  const [rebuildMemberIds, setRebuildMemberIds] = useState('')
+  const [rebuildReason, setRebuildReason] = useState('')
+  const [rebuildExecuting, setRebuildExecuting] = useState(false)
+  const [rebuildResult, setRebuildResult] = useState<RebuildSubtreeResult | null>(null)
+  const [rebuildError, setRebuildError] = useState('')
 
   useEffect(() => {
     loadData()
@@ -194,7 +214,7 @@ export default function BrkDashboardPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">BRK Affiliate</h1>
         <div className="flex gap-2 flex-wrap">
-          {(['dashboard', 'systems', 'revenue', 'move'] as const).map((tab) => (
+          {(['dashboard', 'systems', 'revenue', 'move', 'rebuild'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -202,7 +222,7 @@ export default function BrkDashboardPage() {
                 activeTab === tab ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {tab === 'dashboard' ? 'Tổng quan' : tab === 'systems' ? 'Hệ thống' : tab === 'revenue' ? 'Đồng chia' : 'Di chuyển'}
+              {tab === 'dashboard' ? 'Tổng quan' : tab === 'systems' ? 'Hệ thống' : tab === 'revenue' ? 'Đồng chia' : tab === 'move' ? 'Di chuyển' : 'Rebuild'}
             </button>
           ))}
         </div>
@@ -303,6 +323,96 @@ export default function BrkDashboardPage() {
 
       {activeTab === 'revenue' && (
         <BrkRevenueHistory awards={revenueAwards} />
+      )}
+
+      {activeTab === 'rebuild' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-gray-800">Rebuild Subtree (Sắp xếp lại cây)</h2>
+          <p className="text-sm text-gray-500">
+            Công cụ này cho phép admin đưa nhiều thành viên từ các nhánh khác nhau về dưới một parent, sắp xếp theo thứ tự thời gian kích hoạt.
+            Hữu ích khi cần sửa cây bị sai nhánh do lỗi placement.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Parent User ID</label>
+              <input
+                type="number"
+                value={rebuildParentUserId}
+                onChange={e => setRebuildParentUserId(e.target.value)}
+                placeholder="ID người bảo trợ chính"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member IDs (mỗi dòng / dấu phẩy một ID)</label>
+              <textarea
+                value={rebuildMemberIds}
+                onChange={e => setRebuildMemberIds(e.target.value)}
+                placeholder="834, 837, 703"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={async () => {
+              const parentId = Number(rebuildParentUserId)
+              const ids = rebuildMemberIds.split(/[\n,]+/).map(s => Number(s.trim())).filter(n => !isNaN(n) && n > 0)
+              if (!parentId) { setRebuildError('Vui lòng nhập Parent User ID'); return }
+              if (ids.length === 0) { setRebuildError('Vui lòng nhập ít nhất 1 Member ID'); return }
+              if (!rebuildReason.trim()) { setRebuildError('Vui lòng nhập lý do'); return }
+
+              const msg = `Xác nhận rebuild ${ids.length} thành viên dưới #${parentId}?\n\nThành viên: ${ids.join(', ')}\n\nHành động này sẽ:\n1. Đảo hoa hồng/BRKD từ tất cả ancestors cũ\n2. Detach các thành viên khỏi vị trí cũ\n3. Place lại theo thứ tự thời gian kích hoạt\n4. Credit hoa hồng/BRKD/BRKP cho ancestors mới\n5. Re-check levels\n\nKhông thể hoàn tác tự động!`
+              if (!confirm(msg)) return
+
+              setRebuildExecuting(true)
+              setRebuildError('')
+              setRebuildResult(null)
+              try {
+                const result = await rebuildBrkSubtreeAction(parentId, ids, rebuildReason)
+                setRebuildResult(result)
+              } catch (err: any) {
+                setRebuildError(err.message)
+              } finally {
+                setRebuildExecuting(false)
+              }
+            }}
+            disabled={rebuildExecuting}
+            className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm disabled:opacity-50"
+          >
+            {rebuildExecuting ? 'Đang thực hiện...' : 'Xác nhận Rebuild Subtree'}
+          </button>
+
+          {rebuildError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {rebuildError}
+            </div>
+          )}
+
+          {rebuildResult && (
+            <div className={`p-4 rounded-lg border text-sm ${rebuildResult.success ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+              <p className="font-semibold">{rebuildResult.success ? 'Rebuild thành công!' : 'Rebuild thất bại'}</p>
+              <ul className="mt-2 space-y-1">
+                <li>Members processed: {rebuildResult.membersProcessed}</li>
+                <li>Đảo (reverse): {rebuildResult.details.reversedCount}</li>
+                <li>Credit hoa hồng: {rebuildResult.details.creditedCount}</li>
+                <li>Level checked: {rebuildResult.details.levelsChecked}</li>
+                <li>Level changed: {rebuildResult.details.levelsChanged}</li>
+                {rebuildResult.logId && <li>Audit log ID: #{rebuildResult.logId}</li>}
+              </ul>
+              {rebuildResult.warnings.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer font-medium text-amber-700">Cảnh báo ({rebuildResult.warnings.length})</summary>
+                  <ul className="mt-1 list-disc pl-4 text-amber-600">
+                    {rebuildResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === 'move' && (

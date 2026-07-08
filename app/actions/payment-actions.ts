@@ -138,9 +138,26 @@ export async function verifyPaymentAction(
       })
       if (brkTree) {
         try {
-          const { activateBrkMember } = await import("@/lib/brk/activation-service")
+          const { activateBrkMember, getBrkPlacementChain } = await import("@/lib/brk/activation-service")
+          const { sendTelegramAdmin } = await import("@/lib/notifications")
           await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId)
           console.log(`[BRK] Activated user ${enrollment.userId} in system ${brkTree.onSystem}`)
+
+          const brkUser = await prisma.user.findUnique({ where: { id: enrollment.userId }, select: { name: true, phone: true } })
+          const placement = await getBrkPlacementChain(enrollment.userId, brkTree.onSystem)
+          let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
+            `👤 Học viên: <b>${brkUser?.name || 'N/A'}</b>\n` +
+            `📞 SĐT: ${brkUser?.phone || 'N/A'}\n` +
+            `🎓 Khóa học: <b>${enrollment.course.name_lop}</b>\n` +
+            `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+          if (placement.parentId) {
+            teleMsg += `\n📍 Vị trí: Dưới <b>#${placement.parentId} ${placement.parentName}</b>`
+            if (placement.chain.length > 1) {
+              const upline = placement.chain.slice(1).map(a => `#${a.userId} ${a.name}`).join(' → ')
+              teleMsg += `\n🔗 Tuyến trên: ${upline}`
+            }
+          }
+          await sendTelegramAdmin(teleMsg)
         } catch (brkErr) {
           console.error(`[BRK ERROR] Kích hoạt thành viên ${enrollment.userId} thất bại:`, brkErr)
         }
