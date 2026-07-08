@@ -1149,3 +1149,64 @@ Timestamp đúng 06:08 AM Vietnam mỗi ngày (không bị gộp vào now)
 - ✅ `cleanup()` không còn lỗi FK constraint
 - ✅ `npx tsc --noEmit` — 0 lỗi
 
+---
+
+## ✅ [2026-07-08] Fix future-dated level-up records + Cập nhật luồng live cho 24h cooling-off
+
+### Vấn đề 1: Level-up records ở tương lai (9/7, 10/7) khi rebuild
+- **Nguyên nhân**: `executeMethodB()` luôn tính `evalTime = D+1 06:08` cho mỗi ngày. Với ngày cuối (8/7), evalTime = 9/7 06:08 trong tương lai. Final block dùng `lastDay+2 06:08` = 10/7.
+- **Fix** (`rebuild-service.ts`):
+  - Thêm `getCurrentEvalTime()` helper: trả về mốc 06:08 gần nhất ≤ `now`
+  - Main loop: `if (evalTime > now) break;` — chỉ tạo system record, skip confirmations cho eval tương lai
+  - Final block: dùng `now.getTime()` làm cutoff, `getCurrentEvalTime()` làm timestamp
+
+### Vấn đề 2: Luồng live chưa cập nhật 24h cooling-off
+Tất cả các luồng thực tế (auto-verify, duyệt tay, cron) vẫn trả hoa hồng/điểm ngay lập tức.
+
+#### `lib/brk/wallet-service.ts`
+- Thêm `createdAt?: Date` vào tất cả credit functions (`creditBrkWallet`, `creditBrkdWallet`, `creditVoucherWallet`)
+- Pass xuống `creditBalance()` → dùng trong `Prisma.brkTransaction.create`
+
+#### `lib/brk/activation-service.ts`
+- `activateBrkMember()`: thêm `activatedAt?: Date` param
+- Nếu Method B: chỉ tạo system record (với `totalPoints: BRKP_PER_ACTIVATION`) + closure + wallet. **Không** commissions/points/level-up/2F1 voucher
+- Nếu Method A: behavior cũ (immediate)
+- `processGracePeriodExpirations()`: skip nếu Method B (xử lý bởi `brk-daily-eval`)
+
+#### `lib/brk/commission-calculator.ts`
+- `distributeCommission()`: thêm `createdAt?: Date` param, pass xuống wallet functions
+
+#### `lib/brk/level-manager.ts`
+- `checkAndPromoteLevel()`: thêm `promotedAt?: Date`, dùng trong `brkLevelUpRecord.create` và `creditVoucherWallet`
+- `create2F1Voucher()`: thêm `createdAt?: Date`, pass xuống `creditVoucherWallet`
+
+#### `lib/brk/revenue-share-service.ts`
+- `processRevenueShareForSystem()`: thêm `distributedAt?: Date` param
+- Dùng `distDate` thay `now` cho periodStart/periodEnd/distributedAt timestamps
+- Thêm `gracePeriodEnd: { lt: distDate }` filter khi Method B
+- Đổi `lte` → `lt` cho activatedAt filter
+
+#### `app/api/cron/brk-daily-eval/route.ts` (Tạo mới)
+- Cron chạy 06:08 daily
+- Tìm members Method B có `gracePeriodEnd < now` chưa được confirm (chưa có RETURN_FEE transaction)
+- Gọi `distributeCommission()` → trả commissions + BRKP cho ancestors
+- Return fee 21% + BRKD return
+- 2F1 voucher cho referrer
+- Level-up check cho member + ancestors
+
+#### `app/api/cron/brk-level-check/route.ts`
+- Method B: skip members có `gracePeriodEnd > now` (chưa confirm)
+
+#### `vercel.json`
+- Thêm cron `brk-daily-eval` tại `8 6 * * *` (06:08 daily)
+- Chuyển `brk-grace-processing`, `brk-level-check`, `brk-revenue-share` về múc 06:08
+
+### Trạng thái
+- ✅ Rebuild không còn future-dated records
+- ✅ Live `activateBrkMember` defer commissions cho Method B
+- ✅ `brk-daily-eval` cron xử lý confirmations + return + level-up
+- ✅ Revenue share filter `gracePeriodEnd < distDate`
+- ✅ `brk-level-check` skip unconfirmed Method B members
+- ✅ All credit functions support `createdAt?: Date`
+- ✅ `npx tsc --noEmit` — 0 lỗi
+

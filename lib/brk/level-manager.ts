@@ -5,7 +5,7 @@ import { getLevelConfig, getAllLevelConfigs } from './config-service'
 import { validateBranchRequirements } from './branch-validator'
 import { creditVoucherWallet } from './wallet-service'
 
-export async function checkAndPromoteLevel(userId: number, onSystem: number) {
+export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -36,6 +36,7 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number) {
         onSystem,
         fromLevel: currentLevel - 1,
         toLevel: currentLevel,
+        promotedAt,
       }
     }).catch(() => {})
 
@@ -44,7 +45,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number) {
         userId,
         nextConfig.giftValue,
         `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue} VND)`,
-        `level_${currentLevel}_sys_${onSystem}`
+        `level_${currentLevel}_sys_${onSystem}`,
+        promotedAt
       )
     }
   }
@@ -152,7 +154,7 @@ export async function getLevelProgress(userId: number, onSystem: number) {
   }
 }
 
-export async function create2F1Voucher(userId: number, onSystem: number) {
+export async function create2F1Voucher(userId: number, onSystem: number, createdAt?: Date) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -182,7 +184,8 @@ export async function create2F1Voucher(userId: number, onSystem: number) {
     userId,
     386_000,
     `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
-    `referral_2f1_sys_${onSystem}`
+    `referral_2f1_sys_${onSystem}`,
+    createdAt
   )
 
   return bonus

@@ -12,7 +12,8 @@ export async function distributeCommission(
   newMemberUserId: number,
   onSystem: number,
   fee: number,
-  systemTree: SystemTree
+  systemTree: SystemTree,
+  createdAt?: Date
 ) {
   const newMemberSys = await prisma.system.findUnique({
     where: { userId_onSystem: { userId: newMemberUserId, onSystem } }
@@ -63,7 +64,8 @@ export async function distributeCommission(
         commissionAmount,
         'COMMISSION',
         `Hoa hồng cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
-        `sys_${onSystem}_member_${newMemberUserId}`
+        `sys_${onSystem}_member_${newMemberUserId}`,
+        createdAt
       )
     }
 
@@ -73,7 +75,8 @@ export async function distributeCommission(
         uplineSystem.userId,
         brkdAmount,
         `BRKD cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
-        `sys_${onSystem}_member_${newMemberUserId}`
+        `sys_${onSystem}_member_${newMemberUserId}`,
+        createdAt
       )
     }
   }

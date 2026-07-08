@@ -23,7 +23,8 @@ async function creditBalance(
   balanceType: BalanceType,
   type: BrkTransactionType,
   description: string,
-  refId?: string
+  refId?: string,
+  createdAt?: Date
 ) {
   const wallet = await ensureBrkWallet(userId)
   const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : 'balance'
@@ -51,6 +52,7 @@ async function creditBalance(
         balanceType,
         balanceBefore: oldVal,
         balanceAfter: newVal,
+        createdAt,
       }
     })
   ])
@@ -63,27 +65,30 @@ export async function creditBrkWallet(
   amount: number,
   type: BrkTransactionType,
   description: string,
-  refId?: string
+  refId?: string,
+  createdAt?: Date
 ) {
-  return creditBalance(userId, amount, 'CASH', type, description, refId)
+  return creditBalance(userId, amount, 'CASH', type, description, refId, createdAt)
 }
 
 export async function creditBrkdWallet(
   userId: number,
   amount: number,
   description: string,
-  refId?: string
+  refId?: string,
+  createdAt?: Date
 ) {
-  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId)
+  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId, createdAt)
 }
 
 export async function creditVoucherWallet(
   userId: number,
   amount: number,
   description: string,
-  refId?: string
+  refId?: string,
+  createdAt?: Date
 ) {
-  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId)
+  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt)
 }
 
 export async function debitBrkWallet(

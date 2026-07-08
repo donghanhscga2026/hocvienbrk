@@ -9,13 +9,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
+    const isOptionB = promoConfig?.value === 'B'
+
     const activeMembers = await prisma.system.findMany({
       where: { status: 'ACTIVE' }
     })
 
     let promoted = 0
+    const now = new Date()
     for (const member of activeMembers) {
-      const result = await checkAndPromoteLevel(member.userId, member.onSystem)
+      // For Method B, skip members whose grace period hasn't ended (not yet confirmed)
+      if (isOptionB && member.gracePeriodEnd && member.gracePeriodEnd > now) continue
+
+      const result = await checkAndPromoteLevel(member.userId, member.onSystem, now)
       if (result) promoted++
     }
 

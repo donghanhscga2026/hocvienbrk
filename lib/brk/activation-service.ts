@@ -14,6 +14,7 @@ export async function activateBrkMember(
   userId: number,
   onSystem: number,
   enrollmentReferrerId?: number | null,
+  activatedAt?: Date,
 ) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
   if (!systemTree) throw new Error('System not found')
@@ -21,8 +22,9 @@ export async function activateBrkMember(
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error('User not found')
 
-  const now = new Date()
-  const graceEnd = new Date(now.getTime() + systemTree.graceDays * 24 * 60 * 60 * 1000)
+  const now = activatedAt || new Date()
+  const graceDays = systemTree.graceDays || 1
+  const graceEnd = new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000)
   const expiresAt = new Date(now.getTime() + systemTree.durationDays * 24 * 60 * 60 * 1000)
   const fee = Number(systemTree.fee)
 
@@ -58,6 +60,7 @@ export async function activateBrkMember(
       gracePeriodEnd: graceEnd,
       expiresAt,
       level: 1,
+      totalPoints: BRKP_PER_ACTIVATION,
     }
   })
 
@@ -65,26 +68,23 @@ export async function activateBrkMember(
 
   await ensureBrkWallet(userId)
 
-  // BRKP for self-activation
-  await prisma.system.update({
-    where: { autoId: system.autoId },
-    data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
-  })
-
-
-  // Distribute commissions to ancestors
-  await distributeCommission(userId, onSystem, fee, systemTree)
-
-  // Check level-up
+  // Check if Method B (24h cooling-off — defer commissions/points)
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
-  if (!isOptionB) {
-    await checkAndPromoteLevel(userId, onSystem)
+  if (isOptionB) {
+    // System record + wallet + self points created. Commissions to ancestors,
+    // ancestor points, return fee, 2F1 voucher, and level-up will be processed
+    // by brk-daily-eval cron after gracePeriodEnd passes.
+    return system
   }
 
-  // Check 2F1 voucher for the referrer
+  // Method A: immediate commissions + points + level-up + 2F1 voucher
+  await distributeCommission(userId, onSystem, fee, systemTree, now)
+
+  await checkAndPromoteLevel(userId, onSystem, now)
+
   if (refSysId > 0) {
-    await create2F1Voucher(refSysId, onSystem)
+    await create2F1Voucher(refSysId, onSystem, now)
   }
 
   return system
@@ -208,6 +208,11 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
 
 export async function processGracePeriodExpirations() {
   const now = new Date()
+
+  // Skip processing if the system uses Method B (24h cooling-off is handled by brk-daily-eval cron)
+  const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
+  if (promoConfig?.value === 'B') return { processed: 0, reason: 'Method B active, skipping grace processing' }
+
   const expiredGrace = await prisma.system.findMany({
     where: {
       status: 'ACTIVE',
