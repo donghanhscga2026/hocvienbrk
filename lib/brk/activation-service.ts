@@ -90,6 +90,56 @@ export async function activateBrkMember(
   return system
 }
 
+export async function getBrkPlacementChain(
+  userId: number,
+  onSystem: number
+): Promise<{
+  parentName: string | null;
+  parentId: number | null;
+  chain: { userId: number; name: string; depth: number }[];
+}> {
+  const systemRecord = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId, onSystem } }
+  })
+  if (!systemRecord || !systemRecord.refSysId) {
+    return { parentName: null, parentId: null, chain: [] }
+  }
+
+  const ancestorClosures = await prisma.systemClosure.findMany({
+    where: { descendantId: systemRecord.autoId, systemId: onSystem, depth: { gt: 0 } },
+    orderBy: { depth: 'asc' }
+  })
+
+  const ancestorIds = ancestorClosures.map(a => a.ancestorId)
+  if (ancestorIds.length === 0) return { parentName: null, parentId: null, chain: [] }
+
+  const ancestorSystems = await prisma.system.findMany({
+    where: { autoId: { in: ancestorIds }, onSystem }
+  })
+  const ancestorUserIds = ancestorSystems.map(s => s.userId)
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: ancestorUserIds } },
+    select: { id: true, name: true }
+  })
+  const nameMap = new Map(users.map(u => [u.id, u.name?.trim() || 'N/A']))
+
+  const chain = ancestorClosures
+    .map(c => {
+      const sys = ancestorSystems.find(s => s.autoId === c.ancestorId)
+      if (!sys) return null
+      return { userId: sys.userId, name: nameMap.get(sys.userId) || 'N/A', depth: c.depth }
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+
+  const parent = chain.length > 0 ? chain[0] : null
+  return {
+    parentName: parent?.name || null,
+    parentId: parent?.userId || null,
+    chain
+  }
+}
+
 export async function cancelBrkMemberWithinGrace(userId: number, onSystem: number) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }

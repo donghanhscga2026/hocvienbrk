@@ -272,14 +272,24 @@ export async function processPaymentEmails() {
             });
 
             // [BRK ACTIVATION]
+            let brkPlacementMsg = '';
             const brkConfig = await prisma.autoVerifyConfig.findUnique({
               where: { courseId: enrollment.courseId }
             });
             if (brkConfig?.enabled && brkConfig.onSystem != null) {
               try {
-                const { activateBrkMember } = await import("@/lib/brk/activation-service");
-                await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId);
+                const { activateBrkMember, getBrkPlacementChain } = await import("@/lib/brk/activation-service");
+                const brkSystem = await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId);
                 console.log(`  ✅ BRK activated for user#${enrollment.userId} on system ${brkConfig.onSystem}`);
+
+                const placement = await getBrkPlacementChain(enrollment.userId, brkConfig.onSystem);
+                if (placement.parentId) {
+                  brkPlacementMsg = `📍 Vị trí: Dưới <b>#${placement.parentId} ${placement.parentName}</b>\n`;
+                  if (placement.chain.length > 1) {
+                    const upline = placement.chain.slice(1).map(a => `#${a.userId} ${a.name}`).join(' → ');
+                    brkPlacementMsg += `🔗 Tuyến trên: ${upline}\n`;
+                  }
+                }
               } catch (err) {
                 console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);
               }
@@ -298,7 +308,8 @@ export async function processPaymentEmails() {
               `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
               `💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
               `🏦 Ngân hàng: Sacombank\n` +
-              `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+              `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n` +
+              brkPlacementMsg;
             await sendTelegramAdmin(msgAdmin);
 
             // Activation email

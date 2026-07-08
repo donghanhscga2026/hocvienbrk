@@ -512,3 +512,227 @@ export async function moveBrkMember(
 
   return result
 }
+
+export interface RebuildSubtreeResult {
+  success: boolean
+  logId?: number
+  membersProcessed: number
+  details: {
+    reversedCount: number
+    creditedCount: number
+    levelsChecked: number
+    levelsChanged: number
+  }
+  warnings: string[]
+}
+
+export async function rebuildSubtree(
+  parentUserId: number,
+  memberUserIds: number[],
+  reason: string,
+  adminId: number,
+  onSystem: number = ON_SYSTEM
+): Promise<RebuildSubtreeResult> {
+  const result: RebuildSubtreeResult = {
+    success: false,
+    membersProcessed: 0,
+    details: { reversedCount: 0, creditedCount: 0, levelsChecked: 0, levelsChanged: 0 },
+    warnings: []
+  }
+
+  const parentSys = await getSystemRecord(parentUserId)
+  if (!parentSys) { result.warnings.push('Parent user not found'); return result }
+  if (parentSys.status !== 'ACTIVE') { result.warnings.push('Parent not active'); return result }
+
+  const memberSystems: { userId: number; autoId: number; refSysId: number; activatedAt: Date | null }[] = []
+  for (const uid of [...new Set(memberUserIds)]) {
+    const sys = await prisma.system.findUnique({
+      where: { userId_onSystem: { userId: uid, onSystem } },
+      select: { autoId: true, refSysId: true, activatedAt: true, status: true }
+    })
+    if (!sys || sys.status !== 'ACTIVE') {
+      result.warnings.push(`Member #${uid} not found or not active, skipping`)
+      continue
+    }
+    // Check circular: parent cannot be a descendant of any member being moved
+    const closures = await prisma.systemClosure.findFirst({
+      where: { ancestorId: sys.autoId, descendantId: parentSys.autoId, depth: { gte: 1 }, systemId: onSystem }
+    })
+    if (closures) {
+      result.warnings.push(`Cannot rebuild: #${parentUserId} is a descendant of #${uid} (circular)`)
+      return result
+    }
+    memberSystems.push({ userId: uid, autoId: sys.autoId, refSysId: sys.refSysId, activatedAt: sys.activatedAt })
+  }
+
+  if (memberSystems.length === 0) { result.warnings.push('No valid members to process'); return result }
+
+  // ===== PHASE 1: REVERSE & DETACH ALL =====
+  const allOldAncestorIds = new Set<number>()
+  let reversedCount = 0
+
+  for (const ms of memberSystems) {
+    const oldAncestors = await getAncestorUserIds(ms.autoId)
+    const oldAncestorUserIds = oldAncestors.map(a => a.userId)
+    for (const aid of oldAncestorUserIds) allOldAncestorIds.add(aid)
+
+    // Reverse commissions
+    const commissions = await getCommissionTransactionsForMember(ms.userId, oldAncestorUserIds)
+    for (const comm of commissions) {
+      const { debited, shortfall } = await reversalDebit(
+        comm.ancestorId,
+        comm.amount,
+        `Đảo hoa hồng từ #${ms.userId} (rebuild subtree: ${reason})`,
+        'CASH'
+      )
+      if (shortfall > 0) {
+        result.warnings.push(`User #${comm.ancestorId}: shortfall ${shortfall}đ khi đảo hoa hồng từ #${ms.userId}`)
+      }
+      reversedCount++
+    }
+
+    // Reverse BRKD
+    const brkdTxs = await getBrkdTransactionsForMember(ms.userId, oldAncestorUserIds)
+    for (const bt of brkdTxs) {
+      await reversalDebit(
+        bt.ancestorId,
+        bt.amount,
+        `Đảo BRKD từ #${ms.userId} (rebuild subtree: ${reason})`,
+        'BRKD'
+      )
+      reversedCount++
+    }
+
+    // Deduct BRKP from all old ancestors
+    for (const ancestorId of oldAncestorUserIds) {
+      const ancSys = await getSystemRecord(ancestorId)
+      if (ancSys) {
+        const newTotal = Math.max(0, Number(ancSys.totalPoints) - BRKP_PER_ACTIVATION)
+        await prisma.system.update({
+          where: { autoId: ancSys.autoId },
+          data: { totalPoints: newTotal }
+        })
+      }
+    }
+
+    // Detach: delete closure entries (depth ≥ 1) and reset refSysId
+    await prisma.systemClosure.deleteMany({
+      where: { descendantId: ms.autoId, depth: { gte: 1 }, systemId: onSystem }
+    })
+    await prisma.system.update({
+      where: { autoId: ms.autoId },
+      data: { refSysId: 0 }
+    })
+  }
+
+  result.details.reversedCount = reversedCount
+
+  // ===== PHASE 2: PLACE & CREDIT CHRONOLOGICALLY =====
+  memberSystems.sort((a, b) => (a.activatedAt || new Date(0)).getTime() - (b.activatedAt || new Date(0)).getTime())
+
+  const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
+  if (!systemTree) { result.warnings.push('SystemTree not found'); return result }
+  const fee = Number(systemTree.fee ?? 26868)
+
+  const allNewAncestorIds = new Set<number>()
+  let creditedCount = 0
+
+  const { distributeCommission } = await import('./commission-calculator')
+
+  for (const ms of memberSystems) {
+    const refSysId = await resolvePlacement(onSystem, parentUserId)
+
+    await prisma.system.update({
+      where: { autoId: ms.autoId },
+      data: { refSysId }
+    })
+
+    await addUserToSystemClosure(ms.userId, refSysId, onSystem)
+
+    // Track new chain ancestors
+    const newSys = await prisma.system.findUnique({ where: { autoId: ms.autoId }, select: { autoId: true } })
+    if (newSys) {
+      const newAncestors = await getAncestorUserIds(newSys.autoId)
+      for (const a of newAncestors) allNewAncestorIds.add(a.userId)
+    }
+
+    try {
+      await distributeCommission(ms.userId, onSystem, fee, systemTree)
+      creditedCount++
+    } catch (err) {
+      result.warnings.push(`distributeCommission thất bại cho #${ms.userId}: ${err}`)
+    }
+  }
+
+  result.details.creditedCount = creditedCount
+  result.membersProcessed = memberSystems.length
+
+  // ===== PHASE 3: RE-CHECK LEVELS =====
+  const allAffectedUserIds = [...new Set([...allOldAncestorIds, ...allNewAncestorIds, ...memberSystems.map(m => m.userId)])]
+  const allLevelConfigs = await getAllLevelConfigs(onSystem)
+
+  let levelsChanged = 0
+  for (const affectedId of allAffectedUserIds) {
+    const sys = await getSystemRecord(affectedId)
+    if (!sys) continue
+    result.details.levelsChecked++
+
+    const currentPoints = Number(sys.totalPoints)
+    const currentLevel = sys.level
+
+    // Find highest qualified level
+    let highestQualified = 0
+    for (const cfg of allLevelConfigs) {
+      if (currentPoints >= Number(cfg.pointsRequired)) {
+        highestQualified = cfg.level
+      }
+    }
+
+    if (highestQualified < currentLevel) {
+      await prisma.system.update({
+        where: { autoId: sys.autoId },
+        data: { level: Math.max(1, highestQualified) }
+      })
+      await prisma.brkLevelUpRecord.deleteMany({
+        where: { userId: affectedId, onSystem, toLevel: { gt: highestQualified } }
+      })
+      levelsChanged++
+    } else if (highestQualified > currentLevel) {
+      const { checkAndPromoteLevel } = await import('./level-manager')
+      try {
+        await checkAndPromoteLevel(affectedId, onSystem)
+        levelsChanged++
+      } catch { }
+    }
+  }
+
+  result.details.levelsChanged = levelsChanged
+
+  // ===== PHASE 4: AUDIT LOG =====
+  const log = await prisma.brkSystemLog.create({
+    data: {
+      action: 'REBUILD_SUBTREE',
+      onSystem,
+      sourceUserId: parentUserId,
+      oldRefSysId: 0,
+      newRefSysId: 0,
+      oldChain: [],
+      newChain: [],
+      subtree: memberSystems.map(m => m.userId),
+      affectedCount: memberSystems.length,
+      reason,
+      adminId,
+      metadata: JSON.parse(JSON.stringify({
+        memberCount: memberSystems.length,
+        totalOldAncestors: allOldAncestorIds.size,
+        totalNewAncestors: allNewAncestorIds.size,
+        sortOrder: memberSystems.map(m => ({ userId: m.userId, activatedAt: m.activatedAt?.toISOString() }))
+      }))
+    }
+  })
+
+  result.logId = log.id
+  result.success = true
+
+  return result
+}

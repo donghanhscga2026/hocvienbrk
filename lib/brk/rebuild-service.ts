@@ -393,6 +393,10 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
     autoId: number;
   }
   const state: Map<number, StateItem> = new Map();
+  let daysProcessed = 0;
+  let currentPeriodStart: Date | null = null;
+  let periodNumber = 1;
+  const SHARE_PCT = Number(systemTree.revenueSharePct || 2.0);
 
   for (const day of sortedDays) {
     const dayEnrollments = enrollByDay.get(day)!;
@@ -509,13 +513,14 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
       }
     }
 
-    // Chia đồng chia Kỳ 1 (từ 02/07/2026 đến 05/07/2026) cho Method B khi kết thúc xử lý ngày 04/07
-    if (day === '4/7/2026') {
-      const period1Start = new Date(2026, 6, 2, 0, 0, 0); // 02/07/2026
-      const period1End = new Date(2026, 6, 5, 0, 0, 0); // 05/07/2026
-      const sharePct = Number(systemTree.revenueSharePct || 2.0);
-      const distributedAt = new Date(2026, 6, 5, 1, 0, 0); // 05/07/2026 01:00:00
-      await distributeRevenueSharePeriod(4, period1Start, period1End, 1, fee, sharePct, distributedAt);
+    daysProcessed++;
+    if (!currentPeriodStart) currentPeriodStart = new Date(Number(y), Number(m) - 1, Number(d));
+
+    if (daysProcessed % 3 === 0) {
+      const periodEnd = new Date(Number(y), Number(m) - 1, Number(d) + 1);
+      const distributedAt = new Date(Number(y), Number(m) - 1, Number(d) + 1, 1, 0, 0);
+      await distributeRevenueSharePeriod(4, currentPeriodStart, periodEnd, periodNumber++, fee, SHARE_PCT, distributedAt);
+      currentPeriodStart = new Date(Number(y), Number(m) - 1, Number(d) + 1);
     }
   }
 }

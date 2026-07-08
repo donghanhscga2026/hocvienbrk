@@ -232,6 +232,25 @@ export async function moveBrkMemberAction(
   return result
 }
 
+export async function rebuildBrkSubtreeAction(
+  parentUserId: number,
+  memberIds: number[],
+  reason: string
+) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error('Unauthorized')
+  const admin = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { role: true } })
+  if (admin?.role !== 'ADMIN') throw new Error('Only admins can perform this action')
+
+  const { rebuildSubtree } = await import('@/lib/brk/tree-surgery-service')
+  const result = await rebuildSubtree(parentUserId, memberIds, reason, Number(session.user.id))
+
+  if (result.success) {
+    revalidatePath('/tools/brk')
+  }
+  return result
+}
+
 export async function getAvailableBrkSystems() {
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
