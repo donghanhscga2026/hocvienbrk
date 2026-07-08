@@ -15,10 +15,12 @@ const LEVEL_CONFIGS = [
 ];
 
 async function cleanup() {
-  const userIds = (await prisma.system.findMany({
+  const systems = await prisma.system.findMany({
     where: { onSystem: 4 },
-    select: { userId: true }
-  })).map(r => r.userId);
+    select: { autoId: true, userId: true }
+  });
+  const userIds = systems.map(r => r.userId);
+  const autoIds = systems.map(r => r.autoId);
 
   if (userIds.length === 0) return;
 
@@ -30,7 +32,12 @@ async function cleanup() {
     where: { systemId: 4 }
   });
 
-  await prisma.systemClosure.deleteMany({ where: { systemId: 4 } });
+  // Delete systemClosure by ancestorId/descendantId (FK to System.autoId), not by systemId
+  if (autoIds.length > 0) {
+    await prisma.systemClosure.deleteMany({
+      where: { OR: [{ ancestorId: { in: autoIds } }, { descendantId: { in: autoIds } }] }
+    });
+  }
   await prisma.brkLevelUpRecord.deleteMany({ where: { onSystem: 4 } });
   await prisma.brkReferralBonus.deleteMany({ where: { onSystem: 4 } });
 
@@ -54,21 +61,24 @@ async function distributeRevenueSharePeriod(
   sharePct: number,
   distributedAt?: Date
 ) {
+  const distDate = distributedAt || periodEnd;
+
   const newActivations = await prisma.system.findMany({
     where: {
       onSystem,
       status: 'ACTIVE',
       activatedAt: {
         gte: periodStart,
-        lte: periodEnd
+        lt: periodEnd
+      },
+      gracePeriodEnd: {
+        lt: distDate
       }
     }
   });
 
   const totalRevenue = newActivations.length * fee;
   const poolAmount = (totalRevenue * sharePct) / 100;
-
-  const distDate = distributedAt || periodEnd;
 
   if (totalRevenue <= 0) {
     await prisma.brkRevenuePool.create({
@@ -309,10 +319,10 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
 
       if (earnPct > 0) {
         const commAmt = (fee * earnPct) / 100;
-        await creditBrkWallet(upSys.userId, commAmt, 'COMMISSION', `Hoa hồng cấp ${upSys.level} (${earnPct}%) từ thành viên mới #${userId}`);
+        await creditBrkWallet(upSys.userId, commAmt, 'COMMISSION', `Hoa hồng cấp ${upSys.level} (${earnPct}%) từ thành viên mới #${userId}`, activatedAt);
 
         const brkdAmt = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100);
-        await creditBrkdWallet(upSys.userId, brkdAmt, 'BRKD_CREDIT', `BRKD cấp ${upSys.level} (${earnPct}%) từ thành viên mới #${userId}`);
+        await creditBrkdWallet(upSys.userId, brkdAmt, 'BRKD_CREDIT', `BRKD cấp ${upSys.level} (${earnPct}%) từ thành viên mới #${userId}`, activatedAt);
 
         previousPct = Math.max(previousPct, upConfig.pct);
       }
@@ -343,7 +353,7 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
           });
 
           if (nextConfig.gift > 0) {
-            await creditVoucherWallet(sysToCheck.userId, nextConfig.gift, 'VOUCHER_CREDIT', `Quà tặng lên cấp ${nextConfig.level} (${nextConfig.gift.toLocaleString('vi')} VND)`);
+            await creditVoucherWallet(sysToCheck.userId, nextConfig.gift, 'VOUCHER_CREDIT', `Quà tặng lên cấp ${nextConfig.level} (${nextConfig.gift.toLocaleString('vi')} VND)`, activatedAt);
           }
           hasLevelUp = true;
         }
@@ -357,10 +367,10 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
   for (const m of activeMembers) {
     if (m.activatedAt && new Date(m.activatedAt.getTime() + 3 * 24 * 60 * 60 * 1000) <= now) {
       const cashbackAmt = (fee * 21) / 100;
-      await creditBrkWallet(m.userId, cashbackAmt, 'RETURN_FEE', `Hoàn 21% phí tham gia sau 3 ngày cân nhắc`);
+        await creditBrkWallet(m.userId, cashbackAmt, 'RETURN_FEE', `Hoàn 21% phí tham gia sau 3 ngày cân nhắc`, new Date(m.activatedAt.getTime() + 3 * 24 * 60 * 60 * 1000));
 
       const brkdAmt = Math.round((BRKD_PER_ACTIVATION * 21) / 100);
-      await creditBrkdWallet(m.userId, brkdAmt, 'BRKD_CREDIT', `BRKD hoàn 21% sau 3 ngày cân nhắc`);
+        await creditBrkdWallet(m.userId, brkdAmt, 'BRKD_CREDIT', `BRKD hoàn 21% sau 3 ngày cân nhắc`, new Date(m.activatedAt.getTime() + 3 * 24 * 60 * 60 * 1000));
     }
   }
 
@@ -369,6 +379,82 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
   const period1End = new Date(2026, 6, 5, 0, 0, 0); // 05/07/2026
   const sharePct = Number(systemTree.revenueSharePct || 2.0);
   await distributeRevenueSharePeriod(4, period1Start, period1End, 1, fee, sharePct);
+}
+
+// 06:08 AM Vietnam (UTC+7) = 23:08 UTC previous day
+function getEvalTime(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month, day - 1, 23, 8, 0));
+}
+
+interface PendingMember {
+  userId: number;
+  activatedAt: Date;
+  refSysId: number;
+}
+
+interface StateItem {
+  userId: number;
+  level: number;
+  points: number;
+  refSysId: number;
+  autoId: number;
+}
+
+async function processConfirmations(
+  due: PendingMember[],
+  state: Map<number, StateItem>,
+  fee: number,
+  evalTime: Date
+) {
+  for (const member of due) {
+    let currentRef = member.refSysId;
+    let previousPct = 21;
+
+    while (currentRef > 0) {
+      const upState = state.get(currentRef);
+      if (!upState) break;
+
+      upState.points += BRKP_PER_ACTIVATION;
+      await prisma.system.update({
+        where: { autoId: upState.autoId },
+        data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
+      });
+
+      const upConfig = LEVEL_CONFIGS.find(c => c.level === upState.level) || LEVEL_CONFIGS[0];
+      const earnPct = upConfig.pct - previousPct;
+
+      if (earnPct > 0) {
+        const commAmt = (fee * earnPct) / 100;
+        await creditBrkWallet(currentRef, commAmt, 'COMMISSION',
+          `Hoa hồng cấp ${upState.level} (${earnPct}%) từ thành viên mới #${member.userId}`,
+          evalTime
+        );
+
+        const brkdAmt = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100);
+        await creditBrkdWallet(currentRef, brkdAmt, 'BRKD_CREDIT',
+          `BRKD cấp ${upState.level} (${earnPct}%) từ thành viên mới #${member.userId}`,
+          evalTime
+        );
+
+        previousPct = Math.max(previousPct, upConfig.pct);
+      }
+
+      currentRef = upState.refSysId;
+    }
+
+    // Return fee 21% after 24h cooling-off
+    const cashbackAmt = (fee * 21) / 100;
+    await creditBrkWallet(member.userId, cashbackAmt, 'RETURN_FEE',
+      `Hoàn 21% phí tham gia sau 1 ngày cân nhắc`,
+      evalTime
+    );
+
+    const brkdAmt2 = Math.round((BRKD_PER_ACTIVATION * 21) / 100);
+    await creditBrkdWallet(member.userId, brkdAmt2, 'BRKD_CREDIT',
+      `BRKD hoàn 21% sau 1 ngày cân nhắc`,
+      evalTime
+    );
+  }
 }
 
 async function executeMethodB(enrollments: any[], systemTree: any, fee: number) {
@@ -385,14 +471,8 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
   const sortedDays = Array.from(enrollByDay.keys());
   let processedCount = 0;
 
-  interface StateItem {
-    userId: number;
-    level: number;
-    points: number;
-    refSysId: number;
-    autoId: number;
-  }
   const state: Map<number, StateItem> = new Map();
+  const pending: PendingMember[] = [];
   let daysProcessed = 0;
   let currentPeriodStart: Date | null = null;
   let periodNumber = 1;
@@ -400,7 +480,9 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
 
   for (const day of sortedDays) {
     const dayEnrollments = enrollByDay.get(day)!;
+    const [d, m, y] = day.split('/');
 
+    // 1. Process day D enrollments (no commissions/points yet)
     for (const enrollment of dayEnrollments) {
       const userId = enrollment.userId;
       const activatedAt = enrollment.payment?.transferTime || enrollment.payment?.verifiedAt || enrollment.createdAt;
@@ -432,40 +514,28 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
       await addUserToSystemClosure(userId, refSysId, 4);
       await ensureWallet(userId);
 
-      let currentRef = refSysId;
-      let previousPct = 21;
-
-      while (currentRef > 0) {
-        const upState = state.get(currentRef);
-        if (!upState) break;
-
-        upState.points += BRKP_PER_ACTIVATION;
-        await prisma.system.update({
-          where: { autoId: upState.autoId },
-          data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
-        });
-
-        const upConfig = LEVEL_CONFIGS.find(c => c.level === upState.level) || LEVEL_CONFIGS[0];
-        const earnPct = upConfig.pct - previousPct;
-
-        if (earnPct > 0) {
-          const commAmt = (fee * earnPct) / 100;
-          await creditBrkWallet(currentRef, commAmt, 'COMMISSION', `Hoa hồng cấp ${upState.level} (${earnPct}%) từ thành viên mới #${userId}`);
-
-          const brkdAmt = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100);
-          await creditBrkdWallet(currentRef, brkdAmt, 'BRKD_CREDIT', `BRKD cấp ${upState.level} (${earnPct}%) từ thành viên mới #${userId}`);
-
-          previousPct = Math.max(previousPct, upConfig.pct);
-        }
-
-        currentRef = upState.refSysId;
-      }
+      pending.push({ userId, activatedAt, refSysId });
     }
 
-    let hasLevelUp = true;
-    const [d, m, y] = day.split('/');
-    const nextDayMidnight = new Date(Number(y), Number(m) - 1, Number(d) + 1, 0, 0, 0);
+    // 2. Process confirmations at 06:08 AM next day (Vietnam time)
+    const evalTime = getEvalTime(Number(y), Number(m) - 1, Number(d) + 1);
+    const due: PendingMember[] = [];
+    const remaining: PendingMember[] = [];
 
+    for (const p of pending) {
+      if (p.activatedAt.getTime() + 24 * 60 * 60 * 1000 <= evalTime.getTime()) {
+        due.push(p);
+      } else {
+        remaining.push(p);
+      }
+    }
+    pending.length = 0;
+    pending.push(...remaining);
+
+    await processConfirmations(due, state, fee, evalTime);
+
+    // 3. Level-up checks (with points from confirmed members)
+    let hasLevelUp = true;
     while (hasLevelUp) {
       hasLevelUp = false;
       for (const st of state.values()) {
@@ -482,45 +552,71 @@ async function executeMethodB(enrollments: any[], systemTree: any, fee: number) 
           });
 
           await prisma.brkLevelUpRecord.create({
-            data: { userId: st.userId, onSystem: 4, fromLevel: currentLvl, toLevel: nextConfig.level, promotedAt: nextDayMidnight }
+            data: { userId: st.userId, onSystem: 4, fromLevel: currentLvl, toLevel: nextConfig.level, promotedAt: evalTime }
           });
 
           if (nextConfig.gift > 0) {
-            await creditVoucherWallet(st.userId, nextConfig.gift, 'VOUCHER_CREDIT', `Quà tặng lên cấp ${nextConfig.level} (${nextConfig.gift.toLocaleString('vi')} VND)`);
+            await creditVoucherWallet(st.userId, nextConfig.gift, 'VOUCHER_CREDIT',
+              `Quà tặng lên cấp ${nextConfig.level} (${nextConfig.gift.toLocaleString('vi')} VND)`,
+              evalTime
+            );
           }
         }
       }
     }
 
-    for (const st of state.values()) {
-      const dbNode = await prisma.system.findUnique({ where: { autoId: st.autoId } });
-      if (dbNode && dbNode.activatedAt) {
-        const isGraceExpired = new Date(dbNode.activatedAt.getTime() + 1 * 24 * 60 * 60 * 1000) <= nextDayMidnight;
-        if (isGraceExpired) {
-          const wallet = await prisma.brkWallet.findUnique({ where: { userId: st.userId } });
-          const existing = await prisma.brkTransaction.findFirst({
-            where: { walletId: wallet?.id, type: 'RETURN_FEE' }
-          });
-
-          if (!existing) {
-            const cashbackAmt = (fee * 21) / 100;
-            await creditBrkWallet(st.userId, cashbackAmt, 'RETURN_FEE', `Hoàn 21% phí tham gia sau 1 ngày cân nhắc`);
-
-            const brkdAmt = Math.round((BRKD_PER_ACTIVATION * 21) / 100);
-            await creditBrkdWallet(st.userId, brkdAmt, 'BRKD_CREDIT', `BRKD hoàn 21% sau 1 ngày cân nhắc`);
-          }
-        }
-      }
-    }
-
+    // 4. Revenue share (every 3 days at 06:08)
     daysProcessed++;
-    if (!currentPeriodStart) currentPeriodStart = new Date(Number(y), Number(m) - 1, Number(d));
+    if (!currentPeriodStart) currentPeriodStart = getEvalTime(Number(y), Number(m) - 1, Number(d));
 
     if (daysProcessed % 3 === 0) {
-      const periodEnd = new Date(Number(y), Number(m) - 1, Number(d) + 1);
-      const distributedAt = new Date(Number(y), Number(m) - 1, Number(d) + 1, 1, 0, 0);
-      await distributeRevenueSharePeriod(4, currentPeriodStart, periodEnd, periodNumber++, fee, SHARE_PCT, distributedAt);
-      currentPeriodStart = new Date(Number(y), Number(m) - 1, Number(d) + 1);
+      const periodEnd = getEvalTime(Number(y), Number(m) - 1, Number(d) + 1);
+      await distributeRevenueSharePeriod(4, currentPeriodStart, periodEnd, periodNumber++, fee, SHARE_PCT, periodEnd);
+      currentPeriodStart = periodEnd;
+    }
+  }
+
+  // 5. Final: process remaining pending members
+  if (pending.length > 0) {
+    const lastDay = sortedDays[sortedDays.length - 1];
+    const [d, m, y] = lastDay.split('/');
+    const finalEval = getEvalTime(Number(y), Number(m) - 1, Number(d) + 2);
+
+    const due: PendingMember[] = [];
+    for (const p of pending) {
+      if (p.activatedAt.getTime() + 24 * 60 * 60 * 1000 <= finalEval.getTime()) {
+        due.push(p);
+      }
+    }
+
+    if (due.length > 0) {
+      await processConfirmations(due, state, fee, finalEval);
+
+      let hasLevelUp = true;
+      while (hasLevelUp) {
+        hasLevelUp = false;
+        for (const st of state.values()) {
+          const currentLvl = st.level;
+          const nextConfig = LEVEL_CONFIGS.find(c => c.level === currentLvl + 1);
+          if (nextConfig && st.points >= nextConfig.req) {
+            st.level = nextConfig.level;
+            hasLevelUp = true;
+            await prisma.system.update({
+              where: { autoId: st.autoId },
+              data: { level: nextConfig.level }
+            });
+            await prisma.brkLevelUpRecord.create({
+              data: { userId: st.userId, onSystem: 4, fromLevel: currentLvl, toLevel: nextConfig.level, promotedAt: finalEval }
+            });
+            if (nextConfig.gift > 0) {
+              await creditVoucherWallet(st.userId, nextConfig.gift, 'VOUCHER_CREDIT',
+                `Quà tặng lên cấp ${nextConfig.level} (${nextConfig.gift.toLocaleString('vi')} VND)`,
+                finalEval
+              );
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -1048,3 +1048,104 @@ Thay đổi cơ chế xử lý đăng nhập thất bại:
 - ✅ 3 nhóm Telegram: `FAILED_LOGIN`, `REGISTER`, `CHANGE` — mỗi nhóm 1 chat ID riêng
 - ⏳ Chờ deploy Vercel kèm env mới
 
+---
+
+## ✅ [2026-07-08] Debug Level Check Bug + Rebuild BRK System 4 hoàn chỉnh
+
+### Mục tiêu
+Debug lỗi `BrkLevelUpRecord` chỉ có 11 records (từ 2/7-4/7) sau rebuild, thiếu 7 records cho các ngày 5/7-8/7. Kết luận: **không có bug level check** — lần chạy trước bị gián đoạn/timeout.
+
+### Phát hiện
+- Level check trong `executeMethodB()` hoạt động chính xác: multi-pass `while(hasLevelUp)` loop xử lý promotions cascade (Lv1→Lv2→Lv3)
+- Debug log `[LVL]` xác nhận level-up chạy trên tất cả các ngày: 2/7 (6 records), 3/7 (1), 4/7 (4), 7/7 (5), 8/7 (1)
+- Script timeout 5 phút do Prisma connection pool không release — fix bằng `process.exit(0)` + timeout 10 phút
+- Lần chạy thành công: ~5 phút 40 giây, 17 level-up records (đúng với 14 member có level>1)
+
+### Kết quả rebuild (56 members)
+```
+System records: 56 | BrkLevelUpRecord: 17 | Revenue pools: 2 (26 awards)
+Level: Lv1=42, Lv2=11, Lv3=3
+Root: #3773 Coach Nguyễn Biên Cương (Lv3, 952pts)
+  ├─ #1010 BÙI THỊ PHƯƠNG ANH (Lv3, 578pts)
+  ├─ #1035 ĐẶNG THỊ HIỀN (Lv2, 187pts)
+  ├─ #1057 Vũ Thị Thao (Lv2, 85pts)
+  └─ #1061 Nguyễn Huyền (Lv2, 85pts)
+
+Placement verified:
+  ✅ #834, #837 dưới #478 (enrollment.referrerId)
+  ✅ #703 dưới #1079 (cascade)
+  ✅ #878, #1093 dưới #976 (BFS fallback do referrer null)
+  ✅ Closure tree: 224 records, all 56 reachable
+```
+
+### Các file đã sửa
+#### `lib/brk/rebuild-service.ts`
+- **Vấn đề**: Script timeout sau 5 phút do Prisma không release connection
+- **Fix**: Xóa debug console.log; không thay đổi logic (level check đã chạy đúng)
+- **Tạm thời**: `scripts/_run_rebuild_debug.ts` đã xóa
+
+#### `PLAN.md`
+- Ghi nhận kết luận debug level check
+
+### Trạng thái
+- ✅ 17 level-up records chính xác (so với 11 records bug run trước)
+- ✅ Commission: 72 transactions, 178,941 VND
+- ✅ Revenue share: 2 kỳ (pool 1: 10 qualified × 1,881 VND; pool 2: 16 × 571 VND)
+- ✅ Level gifts: 17 voucher transactions = 8,404,000 VND
+- ✅ Tất cả 56 wallets có balance đúng
+- ✅ `npx tsc --noEmit` — cần chạy xác nhận
+
+---
+
+## ✅ [2026-07-08] 24h Cooling-off + 06:08 AM Evaluation Time cho BRK Method B
+
+### Mục tiêu
+Triển khai cơ chế cooling-off 24h cho Method B: từ `payment.transferTime` (thời gian chuyển khoản thực tế từ email Sacombank), member có 24h để hủy. Sau 24h, phí được "confirmed" mới dùng để trả hoa hồng, cộng điểm, tính revenue share. Tất cả xử lý tại mốc 06:08 AM Vietnam (UTC+7) mỗi ngày.
+
+### Kiến trúc mới
+
+```
+executeMethodB():
+  1. Enrollment → tạo System record + Closure table (KHÔNG commissions/points)
+  2. Vòng lặp ngày với pending queue carryover:
+     - getEvalTime(year, month, day) = Date.UTC(year, month, day-1, 23, 8, 0) = 06:08 AM VN
+     - processConfirmations(): kiểm tra members có gracePeriodEnd < evalTime
+       → credit commissions (CASH + BRKD) + points (BRKP) + return fee (21%)
+     - Level-up checks (dùng confirmed points)
+     - Revenue share mỗi 3 ngày (chỉ confirmed members)
+  3. Sau loop: xử lý pending còn lại
+```
+
+### Các file đã sửa
+
+#### `lib/brk/rebuild-service.ts`
+- **Vấn đề**: Commissions/points được trả ngay khi tạo system record, không tôn trọng cooling-off 24h. Timestamp transaction bị gộp vào thời điểm rebuild (now) thay vì rải theo ngày thực tế.
+- **Fix**:
+  - Thêm `getEvalTime()` helper: `Date.UTC(year, month, day-1, 23, 8, 0)` = 06:08 AM Vietnam
+  - Thêm `PendingMember` interface và `processConfirmations()`: defer tất cả commissions/points/return fee
+  - Thêm pending queue với day-to-day carryover
+  - Restructure `executeMethodB()`: enrollment chỉ tạo system+closure, commissions deferred
+  - Sửa tất cả 10 call sites: dùng eval time thay vì `createdAt` (now)
+  - `cleanup()`: xóa closures bằng `ancestorId`/`descendantId` thay vì `systemId` (fix FK constraint)
+- **`distributeRevenueSharePeriod()`**: thêm `gracePeriodEnd: { lt: distDate }`, đổi `lte` → `lt`, `distDate` khai báo trước `newActivations` query
+
+### Kết quả rebuild
+```
+56 members, 17 level-ups, 317 transactions across 7 days
+Timestamp đúng 06:08 AM Vietnam mỗi ngày (không bị gộp vào now)
+```
+
+### Temp scripts đã xóa
+- `scripts/_debug_cleanup.ts`, `_debug_cleanup2.ts`, `_debug_cleanup3.ts`, `_debug_rebuild.ts`, `_debug_fk.ts`
+- `scripts/_verify_rebuild.ts`, `_verify_rebuild2.ts`
+- `scripts/_run_rebuild.ts`, `_run_rebuild2.ts`
+- `scripts/_check_timestamps.ts`, `_check_rebuild.ts`
+
+### Trạng thái
+- ✅ 24h cooling-off: commissions/points/return fee deferred đến khi gracePeriodEnd qua
+- ✅ 06:08 AM evaluation: tất cả transactions timestamped đúng
+- ✅ Pending queue carryover: members chưa đủ 24h được kiểm tra lại ngày hôm sau
+- ✅ Revenue share filter: chỉ đếm members có `gracePeriodEnd < distributedAt`
+- ✅ `cleanup()` không còn lỗi FK constraint
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
