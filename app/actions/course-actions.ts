@@ -4,7 +4,7 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { createPaymentQR } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
@@ -12,7 +12,7 @@ import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 /**
  * Đăng ký khóa học mới
  */
-export async function enrollInCourseAction(courseId: number) {
+export async function enrollInCourseAction(courseId: number, clientRef?: number | null) {
     try {
         const session = await auth()
         if (!session?.user?.id) throw new Error("Vui lòng đăng nhập để tiếp tục.")
@@ -96,27 +96,83 @@ export async function enrollInCourseAction(courseId: number) {
             return { success: true, status: existing.status, enrollment: existingWithPayment }
         }
 
+        // [ENROLL-DEBUG] Đọc affiliate cookie
         let enrollmentReferrerId: number | null = null
-        try {
-            const cookieStore = await cookies()
-            const refCookie = cookieStore.get('aff_ref')
-            if (refCookie?.value) {
-                let rawRef = refCookie.value
-                try {
-                    const affData = JSON.parse(decodeURIComponent(refCookie.value))
-                    if (affData?.r) {
-                        rawRef = affData.r
-                    }
-                } catch { }
+        console.log('[ENROLL-DEBUG] clientRef provided:', clientRef ?? 'null')
 
-                let refId = parseInt(rawRef)
-                if (isNaN(refId) || refId <= 0) {
-                    const resolved = await resolveRefToUserId(rawRef)
-                    if (resolved) refId = resolved
+        // Ưu tiên 1: clientRef từ client-side (document.cookie - ổn định nhất)
+        if (clientRef && clientRef > 0) {
+            enrollmentReferrerId = clientRef
+            console.log('[ENROLL-DEBUG] Using clientRef:', clientRef)
+        } else {
+            console.log('[ENROLL-DEBUG] ===== START cookie read =====')
+            console.log('[ENROLL-DEBUG] User ID:', userId, 'Course ID:', courseId)
+            console.log('[ENROLL-DEBUG] user.referrerId from DB:', user?.referrerId)
+            try {
+                const cookieStore = await cookies()
+                const refCookie = cookieStore.get('aff_ref')
+                console.log('[ENROLL-DEBUG] refCookie found:', !!refCookie, 'value:', refCookie?.value)
+                if (refCookie?.value) {
+                    let rawRef = refCookie.value
+                    try {
+                        const decoded = decodeURIComponent(refCookie.value)
+                        const affData = JSON.parse(decoded)
+                        console.log('[ENROLL-DEBUG] Parsed affData:', JSON.stringify(affData))
+                        if (affData?.r) {
+                            rawRef = affData.r
+                        }
+                    } catch (parseErr) {
+                        console.log('[ENROLL-DEBUG] JSON parse error:', parseErr)
+                    }
+
+                    let refId = parseInt(rawRef)
+                    console.log('[ENROLL-DEBUG] rawRef:', rawRef, 'parsedInt:', refId)
+                    if (isNaN(refId) || refId <= 0) {
+                        const resolved = await resolveRefToUserId(rawRef)
+                        console.log('[ENROLL-DEBUG] resolveRefToUserId result:', resolved)
+                        if (resolved) refId = resolved
+                    }
+                    if (refId > 0) enrollmentReferrerId = refId
                 }
-                if (refId > 0) enrollmentReferrerId = refId
+            } catch (cookieErr) {
+                console.log('[ENROLL-DEBUG] cookies() threw:', cookieErr)
             }
-        } catch { }
+            console.log('[ENROLL-DEBUG] enrollmentReferrerId after cookie:', enrollmentReferrerId)
+
+            // Fallback 1: nếu cookie ko đọc được → query DB AffiliateClick theo IP
+            if (enrollmentReferrerId === null || enrollmentReferrerId === undefined) {
+                try {
+                    const hdrs = await headers()
+                    const ip = hdrs.get('x-forwarded-for')?.split(',')[0]?.trim()
+                    if (ip && ip !== 'unknown') {
+                        console.log('[ENROLL-DEBUG] DB CLICK FALLBACK: querying IP:', ip)
+                        const recentClick = await prisma.affiliateClick.findFirst({
+                            where: { ipAddress: ip },
+                            orderBy: { createdAt: 'desc' },
+                            include: { link: true }
+                        })
+                        if (recentClick?.link?.userId) {
+                            enrollmentReferrerId = recentClick.link.userId
+                            console.log('[ENROLL-DEBUG] DB CLICK FALLBACK: found clickId', recentClick.id, 'referrer =', enrollmentReferrerId)
+                        } else {
+                            console.log('[ENROLL-DEBUG] DB CLICK FALLBACK: no recent click found for IP')
+                        }
+                    } else {
+                        console.log('[ENROLL-DEBUG] DB CLICK FALLBACK: no valid IP from headers')
+                    }
+                } catch (ipErr) {
+                    console.log('[ENROLL-DEBUG] DB CLICK FALLBACK error:', ipErr)
+                }
+            }
+
+            // Fallback 2: nếu tất cả đều fail → dùng user.referrerId từ DB (chỉ khi user ko click bất kỳ link nào)
+            if ((enrollmentReferrerId === null || enrollmentReferrerId === undefined) && user?.referrerId) {
+                enrollmentReferrerId = user.referrerId
+                console.log('[ENROLL-DEBUG] FALLBACK used: user.referrerId =', user.referrerId)
+            }
+        }
+        console.log('[ENROLL-DEBUG] FINAL enrollmentReferrerId:', enrollmentReferrerId)
+        console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
         const isAutoActive = effectivePhiCoc === 0
         const newEnrollment = await prisma.enrollment.create({

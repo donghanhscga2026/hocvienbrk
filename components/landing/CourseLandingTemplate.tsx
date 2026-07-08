@@ -8,6 +8,7 @@ import {
     Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2
 } from 'lucide-react'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
+import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { useRouter } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
 import PaymentModal from '@/components/course/PaymentModal'
@@ -87,7 +88,7 @@ export default function CourseLandingTemplate({
         
         setLoading(true)
         try {
-            const res: any = await enrollInCourseAction(course.id)
+            const res: any = await enrollInCourseAction(course.id, getClientRef())
             if (res.success) {
                 if (res.enrollment) {
                     setLocalEnrollment(res.enrollment)

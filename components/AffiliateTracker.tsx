@@ -24,8 +24,13 @@ function AffiliateTrackerInner() {
         timestamp: Date.now()
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(refData))
-      console.log('[Affiliate] Captured ref:', refParam)
-      
+
+      const cookieData = JSON.stringify({ r: refParam, t: Date.now() })
+      document.cookie = `aff_ref=${encodeURIComponent(cookieData)}; path=/; max-age=${EXPIRY_DAYS * 24 * 60 * 60}; SameSite=Lax`
+      console.log('[Affiliate] Captured ref:', refParam, '| Cookie set')
+
+      fetch(`/api/affiliate/log-click?ref=${encodeURIComponent(refParam)}`).catch(() => {})
+
       const cleanUrl = pathname.split('?')[0]
       window.history.replaceState({}, '', cleanUrl)
     }

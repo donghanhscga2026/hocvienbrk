@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật & Lịch sử cập nhật HocVien-BRK
-> Cập nhật lần cuối: **2026-07-04** (phiên 5: Fix auto-verify + Build BRK 29 members)  
+> Cập nhật lần cuối: **2026-07-08** (phiên 7: Tái cấu trúc Telegram groups)  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -969,7 +969,7 @@ Thay đổi cơ chế xử lý đăng nhập thất bại:
 
 #### `auth.ts`
 - Server authorize: throw `CustomLoginError` với code cụ thể
-- Gửi Telegram type `FAILED_LOGIN` thay vì `LESSON`
+- Gửi Telegram type `FAILED_LOGIN` — **đã xóa ở session 2026-07-08** (chỉ giữ lại throw error)
 - Bỏ fallback #2689
 
 #### `app/login/page.tsx`
@@ -1002,4 +1002,49 @@ Thay đổi cơ chế xử lý đăng nhập thất bại:
 - ✅ Register success: hiển thị contact + nút "Tiếp tục vào Học viện"
 - ⏳ Chờ deploy Vercel + add bot vào group Telegram
 - ⏳ Bot cần được add vào group `-1004466932240` trước khi Telegram hoạt động
+
+---
+
+## ✅ [2026-07-08] Tái cấu trúc Telegram groups + Xóa trùng lặp cảnh báo login fail
+
+### Mục tiêu
+- **Bỏ gửi Telegram từ `auth.ts`** (tin 1) — chỉ giữ lại cảnh báo từ API `report-failed-login` (tin 2) vì đã xác định được user cụ thể
+- `sendLoginNotification` (login thành công) gửi về `FAILED_LOGIN` thay vì `LESSON`
+- Tạo type `CHANGE` cho các thay đổi của học viên (reset password, đổi password, cập nhật profile)
+- Chuyển OTP verify + bulk-enroll từ `ACTIVATE` → `REGISTER`
+
+### Các file đã sửa
+
+#### `lib/notifications.ts`
+- **Sửa**: `sendLoginNotification` gửi `FAILED_LOGIN` thay `LESSON`
+- **Thêm**: type `CHANGE` vào union type + mapping env `TELEGRAM_CHAT_ID_CHANGE`
+- **Sửa**: `sendPasswordChangedNotification` gửi `CHANGE` thay `LESSON`
+
+#### `auth.ts`
+- **Xóa**: Block gửi Telegram cảnh báo đăng nhập thất bại (tin 1) — chỉ giữ `throw CustomLoginError`
+
+#### `app/api/auth/report-failed-login/route.ts`
+- Không đổi — vẫn là nguồn duy nhất gửi cảnh báo login fail (tin 2)
+
+#### `app/api/auth/verify-otp/route.ts`
+- `ACTIVATE` → `REGISTER`
+
+#### `app/api/auth/reset-password/route.ts`
+- `LESSON` → `CHANGE`
+
+#### `app/actions/bulk-enroll-actions.ts`
+- `ACTIVATE` → `REGISTER`
+
+#### `app/actions/account-actions.ts`
+- Thêm gửi Telegram `CHANGE` khi học viên cập nhật profile (tên, SĐT, ảnh)
+
+#### `.env` & `.env.local`
+- Thêm `TELEGRAM_CHAT_ID_CHANGE=-1004458102417`
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — 0 lỗi biên dịch
+- ✅ Chỉ 1 tin Telegram cho mỗi lần login fail (từ API `report-failed-login`)
+- ✅ Login thành công → gửi về `FAILED_LOGIN` (để support biết học viên đã vào được)
+- ✅ 3 nhóm Telegram: `FAILED_LOGIN`, `REGISTER`, `CHANGE` — mỗi nhóm 1 chat ID riêng
+- ⏳ Chờ deploy Vercel kèm env mới
 
