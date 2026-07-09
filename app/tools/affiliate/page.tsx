@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import MainHeader from '@/components/layout/MainHeader'
 import { requestPayout } from '@/app/actions/affiliate-actions'
+import { AdminSubNav } from '@/components/admin/AdminSubNav'
+import { affiliateSubNav } from './affiliate-nav'
 
 interface DashboardData {
     points: { total: number; referrals: number }
@@ -746,11 +749,15 @@ function RefsTab() {
 }
 
 export default function AffiliateToolsPage() {
+    const { data: session } = useSession()
     const [activeTab, setActiveTab] = useState<'dashboard' | 'links' | 'withdraw' | 'refs'>('dashboard')
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20">
             <MainHeader title="AFFILIATE" toolSlug="affiliate" />
+            {session?.user?.role === 'ADMIN' && (
+                <AdminSubNav title="Affiliate" items={affiliateSubNav} />
+            )}
 
             <div className="max-w-4xl mx-auto p-4">
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5 mb-6 flex">

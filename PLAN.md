@@ -1272,3 +1272,54 @@ Tất cả các luồng thực tế (auto-verify, duyệt tay, cron) vẫn trả
 - ✅ Các dòng thông tin hiển thị khít và gọn gàng hơn
 - ✅ `npx tsc --noEmit` — 0 lỗi build
 
+
+## ✅ Đồng bộ dữ liệu Affiliate Enroll Referrer cho khóa học #22 (2026-07-09)
+
+### Mục tiêu
+- Khôi phục và đồng bộ trường `Enrollment.referrerId` (Nhân mạch chia sẻ khóa học #22) bị thiếu của các học viên đăng ký từ ngày 02/07/2026 trở đi (trước thời điểm tính năng ghi nhận tự động được nâng cấp).
+- Đảm bảo dữ liệu affiliate nhất quán, phục vụ chính xác cho việc tính toán hoa hồng, điểm số và hiển thị phả hệ.
+
+### Các lệnh đã chạy
+- Chạy script cập nhật dữ liệu database:
+  - Lượt 1: Đồng bộ `referrerId = 3773` cho 20 học viên tham gia ngày 02/07 và 03/07 xếp tràn tầng F1/F2 của Root.
+  - Lượt 2: Đồng bộ theo quy tắc tràn tầng cho 26 học viên còn lại (Cập nhật về đúng người giới thiệu gốc nếu người giới thiệu đã active khóa #22, hoặc mặc định chuyển về mã Root `#3773` nếu người giới thiệu gốc không tham gia khóa #22).
+- Loại trừ an toàn root `#3773` tự làm referrer của chính mình.
+- Dọn dẹp sạch các script backfill tạm thời trong thư mục `plan_temp`.
+
+- ✅ Đồng bộ thành công tổng cộng 46 học viên bị thiếu `referrerId`
+- ✅ Dữ liệu phả hệ và affiliate khóa #22 đã khớp chính xác
+- ✅ `npx tsc --noEmit` — 0 lỗi build
+
+
+## ✅ Xây dựng trang giao diện Lượt Đăng Ký Affiliate (conversions) (2026-07-09)
+
+### Mục tiêu
+- Xây dựng giao diện web tập trung cho Admin để tra cứu lịch sử học viên đăng ký qua link ref giới thiệu (Affiliate Conversions).
+- Giúp Admin đối chiếu và sắp xếp vị trí phả hệ dễ dàng dựa trên người giới thiệu gốc.
+
+### Các file đã sửa / Tạo mới
+#### `app/tools/affiliate/conversions/page.tsx` (Tạo mới)
+- Trang giao diện bảng danh sách Conversions: Hiển thị thời gian, thông tin học viên (Họ tên, SĐT), link ref đã bấm, người giới thiệu gốc, khóa học đăng ký và trạng thái kích hoạt thực tế.
+- Thống kê nhanh ở đầu trang. Thiết kế tối giản, loại bỏ thông tin email của học viên và người giới thiệu để tối ưu cột, sử dụng size chữ nhỏ (`text-xs` / `text-[11px]`) và giảm padding (`px-3 py-2`) giúp các cột khít hơn theo đúng yêu cầu của Admin.
+- Bổ sung số điện thoại của người giới thiệu (quét từ DB qua Prisma và render dưới tên người giới thiệu) và thời gian kích hoạt cụ thể (quét từ `updatedAt` của ACTIVE enrollment) hiển thị nhỏ gọn ngay dưới trạng thái kích hoạt.
+#### `app/tools/affiliate/affiliate-nav.ts` (Sửa đổi)
+- Thêm tab "Lượt Đăng Ký" (URL `/tools/affiliate/conversions`) vào thanh menu phụ của Affiliate.
+#### `app/tools/affiliate/page.tsx` (Sửa đổi)
+- Sử dụng `useSession` để nhận diện vai trò `ADMIN` và tự động hiển thị thanh điều hướng phụ `AdminSubNav` ở đầu trang, giúp Admin nhanh chóng truy cập và chuyển đổi giữa các tab quản trị từ trang Dashboard chính.
+#### `app/actions/course-actions.ts` (Sửa đổi)
+- Gọi `trackAffiliateConversion` (loại `PURCHASE`) ngay sau khi tạo `Enrollment` thành công qua form web để đảm bảo không bị bỏ sót lượt đăng ký mua khóa học.
+#### `app/api/enroll-after-register/route.ts` (Sửa đổi)
+- Gọi `trackAffiliateConversion` (loại `PURCHASE`) sau khi tạo `Enrollment` thành công ngay sau khi đăng ký tài khoản.
+#### `components/AffiliateTracker.tsx` (Sửa đổi)
+- Sửa lỗi phương thức gửi dữ liệu nhấp chuột (log-click) từ `GET` thành `POST` để API lưu trữ đúng thông tin click thô của người dùng.
+
+### Trạng thái
+- ✅ Đã sửa lỗi track click thô (POST method) và bổ sung ghi nhận conversion khi mua khóa học
+- ✅ Đồng bộ (backfill) thành công 54 bản ghi `AffiliateConversion` bị thiếu cho học viên khóa #22 từ ngày 2/7 trở đi
+- ✅ Giao diện xem danh sách Conversions hiển thị trực quan, khít và gọn gàng, không bị tràn
+- ✅ Loại bỏ hoàn toàn email học viên & người giới thiệu để bảng thoáng hơn
+- ✅ Số điện thoại người giới thiệu và Ngày giờ kích hoạt hiển thị chuẩn xác
+- ✅ Menu Affiliate được tích hợp liên kết mượt mà
+- ✅ AdminSubNav hiển thị tự động trên Dashboard chính khi đăng nhập Admin
+- ✅ `npx tsc --noEmit` — 0 lỗi build
+

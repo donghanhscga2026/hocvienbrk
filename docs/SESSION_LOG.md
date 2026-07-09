@@ -173,3 +173,75 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 
 ### Kiểm tra
 - ✅ TypeScript: `npx tsc --noEmit` → 0 errors
+
+## ✅ SESSION-20260709_03 — Đồng bộ dữ liệu Affiliate Enroll Referrer cho khóa học #22
+
+- **Ngày**: 2026-07-09
+- **Thời gian**: ~19:40 - 20:05
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Đồng bộ và backfill trường `Enrollment.referrerId` (Nhân mạch chia sẻ khóa học #22) bị thiếu của các học viên đăng ký từ ngày 02/07/2026 trở đi.
+- Đảm bảo dữ liệu affiliate nhất quán, hỗ trợ tính toán chính xác hoa hồng và phả hệ theo Phương án B.
+
+### Công việc đã thực hiện
+- Chạy script cập nhật dữ liệu database:
+  - **Lượt 1**: Đồng bộ `referrerId = 3773` cho 20 học viên đầu tiên tham gia ngày 02/07 và 03/07 xếp tràn tầng F1/F2 của Root.
+  - **Lượt 2**: Đồng bộ theo quy tắc tràn tầng cho 26 học viên còn lại:
+    - Nếu người giới thiệu gốc (`User.referrerId`) **có đăng ký/active** khóa #22 $\rightarrow$ Cập nhật `Enrollment.referrerId` về đúng người giới thiệu đó.
+    - Nếu người giới thiệu gốc **không đăng ký** khóa #22 (hoặc không có ref gốc) $\rightarrow$ Cập nhật `Enrollment.referrerId` về Root **`3773`** (vì họ bị xếp tràn tầng).
+- Loại trừ an toàn root `#3773` tự làm referrer của chính mình.
+- Dọn dẹp sạch các script backfill tạm thời trong thư mục `plan_temp`.
+
+- ✅ Đồng bộ thành công tổng cộng 46 học viên bị thiếu `referrerId` trong DB.
+- ✅ TypeScript: `npx tsc --noEmit` → 0 errors
+
+## ✅ SESSION-20260709_04 — Xây dựng trang giao diện Lượt Đăng Ký Affiliate (conversions)
+
+- **Ngày**: 2026-07-09
+- **Thời gian**: ~20:10 - 20:15
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Xây dựng giao diện web tập trung cho Admin để tra cứu lịch sử học viên đăng ký qua link ref giới thiệu (Affiliate Conversions).
+- Giúp Admin đối chiếu và sắp xếp vị trí phả hệ dễ dàng dựa trên người giới thiệu gốc.
+
+### Các file đã thay đổi / Tạo mới
+#### `app/tools/affiliate/conversions/page.tsx` (Tạo mới)
+- Trang giao diện bảng danh sách Conversions: Hiển thị thời gian, thông tin học viên (Họ tên, SĐT), link ref đã bấm, người giới thiệu gốc, khóa học đăng ký và trạng thái kích hoạt thực tế.
+- Thiết kế tối giản, loại bỏ thông tin email của học viên và người giới thiệu để tối ưu cột, sử dụng size chữ nhỏ (`text-xs` / `text-[11px]`) và giảm padding (`px-3 py-2`) giúp các cột khít hơn theo đúng yêu cầu của Admin.
+- Bổ sung số điện thoại của người giới thiệu (quét từ DB qua Prisma và render dưới tên người giới thiệu) và thời gian kích hoạt cụ thể (quét từ `updatedAt` của ACTIVE enrollment) hiển thị nhỏ gọn ngay dưới trạng thái kích hoạt.
+#### `app/tools/affiliate/affiliate-nav.ts` (Sửa đổi)
+- Thêm tab "Lượt Đăng Ký" (URL `/tools/affiliate/conversions`) vào thanh menu phụ của Affiliate.
+#### `app/tools/affiliate/page.tsx` (Sửa đổi)
+- Sử dụng `useSession` để nhận diện vai trò `ADMIN` và tự động hiển thị thanh điều hướng phụ `AdminSubNav` ở đầu trang, giúp Admin nhanh chóng truy cập và chuyển đổi giữa các tab quản trị từ trang Dashboard chính.
+#### `app/actions/course-actions.ts` (Sửa đổi)
+- Gọi `trackAffiliateConversion` (loại `PURCHASE`) ngay sau khi tạo `Enrollment` thành công qua form web để đảm bảo không bị bỏ sót lượt đăng ký mua khóa học.
+#### `app/api/enroll-after-register/route.ts` (Sửa đổi)
+- Gọi `trackAffiliateConversion` (loại `PURCHASE`) sau khi tạo `Enrollment` thành công ngay sau khi đăng ký tài khoản.
+#### `components/AffiliateTracker.tsx` (Sửa đổi)
+- Sửa lỗi phương thức gửi dữ liệu nhấp chuột (log-click) từ `GET` thành `POST` để API lưu trữ đúng thông tin click thô của người dùng.
+
+### Các file backup (trong `plan_temp/`)
+| File backup | File gốc |
+|---|---|
+| `affiliate-nav.backup_20260709_2012.ts` | `app/tools/affiliate/affiliate-nav.ts` |
+| `page.backup_20260709_2034.tsx` | `app/tools/affiliate/page.tsx` |
+| `course-actions.backup_20260709_2052.ts` | `app/actions/course-actions.ts` |
+| `enroll-after-register.backup_20260709_2052.ts` | `app/api/enroll-after-register/route.ts` |
+| `AffiliateTracker.backup_20260709_2052.tsx` | `components/AffiliateTracker.tsx` |
+
+### Kiểm tra
+- ✅ Đã sửa lỗi track click thô (POST method) và bổ sung ghi nhận conversion khi mua khóa học.
+- ✅ Đồng bộ (backfill) thành công 54 bản ghi `AffiliateConversion` bị thiếu cho học viên khóa #22 từ ngày 2/7 trở đi.
+- ✅ Giao diện xem danh sách Conversions hiển thị trực quan, khít và gọn gàng, không bị tràn.
+- ✅ Loại bỏ hoàn toàn email học viên & người giới thiệu để bảng thoáng hơn.
+- ✅ Số điện thoại người giới thiệu và Ngày giờ kích hoạt hiển thị chuẩn xác.
+- ✅ AdminSubNav hiển thị tự động trên Dashboard chính khi đăng nhập Admin.
+- ✅ TypeScript: `npx tsc --noEmit` → 0 errors
+
+
+
+
+
+
