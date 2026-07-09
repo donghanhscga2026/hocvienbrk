@@ -769,18 +769,39 @@ export async function getCurrentUserRoleAction(systemId?: number) {
 export async function getMemberDetailsAction(userId: number, systemId?: number) {
     try {
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true, createdAt: true, image: true } })
+        const user = await prisma.user.findUnique({ 
+            where: { id: userId }, 
+            select: { 
+                id: true, 
+                name: true, 
+                email: true, 
+                phone: true, 
+                createdAt: true, 
+                image: true,
+                referrerId: true,
+                referrer: { select: { id: true, name: true } }
+            } 
+        })
+
+        // Lấy thông tin enrollment chung cho cả 2 hệ thống
+        const enrollment = await prisma.enrollment.findFirst({ 
+            where: { userId, courseId: 22 }, 
+            select: { 
+                updatedAt: true,
+                referrerId: true,
+                referrer: { select: { id: true, name: true } }
+            } 
+        })
 
         // TCA system — keep existing logic
         if (!systemId || systemId === 1) {
             const tcaRaw = await prisma.tCAMember.findFirst({ where: { userId }, select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true } })
             const tca = tcaRaw ? { ...tcaRaw, personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0, totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0 } : null
-            return { success: true, user, tca, systemData: null }
+            return { success: true, user, tca, systemData: null, enrollment }
         }
 
         // Non-TCA system (BRK / KTC / YTB)
         const sysRec = await prisma.system.findUnique({ where: { userId_onSystem: { userId, onSystem: systemId } } })
-        const enrollment = await prisma.enrollment.findFirst({ where: { userId, courseId: 22 }, select: { updatedAt: true } })
         const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
 
         const rootSys = await prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } })
@@ -831,6 +852,7 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
             success: true,
             user,
             tca: null,
+            enrollment,
             systemData: {
                 systemName: systemTree?.nameSystem || `Hệ thống ${systemId}`,
                 level: sysRec?.level ?? null,

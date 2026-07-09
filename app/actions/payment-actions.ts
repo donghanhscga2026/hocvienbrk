@@ -89,7 +89,14 @@ export async function verifyPaymentAction(
 
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { course: true, payment: true }
+      include: { 
+        course: {
+          include: {
+            teacherBankAccount: true
+          }
+        }, 
+        payment: true 
+      }
     })
 
     if (!enrollment) {
@@ -145,16 +152,21 @@ export async function verifyPaymentAction(
 
           const brkUser = await prisma.user.findUnique({ where: { id: enrollment.userId }, select: { name: true, phone: true } })
           const placement = await getBrkPlacementChain(enrollment.userId, brkTree.onSystem)
+          const effectiveAmount = enrollment.payment?.amount || enrollment.course.phi_coc || 0
+          const bankName = enrollment.course.teacherBankAccount?.bankName || enrollment.payment?.bankName || 'N/A'
+
           let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
             `👤 Học viên: <b>${brkUser?.name || 'N/A'}</b>\n` +
             `📞 SĐT: ${brkUser?.phone || 'N/A'}\n` +
-            `🎓 Khóa học: <b>${enrollment.course.name_lop}</b>\n` +
-            `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+            `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
+            `💰 Số tiền: ${effectiveAmount.toLocaleString()}đ\n` +
+            `🏦 Ngân hàng: ${bankName}\n` +
+            `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
           if (placement.parentId) {
-            teleMsg += `\n📍 Vị trí: Dưới <b>#${placement.parentId} ${placement.parentName}</b>`
+            teleMsg += `📍 Vị trí: Dưới <b>#${placement.parentId} ${placement.parentName}</b>\n`
             if (placement.chain.length > 1) {
               const upline = placement.chain.slice(1).map(a => `#${a.userId} ${a.name}`).join(' → ')
-              teleMsg += `\n🔗 Tuyến trên: ${upline}`
+              teleMsg += `🔗 Tuyến trên: ${upline}\n`
             }
           }
           await sendTelegramAdmin(teleMsg)
@@ -259,10 +271,28 @@ export async function getPendingPayments() {
         enrollment: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, phone: true }
+              select: { 
+                id: true, 
+                name: true, 
+                email: true, 
+                phone: true,
+                referrerId: true,
+                referrer: {
+                  select: { id: true, name: true, phone: true }
+                }
+              }
             },
             course: {
-              select: { id: true, id_khoa: true, name_lop: true, phi_coc: true }
+              select: { 
+                id: true, 
+                id_khoa: true, 
+                name_lop: true, 
+                phi_coc: true,
+                teacherBankAccount: true
+              }
+            },
+            referrer: {
+              select: { id: true, name: true, phone: true }
             }
           }
         }
@@ -298,10 +328,28 @@ export async function getAllPayments() {
         enrollment: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, phone: true }
+              select: { 
+                id: true, 
+                name: true, 
+                email: true, 
+                phone: true,
+                referrerId: true,
+                referrer: {
+                  select: { id: true, name: true, phone: true }
+                }
+              }
             },
             course: {
-              select: { id: true, id_khoa: true, name_lop: true, phi_coc: true }
+              select: { 
+                id: true, 
+                id_khoa: true, 
+                name_lop: true, 
+                phi_coc: true,
+                teacherBankAccount: true
+              }
+            },
+            referrer: {
+              select: { id: true, name: true, phone: true }
             }
           }
         }

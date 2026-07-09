@@ -40,6 +40,7 @@ interface MemberDetailInfo {
   data?: {
     user: any;
     tca: any;
+    enrollment?: any;
     systemData?: {
       systemName: string;
       level: number | null;
@@ -1626,9 +1627,13 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
 
   if (!info.show) return null;
 
-  const { user, tca, systemData } = info.data || {};
+  const { user, tca, systemData, enrollment } = info.data || {};
   const isLoading = info.loading;
   const isBrk = !!systemData;
+
+  const currentLevelText = isBrk 
+    ? (systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có') 
+    : (tca?.level ? `Cấp ${tca.level}` : 'Học viên');
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex items-center justify-center p-3 sm:p-4 transition-all duration-300">
@@ -1655,17 +1660,23 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
               <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300 mb-1">
                 {isBrk ? 'MB - Ngân hàng phước báu' : 'Hệ thống'}
               </span>
-              <div className="flex items-center justify-between gap-2 w-full pr-3 sm:pr-10">
+              <div className="flex items-end justify-between gap-2 w-full pr-1 sm:pr-2">
                 <div className="flex flex-col min-w-0">
-                  <h3 className="text-white text-sm sm:text-base font-black leading-tight truncate">
-                    {tca?.name || user?.name || 'Học viên'}
-                  </h3>
-                  <span className="text-white/80 text-[10px] sm:text-xs font-medium truncate mt-1">
-                    {user?.email || 'Chưa cập nhật email'}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="text-white text-sm sm:text-base font-bold tracking-tight leading-tight uppercase select-all">
+                      {tca?.name || user?.name || 'Học viên'}
+                    </h3>
+                    <span className="bg-yellow-400 text-teal-950 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-lg shadow-sm border border-yellow-300 select-all inline-flex items-center h-4.5 sm:h-5 shrink-0 font-mono">
+                      #{info.userId}
+                    </span>
+                  </div>
+                  <span className="text-white/85 text-[10px] sm:text-xs font-semibold truncate mt-1 select-all">
+                    {user?.phone ? `📞 ${user.phone}` : 'Chưa cập nhật SĐT'}
                   </span>
                 </div>
-                <div className="bg-yellow-400 text-teal-950 font-black text-xs sm:text-sm px-1 py-1 rounded-xl shadow-md border border-yellow-300 select-all shrink-0 self-end mb-0.5">
-                  #{info.userId}
+                {/* Badge Cấp bậc nổi bật được hạ thấp xuống và dịch sát bên phải */}
+                <div className="bg-red-500 text-white font-black text-xs sm:text-sm px-3.5 py-0.5 rounded-full shadow-md border border-white select-none shrink-0 mb-0.5 ml-auto">
+                  {currentLevelText}
                 </div>
               </div>
             </div>
@@ -1682,38 +1693,69 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
           ) : (
             <>
               <div className="space-y-1.5 sm:space-y-2">
-                {/* Upline Leaders */}
-                {isBrk && (systemData?.upline1 || systemData?.upline2) && (
-                  <div className="p-2 sm:p-2.5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl mb-2">
-                    <div className="flex flex-col gap-1 text-[10px] sm:text-xs">
-                      {systemData.upline1 && (
-                        <div className="flex items-center justify-between text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-lg shadow-sm border border-indigo-100/20">
-                          <span>Nhân mạch:</span>
-                          <span className="font-black text-indigo-900">{systemData.upline1.name} <code className="bg-indigo-50 px-1 py-0.2 rounded text-[9px]">#{systemData.upline1.id}</code></span>
-                        </div>
-                      )}
-                      {systemData.upline2 && (
-                        <div className="flex items-center justify-between text-indigo-600 font-bold bg-white px-2 py-0.5 rounded-lg shadow-sm border border-indigo-100/20">
-                          <span>Nhân mạch upline:</span>
-                          <span className="font-black text-indigo-900">{systemData.upline2.name} <code className="bg-indigo-50 px-1 py-0.2 rounded text-[9px]">#{systemData.upline2.id}</code></span>
-                        </div>
-                      )}
-                    </div>
+                {/* Upline Leaders & Referrers */}
+                <div className="p-2.5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl mb-2 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between text-indigo-750 font-semibold">
+                    <span>Nhân mạch kết nối:</span>
+                    <span className="font-bold text-indigo-900">
+                      {user?.referrer ? (
+                        <>
+                          {user.referrer.name}{' '}
+                          <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{user.referrer.id}</code>
+                        </>
+                      ) : 'Chưa cập nhật'}
+                    </span>
                   </div>
-                )}
+                  
+                  <div className="flex items-center justify-between text-indigo-750 font-semibold pt-1.5 border-t border-indigo-100/30">
+                    <span>Nhân mạch chia sẻ:</span>
+                    <span className="font-bold text-indigo-900">
+                      {enrollment?.referrer ? (
+                        <>
+                          {enrollment.referrer.name}{' '}
+                          <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{enrollment.referrer.id}</code>
+                        </>
+                      ) : 'Chưa cập nhật'}
+                    </span>
+                  </div>
+
+                  {isBrk && (
+                    <>
+                      <div className="flex items-center justify-between text-indigo-750 font-semibold pt-1.5 border-t border-indigo-100/30">
+                        <span>MB upline 1:</span>
+                        <span className="font-bold text-indigo-900">
+                          {systemData.upline1 ? (
+                            <>
+                              {systemData.upline1.name}{' '}
+                              <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{systemData.upline1.id}</code>
+                            </>
+                          ) : 'Chưa cập nhật'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-indigo-750 font-semibold pt-1.5 border-t border-indigo-100/30">
+                        <span>MB upline 2:</span>
+                        <span className="font-bold text-indigo-900">
+                          {systemData.upline2 ? (
+                            <>
+                              {systemData.upline2.name}{' '}
+                              <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{systemData.upline2.id}</code>
+                            </>
+                          ) : 'Chưa cập nhật'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 {isBrk ? (
                   <>
-                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Cấp bậc thăng tiến" value={systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có'} />
-                      <InfoItem icon={<Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
-                    </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                       <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày kích hoạt" value={systemData?.joinedAt ? new Date(systemData.joinedAt).toLocaleDateString('vi-VN') : '---'} />
                       <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng (MP)" value={systemData?.totalPoints != null ? systemData.totalPoints.toLocaleString('vi') : '0'} />
+                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng" value={systemData?.totalPoints != null ? `${systemData.totalPoints.toLocaleString('vi')} (MP)` : '0 (MP)'} />
                       <InfoItem icon={<Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />} label="Số thành viên nhóm" value={systemData?.teamSize != null ? `${systemData.teamSize.toLocaleString('vi')}` : '0'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
@@ -1723,21 +1765,19 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                   </>
                 ) : (
                   <>
-                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
                       <InfoItem icon={<User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
-                      <InfoItem icon={<Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Số điện thoại" value={user?.phone || 'Chưa cập nhật'} />
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} label="Cấp bậc" value={tca?.level ? `Cấp ${tca.level}` : 'Học viên'} />
+                    <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
                       <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Wallet Section (BRK only) */}
+              {/* Wallet Section (BRK only) - mt-2 và bỏ border-t / padding ngăn cách */}
               {isBrk && systemData?.wallet && (
-                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100">
+                <div className="mt-2">
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <WalletItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Thu nhập (VNĐ)" value={systemData.wallet.balance} valueClassName="text-emerald-600 font-extrabold" />
                     <WalletItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Đối ứng (MDT)" value={systemData.wallet.brkd} valueClassName="text-rose-600 font-extrabold" />
@@ -1747,9 +1787,9 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 </div>
               )}
 
-              {/* Promotion History Button */}
+              {/* Promotion History Button - mt-2 và bỏ border-t / padding ngăn cách */}
               {isBrk && (
-                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-center">
+                <div className="mt-2 flex justify-center">
                   <button
                     onClick={() => setShowHistory(true)}
                     className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-md hover:scale-[1.02] transition-all uppercase tracking-wider"

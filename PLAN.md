@@ -1210,3 +1210,65 @@ Tất cả các luồng thực tế (auto-verify, duyệt tay, cron) vẫn trả
 - ✅ All credit functions support `createdAt?: Date`
 - ✅ `npx tsc --noEmit` — 0 lỗi
 
+
+## ✅ Nâng cấp tính năng và giao diện Giao dịch thanh toán (tools/payments) (2026-07-09)
+
+### Mục tiêu
+- Hiển thị thêm thông tin số điện thoại của học viên và hỗ trợ sao chép nhanh SĐT (tách ô copy riêng biệt).
+- Hiển thị chi tiết thông tin Nhân mạch chia sẻ khóa học #[id_khoa] và Nhân mạch kết nối để đối chiếu (rút gọn nhãn, bỏ tên khóa học ở nhân mạch chia sẻ).
+- Tự động sinh cú pháp chuyển khoản chuẩn của hệ thống và hiển thị so sánh với nội dung học viên chuyển thực tế (phát hiện khớp/lệch).
+- Bổ sung nút sinh mã QR chuyển khoản VietQR tự động theo đúng tài khoản nhận của giảng viên dạy khóa, đúng số tiền và cú pháp chuẩn.
+- Đồng bộ nội dung tin nhắn Telegram khi phê duyệt thủ công có đầy đủ thông tin (Số tiền, Ngân hàng, Mã khóa học) giống hệt tin nhắn khi tự động kích hoạt.
+- Tối ưu giao diện đáp ứng (responsive), hạn chế tràn chữ và thiếu nội dung trên thiết bị di động.
+
+### Các file đã sửa
+#### `app/actions/payment-actions.ts`
+- Cập nhật hàm `getPendingPayments` và `getAllPayments` để include thông tin của `enrollment.referrer`, `enrollment.user.referrer` và `enrollment.course.teacherBankAccount`.
+- Cập nhật hàm `verifyPaymentAction` (duyệt thủ công) để lấy thêm `teacherBankAccount` và đồng bộ nội dung tin nhắn Telegram báo về (thêm Số tiền, Ngân hàng nhận, Mã khóa học) giống hệt định dạng của kích hoạt tự động.
+
+#### `app/tools/payments/page.tsx`
+- Cập nhật interface `PaymentData` và import `QrCode`, `resolveBankBin`.
+- Sắp xếp lại giao diện hiển thị gọn gàng: thông tin học viên (bao gồm mã số học viên `#`, họ tên, email, ngày đăng ký, nút Copy số điện thoại riêng), thông tin 2 loại nhân mạch (rút gọn nhãn nhã, bỏ chữ user.referrer), thông tin khóa học (tên, giá cọc, số tiền nhận được, STK từ Gmail), cú pháp đối chiếu, nút sinh QR và biên lai.
+- Tối ưu hóa CSS Tailwind và layout responsive trên mobile.
+
+### Trạng thái
+- ✅ Hiển thị đầy đủ thông tin học viên, SĐT (có nút Copy) và mã học viên
+- ✅ Hiển thị chính xác thông tin Nhân mạch chia sẻ và Nhân mạch kết nối
+- ✅ Hiển thị đối chiếu cú pháp chuyển khoản chuẩn và thực tế
+- ✅ Chức năng tạo/xem mã QR chuyển khoản VietQR hoạt động đúng tài khoản giảng viên và cú pháp chuẩn
+- ✅ Đồng bộ hoàn toàn định dạng tin nhắn Telegram giữa kích hoạt thủ công và tự động
+- ✅ Giao diện điện thoại hiển thị mượt mà, không bị tràn hay thiếu thông tin
+- ✅ `npx tsc --noEmit` — 0 lỗi build
+
+
+## ✅ Cập nhật giao diện thông tin chi tiết thành viên (tools/genealogy) (2026-07-09)
+
+### Mục tiêu
+- Hiển thị Số điện thoại của thành viên thay thế cho email ngay dưới tên thành viên.
+- Rút gọn và hiển thị Mã học viên `#[id]` cùng dòng họ tên học viên.
+- Đưa Cấp bậc (ví dụ Cấp 3, Học viên) làm nổi bật ở góc bên phải của header thay vào vị trí cũ của Mã học viên.
+- Bổ sung hiển thị đầy đủ 4 dòng Nhân mạch & Upline:
+  1. Nhân mạch kết nối (`user.referrer`)
+  2. Nhân mạch chia sẻ (`enrollment.referrer` lấy từ khóa 22)
+  3. MB upline 1 (Tuyến trên trực tiếp)
+  4. MB upline 2 (Tuyến trên của upline 1)
+- Chỉnh nhãn Điểm tăng trưởng dời chữ `(MP)` ra sau giá trị điểm (ví dụ: `357 (MP)`).
+- Loại bỏ các đường kẻ ngăn cách `border-t` và giảm khoảng cách margins/paddings giữa các khu vực thông tin để thu gọn diện tích hiển thị.
+
+### Các file đã sửa
+#### `app/actions/admin-actions.ts`
+- Cập nhật hàm `getMemberDetailsAction` để include thêm `referrer` trong query select của `user` và `enrollment`, đồng thời trả về `enrollment` trong response object.
+
+#### `app/tools/genealogy/page.tsx`
+- Cập nhật interface `MemberDetailInfo` thêm property `enrollment?: any` vào `data`.
+- Chỉnh sửa component `MemberDetailsModal`: thay đổi layout header, định dạng họ tên font chữ gọn gàng hơn (`font-bold tracking-tight` cỡ `text-sm sm:text-base`), dời badge Cấp bậc xuống góc dưới bên phải, loại bỏ ô số điện thoại ở phần chi tiết, hiển thị 4 dòng Upline/Nhân mạch kết nối/chia sẻ, chỉnh nhãn MP và thu gọn khoảng cách.
+
+### Trạng thái
+- ✅ Hiển thị họ tên kèm ID cùng dòng gọn gàng
+- ✅ SĐT hiển thị ngay dưới họ tên thay thế cho email
+- ✅ Badge Cấp bậc (ví dụ Cấp 3) hiển thị chữ thường, to rõ và căn sát dưới cùng bên phải
+- ✅ Hiển thị đầy đủ 4 dòng Upline / Nhân mạch kết nối / chia sẻ
+- ✅ Điểm tăng trưởng hiển thị đúng định dạng `X (MP)`
+- ✅ Các dòng thông tin hiển thị khít và gọn gàng hơn
+- ✅ `npx tsc --noEmit` — 0 lỗi build
+
