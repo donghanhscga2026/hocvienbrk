@@ -57,6 +57,12 @@ export async function POST(request: Request) {
         if (existingReturn) continue
       }
 
+      // Credit self points (MP) — not awarded until now (previously 0)
+      await prisma.system.update({
+        where: { userId_onSystem: { userId: member.userId, onSystem: 4 } },
+        data: { totalPoints: { increment: 17 } }
+      })
+
       // Distribute commissions + BRKP to ancestors
       await distributeCommission(member.userId, 4, fee, systemTree, evalTime)
 
