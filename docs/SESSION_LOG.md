@@ -103,3 +103,73 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - [ ] Add bot `8630082731:AAENKynjPOEAK_ZKQE35hwbeEoBgx14TiQ0` vào group `-1004466932240`
 - [ ] Deploy lên Vercel (kèm env `TELEGRAM_CHAT_ID_FAILED_LOGIN`)
 - [ ] Test đăng nhập sai trên production → kiểm tra Telegram
+
+
+## ✅ SESSION-20260709_01 — Nâng cấp tính năng và giao diện Giao dịch thanh toán (tools/payments)
+
+- **Ngày**: 2026-07-09
+- **Thời gian**: ~17:00 - 18:00
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Hiển thị thêm thông tin số điện thoại của học viên và hỗ trợ sao chép nhanh SĐT (tách ô copy riêng biệt).
+- Hiển thị chi tiết thông tin Nhân mạch chia sẻ khóa học #[id_khoa] và Nhân mạch kết nối để đối chiếu (rút gọn nhãn, bỏ tên khóa học ở nhân mạch chia sẻ).
+- Tự động sinh cú pháp chuyển khoản chuẩn của hệ thống và hiển thị so sánh với nội dung học viên chuyển thực tế (phát hiện khớp/lệch).
+- Bổ sung nút sinh mã QR chuyển khoản VietQR tự động theo đúng tài khoản nhận của giảng viên dạy khóa, đúng số tiền và cú pháp chuẩn.
+- Đồng bộ nội dung tin nhắn Telegram khi phê duyệt thủ công có đầy đủ thông tin (Số tiền, Ngân hàng, Mã khóa học) giống hệt tin nhắn khi tự động kích hoạt.
+- Tối ưu giao diện đáp ứng (responsive), hạn chế tràn chữ và thiếu nội dung trên thiết bị di động.
+
+### Các file đã thay đổi
+#### `app/actions/payment-actions.ts`
+- Cập nhật hàm `getPendingPayments` và `getAllPayments` để include thông tin của `enrollment.referrer`, `enrollment.user.referrer` và `enrollment.course.teacherBankAccount`.
+- Cập nhật hàm `verifyPaymentAction` (duyệt thủ công) để lấy thêm `teacherBankAccount` và đồng bộ nội dung tin nhắn Telegram báo về (thêm Số tiền, Ngân hàng nhận, Mã khóa học) giống hệt định dạng của kích hoạt tự động.
+
+#### `app/tools/payments/page.tsx`
+- Cập nhật interface `PaymentData` và import `QrCode`, `resolveBankBin`.
+- Sắp xếp lại giao diện hiển thị gọn gàng: thông tin học viên (bao gồm mã số học viên `#`, họ tên, email, ngày đăng ký, nút Copy số điện thoại riêng), thông tin 2 loại nhân mạch (rút gọn nhãn nhã, bỏ chữ user.referrer), thông tin khóa học (tên, giá cọc, số tiền nhận được, STK từ Gmail), cú pháp đối chiếu, nút sinh QR và biên lai.
+- Tối ưu hóa CSS Tailwind và layout responsive trên mobile.
+
+### Các file backup (trong `plan_temp/`)
+| File backup | File gốc |
+|---|---|
+| `payment-actions.backup_20260709_1733.ts` | `app/actions/payment-actions.ts` |
+| `payment-actions.backup_20260709_1800.ts` | `app/actions/payment-actions.ts` |
+| `page.backup_20260709_1733.tsx` | `app/tools/payments/page.tsx` |
+
+### Kiểm tra
+- ✅ TypeScript: `npx tsc --noEmit` → 0 errors
+
+
+## ✅ SESSION-20260709_02 — Cập nhật giao diện thông tin chi tiết thành viên (tools/genealogy)
+
+- **Ngày**: 2026-07-09
+- **Thời gian**: ~18:20 - 18:50
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Hiển thị Số điện thoại của thành viên thay thế cho email ngay dưới tên thành viên.
+- Rút gọn và hiển thị Mã học viên `#[id]` cùng dòng họ tên học viên.
+- Đưa Cấp bậc (ví dụ Cấp 3, Học viên) làm nổi bật ở góc bên phải của header thay vào vị trí cũ của Mã học viên.
+- Bổ sung hiển thị đầy đủ 4 dòng Nhân mạch & Upline:
+  1. Nhân mạch kết nối (`user.referrer`)
+  2. Nhân mạch chia sẻ (`enrollment.referrer` lấy từ khóa 22)
+  3. MB upline 1 (Tuyến trên trực tiếp)
+  4. MB upline 2 (Tuyến trên của upline 1)
+- Chỉnh nhãn Điểm tăng trưởng dời chữ `(MP)` ra sau giá trị điểm (ví dụ: `357 (MP)`).
+- Loại bỏ các đường kẻ ngăn cách `border-t` và giảm khoảng cách margins/paddings giữa các khu vực thông tin để thu gọn diện tích hiển thị.
+
+### Các file đã thay đổi
+#### `app/actions/admin-actions.ts`
+- Cập nhật hàm `getMemberDetailsAction` để include thêm `referrer` trong query select của `user` và `enrollment`, đồng thời trả về `enrollment` trong response object.
+
+#### `app/tools/genealogy/page.tsx`
+- Cập nhật interface `MemberDetailInfo` thêm property `enrollment?: any` vào `data`.
+- Chỉnh sửa component `MemberDetailsModal`: thay đổi layout header, định dạng họ tên font chữ gọn gàng hơn (`font-bold tracking-tight` cỡ `text-sm sm:text-base`), dời badge Cấp bậc xuống góc dưới bên phải, loại bỏ ô số điện thoại ở phần chi tiết, hiển thị 4 dòng Upline/Nhân mạch kết nối/chia sẻ, chỉnh nhãn MP và thu gọn khoảng cách.
+
+### Các file backup (trong `plan_temp/`)
+| File backup | File gốc |
+|---|---|
+| `admin-actions.backup_20260709_1823.ts` | `app/actions/admin-actions.ts` |
+
+### Kiểm tra
+- ✅ TypeScript: `npx tsc --noEmit` → 0 errors

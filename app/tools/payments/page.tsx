@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getPendingPayments, getAllPayments, verifyPaymentAction, rejectPaymentAction, triggerAutoVerifyManual, getGmailStatus } from '@/app/actions/payment-actions'
-import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Clock, CheckCircle, XCircle, AlertCircle, QrCode } from 'lucide-react'
 import Image from 'next/image'
 import MainHeader from '@/components/layout/MainHeader'
+import { resolveBankBin } from '@/lib/bank-bin'
 
 interface PaymentData {
   id: number
@@ -23,17 +24,36 @@ interface PaymentData {
   enrollment: {
     id: number
     status: string
+    referrerId: number | null
+    referrer: {
+      id: number
+      name: string | null
+      phone: string | null
+    } | null
     user: {
       id: number
       name: string | null
       email: string
       phone: string | null
+      referrerId: number | null
+      referrer: {
+        id: number
+        name: string | null
+        phone: string | null
+      } | null
     }
     course: {
       id: number
       id_khoa: string
       name_lop: string
       phi_coc: number
+      teacherBankAccount: {
+        id: number
+        accountHolder: string
+        accountNumber: string
+        bankName: string | null
+        qrCodeUrl: string | null
+      } | null
     }
   }
 }
@@ -45,6 +65,7 @@ export default function PaymentsPage() {
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [scanning, setScanning] = useState(false)
   const [gmailStatus, setGmailStatus] = useState<{ penalized: boolean; retryAfter?: string }>({ penalized: false })
+  const [selectedQR, setSelectedQR] = useState<number | null>(null)
 
   async function handleManualScan() {
     setScanning(true)
@@ -271,45 +292,161 @@ export default function PaymentsPage() {
                     </span>
                   </div>
 
-                  {/* Info Grid */}
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Học viên</p>
-                      <p className="font-bold text-sm text-gray-900 truncate">
-                        {payment.enrollment.user.name || 'N/A'}{' '}
-                        <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 py-0.5 rounded">
-                          HV#{payment.enrollment.user.id}
-                        </span>
-                      </p>
-                      <p className="text-xs text-gray-500 truncate mb-1">{payment.enrollment.user.email}</p>
-                      <p className="text-[9px] text-slate-400 font-bold">
-                        Đề nghị: <span className="font-black text-slate-600">{new Date(payment.createdAt).toLocaleString('vi-VN')}</span>
-                      </p>
+                  {/* Info: Học viên */}
+                  <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1 mb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-gray-200 pb-1.5 mb-1.5">
+                      <span className="text-[10px] text-gray-400 font-bold uppercase">Học viên</span>
+                      <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[10px]">
+                        #{payment.enrollment.user.id}
+                      </span>
                     </div>
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Khóa học</p>
-                      <p className="font-bold text-sm text-orange-600 truncate">{payment.enrollment.course.name_lop}</p>
-                      <p className="text-xs text-gray-500">{payment.enrollment.course.phi_coc.toLocaleString()}đ</p>
+                    <div className="flex justify-between items-center flex-wrap gap-2 text-gray-900 font-semibold">
+                      <span>{payment.enrollment.user.name || 'N/A'}</span>
+                      <span className="text-[10px] text-gray-500 font-normal">
+                        Đăng ký: {new Date(payment.createdAt).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+                    <p className="text-gray-500 break-all mb-1.5">{payment.enrollment.user.email}</p>
+                    
+                    {payment.enrollment.user.phone && (
+                      <div className="flex items-center justify-between bg-white border border-gray-150 rounded-lg p-2 mt-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-500 font-bold uppercase">SĐT:</span>
+                          <span className="font-bold text-gray-800 break-all select-all">{payment.enrollment.user.phone}</span>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(payment.enrollment.user.phone!)
+                            alert('Đã copy số điện thoại học viên!')
+                          }}
+                          className="text-[10px] text-indigo-700 hover:text-indigo-900 font-bold bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors shrink-0"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info: Nhân mạch */}
+                  <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3 mb-3 text-xs space-y-2">
+                    <div>
+                      <span className="text-[9px] text-purple-600 font-bold uppercase block mb-0.5">
+                        Nhân mạch chia sẻ khóa học #{payment.enrollment.course.id_khoa}
+                      </span>
+                      {payment.enrollment.referrer ? (
+                        <p className="font-semibold text-gray-800 break-words">
+                          #{payment.enrollment.referrer.id} - {payment.enrollment.referrer.name || 'N/A'}{' '}
+                          {payment.enrollment.referrer.phone && (
+                            <span className="text-gray-500 font-normal">(📞 {payment.enrollment.referrer.phone})</span>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-gray-400 italic">Không có (N/A)</p>
+                      )}
+                    </div>
+                    <div className="pt-2 border-t border-purple-100/50">
+                      <span className="text-[9px] text-purple-600 font-bold uppercase block mb-0.5">
+                        Nhân mạch kết nối
+                      </span>
+                      {payment.enrollment.user.referrer ? (
+                        <p className="font-semibold text-gray-800 break-words">
+                          #{payment.enrollment.user.referrer.id} - {payment.enrollment.user.referrer.name || 'N/A'}{' '}
+                          {payment.enrollment.user.referrer.phone && (
+                            <span className="text-gray-500 font-normal">(📞 {payment.enrollment.user.referrer.phone})</span>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-gray-400 italic">Không có (N/A)</p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Payment Info */}
-                  {(payment.amount > 0 || payment.bankName || payment.content) && (
-                    <div className="bg-green-50 rounded-xl p-3 mb-3">
-                      <p className="text-[10px] text-green-600 font-bold uppercase mb-1">Thông tin CK</p>
-                      <div className="flex flex-wrap gap-2">
-                        {payment.amount > 0 && (
-                          <span className="text-sm font-bold text-green-700">
-                            {payment.amount.toLocaleString()}đ
-                          </span>
-                        )}
-                        {payment.bankName && (
-                          <span className="text-xs text-green-600">🏦 {payment.bankName}</span>
-                        )}
+                  {/* Info: Khóa học */}
+                  <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-3 mb-3 text-xs space-y-1.5">
+                    <div>
+                      <span className="text-[9px] text-orange-600 font-bold uppercase block">Khóa học</span>
+                      <p className="font-bold text-sm text-orange-650 break-words">{payment.enrollment.course.name_lop}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-orange-100/50">
+                      <div>
+                        <span className="text-[9px] text-gray-400 font-bold uppercase block">Giá cọc</span>
+                        <span className="font-bold text-gray-800">{payment.enrollment.course.phi_coc.toLocaleString()}đ</span>
+                      </div>
+                      {payment.amount > 0 && (
+                        <div>
+                          <span className="text-[9px] text-gray-400 font-bold uppercase block">Nhận được</span>
+                          <span className="font-black text-green-700">{payment.amount.toLocaleString()}đ</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ngân hàng chuyển thực tế từ mail config */}
+                    {(payment.bankName || payment.accountNumber) && (
+                      <div className="pt-1.5 border-t border-orange-100/50 text-[11px] text-slate-600">
+                        <p>
+                          🏦 <span className="font-medium">{payment.bankName}</span> 
+                          {payment.accountNumber && ` - STK: ${payment.accountNumber}`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Cú pháp chuyển khoản chuẩn */}
+                  {(() => {
+                    const cleanPhone = payment.enrollment.user.phone ? payment.enrollment.user.phone.replace(/\D/g, '').slice(-6) : ''
+                    const standardContent = `SDT ${cleanPhone} HV ${payment.enrollment.user.id} COC ${payment.enrollment.course.id_khoa}`.toUpperCase()
+                    const isContentMatch = payment.content ? payment.content.trim().toUpperCase() === standardContent : false
+                    
+                    return (
+                      <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3 mb-3 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] text-blue-600 font-bold uppercase">Cú pháp CK chuẩn</p>
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(standardContent)
+                              alert('Đã copy cú pháp chuyển khoản!')
+                            }}
+                            className="text-[10px] text-blue-700 hover:text-blue-900 font-bold bg-blue-100/50 px-1.5 py-0.5 rounded transition-colors"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                        <p className="font-mono font-bold text-gray-900 bg-white border border-blue-100 p-2 rounded break-all select-all">
+                          {standardContent}
+                        </p>
+                        
+                        {/* So sánh cú pháp thực tế */}
                         {payment.content && (
-                          <span className="text-xs text-green-600">ND: {payment.content}</span>
+                          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-gray-500 font-semibold">ND thực tế:</span>
+                            <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] break-all ${
+                              isContentMatch 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {payment.content} {isContentMatch ? '✓ Khớp' : '✗ Lệch'}
+                            </span>
+                          </div>
                         )}
                       </div>
+                    )
+                  })()}
+
+                  {/* Nút Tạo / Xem QR Code */}
+                  {payment.enrollment.course.teacherBankAccount ? (
+                    <div className="mb-3">
+                      <button
+                        onClick={() => setSelectedQR(payment.id)}
+                        className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-indigo-50 border border-indigo-150 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 transition-colors rounded-xl text-xs font-bold"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        Tạo / Xem mã QR Chuyển Khoản
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mb-3 text-[10px] text-amber-600 font-semibold italic bg-amber-50 p-2 rounded-lg border border-amber-100">
+                      ⚠️ Khóa học chưa cấu hình tài khoản nhận chuyển khoản.
                     </div>
                   )}
 
@@ -330,7 +467,7 @@ export default function PaymentsPage() {
 
                   {/* Action Buttons */}
                   {payment.status === 'PENDING' && (
-                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
                       <button
                         onClick={() => handleVerify(payment.id)}
                         disabled={actionLoading === payment.id}
@@ -361,6 +498,76 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+
+      {selectedQR && (() => {
+        const p = payments.find(pay => pay.id === selectedQR)
+        if (!p || !p.enrollment.course.teacherBankAccount) return null
+        const bankAcc = p.enrollment.course.teacherBankAccount
+        const bankId = resolveBankBin(bankAcc.bankName)
+        const cleanPhone = p.enrollment.user.phone ? p.enrollment.user.phone.replace(/\D/g, '').slice(-6) : ''
+        const standardContent = `SDT ${cleanPhone} HV ${p.enrollment.user.id} COC ${p.enrollment.course.id_khoa}`.toUpperCase()
+        const effectiveAmount = p.enrollment.course.phi_coc || p.amount || 0
+        const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(standardContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200 text-center relative mx-auto">
+              <button 
+                onClick={() => setSelectedQR(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 p-1.5 rounded-full transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+              
+              <h3 className="text-base font-black text-gray-900 mb-1">Mã QR Chuyển Khoản</h3>
+              <p className="text-xs text-gray-500 mb-4">{p.enrollment.course.name_lop}</p>
+              
+              <div className="relative w-60 h-60 mx-auto border-2 border-indigo-100 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center mb-4 shadow-inner">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={qrUrl} 
+                  alt="Mã QR Chuyển Khoản"
+                  className="object-contain w-full h-full"
+                />
+              </div>
+              
+              <div className="bg-gray-50 rounded-2xl p-3 text-left text-xs space-y-2 border border-gray-100">
+                <div>
+                  <span className="text-gray-400 block text-[10px] font-bold uppercase">Ngân hàng</span>
+                  <span className="font-bold text-gray-800">{bankAcc.bankName || 'N/A'}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Số tài khoản</span>
+                    <span className="font-mono font-bold text-gray-800 break-all">{bankAcc.accountNumber}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Chủ tài khoản</span>
+                    <span className="font-bold text-gray-800 uppercase">{bankAcc.accountHolder}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Số tiền</span>
+                    <span className="font-bold text-red-600 text-sm">{effectiveAmount.toLocaleString()}đ</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block text-[10px] font-bold uppercase">Nội dung CK</span>
+                    <span className="font-mono font-bold text-indigo-600 break-all">{standardContent}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setSelectedQR(null)}
+                className="mt-5 w-full py-3 bg-black hover:bg-gray-800 text-yellow-400 font-bold rounded-2xl text-sm transition-colors shadow-lg"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
