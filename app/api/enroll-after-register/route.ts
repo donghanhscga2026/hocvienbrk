@@ -73,6 +73,45 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Track affiliate conversion for purchase
+    if (user?.referrerId) {
+      try {
+        const { trackAffiliateConversion } = await import("@/lib/affiliate/tracking")
+        const { cookies } = await import("next/headers")
+        const cookieStore = await cookies()
+        const refCookie = cookieStore.get('aff_ref')
+        
+        let finalRefCode = ""
+        if (refCookie?.value) {
+          try {
+            const decoded = decodeURIComponent(refCookie.value)
+            const affData = JSON.parse(decoded)
+            if (affData?.r) finalRefCode = affData.r
+          } catch {
+            finalRefCode = refCookie.value
+          }
+        }
+
+        if (!finalRefCode) {
+          const defaultLink = await prisma.affiliateLink.findFirst({
+            where: { userId: user.referrerId, name: "Default" }
+          })
+          finalRefCode = defaultLink?.code || `default-${user.referrerId}`
+        }
+
+        await trackAffiliateConversion({
+          refCode: finalRefCode,
+          userId: userIdNum,
+          type: 'PURCHASE',
+          enrollmentId: newEnrollment.id,
+          orderAmount: effectivePhiCoc
+        })
+        console.log(`[EnrollAfterRegister-Track] Tracked conversion for user #${userIdNum} under refCode ${finalRefCode}`)
+      } catch (trackErr) {
+        console.error("[EnrollAfterRegister-Track] Failed to track conversion:", trackErr)
+      }
+    }
+
     // Tạo Payment record cho enrollment cần thu phí (auto-verify cần Payment để update)
     if (effectivePhiCoc > 0) {
       await prisma.payment.create({

@@ -184,6 +184,45 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             }
         })
 
+        // Track affiliate conversion for purchase
+        if (enrollmentReferrerId) {
+            try {
+                const { trackAffiliateConversion } = await import('@/lib/affiliate/tracking')
+                let finalRefCode = ""
+                try {
+                    const cookieStore = await cookies()
+                    const refCookie = cookieStore.get('aff_ref')
+                    if (refCookie?.value) {
+                        try {
+                            const decoded = decodeURIComponent(refCookie.value)
+                            const affData = JSON.parse(decoded)
+                            if (affData?.r) finalRefCode = affData.r
+                        } catch {
+                            finalRefCode = refCookie.value
+                        }
+                    }
+                } catch {}
+
+                if (!finalRefCode) {
+                    const defaultLink = await prisma.affiliateLink.findFirst({
+                        where: { userId: enrollmentReferrerId, name: "Default" }
+                    })
+                    finalRefCode = defaultLink?.code || `default-${enrollmentReferrerId}`
+                }
+
+                await trackAffiliateConversion({
+                    refCode: finalRefCode,
+                    userId,
+                    type: 'PURCHASE',
+                    enrollmentId: newEnrollment.id,
+                    orderAmount: effectivePhiCoc
+                })
+                console.log(`[Enroll-Track] Tracked conversion for user #${userId} under refCode ${finalRefCode}`)
+            } catch (trackErr) {
+                console.error('[Enroll-Track] Failed to track conversion:', trackErr)
+            }
+        }
+
         // Auto-sync vào hệ thống YTB (onSystem=3) nếu là khóa của teacher 327 (không áp dụng SYS)
         if (course.teacherId === 327 && course.type !== 'SYS') {
             const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")

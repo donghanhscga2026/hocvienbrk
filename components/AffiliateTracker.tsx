@@ -29,7 +29,7 @@ function AffiliateTrackerInner() {
       document.cookie = `aff_ref=${encodeURIComponent(cookieData)}; path=/; max-age=${EXPIRY_DAYS * 24 * 60 * 60}; SameSite=Lax`
       console.log('[Affiliate] Captured ref:', refParam, '| Cookie set')
 
-      fetch(`/api/affiliate/log-click?ref=${encodeURIComponent(refParam)}`).catch(() => {})
+      fetch(`/api/affiliate/log-click?ref=${encodeURIComponent(refParam)}`, { method: 'POST' }).catch(() => {})
 
       const cleanUrl = pathname.split('?')[0]
       window.history.replaceState({}, '', cleanUrl)
