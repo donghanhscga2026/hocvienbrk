@@ -60,7 +60,7 @@ export async function activateBrkMember(
       gracePeriodEnd: graceEnd,
       expiresAt,
       level: 1,
-      totalPoints: BRKP_PER_ACTIVATION,
+      totalPoints: 0,
     }
   })
 
@@ -72,9 +72,9 @@ export async function activateBrkMember(
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
   if (isOptionB) {
-    // System record + wallet + self points created. Commissions to ancestors,
-    // ancestor points, return fee, 2F1 voucher, and level-up will be processed
-    // by brk-daily-eval cron after gracePeriodEnd passes.
+    // System record + wallet created. Self points = 0 (not yet confirmed).
+    // After gracePeriodEnd passes, brk-daily-eval cron will credit self points + 17,
+    // distribute ancestor commissions/points, return fee, 2F1 voucher, and level-up.
     return system
   }
 
