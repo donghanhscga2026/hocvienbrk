@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { saveBase64Image } from "@/lib/image-utils"
+import { normalizePhone } from "@/lib/phone-utils"
 
 export async function getUserWithAccounts() {
     const session = await auth()
@@ -47,11 +48,13 @@ export async function updateUserProfile(data: {
             finalImageUrl = await saveBase64Image(finalImageUrl);
         }
 
+        const normalizedPhone = data.phone ? normalizePhone(data.phone) : data.phone;
+
         const user = await prisma.user.update({
             where: { id: userId },
             data: {
                 name: data.name,
-                phone: data.phone,
+                phone: normalizedPhone,
                 image: finalImageUrl,
             }
         })

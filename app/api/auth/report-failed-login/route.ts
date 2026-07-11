@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getAllPhoneVariants } from "@/lib/phone-utils";
 
 type IdentifierType = 'student_id' | 'email' | 'phone' | 'unknown';
 type ErrorType = 'NOT_FOUND' | 'INVALID_PASSWORD' | 'NO_PASSWORD' | 'UNKNOWN';
@@ -10,17 +11,6 @@ function detectIdentifierType(identifier: string): IdentifierType {
   const digitsOnly = identifier.replace(/\D/g, '');
   if (digitsOnly.length >= 8 && digitsOnly.length <= 15) return 'phone';
   return 'unknown';
-}
-
-function normalizePhone(identifier: string): string[] {
-  const clean = identifier.replace(/\s/g, '');
-  const variants: string[] = [];
-  let base = clean;
-  if (base.startsWith('+84')) base = base.slice(3);
-  else if (base.startsWith('84')) base = base.slice(2);
-  else if (base.startsWith('0')) base = base.slice(1);
-  variants.push(base, '0' + base, '84' + base, '+84' + base);
-  return [...new Set(variants)];
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +33,7 @@ export async function POST(request: NextRequest) {
         where: { email: { equals: identifier.toLowerCase().trim(), mode: 'insensitive' } },
       });
     } else if (identifierType === 'phone') {
-      const phoneVariants = normalizePhone(identifier);
+      const phoneVariants = getAllPhoneVariants(identifier);
       user = await prisma.user.findFirst({
         where: { phone: { in: phoneVariants } },
       });

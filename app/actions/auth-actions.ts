@@ -11,54 +11,7 @@ import { trackAffiliateConversion } from "@/lib/affiliate/tracking"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { cookies } from "next/headers"
 import { auth } from "@/auth"
-
-function normalizePhone(phone: string): string {
-  if (!phone) return '';
-  let p = phone.replace(/\s/g, '').replace(/^0/, '84');
-  if (!p.startsWith('+')) p = '+' + p;
-  return p;
-}
-
-function getAllPhoneVariants(fullPhone: string): string[] {
-  const normalized = normalizePhone(fullPhone);
-  const variants = [normalized];
-  
-  if (normalized.startsWith('+84')) {
-    const rawNumber = normalized.slice(3);
-    variants.push('0' + rawNumber);
-    variants.push('84' + rawNumber);
-    variants.push(rawNumber);
-    variants.push('+' + '84' + rawNumber);
-  } else if (normalized.startsWith('+')) {
-    const withoutPlus = normalized.slice(1);
-    variants.push(withoutPlus);
-    if (withoutPlus.startsWith('84')) {
-      const rawNumber = withoutPlus.slice(2);
-      variants.push('0' + rawNumber);
-      variants.push(rawNumber);
-    }
-  } else {
-    variants.push('+' + normalized);
-  }
-
-  // Luôn thêm biến thể làm sạch hoàn toàn mọi prefix để đối chiếu với legacy data
-  let clean = normalized.replace(/\s/g, '');
-  while (true) {
-    if (clean.startsWith('+84')) clean = clean.slice(3);
-    else if (clean.startsWith('84')) clean = clean.slice(2);
-    else if (clean.startsWith('0')) clean = clean.slice(1);
-    else if (clean.startsWith('+')) clean = clean.slice(1);
-    else break;
-  }
-  if (clean) {
-    variants.push(clean);
-    variants.push('0' + clean);
-    variants.push('84' + clean);
-    variants.push('+84' + clean);
-  }
-  
-  return [...new Set(variants)];
-}
+import { normalizePhone, getAllPhoneVariants } from "@/lib/phone-utils"
 
 const registerSchema = z.object({
     name: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
@@ -88,23 +41,7 @@ export async function registerUser(prevState: any, formData: FormData) {
 
     const { name, email, countryCode, phone, password, referrerId } = validatedFields.data
     
-    // Chuẩn hóa loại bỏ khoảng trắng và các mã quốc gia trùng lặp nếu người dùng nhập thừa
-    let cleanPhone = phone.replace(/\s/g, '');
-    const cleanCountryCode = countryCode.replace('+', '');
-    
-    while (true) {
-        if (cleanPhone.startsWith('+' + cleanCountryCode)) {
-            cleanPhone = cleanPhone.slice(('+' + cleanCountryCode).length);
-        } else if (cleanPhone.startsWith(cleanCountryCode)) {
-            cleanPhone = cleanPhone.slice(cleanCountryCode.length);
-        } else if (cleanPhone.startsWith('0')) {
-            cleanPhone = cleanPhone.slice(1);
-        } else {
-            break;
-        }
-    }
-    
-    const fullPhone = `${countryCode}${cleanPhone}`;
+    const fullPhone = normalizePhone(`${countryCode}${phone}`) || `${countryCode}${phone.replace(/\s/g, '').replace(/^0/, '')}`;
     
     const phoneVariants = getAllPhoneVariants(fullPhone);
     const normalizedEmail = email.toLowerCase().trim();
@@ -270,12 +207,7 @@ export async function completeProfileAction(data: { name: string, phone: string,
     const { name, phone, countryCode, password } = data
 
     try {
-        // Chuẩn hóa SĐT: Loại bỏ số 0 ở đầu nếu có
-        let cleanPhone = phone.trim().replace(/\s+/g, '')
-        if (cleanPhone.startsWith('0')) {
-            cleanPhone = cleanPhone.substring(1)
-        }
-        const fullPhone = `${countryCode}${cleanPhone}`
+        const fullPhone = normalizePhone(`${countryCode}${phone}`) || `${countryCode}${phone.replace(/\s/g, '').replace(/^0/, '')}`;
 
         // Kiểm tra xem SĐT đã được dùng bởi tài khoản khác chưa
         const existingUser = await prisma.user.findFirst({

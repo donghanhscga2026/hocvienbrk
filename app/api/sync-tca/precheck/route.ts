@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { normalizePhone } from '@/lib/phone-utils'
 
 const prisma = new PrismaClient()
 
@@ -41,23 +42,6 @@ export async function POST(request: Request) {
     console.log('[API/sync-tca/precheck] Precheck request')
     console.log('Total nodes:', allNodes?.length || 0)
     console.log('==========================================')
-
-    // Helper function to normalize phone number
-    const normalizePhone = (phone: string | null): string | null => {
-      if (!phone) return null;
-      // Remove all non-digit characters
-      const digits = phone.replace(/\D/g, '');
-      // If starts with 84, remove it
-      if (digits.startsWith('84') && digits.length === 11) {
-        return '0' + digits.substring(2);
-      }
-      // If starts with 0, keep as is
-      if (digits.startsWith('0')) {
-        return digits;
-      }
-      // Otherwise return original
-      return phone;
-    }
 
     if (!allNodes || !Array.isArray(allNodes)) {
       return NextResponse.json(
