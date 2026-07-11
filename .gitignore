@@ -58,3 +58,5 @@ nul
 .vercel
 .env*.local
 .continue/
+_env
+_env.local

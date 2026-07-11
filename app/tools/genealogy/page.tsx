@@ -580,7 +580,7 @@ function GenealogyFlow() {
     setMemberDetail({ show: true, userId, loading: true })
     const res = await getMemberDetailsAction(userId, selectedSystem || undefined)
     if (res.success) {
-      setMemberDetail({ show: true, userId, data: { user: res.user, tca: res.tca, systemData: res.systemData || undefined }, loading: false })
+      setMemberDetail({ show: true, userId, data: { user: res.user, tca: res.tca, systemData: res.systemData || undefined, enrollment: res.enrollment }, loading: false })
     } else {
       setMemberDetail(prev => ({ ...prev, loading: false }))
     }
@@ -1694,14 +1694,14 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
             <>
               <div className="space-y-1.5 sm:space-y-2">
                 {/* Upline Leaders & Referrers */}
-                <div className="p-2.5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl mb-2 text-xs space-y-1.5">
+                <div className="p-2.5 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl mb-2 text-[10px] sm:text-xs space-y-1.5">
                   <div className="flex items-center justify-between text-indigo-750 font-semibold">
                     <span>Nhân mạch kết nối:</span>
                     <span className="font-bold text-indigo-900">
                       {user?.referrer ? (
                         <>
                           {user.referrer.name}{' '}
-                          <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{user.referrer.id}</code>
+                          <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-bold">#{user.referrer.id}</code>
                         </>
                       ) : 'Chưa cập nhật'}
                     </span>
@@ -1713,7 +1713,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       {enrollment?.referrer ? (
                         <>
                           {enrollment.referrer.name}{' '}
-                          <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{enrollment.referrer.id}</code>
+                          <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-bold">#{enrollment.referrer.id}</code>
                         </>
                       ) : 'Chưa cập nhật'}
                     </span>
