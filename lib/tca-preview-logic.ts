@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { normalizePhone } from '@/lib/phone-utils'
 
 const prisma = new PrismaClient()
 
@@ -84,18 +85,6 @@ export interface PreviewResult {
   nextAvailableUserId: number
   nextAvailableSystemId: number
   rows: PreviewRow[]
-}
-
-const normalizePhone = (phone: string | null): string | null => {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('84') && digits.length === 11) {
-    return '0' + digits.substring(2);
-  }
-  if (digits.startsWith('0')) {
-    return digits;
-  }
-  return phone;
 }
 
 export async function generatePreview(allNodes: TCANode[], memberInfo: Record<number, MemberInfo>): Promise<PreviewResult> {

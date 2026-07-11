@@ -6,6 +6,7 @@ import { Role } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import { addUserToClosure } from '@/lib/closure-helpers'
 import { trackAffiliateConversion } from '@/lib/affiliate/tracking'
+import { normalizePhone } from '@/lib/phone-utils'
 
 const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"
 
@@ -73,10 +74,6 @@ function extractSheetId(url: string): string | null {
     return match ? match[1] : null
 }
 
-function normalizePhone(phone: string): string {
-    return phone.replace(/\D/g, '').replace(/^0+/, '')
-}
-
 export async function previewBulkEnrollAction(spreadsheetUrl: string, courseId: number) {
     try {
         const session = await auth()
@@ -127,7 +124,7 @@ export async function previewBulkEnrollAction(spreadsheetUrl: string, courseId: 
             const cols = rows[i]
             const name = (cols[nameIdx] || '').trim()
             const email = (cols[emailIdx] || '').trim().toLowerCase()
-            const phone = normalizePhone(cols[phoneIdx] || '')
+            const phone = normalizePhone(cols[phoneIdx] || '') || ''
             const rawReferrer = (cols[referrerIdx] || '').trim()
             const referrerId = rawReferrer ? parseInt(rawReferrer) || 0 : 0
 
