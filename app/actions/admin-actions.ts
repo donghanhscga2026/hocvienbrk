@@ -1020,9 +1020,19 @@ export async function updateCourseAction(courseId: number, data: {
             }
         }
 
+        // Extract fields that are NOT direct Course model columns
+        const { acceptedVoucherIds, awardVoucherIds, teacherBankAccountId: tbaid, ...courseData } = data
+        // Prisma doesn't accept teacherBankAccountId directly — convert to relation
+        const bankAccountId = data.teacherBankAccountId ?? null
+
         const updatedCourse = await prisma.course.update({
             where: { id: courseId },
-            data: data as any
+            data: {
+                ...courseData as any,
+                teacherBankAccount: bankAccountId
+                    ? { connect: { id: bankAccountId } }
+                    : { disconnect: true }
+            }
         })
 
         // Update accepted vouchers

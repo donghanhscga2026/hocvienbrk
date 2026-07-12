@@ -94,9 +94,18 @@ export async function PUT(
     delete body.acceptedVoucherIds
     delete body.awardVoucherIds
 
+    // Extract teacherBankAccountId — Prisma update() requires relation syntax
+    const bankAccountId = body.teacherBankAccountId ?? null
+    delete body.teacherBankAccountId
+
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },
-      data: body
+      data: {
+        ...body,
+        teacherBankAccount: bankAccountId
+          ? { connect: { id: bankAccountId } }
+          : { disconnect: true }
+      }
     });
 
     // Update accepted vouchers
