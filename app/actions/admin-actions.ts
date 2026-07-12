@@ -1020,19 +1020,45 @@ export async function updateCourseAction(courseId: number, data: {
             }
         }
 
-        // Extract fields that are NOT direct Course model columns
-        const { acceptedVoucherIds, awardVoucherIds, teacherBankAccountId: tbaid, ...courseData } = data
-        // Prisma doesn't accept teacherBankAccountId directly — convert to relation
+        // Build Prisma-safe data: only scalar columns, no FK fields
+        const courseData: Record<string, any> = {
+            id_khoa: data.id_khoa,
+            name_lop: data.name_lop,
+            name_khoa: data.name_khoa ?? null,
+            date_join: data.date_join ?? null,
+            status: data.status,
+            mo_ta_ngan: data.mo_ta_ngan ?? null,
+            mo_ta_dai: data.mo_ta_dai ?? null,
+            link_anh_bia: data.link_anh_bia ?? null,
+            link_zalo: data.link_zalo ?? null,
+            phi_coc: data.phi_coc,
+            feeType: data.feeType,
+            noidung_stk: data.noidung_stk ?? null,
+            file_email: data.file_email ?? null,
+            noidung_email: data.noidung_email ?? null,
+            type: data.type,
+            pin: data.pin,
+            category: data.category ?? 'Khác',
+        }
+
+        // FK fields → relation syntax (Prisma update() rejects scalar FKs)
+        const categoryId = data.categoryId ?? null
+        const teacherIdVal = data.teacherId ?? null
         const bankAccountId = data.teacherBankAccountId ?? null
+
+        courseData.courseCategory = categoryId
+            ? { connect: { id: categoryId } }
+            : { disconnect: true }
+        courseData.teacher = teacherIdVal
+            ? { connect: { id: teacherIdVal } }
+            : { disconnect: true }
+        courseData.teacherBankAccount = bankAccountId
+            ? { connect: { id: bankAccountId } }
+            : { disconnect: true }
 
         const updatedCourse = await prisma.course.update({
             where: { id: courseId },
-            data: {
-                ...courseData as any,
-                teacherBankAccount: bankAccountId
-                    ? { connect: { id: bankAccountId } }
-                    : { disconnect: true }
-            }
+            data: courseData
         })
 
         // Update accepted vouchers

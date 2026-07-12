@@ -88,20 +88,35 @@ export async function PUT(
       delete body.teacherId;  // TEACHER không được thay đổi teacherId
     }
 
-    // Extract voucher arrays before course update (they're not direct course fields)
+    // Extract non-scalar fields BEFORE any deletions
     const acceptedVoucherIds = body.acceptedVoucherIds
     const awardVoucherIds = body.awardVoucherIds
+    const categoryId = body.categoryId ?? null
+    const rawTeacherId = body.teacherId ?? null
+    const bankAccountId = body.teacherBankAccountId ?? null
+
+    // TEACHER không được thay đổi teacherId — nhưng KHÔNG disconnect, giữ nguyên
+    if (!isAdmin) {
+      delete body.teacherId
+    }
+
     delete body.acceptedVoucherIds
     delete body.awardVoucherIds
-
-    // Extract teacherBankAccountId — Prisma update() requires relation syntax
-    const bankAccountId = body.teacherBankAccountId ?? null
+    delete body.categoryId
     delete body.teacherBankAccountId
 
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },
       data: {
         ...body,
+        courseCategory: categoryId
+          ? { connect: { id: categoryId } }
+          : { disconnect: true },
+        ...(isAdmin ? {
+          teacher: rawTeacherId
+            ? { connect: { id: rawTeacherId } }
+            : { disconnect: true }
+        } : {}),
         teacherBankAccount: bankAccountId
           ? { connect: { id: bankAccountId } }
           : { disconnect: true }
