@@ -38,7 +38,6 @@ interface HomeClientProps {
   groupedOtherCourses: { category: string; courses: Course[] }[]
   session: any
   enrollmentsMap: EnrollmentMap
-  isCourseOneActive: boolean
   userPhone: string | null
   userId: number | null
   customPath: number[] | null
@@ -54,7 +53,6 @@ export default function HomeClient({
   groupedOtherCourses,
   session,
   enrollmentsMap,
-  isCourseOneActive,
   userPhone,
   userId,
   customPath,
@@ -112,7 +110,6 @@ export default function HomeClient({
                 courses={myCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
-                isCourseOneActive={isCourseOneActive}
                 userPhone={userPhone}
                 userId={userId}
                 darkMode={false}
@@ -126,7 +123,6 @@ export default function HomeClient({
                 groupedCourses={groupedOtherCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
-                isCourseOneActive={isCourseOneActive}
                 userPhone={userPhone}
                 userId={userId}
                 accentColor="bg-blue-600"
@@ -139,7 +135,6 @@ export default function HomeClient({
             groupedCourses={groupedOtherCourses}
             session={session}
             enrollmentsMap={enrollmentsMap}
-            isCourseOneActive={isCourseOneActive}
             userPhone={userPhone}
             userId={userId}
             accentColor="bg-blue-600"
@@ -151,7 +146,6 @@ export default function HomeClient({
         <PaymentModal
           course={courseToPay}
           enrollment={enrollmentsMap[courseToPay.id] || null}
-          isCourseOneActive={isCourseOneActive}
           userPhone={userPhone}
           userId={userId}
           onClose={handleClosePayment}

@@ -24,7 +24,13 @@ export async function GET(
         lessons: {
           orderBy: { order: 'asc' }
         },
-        teacher: true
+        teacher: true,
+        acceptedVouchers: {
+          include: { voucher: true }
+        },
+        voucherAwards: {
+          include: { voucher: true }
+        },
       }
     });
 
@@ -82,10 +88,38 @@ export async function PUT(
       delete body.teacherId;  // TEACHER không được thay đổi teacherId
     }
 
+    // Extract voucher arrays before course update (they're not direct course fields)
+    const acceptedVoucherIds = body.acceptedVoucherIds
+    const awardVoucherIds = body.awardVoucherIds
+    delete body.acceptedVoucherIds
+    delete body.awardVoucherIds
+
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },
       data: body
     });
+
+    // Update accepted vouchers
+    if (acceptedVoucherIds !== undefined) {
+      const courseId = parseInt(id)
+      await prisma.courseAcceptedVoucher.deleteMany({ where: { courseId } })
+      if (acceptedVoucherIds.length > 0) {
+        await prisma.courseAcceptedVoucher.createMany({
+          data: acceptedVoucherIds.map((voucherId: number) => ({ courseId, voucherId }))
+        })
+      }
+    }
+
+    // Update award vouchers
+    if (awardVoucherIds !== undefined) {
+      const courseId = parseInt(id)
+      await prisma.courseVoucherAward.deleteMany({ where: { courseId } })
+      if (awardVoucherIds.length > 0) {
+        await prisma.courseVoucherAward.createMany({
+          data: awardVoucherIds.map((voucherId: number) => ({ courseId, voucherId }))
+        })
+      }
+    }
 
     return NextResponse.json({ success: true, course: updatedCourse });
   } catch (error: any) {

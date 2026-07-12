@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
             link_anh_bia: body.link_anh_bia || null,
             phi_coc: Number(body.phi_coc) || 0,
             feeType: body.feeType || 'MIEN_PHI',
-            vipExempt: body.vipExempt === true,
             noidung_stk: body.noidung_stk || null,
             link_zalo: body.link_zalo || null,
             file_email: body.file_email || null,
@@ -72,6 +71,28 @@ export async function POST(request: NextRequest) {
         const course = await prisma.course.create({
             data: courseData
         })
+
+        // Create accepted voucher records
+        const acceptedVoucherIds: number[] = body.acceptedVoucherIds || []
+        if (acceptedVoucherIds.length > 0) {
+            await prisma.courseAcceptedVoucher.createMany({
+                data: acceptedVoucherIds.map((voucherId: number) => ({
+                    courseId: course.id,
+                    voucherId
+                }))
+            })
+        }
+
+        // Create award voucher records
+        const awardVoucherIds: number[] = body.awardVoucherIds || []
+        if (awardVoucherIds.length > 0) {
+            await prisma.courseVoucherAward.createMany({
+                data: awardVoucherIds.map((voucherId: number) => ({
+                    courseId: course.id,
+                    voucherId
+                }))
+            })
+        }
 
         revalidatePath('/tools/courses')
         return NextResponse.json({ success: true, course })

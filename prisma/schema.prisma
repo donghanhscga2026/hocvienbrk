@@ -52,6 +52,7 @@ model User {
   brkWallet                    BrkWallet?
   brkSystemsCreated            SystemTree[]
   bankAccounts                 UserBankAccount[]
+  userVouchers                 UserVoucher[]
 
   @@index([email])
   @@index([phone])
@@ -370,6 +371,8 @@ model Course {
   lessons       Lesson[]
   systemTree    SystemTree?
   autoVerifyConfig AutoVerifyConfig?
+  acceptedVouchers  CourseAcceptedVoucher[]
+  voucherAwards     CourseVoucherAward[]
 
   @@index([teacherId])
 }
@@ -1494,6 +1497,18 @@ enum BankAccountType {
   OTHER
 }
 
+enum VoucherType {
+  VIP
+  ALL
+  CASH
+}
+
+enum UserVoucherStatus {
+  ACTIVE
+  USED
+  EXPIRED
+}
+
 model UserBankAccount {
   id             Int             @id @default(autoincrement())
   userId         Int
@@ -1509,4 +1524,65 @@ model UserBankAccount {
   courses        Course[] @relation("CourseTeacherBank")
 
   @@index([userId])
+}
+
+model Voucher {
+  id            Int          @id @default(autoincrement())
+  code          String       @unique
+  name          String
+  type          VoucherType
+  value         Int          @default(0)
+  durationDays  Int?
+  description   String?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+
+  userVouchers        UserVoucher[]
+  awardedCourses      CourseVoucherAward[]
+  acceptedCourses     CourseAcceptedVoucher[]
+
+  @@index([type])
+  @@index([code])
+}
+
+model UserVoucher {
+  id                    Int               @id @default(autoincrement())
+  userId                Int
+  voucherId             Int
+  status                UserVoucherStatus @default(ACTIVE)
+  awardedFromCourseId   Int?
+  expiresAt             DateTime?
+  usedAt                DateTime?
+  usedForCourseId       Int?
+  createdAt             DateTime          @default(now())
+
+  user                  User              @relation(fields: [userId], references: [id])
+  voucher               Voucher           @relation(fields: [voucherId], references: [id])
+
+  @@unique([userId, voucherId, awardedFromCourseId])
+  @@index([userId, status])
+  @@index([voucherId])
+  @@map("user_voucher")
+}
+
+model CourseVoucherAward {
+  id          Int       @id @default(autoincrement())
+  courseId     Int
+  voucherId   Int
+  course      Course    @relation(fields: [courseId], references: [id])
+  voucher     Voucher   @relation(fields: [voucherId], references: [id])
+
+  @@unique([courseId, voucherId])
+  @@map("course_voucher_award")
+}
+
+model CourseAcceptedVoucher {
+  id          Int       @id @default(autoincrement())
+  courseId     Int
+  voucherId   Int
+  course      Course    @relation(fields: [courseId], references: [id])
+  voucher     Voucher   @relation(fields: [voucherId], references: [id])
+
+  @@unique([courseId, voucherId])
+  @@map("course_accepted_voucher")
 }

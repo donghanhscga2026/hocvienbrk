@@ -7,6 +7,7 @@ import RealityMap from '@/components/home/RealityMap'
 import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
 import CommunityBoard from '@/components/home/CommunityBoard'
 import PaymentModal from '@/components/course/PaymentModal'
+import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 
 interface HomePageClientProps {
   profile: any
@@ -17,7 +18,6 @@ interface HomePageClientProps {
   posts?: any[]
   session: any
   enrollmentsMap: Record<number, any>
-  isCourseOneActive: boolean
   userPhone: string | null
   userId: number | null
   customPath: number[] | null
@@ -38,7 +38,6 @@ function HomePageContent({
   posts = [],
   session,
   enrollmentsMap,
-  isCourseOneActive,
   userPhone,
   userId,
   customPath,
@@ -52,6 +51,13 @@ function HomePageContent({
   const searchParams = useSearchParams()
   const paymentCourseId = searchParams.get('paymentCourseId')
   const [courseToPay, setCourseToPay] = useState<any>(null)
+  const { open: openMbw } = useMbwDashboard()
+
+  useEffect(() => {
+    if (session?.user) {
+      setTimeout(() => openMbw(), 500)
+    }
+  }, [session?.user, openMbw])
 
   useEffect(() => {
     if (paymentCourseId) {
@@ -124,7 +130,7 @@ function HomePageContent({
                 hiddenCourses={myCompletedCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
-                isCourseOneActive={isCourseOneActive}
+                
                 userPhone={userPhone}
                 userId={userId}
                 darkMode={false}
@@ -140,7 +146,7 @@ function HomePageContent({
                 groupedCourses={groupedOtherCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
-                isCourseOneActive={isCourseOneActive}
+                
                 userPhone={userPhone}
                 userId={userId}
                 accentColor="bg-blue-600"
@@ -156,7 +162,7 @@ function HomePageContent({
               groupedCourses={groupedOtherCourses}
               session={session}
               enrollmentsMap={enrollmentsMap}
-              isCourseOneActive={isCourseOneActive}
+              
               userPhone={userPhone}
               userId={userId}
               accentColor="bg-blue-600"
@@ -172,7 +178,7 @@ function HomePageContent({
         <PaymentModal
           course={courseToPay}
           enrollment={enrollmentsMap[courseToPay.id] || null}
-          isCourseOneActive={isCourseOneActive}
+          
           userPhone={userPhone}
           userId={userId}
           onClose={handleClosePayment}

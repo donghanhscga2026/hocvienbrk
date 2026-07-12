@@ -24,14 +24,13 @@ interface PaymentModalProps {
             accountNumber?: string | null
         }
     } | null
-    isCourseOneActive?: boolean
     userPhone?: string | null
     userId?: number | null
     onClose: () => void
     onUploadProof?: (enrollmentId: number) => void
 }
 
-export default function PaymentModal({ course, enrollment, isCourseOneActive = false, userPhone = null, userId = null, onClose, onUploadProof }: PaymentModalProps) {
+export default function PaymentModal({ course, enrollment, userPhone = null, userId = null, onClose, onUploadProof }: PaymentModalProps) {
     const [showUploadModal, setShowUploadModal] = useState(false)
     const [showFullQR, setShowFullQR] = useState(false)
     const [uploading, setUploading] = useState(false)
@@ -42,8 +41,8 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
     const isVerified = paymentStatus === 'VERIFIED'
     const isPending = paymentStatus === 'PENDING' || paymentStatus === undefined
     
-    // QR từ VietQR API hoặc fallback
-    const effectiveAmount = isCourseOneActive ? 0 : (payment?.amount || course.phi_coc || 0)
+    // Use payment amount directly — server handles voucher logic
+    const effectiveAmount = payment?.amount || course.phi_coc || 0
     
     // Format nội dung thống nhất với lib/vietqr: SDT [6_cuối] HV [userId] COC [courseCode]
     const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-6) : ''
@@ -146,9 +145,9 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
                                 <p className="text-lg sm:text-xl font-black text-[#7c3aed]">
                                     {effectiveAmount?.toLocaleString()}đ
                                 </p>
-                                {isCourseOneActive && (
+                                {effectiveAmount === 0 && (
                                     <p className="text-[9px] font-bold text-green-600 italic">
-                                        * Miễn phí (Đã có khóa 86 ngày)
+                                        * Miễn phí
                                     </p>
                                 )}
                             </div>
