@@ -985,7 +985,8 @@ export async function updateCourseAction(courseId: number, data: {
     file_email?: string | null,
     teacherId?: number | null,
     teacherBankAccountId?: number | null,
-    vipExempt?: boolean
+    vipExempt?: boolean,
+    feeType?: string
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
@@ -1020,7 +1021,7 @@ export async function updateCourseAction(courseId: number, data: {
 
         const updatedCourse = await prisma.course.update({
             where: { id: courseId },
-            data
+            data: data as any
         })
         revalidatePath('/tools/courses')
         revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá

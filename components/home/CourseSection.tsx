@@ -42,13 +42,13 @@ function CourseCategoryGroup({
             ref={groupRef}
             onMouseMove={handleActivity}
             onTouchStart={handleActivity}
-            className={`relative p-6 rounded-[2.5rem] transition-all duration-500 bg-brk-background border-brk-outline shadow-xl ${
+            className={`relative p-3 rounded-[2rem] transition-all duration-500 bg-brk-background border-brk-outline shadow-xl ${
                 isExpanded 
                 ? 'ring-2 ring-yellow-400 shadow-2xl z-20 mb-8' 
                 : 'mb-4'
             }`}
         >
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isExpanded ? 'bg-brk-primary text-brk-on-primary' : 'bg-brk-surface text-brk-muted shadow-sm'}`}>
                         <LayoutGrid className="w-5 h-5" />
@@ -71,7 +71,7 @@ function CourseCategoryGroup({
                 )}
             </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {visibleCourses.map((course: any, index: number) => (
                     <div key={course.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                         <CourseCard
@@ -114,6 +114,7 @@ function CourseCategoryGroup({
 interface CourseSectionProps {
     title: string
     courses?: any[]
+    hiddenCourses?: any[]
     groupedCourses?: { category: string, courses: any[] }[]
     session: any
     enrollmentsMap: any
@@ -129,6 +130,7 @@ interface CourseSectionProps {
 export default function CourseSection({
     title,
     courses,
+    hiddenCourses,
     groupedCourses,
     session,
     enrollmentsMap,
@@ -145,7 +147,7 @@ export default function CourseSection({
     // Nếu có groupedCourses thì hiển thị theo nhóm
     if (groupedCourses && groupedCourses.length > 0) {
         return (
-            <div className="mb-16 rounded-[3rem] transition-all duration-500 bg-brk-surface border-brk-outline p-4 md:p-12">
+            <div className="mb-16 rounded-[3rem] transition-all duration-500 bg-brk-surface border-brk-outline p-2 md:p-10">
                 <div className="mb-10 text-center">
                     <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
                         {title}
@@ -153,7 +155,7 @@ export default function CourseSection({
                     <div className={`mx-auto mt-3 h-1.5 w-16 rounded-full ${accentColor}`}></div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-3">
                     {groupedCourses.map((group, idx) => (
                         <CourseCategoryGroup 
                             key={group.category + idx}
@@ -174,9 +176,11 @@ export default function CourseSection({
         )
     }
 
-    const displayCount = showAllCourses ? (courses?.length || 0) : 3
-    const visibleCourses = isExpanded ? (courses || []) : (courses || []).slice(0, displayCount)
-    const hasMore = (courses || []).length > displayCount
+    // Flat mode: courses = đang học (luôn hiện), hiddenCourses = đã hoàn thành (ẩn, xem thêm mới hiện)
+    const activeCourses = courses || []
+    const completedCourses = hiddenCourses || []
+    const hasCompleted = completedCourses.length > 0
+    const visibleCourses = isExpanded ? [...activeCourses, ...completedCourses] : activeCourses
 
     return (
         <div 
@@ -187,7 +191,7 @@ export default function CourseSection({
             }`}
         >
             {/* Thông báo đếm ngược nổi */}
-            {isExpanded && (
+            {isExpanded && hasCompleted && (
                 <div className="absolute top-6 right-6 z-50 animate-in fade-in zoom-in duration-300">
                     <div className="bg-brk-surface text-brk-primary px-4 py-2 rounded-full border border-brk-primary/30 shadow-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
                         <Clock className="w-3 h-3 animate-pulse" />
@@ -224,22 +228,21 @@ export default function CourseSection({
                 ))}
             </div>
 
-            {hasMore && (
-                <div className="mt-10 flex justify-center">
-                    <button
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className={`group flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
-                            isExpanded 
-                            ? 'bg-brk-background-dark text-brk-on-primary shadow-brk-primary/20' 
-                            : 'bg-brk-background-dark text-brk-on-primary shadow-brk-primary/20'
-                        }`}
-                    >
-                        {isExpanded ? (
-                            <> Thu gọn lộ trình <ChevronUp className="w-3.5 h-3.5" /> </>
-                        ) : (
-                            <> Xem tất cả ({ (courses?.length || 0) - displayCount} khóa) <ChevronDown className="w-3.5 h-3.5 animate-bounce group-hover:animate-none" /> </>
-                        )}
-                    </button>
+            {/* Nút Xem thêm / Thu gọn — full width, bắt mắt */}
+            {hasCompleted ? (
+                <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="group w-full mt-8 flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all duration-300 active:scale-[0.98] shadow-xl hover:shadow-2xl bg-gradient-to-r from-brk-primary to-brk-accent text-brk-on-primary hover:brightness-110"
+                >
+                    {isExpanded ? (
+                        <> Thu gọn <ChevronUp className="w-4 h-4" /> </>
+                    ) : (
+                        <> Xem thêm {completedCourses.length} khóa đã hoàn thành <ChevronDown className="w-4 h-4 animate-bounce group-hover:animate-none" /> </>
+                    )}
+                </button>
+            ) : (
+                <div className="w-full mt-8 py-4 rounded-2xl bg-brk-muted/20 text-brk-muted font-black text-[10px] uppercase tracking-widest text-center cursor-default select-none">
+                    Đã hiển thị tất cả khóa đang học
                 </div>
             )}
         </div>

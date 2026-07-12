@@ -50,6 +50,22 @@ export default function PaymentModal({ course, enrollment, isCourseOneActive = f
     const effectiveContent = payment?.transferContent || `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase().slice(0, 50)
     
     const bankAcc = course.teacherBankAccount
+
+    if (!bankAcc && !payment) {
+        return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-2 sm:p-4 backdrop-blur-sm">
+                <div className="relative w-full max-w-md rounded-2xl sm:rounded-3xl bg-white shadow-2xl p-6 text-center">
+                    <div className="text-4xl mb-4">⚠️</div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">Chưa cấu hình tài khoản ngân hàng</h3>
+                    <p className="text-sm text-gray-500 mb-4">Khóa học này chưa được gắn tài khoản nhận tiền. Vui lòng liên hệ Admin để được hỗ trợ.</p>
+                    <button onClick={onClose} className="px-6 py-2 bg-[#7c3aed] text-white rounded-xl font-bold text-sm hover:bg-[#6d28d9] transition-colors">
+                        Đóng
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     const bankId = resolveBankBin(bankAcc?.bankName)
 
     const qrCodeUrl = payment?.qrCodeUrl || `https://img.vietqr.io/image/${bankId}-${bankAcc?.accountNumber || ''}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(effectiveContent)}&accountName=${encodeURIComponent(bankAcc?.accountHolder || '')}` || bankAcc?.qrCodeUrl

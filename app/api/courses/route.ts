@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
             mo_ta_dai: body.mo_ta_dai || null,
             link_anh_bia: body.link_anh_bia || null,
             phi_coc: Number(body.phi_coc) || 0,
+            feeType: body.feeType || 'MIEN_PHI',
             vipExempt: body.vipExempt === true,
             noidung_stk: body.noidung_stk || null,
             link_zalo: body.link_zalo || null,

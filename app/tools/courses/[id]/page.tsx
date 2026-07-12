@@ -51,6 +51,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [teacherBankAccountId, setTeacherBankAccountId] = useState<number | null>(null)
     
     // ✅ NEW: Section 3 - Fee & Payment
+    const [feeType, setFeeType] = useState('MIEN_PHI')
     const [vipExempt, setVipExempt] = useState(false)
     const [noidungStk, setNoidungStk] = useState('')
     
@@ -157,6 +158,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 // Original 5 fields
                 setNameLop(res.name_lop || '')
                 setPhiCoc(res.phi_coc || 0)
+                setFeeType(res.feeType || 'MIEN_PHI')
                 setIdKhoa(res.id_khoa || '')
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
@@ -206,6 +208,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             mo_ta_dai: moTaDai || null,
             link_anh_bia: linkAnhBia || null,
             phi_coc: phiCoc,
+            feeType,
             vipExempt,
             noidung_stk: noidungStk || null,
             link_zalo: linkZalo || null,
@@ -424,12 +427,23 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             <input type="number" value={phiCoc} onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">VIP</label>
-                            <label className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
-                                <input type="checkbox" checked={vipExempt} onChange={(e) => setVipExempt(e.target.checked)} className="w-5 h-5 rounded" />
-                                <span className="text-sm font-bold text-gray-700">Không áp dụng VIP</span>
-                            </label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Dạng phí</label>
+                            <select value={feeType} onChange={(e) => setFeeType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                <option value="MIEN_PHI">Miễn phí</option>
+                                <option value="PHI_TUY_TINH">Phí tùy tâm</option>
+                                <option value="PHI_CAM_KET">Phí cam kết</option>
+                                <option value="PHI_DONG_HANH">Phí đồng hành</option>
+                                <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
+                            </select>
                         </div>
+                    </div>
+                    
+                    <div className="space-y-1.5 mt-4">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">VIP</label>
+                        <label className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
+                            <input type="checkbox" checked={vipExempt} onChange={(e) => setVipExempt(e.target.checked)} className="w-5 h-5 rounded" />
+                            <span className="text-sm font-bold text-gray-700">Không áp dụng VIP</span>
+                        </label>
                     </div>
                     
                     <div className="space-y-1.5 mt-4">

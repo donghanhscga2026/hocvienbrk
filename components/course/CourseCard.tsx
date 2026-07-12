@@ -65,9 +65,20 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
     // Override phi_coc nếu đã kích hoạt khóa 1
     const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
 
+    const feeTypeDisplay = (() => {
+        const ft = course.feeType || 'MIEN_PHI'
+        switch (ft) {
+            case 'PHI_CAM_KET': return { icon: '💰', color: 'text-brk-primary', label: 'Phí cam kết' }
+            case 'PHI_TUY_TINH': return { icon: '💝', color: 'text-yellow-500', label: 'Phí tùy tâm' }
+            case 'PHI_DONG_HANH': return { icon: '🤝', color: 'text-green-500', label: 'Phí đồng hành' }
+            case 'PHI_TOI_THIEU': return { icon: '📌', color: 'text-orange-500', label: 'Phí tối thiểu' }
+            default: return { icon: '📘', color: 'text-brk-accent', label: 'Miễn phí' }
+        }
+    })()
+
     const isActive = enrollment?.status === 'ACTIVE'
     const isPending = enrollment?.status === 'PENDING'
-    
+
     // Sửa lỗi hydration: Format ngày chỉ ở client side
     const [formattedStartDate, setFormattedStartDate] = useState('')
     useEffect(() => {
@@ -114,6 +125,9 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         if (res.enrollment) {
                             setLocalEnrollment(res.enrollment)
                         }
+                        if (res.warning) {
+                            alert(res.warning)
+                        }
                         setTimeout(() => setShowPayment(true), 100)
                     }
                 } catch (err: any) {
@@ -145,59 +159,65 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                 </div>
 
                 {/* Nội dung - Giữ nguyên 100% */}
-                <div className="p-5 flex flex-col flex-grow">
+                <div className="p-3 flex flex-col flex-grow">
                     {/* Title */}
                     <div className="mb-3 flex items-center gap-2.5">
-                        <span className="text-2xl leading-none drop-shadow-sm select-none shrink-0">📘</span>
+                        <span className={`text-2xl leading-none drop-shadow-sm select-none shrink-0 ${feeTypeDisplay.color}`}>{feeTypeDisplay.icon}</span>
                         <h3 className="text-base sm:text-lg font-black leading-tight flex-1 text-brk-on-surface"
                             style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
                             {course.name_lop}
                         </h3>
                     </div>
 
-                    {/* Badges + Trạng thái + Ngày bắt đầu */}
+                    {/* Badges - [Số tiền/Dạng phí] [Chia sẻ] [Kích hoạt] [Mục lục] */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className={`inline-block rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-wider shadow-sm ${effectivePhiCoc === 0 ? 'bg-brk-accent text-brk-on-primary' : 'bg-brk-accent text-brk-on-primary'}`}>
-                            {effectivePhiCoc === 0 ? 'Miễn phí' : 'Phí cam kết'}
-                        </span>
+                        {effectivePhiCoc === 0 ? (
+                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary">
+                                Miễn phí
+                            </span>
+                        ) : (
+                            <>
+                                <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface text-brk-accent border border-brk-primary/30">
+                                    {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                </span>
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
+                                    {feeTypeDisplay.label}
+                                </span>
+                            </>
+                        )}
                         <button
                             onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
                                 setShowShare(true)
                             }}
-                            className="inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
+                            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-primary px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm hover:brightness-110 transition-colors"
                         >
                             <Share2 className="w-2.5 h-2.5" />
                             Chia sẻ
                         </button>
+                        {isActive && effectivePhiCoc > 0 && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-background-dark px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
+                                Kích hoạt {formattedStartDate || ''}
+                            </span>
+                        )}
+                        {isPending && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-accent px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm border border-brk-accent/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
+                                Chờ thanh toán
+                            </span>
+                        )}
                         <button
                             onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
                                 setShowToc(true)
                             }}
-                            className="ml-auto inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
+                            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
                         >
                             Mục lục
                         </button>
-                        {isActive && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-background-dark px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
-                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
-                                Đã kích hoạt
-                                {enrollment?.startedAt && (
-                                    <span className="opacity-80 font-normal">
-                                        · Từ {formattedStartDate || '...'}
-                                    </span>
-                                )}
-                            </span>
-                        )}
-                        {isPending && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-accent px-3 py-1 text-[10px] font-black uppercase tracking-wider text-brk-on-primary shadow-sm border border-brk-accent/50">
-                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
-                                Chờ thanh toán
-                            </span>
-                        )}
                     </div>
 
                     {/* Mô tả - URL trong text sẽ được chuyển thành link clickable */}
@@ -213,8 +233,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
                             ${loading ? 'bg-brk-muted text-brk-on-surface cursor-not-allowed' :
                                 isActive ? 'bg-brk-primary text-brk-on-primary hover:bg-brk-accent hover:brightness-110' :
-                                isPending ? 'bg-brk-accent text-brk-on-primary hover:brightness-110' :
-                                    'bg-brk-primary text-brk-on-primary hover:brightness-110'}`}
+                                    isPending ? 'bg-brk-accent text-brk-on-primary hover:brightness-110' :
+                                        'bg-brk-primary text-brk-on-primary hover:brightness-110'}`}
                     >
                         {loading ? (
                             <span className="flex items-center gap-2 relative z-10">
@@ -249,11 +269,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         )}
                     </button>
 
-                    {isPending && !loading && (
-                        <p className="mt-3 text-center text-xs font-bold text-brk-accent animate-pulse italic">
-                            Đang chờ thanh toán...
-                        </p>
-                    )}
+
                 </div>
             </div>
 
