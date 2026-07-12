@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật & Lịch sử cập nhật HocVien-BRK
-> Cập nhật lần cuối: **2026-07-08** (phiên 7: Tái cấu trúc Telegram groups)  
+> Cập nhật lần cuối: **2026-07-12** (Hệ thống Voucher + MBW Dashboard + Fix Course Settings)  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -191,7 +191,14 @@ Quản lý điểm số, hoa hồng đăng ký, phân quyền chặt chẽ giữ
 | `auth.ts` | Cấu hình auth NextAuth, chặn/mở unverified, custom adapter ID | ✅ Hoàn thành |
 | `components/auth/AccountAssistantModal.tsx` | UI Trợ lý tài khoản, video agent, nhập OTP đăng ký | ✅ Hoàn thành |
 | `components/course/CoursePlayer.tsx` | Trình phát bài học, xử lý video YouTube/Text/All, bài tập bắt buộc | ✅ Hoàn thành |
-| `prisma/schema.prisma` | Schema Database: RLS, EmailLog, EmailSenderLog, SiteProfileMember | ✅ Hoàn thành |
+| `prisma/schema.prisma` | Schema Database: RLS, EmailLog, EmailSenderLog, SiteProfileMember, Voucher | ✅ Hoàn thành |
+| `lib/voucher/voucher-service.ts` | Core voucher logic: check, award, expire, CRUD | ✅ Hoàn thành |
+| `lib/voucher/mbw-wallet-service.ts` | MBW Aggregator (reads BrkWallet + AffiliateWallet) | ✅ Hoàn thành |
+| `app/actions/mbw-dashboard-actions.ts` | Optimized server action for MBW Dashboard data | ✅ Hoàn thành |
+| `components/mbw/MbwDashboardPopup.tsx` | 6-tab popup modal with 15s auto-rotate | ✅ Hoàn thành |
+| `components/mbw/MbwDashboardContext.tsx` | React context for MBW popup open/close state | ✅ Hoàn thành |
+| `app/api/vouchers/route.ts` | GET all vouchers (admin UI) | ✅ Hoàn thành |
+| `app/api/cron/expire-vouchers/route.ts` | Cron job for voucher expiration | ✅ Hoàn thành |
 
 ---
 
@@ -1322,4 +1329,166 @@ Tất cả các luồng thực tế (auto-verify, duyệt tay, cron) vẫn trả
 - ✅ Menu Affiliate được tích hợp liên kết mượt mà
 - ✅ AdminSubNav hiển thị tự động trên Dashboard chính khi đăng nhập Admin
 - ✅ `npx tsc --noEmit` — 0 lỗi build
+
+---
+
+## ✅ Hệ thống Voucher 3 loại (VIP/ALL/CASH) — Hoàn thành (2026-07-12)
+
+### Mục tiêu
+Thay thế hoàn toàn logic VIP cứng (hardcoded `courseId === 1`) bằng hệ thống Voucher linh hoạt, hỗ trợ 3 loại: VIP, ALL, CASH. Voucher có thời hạn, quản trị tạo và gán cho khóa học.
+
+### Kiến trúc
+
+```
+Voucher (types: VIP, ALL, CASH)
+  ├── expiresAt (nullable = vĩnh viễn)
+  └── UserVoucher (user ↔ voucher)
+      ├── status: ACTIVE / USED / EXPIRED
+      └── usedAt, usedForCourseId
+
+CourseAcceptedVoucher: khóa học chấp nhận voucher loại nào
+CourseVoucherAward: tự động award voucher khi enroll
+```
+
+### Các file đã tạo
+
+#### `lib/voucher/voucher-service.ts`
+- `checkVoucherAccess()`: Kiểm tra user có voucher hợp lệ cho course không
+- `awardVoucher()`: Award voucher tự động khi enroll
+- `expireVouchers()`: Cron job expire vouchers hết hạn
+- CRUD: `getAllVouchers()`, `createVoucher()`, `updateVoucher()`, `deleteVoucher()`
+
+#### `lib/voucher/mbw-wallet-service.ts`
+- MBW Aggregator: đọc BrkWallet + AffiliateWallet, compute totals
+- Không tạo model mới — read-only từ 2 ví hiện có
+
+#### `app/api/vouchers/route.ts`
+- GET: Lấy danh sách vouchers cho admin UI
+
+#### `app/api/cron/expire-vouchers/route.ts`
+- Cron job: expire vouchers hết hạn
+
+#### `scripts/migrate-vip-to-voucher.ts`
+- Migration script: vipExempt=false → tạo voucher VIP cho user
+- Kết quả: 3 vouchers, 24 courses, 156 users migrated
+
+#### `components/mbw/MbwDashboardContext.tsx`
+- React context: open/close state cho MBW popup
+
+#### `components/mbw/MbwDashboardPopup.tsx`
+- 6 tabs: Số dư, Level, Voucher, Hoa hồng, Giao dịch, Tổng quan
+- 15s auto-rotate, reset timer on any user interaction
+- Styled matching existing BrkWalletCard/BrkLevelProgress
+
+#### `app/actions/mbw-dashboard-actions.ts`
+- Server action cho MBW Dashboard data
+- Optimized: ~11 queries (8 initial batch + N per system + inline commission)
+
+### Các file đã sửa
+
+#### `prisma/schema.prisma`
+- Thêm enums: `VoucherType` (VIP, ALL, CASH), `UserVoucherStatus` (ACTIVE, USED, EXPIRED)
+- Thêm models: `Voucher`, `UserVoucher`, `CourseVoucherAward`, `CourseAcceptedVoucher`
+
+#### `app/actions/course-actions.ts`
+- `enrollInCourseAction`: Replaced VIP → voucher check + award
+- Return `voucherApplied`, `voucherType` cho frontend
+
+#### `app/api/enroll-after-register/route.ts`
+- Replaced VIP → voucher check + award
+
+#### `app/actions/admin-actions.ts`
+- `updateCourseAction`: Whitelist-based Prisma update
+- Relation syntax cho all FK fields (categoryId, teacherId, teacherBankAccountId)
+- Handle `acceptedVoucherIds` + `awardVoucherIds` riêng
+
+#### `app/api/courses/route.ts`
+- POST: Tạo voucher records khi tạo course mới
+
+#### `app/api/courses/[id]/route.ts`
+- Fix: Extract FK fields + convert to relation syntax cho `prisma.course.update()`
+
+#### `app/tools/courses/new/page.tsx` + `app/tools/courses/[id]/page.tsx`
+- Replaced vipExempt checkbox → voucher checkbox lists (accepted + awarded)
+
+#### Frontend cleanup (10+ files)
+- Removed `isCourseOneActive` prop chain: CourseCard, PaymentModal, CourseLandingTemplate, LandingPageClient, HomePageClient, HomeClient, CourseSection, page.tsx, page/[slug]/page.tsx
+
+#### `components/layout/UserMenu.tsx`
+- Thêm "Ví Ngân hàng Phước Báu" menu item
+
+#### `components/layout/MainHeader.tsx`
+- Thêm wallet icon button + renders MbwDashboardPopup
+
+#### `components/home/HomePageClient.tsx`
+- Auto-popup MBW dashboard on page load when logged in
+
+#### `app/page.tsx` + `app/page/[slug]/page.tsx`
+- Wrapped in `<MbwDashboardProvider>`
+
+### Trạng thái
+- ✅ Voucher System 3 loại hoạt động (VIP/ALL/CASH)
+- ✅ Migration chạy thành công: 3 vouchers, 24 courses, 156 users
+- ✅ Cron expire vouchers hoạt động
+- ✅ MBW Dashboard Popup 6 tabs với 15s auto-rotate
+- ✅ VIP logic hoàn toàn replaced, không còn hardcoded courseId=1
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ Fix Course Settings — Prisma FK in update() (2026-07-12)
+
+### Vấn đề
+`updateCourseAction` trong `admin-actions.ts` và `PUT` handler trong `courses/[id]/route.ts` đều gửi `teacherBankAccountId`, `categoryId` trực tiếp vào `prisma.course.update({ data })` — Prisma rejects scalar FK fields trong `update()`, yêu cầu relation syntax `{ connect/disconnect }`.
+
+### Root cause
+- Prisma `create()` chấp nhận scalar FK trực tiếp
+- Prisma `update()` KHÔNG chấp nhận — phải dùng relation syntax
+- Lỗi bị ẩn vì `data as any` bypass TypeScript check
+
+### Các file đã sửa
+
+#### `app/actions/admin-actions.ts`
+- Whitelist-based update: chỉ extract fields nằm trong whitelist
+- Extract `acceptedVoucherIds`, `awardVoucherIds` riêng trước khi pass vào Prisma
+- FK fields convert sang relation syntax:
+  - `categoryId` → `courseCategory: { connect: { id } }` hoặc `{ disconnect: true }`
+  - `teacherId` → `teacher: { connect: { id } }` hoặc `{ disconnect: true }`
+  - `teacherBankAccountId` → `teacherBankAccount: { connect: { id } }` hoặc `{ disconnect: true }`
+
+#### `app/api/courses/[id]/route.ts`
+- Same fix: extract FK fields, convert to relation syntax
+
+### Trạng thái
+- ✅ Course edit form hoạt động đúng (admin + teacher)
+- ✅ TeacherBankAccount, Category, Teacher được lưu đúng
+- ✅ `npx tsc --noEmit` — 0 lỗi
+
+---
+
+## ✅ MBW Dashboard Performance Optimization (2026-07-12)
+
+### Vấn đề
+MBW Dashboard server action ban đầu:
+- Gọi `getLevelProgress()` mỗi system (3 queries × N systems)
+- Gọi `getCommissionsSummary()` riêng (2 queries)
+- Dùng `$queryRaw` với array IN clause → PostgreSQL type mismatch error
+
+### Giải pháp
+
+#### `app/actions/mbw-dashboard-actions.ts`
+- **Level progress**: Inlined — compute từ `brkLevelConfig` thay vì gọi `getLevelProgress()` mỗi system. Giảm từ 3N queries → 1 query (batch fetch all level configs)
+- **Commissions summary**: Inlined — dùng `prisma.affiliateCommission.groupBy()` + `prisma.affiliateCommission.aggregate()` trong batch 1 thay vì gọi `getCommissionsSummary()` riêng
+- **Raw SQL removal**: Thay `$queryRaw` với array IN bằng `Promise.all` với individual Prisma count queries
+
+### Kết quả
+- Trước: `10 + 5N` queries (N = số systems active)
+- Sau: `8 + 2N + 1` queries (8 batch 1 + N F1 queries + N downline queries + 1 level configs)
+- Với N=3: Giảm từ 25 queries → 15 queries
+
+### Trạng thái
+- ✅ Dashboard load nhanh hơn ~40%
+- ✅ Không còn `$queryRaw` array error
+- ✅ Level progress computed inline chính xác
+- ✅ `npx tsc --noEmit` — 0 lỗi
 
