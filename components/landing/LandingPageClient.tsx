@@ -166,7 +166,6 @@ interface CourseLandingClientProps {
     lessons: any[]
     testimonials: any[]
     enrollment: any
-    isCourseOneActive: boolean
     userPhone: string | null
     userId: number | null
     session: any
@@ -179,7 +178,6 @@ export function CourseLandingClient({
     lessons,
     testimonials,
     enrollment,
-    isCourseOneActive,
     userPhone,
     userId,
     session,
@@ -192,7 +190,6 @@ export function CourseLandingClient({
             lessons={lessons}
             testimonials={testimonials}
             enrollment={enrollment}
-            isCourseOneActive={isCourseOneActive}
             userPhone={userPhone}
             userId={userId}
             session={session}

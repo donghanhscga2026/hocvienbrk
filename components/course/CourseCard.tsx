@@ -38,7 +38,6 @@ interface CourseCardProps {
             proofImage?: string | null
         }
     } | null
-    isCourseOneActive?: boolean
     userPhone?: string | null
     userId?: number | null
     priority?: boolean
@@ -46,7 +45,7 @@ interface CourseCardProps {
     profileSlug?: string | null
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, isCourseOneActive = false, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
     const [showPayment, setShowPayment] = useState(false)
     const [showShare, setShowShare] = useState(false)
     const [localEnrollment, setLocalEnrollment] = useState<any>(null)
@@ -62,8 +61,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         }
     }, [isLoggedIn, userId])
 
-    // Override phi_coc nếu đã kích hoạt khóa 1
-    const effectivePhiCoc = isCourseOneActive ? 0 : course.phi_coc
+    // Use phi_coc directly — server handles voucher logic
+    const effectivePhiCoc = course.phi_coc
 
     const feeTypeDisplay = (() => {
         const ft = course.feeType || 'MIEN_PHI'
@@ -277,7 +276,6 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                 <PaymentModal
                     course={course}
                     enrollment={enrollment}
-                    isCourseOneActive={isCourseOneActive}
                     userPhone={userPhone}
                     userId={userId}
                     onClose={() => setShowPayment(false)}

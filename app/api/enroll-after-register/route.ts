@@ -54,12 +54,19 @@ export async function POST(request: NextRequest) {
     }
 
     let effectivePhiCoc = course.phi_coc
+    let appliedUserVoucherId: number | null = null
 
     if (course.type !== 'LIB' && course.type !== 'SYS') {
-      const vipEnrollment = await prisma.enrollment.findFirst({
-        where: { userId: userIdNum, courseId: 1, status: 'ACTIVE' }
-      })
-      if (vipEnrollment) effectivePhiCoc = 0
+      const { checkVoucherForCourse } = await import('@/lib/voucher/voucher-service')
+      const voucherCheck = await checkVoucherForCourse(userIdNum, course.id)
+      if (voucherCheck.applicable) {
+        if (voucherCheck.voucherType === 'CASH') {
+          effectivePhiCoc = Math.max(0, course.phi_coc - (voucherCheck.discount || 0))
+        } else {
+          effectivePhiCoc = 0
+        }
+        appliedUserVoucherId = voucherCheck.userVoucherId || null
+      }
     }
 
     const isAutoActive = effectivePhiCoc === 0
@@ -72,6 +79,22 @@ export async function POST(request: NextRequest) {
         referrerId: user?.referrerId || null,
       }
     })
+
+    // Đánh dấu voucher đã dùng (nếu có)
+    if (appliedUserVoucherId) {
+      const { markVoucherUsed } = await import('@/lib/voucher/voucher-service')
+      await markVoucherUsed(appliedUserVoucherId, newEnrollment.id)
+    }
+
+    // Award voucher từ course
+    const { awardVoucher } = await import('@/lib/voucher/voucher-service')
+    const awards = await prisma.courseVoucherAward.findMany({
+      where: { courseId: course.id },
+      include: { voucher: true }
+    })
+    for (const award of awards) {
+      await awardVoucher(userIdNum, award.voucherId, course.id)
+    }
 
     // Track affiliate conversion for purchase
     if (user?.referrerId) {

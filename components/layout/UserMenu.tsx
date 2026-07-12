@@ -3,13 +3,15 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { signOut, useSession } from 'next-auth/react'
-import { Settings, LogOut, ChevronDown, LogIn, Check } from 'lucide-react'
+import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet } from 'lucide-react'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
+import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 
 export default function UserMenu() {
     const { data: session } = useSession()
     const { openAssistant } = useAccountAssistant()
+    const { open: openMbw } = useMbwDashboard()
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [userImage, setUserImage] = useState<string | null>(null)
     const [currentThemeId, setCurrentThemeId] = useState<ThemeId>('default')
@@ -138,6 +140,13 @@ export default function UserMenu() {
                         <Settings className="h-4 w-4" />
                         Công cụ hỗ trợ
                     </Link>
+                    <button
+                        onClick={() => { setIsUserMenuOpen(false); openMbw() }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors font-bold"
+                    >
+                        <Wallet className="h-4 w-4" />
+                        Ví Ngân hàng Phước Báu
+                    </button>
                     <Link
                         href="/account-settings"
                         onClick={() => setIsUserMenuOpen(false)}

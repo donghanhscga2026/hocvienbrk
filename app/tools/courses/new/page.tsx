@@ -53,7 +53,9 @@ function CreateCourseContent() {
     // Section3: Học phí & Thanh toán
     const [phiCoc, setPhiCoc] = useState(0)
     const [feeType, setFeeType] = useState('MIEN_PHI')
-    const [vipExempt, setVipExempt] = useState(false)
+    const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
+    const [awardVoucherIds, setAwardVoucherIds] = useState<number[]>([])
+    const [allVouchers, setAllVouchers] = useState<any[]>([])
     const [noidungStk, setNoidungStk] = useState('')
     
     // Section4: Email & Zalo
@@ -125,6 +127,13 @@ function CreateCourseContent() {
         }
         fetchCategories()
     }, [])
+
+    useEffect(() => {
+        fetch('/api/vouchers')
+            .then(r => r.json())
+            .then(data => setAllVouchers(data.vouchers || []))
+            .catch(() => {})
+    }, [])
     
     useEffect(() => {
         const fetchData = async () => {
@@ -169,7 +178,8 @@ function CreateCourseContent() {
                         
                         setPhiCoc(courseRes.phi_coc || 0)
                         setFeeType(courseRes.feeType || 'MIEN_PHI')
-                        setVipExempt(courseRes.vipExempt ?? false)
+                        setAcceptedVoucherIds(courseRes.acceptedVouchers?.map((v: any) => v.voucherId) || [])
+                        setAwardVoucherIds(courseRes.voucherAwards?.map((v: any) => v.voucherId) || [])
                         setNoidungStk(courseRes.noidung_stk || '')
                         
                         setLinkZalo(courseRes.link_zalo || '')
@@ -232,7 +242,8 @@ function CreateCourseContent() {
                 link_anh_bia: linkAnhBia || null,
                 phi_coc: phiCoc,
                 feeType,
-                vipExempt,
+                acceptedVoucherIds,
+                awardVoucherIds,
                 noidung_stk: noidungStk || null,
                 link_zalo: linkZalo || null,
                 file_email: fileEmail || null,
@@ -268,7 +279,8 @@ function CreateCourseContent() {
             if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
             formData.append('phi_coc', phiCoc.toString())
             formData.append('feeType', feeType)
-            formData.append('vipExempt', vipExempt.toString())
+            formData.append('acceptedVoucherIds', JSON.stringify(acceptedVoucherIds))
+            formData.append('awardVoucherIds', JSON.stringify(awardVoucherIds))
             if (teacherBankAccountId) formData.append('teacherBankAccountId', teacherBankAccountId.toString())
             if (noidungStk) formData.append('noidung_stk', noidungStk)
             if (linkZalo) formData.append('link_zalo', linkZalo)
@@ -412,12 +424,44 @@ function CreateCourseContent() {
                                     <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
                                 </label>
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">VIP</label>
-                            <label className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
-                                <input type="checkbox" checked={vipExempt} onChange={(e) => setVipExempt(e.target.checked)} className="w-5 h-5 rounded" />
-                                <span className="text-sm font-bold text-gray-700">Không áp dụng VIP</span>
-                            </label>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>
+                                <div className="flex flex-wrap gap-3 mt-2">
+                                    {allVouchers.map((v: any) => (
+                                        <label key={v.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
+                                            <input type="checkbox"
+                                                checked={acceptedVoucherIds.includes(v.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setAcceptedVoucherIds([...acceptedVoucherIds, v.id])
+                                                    else setAcceptedVoucherIds(acceptedVoucherIds.filter(id => id !== v.id))
+                                                }}
+                                                className="w-5 h-5 rounded" />
+                                            <span className="text-sm font-bold text-gray-700">{v.name}</span>
+                                            <span className="text-[10px] text-gray-400">({v.type})</span>
+                                        </label>
+                                    ))}
+                                    {allVouchers.length === 0 && <span className="text-xs text-gray-400">Chưa có voucher nào</span>}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher thưởng khi kích hoạt</label>
+                                <div className="flex flex-wrap gap-3 mt-2">
+                                    {allVouchers.map((v: any) => (
+                                        <label key={v.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
+                                            <input type="checkbox"
+                                                checked={awardVoucherIds.includes(v.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setAwardVoucherIds([...awardVoucherIds, v.id])
+                                                    else setAwardVoucherIds(awardVoucherIds.filter(id => id !== v.id))
+                                                }}
+                                                className="w-5 h-5 rounded" />
+                                            <span className="text-sm font-bold text-gray-700">{v.name}</span>
+                                        </label>
+                                    ))}
+                                    {allVouchers.length === 0 && <span className="text-xs text-gray-400">Chưa có voucher nào</span>}
+                                </div>
+                            </div>
                         </div>
                     </div>
                     </div>

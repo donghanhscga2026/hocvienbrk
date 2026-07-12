@@ -28,7 +28,6 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             where: { id: courseId },
             select: {
                 phi_coc: true,
-                vipExempt: true,
                 id_khoa: true,
                 name_lop: true,
                 noidung_email: true,
@@ -51,6 +50,8 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         // Xử lý riêng cho loại khóa học LIB
         let effectivePhiCoc = course.phi_coc
         let isLibAllowed = false
+        let appliedUserVoucherId: number | null = null
+        let appliedVoucherType: string | null = null
 
         if (course.type === 'LIB') {
             if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")
@@ -63,15 +64,17 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             effectivePhiCoc = 0
             isLibAllowed = true
         } else if (course.type !== 'SYS') {
-            // Kiểm tra xem user có active course 1 không (Chỉ áp dụng khóa thường/Challenge, không áp dụng SYS)
-            const vipEnrollment = await prisma.enrollment.findFirst({
-                where: {
-                    userId,
-                    courseId: 1,
-                    status: 'ACTIVE'
+            const { checkVoucherForCourse } = await import('@/lib/voucher/voucher-service')
+            const voucherCheck = await checkVoucherForCourse(userId, courseId)
+            if (voucherCheck.applicable) {
+                if (voucherCheck.voucherType === 'CASH') {
+                    effectivePhiCoc = Math.max(0, course.phi_coc - (voucherCheck.discount || 0))
+                } else {
+                    effectivePhiCoc = 0
                 }
-            })
-            if (vipEnrollment && !course.vipExempt) effectivePhiCoc = 0
+                appliedUserVoucherId = voucherCheck.userVoucherId || null
+                appliedVoucherType = voucherCheck.voucherType || null
+            }
         }
 
         const existing = await prisma.enrollment.findUnique({
@@ -183,6 +186,22 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                 referrerId: enrollmentReferrerId,
             }
         })
+
+        // Đánh dấu voucher đã dùng (nếu có)
+        if (appliedUserVoucherId) {
+            const { markVoucherUsed } = await import('@/lib/voucher/voucher-service')
+            await markVoucherUsed(appliedUserVoucherId, newEnrollment.id)
+        }
+
+        // Award voucher từ course
+        const { awardVoucher } = await import('@/lib/voucher/voucher-service')
+        const awards = await prisma.courseVoucherAward.findMany({
+            where: { courseId },
+            include: { voucher: true }
+        })
+        for (const award of awards) {
+            await awardVoucher(userId, award.voucherId, courseId)
+        }
 
         // Track affiliate conversion for purchase
         if (enrollmentReferrerId) {
@@ -317,7 +336,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 
         revalidatePath('/')
         revalidatePath('/courses')
-        return { success: true, status: newEnrollment.status, enrollment: enrolledData, warning: missingBankAccount ? "Khóa học chưa được cấu hình tài khoản ngân hàng. Vui lòng liên hệ Admin để được hỗ trợ." : undefined }
+        return { success: true, status: newEnrollment.status, enrollment: enrolledData, warning: missingBankAccount ? "Khóa học chưa được cấu hình tài khoản ngân hàng. Vui lòng liên hệ Admin để được hỗ trợ." : undefined, voucherApplied: !!appliedUserVoucherId, voucherType: appliedVoucherType }
     } catch (error: any) {
         console.error("Enroll Course Error:", error)
         return { success: false, message: error.message || "Không thể đăng ký khóa học." }
@@ -707,7 +726,6 @@ export async function createCourseAction(formData: FormData) {
             link_anh_bia: formData.get('link_anh_bia') as string || null,
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
             feeType: (formData.get('feeType') as string) || 'MIEN_PHI',
-            vipExempt: formData.get('vipExempt') === 'true',
             noidung_stk: formData.get('noidung_stk') as string || null,
             link_zalo: formData.get('link_zalo') as string || null,
             file_email: formData.get('file_email') as string || null,
@@ -727,6 +745,32 @@ export async function createCourseAction(formData: FormData) {
         const newCourse = await prisma.course.create({
             data: courseData
         })
+
+        // Create accepted voucher records
+        const acceptedVoucherIdsRaw = formData.get('acceptedVoucherIds') as string
+        if (acceptedVoucherIdsRaw) {
+            try {
+                const ids = JSON.parse(acceptedVoucherIdsRaw) as number[]
+                if (ids.length > 0) {
+                    await prisma.courseAcceptedVoucher.createMany({
+                        data: ids.map(voucherId => ({ courseId: newCourse.id, voucherId }))
+                    })
+                }
+            } catch {}
+        }
+
+        // Create award voucher records
+        const awardVoucherIdsRaw = formData.get('awardVoucherIds') as string
+        if (awardVoucherIdsRaw) {
+            try {
+                const ids = JSON.parse(awardVoucherIdsRaw) as number[]
+                if (ids.length > 0) {
+                    await prisma.courseVoucherAward.createMany({
+                        data: ids.map(voucherId => ({ courseId: newCourse.id, voucherId }))
+                    })
+                }
+            } catch {}
+        }
 
         revalidatePath('/tools/courses')
 

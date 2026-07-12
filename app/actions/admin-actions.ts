@@ -985,7 +985,8 @@ export async function updateCourseAction(courseId: number, data: {
     file_email?: string | null,
     teacherId?: number | null,
     teacherBankAccountId?: number | null,
-    vipExempt?: boolean,
+    acceptedVoucherIds?: number[],
+    awardVoucherIds?: number[],
     feeType?: string
 }) {
     const session = await auth()
@@ -1023,6 +1024,27 @@ export async function updateCourseAction(courseId: number, data: {
             where: { id: courseId },
             data: data as any
         })
+
+        // Update accepted vouchers
+        if (data.acceptedVoucherIds !== undefined) {
+            await prisma.courseAcceptedVoucher.deleteMany({ where: { courseId } })
+            if (data.acceptedVoucherIds.length > 0) {
+                await prisma.courseAcceptedVoucher.createMany({
+                    data: data.acceptedVoucherIds.map(voucherId => ({ courseId, voucherId }))
+                })
+            }
+        }
+
+        // Update award vouchers
+        if (data.awardVoucherIds !== undefined) {
+            await prisma.courseVoucherAward.deleteMany({ where: { courseId } })
+            if (data.awardVoucherIds.length > 0) {
+                await prisma.courseVoucherAward.createMany({
+                    data: data.awardVoucherIds.map(voucherId => ({ courseId, voucherId }))
+                })
+            }
+        }
+
         revalidatePath('/tools/courses')
         revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
         return { success: true, course: updatedCourse }

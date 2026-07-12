@@ -10,7 +10,6 @@ interface CourseCategoryGroupProps {
     courses: any[]
     session: any
     enrollmentsMap: any
-    isCourseOneActive: boolean
     userPhone: string | null
     userId: number | null
     darkMode?: boolean
@@ -23,7 +22,6 @@ function CourseCategoryGroup({
     courses,
     session,
     enrollmentsMap,
-    isCourseOneActive,
     userPhone,
     userId,
     darkMode = false,
@@ -78,7 +76,6 @@ function CourseCategoryGroup({
                             course={course}
                             isLoggedIn={!!session}
                             enrollment={enrollmentsMap[course.id] || null}
-                            isCourseOneActive={isCourseOneActive}
                             userPhone={userPhone}
                             userId={userId}
                             priority={index === 0}
@@ -118,7 +115,6 @@ interface CourseSectionProps {
     groupedCourses?: { category: string, courses: any[] }[]
     session: any
     enrollmentsMap: any
-    isCourseOneActive: boolean
     userPhone: string | null
     userId: number | null
     darkMode?: boolean
@@ -134,7 +130,6 @@ export default function CourseSection({
     groupedCourses,
     session,
     enrollmentsMap,
-    isCourseOneActive,
     userPhone,
     userId,
     darkMode = false,
@@ -163,7 +158,6 @@ export default function CourseSection({
                             courses={group.courses}
                             session={session}
                             enrollmentsMap={enrollmentsMap}
-                            isCourseOneActive={isCourseOneActive}
                             userPhone={userPhone}
                             userId={userId}
                             darkMode={darkMode}
@@ -217,7 +211,6 @@ export default function CourseSection({
                             course={course}
                             isLoggedIn={!!session}
                             enrollment={enrollmentsMap[course.id] || null}
-                            isCourseOneActive={isCourseOneActive}
                             userPhone={userPhone}
                             userId={userId}
                             priority={index < 3}

@@ -71,13 +71,6 @@ export default async function KhoaHocPage({ params }: PageProps) {
         })
         : null
 
-    const courseOneEnrollment = userId
-        ? await prisma.enrollment.findFirst({
-            where: { userId, courseId: 1 }
-        })
-        : null
-    const isCourseOneActive = courseOneEnrollment?.status === 'ACTIVE'
-
     const lessons = await prisma.lesson.findMany({
         where: { courseId },
         orderBy: { order: 'asc' },
@@ -154,7 +147,6 @@ export default async function KhoaHocPage({ params }: PageProps) {
             lessons={lessons}
             testimonials={testimonials}
             enrollment={enrollment}
-            isCourseOneActive={isCourseOneActive}
             userPhone={userPhone}
             userId={userId}
             session={session}

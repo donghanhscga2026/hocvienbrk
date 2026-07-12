@@ -5,9 +5,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { Wallet } from 'lucide-react'
 import { useHomeSlug } from '@/hooks/useHomeSlug'
 import UserMenu from './UserMenu'
 import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
+import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
+import MbwDashboardPopup from '@/components/mbw/MbwDashboardPopup'
 import dynamic from 'next/dynamic'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
@@ -24,6 +27,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
     const { data: session } = useSession()
     const [showShare, setShowShare] = useState(false)
     const { homeSlug, isReady } = useHomeSlug()
+    const { open: openMbw } = useMbwDashboard()
     
     const userId = session?.user?.id != null ? String(session.user.id) : null
     
@@ -122,6 +126,16 @@ export default function MainHeader({ title }: MainHeaderProps) {
                             </button>
                         )}
 
+                        {userId && (
+                            <button
+                                onClick={openMbw}
+                                className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
+                                title="Ví MBW — Ngân hàng Phước Báu"
+                            >
+                                <Wallet className="w-6 h-6 text-brk-primary" />
+                            </button>
+                        )}
+
                         <UserMenu />
                     </div>
                 </div>
@@ -145,6 +159,8 @@ export default function MainHeader({ title }: MainHeaderProps) {
                     shareType="header"
                 />
             )}
+
+            <MbwDashboardPopup />
         </>
     )
 }

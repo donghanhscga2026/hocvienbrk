@@ -38,14 +38,12 @@ interface CourseLandingTemplateProps {
         mo_ta_dai?: string | null
         link_anh_bia?: string | null
         phi_coc: number
-        vipExempt: boolean
         category?: string | null
         courseCategory?: { name: string } | null
     }
     lessons: CourseLesson[]
     testimonials: CourseTestimonial[]
     enrollment?: { status: string } | null
-    isCourseOneActive: boolean
     userPhone: string | null
     userId: number | null
     session: any
@@ -58,7 +56,6 @@ export default function CourseLandingTemplate({
     lessons,
     testimonials,
     enrollment,
-    isCourseOneActive,
     userPhone,
     userId,
     session,
@@ -75,7 +72,7 @@ export default function CourseLandingTemplate({
     const effectiveEnrollment = localEnrollment || enrollment
     const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
     const isPending = effectiveEnrollment?.status === 'PENDING'
-    const effectivePhiCoc = (isCourseOneActive && !course.vipExempt) ? 0 : course.phi_coc
+    const effectivePhiCoc = course.phi_coc
     
     const displayLessons = showAllLessons ? lessons : lessons.slice(0, 3)
     const hasMoreLessons = lessons.length > 3
@@ -450,7 +447,6 @@ export default function CourseLandingTemplate({
                 <PaymentModal
                     course={course}
                     enrollment={effectiveEnrollment}
-                    isCourseOneActive={isCourseOneActive}
                     userPhone={userPhone}
                     userId={userId}
                     onClose={() => setShowPayment(false)}
