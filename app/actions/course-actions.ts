@@ -292,6 +292,8 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             })
         }
 
+        const missingBankAccount = effectivePhiCoc > 0 && !course.teacherBankAccount
+
         // Lấy enrollment + payment đầy đủ để trả về cho client
         const enrolledData = await prisma.enrollment.findUnique({
             where: { id: newEnrollment.id },
@@ -315,7 +317,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 
         revalidatePath('/')
         revalidatePath('/courses')
-        return { success: true, status: newEnrollment.status, enrollment: enrolledData }
+        return { success: true, status: newEnrollment.status, enrollment: enrolledData, warning: missingBankAccount ? "Khóa học chưa được cấu hình tài khoản ngân hàng. Vui lòng liên hệ Admin để được hỗ trợ." : undefined }
     } catch (error: any) {
         console.error("Enroll Course Error:", error)
         return { success: false, message: error.message || "Không thể đăng ký khóa học." }
@@ -704,6 +706,7 @@ export async function createCourseAction(formData: FormData) {
             mo_ta_dai: formData.get('mo_ta_dai') as string || null,
             link_anh_bia: formData.get('link_anh_bia') as string || null,
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
+            feeType: (formData.get('feeType') as string) || 'MIEN_PHI',
             vipExempt: formData.get('vipExempt') === 'true',
             noidung_stk: formData.get('noidung_stk') as string || null,
             link_zalo: formData.get('link_zalo') as string || null,

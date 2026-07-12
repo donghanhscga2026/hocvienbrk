@@ -11,7 +11,8 @@ import PaymentModal from '@/components/course/PaymentModal'
 interface HomePageClientProps {
   profile: any
   courses: any[]
-  myCourses: any[]
+  myActiveCourses: any[]
+  myCompletedCourses: any[]
   groupedOtherCourses: { category: string; courses: any[] }[]
   posts?: any[]
   session: any
@@ -31,7 +32,8 @@ interface HomePageClientProps {
 function HomePageContent({
   profile,
   courses,
-  myCourses,
+  myActiveCourses,
+  myCompletedCourses,
   groupedOtherCourses,
   posts = [],
   session,
@@ -115,10 +117,11 @@ function HomePageContent({
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
         {session?.user ? (
           <>
-            {myCourses.length > 0 && (
+            {(myActiveCourses.length > 0 || myCompletedCourses.length > 0) && (
               <CourseSection 
                 title={coursesTitle}
-                courses={myCourses}
+                courses={myActiveCourses}
+                hiddenCourses={myCompletedCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
                 isCourseOneActive={isCourseOneActive}

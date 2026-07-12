@@ -117,6 +117,18 @@ export default async function PageSlugPage({ params }: PageProps) {
     })
 
     const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
+
+    // Tách active vs completed
+    const myActiveCourses = myCourses
+        .filter((c: any) => enrollmentsMap[c.id]?.status === 'ACTIVE')
+        .sort((a: any, b: any) => {
+            const dateA = enrollmentsMap[a.id]?.startedAt ? new Date(enrollmentsMap[a.id].startedAt!).getTime() : 0
+            const dateB = enrollmentsMap[b.id]?.startedAt ? new Date(enrollmentsMap[b.id].startedAt!).getTime() : 0
+            return dateB - dateA
+        })
+    const myCompletedCourses = myCourses
+        .filter((c: any) => enrollmentsMap[c.id]?.status === 'COMPLETED')
+
     const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
 
     const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
@@ -132,6 +144,14 @@ export default async function PageSlugPage({ params }: PageProps) {
         const orderA = a.courses[0]?.courseCategory?.order ?? 0
         const orderB = b.courses[0]?.courseCategory?.order ?? 0
         return orderA - orderB
+    })
+
+    // Sort courses trong mỗi category: pin ASC → createdAt DESC
+    groupedOtherCourses.forEach((g: any) => {
+        g.courses.sort((a: any, b: any) => {
+            if (a.pin !== b.pin) return a.pin - b.pin
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        })
     })
 
     const userName = userRecord?.name ?? null
@@ -172,7 +192,8 @@ export default async function PageSlugPage({ params }: PageProps) {
             <HomePageClient
                 profile={profile}
                 courses={courses}
-                myCourses={myCourses}
+                myActiveCourses={myActiveCourses}
+                myCompletedCourses={myCompletedCourses}
                 groupedOtherCourses={groupedOtherCourses}
                 posts={posts}
                 session={session}

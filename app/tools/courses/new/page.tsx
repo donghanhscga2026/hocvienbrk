@@ -52,6 +52,7 @@ function CreateCourseContent() {
     
     // Section3: Học phí & Thanh toán
     const [phiCoc, setPhiCoc] = useState(0)
+    const [feeType, setFeeType] = useState('MIEN_PHI')
     const [vipExempt, setVipExempt] = useState(false)
     const [noidungStk, setNoidungStk] = useState('')
     
@@ -167,6 +168,7 @@ function CreateCourseContent() {
                         setLinkAnhBia(courseRes.link_anh_bia || '')
                         
                         setPhiCoc(courseRes.phi_coc || 0)
+                        setFeeType(courseRes.feeType || 'MIEN_PHI')
                         setVipExempt(courseRes.vipExempt ?? false)
                         setNoidungStk(courseRes.noidung_stk || '')
                         
@@ -229,6 +231,7 @@ function CreateCourseContent() {
                 mo_ta_dai: moTaDai || null,
                 link_anh_bia: linkAnhBia || null,
                 phi_coc: phiCoc,
+                feeType,
                 vipExempt,
                 noidung_stk: noidungStk || null,
                 link_zalo: linkZalo || null,
@@ -264,6 +267,7 @@ function CreateCourseContent() {
             if (moTaDai) formData.append('mo_ta_dai', moTaDai)
             if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
             formData.append('phi_coc', phiCoc.toString())
+            formData.append('feeType', feeType)
             formData.append('vipExempt', vipExempt.toString())
             if (teacherBankAccountId) formData.append('teacherBankAccountId', teacherBankAccountId.toString())
             if (noidungStk) formData.append('noidung_stk', noidungStk)
@@ -550,6 +554,16 @@ function CreateCourseContent() {
                                 onChange={(e) => setPhiCoc(parseInt(e.target.value) || 0)} 
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
                             />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Dạng phí</label>
+                            <select value={feeType} onChange={(e) => setFeeType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                <option value="MIEN_PHI">Miễn phí</option>
+                                <option value="PHI_TUY_TINH">Phí tùy tâm</option>
+                                <option value="PHI_CAM_KET">Phí cam kết</option>
+                                <option value="PHI_DONG_HANH">Phí đồng hành</option>
+                                <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
+                            </select>
                         </div>
                     </div>
                     

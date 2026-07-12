@@ -125,6 +125,18 @@ export default async function Home() {
   // Phân loại courses an toàn
   const safeCourses = Array.isArray(courses) ? courses : []
   const myCourses = safeCourses.filter((c: any) => myCourseIds.has(c.id))
+
+  // Tách active vs completed — ACTIVE hiện trước, COMPLETED ẩn (xem thêm mới hiện)
+  const myActiveCourses = myCourses
+    .filter((c: any) => enrollmentsMap[c.id]?.status === 'ACTIVE')
+    .sort((a: any, b: any) => {
+      const dateA = enrollmentsMap[a.id]?.startedAt ? new Date(enrollmentsMap[a.id].startedAt).getTime() : 0
+      const dateB = enrollmentsMap[b.id]?.startedAt ? new Date(enrollmentsMap[b.id].startedAt).getTime() : 0
+      return dateB - dateA // Gnearest first
+    })
+  const myCompletedCourses = myCourses
+    .filter((c: any) => enrollmentsMap[c.id]?.status === 'COMPLETED')
+
   const otherCourses = safeCourses.filter((c: any) => !myCourseIds.has(c.id))
 
   const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
@@ -140,6 +152,14 @@ export default async function Home() {
     const orderA = a.courses[0]?.courseCategory?.order ?? 0
     const orderB = b.courses[0]?.courseCategory?.order ?? 0
     return orderA - orderB
+  })
+
+  // Sort courses trong mỗi category: pin ASC → createdAt DESC
+  groupedOtherCourses.forEach((g: any) => {
+    g.courses.sort((a: any, b: any) => {
+      if (a.pin !== b.pin) return a.pin - b.pin
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
   })
 
   return (
@@ -162,7 +182,8 @@ export default async function Home() {
         <HomePageClient
           profile={safeProfile as any}
           courses={safeCourses}
-          myCourses={myCourses}
+          myActiveCourses={myActiveCourses}
+          myCompletedCourses={myCompletedCourses}
           groupedOtherCourses={groupedOtherCourses}
           posts={posts || []}
           session={session}

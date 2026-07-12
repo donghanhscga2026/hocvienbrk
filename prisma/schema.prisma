@@ -347,6 +347,7 @@ model Course {
   link_anh_bia  String?             @map("link_anh_bia_khoa")
   link_zalo     String?
   phi_coc       Int                 @default(0)
+  feeType       FeeType             @default(MIEN_PHI)
   vipExempt     Boolean             @default(false)
   noidung_stk   String?
   file_email    String?
@@ -1362,6 +1363,14 @@ enum CourseType {
   CHALLENGE
   LIB
   SYS
+}
+
+enum FeeType {
+  MIEN_PHI
+  PHI_TUY_TINH
+  PHI_CAM_KET
+  PHI_DONG_HANH
+  PHI_TOI_THIEU
 }
 
 enum AffiliateStatus {
