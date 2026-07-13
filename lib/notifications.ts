@@ -475,8 +475,9 @@ export async function sendLoginNotification(user: { id: number; name: string }, 
   await sendTelegram(msg, 'FAILED_LOGIN');
 }
 
-export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }) {
-  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
+export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }, newPassword?: string) {
+  const pwdInfo = newPassword ? `\n🔑 Mật khẩu mới: <code>${newPassword}</code>` : '';
+  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${pwdInfo}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
   await sendTelegram(msg, 'CHANGE');
 }
 
