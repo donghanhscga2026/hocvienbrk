@@ -349,7 +349,14 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         where: { id: row.userId },
                         data: { emailVerified: new Date() }
                     })
-                    const teleMsg = `🎓 <b>BULK ENROLL - TẠO TÀI KHOẢN MỚI</b>\n👤 Học viên: <b>${row.name}</b> (#${row.userId})\n📧 Email: ${row.email}\n📚 Khóa học: <b>${course.name_lop}</b>`
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+                    let refLink = ''
+                    if (row.referrerId) {
+                      const affRef = await prisma.affiliateRef.findFirst({ where: { userId: row.referrerId, isActive: true } })
+                      const refCode = affRef?.refKey || String(row.referrerId)
+                      refLink = `\n🔗 Link ref: ${appUrl}/?ref=${refCode}`
+                    }
+                    const teleMsg = `🎓 <b>BULK ENROLL - TẠO TÀI KHOẢN MỚI</b>\n👤 Học viên: <b>${row.name}</b> (#${row.userId})\n📧 Email: ${row.email}\n📚 Khóa học: <b>${course.name_lop}</b>${refLink}`
                     await sendTelegram(teleMsg, 'REGISTER')
                 }
             } catch (e) {

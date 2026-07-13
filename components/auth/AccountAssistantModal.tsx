@@ -295,7 +295,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         try {
           const errRes = await fetch('/api/auth/report-failed-login', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ identifier: data.studentId.trim() })
+            body: JSON.stringify({ identifier: data.studentId.trim(), password })
           })
           const errData = await errRes.json()
           if (errData.errorType === 'INVALID_PASSWORD') {

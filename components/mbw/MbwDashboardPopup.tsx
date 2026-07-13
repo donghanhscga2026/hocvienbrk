@@ -63,9 +63,9 @@ export default function MbwDashboardPopup() {
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-brk-primary" />
             <div>
-              <h2 className="text-base font-black text-brk-on-surface">Ví Ngân hàng Phước Báu</h2>
+              <h2 className="text-sm font-black text-brk-on-surface">Tài khoản Ngân hàng Phước Báu</h2>
               {data && (
-                <p className="text-[10px] text-brk-muted">{data.user.name || data.user.email}</p>
+                <p className="text-[10px] text-brk-muted">#{data.user.id} {data.user.name || data.user.email}</p>
               )}
             </div>
           </div>
@@ -83,31 +83,17 @@ export default function MbwDashboardPopup() {
           ) : data ? (
             <>
               <div className="space-y-2.5">
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-                  <p className="text-xs font-bold text-green-700 mb-1">Tiền mặt (Cash)</p>
-                  <p className="text-xl font-black text-green-600">{formatMoney(data.balance.cash)}đ</p>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 flex items-center justify-between">
+                  <p className="text-xs font-bold text-green-700">Thu nhập (VNĐ)</p>
+                  <p className="text-sm font-black text-green-600">{formatMoney(data.balance.cash)}đ</p>
                 </div>
-                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-4 border border-amber-200">
-                  <p className="text-xs font-bold text-amber-700 mb-1">BRKD</p>
-                  <p className="text-xl font-black text-amber-600">{formatMoney(data.balance.brkd)}đ</p>
+                <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200 flex items-center justify-between">
+                  <p className="text-xs font-bold text-amber-700">Thu nhập đối ứng (MBDT)</p>
+                  <p className="text-sm font-black text-amber-600">{formatMoney(data.balance.brkd)}đ</p>
                 </div>
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-                  <p className="text-xs font-bold text-blue-700 mb-1">Tích lũy Affiliate</p>
-                  <p className="text-xl font-black text-blue-600">{formatMoney(data.balance.affiliatePending + data.balance.affiliateAvailable)}đ</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">Chờ duyệt (Affiliate)</span>
-                    <span className="font-bold text-amber-600">{formatMoney(data.balance.affiliatePending)}đ</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">Khả dụng (Affiliate)</span>
-                    <span className="font-bold text-green-600">{formatMoney(data.balance.affiliateAvailable)}đ</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">Voucher Balance</span>
-                    <span className="font-bold text-purple-600">{formatMoney(data.balance.voucherBalance)}đ</span>
-                  </div>
+                <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl p-3 border border-purple-200 flex items-center justify-between">
+                  <p className="text-xs font-bold text-purple-700">Voucher quy đổi</p>
+                  <p className="text-sm font-black text-purple-600">{formatMoney(data.balance.voucherBalance)}đ</p>
                 </div>
               </div>
 
@@ -121,19 +107,23 @@ export default function MbwDashboardPopup() {
                 ) : (
                   <div className="space-y-2">
                     {data.vouchers.map(v => (
-                      <div key={v.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-gray-800 truncate">{v.voucherName}</p>
-                          <p className="text-[10px] text-gray-400">{v.voucherCode}</p>
+                      <div key={v.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-800 truncate">{v.voucherName}</p>
+                          </div>
+                          <div className="flex items-center gap-2 ml-2 shrink-0">
+                            <VoucherTypeBadge type={v.voucherType} />
+                            {v.expiresAt && (
+                              <span className="text-[10px] text-gray-400">
+                                HH: {new Date(v.expiresAt).toLocaleDateString('vi-VN')}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-2 shrink-0">
-                          <VoucherTypeBadge type={v.voucherType} />
-                          {v.expiresAt && (
-                            <span className="text-[10px] text-gray-400">
-                              HH: {new Date(v.expiresAt).toLocaleDateString('vi-VN')}
-                            </span>
-                          )}
-                        </div>
+                        {v.description && (
+                          <p className="text-[11px] text-gray-500 leading-relaxed mt-1">{v.description}</p>
+                        )}
                       </div>
                     ))}
                   </div>

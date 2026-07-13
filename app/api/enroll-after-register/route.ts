@@ -155,9 +155,23 @@ export async function POST(request: NextRequest) {
     if (isAutoActive) {
       const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
 
+      let rawRefCode = ''
+      try {
+        const { cookies } = await import("next/headers")
+        const cookieStore = await cookies()
+        const refCookie = cookieStore.get('aff_ref')
+        if (refCookie?.value) {
+          const decoded = decodeURIComponent(refCookie.value)
+          const affData = JSON.parse(decoded)
+          if (affData?.r) rawRefCode = affData.r
+        }
+      } catch {}
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+      const refLink = rawRefCode ? `\n🔗 Link ref: ${appUrl}/khoa-hoc/${course.id_khoa}?ref=${rawRefCode}` : ''
       const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ (từ ĐK)</b>\n\n` +
         `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
-        `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
+        `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>${refLink}\n` +
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
       await sendTelegram(msgAdmin, 'ACTIVATE')
 

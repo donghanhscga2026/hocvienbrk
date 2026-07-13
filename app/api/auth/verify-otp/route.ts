@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // 2. Tìm user
     const user = await prisma.user.findUnique({
       where: { email: email },
-      select: { id: true, name: true, email: true }
+      select: { id: true, name: true, email: true, referrerId: true }
     });
 
     if (!user) {
@@ -55,7 +55,14 @@ export async function POST(request: NextRequest) {
     // 6. Gửi thông báo Telegram về việc xác minh thành công
     try {
         const { sendTelegram } = await import("@/lib/notifications");
-        const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+        let refLink = ''
+        if (user.referrerId) {
+          const affRef = await prisma.affiliateRef.findFirst({ where: { userId: user.referrerId, isActive: true } })
+          const refCode = affRef?.refKey || String(user.referrerId)
+          refLink = `\n🔗 Link ref: ${appUrl}/?ref=${refCode}`
+        }
+        const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${refLink}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
         await sendTelegram(msg, 'REGISTER');
     } catch (e) {
         console.error("Telegram notification error:", e);

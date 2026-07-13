@@ -155,11 +155,18 @@ export async function verifyPaymentAction(
           const effectiveAmount = enrollment.payment?.amount || enrollment.course.phi_coc || 0
           const bankName = enrollment.course.teacherBankAccount?.bankName || enrollment.payment?.bankName || 'N/A'
 
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+          let refLink = ''
+          if (enrollment.referrerId) {
+            const affRef = await prisma.affiliateRef.findFirst({ where: { userId: enrollment.referrerId, isActive: true } })
+            const refCode = affRef?.refKey || String(enrollment.referrerId)
+            refLink = `🔗 Link ref: ${appUrl}/khoa-hoc/${enrollment.course.id_khoa}?ref=${refCode}\n`
+          }
           let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
             `👤 Học viên: <b>${brkUser?.name || 'N/A'}</b>\n` +
             `📞 SĐT: ${brkUser?.phone || 'N/A'}\n` +
             `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
-            `💰 Số tiền: ${effectiveAmount.toLocaleString()}đ\n` +
+            `${refLink}💰 Số tiền: ${effectiveAmount.toLocaleString()}đ\n` +
             `🏦 Ngân hàng: ${bankName}\n` +
             `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
           if (placement.parentId) {

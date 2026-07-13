@@ -192,7 +192,7 @@ export async function processPaymentEmails() {
       where: { status: 'PENDING' },
       include: {
         course: { select: { id_khoa: true, phi_coc: true, name_lop: true } },
-        user: { select: { id: true, name: true, phone: true, email: true } }
+        user: { select: { id: true, name: true, phone: true, email: true, referrerId: true } }
       }
     });
 
@@ -302,11 +302,18 @@ export async function processPaymentEmails() {
             }));
 
             // Telegram admin notification
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+            let refLink = ''
+            if (enrollment.referrerId) {
+              const affRef = await prisma.affiliateRef.findFirst({ where: { userId: enrollment.referrerId, isActive: true } })
+              const refCode = affRef?.refKey || String(enrollment.referrerId)
+              refLink = `🔗 Link ref: ${appUrl}/khoa-hoc/${enrollment.course.id_khoa}?ref=${refCode}\n`
+            }
             const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +
               `👤 Học viên: <b>${enrollment.user.name}</b>\n` +
               `📞 SĐT: ${enrollment.user.phone}\n` +
               `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
-              `💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
+              `${refLink}💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +
               `🏦 Ngân hàng: Sacombank\n` +
               `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n` +
               brkPlacementMsg;
