@@ -56,13 +56,17 @@ export async function POST(request: NextRequest) {
     try {
         const { sendTelegram } = await import("@/lib/notifications");
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
-        let refLink = ''
+        let referrerInfo = ''
         if (user.referrerId) {
-          const affRef = await prisma.affiliateRef.findFirst({ where: { userId: user.referrerId, isActive: true } })
+          const [affRef, referrerUser] = await Promise.all([
+            prisma.affiliateRef.findFirst({ where: { userId: user.referrerId, isActive: true } }),
+            prisma.user.findUnique({ where: { id: user.referrerId }, select: { name: true } })
+          ])
           const refCode = affRef?.refKey || String(user.referrerId)
-          refLink = `\n🔗 Link ref: ${appUrl}/?ref=${refCode}`
+          const refName = referrerUser?.name || ''
+          referrerInfo = `\n📢 Người giới thiệu: #${user.referrerId}${refName ? ' (' + refName + ')' : ''}\n🔗 Link ref: ${appUrl}/?ref=${refCode}`
         }
-        const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${refLink}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
+        const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${referrerInfo}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
         await sendTelegram(msg, 'REGISTER');
     } catch (e) {
         console.error("Telegram notification error:", e);

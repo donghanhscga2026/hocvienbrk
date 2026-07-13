@@ -175,7 +175,12 @@ export async function registerUser(prevState: any, formData: FormData) {
 
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
         const refLink = rawRefCode ? `${appUrl}/?ref=${rawRefCode}` : ''
-        const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}` + (refLink ? `\n🔗 Link ref: ${refLink}` : '') : ''
+        let referrerName = ''
+        if (refId) {
+            const referrerUser = await prisma.user.findUnique({ where: { id: refId }, select: { name: true } })
+            referrerName = referrerUser?.name || ''
+        }
+        const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}${referrerName ? ' (' + referrerName + ')' : ''}` + (refLink ? `\n🔗 Link ref: ${refLink}` : '') : ''
         const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
                          `👤 Họ tên: <b>${user.name}</b>\n` +

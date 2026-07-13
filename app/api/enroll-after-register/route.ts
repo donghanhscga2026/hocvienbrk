@@ -169,9 +169,17 @@ export async function POST(request: NextRequest) {
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
       const refLink = rawRefCode ? `\n🔗 Link ref: ${appUrl}/khoa-hoc/${course.id_khoa}?ref=${rawRefCode}` : ''
+      let referrerInfo = ''
+      if (user?.referrerId) {
+        const referrerUser = await prisma.user.findUnique({ where: { id: user.referrerId }, select: { name: true } })
+        const refName = referrerUser?.name || ''
+        referrerInfo = `\n📢 Người giới thiệu: #${user.referrerId}${refName ? ' (' + refName + ')' : ''}${refLink}`
+      } else {
+        referrerInfo = refLink
+      }
       const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ (từ ĐK)</b>\n\n` +
         `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
-        `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>${refLink}\n` +
+        `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>${referrerInfo}\n` +
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
       await sendTelegram(msgAdmin, 'ACTIVATE')
 
