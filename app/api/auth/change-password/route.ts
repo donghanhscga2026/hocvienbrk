@@ -32,7 +32,7 @@ export async function POST(request: Request) {
             id: parseInt(session.user.id),
             name: session.user.name || "Unknown",
             email: session.user.email || ""
-        })
+        }, newPassword)
 
         return NextResponse.json({ success: true, message: "Đổi mật khẩu thành công" })
     } catch (error: any) {
