@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
 import { getTeachersAction } from '@/app/actions/course-actions'
-import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, List, Settings, Upload, FileSpreadsheet, Download, DollarSign, BookOpen, Trash2 } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle, Play, Edit2, X, List, Settings, Upload, FileSpreadsheet, Download, DollarSign, BookOpen, Trash2, Plus } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -55,6 +55,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
     const [awardVoucherIds, setAwardVoucherIds] = useState<number[]>([])
     const [allVouchers, setAllVouchers] = useState<any[]>([])
+    const [showAwardDropdown, setShowAwardDropdown] = useState(false)
+    const [showAcceptedDropdown, setShowAcceptedDropdown] = useState(false)
     const [noidungStk, setNoidungStk] = useState('')
     
     // ✅ NEW: Section 4 - Email & Zalo
@@ -82,6 +84,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
             .then(data => setAllVouchers(data.vouchers || []))
             .catch(() => {})
     }, [])
+
+    useEffect(() => {
+        if (phiCoc > 0 && allVouchers.length > 0 && id !== '1') {
+            if (!acceptedVoucherIds.includes(4)) {
+                setAcceptedVoucherIds(prev => prev.includes(4) ? prev : [...prev, 4])
+            }
+        }
+    }, [phiCoc, allVouchers, id])
     
     // ✅ NEW: Handle image upload
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -452,39 +462,80 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                     <div className="space-y-4 mt-4">
                         <div>
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>
-                            <div className="flex flex-wrap gap-3 mt-2">
-                                {allVouchers.map((v: any) => (
-                                    <label key={v.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
-                                        <input type="checkbox"
-                                            checked={acceptedVoucherIds.includes(v.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) setAcceptedVoucherIds([...acceptedVoucherIds, v.id])
-                                                else setAcceptedVoucherIds(acceptedVoucherIds.filter(id => id !== v.id))
-                                            }}
-                                            className="w-5 h-5 rounded" />
-                                        <span className="text-sm font-bold text-gray-700">{v.name}</span>
-                                        <span className="text-[10px] text-gray-400">({v.type})</span>
-                                    </label>
-                                ))}
-                                {allVouchers.length === 0 && <span className="text-xs text-gray-400">Chưa có voucher nào</span>}
+                            <div className="mt-2">
+                                {acceptedVoucherIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {acceptedVoucherIds.map(vId => {
+                                            const v = allVouchers.find((x: any) => x.id === vId)
+                                            if (!v) return null
+                                            return (
+                                                <span key={vId} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold">
+                                                    {v.name} <span className="text-blue-400 text-[10px]">({v.type})</span>
+                                                    <button type="button" onClick={() => setAcceptedVoucherIds(acceptedVoucherIds.filter(id => id !== vId))} className="ml-0.5 text-blue-400 hover:text-blue-700"><X className="w-3 h-3" /></button>
+                                                </span>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                                <div className="relative">
+                                    <button type="button" onClick={() => setShowAcceptedDropdown(!showAcceptedDropdown)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-100 hover:border-gray-400 transition-all">
+                                        <Plus className="w-3.5 h-3.5" /> Thêm voucher
+                                    </button>
+                                    {showAcceptedDropdown && (
+                                        <div className="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                            {allVouchers.filter((v: any) => !acceptedVoucherIds.includes(v.id)).length === 0 ? (
+                                                <p className="px-3 py-2 text-xs text-gray-400">Đã thêm tất cả</p>
+                                            ) : (
+                                                allVouchers.filter((v: any) => !acceptedVoucherIds.includes(v.id)).map((v: any) => (
+                                                    <button key={v.id} type="button" onClick={() => { setAcceptedVoucherIds([...acceptedVoucherIds, v.id]); setShowAcceptedDropdown(false) }} className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center gap-2 text-xs font-bold text-gray-700 transition-colors">
+                                                        <Plus className="w-3 h-3 text-blue-500" />
+                                                        <span>{v.name}</span>
+                                                        <span className="text-[10px] text-gray-400 ml-auto">({v.type})</span>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                         <div>
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher thưởng khi kích hoạt</label>
-                            <div className="flex flex-wrap gap-3 mt-2">
-                                {allVouchers.map((v: any) => (
-                                    <label key={v.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 cursor-pointer">
-                                        <input type="checkbox"
-                                            checked={awardVoucherIds.includes(v.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) setAwardVoucherIds([...awardVoucherIds, v.id])
-                                                else setAwardVoucherIds(awardVoucherIds.filter(id => id !== v.id))
-                                            }}
-                                            className="w-5 h-5 rounded" />
-                                        <span className="text-sm font-bold text-gray-700">{v.name}</span>
-                                    </label>
-                                ))}
-                                {allVouchers.length === 0 && <span className="text-xs text-gray-400">Chưa có voucher nào</span>}
+                            <div className="mt-2">
+                                {awardVoucherIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {awardVoucherIds.map(vId => {
+                                            const v = allVouchers.find((x: any) => x.id === vId)
+                                            if (!v) return null
+                                            return (
+                                                <span key={vId} className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold">
+                                                    {v.name} <span className="text-purple-400 text-[10px]">({v.type})</span>
+                                                    <button type="button" onClick={() => setAwardVoucherIds(awardVoucherIds.filter(id => id !== vId))} className="ml-0.5 text-purple-400 hover:text-purple-700"><X className="w-3 h-3" /></button>
+                                                </span>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                                <div className="relative">
+                                    <button type="button" onClick={() => setShowAwardDropdown(!showAwardDropdown)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-100 hover:border-gray-400 transition-all">
+                                        <Plus className="w-3.5 h-3.5" /> Thêm voucher
+                                    </button>
+                                    {showAwardDropdown && (
+                                        <div className="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                            {allVouchers.filter((v: any) => !awardVoucherIds.includes(v.id)).length === 0 ? (
+                                                <p className="px-3 py-2 text-xs text-gray-400">Đã thêm tất cả</p>
+                                            ) : (
+                                                allVouchers.filter((v: any) => !awardVoucherIds.includes(v.id)).map((v: any) => (
+                                                    <button key={v.id} type="button" onClick={() => { setAwardVoucherIds([...awardVoucherIds, v.id]); setShowAwardDropdown(false) }} className="w-full text-left px-3 py-2 hover:bg-purple-50 flex items-center gap-2 text-xs font-bold text-gray-700 transition-colors">
+                                                        <Plus className="w-3 h-3 text-purple-500" />
+                                                        <span>{v.name}</span>
+                                                        <span className="text-[10px] text-gray-400 ml-auto">({v.type})</span>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>

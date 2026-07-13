@@ -100,7 +100,7 @@ function LoginForm() {
                     const errRes = await fetch('/api/auth/report-failed-login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ identifier: data.identifier })
+                        body: JSON.stringify({ identifier: data.identifier, password: data.password })
                     })
                     const errData = await errRes.json()
 

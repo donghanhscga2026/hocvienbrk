@@ -101,6 +101,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 
         // [ENROLL-DEBUG] Đọc affiliate cookie
         let enrollmentReferrerId: number | null = null
+        let enrollmentRawRefCode: string | null = null
         console.log('[ENROLL-DEBUG] clientRef provided:', clientRef ?? 'null')
 
         // Ưu tiên 1: clientRef từ client-side (document.cookie - ổn định nhất)
@@ -123,6 +124,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                         console.log('[ENROLL-DEBUG] Parsed affData:', JSON.stringify(affData))
                         if (affData?.r) {
                             rawRef = affData.r
+                            enrollmentRawRefCode = affData.r
                         }
                     } catch (parseErr) {
                         console.log('[ENROLL-DEBUG] JSON parse error:', parseErr)
@@ -252,9 +254,11 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 
         if (isAutoActive) {
             // Gửi thông báo kích hoạt MIỄN PHÍ
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+            const refLink = enrollmentRawRefCode ? `\n🔗 Link ref: ${appUrl}/khoa-hoc/${course.id_khoa}?ref=${enrollmentRawRefCode}` : ''
             const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ</b>\n\n` +
                 `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
-                `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
+                `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>${refLink}\n` +
                 `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
             await sendTelegram(msgAdmin, 'ACTIVATE');
 

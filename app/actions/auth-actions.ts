@@ -81,6 +81,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         
         // Parse referrerId: Ưu tiên lấy từ Cookie an toàn ở phía Server
         let refId = 0;
+        let rawRefCode = '';
         const cookieStore = await cookies();
         const affRefCookie = cookieStore.get('aff_ref');
         
@@ -88,9 +89,8 @@ export async function registerUser(prevState: any, formData: FormData) {
             try {
                 const affData = JSON.parse(decodeURIComponent(affRefCookie.value));
                 if (affData.r) {
-                    // Thử parse trực tiếp số
+                    rawRefCode = affData.r;
                     refId = parseInt(affData.r);
-                    // Nếu không phải số (custom alias), resolve qua DB
                     if (isNaN(refId) || refId <= 0) {
                         const resolved = await resolveRefToUserId(affData.r);
                         refId = resolved;
@@ -173,7 +173,9 @@ export async function registerUser(prevState: any, formData: FormData) {
         // Gui email xac minh
         await sendVerificationEmail(normalizedEmail, name, otpCode)
 
-        const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}` : ''
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+        const refLink = rawRefCode ? `${appUrl}/?ref=${rawRefCode}` : ''
+        const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}` + (refLink ? `\n🔗 Link ref: ${refLink}` : '') : ''
         const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
                          `👤 Họ tên: <b>${user.name}</b>\n` +
