@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma'
 
-// ADD 1 USER TO SYSTEM CLOSURE
+// ADD 1 USER TO SYSTEM CLOSURE — Idempotent, fail-hard on critical steps
 export async function addUserToSystemClosure(
     userId: number,
     refSysId: number,
@@ -31,28 +31,27 @@ export async function addUserToSystemClosure(
 
     const { autoId } = systemRecord
 
-    // 2. Insert closure for user itself (ancestor = descendant = autoId, depth = 0)
+    // 2. Self-closure MUST succeed — this is the gate for all downstream operations
     await prisma.systemClosure.upsert({
         where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } },
         update: { depth: 0 },
         create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
-    }).catch(() => { }) // Ignore if exists
+    })
 
-    // Delete old non-self closures before rebuilding (handles refSysId change + stale data)
+    // 3. Delete old non-self closures before rebuilding (handles refSysId change + stale data)
     if (existing) {
         await prisma.systemClosure.deleteMany({
             where: { descendantId: autoId, depth: { gt: 0 }, systemId }
         })
     }
 
-    // 3. If upline exists (refSysId >= 0), copy all upline closures and update depth
+    // 4. If upline exists (refSysId >= 0), copy all upline closures using upsert (idempotent)
     if (refSysId >= 0) {
         const uplineSystem = await prisma.system.findFirst({
             where: { userId: refSysId, onSystem: systemId }
         })
 
         if (uplineSystem) {
-            // Get ALL ancestors of upline (from root to upline)
             const ancestors = await prisma.systemClosure.findMany({
                 where: {
                     systemId,
@@ -61,18 +60,34 @@ export async function addUserToSystemClosure(
                 orderBy: { depth: 'desc' }
             })
 
-            // Create closures for user - copy from each ancestor + 1 depth
             for (const ancestor of ancestors) {
-                await prisma.systemClosure.create({
-                    data: {
+                // Use upsert instead of create — idempotent, no duplicate key errors
+                await prisma.systemClosure.upsert({
+                    where: {
+                        ancestorId_descendantId_systemId: {
+                            ancestorId: ancestor.ancestorId,
+                            descendantId: autoId,
+                            systemId
+                        }
+                    },
+                    update: { depth: ancestor.depth + 1 },
+                    create: {
                         ancestorId: ancestor.ancestorId,
                         descendantId: autoId,
                         depth: ancestor.depth + 1,
                         systemId
                     }
-                }).catch(() => { }) // Ignore duplicates
+                })
             }
         }
+    }
+
+    // 5. Post-validation: verify self-closure exists (defensive check)
+    const selfCheck = await prisma.systemClosure.findUnique({
+        where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } }
+    })
+    if (!selfCheck) {
+        throw new Error(`[SystemClosure] Post-validation FAILED: self-closure missing for userId=${userId} autoId=${autoId} systemId=${systemId}`)
     }
 }
 
@@ -137,31 +152,40 @@ export async function buildSystemClosuresFromData(
         const autoId = systemRecords.get(row.userId)
         if (!autoId) continue
 
-        // Self closure
-        await prisma.systemClosure.create({
-            data: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
-        }).catch(() => { })
+        // Self closure — upsert idempotent
+        await prisma.systemClosure.upsert({
+            where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } },
+            update: { depth: 0 },
+            create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
+        })
         closureCount++
 
-        // If upline exists, copy closures from upline (all ancestors)
+        // If upline exists, copy closures from upline using upsert (idempotent)
         if (row.refSysId > 0) {
             const uplineAutoId = systemRecords.get(row.refSysId)
             if (uplineAutoId) {
-                // Get ALL ancestors of upline
                 const ancestors = await prisma.systemClosure.findMany({
                     where: { systemId, descendantId: uplineAutoId },
                     orderBy: { depth: 'desc' }
                 })
 
                 for (const ancestor of ancestors) {
-                    await prisma.systemClosure.create({
-                        data: {
+                    await prisma.systemClosure.upsert({
+                        where: {
+                            ancestorId_descendantId_systemId: {
+                                ancestorId: ancestor.ancestorId,
+                                descendantId: autoId,
+                                systemId
+                            }
+                        },
+                        update: { depth: ancestor.depth + 1 },
+                        create: {
                             ancestorId: ancestor.ancestorId,
                             descendantId: autoId,
                             depth: ancestor.depth + 1,
                             systemId
                         }
-                    }).catch(() => { })
+                    })
                     closureCount++
                 }
             }
@@ -248,4 +272,127 @@ export async function syncUserToYtbSystem(userId: number, teacherId: number): Pr
     } catch (error) {
         console.error(`[Sync-YTB] Error syncing user #${userId}:`, error)
     }
+}
+
+// ═══════════════════════════════════════════════════════
+// VALIDATE: Kiểm tra toàn vẹn closure data
+// ═══════════════════════════════════════════════════════
+
+export interface ClosureIssue {
+    userId: number
+    autoId: number
+    issue: string
+}
+
+export async function validateSystemClosures(systemId: number): Promise<ClosureIssue[]> {
+    const issues: ClosureIssue[] = []
+
+    const members = await prisma.system.findMany({
+        where: { onSystem: systemId },
+        include: { user: { select: { id: true, name: true } } }
+    })
+
+    for (const member of members) {
+        // Check 1: Self-closure exists
+        const selfClosure = await prisma.systemClosure.findUnique({
+            where: { ancestorId_descendantId_systemId: { ancestorId: member.autoId, descendantId: member.autoId, systemId } }
+        })
+        if (!selfClosure) {
+            issues.push({ userId: member.userId, autoId: member.autoId, issue: 'Thiếu self-closure' })
+        }
+
+        // Check 2: Non-root members must have depth=1 link from parent
+        if (member.refSysId > 0) {
+            const parent = await prisma.system.findFirst({ where: { userId: member.refSysId, onSystem: systemId } })
+            if (parent) {
+                const parentLink = await prisma.systemClosure.findUnique({
+                    where: { ancestorId_descendantId_systemId: { ancestorId: parent.autoId, descendantId: member.autoId, systemId } }
+                })
+                if (!parentLink) {
+                    issues.push({ userId: member.userId, autoId: member.autoId, issue: `Thiếu depth-1 link từ parent #${member.refSysId} (autoId=${parent.autoId})` })
+                }
+            } else {
+                issues.push({ userId: member.userId, autoId: member.autoId, issue: `Parent #${member.refSysId} không tồn tại trong system` })
+            }
+        }
+
+        // Check 3: Total closure count should = depth from root + 1 (self)
+        const closureCount = await prisma.systemClosure.count({
+            where: { systemId, descendantId: member.autoId }
+        })
+        if (closureCount === 0) {
+            issues.push({ userId: member.userId, autoId: member.autoId, issue: 'Không có closure record nào' })
+        }
+    }
+
+    return issues
+}
+
+// ═══════════════════════════════════════════════════════
+// REBUILD: Xóa toàn bộ closure và tạo lại từ System records
+// ═══════════════════════════════════════════════════════
+
+export async function rebuildSystemClosures(systemId: number): Promise<{ deleted: number; created: number; errors: string[] }> {
+    const errors: string[] = []
+
+    // 1. Delete ALL existing closures for this system
+    const deleted = await prisma.systemClosure.deleteMany({ where: { systemId } })
+
+    // 2. Get all members sorted by autoId (insertion order = topological)
+    const members = await prisma.system.findMany({
+        where: { onSystem: systemId },
+        orderBy: { autoId: 'asc' }
+    })
+
+    let created = 0
+
+    for (const member of members) {
+        try {
+            // Self-closure
+            await prisma.systemClosure.create({
+                data: { ancestorId: member.autoId, descendantId: member.autoId, depth: 0, systemId }
+            })
+            created++
+
+            // Copy from parent's closures
+            if (member.refSysId >= 0) {
+                const parent = await prisma.system.findFirst({
+                    where: { userId: member.refSysId, onSystem: systemId }
+                })
+                if (parent) {
+                    const parentClosures = await prisma.systemClosure.findMany({
+                        where: { systemId, descendantId: parent.autoId },
+                        orderBy: { depth: 'desc' }
+                    })
+                    for (const pc of parentClosures) {
+                        await prisma.systemClosure.create({
+                            data: {
+                                ancestorId: pc.ancestorId,
+                                descendantId: member.autoId,
+                                depth: pc.depth + 1,
+                                systemId
+                            }
+                        })
+                        created++
+                    }
+                }
+            }
+        } catch (err) {
+            const msg = `User #${member.userId} (autoId=${member.autoId}): ${err}`
+            errors.push(msg)
+            console.error(`[Rebuild] FAILED:`, msg)
+        }
+    }
+
+    // 3. Post-rebuild validation
+    const issues = await validateSystemClosures(systemId)
+    if (issues.length > 0) {
+        console.warn(`[Rebuild] System #${systemId}: ${issues.length} issues remaining after rebuild:`)
+        for (const issue of issues) {
+            console.warn(`  #${issue.userId}: ${issue.issue}`)
+        }
+    }
+
+    console.log(`[Rebuild] System #${systemId}: deleted ${deleted.count}, created ${created}, errors ${errors.length}`)
+    return { deleted: deleted.count, created, errors }
 }
