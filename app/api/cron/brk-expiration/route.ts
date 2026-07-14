@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
