@@ -14,7 +14,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Email là bắt buộc" }, { status: 400 })
         }
 
-        const user = await prisma.user.findUnique({ where: { email } })
+        const normalizedEmail = email.toLowerCase().trim()
+        const user = await prisma.user.findFirst({
+            where: {
+                email: { equals: normalizedEmail, mode: 'insensitive' }
+            }
+        })
 
         if (!user) {
             return NextResponse.json({ error: "Không tìm thấy tài khoản với email này" }, { status: 404 })

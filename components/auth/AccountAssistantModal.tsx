@@ -271,7 +271,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       const res = await fetch(`/api/user/${data.studentId.trim()}`)
       if (!res.ok) { setError('Không tìm thấy mã học viên này.'); return }
       const json = await res.json()
-      if (json.id) {
+      if (json.id != null) {
         updateField('email', json.email || ''); updateField('phone', json.phone || '')
         goToStep('login_confirm')
       } else setError('Không tìm thấy mã học viên này.')
@@ -327,7 +327,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
           // Thêm nút "Quên mật khẩu?" sau 1s để user có thể đặt lại qua OTP
           setTimeout(() => {
             if (confirm('Bạn có muốn đặt lại mật khẩu qua email không?')) {
-              goToStep('forgot_otp')
+              handleSendOtp()
             }
           }, 500)
         }

@@ -5,10 +5,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
 import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction } from '@/app/actions/admin-actions'
-import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload } from 'lucide-react'
+import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
 import BulkEnrollModal from '@/components/admin/students/BulkEnrollModal'
+import ActivityTimeline from '@/components/admin/ActivityTimeline'
 
 interface EnrollmentData {
   courseId: number
@@ -93,6 +94,7 @@ export default function ToolsStudentsPage() {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'ADMIN'
   const isTeacher = session?.user?.role === 'TEACHER'
+  const isRoot = session?.user?.id === '0'
 
   const [students, setStudents] = useState<StudentData[]>([])
   const [loading, setLoading] = useState(true)
@@ -106,6 +108,7 @@ export default function ToolsStudentsPage() {
   const [totalPages, setTotalPages] = useState(0)
   const [total, setTotal] = useState(0)
   const [roleCounts, setRoleCounts] = useState<Record<string, number>>({})
+  const [activityLogTarget, setActivityLogTarget] = useState<{ id: number; name: string } | null>(null)
 
   const [courses, setCourses] = useState<{ id: number; name_lop: string }[]>([])
   const [selectedCourseId, setSelectedCourseId] = useState<number | undefined>(undefined)
@@ -369,54 +372,64 @@ export default function ToolsStudentsPage() {
               const textColor = roleTextColors[displayRole] || 'text-gray-900'
 
               return (
-                <Link
-                  key={student.id}
-                  href={`/tools/students/${student.id}`}
-                  prefetch={false}
-                  className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex flex-col items-center gap-1 shrink-0">
-                      {student.image ? (
-                        <div className={`w-12 h-12 rounded-xl overflow-hidden ${bgColor}`}>
-                          <Image
-                            src={student.image}
-                            alt={student.name || 'Avatar'}
-                            width={48}
-                            height={48}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bgColor}`}>
-                          <User className={`w-6 h-6 ${textColor}`} />
-                        </div>
-                      )}
-                      <span className="text-[10px] font-black text-gray-400">#{student.id}</span>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-bold text-base truncate ${isCoach ? 'text-purple-600' : textColor}`}>
-                        {student.name || 'Chưa có tên'}
-                      </h3>
-
-                      <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500">
-                        <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span className="truncate">{student.email}</span>
-                        {student.emailVerified ? (
-                          <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">Đã XM</span>
+                <div key={student.id} className="relative group">
+                  <Link
+                    href={`/tools/students/${student.id}`}
+                    prefetch={false}
+                    className="block bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        {student.image ? (
+                          <div className={`w-12 h-12 rounded-xl overflow-hidden ${bgColor}`}>
+                            <Image
+                              src={student.image}
+                              alt={student.name || 'Avatar'}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
                         ) : (
-                          <><span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">Chờ XM</span><ResendVerifyBtn studentId={student.id} /></>
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${bgColor}`}>
+                            <User className={`w-6 h-6 ${textColor}`} />
+                          </div>
                         )}
+                        <span className="text-[10px] font-black text-gray-400">#{student.id}</span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
-                        <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                        <span>{student.phone || 'Chưa có SĐT'}</span>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`font-bold text-base truncate ${isCoach ? 'text-purple-600' : textColor}`}>
+                          {student.name || 'Chưa có tên'}
+                        </h3>
+
+                        <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500">
+                          <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate">{student.email}</span>
+                          {student.emailVerified ? (
+                            <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">Đã XM</span>
+                          ) : (
+                            <><span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">Chờ XM</span><ResendVerifyBtn studentId={student.id} /></>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
+                          <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                          <span>{student.phone || 'Chưa có SĐT'}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                  {isRoot && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActivityLogTarget({ id: student.id, name: student.name || 'Chưa có tên' }) }}
+                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-blue-50 transition-all"
+                      title="Xem lịch sử hoạt động"
+                    >
+                      <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
+                    </button>
+                  )}
+                </div>
               )
             })}
           </div>
@@ -454,6 +467,15 @@ export default function ToolsStudentsPage() {
           courses={courses}
           isAdmin={isAdmin}
           isTeacher={isTeacher}
+        />
+      )}
+
+      {activityLogTarget && (
+        <ActivityTimeline
+          userId={activityLogTarget.id}
+          userName={activityLogTarget.name}
+          isOpen={!!activityLogTarget}
+          onClose={() => setActivityLogTarget(null)}
         />
       )}
     </div>

@@ -1811,3 +1811,38 @@ export async function getMemberPromotionHistoryAction(userId: number, systemId: 
         return { success: false, error: error.message }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACTIVITY LOG — Root admin only
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export async function getStudentActivityLogAction(
+    studentId: number,
+    options?: { limit?: number; offset?: number; actions?: string[] }
+) {
+    const session = await auth()
+    if (!session?.user?.id) return { success: false, error: "Chưa đăng nhập", logs: [], total: 0 }
+
+    const userId = parseInt(session.user.id)
+    if (userId !== 0) return { success: false, error: "Chỉ root admin mới có quyền xem", logs: [], total: 0 }
+
+    const limit = options?.limit || 50
+    const offset = options?.offset || 0
+
+    const where: any = { userId: studentId }
+    if (options?.actions && options.actions.length > 0) {
+        where.action = { in: options.actions }
+    }
+
+    const [logs, total] = await Promise.all([
+        prisma.activityLog.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            skip: offset,
+        }),
+        prisma.activityLog.count({ where })
+    ])
+
+    return { success: true, logs, total }
+}

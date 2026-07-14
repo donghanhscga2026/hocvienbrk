@@ -57,6 +57,16 @@ async function creditBalance(
     })
   ])
 
+  try {
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId,
+      action: 'WALLET_CHANGE',
+      detail: `${balanceType} +${amount.toLocaleString()}đ: ${description}`,
+      metadata: { balanceType, amount, type, oldVal, newVal, refId }
+    })
+  } catch {}
+
   return updated
 }
 
@@ -125,6 +135,16 @@ export async function debitBrkWallet(
       }
     })
   ])
+
+  try {
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId,
+      action: 'WALLET_CHANGE',
+      detail: `CASH -${amount.toLocaleString()}đ: ${description}`,
+      metadata: { balanceType: 'CASH', amount: -amount, type, oldVal: Number(wallet.balance), newVal: newBalance, refId }
+    })
+  } catch {}
 
   return updated
 }

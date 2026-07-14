@@ -14,8 +14,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Mật khẩu phải có ít nhất 6 ký tự" }, { status: 400 })
         }
 
-        const user = await prisma.user.findUnique({ where: { email } })
-
+        const normalizedEmail = email.toLowerCase().trim()
+        const user = await prisma.user.findFirst({
+            where: {
+                email: { equals: normalizedEmail, mode: 'insensitive' }
+            }
+        })
         if (!user) {
             return NextResponse.json({ error: "Không tìm thấy tài khoản" }, { status: 404 })
         }
@@ -49,6 +53,14 @@ export async function POST(request: Request) {
             const { sendTelegram } = await import("@/lib/notifications")
             const msg = `🔐 <b>ĐẶT LẠI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n🔑 Mật khẩu mới: <code>${newPassword}</code>\n\n✅ Đã đặt lại mật khẩu thành công qua chức năng Quên mật khẩu.`
             await sendTelegram(msg, 'CHANGE')
+
+            const { logActivity } = await import("@/lib/activity-logger");
+            await logActivity({
+                userId: user.id,
+                action: 'PASSWORD_RESET',
+                detail: 'Đặt lại mật khẩu qua Quên mật khẩu',
+                metadata: { email: user.email || null }
+            })
         } catch (error) {
             console.error("Telegram notification error:", error)
         }

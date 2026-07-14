@@ -262,6 +262,14 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                 `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
             await sendTelegram(msgAdmin, 'ACTIVATE');
 
+            const { logActivity } = await import('@/lib/activity-logger')
+            if (user?.id) await logActivity({
+                userId: user.id,
+                action: 'ENROLL_FREE',
+                detail: `Kích hoạt miễn phí: ${course.name_lop} (${course.id_khoa})`,
+                metadata: { courseId, idKhoa: course.id_khoa, studentName: user?.name || null, referrerId: enrollmentReferrerId || null }
+            })
+
             if (user?.email) {
                 await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email);
             }
@@ -608,6 +616,14 @@ export async function submitAssignmentAction({
                 console.log(`📡 Đang gửi thông báo Telegram LESSON đến ChatID: ${process.env.TELEGRAM_CHAT_ID_LESSON}`);
                 await sendTelegram(msgAdmin, 'LESSON');
                 console.log(`✅ Đã gửi thông báo Telegram LESSON thành công!`);
+
+                const { logActivity } = await import('@/lib/activity-logger')
+                if (enrollment?.user?.id) await logActivity({
+                    userId: enrollment.user.id,
+                    action: 'LESSON_COMPLETE',
+                    detail: `Hoàn thành bài: ${lesson?.title} (${totalScore}đ)`,
+                    metadata: { enrollmentId, lessonTitle: lesson?.title, score: totalScore, courseName: enrollment?.course?.name_lop || null, studentName: enrollment?.user?.name || null }
+                })
             } catch (teleError: any) {
                 console.error(`❌ Lỗi khi gửi thông báo Telegram LESSON:`, teleError.message);
             }

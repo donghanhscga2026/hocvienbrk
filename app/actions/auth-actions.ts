@@ -159,6 +159,14 @@ export async function registerUser(prevState: any, formData: FormData) {
                             const { addUserToSystemClosure } = await import('@/lib/system-closure-helpers');
                             await addUserToSystemClosure(user.id, user.referrerId, systemId);
                             console.log(`✅ Auto-enrolled user #${user.id} to System ${affData.s.toUpperCase()} under referrer #${user.referrerId}`);
+
+                            const { logActivity: logAct } = await import('@/lib/activity-logger')
+                            await logAct({
+                                userId: user.id,
+                                action: 'SYSTEM_JOIN',
+                                detail: `Vào hệ thống ${affData.s.toUpperCase()}`,
+                                metadata: { systemId, referrerId: user.referrerId }
+                            })
                         }
                     }
                 }
@@ -180,6 +188,14 @@ export async function registerUser(prevState: any, formData: FormData) {
             const referrerUser = await prisma.user.findUnique({ where: { id: refId }, select: { name: true } })
             referrerName = referrerUser?.name || ''
         }
+
+        const { logActivity } = await import('@/lib/activity-logger')
+        await logActivity({
+            userId: user.id,
+            action: 'REGISTER',
+            detail: `Đăng ký tài khoản mới: ${normalizedEmail}`,
+            metadata: { studentName: name, email: normalizedEmail, phone: fullPhone, referrerId: refId || null, referrerName: referrerName || null }
+        })
         const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}${referrerName ? ' (' + referrerName + ')' : ''}` + (refLink ? `\n🔗 Link ref: ${refLink}` : '') : ''
         const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
