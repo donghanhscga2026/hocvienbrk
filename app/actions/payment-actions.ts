@@ -188,6 +188,17 @@ export async function verifyPaymentAction(
           })
         } catch (brkErr) {
           console.error(`[BRK ERROR] Kích hoạt thành viên ${enrollment.userId} thất bại:`, brkErr)
+          try {
+            const { sendTelegramAdmin: sendTg } = await import('@/lib/notifications')
+            const errDetail = brkErr instanceof Error ? brkErr.message : String(brkErr)
+            await sendTg(
+              `❌ <b>BRK KÍCH HOẠT THẤT BẠI (THỦ CÔNG)</b>\n\n` +
+              `👤 Học viên ID: <b>#${enrollment.userId}</b>\n` +
+              `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
+              `⚠️ Lỗi: ${errDetail}\n` +
+              `📅 ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+            )
+          } catch (_) {}
         }
       }
     }
@@ -407,7 +418,7 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
     // Lấy enrollment info trước
     const enrollmentInfo = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { user: true, course: { select: { teacherId: true } } }
+      include: { user: true, course: { select: { teacherId: true, type: true, name_lop: true, id_khoa: true } } }
     })
 
     // Tài khoản test không được phép kích hoạt khóa học

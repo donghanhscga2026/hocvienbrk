@@ -132,6 +132,13 @@ export async function GET(request: Request) {
       totalConfirmed += result.confirmed
     }
 
+    const { sendTelegramAdmin } = await import('@/lib/notifications')
+    await sendTelegramAdmin(
+      `✅ <b>[CRON] BRK Daily Eval</b>\n` +
+      `📊 Hệ thống: ${results.length} | Kiểm tra: ${totalChecked} | Xác nhận: ${totalConfirmed}\n` +
+      `⏰ Eval: ${evalTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+    )
+
     return NextResponse.json({
       success: true,
       systemsProcessed: results.length,
@@ -142,6 +149,11 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('BRK daily eval error:', error)
+    try {
+      const { sendTelegramAdmin } = await import('@/lib/notifications')
+      const errMsg = error instanceof Error ? error.message : String(error)
+      await sendTelegramAdmin(`❌ <b>[CRON] BRK Daily Eval FAILED</b>\n⚠️ ${errMsg}`)
+    } catch (_) {}
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

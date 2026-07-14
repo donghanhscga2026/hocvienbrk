@@ -1601,3 +1601,18 @@ model CourseAcceptedVoucher {
   @@unique([courseId, voucherId])
   @@map("course_accepted_voucher")
 }
+
+model CronRun {
+  id        Int       @id @default(autoincrement())
+  jobName   String
+  status    String    @default("RUNNING") // RUNNING, SUCCESS, FAILURE, SKIPPED
+  details   Json?
+  error     String?
+  triggeredBy String  @default("CRON") // CRON, ADMIN
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  durationMs Int?
+
+  @@index([jobName, startedAt])
+  @@map("cron_run")
+}

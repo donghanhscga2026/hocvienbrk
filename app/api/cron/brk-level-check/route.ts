@@ -26,9 +26,20 @@ export async function GET(request: Request) {
       if (result) promoted++
     }
 
+    const { sendTelegramAdmin } = await import('@/lib/notifications')
+    await sendTelegramAdmin(
+      `✅ <b>[CRON] BRK Level Check</b>\n` +
+      `📊 Kiểm tra: ${activeMembers.length} | Thăng cấp: ${promoted}`
+    )
+
     return NextResponse.json({ success: true, checked: activeMembers.length, promoted })
   } catch (error) {
     console.error('BRK level check error:', error)
+    try {
+      const { sendTelegramAdmin } = await import('@/lib/notifications')
+      const errMsg = error instanceof Error ? error.message : String(error)
+      await sendTelegramAdmin(`❌ <b>[CRON] BRK Level Check FAILED</b>\n⚠️ ${errMsg}`)
+    } catch (_) {}
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
