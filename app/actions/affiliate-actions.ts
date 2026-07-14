@@ -119,6 +119,16 @@ export async function requestPayout(
             }
         })
 
+        try {
+            const { logActivity } = await import('@/lib/activity-logger')
+            await logActivity({
+                userId,
+                action: 'WALLET_CHANGE',
+                detail: `Rút tiền affiliate: -${amount.toLocaleString()}đ`,
+                metadata: { amount, balanceType: 'AFFILIATE', type: 'WITHDRAWAL' }
+            })
+        } catch {}
+
         // 6. Ghi transaction log
         await prisma.affiliateTransaction.create({
             data: {

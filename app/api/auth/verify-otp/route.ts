@@ -68,6 +68,14 @@ export async function POST(request: NextRequest) {
         }
         const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${referrerInfo}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
         await sendTelegram(msg, 'REGISTER');
+
+        const { logActivity } = await import("@/lib/activity-logger");
+        await logActivity({
+            userId: user.id,
+            action: 'VERIFY_OTP',
+            detail: 'Xác minh OTP thành công, tài khoản đã kích hoạt',
+            metadata: { email: user.email, referrerId: user.referrerId || null }
+        });
     } catch (e) {
         console.error("Telegram notification error:", e);
     }

@@ -177,6 +177,14 @@ export async function verifyPaymentAction(
             }
           }
           await sendTelegramAdmin(teleMsg)
+
+          const { logActivity } = await import('@/lib/activity-logger')
+          await logActivity({
+            userId: enrollment.userId,
+            action: 'PAYMENT_VERIFIED',
+            detail: `Xác minh thanh toán: ${enrollment.course.name_lop} - ${effectiveAmount.toLocaleString()}đ`,
+            metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: Number(effectiveAmount), bankName, studentName: brkUser?.name || null, parentId: placement.parentId || null, uplineChain: placement.chain.map(a => a.userId) }
+          })
         } catch (brkErr) {
           console.error(`[BRK ERROR] Kích hoạt thành viên ${enrollment.userId} thất bại:`, brkErr)
         }
@@ -242,6 +250,14 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
     }
 
     // Xóa enrollment (cascade sẽ xóa luôn payment) để học viên có thể kích hoạt lại từ đầu
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId: enrollment.userId,
+      action: 'PAYMENT_REJECTED',
+      detail: `Từ chối thanh toán: ${enrollment.course.name_lop}`,
+      metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, reason, adminId: userId }
+    })
+
     await prisma.enrollment.delete({
       where: { id: enrollmentId }
     })
@@ -411,6 +427,14 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
     await prisma.enrollment.update({
       where: { id: enrollmentId },
       data: { status: 'ACTIVE' }
+    })
+
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId: enrollmentInfo!.userId,
+      action: 'PAYMENT_AUTO_VERIFIED',
+      detail: `Auto verify thanh toán: ${transferData.amount.toLocaleString()}đ`,
+      metadata: { courseId: enrollmentInfo!.courseId, enrollmentId, amount: transferData.amount, bankName: transferData.bankName, phone: transferData.phone }
     })
 
     // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327

@@ -168,6 +168,16 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    try {
+      const { logActivity } = await import('@/lib/activity-logger')
+      await logActivity({
+        userId,
+        action: 'AFFILIATE_CLICK',
+        detail: `Click link affiliate`,
+        metadata: { url: url || '', deviceType, ipAddress, landingSlug, referer }
+      })
+    } catch {}
+
     // Increment landing click count if applicable
     if (landingId) {
       prisma.landingPage.update({

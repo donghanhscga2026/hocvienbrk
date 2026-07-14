@@ -34,6 +34,14 @@ export async function POST(request: Request) {
             email: session.user.email || ""
         }, newPassword)
 
+        const { logActivity } = await import("@/lib/activity-logger");
+        await logActivity({
+            userId: parseInt(session.user.id),
+            action: 'PASSWORD_CHANGE',
+            detail: 'Đổi mật khẩu thành công',
+            metadata: { email: session.user.email || null }
+        })
+
         return NextResponse.json({ success: true, message: "Đổi mật khẩu thành công" })
     } catch (error: any) {
         console.error("Change password error:", error)

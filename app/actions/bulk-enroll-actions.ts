@@ -358,6 +358,14 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                     }
                     const teleMsg = `🎓 <b>BULK ENROLL - TẠO TÀI KHOẢN MỚI</b>\n👤 Học viên: <b>${row.name}</b> (#${row.userId})\n📧 Email: ${row.email}\n📚 Khóa học: <b>${course.name_lop}</b>${refLink}`
                     await sendTelegram(teleMsg, 'REGISTER')
+
+                    const { logActivity } = await import('@/lib/activity-logger')
+                    await logActivity({
+                      userId: row.userId,
+                      action: 'BULK_ENROLL',
+                      detail: `Bulk enroll: ${course.name_lop} (tạo TK mới)`,
+                      metadata: { courseId: course.id, courseName: course.name_lop, studentName: row.name, email: row.email, referrerId: row.referrerId || null }
+                    })
                 }
             } catch (e) {
                 // non-critical

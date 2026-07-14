@@ -183,6 +183,14 @@ export async function POST(request: NextRequest) {
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
       await sendTelegram(msgAdmin, 'ACTIVATE')
 
+      const { logActivity } = await import("@/lib/activity-logger");
+      await logActivity({
+        userId: userIdNum,
+        action: 'ENROLL_AFTER_REGISTER',
+        detail: `Kích hoạt từ đăng ký: ${course.name_lop} (${course.id_khoa})`,
+        metadata: { courseId: course.id, idKhoa: course.id_khoa, studentName: user?.name || null, referrerId: user?.referrerId || null }
+      })
+
       if (user?.email) {
         await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email)
       }

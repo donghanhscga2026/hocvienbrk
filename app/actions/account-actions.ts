@@ -70,6 +70,14 @@ export async function updateUserProfile(data: {
             if (changed.length > 0) {
                 const msg = `✏️ <b>THAY ĐỔI THÔNG TIN</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📝 Thay đổi: ${changed.join(', ')}`;
                 await sendTelegram(msg, 'CHANGE');
+
+                const { logActivity } = await import('@/lib/activity-logger')
+                await logActivity({
+                    userId: user.id,
+                    action: 'PROFILE_UPDATE',
+                    detail: `Cập nhật: ${changed.join(', ')}`,
+                    metadata: { changedFields: changed }
+                })
             }
         } catch (e) {
             console.error("Telegram notification error:", e);
@@ -112,6 +120,14 @@ export async function changePassword(currentPassword: string, newPassword: strin
     await prisma.user.update({
         where: { id: userId },
         data: { password: hashedPassword }
+    })
+
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+        userId,
+        action: 'PASSWORD_CHANGE',
+        detail: 'Đổi mật khẩu từ cài đặt tài khoản',
+        metadata: { email: user?.email || null }
     })
 
     return { success: true, message: "Đổi mật khẩu thành công" }

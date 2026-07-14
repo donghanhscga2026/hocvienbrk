@@ -83,7 +83,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     potentialId = parseInt(identifier);
                 }
 
-                if (!isNaN(potentialId) && potentialId > 0 && potentialId < 2147483647) {
+                if (!isNaN(potentialId) && potentialId >= 0 && potentialId < 2147483647) {
                     console.log(`🔍 [Auth] Đang kiểm tra đăng nhập theo ID học viên: #${potentialId}`);
                     user = await prisma.user.findUnique({
                         where: { id: potentialId }
@@ -348,11 +348,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     console.log(`📡 Đang gửi thông báo đăng nhập cho #${user.id} từ IP: ${ip}`);
                     const { sendLoginNotification, sendVerificationEmail } = await import("@/lib/notifications");
+                    const { logActivity } = await import("@/lib/activity-logger");
                     
                     // Convert user id từ string sang number cho sendLoginNotification
                     const userIdNum = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
                     const userName = user.name || 'User';
                     await sendLoginNotification({ id: userIdNum, name: userName }, ip, userAgent);
+
+                    await logActivity({
+                        userId: userIdNum,
+                        action: 'LOGIN',
+                        detail: `Đăng nhập từ IP: ${ip}`,
+                        metadata: { ip, userAgent, provider: account?.provider }
+                    });
 
                     // GỬI THÔNG BÁO XÁC MINH CHO HỌC VIÊN CHƯA XÁC MINH
                     if ((user as any).isUnverified) {

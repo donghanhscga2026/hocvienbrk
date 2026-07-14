@@ -112,6 +112,19 @@ export async function POST(request: NextRequest) {
       }).catch(() => {});
     }
 
+    // Log failed login to activity_log (only if user was found)
+    if (user) {
+      try {
+        const { logActivity } = await import("@/lib/activity-logger");
+        await logActivity({
+          userId: user.id,
+          action: 'LOGIN_FAILED',
+          detail: `Đăng nhập thất bại: ${errorLabels[errorType]}`,
+          metadata: { identifierType, errorType, identifier, studentName: user.name || null, email: user.email || null, phone: user.phone || null }
+        });
+      } catch {}
+    }
+
     return NextResponse.json({
       identifierType,
       errorType,
