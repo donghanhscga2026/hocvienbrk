@@ -31,6 +31,12 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
     currentLevel++
     if (currentLevel > maxPromotedLevel) maxPromotedLevel = currentLevel
 
+    // Idempotency: skip if this promotion already recorded
+    const existing = await prisma.brkLevelUpRecord.findFirst({
+      where: { userId, onSystem, toLevel: currentLevel }
+    })
+    if (existing) continue
+
     await prisma.brkLevelUpRecord.create({
       data: {
         userId,
@@ -39,7 +45,7 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
         toLevel: currentLevel,
         promotedAt,
       }
-    }).catch(() => {})
+    })
 
     try {
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, phone: true } })
@@ -54,14 +60,21 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       )
     } catch (_) {}
 
+    // Idempotency: skip voucher if already credited for this level
     if (nextConfig.giftValue > 0) {
-      await creditVoucherWallet(
-        userId,
-        nextConfig.giftValue,
-        `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue} VND)`,
-        `level_${currentLevel}_sys_${onSystem}`,
-        promotedAt
-      )
+      const refId = `level_${currentLevel}_sys_${onSystem}`
+      const existingVoucher = await prisma.brkTransaction.findFirst({
+        where: { refId, type: 'VOUCHER_CREDIT' }
+      })
+      if (!existingVoucher) {
+        await creditVoucherWallet(
+          userId,
+          nextConfig.giftValue,
+          `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue} VND)`,
+          refId,
+          promotedAt
+        )
+      }
     }
   }
 

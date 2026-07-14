@@ -663,6 +663,7 @@ model BrkTransaction {
 
   @@index([walletId, createdAt])
   @@index([type])
+  @@index([walletId, type, balanceType, refId])
   @@map("brk_transaction")
 }
 
@@ -710,6 +711,7 @@ model BrkLevelUpRecord {
   giftClaimedAt DateTime?
   system       System   @relation(fields: [userId, onSystem], references: [userId, onSystem])
 
+  @@unique([userId, onSystem, toLevel])
   @@index([userId, onSystem])
   @@map("brk_level_up_record")
 }

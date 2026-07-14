@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
+import { withCronLogging } from '@/lib/cron-logger'
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   const authHeader = request.headers.get('Authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,3 +19,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
+export const GET = withCronLogging('expire-vouchers', handler)

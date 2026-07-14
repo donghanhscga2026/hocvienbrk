@@ -41,7 +41,7 @@ export default function MessageCard({
     const [greetingMessage, setGreetingMessage] = useState('') // Sửa lỗi hydration - chỉ tính greeting ở client
     const [greetingPrefix, setGreetingPrefix] = useState('') // Sửa lỗi hydration - chỉ tính prefix ở client
     
-    const heroImage = messageImageUrl || profile.heroImage || profile.messageImage || null
+    const heroImage = profile.heroImage || messageImageUrl || profile.messageImage || null
     const heroOverlay = profile.heroOverlay ?? 0.3
     const accentColor = profile.accentColor || '#f59e0b'
     

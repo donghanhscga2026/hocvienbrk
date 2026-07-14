@@ -1,13 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
 import MySiteTab from './MySiteTab'
 import LandingsTab from './LandingsTab'
 import SiteProfilesTab from './SiteProfilesTab'
 
-export default function PagesPage() {
+function PagesPageContent() {
+  const searchParams = useSearchParams()
   const [tab, setTab] = useState<'my-site' | 'landings' | 'site-profiles'>('my-site')
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'my-site' || tabParam === 'landings' || tabParam === 'site-profiles') {
+      setTab(tabParam)
+    }
+  }, [searchParams])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -44,5 +53,13 @@ export default function PagesPage() {
       {tab === 'landings' && <LandingsTab />}
       {tab === 'site-profiles' && <SiteProfilesTab />}
     </div>
+  )
+}
+
+export default function PagesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Đang tải...</div>}>
+      <PagesPageContent />
+    </Suspense>
   )
 }

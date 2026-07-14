@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
+import { withCronLogging } from '@/lib/cron-logger'
 import { processAllBrkRevenueShares } from '@/lib/brk/revenue-share-service'
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -27,3 +28,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export const GET = withCronLogging('brk-revenue-share', handler)

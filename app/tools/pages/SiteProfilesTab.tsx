@@ -27,7 +27,7 @@ export default function SiteProfilesTab() {
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
           <h2 className="text-lg font-bold text-amber-800 mb-2">Cần đăng nhập</h2>
-          <Link href="/login?redirect=/tools/site-profiles" className="inline-block px-6 py-2 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600">Đăng nhập</Link>
+          <Link href="/login?redirect=/tools/pages?tab=site-profiles" className="inline-block px-6 py-2 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600">Đăng nhập</Link>
         </div>
       </div>
     )

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withCronLogging } from '@/lib/cron-logger'
 import prisma from '@/lib/prisma'
 import { distributeCommission } from '@/lib/brk/commission-calculator'
 import { checkAndPromoteLevel, create2F1Voucher } from '@/lib/brk/level-manager'
@@ -6,8 +7,9 @@ import { creditBrkWallet, creditBrkdWallet } from '@/lib/brk/wallet-service'
 import type { SystemTree } from '@prisma/client'
 
 const BRKD_PER_ACTIVATION = 12_868_686
+const LOCK_KEY = 'brk_daily_eval_lock'
+const LOCK_TIMEOUT_MS = 120_000 // 2 minutes
 
-// 06:08 AM Vietnam (UTC+7) = 23:08 UTC previous day
 function getEvalTime(year: number, month: number, day: number): Date {
   return new Date(Date.UTC(year, month, day - 1, 23, 8, 0))
 }
@@ -16,6 +18,35 @@ function getCurrentEvalTime(): Date {
   const now = new Date()
   const todayEval = getEvalTime(now.getFullYear(), now.getMonth(), now.getDate())
   return todayEval <= now ? todayEval : getEvalTime(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+}
+
+async function acquireLock(): Promise<boolean> {
+  const now = Date.now()
+  try {
+    const existing = await prisma.systemConfig.findUnique({ where: { key: LOCK_KEY } })
+    if (existing && existing.value) {
+      const lockTime = parseInt(String(existing.value))
+      if (now - lockTime < LOCK_TIMEOUT_MS) {
+        return false // Another instance holds the lock
+      }
+    }
+    await prisma.systemConfig.upsert({
+      where: { key: LOCK_KEY },
+      update: { value: now.toString() },
+      create: { key: LOCK_KEY, value: now.toString() }
+    })
+    // Re-check after upsert to handle race between two concurrent acquireLock calls
+    const recheck = await prisma.systemConfig.findUnique({ where: { key: LOCK_KEY } })
+    return recheck?.value === now.toString()
+  } catch {
+    return false
+  }
+}
+
+async function releaseLock() {
+  try {
+    await prisma.systemConfig.update({ where: { key: LOCK_KEY }, data: { value: '' } })
+  } catch {}
 }
 
 async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) {
@@ -33,14 +64,12 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
 
   let confirmed = 0
   for (const member of dueMembers) {
-    // Check if already confirmed (look for RETURN_FEE as marker)
-    const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
-    if (wallet) {
-      const existingReturn = await prisma.brkTransaction.findFirst({
-        where: { walletId: wallet.id, type: 'RETURN_FEE' }
-      })
-      if (existingReturn) continue
-    }
+    // Atomic dedup: check RETURN_FEE with specific refId
+    const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
+    const existingReturn = await prisma.brkTransaction.findFirst({
+      where: { refId: returnRefId, type: 'RETURN_FEE' }
+    })
+    if (existingReturn) continue
 
     // Credit self points (MP) — not awarded until now (previously 0)
     await prisma.system.update({
@@ -51,7 +80,7 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
     // Distribute commissions + BRKP to ancestors
     await distributeCommission(member.userId, onSystem, fee, systemTree, evalTime)
 
-    // Return fee to member
+    // Return fee to member (with dedup refId)
     const returnAmt = (fee * returnPct) / 100
     if (returnAmt > 0) {
       await creditBrkWallet(
@@ -59,17 +88,18 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
         returnAmt,
         'RETURN_FEE',
         `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`,
-        undefined,
+        returnRefId,
         evalTime
       )
 
       const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
       if (brkdReturn > 0) {
+        const brkdRefId = `return_brkd_sys_${onSystem}_user_${member.userId}`
         await creditBrkdWallet(
           member.userId,
           brkdReturn,
           `BRKD hoàn ${returnPct}% sau 1 ngày cân nhắc`,
-          undefined,
+          brkdRefId,
           evalTime
         )
       }
@@ -100,53 +130,61 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
   return { onSystem, checked: dueMembers.length, confirmed }
 }
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
-    if (!promoConfig || promoConfig.value !== 'B') {
-      return NextResponse.json({ success: true, reason: 'Not Method B, skipping' })
+    // Mutex: prevent concurrent runs
+    if (!(await acquireLock())) {
+      return NextResponse.json({ success: true, reason: 'Another instance running, skipping' })
     }
 
-    // Process ALL systems dynamically (not hardcoded to onSystem: 4)
-    const allSystemTrees = await prisma.systemTree.findMany()
-    if (allSystemTrees.length === 0) {
-      return NextResponse.json({ success: true, reason: 'No system trees found', systems: [] })
+    try {
+      const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
+      if (!promoConfig || promoConfig.value !== 'B') {
+        return NextResponse.json({ success: true, reason: 'Not Method B, skipping' })
+      }
+
+      const allSystemTrees = await prisma.systemTree.findMany()
+      if (allSystemTrees.length === 0) {
+        return NextResponse.json({ success: true, reason: 'No system trees found', systems: [] })
+      }
+
+      const evalTime = getCurrentEvalTime()
+      const now = new Date()
+
+      const results = []
+      let totalChecked = 0
+      let totalConfirmed = 0
+
+      for (const systemTree of allSystemTrees) {
+        const result = await processSystem(systemTree, evalTime, now)
+        results.push(result)
+        totalChecked += result.checked
+        totalConfirmed += result.confirmed
+      }
+
+      const { sendTelegramAdmin } = await import('@/lib/notifications')
+      await sendTelegramAdmin(
+        `✅ <b>[CRON] BRK Daily Eval</b>\n` +
+        `📊 Hệ thống: ${results.length} | Kiểm tra: ${totalChecked} | Xác nhận: ${totalConfirmed}\n` +
+        `⏰ Eval: ${evalTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+      )
+
+      return NextResponse.json({
+        success: true,
+        systemsProcessed: results.length,
+        results,
+        checked: totalChecked,
+        confirmed: totalConfirmed,
+        evalTime: evalTime.toISOString()
+      })
+    } finally {
+      await releaseLock()
     }
-
-    const evalTime = getCurrentEvalTime()
-    const now = new Date()
-
-    const results = []
-    let totalChecked = 0
-    let totalConfirmed = 0
-
-    for (const systemTree of allSystemTrees) {
-      const result = await processSystem(systemTree, evalTime, now)
-      results.push(result)
-      totalChecked += result.checked
-      totalConfirmed += result.confirmed
-    }
-
-    const { sendTelegramAdmin } = await import('@/lib/notifications')
-    await sendTelegramAdmin(
-      `✅ <b>[CRON] BRK Daily Eval</b>\n` +
-      `📊 Hệ thống: ${results.length} | Kiểm tra: ${totalChecked} | Xác nhận: ${totalConfirmed}\n` +
-      `⏰ Eval: ${evalTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
-    )
-
-    return NextResponse.json({
-      success: true,
-      systemsProcessed: results.length,
-      results,
-      checked: totalChecked,
-      confirmed: totalConfirmed,
-      evalTime: evalTime.toISOString()
-    })
   } catch (error) {
     console.error('BRK daily eval error:', error)
     try {
@@ -157,3 +195,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export const GET = withCronLogging('brk-daily-eval', handler)
