@@ -36,7 +36,7 @@ function toInputValue(date: Date | null): string {
 }
 
 function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<string, any>, courseType?: string) {
-    if (courseType === 'LIB' || courseType === 'NORMAL') return true
+    if (courseType === 'LIB' || courseType === 'NORMAL' || courseType === 'SYS') return true
     if (lesson.order === 1) return true
     const prev = lessons.find(l => l.order === lesson.order - 1)
     if (!prev) return true

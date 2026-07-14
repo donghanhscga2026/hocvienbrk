@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { saveBase64Image } from "@/lib/image-utils"
 import { normalizePhone } from "@/lib/phone-utils"
+import { isTestAccount } from "@/lib/test-account"
 
 export async function getUserWithAccounts() {
     const session = await auth()
@@ -37,8 +38,8 @@ export async function updateUserProfile(data: {
 
     const userId = parseInt(session.user.id as string)
 
-    // Bảo vệ tài khoản test #2689 khỏi bị sửa đổi profile bởi người khác
-    if (userId === 2689 && session.user.role !== 'ADMIN') {
+    // Bảo vệ tài khoản test khỏi bị sửa đổi profile bởi người khác
+    if (isTestAccount(userId) && session.user.role !== 'ADMIN') {
         return { success: false, message: "Không thể cập nhật thông tin của tài khoản test hệ thống này." }
     }
 
@@ -96,8 +97,8 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
     const userId = parseInt(session.user.id as string)
 
-    // Bảo vệ tài khoản test #2689 khỏi bị đổi mật khẩu bởi người khác
-    if (userId === 2689 && session.user.role !== 'ADMIN') {
+    // Bảo vệ tài khoản test khỏi bị đổi mật khẩu bởi người khác
+    if (isTestAccount(userId) && session.user.role !== 'ADMIN') {
         return { success: false, message: "Không thể đổi mật khẩu của tài khoản test hệ thống này." }
     }
 

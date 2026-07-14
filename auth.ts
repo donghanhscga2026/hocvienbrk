@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { z } from "zod"
 import prisma from "@/lib/prisma"
+import { isTestAccount } from "@/lib/test-account"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
@@ -189,7 +190,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     affiliateCode: validUser.affiliateCode ?? undefined, 
                     needsPasswordChange: isDefault && !userAny.passwordChanged,
                     isUnverified: !validUser.emailVerified,
-                    isTempLogin: validUser.id === 2689, // Nếu đăng nhập trực tiếp vào #2689 thì cũng coi là temp login
+                    isTempLogin: isTestAccount(validUser.id), // Tài khoản test = temp login
                 } as any; 
             },
         }),

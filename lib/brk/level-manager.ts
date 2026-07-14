@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { getLevelConfig, getAllLevelConfigs } from './config-service'
 import { validateBranchRequirements } from './branch-validator'
 import { creditVoucherWallet } from './wallet-service'
+import { isTestAccount } from '@/lib/test-account'
 
 export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date) {
   const systemRec = await prisma.system.findUnique({
@@ -99,7 +100,7 @@ export async function claimLevelGift(userId: number, onSystem: number, courseId:
     throw new Error(`Course fee (${course.phi_coc}) exceeds gift value (${config.giftValue})`)
   }
 
-  if (userId === 2689) throw new Error('Tài khoản test không được nhận quà tặng level')
+  if (isTestAccount(userId)) throw new Error('Tài khoản test không được nhận quà tặng level')
 
   await prisma.enrollment.create({
     data: {

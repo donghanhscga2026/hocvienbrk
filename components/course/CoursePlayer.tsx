@@ -141,7 +141,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
 
         // isDailyChallenge check — mandatory assignment before switching
-        if (course.type !== 'LIB' && currentLessonData?.isDailyChallenge && currentLessonId && currentLessonId !== lessonId) {
+        if (course.type !== 'LIB' && course.type !== 'SYS' && currentLessonData?.isDailyChallenge && currentLessonId && currentLessonId !== lessonId) {
             const currentProg = progressMap[currentLessonId]
             if (!currentProg || currentProg.status !== 'COMPLETED') {
                 setPendingLessonId(lessonId)
@@ -596,7 +596,8 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                 {lessons.map((lesson: any) => {
                     const prog = filteredProgress[lesson.id]
                     const isActive = currentLessonId === lesson.id
-                    const unlocked = courseType === 'LIB' || courseType === 'NORMAL' || lesson.order === 1 || (filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]?.status === 'COMPLETED')
+                    const prevProg = filteredProgress[lessons.find((l: any) => l.order === lesson.order - 1)?.id]
+                    const unlocked = courseType === 'LIB' || courseType === 'NORMAL' || courseType === 'SYS' || lesson.order === 1 || (prevProg?.status === 'COMPLETED' && (prevProg?.totalScore ?? 0) >= 5)
                     return (
                         <button
                             key={lesson.id}

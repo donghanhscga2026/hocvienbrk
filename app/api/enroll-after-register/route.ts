@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { isTestAccount } from "@/lib/test-account"
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Tài khoản test hệ thống không được phép tham gia khóa học
-    if (userIdNum === 2689) {
+    if (isTestAccount(userIdNum)) {
       return NextResponse.json({ error: "Tài khoản test này không được phép tham gia khóa học." }, { status: 403 })
     }
 
@@ -198,7 +199,7 @@ export async function POST(request: NextRequest) {
       // Xử lý commission cho enrollment miễn phí
       try {
         const { processEnrollmentCommission } = await import("@/lib/affiliate/commission-calculator")
-        await processEnrollmentCommission(userIdNum, newEnrollment.id, course.phi_coc)
+        await processEnrollmentCommission(userIdNum, newEnrollment.id, effectivePhiCoc)
       } catch (e) {
         console.error("[EnrollAfterRegister] Commission error:", e)
       }

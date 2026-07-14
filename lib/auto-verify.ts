@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import prisma from '@/lib/prisma';
 import { sendTelegramAdmin, sendSuccessEmail } from './notifications';
+import { isTestAccount } from '@/lib/test-account';
 
 function extractTextFromHtml(html: string): string {
   return html
@@ -221,7 +222,7 @@ export async function processPaymentEmails() {
 
         for (const enrollment of pendingEnrollments) {
           // Bỏ qua enrollment của tài khoản test hệ thống
-          if (enrollment.userId === 2689) continue;
+          if (isTestAccount(enrollment.userId)) continue;
           try {
             const userPhone = enrollment.user.phone?.replace(/\D/g, '') || '';
             const emailPhone = parsed.phone || '';

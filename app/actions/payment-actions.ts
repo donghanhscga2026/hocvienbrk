@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { processEnrollmentCommission } from "@/lib/affiliate/commission-calculator"
+import { isTestAccount } from "@/lib/test-account"
 
 export async function getPaymentByEnrollmentId(enrollmentId: number) {
   try {
@@ -103,8 +104,8 @@ export async function verifyPaymentAction(
       return { success: false, error: "Enrollment not found" }
     }
 
-    // Tài khoản test #2689 không được phép kích hoạt khóa học
-    if (enrollment.userId === 2689) {
+    // Tài khoản test không được phép kích hoạt khóa học
+    if (isTestAccount(enrollment.userId)) {
       return { success: false, error: "Tài khoản test này không được phép kích hoạt khóa học." }
     }
 
@@ -249,7 +250,7 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
       return { success: false, error: "Forbidden" }
     }
 
-    // Xóa enrollment (cascade sẽ xóa luôn payment) để học viên có thể kích hoạt lại từ đầu
+    // Đánh dấu REJECTED (giữ enrollment + lessonProgress, chỉ xóa payment)
     const { logActivity } = await import('@/lib/activity-logger')
     await logActivity({
       userId: enrollment.userId,
@@ -258,9 +259,15 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
       metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, reason, adminId: userId }
     })
 
-    await prisma.enrollment.delete({
-      where: { id: enrollmentId }
-    })
+    await prisma.$transaction([
+      prisma.enrollment.update({
+        where: { id: enrollmentId },
+        data: { status: 'REJECTED' }
+      }),
+      prisma.payment.delete({
+        where: { enrollmentId }
+      })
+    ])
 
     revalidatePath('/')
     revalidatePath('/courses')
@@ -403,8 +410,8 @@ export async function autoVerifyPayment(enrollmentId: number, transferData: {
       include: { user: true, course: { select: { teacherId: true } } }
     })
 
-    // Tài khoản test #2689 không được phép kích hoạt khóa học
-    if (enrollmentInfo?.userId === 2689) {
+    // Tài khoản test không được phép kích hoạt khóa học
+    if (isTestAccount(enrollmentInfo?.userId)) {
       return { success: false, error: "Tài khoản test này không được phép kích hoạt khóa học." }
     }
 

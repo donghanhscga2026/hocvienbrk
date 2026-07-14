@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 import { addUserToClosure } from '@/lib/closure-helpers'
 import { trackAffiliateConversion } from '@/lib/affiliate/tracking'
 import { normalizePhone } from '@/lib/phone-utils'
+import { isTestAccount } from '@/lib/test-account'
 
 const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"
 
@@ -302,8 +303,8 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         }
                     }
 
-                    if (row.userId && row.userId === 2689) {
-                        errors.push(`Dòng #${row.rowIndex}: Tài khoản test #2689 không được phép tham gia khóa học`)
+                    if (isTestAccount(row.userId)) {
+                        errors.push(`Dòng #${row.rowIndex}: Tài khoản test không được phép tham gia khóa học`)
                         continue
                     }
                     if (row.userId) {

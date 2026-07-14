@@ -240,6 +240,47 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ AdminSubNav hiển thị tự động trên Dashboard chính khi đăng nhập Admin.
 - ✅ TypeScript: `npx tsc --noEmit` → 0 errors
 
+## ✅ SESSION-20260714_01 — Sửa lỗi đăng nhập ID #0, trợ lý modal falsy ID, chuẩn hóa email API quên mật khẩu
+
+- **Ngày**: 2026-07-14
+- **Thời gian**: ~08:10 - 10:50
+- **Trạng thái**: ✅ Hoàn thành & Đã deploy PROD
+
+### Mục tiêu
+- Sửa lỗi không nhận được email OTP đổi mật khẩu cho tài khoản admin ID `#0` (`cuonghamhoc.hn@gmail.com`) khi đặt lại mật khẩu từ popup báo sai mật khẩu.
+- Sửa lỗi đăng nhập ID `0` báo không tìm thấy tài khoản học viên.
+- Sửa lỗi modal trợ lý đăng nhập báo không tìm thấy mã học viên khi nhập ID `0`.
+- Khắc phục lỗi quên mật khẩu báo 404 do phân biệt chữ hoa/thường hoặc khoảng trắng trong email input.
+
+### Các file đã thay đổi
+#### `auth.ts`
+- Sửa điều kiện nhận diện ID học viên `potentialId > 0` thành `potentialId >= 0` để nhận diện ID `0` đăng nhập.
+
+#### `components/auth/AccountAssistantModal.tsx`
+- Sửa `goToStep('forgot_otp')` thành `handleSendOtp()` ở logic popup để thực sự gọi API gửi email OTP.
+- Sửa `if (json.id)` thành `if (json.id != null)` để tránh việc ID `0` bị hiểu là falsy.
+
+#### `app/actions/course-actions.ts`
+- Sửa lỗi build TypeScript: Đổi `course.id` thành tham số `courseId` ở dòng 270.
+
+#### `app/api/auth/forgot-password/route.ts`
+#### `app/api/auth/verify-forgot-otp/route.ts`
+#### `app/api/auth/reset-password/route.ts`
+- Chuẩn hóa email đầu vào thành `.toLowerCase().trim()` và sử dụng `findFirst` với `mode: 'insensitive'` thay vì `findUnique` phân biệt chữ hoa/thường để tránh lỗi 404.
+
+### Các file backup (trong `plan_temp/`)
+| File backup | File gốc |
+|---|---|
+| `auth.backup_20260714_0838.ts` | `auth.ts` |
+| `AccountAssistantModal.backup_20260714_0838.tsx` | `components/auth/AccountAssistantModal.tsx` |
+| `forgot-password_route.backup_20260714_0838.ts` | `app/api/auth/forgot-password/route.ts` |
+| `verify-forgot-otp_route.backup_20260714_0838.ts` | `app/api/auth/verify-forgot-otp/route.ts` |
+| `reset-password_route.backup_20260714_0838.ts` | `app/api/auth/reset-password/route.ts` |
+
+### Kiểm tra
+- ✅ `npx tsc --noEmit` → 0 errors
+- ✅ Code đã deploy thành công lên master (PROD) qua GitHub.
+
 
 
 
