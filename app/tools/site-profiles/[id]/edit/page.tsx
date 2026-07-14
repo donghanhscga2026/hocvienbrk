@@ -188,7 +188,7 @@ export default function EditSiteProfilePage({ params }: PageProps) {
             <Shield className="w-12 h-12 text-red-500 mx-auto mb-3" />
             <h2 className="text-lg font-bold text-red-800 mb-2">Không có quyền truy cập</h2>
             <Link
-              href="/tools/site-profiles"
+              href="/tools/pages?tab=site-profiles"
               className="inline-block px-6 py-2 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
             >
               Quay lại
@@ -220,7 +220,7 @@ export default function EditSiteProfilePage({ params }: PageProps) {
       <MainHeader title={`CHỈNH SỬA: ${profile.slug}`} />
 
       <div className="max-w-4xl mx-auto p-6">
-        <Link href="/tools/site-profiles" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors mb-6">
+        <Link href="/tools/pages?tab=site-profiles" className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors mb-6">
           <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
         </Link>
         <form onSubmit={handleSubmit} className="space-y-8">
