@@ -220,18 +220,19 @@ export async function processGracePeriodExpirations() {
     }
   })
 
-  const systemTree = expiredGrace.length > 0
-    ? await prisma.systemTree.findFirst({ where: { onSystem: expiredGrace[0].onSystem } })
-    : null
+  if (expiredGrace.length === 0) return { processed: 0 }
 
-  if (!systemTree) return { processed: 0 }
-
-  const fee = Number(systemTree.fee)
-  const returnPct = Number(systemTree.returnPct)
   let count = 0
 
   for (const member of expiredGrace) {
     if (member.gracePeriodEnd && member.gracePeriodEnd <= now) {
+      // Look up SystemTree per-member to handle multi-system correctly
+      const memberSystemTree = await prisma.systemTree.findUnique({ where: { onSystem: member.onSystem } })
+      if (!memberSystemTree) continue
+
+      const fee = Number(memberSystemTree.fee)
+      const returnPct = Number(memberSystemTree.returnPct)
+
       // KIỂM TRA CHỐNG TRÙNG LẶP:
       const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
       if (wallet) {
@@ -252,7 +253,7 @@ export async function processGracePeriodExpirations() {
           member.userId,
           returnAmount,
           'RETURN_FEE',
-          `Hoàn ${returnPct}% phí tham gia sau ${systemTree.graceDays} ngày cân nhắc`
+          `Hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`
         )
         // BRKD refund (proportional)
         const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
@@ -260,7 +261,7 @@ export async function processGracePeriodExpirations() {
           await creditBrkdWallet(
             member.userId,
             brkdReturn,
-            `BRKD hoàn ${returnPct}% sau ${systemTree.graceDays} ngày cân nhắc`
+            `BRKD hoàn ${returnPct}% sau ${memberSystemTree.graceDays} ngày cân nhắc`
           )
         }
         count++

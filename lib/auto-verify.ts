@@ -91,14 +91,19 @@ async function callGmailWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs 
       if (match) {
         const penaltyTimeStr = match[1];
         try {
+          // Cap penalty to max 24 hours from now to prevent indefinite blocking
+          const penaltyDate = new Date(penaltyTimeStr);
+          const maxPenalty = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          const cappedTimeStr = penaltyDate > maxPenalty ? maxPenalty.toISOString() : penaltyTimeStr;
+
           const { PrismaClient } = await import('@prisma/client');
           const prismaClient = new PrismaClient();
           await prismaClient.systemConfig.upsert({
             where: { key: 'gmail_rate_limit_until' },
-            update: { value: penaltyTimeStr },
-            create: { key: 'gmail_rate_limit_until', value: penaltyTimeStr }
+            update: { value: cappedTimeStr },
+            create: { key: 'gmail_rate_limit_until', value: cappedTimeStr }
           });
-          console.log(`⏳ Đã ghi nhận mốc phạt Rate Limit của Google đến: ${penaltyTimeStr}`);
+          console.log(`⏳ Đã ghi nhận mốc phạt Rate Limit của Google đến: ${cappedTimeStr}${penaltyDate > maxPenalty ? ' (capped from ' + penaltyTimeStr + ')' : ''}`);
         } catch (dbErr) {
           console.error('⚠️ Lỗi ghi nhận mốc phạt vào DB:', dbErr);
         }
@@ -267,12 +272,7 @@ export async function processPaymentEmails() {
               }
             });
 
-            await prisma.enrollment.update({
-              where: { id: enrollment.id },
-              data: { status: 'ACTIVE' }
-            });
-
-            // [BRK ACTIVATION]
+            // [BRK ACTIVATION] — Must run BEFORE enrollment update so failure keeps enrollment PENDING (retriable)
             let brkPlacementMsg = '';
             const brkConfig = await prisma.autoVerifyConfig.findUnique({
               where: { courseId: enrollment.courseId }
@@ -293,8 +293,14 @@ export async function processPaymentEmails() {
                 }
               } catch (err) {
                 console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);
+                throw err;
               }
             }
+
+            await prisma.enrollment.update({
+              where: { id: enrollment.id },
+              data: { status: 'ACTIVE' }
+            });
 
             // Mark email as read
             await callGmailWithRetry(() => gmail.users.messages.modify({

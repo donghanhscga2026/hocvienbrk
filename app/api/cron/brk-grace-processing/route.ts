@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { processGracePeriodExpirations } from '@/lib/brk/activation-service'
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
