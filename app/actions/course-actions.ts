@@ -19,8 +19,9 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 
         const userId = Number(session.user.id)
 
-        // Tài khoản test #2689 không được phép tham gia hay kích hoạt khóa học
-        if (userId === 2689) {
+        // Tài khoản test không được phép tham gia hay kích hoạt khóa học
+        const { isTestAccount } = await import('@/lib/test-account')
+        if (isTestAccount(userId)) {
             throw new Error("Tài khoản test này không được phép tham gia hay kích hoạt khóa học.")
         }
 
@@ -81,7 +82,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             where: { userId_courseId: { userId, courseId } }
         })
 
-        if (existing) {
+        if (existing && existing.status !== 'REJECTED') {
             const existingWithPayment = await prisma.enrollment.findUnique({
                 where: { id: existing.id },
                 select: {
@@ -180,14 +181,26 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
         const isAutoActive = effectivePhiCoc === 0
-        const newEnrollment = await prisma.enrollment.create({
-            data: {
-                userId,
-                courseId,
-                status: isAutoActive ? "ACTIVE" : "PENDING",
-                referrerId: enrollmentReferrerId,
+        let newEnrollment: any
+        try {
+            newEnrollment = await prisma.enrollment.create({
+                data: {
+                    userId,
+                    courseId,
+                    status: isAutoActive ? "ACTIVE" : "PENDING",
+                    referrerId: enrollmentReferrerId,
+                }
+            })
+        } catch (createErr: any) {
+            if (createErr?.code === 'P2002') {
+                const existingRace = await prisma.enrollment.findUnique({
+                    where: { userId_courseId: { userId, courseId } },
+                    include: { payment: true }
+                })
+                return { success: true, status: existingRace!.status, enrollment: existingRace }
             }
-        })
+            throw createErr
+        }
 
         // Đánh dấu voucher đã dùng (nếu có)
         if (appliedUserVoucherId) {

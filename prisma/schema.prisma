@@ -1365,6 +1365,7 @@ enum LessonType {
 enum EnrollmentStatus {
   PENDING
   ACTIVE
+  REJECTED
 }
 
 enum Role {

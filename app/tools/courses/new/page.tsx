@@ -195,6 +195,7 @@ function CreateCourseContent() {
                         setLinkZalo(courseRes.link_zalo || '')
                         setFileEmail(courseRes.file_email || '')
                         setNoidungEmail(courseRes.noidung_email || '')
+                        setTeacherBankAccountId(courseRes.teacherBankAccountId || null)
                         
                         // Set lessons
                         setLessons(courseRes.lessons || [])

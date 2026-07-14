@@ -1492,3 +1492,36 @@ MBW Dashboard server action ban đầu:
 - ✅ Level progress computed inline chính xác
 - ✅ `npx tsc --noEmit` — 0 lỗi
 
+---
+
+## ✅ Sửa lỗi đăng nhập và quên mật khẩu tài khoản ID #0 (2026-07-14)
+
+### Mục tiêu
+Sửa các lỗi hệ thống liên quan đến tài khoản admin ID `#0` (`cuonghamhoc.hn@gmail.com`) bao gồm lỗi đăng nhập và không nhận được email xác minh khi đặt lại mật khẩu.
+
+### Các file đã sửa
+
+#### `components/auth/AccountAssistantModal.tsx`
+- Vấn đề 1: Sau khi chọn đặt lại mật khẩu từ popup báo sai mật khẩu, modal chuyển thẳng sang màn nhập OTP mà không gọi API gửi email OTP.
+- Vấn đề 2: Kiểm tra `json.id` bị falsy đối với ID `0`.
+- Fix 1: Thay thế `goToStep('forgot_otp')` thành `handleSendOtp()` tại dòng 330.
+- Fix 2: Thay `if (json.id)` thành `if (json.id != null)` tại dòng 274.
+
+#### `auth.ts`
+- Vấn đề: Nhận diện học viên chỉ lọc `potentialId > 0`, bỏ qua tài khoản admin `#0`.
+- Fix: Thay đổi điều kiện dòng 86 thành `potentialId >= 0`.
+
+#### `app/actions/course-actions.ts`
+- Vấn đề: Lỗi build TypeScript do `course.id` không tồn tại trong kết quả select của Prisma.
+- Fix: Thay `course.id` thành `courseId` tại dòng 270.
+
+#### `app/api/auth/forgot-password/route.ts`
+#### `app/api/auth/verify-forgot-otp/route.ts`
+#### `app/api/auth/reset-password/route.ts`
+- Vấn đề: Lệnh `findUnique` tìm kiếm email phân biệt chữ hoa/thường (case-sensitive) và khoảng trắng thừa khiến người dùng nhập email bị lỗi 404.
+- Fix: Chuẩn hóa email đầu vào thành `.toLowerCase().trim()` và sử dụng `findFirst` với tùy chọn `mode: 'insensitive'`.
+
+### Trạng thái
+- ✅ Đã sửa toàn bộ lỗi liên quan đến tài khoản ID `#0` và email `cuonghamhoc.hn@gmail.com`.
+- ✅ Dự án build thành công với `npx tsc --noEmit` (Exit code: 0).
+- ✅ Đã deploy lên môi trường Production (nhánh master).

@@ -259,7 +259,7 @@ async function processBankEmails() {
         // Tìm enrollment khớp với userId hoặc phone + courseCode
         for (const enrollment of pendingEnrollments) {
           // Bỏ qua tài khoản test
-          if (enrollment.userId === 2689) continue
+          if ([2689].includes(enrollment.userId)) continue
 
           const userPhone = enrollment.user.phone?.replace(/\D/g, '') || ''
           const emailPhone = parsed.phone || ''

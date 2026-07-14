@@ -200,6 +200,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 
                 setLinkZalo(res.link_zalo || '')
                 setFileEmail(res.file_email || '')
+                setTeacherBankAccountId(res.teacherBankAccountId || null)
             }
         } catch (err) {
             console.error("Fetch error:", err)
@@ -334,6 +335,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     <option value="NORMAL">Bình thường</option>
                                     <option value="CHALLENGE">Thử thách</option>
                                     <option value="LIB">Tài liệu (LIB)</option>
+                                    <option value="SYS">Hệ thống (SYS)</option>
                                 </select>
                             </div>
                             <div className="space-y-1.5">
