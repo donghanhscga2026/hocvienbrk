@@ -128,7 +128,7 @@ function checkAndPromoteLevelMemory(
       createdAt: evalTime.toISOString()
     })
 
-    if (nextConfig.giftValue > 0) {
+    if (nextConfig.giftValue > 0 && currentLevel > 2) {
       state.voucherBalance += nextConfig.giftValue
       transactions.push({
         userId,
@@ -363,17 +363,7 @@ export async function simulateDay(dayIndex: number) {
     member.points += memberMBP
     console.log(`  👉 #${member.userId} ${member.userName}: Confirmed! Points +${memberMBP.toFixed(3)} (MBDT=${memberMBDT.toLocaleString()})`)
 
-    // Self MBDT Credit transaction
-    simState.transactions.push({
-      userId: member.userId,
-      type: 'BRKD_CREDIT',
-      amount: memberMBDT,
-      balanceType: 'BRKD',
-      description: `Nhận ${memberMBDT.toLocaleString()} MBDT gốc khi kích hoạt sau 1 ngày cân nhắc`,
-      refId: `brkd_deposit_sys_4_user_${member.userId}`,
-      createdAt: recordTime.toISOString()
-    })
-    member.brkdBalance += memberMBDT
+    // No self MBDT credit, only point updates (memberMBDT is used only as reference for refunds & commissions)
 
     // Confirm & distribute Cash Return + MBDT Return (cá nhân người đó)
     await confirmMember(

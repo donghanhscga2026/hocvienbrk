@@ -125,15 +125,16 @@ export async function processRevenueShareForSystem(onSystem: number, distributed
 
   let totalBrkdRevenue = 0
   for (const act of newActivations) {
-    const depositRefId = `brkd_deposit_sys_${onSystem}_user_${act.userId}`
+    const returnBrkdRefId = `return_brkd_sys_${onSystem}_user_${act.userId}`
     const wallet = await prisma.brkWallet.findUnique({ where: { userId: act.userId } })
     let mMBDT = BRKD_PER_ACTIVATION
     if (wallet) {
-      const depositTx = await prisma.brkTransaction.findFirst({
-        where: { walletId: wallet.id, refId: depositRefId }
+      const returnBrkdTx = await prisma.brkTransaction.findFirst({
+        where: { walletId: wallet.id, refId: returnBrkdRefId }
       })
-      if (depositTx) {
-        mMBDT = Number(depositTx.amount)
+      if (returnBrkdTx) {
+        // Reverse refund percent to reconstruct original MBDT
+        mMBDT = Math.round(Number(returnBrkdTx.amount) / (Number(systemTree.returnPct || 21) / 100))
       }
     }
     totalBrkdRevenue += mMBDT

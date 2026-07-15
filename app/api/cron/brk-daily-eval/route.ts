@@ -96,12 +96,13 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
       // If the member is not yet confirmed by the grace processing cron, skip them
       if (!existingReturn) return false
 
-      // Read member's MBDT from their deposit transaction
-      const depositRefId = `brkd_deposit_sys_${onSystem}_user_${member.userId}`
-      const depositTx = await prisma.brkTransaction.findFirst({
-        where: { walletId: wallet.id, refId: depositRefId }
+      // Read member's MBDT from their MBDT return transaction (since they only receive MBDT return, not the original deposit)
+      const returnPct = Number(systemTree.returnPct || 21)
+      const returnBrkdRefId = `return_brkd_sys_${onSystem}_user_${member.userId}`
+      const returnBrkdTx = await prisma.brkTransaction.findFirst({
+        where: { walletId: wallet.id, refId: returnBrkdRefId }
       })
-      const memberMBDT = depositTx ? Number(depositTx.amount) : 12_868_686
+      const memberMBDT = returnBrkdTx ? Math.round(Number(returnBrkdTx.amount) / (returnPct / 100)) : 12_868_686
 
       // 1. Distribute commissions and accumulate points to ancestors
       const commissionResult = await distributeCommission(
