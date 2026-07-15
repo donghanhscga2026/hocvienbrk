@@ -61,29 +61,32 @@ export async function getBrkDashboard() {
   if (!session?.user?.id) throw new Error('Unauthorized')
   const userId = Number(session.user.id)
 
-  const systems = await prisma.system.findMany({
-    where: { userId, status: 'ACTIVE' },
-    include: {
-      systemTree: {
-        select: { onSystem: true, nameSystem: true, fee: true, durationDays: true }
+  const [systems, wallet] = await Promise.all([
+    prisma.system.findMany({
+      where: { userId, status: 'ACTIVE' },
+      include: {
+        systemTree: {
+          select: { onSystem: true, nameSystem: true, fee: true, durationDays: true }
+        }
       }
-    }
-  })
+    }),
+    getBrkWallet(userId)
+  ])
 
-  const wallet = await getBrkWallet(userId)
   const walletBalance = wallet ? Number(wallet.balance) : 0
 
-  const systemInfos = []
-  for (const sys of systems) {
-    const f1Count = await prisma.systemClosure.count({
-      where: { ancestorId: sys.autoId, depth: 1, systemId: sys.onSystem }
-    })
-    const totalDownline = await prisma.systemClosure.count({
-      where: { ancestorId: sys.autoId, depth: { gte: 1 }, systemId: sys.onSystem }
-    })
-    const levelProgress = await getLevelProgress(userId, sys.onSystem)
+  const systemInfos = await Promise.all(systems.map(async (sys) => {
+    const [f1Count, totalDownline, levelProgress] = await Promise.all([
+      prisma.systemClosure.count({
+        where: { ancestorId: sys.autoId, depth: 1, systemId: sys.onSystem }
+      }),
+      prisma.systemClosure.count({
+        where: { ancestorId: sys.autoId, depth: { gte: 1 }, systemId: sys.onSystem }
+      }),
+      getLevelProgress(userId, sys.onSystem)
+    ])
 
-    systemInfos.push({
+    return {
       onSystem: sys.onSystem,
       nameSystem: sys.systemTree.nameSystem,
       level: sys.level,
@@ -101,8 +104,8 @@ export async function getBrkDashboard() {
         nextConfig: levelProgress.nextConfig ? { level: levelProgress.nextConfig.level } : null,
       } : null,
       bonusEligible: f1Count >= 2,
-    })
-  }
+    }
+  }))
 
   return { walletBalance, systems: systemInfos }
 }

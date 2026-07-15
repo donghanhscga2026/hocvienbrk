@@ -45,8 +45,8 @@ export async function addUserToSystemClosure(
         })
     }
 
-    // 4. If upline exists (refSysId >= 0), copy all upline closures using upsert (idempotent)
-    if (refSysId >= 0) {
+    // 4. If upline exists (refSysId > 0), copy all upline closures using upsert (idempotent)
+    if (refSysId > 0) {
         const uplineSystem = await prisma.system.findFirst({
             where: { userId: refSysId, onSystem: systemId }
         })

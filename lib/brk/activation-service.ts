@@ -233,17 +233,18 @@ export async function processGracePeriodExpirations() {
       const fee = Number(memberSystemTree.fee)
       const returnPct = Number(memberSystemTree.returnPct)
 
-      // KIỂM TRA CHỐNG TRÙNG LẶP:
+      // KIỂM TRA CHỐNG TRÙNG LẶP — Per-system refId để tránh bỏ qua user multi-system:
+      const returnRefId = `return_fee_sys_${member.onSystem}_user_${member.userId}`
       const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
       if (wallet) {
         const existingRefund = await prisma.brkTransaction.findFirst({
           where: {
             walletId: wallet.id,
             type: 'RETURN_FEE',
-            balanceType: 'CASH'
+            refId: returnRefId
           }
         })
-        if (existingRefund) continue // Đã hoàn phí rồi, bỏ qua
+        if (existingRefund) continue // Đã hoàn phí rồi cho hệ thống này, bỏ qua
       }
 
       const returnAmount = (fee * returnPct) / 100
@@ -253,15 +254,18 @@ export async function processGracePeriodExpirations() {
           member.userId,
           returnAmount,
           'RETURN_FEE',
-          `Hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`
+          `Hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+          returnRefId
         )
         // BRKD refund (proportional)
         const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
         if (brkdReturn > 0) {
+          const brkdRefId = `return_brkd_sys_${member.onSystem}_user_${member.userId}`
           await creditBrkdWallet(
             member.userId,
             brkdReturn,
-            `BRKD hoàn ${returnPct}% sau ${memberSystemTree.graceDays} ngày cân nhắc`
+            `BRKD hoàn ${returnPct}% sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+            brkdRefId
           )
         }
         count++
