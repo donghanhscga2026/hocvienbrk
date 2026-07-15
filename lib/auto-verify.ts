@@ -197,7 +197,14 @@ export async function processPaymentEmails() {
     const pendingEnrollments = await prisma.enrollment.findMany({
       where: { status: 'PENDING' },
       include: {
-        course: { select: { id_khoa: true, phi_coc: true, name_lop: true } },
+        course: {
+          select: {
+            id_khoa: true,
+            phi_coc: true,
+            name_lop: true,
+            autoVerifyConfig: { select: { alternativeCodes: true } }
+          }
+        },
         user: { select: { id: true, name: true, phone: true, email: true, referrerId: true } }
       }
     });
@@ -237,9 +244,14 @@ export async function processPaymentEmails() {
             
             let courseCodeMatch = parsed.courseCode && normalizeCode(enrollment.course.id_khoa).includes(normalizeCode(parsed.courseCode));
             
-            // Hỗ trợ đặc biệt cho khóa học #22 (Merit Bank / MB / BRK)
-            if (!courseCodeMatch && enrollment.courseId === 22 && (parsed.courseCode === 'BRK' || parsed.courseCode === 'MB')) {
-              courseCodeMatch = true;
+            // Hỗ trợ mã khoa lịch sử (lấy từ alternativeCodes trong AutoVerifyConfig)
+            if (!courseCodeMatch && parsed.courseCode) {
+              const altCodes: string[] = enrollment.course.autoVerifyConfig?.alternativeCodes
+                ? JSON.parse(enrollment.course.autoVerifyConfig.alternativeCodes)
+                : []
+              if (altCodes.some(code => parsed.courseCode === code)) {
+                courseCodeMatch = true;
+              }
             }
 
             const amountMatch = parsed.amount >= enrollment.course.phi_coc;
