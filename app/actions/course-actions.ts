@@ -913,3 +913,21 @@ export async function getCourseLessonsAction(courseId: number) {
         select: { id: true, title: true, order: true }
     })
 }
+
+// ==========================================
+// CHECK ENROLLMENT STATUS - Kiểm tra trạng thái ghi danh (cho polling)
+// ==========================================
+export async function checkEnrollmentStatusAction(courseId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { status: null }
+        const userId = Number(session.user.id)
+        const enrollment = await prisma.enrollment.findUnique({
+            where: { userId_courseId: { userId, courseId } },
+            select: { status: true }
+        })
+        return { status: enrollment?.status ?? null }
+    } catch {
+        return { status: null }
+    }
+}

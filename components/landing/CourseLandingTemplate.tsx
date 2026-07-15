@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { 
     ChevronDown, ChevronUp, Star, BookOpen, Users, Clock, 
     Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2
 } from 'lucide-react'
-import { enrollInCourseAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { useRouter } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
@@ -68,11 +68,32 @@ export default function CourseLandingTemplate({
     const [copied, setCopied] = useState(false)
     const [showPayment, setShowPayment] = useState(false)
     const [localEnrollment, setLocalEnrollment] = useState<any>(null)
+    const [hasActivated, setHasActivated] = useState(false)
+    const [showActivatedToast, setShowActivatedToast] = useState(false)
     
     const effectiveEnrollment = localEnrollment || enrollment
     const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
     const isPending = effectiveEnrollment?.status === 'PENDING'
     const effectivePhiCoc = course.phi_coc
+
+    // Polling: tự động kiểm tra trạng thái ghi danh sau thanh toán
+    useEffect(() => {
+        if (!course?.id || hasActivated || isEnrolled) return
+        const interval = setInterval(async () => {
+            try {
+                const res = await checkEnrollmentStatusAction(course.id)
+                if (res.status === 'ACTIVE' && !hasActivated) {
+                    setHasActivated(true)
+                    setShowPayment(false)
+                    setShowActivatedToast(true)
+                    setLocalEnrollment((prev: any) => prev ? { ...prev, status: 'ACTIVE' } : { status: 'ACTIVE' })
+                    router.refresh()
+                }
+            } catch {}
+        }, 10_000)
+        const timeout = setTimeout(() => clearInterval(interval), 20 * 60 * 1000)
+        return () => { clearInterval(interval); clearTimeout(timeout) }
+    }, [course?.id, hasActivated, isEnrolled])
     
     const displayLessons = showAllLessons ? lessons : lessons.slice(0, 3)
     const hasMoreLessons = lessons.length > 3
@@ -226,7 +247,17 @@ export default function CourseLandingTemplate({
                             )}
                             
                             {getCTAButton()}
-                            
+
+                            {isEnrolled && (
+                                <button
+                                    onClick={handleCopyShareLink}
+                                    className="w-full mt-3 bg-white border-2 border-brk-primary text-brk-primary py-3 rounded-2xl font-bold text-sm hover:bg-brk-primary/5 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Link2 className="w-4 h-4" />
+                                    {copied ? '✓ Đã sao chép' : 'Chia sẻ link giới thiệu'}
+                                </button>
+                            )}
+
                             {!session && (
                                 <p className="mt-3 text-center text-xs text-brk-muted">
                                     Đăng nhập để xem tiến độ học tập
@@ -451,6 +482,14 @@ export default function CourseLandingTemplate({
                     userId={userId}
                     onClose={() => setShowPayment(false)}
                 />
+            )}
+
+            {showActivatedToast && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-green-500 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-bounce">
+                    <Check className="w-5 h-5" />
+                    <span className="font-bold">Kích hoạt thành công! Bạn có thể vào học ngay.</span>
+                    <button onClick={() => setShowActivatedToast(false)} className="ml-2 opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
+                </div>
             )}
         </div>
     )

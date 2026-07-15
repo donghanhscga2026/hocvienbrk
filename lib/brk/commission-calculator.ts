@@ -61,39 +61,45 @@ export async function distributeCommission(
   const commissionRefId = `sys_${onSystem}_member_${newMemberUserId}`
 
   await Promise.all(ancestorCredits.map(async ({ uplineSystem, uplineLevel, earnPct }) => {
-    if (earnPct <= 0) return
+    let alreadyProcessed = false
+    if (earnPct > 0) {
+      const existingComm = await prisma.brkTransaction.findFirst({
+        where: { wallet: { userId: uplineSystem.userId }, type: 'COMMISSION', refId: commissionRefId }
+      })
+      if (existingComm) {
+        alreadyProcessed = true
+      }
+    }
 
-    const existingComm = await prisma.brkTransaction.findFirst({
-      where: { wallet: { userId: uplineSystem.userId }, type: 'COMMISSION', refId: commissionRefId }
-    })
-
-    if (!existingComm) {
+    if (!alreadyProcessed) {
       await prisma.system.update({
         where: { autoId: uplineSystem.autoId },
         data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
       })
 
-      const commissionAmount = (fee * earnPct) / 100
-      if (commissionAmount > 0) {
-        await creditBrkWallet(
-          uplineSystem.userId,
-          commissionAmount,
-          'COMMISSION',
-          `Hoa hồng cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
-          commissionRefId,
-          createdAt
-        )
-      }
+      if (earnPct > 0) {
+        const commissionAmount = (fee * earnPct) / 100
+        if (commissionAmount > 0) {
+          await creditBrkWallet(
+            uplineSystem.userId,
+            commissionAmount,
+            'COMMISSION',
+            `Hoa hồng cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
+            commissionRefId,
+            createdAt
+          )
+        }
 
-      const brkdAmount = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100)
-      if (brkdAmount > 0) {
-        await creditBrkdWallet(
-          uplineSystem.userId,
-          brkdAmount,
-          `BRKD cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
-          commissionRefId,
-          createdAt
-        )
+        const brkdAmount = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100)
+        if (brkdAmount > 0) {
+          await creditBrkdWallet(
+            uplineSystem.userId,
+            brkdAmount,
+            `BRKD cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
+            commissionRefId,
+            createdAt
+          )
+        }
       }
     }
   }))

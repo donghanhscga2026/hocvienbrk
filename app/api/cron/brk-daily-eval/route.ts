@@ -154,8 +154,8 @@ async function handler(request: Request) {
         return NextResponse.json({ success: true, reason: 'No system trees found', systems: [] })
       }
 
-      const evalTime = getCurrentEvalTime()
       const now = new Date()
+      const evalTime = now
 
       const results = []
       let totalChecked = 0
