@@ -6,7 +6,7 @@ export const runtime = "nodejs"
 
 async function handler(req: Request) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

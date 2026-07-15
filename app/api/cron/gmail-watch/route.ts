@@ -10,7 +10,7 @@ async function handler(req: Request) {
 
   // 1. Kiểm tra Header bảo mật
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
     console.error('❌ Lỗi: Unauthorized - Sai CRON_SECRET')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

@@ -3,7 +3,7 @@ import { withCronLogging } from '@/lib/cron-logger'
 
 async function handler(request: Request) {
   const authHeader = request.headers.get('Authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
