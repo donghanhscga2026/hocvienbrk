@@ -47,7 +47,7 @@ export default function AffiliateTracker() {
   )
 }
 
-export function getAffiliateRef(): string | null {
+function getAffiliateRef(): string | null {
   if (typeof window === 'undefined') return null
   
   try {
@@ -68,7 +68,7 @@ export function getAffiliateRef(): string | null {
   }
 }
 
-export function clearAffiliateRef() {
+function clearAffiliateRef() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY)
   }
