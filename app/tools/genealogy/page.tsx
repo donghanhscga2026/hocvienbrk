@@ -1159,7 +1159,7 @@ function GenealogyFlow() {
                 const systemId = val === '' ? null : Number(val)
                 handleSystemChange(systemId)
               }}
-              className={`w-48 sm:w-44 appearance-none bg-slate-50 text-slate-700 text-[11px] font-black px-3 py-2 pr-8 rounded-xl border border-slate-200 outline-none cursor-pointer transition-all hover:bg-white hover:border-indigo-300 ${selectedSystem === null ? 'animate-[pulse_1.5s_infinite] ring-4 ring-pink-500/30 border-pink-500 bg-pink-50 text-pink-700 scale-105 shadow-[0_0_20px_rgba(236,72,153,0.4)]' : ''}`}
+              className={`w-64 sm:w-72 appearance-none bg-slate-50 text-slate-700 text-[11px] font-black px-3 py-2 pr-8 rounded-xl border border-slate-200 outline-none cursor-pointer transition-all hover:bg-white hover:border-indigo-300 ${selectedSystem === null ? 'animate-[pulse_1.5s_infinite] ring-4 ring-pink-500/30 border-pink-500 bg-pink-50 text-pink-700 scale-105 shadow-[0_0_20px_rgba(236,72,153,0.4)]' : ''}`}
             >
               <option value="">{selectedSystem === null ? '➔ CHỌN HỆ THỐNG' : 'HỆ THỐNG'}</option>
               {availableSystems.map((sys) => (
@@ -1175,11 +1175,10 @@ function GenealogyFlow() {
           {isAdmin && (
             <button
               onClick={() => setShowAdminModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 text-yellow-400 border border-slate-800 text-[11px] font-black hover:bg-black transition-all shrink-0 shadow-md"
+              className="flex items-center justify-center p-2 rounded-xl bg-slate-900 text-yellow-400 border border-slate-800 hover:bg-black transition-all shrink-0 shadow-md"
               title="Quản trị hệ thống"
             >
-              <Zap className="w-3.5 h-3.5 text-yellow-400" />
-              <span className="uppercase">Quản trị</span>
+              <Zap className="w-4 h-4 text-yellow-400" />
             </button>
           )}
 
@@ -1326,9 +1325,6 @@ function GenealogyFlow() {
         {/* Promotion Logic Switch Dropdown (Chỉ hiển thị cho ADMIN và khi chọn Hệ thống BRK = 4) */}
         {isAdmin && selectedSystem === 4 && (
           <div className="relative shrink-0 flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-white hover:border-indigo-300 transition-all">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter shrink-0">
-              Phương án:
-            </span>
             <div className="relative">
               <select
                 disabled={switchingLogic}
@@ -1379,8 +1375,8 @@ function GenealogyFlow() {
               </span>
             </div>
 
-            {/* Hiển thị chi tiết stats (Active/BĐH/DHTT) của đúng đối tượng đang xem */}
-            {(() => {
+            {/* Hiển thị chi tiết stats (Active/BĐH/DHTT) của đúng đối tượng đang xem - Chỉ hiện khi chọn Hệ thống #1 */}
+            {selectedSystem === 1 && (() => {
               const targetIdForStats = showMyTeamOnly ? currentUserId : fullTree.id;
               const findNodeStats = (node: GenealogyNode, targetId: number): any | null => {
                 if (node.id === targetId) return node.stats;

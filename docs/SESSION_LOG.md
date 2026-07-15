@@ -314,7 +314,10 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - Sửa các liên kết quay lại trong tab `site-profiles` và edit page từ đường dẫn lỗi 404 về đúng trang `/tools/pages?tab=site-profiles`.
 
 #### `app/tools/genealogy/page.tsx`
-- Loại bỏ hoàn toàn khối 2 tab ở Header đầu trang. Chuyển giao diện Quản trị hệ thống (`GenealogyAdminTab`) thành một popup Modal (max-w-4xl) mở ra khi click vào nút "⚙️ Quản trị" mới trên thanh công cụ điều khiển (toolbar) bên cạnh Dropdown chọn hệ thống (chỉ hiển thị cho ADMIN).
+- Loại bỏ hoàn toàn khối 2 tab ở Header đầu trang. Chuyển giao diện Quản trị hệ thống (`GenealogyAdminTab`) thành một popup Modal (max-w-4xl) mở ra khi click vào nút icon "⚡" Quản trị mới trên thanh công cụ (toolbar).
+- Tăng chiều rộng ô chọn Hệ thống lên `w-64 sm:w-72` để hiện đầy đủ tên các hệ thống dài.
+- Bỏ nhãn "Phương án:", chỉ để dropdown select đang chọn (mặc định Phương án B).
+- Ẩn hoàn toàn 3 thông số (Active, BĐH, ĐHTT) khi chọn hệ thống khác #1 (chỉ hiển thị khi chọn hệ thống #1).
 
 ### Dọn dẹp dữ liệu (Database Cleanup)
 - Chạy script `scripts/fix-duplicate-return-fee-final.js --execute` quét động và xử lý:
@@ -331,6 +334,7 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 | `vercel.backup_20260715_1941.json` | `vercel.json` |
 | `route.backup_20260715_1941.ts` | `app/api/cron/brk-daily-eval/route.ts` |
 | `page.backup_20260715_1952.tsx` | `app/tools/genealogy/page.tsx` |
+| `page.backup_20260715_2128.tsx` | `app/tools/genealogy/page.tsx` |
 
 ### Kiểm tra
 - ✅ Script chạy thành công, đưa toàn bộ lỗi dữ liệu của 83 thành viên về 0.
