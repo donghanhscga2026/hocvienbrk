@@ -281,6 +281,57 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ `npx tsc --noEmit` → 0 errors
 - ✅ Code đã deploy thành công lên master (PROD) qua GitHub.
 
+## ✅ SESSION-20260715_01 — Fix dữ liệu Hệ thống 4 (BRK), đồng bộ múi giờ Cron & chốt giờ thực tế, fix site profile
+
+- **Ngày**: 2026-07-15
+- **Thời gian**: ~17:00 - 19:45
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Khắc phục lỗi lệch dữ liệu Hệ thống 4 (MB Ngân hàng Phước Báu): ví sai số dư, điểm MP tăng lạm phát (do AI cũ cộng lặp điểm tuyến trên và bỏ sót 22 học viên lặp hoàn phí).
+- Đồng bộ lịch chạy toàn bộ Cron Job của Vercel về đúng giờ Việt Nam (6:00 sáng, 7:00 sáng...) thay vì giờ UTC lệch sang chiều.
+- Thay đổi cơ chế chốt giờ giao dịch `evalTime` từ mốc cứng `06:08` sáng sang thời gian thực chạy `now` của máy chủ.
+- Sửa lỗi site-profile không hiển thị ảnh nền Hero Card được thiết lập riêng và sửa lỗi 404 khi ấn nút quay lại.
+- Chẩn đoán lỗi `401 Unauthorized - Sai CRON_SECRET` trên Vercel.
+
+### Các file đã thay đổi
+#### `lib/brk/commission-calculator.ts`
+- Sửa logic cộng điểm MP: Đưa lệnh cộng điểm lên trước kiểm tra `earnPct <= 0` để đảm bảo tất cả tuyến trên phả hệ đều được cộng điểm (+17), tránh lệch điểm so với Rebuild. Đồng thời bọc trong `!alreadyProcessed` check để chống lặp điểm.
+
+#### `vercel.json`
+- Điều chỉnh lịch chạy Vercel Crons từ UTC sang GMT+7 (Việt Nam): `brk-daily-eval` & `brk-grace-processing` chạy lúc 06:00 sáng (`0 23 * * *`), `brk-expiration` lúc 07:00 sáng (`0 0 * * *`), `brk-level-check` lúc 08:00 sáng (`0 1 * * *`), `brk-revenue-share` lúc 09:00 sáng (`0 2 */3 * *`).
+
+#### `app/api/cron/brk-daily-eval/route.ts`
+- Đổi giá trị `evalTime` từ `getCurrentEvalTime()` (mốc cứng 6:08 sáng) thành thời gian thực chạy `now` (`new Date()`).
+
+#### `app/api/cron/gmail-watch/route.ts`
+- Thêm log chi tiết chẩn đoán tình trạng thiết lập `CRON_SECRET` ở Vercel env và trạng thái Header gửi đến để dễ xác định lý do lỗi 401.
+
+#### `components/home/MessageCard.tsx`
+- Sửa thứ tự ưu tiên render ảnh nền để `profile.heroImage` có mức ưu tiên cao nhất, tránh bị ảnh mặc định của fallback đè lên.
+
+#### Nút Back & Route site profile (4 file)
+- Sửa các liên kết quay lại trong tab `site-profiles` và edit page từ đường dẫn lỗi 404 về đúng trang `/tools/pages?tab=site-profiles`.
+
+### Dọn dẹp dữ liệu (Database Cleanup)
+- Chạy script `scripts/fix-duplicate-return-fee-final.js --execute` quét động và xử lý:
+  - Cập nhật số dư thực tế khớp với giao dịch cho **41 ví** bị lệch (tài khoản `#269` về đúng CASH `5,642.28đ`).
+  - Tính lại điểm MP chuẩn dựa trên số descendants F1/F2... đã confirmed (những người đã qua grace period và có RETURN_FEE) cho **15 tài khoản** (tài khoản `#269` về đúng `17` điểm do F1 `#18` vẫn trong grace period, root `#3773` về đúng `1224` điểm).
+  - Hạ cấp bậc ảo và xóa **3 bản ghi thăng cấp Cấp 2 sai** (của `#837`, `#1093`, `#611`).
+  - Đạt trạng thái: **Passed: 83/83. All users verified ✓**.
+
+### Các file backup (trong `plan_temp/`)
+| File backup | File gốc |
+|---|---|
+| `commission-calculator.backup_20260715_1933.ts` | `lib/brk/commission-calculator.ts` |
+| `fix-duplicate-return-fee-final.backup_20260715_1933.js` | `scripts/fix-duplicate-return-fee-final.js` |
+| `vercel.backup_20260715_1941.json` | `vercel.json` |
+| `route.backup_20260715_1941.ts` | `app/api/cron/brk-daily-eval/route.ts` |
+
+### Kiểm tra
+- ✅ Script chạy thành công, đưa toàn bộ lỗi dữ liệu của 83 thành viên về 0.
+- ✅ TypeScript: `npx tsc --noEmit` → 0 errors.
+
 
 
 

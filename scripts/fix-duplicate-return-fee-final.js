@@ -190,13 +190,9 @@ async function main() {
   // STEP 3: Identify affected wallets for balance recalculation
   // ═══════════════════════════════════════════════════
   const walletsToRecalc = new Set();
-  for (const id of uniqueTxnIds) {
-    const txn = await prisma.brkTransaction.findUnique({ where: { id }, select: { walletId: true } });
-    if (txn) walletsToRecalc.add(txn.walletId);
-  }
-  // Also include wallets of all affected members + ancestors (safety)
-  for (const uid of allRelevantUserIds) {
-    const w = await prisma.brkWallet.findUnique({ where: { userId: uid }, select: { id: true } });
+  // Also include wallets of ALL members on system 4 to ensure their balances are aligned with transactions
+  for (const member of allMembers) {
+    const w = await prisma.brkWallet.findUnique({ where: { userId: member.userId }, select: { id: true } });
     if (w) walletsToRecalc.add(w.id);
   }
   console.log(`  Wallets to recalculate: ${walletsToRecalc.size}`);
@@ -258,24 +254,36 @@ async function main() {
   // ═══════════════════════════════════════════════════
   console.log('\nStep 4: Recalculating totalPoints...');
 
+  // Build a set of user IDs who have a RETURN_FEE transaction (officially confirmed)
+  const confirmedUserIds = new Set();
+  const allWalletsForPoints = await prisma.brkWallet.findMany({
+    include: { transactions: true }
+  });
+  for (const w of allWalletsForPoints) {
+    const hasReturn = w.transactions.some(t => t.type === 'RETURN_FEE');
+    if (hasReturn) {
+      confirmedUserIds.add(w.userId);
+    }
+  }
+
   const pointsChanges = [];
   for (const member of allMembers) {
     const sys = await prisma.system.findUnique({ where: { userId_onSystem: { userId: member.userId, onSystem: SYSTEM_ID } } });
     if (!sys) continue;
 
-    const activatedDescendants = await prisma.systemClosure.count({
+    const descendants = await prisma.systemClosure.findMany({
       where: {
         ancestorId: member.autoId,
         depth: { gt: 0 },
-        systemId: SYSTEM_ID,
-        descendant: { status: 'ACTIVE' }
-      }
+        systemId: SYSTEM_ID
+      },
+      include: { descendant: true }
     });
 
-    // Self gets +17 if confirmed (has RETURN_FEE or was activated before Method B)
-    const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } });
-    const hasReturnFee = wallet ? await prisma.brkTransaction.count({ where: { walletId: wallet.id, type: 'RETURN_FEE' } }) > 0 : false;
-    const selfPts = hasReturnFee ? BRKP_PER_ACTIVATION : 0;
+    const activatedDescendants = descendants.filter(d => confirmedUserIds.has(d.descendant.userId)).length;
+
+    // Self gets +17 if confirmed
+    const selfPts = confirmedUserIds.has(member.userId) ? BRKP_PER_ACTIVATION : 0;
     const correctPoints = selfPts + (BRKP_PER_ACTIVATION * activatedDescendants);
 
     if (Number(sys.totalPoints) !== correctPoints) {
@@ -326,13 +334,20 @@ async function main() {
   console.log('\nStep 6: Finding stale level-up records...');
 
   const staleRecords = [];
-  for (const l of levelChanges) {
+  for (const member of allMembers) {
+    const sys = await prisma.system.findUnique({ where: { userId_onSystem: { userId: member.userId, onSystem: SYSTEM_ID } } });
+    if (!sys) continue;
+
+    const ptsChange = pointsChanges.find(p => p.userId === member.userId);
+    const correctPoints = ptsChange ? ptsChange.correctPts : Number(sys.totalPoints);
+    const correctLevel = getCorrectLevel(correctPoints);
+
     const records = await prisma.brkLevelUpRecord.findMany({
-      where: { userId: l.userId, onSystem: SYSTEM_ID, toLevel: { gt: l.correctLevel } }
+      where: { userId: member.userId, onSystem: SYSTEM_ID, toLevel: { gt: correctLevel } }
     });
     for (const r of records) {
       staleRecords.push(r);
-      console.log(`    User #${l.userId}: Delete L${r.fromLevel}→L${r.toLevel} record (promoted ${r.promotedAt})`);
+      console.log(`    User #${member.userId}: Delete L${r.fromLevel}→L${r.toLevel} record (promoted ${r.promotedAt})`);
     }
   }
   console.log(`  Stale records to delete: ${staleRecords.length}`);
@@ -425,11 +440,13 @@ async function main() {
     const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } });
     const returnFeeCount = wallet ? await prisma.brkTransaction.count({ where: { walletId: wallet.id, type: 'RETURN_FEE' } }) : 0;
 
-    const activatedDescendants = await prisma.systemClosure.count({
-      where: { ancestorId: member.autoId, depth: { gt: 0 }, systemId: SYSTEM_ID, descendant: { status: 'ACTIVE' } }
+    const descendants = await prisma.systemClosure.findMany({
+      where: { ancestorId: member.autoId, depth: { gt: 0 }, systemId: SYSTEM_ID },
+      include: { descendant: true }
     });
+    const activatedDescendants = descendants.filter(d => confirmedUserIds.has(d.descendant.userId)).length;
 
-    const selfPts = returnFeeCount > 0 ? BRKP_PER_ACTIVATION : 0;
+    const selfPts = confirmedUserIds.has(member.userId) ? BRKP_PER_ACTIVATION : 0;
     const expectedPts = selfPts + (BRKP_PER_ACTIVATION * activatedDescendants);
     const expectedLevel = getCorrectLevel(expectedPts);
 

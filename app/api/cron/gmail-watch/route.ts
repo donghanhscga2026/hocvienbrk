@@ -12,6 +12,8 @@ async function handler(req: Request) {
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
     console.error('❌ Lỗi: Unauthorized - Sai CRON_SECRET')
+    console.error(`  - Vercel env CRON_SECRET: ${process.env.CRON_SECRET ? 'ĐƯỢC THIẾT LẬP (SET)' : 'CHƯA THIẾT LẬP (NOT SET)'}`)
+    console.log(`  - Header Authorization: ${authHeader ? 'CÓ GỬI (PRESENT)' : 'KHÔNG GỬI (MISSING)'}`)
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

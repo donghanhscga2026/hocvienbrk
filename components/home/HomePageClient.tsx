@@ -8,6 +8,8 @@ import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
 import CommunityBoard from '@/components/home/CommunityBoard'
 import PaymentModal from '@/components/course/PaymentModal'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
+import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
+import { Check } from 'lucide-react'
 
 interface HomePageClientProps {
   profile: any
@@ -51,6 +53,7 @@ function HomePageContent({
   const searchParams = useSearchParams()
   const paymentCourseId = searchParams.get('paymentCourseId')
   const [courseToPay, setCourseToPay] = useState<any>(null)
+  const [showActivatedToast, setShowActivatedToast] = useState(false)
   const { open: openMbw } = useMbwDashboard()
 
   useEffect(() => {
@@ -68,8 +71,31 @@ function HomePageContent({
 
   const handleClosePayment = () => {
     setCourseToPay(null)
+    setShowActivatedToast(false)
     window.history.replaceState({}, '', `/page/${profile.slug || ''}`)
   }
+
+  useEffect(() => {
+    if (!courseToPay) return
+    const enrollment = enrollmentsMap[courseToPay.id]
+    if (enrollment?.status === 'ACTIVE') return
+
+    let activated = false
+    const interval = setInterval(async () => {
+      if (activated) return
+      try {
+        const res = await checkEnrollmentStatusAction(courseToPay.id)
+        if (res.status === 'ACTIVE' && !activated) {
+          activated = true
+          setCourseToPay(null)
+          setShowActivatedToast(true)
+          setTimeout(() => window.location.reload(), 1500)
+        }
+      } catch {}
+    }, 10_000)
+    const timeout = setTimeout(() => clearInterval(interval), 20 * 60 * 1000)
+    return () => { clearInterval(interval); clearTimeout(timeout) }
+  }, [courseToPay, enrollmentsMap])
 
   // Dynamic section titles từ profile
   const surveyTitle = profile.surveyTitle || 'Thiết kế lộ trình'
@@ -183,6 +209,13 @@ function HomePageContent({
           userId={userId}
           onClose={handleClosePayment}
         />
+      )}
+
+      {showActivatedToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] bg-green-500 text-white px-6 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-bounce">
+          <Check className="w-5 h-5" />
+          <span className="font-bold">Kích hoạt thành công! Đang tải lại trang...</span>
+        </div>
       )}
     </>
   )

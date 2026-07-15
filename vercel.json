@@ -14,23 +14,23 @@
     },
     {
       "path": "/api/cron/brk-daily-eval",
-      "schedule": "0 6 * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/brk-grace-processing",
-      "schedule": "0 6 * * *"
+      "schedule": "0 23 * * *"
     },
     {
       "path": "/api/cron/brk-expiration",
-      "schedule": "0 7 * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/brk-level-check",
-      "schedule": "0 8 * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/brk-revenue-share",
-      "schedule": "0 9 */3 * *"
+      "schedule": "0 2 */3 * *"
     }
   ]
 }
