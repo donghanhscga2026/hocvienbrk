@@ -53,26 +53,31 @@ async function run() {
   const walletMap = new Map(wallets.map(w => [w.userId, w.id]))
 
   // 2. Clear old transactions and level records of System 4
-  console.log(`🧹 Clearing old transactions and promotions for System 4...`)
+  console.log(`🧹 Clearing old transactions, pools, and promotions for System 4...`)
   
-  // Delete transactions containing System 4 references in refId or starting with pool_day
-  await prisma.brkTransaction.deleteMany({
-    where: {
-      OR: [
-        { refId: { contains: 'sys_4' } },
-        { refId: { startsWith: 'pool_day' } }
-      ]
-    }
+  // Delete all revenue awards of System 4 pools
+  await prisma.brkRevenueAward.deleteMany({
+    where: { pool: { systemId: SYSTEM_ID } }
   })
 
-  // Delete level up records (we can just delete all level records for these 84 users on System 4)
+  // Delete all pools of System 4
+  await prisma.brkRevenuePool.deleteMany({
+    where: { systemId: SYSTEM_ID }
+  })
+
+  // Delete ALL transactions of these 84 wallets
+  await prisma.brkTransaction.deleteMany({
+    where: { walletId: { in: wallets.map(w => w.id) } }
+  })
+
+  // Delete level up records of these 84 users on System 4
   await prisma.brkLevelUpRecord.deleteMany({
     where: {
       userId: { in: simMembers.map((m: any) => m.userId) },
       onSystem: SYSTEM_ID
     }
   })
-  console.log(`✅ Old transaction history and promotions cleared.`)
+  console.log(`✅ Old transaction history, pools and promotions cleared.`)
 
   // 3. Insert new transactions from Simulation (calculating balanceBefore/balanceAfter dynamically)
   console.log(`📥 Sorting and calculating balances for ${simState.transactions.length} new transactions...`)
