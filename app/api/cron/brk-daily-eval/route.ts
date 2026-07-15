@@ -72,15 +72,16 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
   for (let i = 0; i < dueMembers.length; i += BATCH_SIZE) {
     const batch = dueMembers.slice(i, i + BATCH_SIZE)
     const results = await Promise.all(batch.map(async (member) => {
+      const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
+
       const existingReturn = await prisma.brkTransaction.findFirst({
         where: {
           wallet: { userId: member.userId },
-          type: 'RETURN_FEE'
+          type: 'RETURN_FEE',
+          refId: returnRefId
         }
       })
       if (existingReturn) return false
-
-      const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
 
       await prisma.system.update({
         where: { userId_onSystem: { userId: member.userId, onSystem } },

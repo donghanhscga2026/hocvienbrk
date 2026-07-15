@@ -70,11 +70,16 @@ async function confirmMember(
   systemTree: any,
   evalTime: Date
 ) {
-  await creditBrkWallet(memberUserId, (fee * 21) / 100, 'RETURN_FEE', `Hoàn 21% phí tham gia sau 1 ngày cân nhắc`, undefined, evalTime);
+  const returnPct = Number(systemTree?.returnPct ?? 21)
+  const returnRefId = `return_fee_sys_${onSystem}_user_${memberUserId}`
+  const returnAmt = (fee * returnPct) / 100
 
-  const brkdReturn = Math.round((BRKD_PER_ACTIVATION * 21) / 100);
+  await creditBrkWallet(memberUserId, returnAmt, 'RETURN_FEE', `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`, returnRefId, evalTime);
+
+  const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100);
   if (brkdReturn > 0) {
-    await creditBrkdWallet(memberUserId, brkdReturn, `BRKD hoàn 21% sau 1 ngày cân nhắc`, undefined, evalTime);
+    const brkdRefId = `return_brkd_sys_${onSystem}_user_${memberUserId}`
+    await creditBrkdWallet(memberUserId, brkdReturn, `BRKD hoàn ${returnPct}% sau 1 ngày cân nhắc`, brkdRefId, evalTime);
   }
 
   if (refSysId > 0) {
@@ -183,7 +188,7 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
 
   await processRevenueShareForSystem(
     4,
-    new Date(2026, 6, 5, 0, 0, 0)
+    getCurrentEvalTime()
   );
 }
 
