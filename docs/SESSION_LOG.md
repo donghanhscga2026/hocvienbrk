@@ -398,7 +398,9 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - Script backfill đọc Simulation state, dọn sạch transactions và promotions cũ của System 4, update số dư ví chuẩn của 84 học viên (bù đắp ví MBDT gốc bị thiếu), và insert lại toàn bộ 666 transactions (tính toán running balance liên tục) + 187 promotions mới vào DB thật.
 
 ### Kiểm tra
-- ✅ Script backfill chạy thành công 100% không có lỗi.
+- ✅ Đã sửa đổi loại bỏ MBDT gốc khỏi ví học viên khi confirm (chỉ nhận hoàn phí 21%) và loại bỏ quà Voucher thăng cấp Level 2 tự động (học viên thăng cấp 2 chỉ nhận voucher qua sự kiện giới thiệu 2 F1).
+- ✅ Đã cập nhật và đồng bộ 100% code logic core của dự án, các APIs cron chạy thực tế và Simulation Replay.
+- ✅ Script backfill chạy thành công 100% không có lỗi. Comparative Stats lệch bằng 0 tuyệt đối cho CASH, MBDT, Level và Points của toàn bộ 84 học viên.
 - ✅ `npx tsc --noEmit` → Exit code: 0 (không lỗi TypeScript).
 
 

@@ -272,14 +272,7 @@ export async function processGracePeriodExpirations() {
         data: { totalPoints: { increment: memberMBP } }
       })
 
-      const depositRefId = `brkd_deposit_sys_${member.onSystem}_user_${member.userId}`
-      await creditBrkdWallet(
-        member.userId,
-        memberMBDT,
-        `Nhận ${memberMBDT.toLocaleString()} MBDT gốc khi kích hoạt sau 1 ngày cân nhắc`,
-        depositRefId,
-        recordTime
-      )
+      // No self MBDT credit, only point updates (memberMBDT is used only as reference for refunds & commissions)
 
       // 2. Hoàn phí cá nhân (Cash + MBDT)
       const returnAmount = (fee * returnPct) / 100
