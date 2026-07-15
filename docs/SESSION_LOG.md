@@ -340,6 +340,67 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ Script chạy thành công, đưa toàn bộ lỗi dữ liệu của 83 thành viên về 0.
 - ✅ TypeScript: `npx tsc --noEmit` → 0 errors.
 
+---
+
+## ✅ SESSION-20260716_01 — Tách biệt Timing 3 Script mô phỏng & Sửa lỗi đếm F1 phả hệ trên memory
+
+- **Ngày**: 2026-07-16
+- **Thời gian**: ~01:45 - 02:05
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Tách rời thời gian vận hành và ghi nhận dữ liệu của 3 script chạy độc lập: Confirm (23:50 VNT), Daily Eval thăng cấp & commission (01:13 VNT sáng hôm sau), và Đồng chia (02:14 VNT sáng ngày thứ 4).
+- Khắc phục lỗi đếm F1 và lookup parent trên memory do so khớp `m.refSysId` với `member.autoId` trong khi Database lưu `refSysId` là `userId` của cha.
+
+### Các file đã thay đổi
+#### `scripts/replay/runner.ts`
+- **Confirm thành viên (23:50 VNT)**: Chỉ cập nhật trạng thái `isConfirmed: true` và ghi nhận ví cá nhân học viên (MBDT gốc, hoàn phí 21%) tại mốc `gracePeriodEnd`.
+- **Daily Eval (01:13 VNT sáng ngày hôm sau)**: Cộng dồn điểm ancestors, chia commission ancestors, check 2F1 voucher, thăng cấp và voucher quà lên cấp tại mốc `evalTime` (01:13 sáng ngày hôm sau).
+- **Đồng chia (02:14 VNT sáng ngày thứ 4)**: Độc lập hoàn toàn, chia đều bể doanh thu CASH/MBDT cho các học viên đủ điều kiện tại mốc `shareTime` (02:14 sáng hôm sau của ngày target thứ 3).
+- **Sửa đếm F1**: Sửa logic so khớp từ `m.refSysId === member.autoId` thành `m.refSysId === member.userId` và parent lookup từ `s.autoId === refSysId` thành `memberStates.get(member.refSysId)`.
+- **Sửa filter log**: Lọc in thăng tiến ở cuối ngày theo cả ngày target và `evalTime` sáng hôm sau.
+
+### Kiểm tra
+- ✅ `npx tsc --noEmit` → Exit code: 0 (không lỗi TypeScript).
+- ✅ Chạy thành công chuỗi 14 ngày giả lập. Số lượng học viên đủ điều kiện đồng chia tăng đúng tỷ lệ (kỳ 1 có 8 người, kỳ 2 có 12 người).
+
+---
+
+## ✅ SESSION-20260716_02 — Đồng bộ Simulation vào DB & Cấu hình Cron chạy thực tế cho System 4
+
+- **Ngày**: 2026-07-16
+- **Thời gian**: ~02:05 - 02:22
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Sửa lỗi mapping thuộc tính thăng cấp nhánh F1 trong Replay Simulation.
+- Đồng bộ toàn bộ dữ liệu 14 ngày đã mô phỏng chuẩn xác từ Simulation vào Database thực tế.
+- Tách biệt logic và mốc thời gian chạy cron của dự án tương ứng khớp 100% logic Simulation, đồng bộ cấu hình trong `vercel.json`.
+
+### Các file đã thay đổi
+#### `scripts/replay/runner.ts`
+- Sửa mapping thuộc tính thăng cấp nhánh F1 từ `reqLevel: r.reqLevel` (undefined) sang `reqLevel: r.branchLevel`. Khôi phục thăng cấp Cấp 3, Cấp 4 chuẩn xác cho các Leader.
+
+#### `lib/brk/activation-service.ts`
+- Cập nhật `processGracePeriodExpirations` (cron confirm 23:50 VNT) để không bị skip đối với Method B. Dưới Method B, nó tự động confirm và hoàn phí/credit ví MBDT gốc cá nhân tại mốc `gracePeriodEnd`, bỏ qua logic dồn lên upline.
+
+#### `app/api/cron/brk-daily-eval/route.ts`
+- Bỏ phần tự động confirm và hoàn phí cá nhân trùng lặp trong Daily Eval (01:13 VNT). Chỉ dồn điểm, commission, 2F1 voucher, check thăng cấp cho các học viên đã được confirm bởi grace processing.
+
+#### `lib/brk/revenue-share-service.ts`
+- Thêm điều kiện lọc `gracePeriodEnd: { lte: periodEnd }` cho cả active members và các nhánh F1 của họ khi xét điều kiện bể đồng chia, đảm bảo chỉ tính toán trên các tài khoản đã confirm chính thức.
+
+#### `vercel.json`
+- Đồng bộ schedules Vercel Crons đúng múi giờ VNT: grace-processing lúc 23:50 VNT (`50 16 * * *`), daily-eval lúc 01:13 VNT (`13 18 * * *`), revenue-share lúc 02:14 VNT (`14 19 */3 * *`). Loại bỏ cron level-check thừa.
+
+### Các file đã tạo
+#### `scripts/replay/apply-simulation-to-db.ts`
+- Script backfill đọc Simulation state, dọn sạch transactions và promotions cũ của System 4, update số dư ví chuẩn của 84 học viên (bù đắp ví MBDT gốc bị thiếu), và insert lại toàn bộ 666 transactions (tính toán running balance liên tục) + 187 promotions mới vào DB thật.
+
+### Kiểm tra
+- ✅ Script backfill chạy thành công 100% không có lỗi.
+- ✅ `npx tsc --noEmit` → Exit code: 0 (không lỗi TypeScript).
+
 
 
 

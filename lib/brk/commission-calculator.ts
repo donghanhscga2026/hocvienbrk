@@ -5,8 +5,12 @@ import type { SystemTree } from '@prisma/client'
 import { creditBrkWallet, creditBrkdWallet } from './wallet-service'
 import { getLevelConfig } from './config-service'
 
-const BRKP_PER_ACTIVATION = 17
-const BRKD_PER_ACTIVATION = 12_868_686
+const DEFAULT_MBDT = 12_868_686
+const MBDT_BASE = 12_000_000
+
+function mbdtToMbp(mbdt: number): number {
+  return Math.round((mbdt / MBDT_BASE) * 16 * 1000) / 1000
+}
 
 interface AncestorCredit {
   uplineSystem: { autoId: number; userId: number; level: number | null }
@@ -20,8 +24,10 @@ export async function distributeCommission(
   fee: number,
   systemTree: SystemTree,
   createdAt?: Date,
-  levelConfigs?: Map<number, any>
+  levelConfigs?: Map<number, any>,
+  memberMBDT: number = DEFAULT_MBDT
 ): Promise<{ ancestorCredits: AncestorCredit[] }> {
+  const memberMBP = mbdtToMbp(memberMBDT)
   const newMemberSys = await prisma.system.findUnique({
     where: { userId_onSystem: { userId: newMemberUserId, onSystem } }
   })
@@ -74,7 +80,7 @@ export async function distributeCommission(
     if (!alreadyProcessed) {
       await prisma.system.update({
         where: { autoId: uplineSystem.autoId },
-        data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
+        data: { totalPoints: { increment: memberMBP } }
       })
 
       if (earnPct > 0) {
@@ -90,7 +96,7 @@ export async function distributeCommission(
           )
         }
 
-        const brkdAmount = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100)
+        const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
         if (brkdAmount > 0) {
           await creditBrkdWallet(
             uplineSystem.userId,
