@@ -49,7 +49,7 @@ export async function activateBrkMember(
       activatedAt: now,
       gracePeriodEnd: graceEnd,
       expiresAt,
-      level: 1,
+      level: 0, // Chưa qua grace period → chưa được xét cấp
     },
     create: {
       userId,
@@ -59,7 +59,7 @@ export async function activateBrkMember(
       activatedAt: now,
       gracePeriodEnd: graceEnd,
       expiresAt,
-      level: 1,
+      level: 0, // Chưa qua grace period → chưa được xét cấp
       totalPoints: 0,
     }
   })
@@ -79,6 +79,11 @@ export async function activateBrkMember(
   }
 
   // Method A: immediate commissions + points + level-up + 2F1 voucher
+  // Self points +17 (same as Method B cron)
+  await prisma.system.update({
+    where: { userId_onSystem: { userId, onSystem } },
+    data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
+  })
   await distributeCommission(userId, onSystem, fee, systemTree, now)
 
   await checkAndPromoteLevel(userId, onSystem, now)

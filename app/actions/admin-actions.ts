@@ -1806,7 +1806,19 @@ export async function getMemberPromotionHistoryAction(userId: number, systemId: 
             ev.accumulatedBrkp = 17 * (1 + teamSizeAtTime)
         }
 
-        return { success: true, history: events }
+        // 4. Lấy level configs để client hiển thị đúng % và gift cho từng cấp
+        const levelConfigsRaw = await prisma.brkLevelConfig.findMany({
+            where: { systemId },
+            orderBy: { level: 'asc' },
+            select: { level: true, personalFeePct: true, giftValue: true }
+        })
+        const levelConfigs = levelConfigsRaw.map(c => ({
+            level: c.level,
+            pct: `${Number(c.personalFeePct)}%`,
+            gift: c.giftValue
+        }))
+
+        return { success: true, history: events, levelConfigs }
     } catch (error: any) {
         return { success: false, error: error.message }
     }

@@ -61,20 +61,20 @@ export async function distributeCommission(
   const commissionRefId = `sys_${onSystem}_member_${newMemberUserId}`
 
   await Promise.all(ancestorCredits.map(async ({ uplineSystem, uplineLevel, earnPct }) => {
-    await prisma.system.update({
-      where: { autoId: uplineSystem.autoId },
-      data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
-    })
-
     if (earnPct <= 0) return
 
-    const commissionAmount = (fee * earnPct) / 100
+    const existingComm = await prisma.brkTransaction.findFirst({
+      where: { wallet: { userId: uplineSystem.userId }, type: 'COMMISSION', refId: commissionRefId }
+    })
 
-    if (commissionAmount > 0) {
-      const existingComm = await prisma.brkTransaction.findFirst({
-        where: { wallet: { userId: uplineSystem.userId }, type: 'COMMISSION', refId: commissionRefId }
+    if (!existingComm) {
+      await prisma.system.update({
+        where: { autoId: uplineSystem.autoId },
+        data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
       })
-      if (!existingComm) {
+
+      const commissionAmount = (fee * earnPct) / 100
+      if (commissionAmount > 0) {
         await creditBrkWallet(
           uplineSystem.userId,
           commissionAmount,
@@ -84,14 +84,9 @@ export async function distributeCommission(
           createdAt
         )
       }
-    }
 
-    const brkdAmount = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100)
-    if (brkdAmount > 0) {
-      const existingBrkd = await prisma.brkTransaction.findFirst({
-        where: { wallet: { userId: uplineSystem.userId }, type: 'BRKD_CREDIT', refId: commissionRefId }
-      })
-      if (!existingBrkd) {
+      const brkdAmount = Math.round((BRKD_PER_ACTIVATION * earnPct) / 100)
+      if (brkdAmount > 0) {
         await creditBrkdWallet(
           uplineSystem.userId,
           brkdAmount,

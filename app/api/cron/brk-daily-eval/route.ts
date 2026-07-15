@@ -77,8 +77,7 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
       const existingReturn = await prisma.brkTransaction.findFirst({
         where: {
           wallet: { userId: member.userId },
-          type: 'RETURN_FEE',
-          refId: returnRefId
+          type: 'RETURN_FEE'
         }
       })
       if (existingReturn) return false

@@ -95,6 +95,12 @@ async function confirmAndLevelUp(
   evalTime: Date
 ) {
   for (const member of members) {
+    // Dedup: skip nếu đã xử lý RETURN_FEE rồi (tránh tính trùng points)
+    const existingReturn = await prisma.brkTransaction.findFirst({
+      where: { wallet: { userId: member.userId }, type: 'RETURN_FEE' }
+    });
+    if (existingReturn) continue;
+
     await prisma.system.update({
       where: { userId_onSystem: { userId: member.userId, onSystem } },
       data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
@@ -160,6 +166,12 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
   if (due.length > 0) {
     const latestEval = getCurrentEvalTime();
     for (const member of due) {
+      // Dedup: skip nếu đã xử lý RETURN_FEE rồi (tránh tính trùng points)
+      const existingReturn = await prisma.brkTransaction.findFirst({
+        where: { wallet: { userId: member.userId }, type: 'RETURN_FEE' }
+      });
+      if (existingReturn) continue;
+
       await prisma.system.update({
         where: { userId_onSystem: { userId: member.userId, onSystem: 4 } },
         data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
