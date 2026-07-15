@@ -15,7 +15,7 @@ const CRON_JOBS = [
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
