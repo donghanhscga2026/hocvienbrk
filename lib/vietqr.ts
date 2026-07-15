@@ -32,29 +32,12 @@ export function generateTransferContent(options: {
 export async function generateVietQR(options: {
   accountNo: string
   accountName: string
-  acqId: string // Nhận bank_stk từ Course
+  acqId: string
   amount: number
   addInfo: string
 }): Promise<{ qrCode: string; qrDataURL: string }> {
-  // Map tên ngân hàng sang mã BIN
-  const bankMap: Record<string, string> = {
-    'SACOMBANK': '970403',
-    'VIETCOMBANK': '970436',
-    'VCB': '970436',
-    'ACB': '970416',
-    'MBBANK': '970422',
-    'MB': '970422',
-    'TECHCOMBANK': '970407',
-    'TCB': '970407',
-    'VIETINBANK': '970415',
-    'CTG': '970415',
-    'BIDV': '970418',
-    'AGRIBANK': '970405',
-    'TPBANK': '970423',
-    'VPBANK': '970432'
-  }
-  
-  const bankId = bankMap[options.acqId?.toUpperCase()] || options.acqId || '970403'
+  const { resolveBankBin } = await import('@/lib/bank-bin')
+  const bankId = resolveBankBin(options.acqId)
   
   const requestBody: VietQRRequest = {
     accountNo: options.accountNo,
