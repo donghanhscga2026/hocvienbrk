@@ -7,12 +7,23 @@ import { creditBrkWallet, creditBrkdWallet } from '@/lib/brk/wallet-service'
 import { getAllLevelConfigs } from '@/lib/brk/config-service'
 import type { SystemTree } from '@prisma/client'
 
-const BRKD_PER_ACTIVATION = 12_868_686
 const LOCK_KEY = 'brk_daily_eval_lock'
 const LOCK_TIMEOUT_MS = 120_000 // 2 minutes
+const MBDT_BASE = 12_000_000
+const MBDT_MIN = 12_868_686
+const MBDT_MAX = 15_868_686
+
+function generateMBDT(): number {
+  const random = Math.floor(Math.random() * (MBDT_MAX - MBDT_MIN + 1)) + MBDT_MIN
+  return random
+}
+
+function mbdtToMbp(mbdt: number): number {
+  return Math.round((mbdt / MBDT_BASE) * 16 * 1000) / 1000
+}
 
 function getEvalTime(year: number, month: number, day: number): Date {
-  return new Date(Date.UTC(year, month, day - 1, 23, 8, 0))
+  return new Date(Date.UTC(year, month, day - 1, 17, 13, 0))
 }
 
 function getCurrentEvalTime(): Date {
@@ -53,7 +64,6 @@ async function releaseLock() {
 async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) {
   const onSystem = systemTree.onSystem
   const fee = Number(systemTree.fee)
-  const returnPct = Number(systemTree.returnPct || 21)
 
   const dueMembers = await prisma.system.findMany({
     where: {
@@ -73,50 +83,43 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
     const batch = dueMembers.slice(i, i + BATCH_SIZE)
     const results = await Promise.all(batch.map(async (member) => {
       const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
+      const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
+      if (!wallet) return false
 
       const existingReturn = await prisma.brkTransaction.findFirst({
         where: {
-          wallet: { userId: member.userId },
-          type: 'RETURN_FEE'
+          walletId: wallet.id,
+          type: 'RETURN_FEE',
+          refId: returnRefId
         }
       })
-      if (existingReturn) return false
+      // If the member is not yet confirmed by the grace processing cron, skip them
+      if (!existingReturn) return false
 
-      await prisma.system.update({
-        where: { userId_onSystem: { userId: member.userId, onSystem } },
-        data: { totalPoints: { increment: 17 } }
+      // Read member's MBDT from their deposit transaction
+      const depositRefId = `brkd_deposit_sys_${onSystem}_user_${member.userId}`
+      const depositTx = await prisma.brkTransaction.findFirst({
+        where: { walletId: wallet.id, refId: depositRefId }
       })
+      const memberMBDT = depositTx ? Number(depositTx.amount) : 12_868_686
 
-      const commissionResult = await distributeCommission(member.userId, onSystem, fee, systemTree, evalTime, configMap)
+      // 1. Distribute commissions and accumulate points to ancestors
+      const commissionResult = await distributeCommission(
+        member.userId,
+        onSystem,
+        fee,
+        systemTree,
+        evalTime,
+        configMap,
+        memberMBDT
+      )
 
-      const returnAmt = (fee * returnPct) / 100
-      if (returnAmt > 0) {
-        await creditBrkWallet(
-          member.userId,
-          returnAmt,
-          'RETURN_FEE',
-          `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`,
-          returnRefId,
-          evalTime
-        )
-
-        const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
-        if (brkdReturn > 0) {
-          const brkdRefId = `return_brkd_sys_${onSystem}_user_${member.userId}`
-          await creditBrkdWallet(
-            member.userId,
-            brkdReturn,
-            `BRKD hoàn ${returnPct}% sau 1 ngày cân nhắc`,
-            brkdRefId,
-            evalTime
-          )
-        }
-      }
-
+      // 2. Check 2F1 Voucher for parent
       if (member.refSysId > 0) {
         await create2F1Voucher(member.refSysId, onSystem, evalTime)
       }
 
+      // 3. Evaluate level promotions for member and ancestors
       await checkAndPromoteLevel(member.userId, onSystem, evalTime, configMap)
 
       for (const { uplineSystem } of commissionResult.ancestorCredits) {

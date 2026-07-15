@@ -9,6 +9,17 @@ import { processRevenueShareForSystem } from './revenue-share-service';
 
 const BRKP_PER_ACTIVATION = 17;
 const BRKD_PER_ACTIVATION = 12868686;
+const MBDT_BASE = 12_000_000;
+const MBDT_MIN = 12_868_686;
+const MBDT_MAX = 15_868_686;
+
+function generateMBDT(): number {
+  return Math.floor(Math.random() * (MBDT_MAX - MBDT_MIN + 1)) + MBDT_MIN;
+}
+
+function mbdtToMbp(mbdt: number): number {
+  return Math.round((mbdt / MBDT_BASE) * 16 * 1000) / 1000;
+}
 
 async function cleanup() {
   const systems = await prisma.system.findMany({
@@ -47,7 +58,7 @@ async function cleanup() {
 }
 
 function getEvalTime(year: number, month: number, day: number): Date {
-  return new Date(Date.UTC(year, month, day - 1, 23, 8, 0));
+  return new Date(Date.UTC(year, month, day - 1, 17, 13, 0));
 }
 
 function getCurrentEvalTime(): Date {
@@ -68,7 +79,8 @@ async function confirmMember(
   onSystem: number,
   fee: number,
   systemTree: any,
-  evalTime: Date
+  evalTime: Date,
+  memberMBDT: number
 ) {
   const returnPct = Number(systemTree?.returnPct ?? 21)
   const returnRefId = `return_fee_sys_${onSystem}_user_${memberUserId}`
@@ -76,7 +88,7 @@ async function confirmMember(
 
   await creditBrkWallet(memberUserId, returnAmt, 'RETURN_FEE', `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`, returnRefId, evalTime);
 
-  const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100);
+  const brkdReturn = Math.round((memberMBDT * returnPct) / 100);
   if (brkdReturn > 0) {
     const brkdRefId = `return_brkd_sys_${onSystem}_user_${memberUserId}`
     await creditBrkdWallet(memberUserId, brkdReturn, `BRKD hoàn ${returnPct}% sau 1 ngày cân nhắc`, brkdRefId, evalTime);
@@ -96,18 +108,29 @@ async function confirmAndLevelUp(
 ) {
   for (const member of members) {
     // Dedup: skip nếu đã xử lý RETURN_FEE rồi (tránh tính trùng points)
+    const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
     const existingReturn = await prisma.brkTransaction.findFirst({
-      where: { wallet: { userId: member.userId }, type: 'RETURN_FEE' }
+      where: { wallet: { userId: member.userId }, type: 'RETURN_FEE', refId: returnRefId }
     });
     if (existingReturn) continue;
 
+    const memberMBDT = generateMBDT();
+
     await prisma.system.update({
       where: { userId_onSystem: { userId: member.userId, onSystem } },
-      data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
+      data: { totalPoints: { increment: mbdtToMbp(memberMBDT) } }
     });
 
-    await distributeCommission(member.userId, onSystem, fee, systemTree, evalTime);
-    await confirmMember(member.userId, member.refSysId, onSystem, fee, systemTree, evalTime);
+    await creditBrkdWallet(
+      member.userId,
+      memberMBDT,
+      `Nhận ${memberMBDT.toLocaleString()} BRKD gốc khi kích hoạt sau 1 ngày cân nhắc`,
+      `brkd_deposit_sys_${onSystem}_user_${member.userId}`,
+      evalTime
+    );
+
+    await distributeCommission(member.userId, onSystem, fee, systemTree, evalTime, undefined, memberMBDT);
+    await confirmMember(member.userId, member.refSysId, onSystem, fee, systemTree, evalTime, memberMBDT);
     await checkAndPromoteLevel(member.userId, onSystem, evalTime);
 
     const memberSys = await prisma.system.findUnique({
@@ -167,18 +190,29 @@ async function executeMethodA(enrollments: any[], systemTree: any, fee: number) 
     const latestEval = getCurrentEvalTime();
     for (const member of due) {
       // Dedup: skip nếu đã xử lý RETURN_FEE rồi (tránh tính trùng points)
+      const returnRefId = `return_fee_sys_4_user_${member.userId}`
       const existingReturn = await prisma.brkTransaction.findFirst({
-        where: { wallet: { userId: member.userId }, type: 'RETURN_FEE' }
+        where: { wallet: { userId: member.userId }, type: 'RETURN_FEE', refId: returnRefId }
       });
       if (existingReturn) continue;
+
+      const memberMBDT = BRKD_PER_ACTIVATION;
 
       await prisma.system.update({
         where: { userId_onSystem: { userId: member.userId, onSystem: 4 } },
         data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
       });
 
-      await distributeCommission(member.userId, 4, fee, systemTree, latestEval);
-      await confirmMember(member.userId, member.refSysId, 4, fee, systemTree, latestEval);
+      await creditBrkdWallet(
+        member.userId,
+        memberMBDT,
+        `Nhận ${memberMBDT.toLocaleString()} BRKD gốc khi kích hoạt`,
+        `brkd_deposit_sys_4_user_${member.userId}`,
+        latestEval
+      );
+
+      await distributeCommission(member.userId, 4, fee, systemTree, latestEval, undefined, memberMBDT);
+      await confirmMember(member.userId, member.refSysId, 4, fee, systemTree, latestEval, memberMBDT);
       await checkAndPromoteLevel(member.userId, 4, latestEval);
 
       const memberSys = await prisma.system.findUnique({

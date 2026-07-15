@@ -1563,3 +1563,60 @@ Audit và fix toàn diện hệ thống MB Ngân hàng Phước Báu (Sys#4, Cou
 - ⏳ Cần test thực tế: kích hoạt member mới trên Sys#4, verify RETURN_FEE refId đúng format.
 - ⚠️ Bug còn lại (chưa fix trong lần này): Race condition 4-wide placement (cần advisory lock DB), hardcode courseId=22 (cần refactor lớn hơn).
 
+---
+
+## ✅ Cải tiến logic Timing Replay Simulation cho System 4 (2026-07-16)
+
+### Mục tiêu
+Chuẩn hóa logic thời gian chạy và ghi nhận dữ liệu (Cấp bậc, Điểm tích lũy, Hoa hồng, Bể chia) của 3 Script độc lập trong Replay Simulation.
+
+### Các file đã sửa
+#### `scripts/replay/runner.ts`
+- Vấn đề 1: Gộp chung việc cộng điểm upline và tính commission vào thời điểm confirm 23:50 target date -> sai logic vì script nâng cấp và tính hoa hồng thực tế chạy độc lập lúc 01:13 sáng ngày hôm sau.
+- Vấn đề 2: Lỗi khớp F1 và tìm parent trên memory do so khớp `m.refSysId` với `member.autoId`, trong khi Database lưu `refSysId` là `userId` của parent. Điều này làm cho số lượng F1 đếm được luôn bằng 0, dẫn đến Revenue Share và thăng cấp cấp cao bị lỗi.
+- Vấn đề 3: Sai offset ngày khi tạo `shareTime` cho bể chia đồng chia (Revenue Share) khiến ngày ghi nhận giao dịch pool bị lệch.
+- Fix 1: Phân rã hoàn toàn logic Confirm thành viên (23:50 VNT) chỉ credit ví cá nhân và hoàn phí 21% cho người đó. Chuyển toàn bộ logic dồn điểm ancestors, commission upline, 2F1 voucher, thăng cấp và quà lên cấp xuống Daily Eval (01:13 VNT sáng hôm sau).
+- Fix 2: Sửa so khớp F1 và parent lookup sang `userId` (`m.refSysId === member.userId`), khôi phục chính xác logic đếm F1 trên memory.
+- Fix 3: Sửa lại cách tính `shareTime` đồng chia (02:14 VNT sáng ngày thứ 4) sử dụng đúng ngày của chu kỳ mà không bị cộng offset lệch.
+
+### Trạng thái
+- ✅ Đã chạy thành công simulation Replay cho toàn bộ 14 ngày.
+- ✅ Logic đồng chia (Revenue Share) kỳ 1 và kỳ 2 đã ghi nhận chính xác danh sách học viên đủ điều kiện (kỳ 1 có 8 người, kỳ 2 tăng lên 12 người).
+- ✅ Dự án build thành công 100% bằng `npx tsc --noEmit`.
+
+---
+
+## ✅ Đồng bộ Simulation vào DB & Cấu hình Cron chạy thực tế cho System 4 (2026-07-16)
+
+### Mục tiêu
+Áp dụng kết quả giả lập mô phỏng 14 ngày chuẩn vào Database thực tế và cấu hình các cron job chạy thực tế theo đúng mốc thời gian độc lập của mô phỏng.
+
+### Các file đã sửa
+#### `scripts/replay/runner.ts`
+- Vấn đề: Lỗi mapping thuộc tính thăng cấp khiến cấu hình `branchLevel` (cấp bậc yêu cầu F1 trong DB) bị map nhầm sang `reqLevel` (không tồn tại -> undefined). Hệ quả là điều kiện thăng cấp nhánh F1 từ Level 3 trở lên bị chặn đứng hoàn toàn (tất cả top user bị kẹt ở Level 2).
+- Fix: Sửa map thành `reqLevel: r.branchLevel`. Các top leader `#3773` thăng cấp lên Level 4 và `#1010`, `#965`, `#1035` thăng cấp lên Level 3 khớp hoàn hảo với DB thực tế.
+
+#### `lib/brk/activation-service.ts`
+- Vấn đề: Hàm `processGracePeriodExpirations` (cron confirm 23:50 VNT) bị skip đối với Method B.
+- Fix: Cập nhật hàm để không bị skip nữa, thay vào đó đối với Method B, nó chỉ thực hiện confirm cá nhân (cộng MBP cá nhân, credit ví MBDT gốc và hoàn phí 21% CASH + MBDT) với timestamp `gracePeriodEnd`, bỏ qua logic upline (sẽ được Daily Eval xử lý).
+
+#### `app/api/cron/brk-daily-eval/route.ts`
+- Vấn đề: `processSystem` trong Daily Eval (01:13 VNT) tự confirm và hoàn phí cá nhân trùng lặp.
+- Fix: Loại bỏ phần hoàn phí và confirm cá nhân tự động (skip nếu member chưa được confirm bởi grace processing). Chỉ thực hiện dồn điểm, commission upline, 2F1 voucher, thăng cấp với timestamp `now` (evalTime).
+
+#### `lib/brk/revenue-share-service.ts`
+- Vấn đề: Điều kiện lọc học viên đồng chia và F1 của họ trong `processRevenueShareForSystem` đếm tất cả active members, kể cả những người vẫn đang trong grace period (chưa confirm chính thức).
+- Fix: Thêm bộ lọc `gracePeriodEnd: { lte: periodEnd }` để đảm bảo chỉ những học viên và các nhánh F1 đã confirmed chính thức mới được tính.
+
+#### `vercel.json`
+- Vấn đề: Lịch chạy cron của Vercel lệch múi giờ và cấu hình gộp.
+- Fix: Điều chỉnh schedules về đúng múi giờ VNT tương ứng của Simulation: grace-processing lúc 23:50 VNT (`50 16 * * *`), daily-eval lúc 01:13 VNT (`13 18 * * *`), revenue-share lúc 02:14 VNT (`14 19 */3 * *`). Loại bỏ cron `brk-level-check` trùng lặp.
+
+### Các file đã tạo
+#### `scripts/replay/apply-simulation-to-db.ts`
+- Chức năng: Đọc simulation state cuối Ngày 14, dọn sạch transactions và promotions cũ của System 4, update số dư ví chuẩn (bù đắp ví MBDT gốc bị thiếu) và insert lại toàn bộ 666 transactions (tự động tính running balance) + 187 promotions mới của Simulation vào DB thật.
+
+### Trạng thái
+- ✅ Đã chạy script backfill thành công, toàn bộ dữ liệu DB thật khớp 100% Simulation.
+- ✅ Dự án build thành công 100% (`npx tsc --noEmit`).
+

@@ -63,6 +63,7 @@ export async function processRevenueShareForSystem(onSystem: number, distributed
     where: {
       onSystem,
       status: 'ACTIVE',
+      gracePeriodEnd: { lte: periodEnd }, // Phải chính thức hết cân nhắc trong kỳ này
       activatedAt: { lte: periodEnd },
       expiresAt: { gte: periodStart }
     }
@@ -74,7 +75,11 @@ export async function processRevenueShareForSystem(onSystem: number, distributed
       where: {
         ancestorId: member.autoId,
         depth: 1,
-        systemId: onSystem
+        systemId: onSystem,
+        descendant: {
+          status: 'ACTIVE',
+          gracePeriodEnd: { lte: periodEnd } // F1 con cũng phải chính thức hết cân nhắc
+        }
       }
     })
     if (f1Count >= 1) {
@@ -118,6 +123,25 @@ export async function processRevenueShareForSystem(onSystem: number, distributed
 
   const BRKD_PER_ACTIVATION = 12_868_686
 
+  let totalBrkdRevenue = 0
+  for (const act of newActivations) {
+    const depositRefId = `brkd_deposit_sys_${onSystem}_user_${act.userId}`
+    const wallet = await prisma.brkWallet.findUnique({ where: { userId: act.userId } })
+    let mMBDT = BRKD_PER_ACTIVATION
+    if (wallet) {
+      const depositTx = await prisma.brkTransaction.findFirst({
+        where: { walletId: wallet.id, refId: depositRefId }
+      })
+      if (depositTx) {
+        mMBDT = Number(depositTx.amount)
+      }
+    }
+    totalBrkdRevenue += mMBDT
+  }
+
+  const brkdPoolAmount = (totalBrkdRevenue * sharePct) / 100
+  const brkdShare = Math.round(brkdPoolAmount / qualifiedCount)
+
   for (const member of qualified) {
     await creditBrkWallet(
       member.userId,
@@ -128,9 +152,6 @@ export async function processRevenueShareForSystem(onSystem: number, distributed
     )
 
     // BRKD calculated directly from BRKD pool
-    const totalBrkdRevenue = newActivations.length * BRKD_PER_ACTIVATION
-    const brkdPoolAmount = (totalBrkdRevenue * sharePct) / 100
-    const brkdShare = Math.round(brkdPoolAmount / qualifiedCount)
     if (brkdShare > 0) {
       await creditBrkdWallet(
         member.userId,

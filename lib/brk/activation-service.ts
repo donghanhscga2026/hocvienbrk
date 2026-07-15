@@ -9,6 +9,17 @@ import { resolvePlacement } from './placement-rules'
 
 const BRKP_PER_ACTIVATION = 17
 const BRKD_PER_ACTIVATION = 12_868_686
+const MBDT_BASE = 12_000_000
+const MBDT_MIN = 12_868_686
+const MBDT_MAX = 15_868_686
+
+function generateMBDT(): number {
+  return Math.floor(Math.random() * (MBDT_MAX - MBDT_MIN + 1)) + MBDT_MIN
+}
+
+function mbdtToMbp(mbdt: number): number {
+  return Math.round((mbdt / MBDT_BASE) * 16 * 1000) / 1000
+}
 
 export async function activateBrkMember(
   userId: number,
@@ -214,9 +225,8 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
 export async function processGracePeriodExpirations() {
   const now = new Date()
 
-  // Skip processing if the system uses Method B (24h cooling-off is handled by brk-daily-eval cron)
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
-  if (promoConfig?.value === 'B') return { processed: 0, reason: 'Method B active, skipping grace processing' }
+  const isOptionB = promoConfig?.value === 'B'
 
   const expiredGrace = await prisma.system.findMany({
     where: {
@@ -252,6 +262,26 @@ export async function processGracePeriodExpirations() {
         if (existingRefund) continue // Đã hoàn phí rồi cho hệ thống này, bỏ qua
       }
 
+      const recordTime = member.gracePeriodEnd
+      const memberMBDT = generateMBDT()
+      const memberMBP = mbdtToMbp(memberMBDT)
+
+      // 1. Credit self points & MBDT gốc
+      await prisma.system.update({
+        where: { userId_onSystem: { userId: member.userId, onSystem: member.onSystem } },
+        data: { totalPoints: { increment: memberMBP } }
+      })
+
+      const depositRefId = `brkd_deposit_sys_${member.onSystem}_user_${member.userId}`
+      await creditBrkdWallet(
+        member.userId,
+        memberMBDT,
+        `Nhận ${memberMBDT.toLocaleString()} MBDT gốc khi kích hoạt sau 1 ngày cân nhắc`,
+        depositRefId,
+        recordTime
+      )
+
+      // 2. Hoàn phí cá nhân (Cash + MBDT)
       const returnAmount = (fee * returnPct) / 100
       if (returnAmount > 0) {
         // Cash refund
@@ -260,21 +290,33 @@ export async function processGracePeriodExpirations() {
           returnAmount,
           'RETURN_FEE',
           `Hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`,
-          returnRefId
+          returnRefId,
+          recordTime
         )
-        // BRKD refund (proportional)
-        const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
+        // MBDT refund
+        const brkdReturn = Math.round((memberMBDT * returnPct) / 100)
         if (brkdReturn > 0) {
           const brkdRefId = `return_brkd_sys_${member.onSystem}_user_${member.userId}`
           await creditBrkdWallet(
             member.userId,
             brkdReturn,
-            `BRKD hoàn ${returnPct}% sau ${memberSystemTree.graceDays} ngày cân nhắc`,
-            brkdRefId
+            `MBDT hoàn ${returnPct}% sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+            brkdRefId,
+            recordTime
           )
         }
-        count++
       }
+
+      // 3. Nếu là Method A, thực hiện ngay commission + level check + 2F1 voucher
+      if (!isOptionB) {
+        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT)
+        await checkAndPromoteLevel(member.userId, member.onSystem, recordTime)
+        if (member.refSysId > 0) {
+          await create2F1Voucher(member.refSysId, member.onSystem, recordTime)
+        }
+      }
+
+      count++
     }
   }
 
