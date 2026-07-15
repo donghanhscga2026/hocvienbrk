@@ -402,9 +402,9 @@ const SearchNodeCard = (props: NodeProps) => {
         <div className="flex items-center justify-between mb-1">
           <div className={`
             text-[10px] font-black px-1.5 py-0.5 rounded-full text-white
-            ${levelColors[data.level || 0]}
+            ${(data.level || 0) > 0 ? levelColors[Math.min(data.level || 0, levelColors.length - 1)] : 'bg-slate-400'}
           `}>
-            F{data.level || 0}
+            {(data.level || 0) > 0 ? `F${data.level}` : 'Mới'}
           </div>
           <div className="font-black text-slate-900 text-xs sm:text-sm">#{data.id}</div>
         </div>
@@ -1611,6 +1611,7 @@ function GenealogyFlow() {
 function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDetailInfo, onClose: () => void, selectedSystem: number | null }) {
   const [showHistory, setShowHistory] = useState(false);
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [historyLevelConfigs, setHistoryLevelConfigs] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
@@ -1619,6 +1620,9 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
       getMemberPromotionHistoryAction(info.userId, selectedSystem).then(res => {
         if (res.success && res.history) {
           setHistoryRecords(res.history);
+        }
+        if (res.levelConfigs) {
+          setHistoryLevelConfigs(res.levelConfigs);
         }
         setLoadingHistory(false);
       });
@@ -1832,14 +1836,26 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 </div>
               ) : (
                 <div className="relative pl-6 border-l border-slate-200 space-y-5">
+                  {/* Hiển thị totalPoints hiện tại để so sánh */}
+                  {systemData?.totalPoints != null && (
+                    <div className="absolute -top-2 -left-6 px-2 py-0.5 bg-slate-800 text-white text-[10px] font-bold rounded-r-md shadow">
+                      Hiện tại: {systemData.totalPoints.toLocaleString('vi')} MP
+                    </div>
+                  )}
                   {(() => {
                     const getLevelDetails = (lvl: number) => {
+                      const cfg = historyLevelConfigs.find((c: any) => c.level === lvl);
+                      if (cfg) return { pct: cfg.pct, gift: cfg.gift };
+                      // Fallback nếu chưa load configs
                       switch (lvl) {
                         case 1: return { pct: '21%', gift: 0 };
-                        case 2: return { pct: '30%', gift: 386000 };
+                        case 2: return { pct: '30%', gift: 500000 };
                         case 3: return { pct: '39%', gift: 1000000 };
                         case 4: return { pct: '52.5%', gift: 2000000 };
                         case 5: return { pct: '64.5%', gift: 4000000 };
+                        case 6: return { pct: '70.5%', gift: 8000000 };
+                        case 7: return { pct: '75%', gift: 16000000 };
+                        case 8: return { pct: '78%', gift: 32000000 };
                         default: return { pct: '21%', gift: 0 };
                       }
                     };

@@ -240,11 +240,11 @@ export default function BrkDashboardPage() {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">{sys.nameSystem}</h3>
                     <p className="text-sm text-gray-500">
-                      F1: {sys.f1Count} | Tổng hạ: {sys.totalDownline} | Điểm: {sys.totalPoints.toFixed(0)} BRKD
+                      F1: {sys.f1Count} | Tổng hạ: {sys.totalDownline} | Điểm: {sys.totalPoints.toFixed(0)} MP
                     </p>
                   </div>
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
-                    Cấp {sys.level}
+                  <span className={`px-3 py-1 text-xs rounded-full font-medium ${sys.level > 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {sys.level > 0 ? `Cấp ${sys.level}` : 'Chờ xét'}
                   </span>
                 </div>
 

@@ -26,36 +26,41 @@ async function creditBalance(
   refId?: string,
   createdAt?: Date
 ) {
-  const wallet = await ensureBrkWallet(userId)
+  await ensureBrkWallet(userId)
   const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : 'balance'
 
-  const oldVal = Number(wallet[field])
-  const newVal = oldVal + amount
+  const [updated] = await prisma.$transaction(async (tx) => {
+    // Read wallet INSIDE transaction to prevent race condition
+    const wallet = await tx.brkWallet.findUnique({ where: { userId } })
+    if (!wallet) throw new Error('Wallet not found')
 
-  const updateData: Record<string, any> = { [field]: newVal }
-  if (balanceType === 'CASH') {
-    updateData.totalEarned = { increment: amount }
-  }
+    const oldVal = Number(wallet[field])
+    const newVal = oldVal + amount
 
-  const [updated] = await prisma.$transaction([
-    prisma.brkWallet.update({
-      where: { userId },
-      data: updateData
-    }),
-    prisma.brkTransaction.create({
-      data: {
-        walletId: wallet.id,
-        amount,
-        type,
-        description,
-        refId,
-        balanceType,
-        balanceBefore: oldVal,
-        balanceAfter: newVal,
-        createdAt,
-      }
-    })
-  ])
+    const updateData: Record<string, any> = { [field]: newVal }
+    if (balanceType === 'CASH') {
+      updateData.totalEarned = { increment: amount }
+    }
+
+    const [updatedWallet] = await Promise.all([
+      tx.brkWallet.update({ where: { userId }, data: updateData }),
+      tx.brkTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount,
+          type,
+          description,
+          refId,
+          balanceType,
+          balanceBefore: oldVal,
+          balanceAfter: newVal,
+          createdAt,
+        }
+      })
+    ])
+
+    return [updatedWallet] as const
+  })
 
   try {
     const { logActivity } = await import('@/lib/activity-logger')
@@ -63,7 +68,7 @@ async function creditBalance(
       userId,
       action: 'WALLET_CHANGE',
       detail: `${balanceType} +${amount.toLocaleString()}đ: ${description}`,
-      metadata: { balanceType, amount, type, oldVal, newVal, refId }
+      metadata: { balanceType, amount, type, refId }
     })
   } catch {}
 
@@ -108,33 +113,41 @@ export async function debitBrkWallet(
   description: string,
   refId?: string
 ) {
-  const wallet = await ensureBrkWallet(userId)
-  if (Number(wallet.balance) < amount) {
-    throw new Error('Số dư BRK wallet không đủ')
-  }
-  const newBalance = Number(wallet.balance) - amount
+  await ensureBrkWallet(userId)
 
-  const [updated] = await prisma.$transaction([
-    prisma.brkWallet.update({
-      where: { userId },
-      data: {
-        balance: newBalance,
-        totalWithdrawn: { increment: amount }
-      }
-    }),
-    prisma.brkTransaction.create({
-      data: {
-        walletId: wallet.id,
-        amount: -amount,
-        type,
-        description,
-        refId,
-        balanceType: 'CASH',
-        balanceBefore: Number(wallet.balance),
-        balanceAfter: newBalance,
-      }
-    })
-  ])
+  const [updated] = await prisma.$transaction(async (tx) => {
+    // Read wallet INSIDE transaction to prevent race condition
+    const wallet = await tx.brkWallet.findUnique({ where: { userId } })
+    if (!wallet) throw new Error('Wallet not found')
+    if (Number(wallet.balance) < amount) {
+      throw new Error('Số dư BRK wallet không đủ')
+    }
+    const newBalance = Number(wallet.balance) - amount
+
+    const [updatedWallet] = await Promise.all([
+      tx.brkWallet.update({
+        where: { userId },
+        data: {
+          balance: newBalance,
+          totalWithdrawn: { increment: amount }
+        }
+      }),
+      tx.brkTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: -amount,
+          type,
+          description,
+          refId,
+          balanceType: 'CASH',
+          balanceBefore: Number(wallet.balance),
+          balanceAfter: newBalance,
+        }
+      })
+    ])
+
+    return [updatedWallet] as const
+  })
 
   try {
     const { logActivity } = await import('@/lib/activity-logger')
@@ -142,7 +155,7 @@ export async function debitBrkWallet(
       userId,
       action: 'WALLET_CHANGE',
       detail: `CASH -${amount.toLocaleString()}đ: ${description}`,
-      metadata: { balanceType: 'CASH', amount: -amount, type, oldVal: Number(wallet.balance), newVal: newBalance, refId }
+      metadata: { balanceType: 'CASH', amount: -amount, type, refId }
     })
   } catch {}
 
