@@ -19,8 +19,14 @@ export async function POST(request: NextRequest) {
       where: { userId, name: "Default" }
     })
     if (!link) {
+      let campaign = await prisma.affiliateCampaign.findFirst({ where: { isDefault: true } })
+      if (!campaign) {
+        campaign = await prisma.affiliateCampaign.create({
+          data: { name: "Default Campaign", slug: "default-campaign", isDefault: true }
+        })
+      }
       link = await prisma.affiliateLink.create({
-        data: { userId, campaignId: 1, code: `default-${userId}`, name: "Default" }
+        data: { userId, campaignId: campaign.id, code: `default-${userId}`, name: "Default" }
       })
     }
 

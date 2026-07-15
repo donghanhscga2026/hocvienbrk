@@ -6,7 +6,7 @@ import { validateBranchRequirements } from './branch-validator'
 import { creditVoucherWallet } from './wallet-service'
 import { isTestAccount } from '@/lib/test-account'
 
-export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date) {
+export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -18,7 +18,7 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
 
   // Multi-level promotion: keep promoting while eligible
   while (currentLevel < 8) {
-    const nextConfig = await getLevelConfig(onSystem, currentLevel + 1)
+    const nextConfig = levelConfigs?.get(currentLevel + 1) ?? await getLevelConfig(onSystem, currentLevel + 1)
     if (!nextConfig) break
 
     if (totalPoints < Number(nextConfig.pointsRequired)) break

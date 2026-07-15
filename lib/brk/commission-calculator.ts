@@ -8,17 +8,24 @@ import { getLevelConfig } from './config-service'
 const BRKP_PER_ACTIVATION = 17
 const BRKD_PER_ACTIVATION = 12_868_686
 
+interface AncestorCredit {
+  uplineSystem: { autoId: number; userId: number; level: number | null }
+  uplineLevel: number
+  earnPct: number
+}
+
 export async function distributeCommission(
   newMemberUserId: number,
   onSystem: number,
   fee: number,
   systemTree: SystemTree,
-  createdAt?: Date
-) {
+  createdAt?: Date,
+  levelConfigs?: Map<number, any>
+): Promise<{ ancestorCredits: AncestorCredit[] }> {
   const newMemberSys = await prisma.system.findUnique({
     where: { userId_onSystem: { userId: newMemberUserId, onSystem } }
   })
-  if (!newMemberSys) return
+  if (!newMemberSys) return { ancestorCredits: [] }
 
   const ancestors = await prisma.systemClosure.findMany({
     where: {
@@ -33,28 +40,31 @@ export async function distributeCommission(
   })
 
   const newMemberLevel = newMemberSys.level || 1
-  const newMemberConfig = await getLevelConfig(onSystem, newMemberLevel)
+  const newMemberConfig = levelConfigs?.get(newMemberLevel) ?? await getLevelConfig(onSystem, newMemberLevel)
   let previousPct = newMemberConfig ? Number(newMemberConfig.personalFeePct) : 0
+
+  const ancestorCredits: AncestorCredit[] = []
 
   for (const closure of ancestors) {
     const uplineSystem = closure.ancestor
     const uplineLevel = uplineSystem.level || 1
-    const config = await getLevelConfig(onSystem, uplineLevel)
-
+    const config = levelConfigs?.get(uplineLevel) ?? await getLevelConfig(onSystem, uplineLevel)
     if (!config) continue
 
     const uplinePct = Number(config.personalFeePct)
     const earnPct = uplinePct - previousPct
     previousPct = Math.max(previousPct, uplinePct)
 
-    // BRKP: 17 to ALL ancestors (full amount, NOT affected by differential)
+    ancestorCredits.push({ uplineSystem, uplineLevel, earnPct })
+  }
+
+  await Promise.all(ancestorCredits.map(async ({ uplineSystem, uplineLevel, earnPct }) => {
     await prisma.system.update({
       where: { autoId: uplineSystem.autoId },
       data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
     })
 
-    // Cash + BRKD: differential (only if earnPct > 0)
-    if (earnPct <= 0) continue
+    if (earnPct <= 0) return
 
     const commissionAmount = (fee * earnPct) / 100
 
@@ -79,5 +89,7 @@ export async function distributeCommission(
         createdAt
       )
     }
-  }
+  }))
+
+  return { ancestorCredits }
 }

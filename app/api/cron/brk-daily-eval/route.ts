@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { distributeCommission } from '@/lib/brk/commission-calculator'
 import { checkAndPromoteLevel, create2F1Voucher } from '@/lib/brk/level-manager'
 import { creditBrkWallet, creditBrkdWallet } from '@/lib/brk/wallet-service'
+import { getAllLevelConfigs } from '@/lib/brk/config-service'
 import type { SystemTree } from '@prisma/client'
 
 const BRKD_PER_ACTIVATION = 12_868_686
@@ -62,69 +63,65 @@ async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) 
     }
   })
 
+  const allConfigs = await getAllLevelConfigs(onSystem)
+  const configMap = new Map(allConfigs.map(c => [c.level, c]))
+
+  const BATCH_SIZE = 5
   let confirmed = 0
-  for (const member of dueMembers) {
-    // Atomic dedup: check RETURN_FEE with specific refId
-    const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
-    const existingReturn = await prisma.brkTransaction.findFirst({
-      where: { refId: returnRefId, type: 'RETURN_FEE' }
-    })
-    if (existingReturn) continue
 
-    // Credit self points (MP) — not awarded until now (previously 0)
-    await prisma.system.update({
-      where: { userId_onSystem: { userId: member.userId, onSystem } },
-      data: { totalPoints: { increment: 17 } }
-    })
+  for (let i = 0; i < dueMembers.length; i += BATCH_SIZE) {
+    const batch = dueMembers.slice(i, i + BATCH_SIZE)
+    const results = await Promise.all(batch.map(async (member) => {
+      const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
+      const existingReturn = await prisma.brkTransaction.findFirst({
+        where: { refId: returnRefId, type: 'RETURN_FEE' }
+      })
+      if (existingReturn) return false
 
-    // Distribute commissions + BRKP to ancestors
-    await distributeCommission(member.userId, onSystem, fee, systemTree, evalTime)
+      await prisma.system.update({
+        where: { userId_onSystem: { userId: member.userId, onSystem } },
+        data: { totalPoints: { increment: 17 } }
+      })
 
-    // Return fee to member (with dedup refId)
-    const returnAmt = (fee * returnPct) / 100
-    if (returnAmt > 0) {
-      await creditBrkWallet(
-        member.userId,
-        returnAmt,
-        'RETURN_FEE',
-        `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`,
-        returnRefId,
-        evalTime
-      )
+      const commissionResult = await distributeCommission(member.userId, onSystem, fee, systemTree, evalTime, configMap)
 
-      const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
-      if (brkdReturn > 0) {
-        const brkdRefId = `return_brkd_sys_${onSystem}_user_${member.userId}`
-        await creditBrkdWallet(
+      const returnAmt = (fee * returnPct) / 100
+      if (returnAmt > 0) {
+        await creditBrkWallet(
           member.userId,
-          brkdReturn,
-          `BRKD hoàn ${returnPct}% sau 1 ngày cân nhắc`,
-          brkdRefId,
+          returnAmt,
+          'RETURN_FEE',
+          `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`,
+          returnRefId,
           evalTime
         )
+
+        const brkdReturn = Math.round((BRKD_PER_ACTIVATION * returnPct) / 100)
+        if (brkdReturn > 0) {
+          const brkdRefId = `return_brkd_sys_${onSystem}_user_${member.userId}`
+          await creditBrkdWallet(
+            member.userId,
+            brkdReturn,
+            `BRKD hoàn ${returnPct}% sau 1 ngày cân nhắc`,
+            brkdRefId,
+            evalTime
+          )
+        }
       }
-    }
 
-    // 2F1 voucher for referrer
-    if (member.refSysId > 0) {
-      await create2F1Voucher(member.refSysId, onSystem, evalTime)
-    }
+      if (member.refSysId > 0) {
+        await create2F1Voucher(member.refSysId, onSystem, evalTime)
+      }
 
-    // Level-up for the confirmed member
-    await checkAndPromoteLevel(member.userId, onSystem, evalTime)
+      await checkAndPromoteLevel(member.userId, onSystem, evalTime, configMap)
 
-    // Level-up for ancestors (their points just increased from commission distribution)
-    const closures = await prisma.systemClosure.findMany({
-      where: { descendantId: member.autoId, depth: { gte: 1 }, systemId: onSystem }
-    })
-    const ancestorSystems = await prisma.system.findMany({
-      where: { autoId: { in: closures.map(c => c.ancestorId) } }
-    })
-    for (const ancestor of ancestorSystems) {
-      await checkAndPromoteLevel(ancestor.userId, onSystem, evalTime)
-    }
+      for (const { uplineSystem } of commissionResult.ancestorCredits) {
+        await checkAndPromoteLevel(uplineSystem.userId, onSystem, evalTime, configMap)
+      }
 
-    confirmed++
+      return true
+    }))
+    confirmed += results.filter(Boolean).length
   }
 
   return { onSystem, checked: dueMembers.length, confirmed }
