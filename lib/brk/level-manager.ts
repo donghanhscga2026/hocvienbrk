@@ -62,7 +62,7 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
 
     // Idempotency: skip voucher if already credited for this level
     if (nextConfig.giftValue > 0) {
-      const refId = `level_${currentLevel}_sys_${onSystem}`
+      const refId = `level_${currentLevel}_sys_${onSystem}_user_${userId}`
       const existingVoucher = await prisma.brkTransaction.findFirst({
         where: { refId, type: 'VOUCHER_CREDIT' }
       })
