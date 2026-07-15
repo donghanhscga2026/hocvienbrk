@@ -1525,3 +1525,41 @@ Sửa các lỗi hệ thống liên quan đến tài khoản admin ID `#0` (`cuo
 - ✅ Đã sửa toàn bộ lỗi liên quan đến tài khoản ID `#0` và email `cuonghamhoc.hn@gmail.com`.
 - ✅ Dự án build thành công với `npx tsc --noEmit` (Exit code: 0).
 - ✅ Đã deploy lên môi trường Production (nhánh master).
+
+---
+
+## ✅ Fix BRK Sys#4 — MB Ngân hàng Phước Báu (2026-07-15)
+
+### Mục tiêu
+Audit và fix toàn diện hệ thống MB Ngân hàng Phước Báu (Sys#4, Course #22): sửa 5 lỗi critical/high gây sai dữ liệu tài chính và hiệu suất thấp.
+
+### Các file đã sửa
+
+#### `app/api/cron/brk-daily-eval/route.ts`
+- Vấn đề: Dedup RETURN_FEE chỉ check `type='RETURN_FEE'` không có `refId` → nếu user join nhiều system thì RETURN_FEE từ system cũ sẽ khiến bỏ qua hoàn phí system mới. Ngoài ra `returnRefId` khai báo SAU dedup check nên check không bao giờ dùng được đúng.
+- Fix: Move `returnRefId` lên trước dedup check; filter `{ type: 'RETURN_FEE', refId: returnRefId }` thay vì chỉ `{ type: 'RETURN_FEE' }`.
+
+#### `lib/brk/activation-service.ts`
+- Vấn đề: `processGracePeriodExpirations` check `{ type: 'RETURN_FEE', balanceType: 'CASH' }` không có filter system → user đã nhận RETURN_FEE từ Sys#1 sẽ bị skip hoàn phí Sys#4. Credit functions cũng không truyền `refId` → không có idempotency tracking.
+- Fix: Thêm `returnRefId = return_fee_sys_{onSystem}_user_{userId}` scope per-system. Truyền `refId` và `brkdRefId` cho cả cash lẫn BRKD credit functions.
+
+#### `lib/brk/rebuild-service.ts`
+- Vấn đề 1: `confirmMember` hardcode 21% thay vì đọc từ `systemTree.returnPct` → sai khi admin thay đổi %.
+- Vấn đề 2: `creditBrkWallet/creditBrkdWallet` không truyền `refId` → không có dedup guard.
+- Vấn đề 3: `executeMethodA` hardcode `new Date(2026, 6, 5)` cho revenue share → sai từ tháng sau.
+- Fix: Đọc `systemTree.returnPct`; thêm `returnRefId` và `brkdRefId`; thay hardcode date bằng `getCurrentEvalTime()`.
+
+#### `lib/system-closure-helpers.ts`
+- Vấn đề: `if (refSysId >= 0)` luôn true với root (refSysId=0) → query thừa `findFirst({ userId: 0 })` cho mỗi root insertion.
+- Fix: Đổi thành `if (refSysId > 0)` để skip query với root user.
+
+#### `app/actions/brk-actions.ts`
+- Vấn đề: `getBrkDashboard` dùng sequential `await` trong `for-loop` → N+1 queries (3 queries/system + 2 đầu) gây dashboard load 1-3s khi user có nhiều system.
+- Fix: Thay bằng `Promise.all` batch — wallet+systems fetch đồng thời, sau đó f1Count+totalDownline+levelProgress chạy concurrently per system.
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` → Exit code: 0 (không lỗi TypeScript).
+- ✅ Git commit: `fix(brk-sys4): 5 critical/high fixes for MB Ngan hang Phuoc Bau Sys#4`.
+- ⏳ Cần test thực tế: kích hoạt member mới trên Sys#4, verify RETURN_FEE refId đúng format.
+- ⚠️ Bug còn lại (chưa fix trong lần này): Race condition 4-wide placement (cần advisory lock DB), hardcode courseId=22 (cần refactor lớn hơn).
+
