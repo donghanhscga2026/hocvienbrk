@@ -313,6 +313,9 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 #### Nút Back & Route site profile (4 file)
 - Sửa các liên kết quay lại trong tab `site-profiles` và edit page từ đường dẫn lỗi 404 về đúng trang `/tools/pages?tab=site-profiles`.
 
+#### `app/tools/genealogy/page.tsx`
+- Loại bỏ hoàn toàn khối 2 tab ở Header đầu trang. Chuyển giao diện Quản trị hệ thống (`GenealogyAdminTab`) thành một popup Modal (max-w-4xl) mở ra khi click vào nút "⚙️ Quản trị" mới trên thanh công cụ điều khiển (toolbar) bên cạnh Dropdown chọn hệ thống (chỉ hiển thị cho ADMIN).
+
 ### Dọn dẹp dữ liệu (Database Cleanup)
 - Chạy script `scripts/fix-duplicate-return-fee-final.js --execute` quét động và xử lý:
   - Cập nhật số dư thực tế khớp với giao dịch cho **41 ví** bị lệch (tài khoản `#269` về đúng CASH `5,642.28đ`).
@@ -327,6 +330,7 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 | `fix-duplicate-return-fee-final.backup_20260715_1933.js` | `scripts/fix-duplicate-return-fee-final.js` |
 | `vercel.backup_20260715_1941.json` | `vercel.json` |
 | `route.backup_20260715_1941.ts` | `app/api/cron/brk-daily-eval/route.ts` |
+| `page.backup_20260715_1952.tsx` | `app/tools/genealogy/page.tsx` |
 
 ### Kiểm tra
 - ✅ Script chạy thành công, đưa toàn bộ lỗi dữ liệu của 83 thành viên về 0.

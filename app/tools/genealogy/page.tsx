@@ -425,6 +425,7 @@ function GenealogyFlow() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showAdminModal, setShowAdminModal] = useState(false)
 
   const [fullTree, setFullTree] = useState<GenealogyNode | null>(null)
   // v8.4.0: State cho filter Active
@@ -1170,6 +1171,18 @@ function GenealogyFlow() {
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>
 
+          {/* Nút Quản trị (chỉ hiện cho ADMIN) */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowAdminModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 text-yellow-400 border border-slate-800 text-[11px] font-black hover:bg-black transition-all shrink-0 shadow-md"
+              title="Quản trị hệ thống"
+            >
+              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+              <span className="uppercase">Quản trị</span>
+            </button>
+          )}
+
           {/* Nút Quay về (chỉ hiện khi đang ở Focus Subtree Mode) */}
           {focusedSubtreeNode && (
             <button
@@ -1456,6 +1469,24 @@ function GenealogyFlow() {
           onAddChild={(parentId) => setAddF1Modal({ parentId, show: true })}
           onDeleteNode={(nodeId) => setDeleteNodeModal({ nodeId, show: true })}
         />
+      )}
+
+      {/* Popup Modal Quản trị hệ thống (Chỉ hiện cho ADMIN) */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl p-6 max-h-[90vh] flex flex-col relative">
+            <button
+              onClick={() => setShowAdminModal(false)}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all z-10"
+              title="Đóng"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+              <GenealogyAdminTab />
+            </div>
+          </div>
+        </div>
       )}
 
       <style jsx global>{`
@@ -2083,32 +2114,8 @@ function WalletItem({ icon, label, value, valueClassName }: { icon: any, label: 
 }
 
 export default function GenealogyPage() {
-  const [pageTab, setPageTab] = useState<'genealogy' | 'admin'>('genealogy')
-
-  if (pageTab === 'admin') return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex items-center gap-1 px-4 py-3 bg-white border-b border-gray-100">
-        <button onClick={() => setPageTab('genealogy')} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
-          🌳 Nhân Mạch
-        </button>
-        <button onClick={() => setPageTab('admin')} className="px-4 py-2 rounded-xl text-xs font-bold bg-black text-yellow-400 shadow-sm transition-all">
-          ⚙️ Quản trị
-        </button>
-      </div>
-      <GenealogyAdminTab />
-    </div>
-  )
-
   return (
     <ReactFlowProvider>
-      <div className="flex items-center gap-1 px-4 py-3 bg-white border-b border-gray-100 z-10 relative">
-        <button onClick={() => setPageTab('genealogy')} className="px-4 py-2 rounded-xl text-xs font-bold bg-black text-yellow-400 shadow-sm transition-all">
-          🌳 Nhân Mạch
-        </button>
-        <button onClick={() => setPageTab('admin')} className="px-4 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all">
-          ⚙️ Quản trị
-        </button>
-      </div>
       <GenealogyFlow />
     </ReactFlowProvider>
   )
