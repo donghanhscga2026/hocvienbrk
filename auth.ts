@@ -54,6 +54,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     trustHost: true,
     adapter: customAdapter as any, 
     session: { strategy: "jwt" },
+    logger: {
+        error(error: Error) {
+            if (error.name === "CredentialsSignin" || error.message?.includes("CredentialsSignin")) {
+                // Chỉ ghi cảnh báo ngắn gọn cho lỗi gõ sai mật khẩu của học viên, ẩn stack trace
+                console.warn(`⚠️ [Auth] CredentialsSignin: Đăng nhập thất bại (Sai mật khẩu hoặc thông tin).`);
+                return;
+            }
+            console.error(error);
+        }
+    },
     providers: [
         // DISABLED: Google Auth
         // Google({

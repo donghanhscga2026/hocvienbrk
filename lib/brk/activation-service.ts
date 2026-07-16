@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { ensureBrkWallet, creditBrkWallet, creditBrkdWallet, creditVoucherWallet } from './wallet-service'
+import { ensureBrkWallet, creditBrkWallet, creditBrkdWallet, creditVoucherWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
 import { distributeCommission } from './commission-calculator'
 import { checkAndPromoteLevel, create2F1Voucher } from './level-manager'
@@ -11,7 +11,7 @@ const BRKP_PER_ACTIVATION = 17
 const BRKD_PER_ACTIVATION = 12_868_686
 const MBDT_BASE = 12_000_000
 const MBDT_MIN = 12_868_686
-const MBDT_MAX = 15_868_686
+const MBDT_MAX = 14_686_868
 
 function generateMBDT(): number {
   return Math.floor(Math.random() * (MBDT_MAX - MBDT_MIN + 1)) + MBDT_MIN
@@ -83,9 +83,90 @@ export async function activateBrkMember(
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
   if (isOptionB) {
-    // System record + wallet created. Self points = 0 (not yet confirmed).
-    // After gracePeriodEnd passes, brk-daily-eval cron will credit self points + 17,
-    // distribute ancestor commissions/points, return fee, 2F1 voucher, and level-up.
+    // 1. Ghi nhận giao dịch JOIN cho chính học viên đó
+    const joinDesc = await makeSystemSnapshotDescription(
+      userId,
+      onSystem,
+      'JOIN',
+      'Tham gia hệ thống',
+      'Bắt đầu tham gia hệ thống, đang trong thời gian cân nhắc, cấp 0.',
+      { mBdtVolume: 0, cashVolume: 0 }
+    )
+    await creditBrkdWallet(
+      userId,
+      0,
+      joinDesc,
+      `sys_${onSystem}_user_${userId}_join`,
+      now
+    )
+
+    await createBrkTimelineRecord({
+      userId,
+      onSystem,
+      type: 'ACTIVATION',
+      time: now,
+      title: 'Đã kích hoạt hệ thống',
+      description: `Đang trong thời gian ${graceDays * 24}h cân nhắc, Cấp 0.`,
+      fromLevel: undefined,
+      toLevel: 0
+    })
+
+    // 2. Ghi nhận log active (F1_ACTIVE / F2_ACTIVE) cho ancestors (depth 1 và 2)
+    const userAncestors = await prisma.systemClosure.findMany({
+      where: { descendantId: system.autoId, depth: { gte: 1, lte: 2 }, systemId: onSystem },
+      orderBy: { depth: 'asc' },
+      include: { ancestor: true }
+    })
+
+    const parentClosure = userAncestors.find(c => c.depth === 1)
+    const parentSys = parentClosure ? await prisma.system.findUnique({
+      where: { autoId: parentClosure.ancestorId },
+      include: { user: true }
+    }) : null
+
+    for (const closure of userAncestors) {
+      const ancestorSys = closure.ancestor
+      let descText = ""
+      if (closure.depth === 1) {
+        descText = `Học viên mới F1 #${userId} ${user.name || 'N/A'} đăng ký tham gia (Đang cân nhắc)`
+      } else if (closure.depth === 2 && parentSys) {
+        descText = `Học viên mới F2 #${userId} ${user.name || 'N/A'} đăng ký tham gia (Đang cân nhắc) dưới leader F1 #${parentSys.userId} ${parentSys.user?.name || 'N/A'}`
+      }
+
+      const activeLogDesc = await makeSystemSnapshotDescription(
+        ancestorSys.userId,
+        onSystem,
+        closure.depth === 1 ? 'F1_ACTIVE' : 'F2_ACTIVE',
+        'Học viên mới đăng ký',
+        descText,
+        {
+          newMemberId: userId,
+          newMemberName: user.name,
+          depth: closure.depth
+        }
+      )
+
+      await creditBrkdWallet(
+        ancestorSys.userId,
+        0,
+        activeLogDesc,
+        `sys_${onSystem}_user_${ancestorSys.userId}_under_${userId}_active`,
+        now
+      )
+
+      await createBrkTimelineRecord({
+        userId: ancestorSys.userId,
+        onSystem,
+        type: 'TRANSACTION',
+        time: now,
+        title: 'Học viên mới đăng ký',
+        description: descText,
+        targetMemberId: userId,
+        targetMemberName: user.name ?? undefined,
+        txType: 'ADJUSTMENT'
+      })
+    }
+
     return system
   }
 
@@ -266,38 +347,82 @@ export async function processGracePeriodExpirations() {
       const memberMBDT = generateMBDT()
       const memberMBP = mbdtToMbp(memberMBDT)
 
-      // 1. Credit self points & MBDT gốc
+      // 1. Credit self points & thăng lên Cấp 1
       await prisma.system.update({
         where: { userId_onSystem: { userId: member.userId, onSystem: member.onSystem } },
-        data: { totalPoints: { increment: memberMBP } }
+        data: {
+          totalPoints: { increment: memberMBP },
+          level: 1
+        }
       })
 
-      // No self MBDT credit, only point updates (memberMBDT is used only as reference for refunds & commissions)
+      // Tạo level up record 0 -> 1
+      await prisma.brkLevelUpRecord.create({
+        data: {
+          userId: member.userId,
+          onSystem: member.onSystem,
+          fromLevel: 0,
+          toLevel: 1,
+          promotedAt: recordTime
+        }
+      })
 
       // 2. Hoàn phí cá nhân (Cash + MBDT)
       const returnAmount = (fee * returnPct) / 100
+      const brkdReturn = Math.round((memberMBDT * returnPct) / 100)
       if (returnAmount > 0) {
-        // Cash refund
+        // Cash refund snapshot description
+        const cashDesc = await makeSystemSnapshotDescription(
+          member.userId,
+          member.onSystem,
+          'RETURN_FEE_CASH',
+          'Chính thức tham gia',
+          `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+          { cashVolume: fee, mBdtVolume: memberMBDT },
+          { cash: returnAmount, brkd: brkdReturn }
+        )
         await creditBrkWallet(
           member.userId,
           returnAmount,
           'RETURN_FEE',
-          `Hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+          cashDesc,
           returnRefId,
           recordTime
         )
-        // MBDT refund
-        const brkdReturn = Math.round((memberMBDT * returnPct) / 100)
+        // MBDT refund snapshot description (includes thăng cấp 1)
         if (brkdReturn > 0) {
           const brkdRefId = `return_brkd_sys_${member.onSystem}_user_${member.userId}`
+          const brkdDesc = await makeSystemSnapshotDescription(
+            member.userId,
+            member.onSystem,
+            'RETURN_FEE',
+            'Chính thức tham gia',
+            `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
+            { cashVolume: fee, mBdtVolume: memberMBDT },
+            { cash: returnAmount, brkd: brkdReturn }
+          )
           await creditBrkdWallet(
             member.userId,
             brkdReturn,
-            `MBDT hoàn ${returnPct}% sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+            brkdDesc,
             brkdRefId,
             recordTime
           )
         }
+
+        await createBrkTimelineRecord({
+          userId: member.userId,
+          onSystem: member.onSystem,
+          type: 'TRANSACTION',
+          time: recordTime,
+          title: 'Chính thức tham gia',
+          description: `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
+          amountCash: returnAmount,
+          amountBrkd: brkdReturn,
+          txType: 'RETURN_FEE',
+          fromLevel: 0,
+          toLevel: 1
+        })
       }
 
       // 3. Nếu là Method A, thực hiện ngay commission + level check + 2F1 voucher

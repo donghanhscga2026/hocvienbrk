@@ -82,7 +82,7 @@ async function getSystemRootUser(systemId: number): Promise<{ id: number; name: 
                 if (user) return user
             }
         }
-        
+
         // Fallback: nếu không tìm thấy node nào thỏa mãn, lấy node đầu tiên
         const user = await prisma.user.findUnique({
             where: { id: potentialRoots[0].userId },
@@ -98,14 +98,14 @@ export async function getSystemRootUserAction(systemId: number) {
 
 // Hàm xây dựng cây chuẩn dùng chung cho cả Học viên và Hệ thống
 async function buildStandardTree(
-    rootId: number, 
+    rootId: number,
     type: 'USER' | 'SYSTEM',
     systemId?: number,
     forceFull: boolean = false
 ): Promise<GenealogyNode | null> {
     try {
         const isSystem = type === 'SYSTEM'
-        
+
         // 1. Lấy thông tin Root
         const rootUser = await prisma.user.findUnique({
             where: { id: rootId },
@@ -125,7 +125,7 @@ async function buildStandardTree(
         let f1Data: any[] = []
         if (isSystem) {
             f1Data = await prisma.system.findMany({
-                where: { 
+                where: {
                     refSysId: rootId,  // Tìm theo userId của parent
                     onSystem: systemId,
                     userId: { not: rootId }
@@ -134,7 +134,7 @@ async function buildStandardTree(
             })
         } else {
             const users = await prisma.user.findMany({
-                where: { 
+                where: {
                     referrerId: rootId,
                     id: { not: rootId }
                 },
@@ -212,13 +212,13 @@ async function buildStandardTree(
             const desc = isSystem ? c.descendant.user : c.descendant
             if (desc?.id) allUserIds.add(desc.id)
         }
-        
+
         const tcaMemberMap = new Map<number, any>()
         let tcaMembers: any[] = []
 
-        if (isSystem && systemId === 1) { 
+        if (isSystem && systemId === 1) {
             tcaMembers = await prisma.tCAMember.findMany({
-                where: { 
+                where: {
                     OR: [
                         { userId: { in: [...allUserIds] } },
                         { tcaId: { in: [...allUserIds] } }
@@ -230,7 +230,7 @@ async function buildStandardTree(
             for (const m of tcaMembers) {
                 const newPersonalScore = m.personalScore != null ? Number(m.personalScore) : null
                 const newTotalScore = m.totalScore != null ? Number(m.totalScore) : null
-                
+
                 const existing = tcaMemberMap.get(m.userId)
                 if (!existing || (newPersonalScore && newPersonalScore > (existing.personalScore ?? 0))) {
                     tcaMemberMap.set(m.userId, {
@@ -242,7 +242,7 @@ async function buildStandardTree(
                         chucDanh: (m as any).chuc_danh ?? null
                     })
                 }
-                
+
                 if (m.tcaId && m.tcaId !== m.userId) {
                     const existingTcaId = tcaMemberMap.get(m.tcaId)
                     if (!existingTcaId || (newPersonalScore && newPersonalScore > (existingTcaId.personalScore ?? 0))) {
@@ -265,7 +265,7 @@ async function buildStandardTree(
             if (!closureByAncestor.has(c.ancestorId)) closureByAncestor.set(c.ancestorId, [])
             const user = getUserFromRow(c)
             if (!user) continue
-            
+
             closureByAncestor.get(c.ancestorId)!.push({
                 depth: c.depth,
                 userId: user.id,
@@ -287,10 +287,10 @@ async function buildStandardTree(
             const closures = closureByAncestor.get(f1.autoId) || []
             const hasF2 = closures.some(c => c.depth === 1)
             const hasF3 = closures.some(c => c.depth === 2)
-            
+
             const f2s = closures.filter(c => c.depth === 1).map(c => {
                 const f2tca = tcaMemberMap.get(c.userId) ?? tcaMemberMap.get(c.autoId)
-                return { 
+                return {
                     id: c.userId, name: c.name, image: c.image,
                     level: f2tca?.level ?? c.level ?? null,
                     personalScore: f2tca?.personalScore ?? (isSystem ? 17 : null),
@@ -302,7 +302,7 @@ async function buildStandardTree(
             })
 
             const f1tca = tcaMemberMap.get(user.id) ?? tcaMemberMap.get(f1.autoId)
-            const fData = { 
+            const fData = {
                 id: user.id, name: user.name, image: user.image, totalSubCount: closures.length, children: f2s,
                 level: f1tca?.level ?? (isSystem ? f1.level : null),
                 personalScore: f1tca?.personalScore ?? (isSystem ? 17 : null),
@@ -382,15 +382,15 @@ async function buildStandardTree(
             if (!f1Record) return null as any
             const f1Closures = closureByAncestor.get(f1Record.autoId) || []
             const f2s = f1Closures.filter(c => c.depth === 1)
-                const f2Subtrees = f2s.map(f2 => {
-                    const grandchildren = buildFullSubtree(f2.autoId, 5)
-                    const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
-                    return {
-                        id: f2.userId, name: f2.name, image: f2.image, referrerId: null,
-                        totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
-                        f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
-                        groupA: [], groupB: [], children: grandchildren,
-                        level: f2tca?.level ?? f2.level ?? null,
+            const f2Subtrees = f2s.map(f2 => {
+                const grandchildren = buildFullSubtree(f2.autoId, 5)
+                const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
+                return {
+                    id: f2.userId, name: f2.name, image: f2.image, referrerId: null,
+                    totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
+                    f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
+                    groupA: [], groupB: [], children: grandchildren,
+                    level: f2tca?.level ?? f2.level ?? null,
                     personalScore: f2tca?.personalScore ?? (isSystem ? 17 : null),
                     totalScore: f2tca?.totalScore ?? (f2 as any).totalPoints ?? null,
                     groupName: f2tca?.groupName ?? null,
@@ -445,7 +445,7 @@ async function buildStandardTree(
             isRoot: true, seq: 0,
             level: rootTca?.level ?? (isSystem ? rootSys?.level : null) ?? null, personalScore: rootTca?.personalScore ?? (isSystem ? 17 : null), totalScore: rootTca?.totalScore ?? (isSystem ? Number(rootSys?.totalPoints) : null) ?? null,
             tcaName: rootTca?.name ?? null, groupName: rootTca?.groupName ?? null, chucDanh: rootTca?.chucDanh ?? null,
-            stats: statsData 
+            stats: statsData
         }
     } catch (e) {
         console.error("[DB ERROR] buildStandardTree:", e)
@@ -483,7 +483,7 @@ export async function getSystemTreeAction(systemId: number, forceFull: boolean =
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
         const userId = parseInt(session.user.id); const isAdmin = session.user.role === Role.ADMIN
         const isRootAdmin = userId === 0 || isAdmin
-        let rootUserId = userId 
+        let rootUserId = userId
 
         const userTca = await prisma.tCAMember.findFirst({
             where: { userId },
@@ -491,7 +491,7 @@ export async function getSystemTreeAction(systemId: number, forceFull: boolean =
         })
         const isC5 = userTca?.chuc_danh === 'C5'
         const isYtbAdmin = systemId === 3 && (userId === 327 || userId === 330)
-        
+
         const systemInfo = await getUserSystemInfo(userId)
         if (!systemInfo || systemInfo.onSystem !== systemId || isC5 || isRootAdmin || isYtbAdmin) {
             if (isRootAdmin || isC5 || isYtbAdmin) {
@@ -502,7 +502,7 @@ export async function getSystemTreeAction(systemId: number, forceFull: boolean =
                 return { success: false, error: "Bạn chưa tham gia hệ thống này" }
             }
         }
-        
+
         const tree = await buildStandardTree(rootUserId, 'SYSTEM', systemId, forceFull)
         return { success: true, tree }
     } catch (error: any) { return { success: false, error: error.message } }
@@ -521,7 +521,7 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
         const isSystem = systemId !== undefined
         let targetAutoId: number | null = null
-        
+
         if (isSystem) {
             const system = await prisma.system.findFirst({ where: { userId: targetId, onSystem: systemId } })
             if (!system) return { success: false, error: `Không tìm thấy mã #${targetId} trong hệ thống này` }
@@ -537,12 +537,12 @@ export async function searchGenealogyByIdAction(targetId: number, systemId?: num
                 where: { systemId, descendantId: targetAutoId! },
                 orderBy: { depth: 'desc' },
                 include: { ancestor: { include: { user: { select: { id: true, name: true, image: true } } } } }
-              })
+            })
             : await prisma.userClosure.findMany({
                 where: { descendantId: targetId },
                 orderBy: { depth: 'desc' },
                 include: { ancestor: { select: { id: true, name: true, image: true, referrerId: true } } }
-              })
+            })
 
         if (!ancestors || ancestors.length === 0) return { success: false, error: `Không tìm thấy đường dẫn cho mã #${targetId}` }
 
@@ -725,12 +725,12 @@ export async function getCurrentUserRoleAction(systemId?: number) {
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false, role: null }
-        
+
         const userId = parseInt(session.user.id)
         const role = session.user.role
         const isSuperAdmin = userId === 0
         const isAdminRole = role === Role.ADMIN
-        
+
         let isActualSystemRoot = false
         let isC5 = false
 
@@ -738,7 +738,7 @@ export async function getCurrentUserRoleAction(systemId?: number) {
             // Check if is the real root of this system (refSysId = 0)
             const root = await getSystemRootUser(systemId)
             if (root && root.id === userId) isActualSystemRoot = true
-            
+
             // Check if is C5 in TCA
             if (systemId === 1) {
                 const tca = await prisma.tCAMember.findFirst({
@@ -754,9 +754,9 @@ export async function getCurrentUserRoleAction(systemId?: number) {
             }
         }
 
-        return { 
-            success: true, 
-            role: isSuperAdmin ? Role.ADMIN : role, 
+        return {
+            success: true,
+            role: isSuperAdmin ? Role.ADMIN : role,
             userId,
             // CHỈ ẨN CHECKBOX NẾU LÀ ADMIN TỐI CAO HOẶC ROOT THỰC SỰ CỦA HỆ THỐNG ĐÓ
             isRoot: isSuperAdmin || isActualSystemRoot,
@@ -769,28 +769,28 @@ export async function getCurrentUserRoleAction(systemId?: number) {
 export async function getMemberDetailsAction(userId: number, systemId?: number) {
     try {
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-        const user = await prisma.user.findUnique({ 
-            where: { id: userId }, 
-            select: { 
-                id: true, 
-                name: true, 
-                email: true, 
-                phone: true, 
-                createdAt: true, 
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true,
+                createdAt: true,
                 image: true,
                 referrerId: true,
                 referrer: { select: { id: true, name: true } }
-            } 
+            }
         })
 
         // Lấy thông tin enrollment chung cho cả 2 hệ thống
-        const enrollment = await prisma.enrollment.findFirst({ 
-            where: { userId, courseId: 22 }, 
-            select: { 
+        const enrollment = await prisma.enrollment.findFirst({
+            where: { userId, courseId: 22 },
+            select: {
                 updatedAt: true,
                 referrerId: true,
                 referrer: { select: { id: true, name: true } }
-            } 
+            }
         })
 
         // TCA system — keep existing logic
@@ -807,18 +807,16 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         const rootSys = await prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } })
         const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true, fee: true } })
         const seq = rootSys && sysRec ? sysRec.autoId - rootSys.autoId : null
-        // Doanh số đội nhóm = tổng BRKD của member + downline (dùng closure table)
-        const descendantClosures = sysRec ? await prisma.systemClosure.findMany({ where: { ancestorId: sysRec.autoId, systemId } }) : []
-        const descendantIds = descendantClosures.map(c => c.descendantId)
-        const teamMembers = descendantIds.length > 0 ? await prisma.system.findMany({ where: { autoId: { in: descendantIds } }, select: { userId: true, status: true } }) : []
-        const teamUserIds = teamMembers.map(m => m.userId)
-        const teamWallets = teamUserIds.length > 0 ? await prisma.brkWallet.findMany({ where: { userId: { in: teamUserIds } }, select: { brkd: true } }) : []
-        const teamTotalBrkd = teamWallets.reduce((sum, w) => sum + Number(w.brkd), 0)
+        // Lấy timeline record mới nhất để lấy doanh số dồn đồng bộ 100%
+        const latestTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
+            where: { userId, onSystem: systemId },
+            orderBy: { id: 'desc' }
+        }) : null
 
-        // Doanh số đội nhóm VNĐ = tổng số thành viên ACTIVE trong đội nhóm (bao gồm cả bản thân) * fee
-        const activeTeamMembers = teamMembers.filter(m => m.status === 'ACTIVE')
-        const systemFee = systemTree?.fee ? Number(systemTree.fee) : 0
-        const teamTotalVnd = activeTeamMembers.length * systemFee
+        const teamTotalBrkd = latestTimeline ? Number(latestTimeline.accumulatedBrkdVolume) : 0
+        const teamTotalVnd = latestTimeline ? Number(latestTimeline.accumulatedCashVolume) : 0
+
+        const descendantClosures = sysRec ? await prisma.systemClosure.findMany({ where: { ancestorId: sysRec.autoId, systemId } }) : []
 
         const latestLevelUp = sysRec ? await prisma.brkLevelUpRecord.findFirst({ where: { userId, onSystem: systemId }, orderBy: { promotedAt: 'desc' }, select: { promotedAt: true } }) : null
 
@@ -886,7 +884,7 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
 export async function getReservedIds() {
     await checkAdmin()
     return await prisma.reservedId.findMany({
-orderBy: { id: 'desc' }
+        orderBy: { id: 'desc' }
     })
 }
 
@@ -937,27 +935,27 @@ export async function createSystemRootAction(systemId: number, userId: number) {
             where: { onSystem: systemId, refSysId: 0 }
         })
         if (existingRoot) return { success: false, error: "Hệ thống đã có Root" }
-        
+
         // Create new root record in system table
         const newSystemRoot = await prisma.system.create({
             data: { onSystem: systemId, userId, refSysId: 0 }
         })
-        
+
         // Add root node to system_closure (self-relation at depth 0)
         await prisma.systemClosure.create({
-            data: { 
-                systemId, 
-                ancestorId: newSystemRoot.autoId, 
-                descendantId: newSystemRoot.autoId, 
-                depth: 0 
+            data: {
+                systemId,
+                ancestorId: newSystemRoot.autoId,
+                descendantId: newSystemRoot.autoId,
+                depth: 0
             }
         })
-        
+
         revalidatePath("/tools/genealogy")
         return { success: true }
-    } catch (e: any) { 
+    } catch (e: any) {
         console.error("[createSystemRootAction] Error:", e)
-        return { success: false, error: e.message || 'Lỗi khi tạo root' } 
+        return { success: false, error: e.message || 'Lỗi khi tạo root' }
     }
 }
 
@@ -991,19 +989,19 @@ export async function updateCourseAction(courseId: number, data: {
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
     const userId = parseInt(session.user.id)
-    
+
     try {
         // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
-        const course = await prisma.course.findUnique({ 
+        const course = await prisma.course.findUnique({
             where: { id: courseId },
             select: { teacherId: true }
         })
-        
+
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
-        
+
         // ✅ Quyền sửa: ADMIN hoặc chính TEACHER sở hữu khóa học
         const isTeacherOwner = session.user.role === Role.TEACHER && course.teacherId === userId
         if (!isAdmin && !isTeacherOwner) {
@@ -1100,7 +1098,7 @@ export async function updateLessonAction(lessonId: string, data: {
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
     const userId = parseInt(session.user.id)
 
@@ -1109,9 +1107,9 @@ export async function updateLessonAction(lessonId: string, data: {
             where: { id: lessonId },
             include: { course: { select: { teacherId: true, id_khoa: true } } }
         })
-        
+
         if (!lesson) return { success: false, error: "Không tìm thấy bài học" }
-        
+
         // ✅ TEACHER chỉ được sửa bài học của khóa học mình dạy
         if (!isAdmin && lesson.course.teacherId !== userId) {
             return { success: false, error: "Bạn không có quyền sửa bài học này" }
@@ -1135,7 +1133,7 @@ export async function updateLessonAction(lessonId: string, data: {
 export async function deleteLessonAction(lessonId: string) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-    
+
     const isAdmin = session.user.role === Role.ADMIN
     const userId = parseInt(session.user.id)
 
@@ -1144,9 +1142,9 @@ export async function deleteLessonAction(lessonId: string) {
             where: { id: lessonId },
             include: { course: { select: { teacherId: true, id_khoa: true } } }
         })
-        
+
         if (!lesson) return { success: false, error: "Không tìm thấy bài học" }
-        
+
         // ✅ TEACHER chỉ được xóa bài học của khóa học mình dạy
         if (!isAdmin && lesson.course.teacherId !== userId) {
             return { success: false, error: "Bạn không có quyền xóa bài học này" }
@@ -1155,7 +1153,7 @@ export async function deleteLessonAction(lessonId: string) {
         await prisma.lesson.delete({
             where: { id: lessonId }
         })
-        
+
         if (lesson.course.id_khoa) {
             revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
         }
@@ -1358,7 +1356,7 @@ export async function previewDeleteUsersAction(condition: UserDeleteCondition) {
     try {
         await checkAdmin()
         const userWhere = await buildUserDeleteWhere(condition)
-        
+
         const users = await prisma.user.findMany({ where: userWhere, select: { id: true, name: true, email: true, phone: true } })
         if (users.length === 0) return { success: false, error: "Không tìm thấy user nào thỏa mãn điều kiện" }
 
@@ -1438,7 +1436,7 @@ export async function bulkDeleteUsersAction(condition: UserDeleteCondition) {
     try {
         await checkAdmin()
         const userWhere = await buildUserDeleteWhere(condition)
-        
+
         const users = await prisma.user.findMany({ where: userWhere, select: { id: true } })
         if (users.length === 0) return { success: false, error: "Không tìm thấy user" }
 
@@ -1555,19 +1553,19 @@ async function getPathFromAncestorToDescendant(ancestorId: number, descendantId:
     const path: { userId: number; name: string }[] = [];
     let currentId = descendantId;
     let depth = 0;
-    
+
     while (currentId !== ancestorId && depth < 20) {
         const node = await prisma.system.findUnique({
             where: { userId_onSystem: { userId: currentId, onSystem: systemId } },
             select: { refSysId: true }
         });
         if (!node || node.refSysId === 0 || node.refSysId === ancestorId) break;
-        
+
         const parentUser = await prisma.user.findUnique({
             where: { id: node.refSysId },
             select: { name: true }
         });
-        
+
         path.push({
             userId: node.refSysId,
             name: parentUser?.name || 'Unknown'
@@ -1580,233 +1578,38 @@ async function getPathFromAncestorToDescendant(ancestorId: number, descendantId:
 
 export async function getMemberPromotionHistoryAction(userId: number, systemId: number) {
     try {
-        const events: any[] = []
-
-        // 1. Lấy thông tin kích hoạt hệ thống của thành viên
-        const sysNode = await prisma.system.findFirst({
-            where: { userId, onSystem: systemId }
-        })
-        if (sysNode && sysNode.activatedAt) {
-            events.push({
-                type: 'ACTIVATION',
-                time: sysNode.activatedAt,
-                title: 'Kích hoạt hệ thống thành công',
-                description: `Bắt đầu tham gia hệ thống BRK tại Cấp 1.`,
-                details: { toLevel: 1 }
-            })
-        }
-
-        // 2. Lấy các mốc thăng cấp
-        const levelRecords = await prisma.brkLevelUpRecord.findMany({
+        // Lấy toàn bộ timeline records của học viên từ CSDL
+        const records = await prisma.brkTimelineRecord.findMany({
             where: { userId, onSystem: systemId },
-            orderBy: { promotedAt: 'asc' }
+            orderBy: { time: 'asc' }
         })
-        for (const rec of levelRecords) {
-            events.push({
-                type: 'LEVEL_UP',
-                time: rec.promotedAt,
-                title: 'Thăng cấp bậc mới',
-                description: `Thăng cấp từ Cấp ${rec.fromLevel} lên Cấp ${rec.toLevel}`,
-                details: { fromLevel: rec.fromLevel, toLevel: rec.toLevel }
-            })
-        }
 
-        // 3. Lấy tất cả biến động dòng tiền (Giao dịch ví)
-        const wallet = await prisma.brkWallet.findUnique({
-            where: { userId }
-        })
-        if (wallet) {
-            const txs = await prisma.brkTransaction.findMany({
-                where: { walletId: wallet.id },
-                orderBy: { createdAt: 'asc' }
-            })
-
-            const normalizeDesc = (desc: string) => {
-                const lower = desc.toLowerCase();
-                
-                // 1. Chuẩn hóa Hoàn phí 21%
-                if (lower.includes('hoàn 21%') || lower.includes('hoàn phí 21%')) {
-                    const matchDay = lower.match(/sau (\d+) ngày/);
-                    const days = matchDay ? matchDay[1] : '1';
-                    return `hoàn phí 21% sau ${days} ngày`;
-                }
-                
-                // 2. Chuẩn hóa Đồng chia 2%
-                if (lower.includes('chia doanh thu kỳ') || lower.includes('chia đều doanh thu kỳ')) {
-                    const matchPeriod = lower.match(/kỳ (\d+)/);
-                    const period = matchPeriod ? matchPeriod[1] : '1';
-                    return `đồng chia kỳ ${period}`;
-                }
-                
-                // 3. Chuẩn hóa Hoa hồng phát sinh
-                if (lower.includes('từ thành viên mới')) {
-                    const matchId = lower.match(/#(\d+)/);
-                    if (matchId) {
-                        return `phát sinh mới từ thành viên #${matchId[1]}`;
-                    }
-                }
-                
-                return desc
-                    .replace(/^BRKD\s+/, '')
-                    .replace(/^Hoa hồng\s+/, '')
-                    .trim();
-            };
-
-            // Gộp các giao dịch phát sinh cùng lúc (lệch nhau <= 5 giây) và chung description sau khi chuẩn hóa
-            const groupedTxs: any[] = [];
-            for (const tx of txs) {
-                const txTime = new Date(tx.createdAt).getTime();
-                const normTxDesc = normalizeDesc(tx.description || '');
-                const existing = groupedTxs.find(g => {
-                    const gTime = new Date(g.createdAt).getTime();
-                    const normGDesc = normalizeDesc(g.description || '');
-                    const isSimilarDesc = normGDesc === normTxDesc;
-                    const isTimeClose = Math.abs(gTime - txTime) < 5000;
-                    return isSimilarDesc && isTimeClose;
-                });
-                
-                if (existing) {
-                    if (tx.balanceType === 'CASH') {
-                        existing.amountCash = Number(tx.amount);
-                        existing.description = tx.description;
-                        existing.type = tx.type;
-                    } else if (tx.balanceType === 'BRKD') {
-                        existing.amountBrkd = Number(tx.amount);
-                    } else if (tx.balanceType === 'VOUCHER') {
-                        existing.amountVoucher = Number(tx.amount);
-                    }
-                } else {
-                    const newGroupObj = {
-                        createdAt: tx.createdAt,
-                        type: tx.type,
-                        description: tx.description,
-                        amountCash: tx.balanceType === 'CASH' ? Number(tx.amount) : 0,
-                        amountBrkd: tx.balanceType === 'BRKD' ? Number(tx.amount) : 0,
-                        amountVoucher: tx.balanceType === 'VOUCHER' ? Number(tx.amount) : 0,
-                    };
-                    groupedTxs.push(newGroupObj);
-                }
+        const events = records.map(r => ({
+            id: r.id,
+            type: r.type,
+            time: r.time,
+            title: r.title,
+            description: r.description,
+            accumulatedCash: Number(r.accumulatedCash),
+            accumulatedBrkd: Number(r.accumulatedBrkd),
+            accumulatedBrkp: Number(r.accumulatedBrkp),
+            accumulatedTeamSize: r.accumulatedTeamSize,
+            accumulatedBrkdVolume: Number(r.accumulatedBrkdVolume),
+            accumulatedCashVolume: Number(r.accumulatedCashVolume),
+            details: {
+                amountCash: Number(r.amountCash),
+                amountBrkd: Number(r.amountBrkd),
+                amountVoucher: Number(r.amountVoucher),
+                txType: r.txType,
+                targetMemberId: r.targetMemberId,
+                targetMemberName: r.targetMemberName,
+                pathStr: r.pathStr,
+                fromLevel: r.fromLevel,
+                toLevel: r.toLevel
             }
+        }))
 
-            for (const gtx of groupedTxs) {
-                let txTitle = 'Biến động số dư'
-                let txDesc = gtx.description || ''
-                if (gtx.type === 'COMMISSION') {
-                    txTitle = 'Phát sinh mới'
-                } else if (gtx.type === 'RETURN_FEE') {
-                    txTitle = 'Hoàn phí 21%'
-                } else if (gtx.type === 'REVENUE_SHARE') {
-                    txTitle = 'Đồng chia 2%'
-                } else if (gtx.type === 'VOUCHER_CREDIT') {
-                    txTitle = 'Thưởng thăng cấp'
-                    const matchLvl = txDesc.match(/cấp (\d+)/);
-                    if (matchLvl) {
-                        txDesc = `Quà tặng lên cấp ${matchLvl[1]}`;
-                    }
-                }
-
-                let targetMemberName = '';
-                let targetMemberId: number | null = null;
-                let pathStr = '';
-                
-                const match = txDesc.match(/#(\d+)/);
-                if (match && match[1]) {
-                    targetMemberId = parseInt(match[1]);
-                    const targetUser = await prisma.user.findUnique({
-                        where: { id: targetMemberId },
-                        select: { name: true }
-                    });
-                    if (targetUser) {
-                        targetMemberName = targetUser.name || '';
-                        
-                        const pctMatch = txDesc.match(/\((\d+(\.\d+)?%)\)/);
-                        const pct = pctMatch ? ` (${pctMatch[1]})` : '';
-                        
-                        if (gtx.type === 'COMMISSION') {
-                            txDesc = `Hoa hồng${pct} từ thành viên mới #${targetMemberId} - ${targetMemberName}`;
-                        } else if (gtx.type === 'RETURN_FEE') {
-                            txDesc = `Hoàn phí 21% cho thành viên #${targetMemberId} - ${targetMemberName}`;
-                        }
-
-                        if (targetMemberId !== userId) {
-                            const path = await getPathFromAncestorToDescendant(userId, targetMemberId, systemId);
-                            const pathParts: string[] = [];
-                            
-                            for (let idx = 0; idx < path.length; idx++) {
-                                pathParts.push(`${path[idx].name} (#${path[idx].userId}) (F${idx + 1})`);
-                            }
-                            pathParts.push(`${targetMemberName} (#${targetMemberId}) (F${path.length + 1})`);
-                            
-                            pathStr = pathParts.join(' ➔ ');
-                        }
-                    }
-                } else {
-                    if (gtx.type === 'RETURN_FEE') {
-                        const matchDay = txDesc.match(/sau (\d+) ngày/);
-                        const days = matchDay ? matchDay[1] : '1';
-                        txDesc = `Hoàn phí 21% phí tham gia sau ${days} ngày`;
-                    } else if (gtx.type === 'REVENUE_SHARE') {
-                        const matchPeriod = txDesc.match(/kỳ (\d+)/);
-                        const period = matchPeriod ? matchPeriod[1] : '1';
-                        txDesc = `Đồng chia 2% kỳ ${period}`;
-                    }
-                }
-
-                events.push({
-                    type: 'TRANSACTION',
-                    time: gtx.createdAt,
-                    title: txTitle,
-                    description: txDesc,
-                    details: {
-                        amountCash: gtx.amountCash,
-                        amountBrkd: gtx.amountBrkd,
-                        amountVoucher: gtx.amountVoucher,
-                        txType: gtx.type,
-                        targetMemberId,
-                        targetMemberName,
-                        pathStr
-                    }
-                })
-            }
-        }
-
-        // Sắp xếp tất cả các sự kiện theo mốc thời gian tăng dần
-        events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
-
-        const myNode = await prisma.system.findUnique({
-            where: { userId_onSystem: { userId, onSystem: systemId } },
-            select: { autoId: true }
-        });
-        const myAutoId = myNode?.autoId || 0;
-
-        // Tính lũy kế số dư VNĐ, BRKD, Team Size và Điểm BRKP theo thời gian
-        let accumCash = 0
-        let accumBrkd = 0
-        for (const ev of events) {
-            if (ev.type === 'TRANSACTION') {
-                accumCash += ev.details?.amountCash || 0
-                accumBrkd += ev.details?.amountBrkd || 0
-            }
-            ev.accumulatedCash = accumCash
-            ev.accumulatedBrkd = accumBrkd
-
-            // Đếm số thành viên nhóm kích hoạt tính đến thời điểm ev.time
-            const teamSizeAtTime = await prisma.systemClosure.count({
-                where: {
-                    ancestorId: myAutoId,
-                    depth: { gt: 0 },
-                    systemId: systemId,
-                    descendant: {
-                        activatedAt: { lte: ev.time },
-                        status: 'ACTIVE'
-                    }
-                }
-            })
-            ev.accumulatedTeamSize = 1 + teamSizeAtTime
-            ev.accumulatedBrkp = 17 * (1 + teamSizeAtTime)
-        }
-
-        // 4. Lấy level configs để client hiển thị đúng % và gift cho từng cấp
+        // Lấy level configs để client hiển thị đúng % và gift cho từng cấp
         const levelConfigsRaw = await prisma.brkLevelConfig.findMany({
             where: { systemId },
             orderBy: { level: 'asc' },

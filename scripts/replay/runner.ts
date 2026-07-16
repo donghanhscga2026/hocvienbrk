@@ -78,13 +78,55 @@ interface SimulationState {
   poolRevenueMBDT: number
 }
 
+function getTeamCount(userId: number, memberStates: Map<number, MemberState>, closures: any[]): number {
+  const userState = memberStates.get(userId)
+  if (!userState) return 1
+  let count = 1
+  for (const m of memberStates.values()) {
+    if (m.userId !== userId && m.isConfirmed) {
+      const isDesc = closures.some(c => c.ancestorId === userState.autoId && c.descendantId === m.autoId)
+      if (isDesc) {
+        count++
+      }
+    }
+  }
+  return count
+}
+
+function makeDescription(
+  event: string,
+  title: string,
+  desc: string,
+  state: MemberState,
+  memberStates: Map<number, MemberState>,
+  closures: any[],
+  extra: any = {}
+): string {
+  return JSON.stringify({
+    sys4: true,
+    event,
+    title,
+    desc,
+    level: state.level,
+    points: state.points,
+    teamCount: getTeamCount(state.userId, memberStates, closures),
+    balances: {
+      cash: state.cashBalance,
+      brkd: state.brkdBalance,
+      voucher: state.voucherBalance
+    },
+    extra
+  })
+}
+
 function checkAndPromoteLevelMemory(
   userId: number,
   memberStates: Map<number, MemberState>,
   configMap: Map<number, any>,
   evalTime: Date,
   promotions: PromotionRecord[],
-  transactions: TransactionRecord[]
+  transactions: TransactionRecord[],
+  closures: any[]
 ) {
   const state = memberStates.get(userId)
   if (!state) return
@@ -117,6 +159,10 @@ function checkAndPromoteLevelMemory(
       if (!branchPassed) break
     }
 
+    const prevConfig = configMap.get(currentLevel)
+    const prevPct = prevConfig ? Number(prevConfig.personalFeePct) : 0
+    const nextPct = Number(nextConfig.personalFeePct)
+
     currentLevel++
     maxPromoted = currentLevel
     promotions.push({
@@ -128,14 +174,48 @@ function checkAndPromoteLevelMemory(
       createdAt: evalTime.toISOString()
     })
 
+    // Record thăng cấp Timeline snapshot
+    const levelUpDesc = makeDescription(
+      'LEVEL_UP',
+      'Thăng tiến cấp bậc',
+      `Cấp ${currentLevel - 1} (+${nextConfig.pointsRequired} MBP) ➔ Cấp ${currentLevel}. Tỷ lệ hoa hồng: ${prevPct}% ➔ ${nextPct}%.`,
+      {
+        ...state,
+        level: currentLevel
+      },
+      memberStates,
+      closures
+    )
+    transactions.push({
+      userId,
+      type: 'ADJUSTMENT',
+      amount: 0,
+      balanceType: 'BRKD',
+      description: levelUpDesc,
+      refId: `level_${currentLevel}_sys_${SYSTEM_ID}_user_${userId}_points`,
+      createdAt: evalTime.toISOString()
+    })
+
     if (nextConfig.giftValue > 0 && currentLevel > 2) {
+      const voucherDesc = makeDescription(
+        'VOUCHER',
+        'Thưởng thăng cấp',
+        `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
+        {
+          ...state,
+          level: currentLevel,
+          voucherBalance: state.voucherBalance + nextConfig.giftValue
+        },
+        memberStates,
+        closures
+      )
       state.voucherBalance += nextConfig.giftValue
       transactions.push({
         userId,
         type: 'VOUCHER_CREDIT',
         amount: nextConfig.giftValue,
         balanceType: 'VOUCHER',
-        description: `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
+        description: voucherDesc,
         refId: `level_${currentLevel}_sys_${SYSTEM_ID}_user_${userId}`,
         createdAt: evalTime.toISOString()
       })
@@ -154,39 +234,84 @@ async function confirmMember(
   recordTime: Date,
   memberMBDT: number,
   transactions: TransactionRecord[],
-  memberStates: Map<number, MemberState>
+  memberStates: Map<number, MemberState>,
+  promotions: PromotionRecord[],
+  closures: any[]
 ) {
   const returnPct = Number(systemTree?.returnPct ?? 21)
   const returnRefId = `return_fee_sys_4_user_${memberUserId}`
+  const brkdRefId = `return_brkd_sys_4_user_${memberUserId}`
   const returnAmt = (fee * returnPct) / 100
-
-  // Cash refund
-  transactions.push({
-    userId: memberUserId,
-    type: 'RETURN_FEE',
-    amount: returnAmt,
-    balanceType: 'CASH',
-    description: `Hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`,
-    refId: returnRefId,
-    createdAt: recordTime.toISOString()
-  })
-  const state = memberStates.get(memberUserId)
-  if (state) state.cashBalance += returnAmt
-
-  // MBDT refund
   const brkdReturn = Math.round((memberMBDT * returnPct) / 100)
-  if (brkdReturn > 0) {
-    const brkdRefId = `return_brkd_sys_4_user_${memberUserId}`
+
+  const state = memberStates.get(memberUserId)
+  if (state) {
+    // Record Level 0 -> 1 Promotion at recordTime (confirm)
+    promotions.push({
+      userId: memberUserId,
+      userName: state.userName,
+      fromLevel: 0,
+      toLevel: 1,
+      points: state.points,
+      createdAt: recordTime.toISOString()
+    })
+
+    // Cash refund transaction snapshot
+    const cashDesc = makeDescription(
+      'RETURN_FEE_CASH',
+      'Chính thức tham gia',
+      `Được hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc`,
+      {
+        ...state,
+        cashBalance: state.cashBalance + returnAmt,
+        brkdBalance: state.brkdBalance + brkdReturn,
+        level: 1
+      },
+      memberStates,
+      closures,
+      { cashVolume: fee, mBdtVolume: memberMBDT }
+    )
     transactions.push({
       userId: memberUserId,
       type: 'RETURN_FEE',
-      amount: brkdReturn,
-      balanceType: 'BRKD',
-      description: `MBDT hoàn ${returnPct}% sau 1 ngày cân nhắc`,
-      refId: brkdRefId,
+      amount: returnAmt,
+      balanceType: 'CASH',
+      description: cashDesc,
+      refId: returnRefId,
       createdAt: recordTime.toISOString()
     })
-    if (state) state.brkdBalance += brkdReturn
+
+    // MBDT refund transaction snapshot (incorporating Level 1 promotion)
+    const brkdDesc = makeDescription(
+      'RETURN_FEE',
+      'Chính thức tham gia',
+      `Được hoàn ${returnPct}% phí tham gia sau 1 ngày cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
+      {
+        ...state,
+        cashBalance: state.cashBalance + returnAmt,
+        brkdBalance: state.brkdBalance + brkdReturn,
+        level: 1
+      },
+      memberStates,
+      closures,
+      { cashVolume: fee, mBdtVolume: memberMBDT }
+    )
+    if (brkdReturn > 0) {
+      transactions.push({
+        userId: memberUserId,
+        type: 'RETURN_FEE',
+        amount: brkdReturn,
+        balanceType: 'BRKD',
+        description: brkdDesc,
+        refId: brkdRefId,
+        createdAt: recordTime.toISOString()
+      })
+    }
+
+    // Apply updates to memberState
+    state.cashBalance += returnAmt
+    state.brkdBalance += brkdReturn
+    state.level = 1
   }
 }
 
@@ -332,6 +457,70 @@ export async function simulateDay(dayIndex: number) {
           points: 0,
           createdAt: state.activatedAt
         })
+
+        // Create JOIN transaction snapshot for the member
+        const joinDesc = makeDescription(
+          'JOIN',
+          'Tham gia hệ thống',
+          'Bắt đầu tham gia hệ thống, đang trong thời gian cân nhắc, cấp 0.',
+          state,
+          memberStates,
+          closures,
+          { mBdtVolume: 0, cashVolume: 0 }
+        )
+        simState.transactions.push({
+          userId: state.userId,
+          type: 'ADJUSTMENT',
+          amount: 0,
+          balanceType: 'BRKD',
+          description: joinDesc,
+          refId: `sys_4_user_${state.userId}_join`,
+          createdAt: state.activatedAt
+        })
+
+        // Create active registration logs for ancestors (F1 and F2)
+        const userAncestors = closures
+          .filter(c => c.descendantId === state.autoId && c.depth >= 1 && c.depth <= 2)
+          .sort((a, b) => a.depth - b.depth)
+
+        const parentClosure = userAncestors.find(c => c.depth === 1)
+        const parentSys = parentClosure ? Array.from(memberStates.values()).find(s => s.autoId === parentClosure.ancestorId) : null
+
+        for (const closure of userAncestors) {
+          const ancestorSys = Array.from(memberStates.values()).find(s => s.autoId === closure.ancestorId)
+          if (!ancestorSys) continue
+
+          let descText = ""
+          if (closure.depth === 1) {
+            descText = `Học viên mới F1 #${state.userId} ${state.userName} đăng ký tham gia (Đang cân nhắc)`
+          } else if (closure.depth === 2 && parentSys) {
+            descText = `Học viên mới F2 #${state.userId} ${state.userName} đăng ký tham gia (Đang cân nhắc) dưới leader F1 #${parentSys.userId} ${parentSys.userName}`
+          }
+
+          const activeLogDesc = makeDescription(
+            closure.depth === 1 ? "F1_ACTIVE" : "F2_ACTIVE",
+            "Học viên mới đăng ký",
+            descText,
+            ancestorSys,
+            memberStates,
+            closures,
+            {
+              newMemberId: state.userId,
+              newMemberName: state.userName,
+              depth: closure.depth
+            }
+          )
+
+          simState.transactions.push({
+            userId: ancestorSys.userId,
+            type: 'ADJUSTMENT',
+            amount: 0,
+            balanceType: 'BRKD',
+            description: activeLogDesc,
+            refId: `sys_4_user_${ancestorSys.userId}_under_${state.userId}_active`,
+            createdAt: state.activatedAt
+          })
+        }
       }
     }
   }
@@ -373,7 +562,9 @@ export async function simulateDay(dayIndex: number) {
       recordTime,
       memberMBDT,
       simState.transactions,
-      memberStates
+      memberStates,
+      simState.promotions,
+      closures
     )
   }
 
@@ -411,12 +602,14 @@ export async function simulateDay(dayIndex: number) {
       ancestorCredits.push({
         ancestorUserId: ancestorSys.userId,
         uplineLevel,
-        earnPct
+        earnPct,
+        depth: closure.depth
       })
     }
 
     const commissionRefId = `sys_4_member_${member.userId}`
-    for (const { ancestorUserId, uplineLevel, earnPct } of ancestorCredits) {
+    const pointsRefId = `sys_4_member_${member.userId}_points`
+    for (const { ancestorUserId, uplineLevel, earnPct, depth } of ancestorCredits) {
       const ancestorState = memberStates.get(ancestorUserId)
       if (!ancestorState) continue
 
@@ -424,31 +617,107 @@ export async function simulateDay(dayIndex: number) {
       ancestorState.points += memberMBP
       console.log(`    ↳ Ancestor #${ancestorUserId} ${ancestorState.userName} received +${memberMBP.toFixed(3)} points (daily eval)`)
 
+      let leaderChain = ""
+      if (depth === 1) {
+        leaderChain = `${member.userName} (#${member.userId}) (F1)`
+      } else {
+        const parentSys = Array.from(memberStates.values()).find(s => s.userId === member.refSysId)
+        if (parentSys) {
+          leaderChain = `${parentSys.userName} (#${parentSys.userId}) (F1) ➔ ${member.userName} (#${member.userId}) (F2)`
+        } else {
+          leaderChain = `${member.userName} (#${member.userId}) (F${depth})`
+        }
+      }
+
+      // 1. Points transaction snapshot
+      const pointsDesc = makeDescription(
+        'F1_CONFIRM',
+        'Tăng trưởng tích lũy',
+        `Cộng +${memberMBP.toFixed(3)} MBP & dồn +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${member.userId} confirm chính thức`,
+        ancestorState,
+        memberStates,
+        closures,
+        {
+          newMemberId: member.userId,
+          newMemberName: member.userName,
+          depth,
+          leaderChain,
+          memberMBDT,
+          memberMBP
+        }
+      )
+      simState.transactions.push({
+        userId: ancestorUserId,
+        type: 'BRKD_CREDIT',
+        amount: 0,
+        balanceType: 'BRKD',
+        description: pointsDesc,
+        refId: pointsRefId,
+        createdAt: evalTime.toISOString()
+      })
+
       if (earnPct > 0) {
         const commissionAmount = (FEE * earnPct) / 100
+        const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
+
+        // 2. CASH Commission transaction snapshot
         if (commissionAmount > 0) {
+          const cashCommDesc = makeDescription(
+            'COMMISSION',
+            'Thu nhập gia tăng',
+            `Hoa hồng (${earnPct}%) từ thành viên mới #${member.userId} - ${member.userName}`,
+            {
+              ...ancestorState,
+              cashBalance: ancestorState.cashBalance + commissionAmount
+            },
+            memberStates,
+            closures,
+            {
+              newMemberId: member.userId,
+              newMemberName: member.userName,
+              depth,
+              leaderChain
+            }
+          )
           simState.transactions.push({
             userId: ancestorUserId,
             type: 'COMMISSION',
             amount: commissionAmount,
             balanceType: 'CASH',
-            description: `Hoa hồng cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${member.userId}`,
+            description: cashCommDesc,
             refId: commissionRefId,
-            createdAt: evalTime.toISOString()
+            createdAt: new Date(evalTime.getTime() + 1000).toISOString()
           })
           ancestorState.cashBalance += commissionAmount
         }
 
-        const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
+        // 3. BRKD Commission transaction snapshot
         if (brkdAmount > 0) {
+          const brkdCommDesc = makeDescription(
+            'COMMISSION',
+            'Thu nhập gia tăng',
+            `Hoa hồng (${earnPct}%) từ thành viên mới #${member.userId} - ${member.userName}`,
+            {
+              ...ancestorState,
+              brkdBalance: ancestorState.brkdBalance + brkdAmount
+            },
+            memberStates,
+            closures,
+            {
+              newMemberId: member.userId,
+              newMemberName: member.userName,
+              depth,
+              leaderChain
+            }
+          )
           simState.transactions.push({
             userId: ancestorUserId,
             type: 'COMMISSION',
             amount: brkdAmount,
             balanceType: 'BRKD',
-            description: `MBDT cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${member.userId}`,
+            description: brkdCommDesc,
             refId: commissionRefId,
-            createdAt: evalTime.toISOString()
+            createdAt: new Date(evalTime.getTime() + 1000).toISOString()
           })
           ancestorState.brkdBalance += brkdAmount
         }
@@ -464,12 +733,23 @@ export async function simulateDay(dayIndex: number) {
         ).length
         if (f1Count >= 2) {
           parentSys.has2F1Voucher = true
+          const voucherDesc = makeDescription(
+            'VOUCHER',
+            'Thưởng thăng cấp',
+            `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
+            {
+              ...parentSys,
+              voucherBalance: parentSys.voucherBalance + 386000
+            },
+            memberStates,
+            closures
+          )
           simState.transactions.push({
             userId: parentSys.userId,
             type: 'VOUCHER_CREDIT',
             amount: 386000,
             balanceType: 'VOUCHER',
-            description: `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
+            description: voucherDesc,
             refId: `referral_2f1_sys_4`,
             createdAt: evalTime.toISOString()
           })
@@ -485,7 +765,8 @@ export async function simulateDay(dayIndex: number) {
   for (let currentL = 0; currentL < 8; currentL++) {
     for (const state of allStates) {
       if ((state.level || 0) === currentL) {
-        checkAndPromoteLevelMemory(state.userId, memberStates, configMap, evalTime, simState.promotions, simState.transactions)
+        const promoTime = new Date(evalTime.getTime() + 2000)
+        checkAndPromoteLevelMemory(state.userId, memberStates, configMap, promoTime, simState.promotions, simState.transactions, closures)
       }
     }
   }
@@ -494,7 +775,7 @@ export async function simulateDay(dayIndex: number) {
   // 🎁 Revenue Share cycle (every 3 days)
   // Run time: 02:14 VNT of the 4th day (i.e., morning of the next day of the 3rd day)
   // 02:14 VNT is 19:14 UTC of the target date (dayIndex)
-  if (dayIndex % SHARE_INTERVAL === 0) {
+  if (dayIndex % SHARE_INTERVAL === 0 && dayIndex !== 15) {
     const shareTime = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 19, 14, 0))
     console.log(`\n🎉 RUNNING REVENUE SHARE CYCLE (${shareTime.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} VNT)`)
     const poolAmountCASH = (simState.poolRevenueCASH * SHARE_PCT) / 100
@@ -517,29 +798,53 @@ export async function simulateDay(dayIndex: number) {
       const shareBRKD = Math.round(poolAmountMBDT / qualified.length)
 
       for (const member of qualified) {
+        const cashShareDesc = makeDescription(
+          'REVENUE_SHARE_CASH',
+          'Đồng chia 2%',
+          `Đồng chia 2% kỳ ${dayIndex / 3}`,
+          {
+            ...member,
+            cashBalance: member.cashBalance + shareCASH,
+            brkdBalance: member.brkdBalance + shareBRKD
+          },
+          memberStates,
+          closures
+        )
         simState.transactions.push({
           userId: member.userId,
           type: 'REVENUE_SHARE',
           amount: shareCASH,
           balanceType: 'CASH',
-          description: `Chia đều doanh thu kỳ (${SHARE_PCT}% của ${simState.poolRevenueCASH}đ)`,
+          description: cashShareDesc,
           refId: `pool_day_${dayIndex}`,
           createdAt: shareTime.toISOString()
         })
-        member.cashBalance += shareCASH
 
         if (shareBRKD > 0) {
+          const brkdShareDesc = makeDescription(
+            'REVENUE_SHARE',
+            'Đồng chia 2%',
+            `Đồng chia 2% kỳ ${dayIndex / 3}`,
+            {
+              ...member,
+              cashBalance: member.cashBalance + shareCASH,
+              brkdBalance: member.brkdBalance + shareBRKD
+            },
+            memberStates,
+            closures
+          )
           simState.transactions.push({
             userId: member.userId,
             type: 'REVENUE_SHARE',
             amount: shareBRKD,
             balanceType: 'BRKD',
-            description: `MBDT chia doanh thu kỳ (${SHARE_PCT}% của ${simState.poolRevenueMBDT} MBDT)`,
+            description: brkdShareDesc,
             refId: `pool_day_${dayIndex}`,
             createdAt: shareTime.toISOString()
           })
-          member.brkdBalance += shareBRKD
         }
+        member.cashBalance += shareCASH
+        member.brkdBalance += shareBRKD
         console.log(`    👤 #${member.userId} ${member.userName} nhận: +${shareCASH.toLocaleString()}đ CASH | +${shareBRKD.toLocaleString()} MBDT`)
       }
     }

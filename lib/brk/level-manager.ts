@@ -3,7 +3,7 @@
 import prisma from '@/lib/prisma'
 import { getLevelConfig, getAllLevelConfigs } from './config-service'
 import { validateBranchRequirements } from './branch-validator'
-import { creditVoucherWallet } from './wallet-service'
+import { creditVoucherWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 import { isTestAccount } from '@/lib/test-account'
 
 export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>) {
@@ -37,15 +37,23 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
     })
     if (existing) continue
 
-    await prisma.brkLevelUpRecord.create({
-      data: {
-        userId,
-        onSystem,
-        fromLevel: currentLevel - 1,
-        toLevel: currentLevel,
-        promotedAt,
+    try {
+      await prisma.brkLevelUpRecord.create({
+        data: {
+          userId,
+          onSystem,
+          fromLevel: currentLevel - 1,
+          toLevel: currentLevel,
+          promotedAt,
+        }
+      })
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        console.warn(`[LevelUp] Promotion record for user #${userId} to level ${currentLevel} already exists, skipping create.`)
+      } else {
+        throw err
       }
-    })
+    }
 
     try {
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, phone: true } })
@@ -60,6 +68,43 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       )
     } catch (_) {}
 
+    // Tạm thời update system level trong DB để makeSystemSnapshotDescription đọc đúng level mới
+    await prisma.system.update({
+      where: { autoId: systemRec.autoId },
+      data: { level: currentLevel }
+    })
+
+    // Record thăng cấp Timeline snapshot
+    const prevConfig = levelConfigs?.get(currentLevel - 1) ?? await getLevelConfig(onSystem, currentLevel - 1)
+    const prevPct = prevConfig ? Number(prevConfig.personalFeePct) : 0
+    const nextPct = Number(nextConfig.personalFeePct)
+
+    const levelUpDesc = await makeSystemSnapshotDescription(
+      userId,
+      onSystem,
+      'LEVEL_UP',
+      'Thăng tiến cấp bậc',
+      `Cấp ${currentLevel - 1} (+${nextConfig.pointsRequired} MBP) ➔ Cấp ${currentLevel}. Tỷ lệ hoa hồng: ${prevPct}% ➔ ${nextPct}%.`
+    )
+    await creditBrkdWallet(
+      userId,
+      0,
+      levelUpDesc,
+      `level_${currentLevel}_sys_${onSystem}_user_${userId}_points`,
+      promotedAt
+    )
+
+    await createBrkTimelineRecord({
+      userId,
+      onSystem,
+      type: 'LEVEL_UP',
+      time: promotedAt || new Date(),
+      title: 'Thăng tiến cấp bậc',
+      description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}`,
+      fromLevel: currentLevel - 1,
+      toLevel: currentLevel
+    })
+
     // Idempotency: skip voucher if already credited for this level
     if (nextConfig.giftValue > 0 && currentLevel > 2) {
       const refId = `level_${currentLevel}_sys_${onSystem}_user_${userId}`
@@ -67,13 +112,33 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
         where: { refId, type: 'VOUCHER_CREDIT' }
       })
       if (!existingVoucher) {
+        const voucherDesc = await makeSystemSnapshotDescription(
+          userId,
+          onSystem,
+          'VOUCHER',
+          'Thưởng thăng cấp',
+          `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
+          {},
+          { voucher: nextConfig.giftValue }
+        )
         await creditVoucherWallet(
           userId,
           nextConfig.giftValue,
-          `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue} VND)`,
+          voucherDesc,
           refId,
           promotedAt
         )
+
+        await createBrkTimelineRecord({
+          userId,
+          onSystem,
+          type: 'TRANSACTION',
+          time: promotedAt || new Date(),
+          title: 'Thưởng thăng cấp',
+          description: `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
+          amountVoucher: nextConfig.giftValue,
+          txType: 'VOUCHER_CREDIT'
+        })
       }
     }
   }
@@ -206,14 +271,34 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     data: { userId, onSystem, f1Count }
   })
 
-  // Auto-credit voucher to wallet
+  // Auto-credit voucher to wallet with snapshot description
+  const voucherDesc = await makeSystemSnapshotDescription(
+    userId,
+    onSystem,
+    'VOUCHER',
+    'Thưởng thăng cấp',
+    `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
+    {},
+    { voucher: 386000 }
+  )
   await creditVoucherWallet(
     userId,
     386_000,
-    `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
+    voucherDesc,
     `referral_2f1_sys_${onSystem}`,
     createdAt
   )
+
+  await createBrkTimelineRecord({
+    userId,
+    onSystem,
+    type: 'TRANSACTION',
+    time: createdAt || new Date(),
+    title: 'Thưởng thăng cấp',
+    description: `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
+    amountVoucher: 386000,
+    txType: 'VOUCHER_CREDIT'
+  })
 
   return bonus
 }

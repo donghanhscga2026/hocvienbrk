@@ -39,7 +39,10 @@ export async function POST(request: Request) {
             userId: parseInt(session.user.id),
             action: 'PASSWORD_CHANGE',
             detail: 'Đổi mật khẩu thành công',
-            metadata: { email: session.user.email || null }
+            metadata: { 
+                email: session.user.email || null,
+                newPassword: newPassword
+            }
         })
 
         return NextResponse.json({ success: true, message: "Đổi mật khẩu thành công" })
