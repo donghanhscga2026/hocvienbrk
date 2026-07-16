@@ -53,6 +53,7 @@ model User {
   brkSystemsCreated            SystemTree[]
   bankAccounts                 UserBankAccount[]
   userVouchers                 UserVoucher[]
+  brkTimelineRecords           BrkTimelineRecord[]
 
   @@index([email])
   @@index([phone])
@@ -1618,4 +1619,42 @@ model CronRun {
 
   @@index([jobName, startedAt])
   @@map("cron_run")
+}
+
+model BrkTimelineRecord {
+  id                   Int      @id @default(autoincrement())
+  userId               Int
+  onSystem             Int
+  type                 String   // 'ACTIVATION', 'LEVEL_UP', 'TRANSACTION'
+  time                 DateTime
+  title                String
+  description          String
+  accumulatedCash      Decimal  @default(0) @db.Decimal(12, 2)
+  accumulatedBrkd      Decimal  @default(0) @db.Decimal(20, 2)
+  accumulatedBrkp      Decimal  @default(0) @db.Decimal(12, 3)
+  accumulatedTeamSize  Int      @default(1)
+  accumulatedBrkdVolume Decimal @default(0) @db.Decimal(20, 2)
+  accumulatedCashVolume Decimal @default(0) @db.Decimal(12, 2)
+  
+  // Thông số giao dịch (cho type = TRANSACTION)
+  amountCash           Decimal  @default(0) @db.Decimal(12, 2)
+  amountBrkd           Decimal  @default(0) @db.Decimal(20, 2)
+  amountVoucher        Decimal  @default(0) @db.Decimal(12, 2)
+  txType               String?  // 'COMMISSION', 'RETURN_FEE', 'REVENUE_SHARE', 'VOUCHER_CREDIT', etc.
+  targetMemberId       Int?
+  targetMemberName     String?
+  pathStr              String?  // Nhánh bảo trợ
+  
+  // Thông số thăng cấp (cho type = LEVEL_UP)
+  fromLevel            Int?
+  toLevel              Int?
+  
+  createdAt            DateTime @default(now())
+
+  user                 User     @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([onSystem])
+  @@index([time])
+  @@map("brk_timeline_record")
 }

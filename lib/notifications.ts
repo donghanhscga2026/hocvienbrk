@@ -447,9 +447,35 @@ export async function sendWelcomeEmail(to: string, studentName: string, studentI
   return result;
 }
 
+export async function sendOtpStatusNotification(
+  email: string, 
+  studentName: string, 
+  otpCode: string, 
+  success: boolean, 
+  errorMsg?: string, 
+  userId?: number
+) {
+  const statusStr = success ? '✅ THÀNH CÔNG' : '❌ THẤT BẠI';
+  const errorInfo = errorMsg ? `\n❌ Lỗi: <code>${errorMsg}</code>` : '';
+  const msg = `📧 <b>GỬI M\u00C3 OTP ${statusStr}</b>\n` +
+              `━━━━━━━━━━━━━━\n` +
+              `👤 Học viên: <b>${studentName}</b> ${userId ? `(#${userId})` : ''}\n` +
+              `📧 Email: <code>${email}</code>\n` +
+              `🔑 Mã OTP: <code>${otpCode}</code>${errorInfo}`;
+  
+  await sendTelegram(msg, 'FAILED_LOGIN');
+}
+
 export async function sendVerificationEmail(to: string, studentName: string, token: string, userId?: number) {
   const { subject, html } = getRandomVerificationTemplate(studentName, token);
   const result = await sendGmail(to, subject, html);
+  
+  try {
+    await sendOtpStatusNotification(to, studentName, token, result.success, result.success ? undefined : result.message, userId);
+  } catch (e) {
+    console.error("Failed to send OTP status notification to Telegram:", e);
+  }
+
   const { logEmail } = await import('@/lib/email-logger')
   await logEmail({
     userId,

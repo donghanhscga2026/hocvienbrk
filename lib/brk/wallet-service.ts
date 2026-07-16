@@ -171,3 +171,141 @@ export async function getBrkTransactionHistory(userId: number, limit = 50) {
     take: limit
   })
 }
+
+export async function makeSystemSnapshotDescription(
+  userId: number,
+  onSystem: number,
+  event: string,
+  title: string,
+  desc: string,
+  extra: any = {},
+  overrides: any = {}
+) {
+  const system = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId, onSystem } }
+  })
+  const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
+  
+  let teamCount = 1
+  if (system) {
+    teamCount = 1 + await prisma.systemClosure.count({
+      where: { ancestorId: system.autoId, depth: { gte: 1 }, systemId: onSystem }
+    })
+  }
+
+  const cash = (wallet ? Number(wallet.balance) : 0) + (overrides.cash ?? 0)
+  const brkd = (wallet ? Number(wallet.brkd) : 0) + (overrides.brkd ?? 0)
+  const voucher = (wallet ? Number(wallet.voucherBalance) : 0) + (overrides.voucher ?? 0)
+
+  return JSON.stringify({
+    sys4: true,
+    event,
+    title,
+    desc,
+    level: system?.level ?? 0,
+    points: Number(system?.totalPoints ?? 0),
+    teamCount,
+    balances: {
+      cash,
+      brkd,
+      voucher
+    },
+    extra
+  })
+}
+
+export async function createBrkTimelineRecord(data: {
+  userId: number
+  onSystem: number
+  type: string
+  time: Date
+  title: string
+  description: string
+  accumulatedCash?: number
+  accumulatedBrkd?: number
+  accumulatedBrkp?: number
+  accumulatedTeamSize?: number
+  accumulatedBrkdVolume?: number
+  accumulatedCashVolume?: number
+  amountCash?: number
+  amountBrkd?: number
+  amountVoucher?: number
+  txType?: string
+  targetMemberId?: number
+  targetMemberName?: string
+  pathStr?: string
+  fromLevel?: number
+  toLevel?: number
+}) {
+  let cash = data.accumulatedCash
+  let brkd = data.accumulatedBrkd
+  let brkp = data.accumulatedBrkp
+  let teamSize = data.accumulatedTeamSize
+  let brkdVol = data.accumulatedBrkdVolume
+  let cashVol = data.accumulatedCashVolume
+
+  const system = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId: data.userId, onSystem: data.onSystem } }
+  })
+  const wallet = await prisma.brkWallet.findUnique({ where: { userId: data.userId } })
+
+  if (cash === undefined) cash = wallet ? Number(wallet.balance) : 0
+  if (brkd === undefined) brkd = wallet ? Number(wallet.brkd) : 0
+  if (brkp === undefined) brkp = system ? Number(system.totalPoints) : 0
+  
+  if (teamSize === undefined) {
+    teamSize = 1
+    if (system) {
+      teamSize = 1 + await prisma.systemClosure.count({
+        where: { ancestorId: system.autoId, depth: { gte: 1 }, systemId: data.onSystem }
+      })
+    }
+  }
+
+  if (brkdVol === undefined || cashVol === undefined) {
+    const lastRec = await prisma.brkTimelineRecord.findFirst({
+      where: { userId: data.userId, onSystem: data.onSystem },
+      orderBy: { time: 'desc' }
+    })
+    brkdVol = lastRec ? Number(lastRec.accumulatedBrkdVolume) : 0
+    cashVol = lastRec ? Number(lastRec.accumulatedCashVolume) : 0
+
+    if (data.type === 'TRANSACTION') {
+      const sysTree = await prisma.systemTree.findUnique({
+        where: { onSystem: data.onSystem },
+        select: { fee: true }
+      })
+      const sysFee = sysTree ? Number(sysTree.fee) : 26866666
+      if (data.txType === 'RETURN_FEE') {
+        brkdVol += data.amountBrkd ? Math.round(data.amountBrkd / 0.21) : 0
+        cashVol += sysFee
+      }
+    }
+  }
+
+  return prisma.brkTimelineRecord.create({
+    data: {
+      userId: data.userId,
+      onSystem: data.onSystem,
+      type: data.type,
+      time: data.time,
+      title: data.title,
+      description: data.description,
+      accumulatedCash: cash,
+      accumulatedBrkd: brkd,
+      accumulatedBrkp: brkp,
+      accumulatedTeamSize: teamSize,
+      accumulatedBrkdVolume: brkdVol,
+      accumulatedCashVolume: cashVol,
+      amountCash: data.amountCash ?? 0,
+      amountBrkd: data.amountBrkd ?? 0,
+      amountVoucher: data.amountVoucher ?? 0,
+      txType: data.txType,
+      targetMemberId: data.targetMemberId,
+      targetMemberName: data.targetMemberName,
+      pathStr: data.pathStr,
+      fromLevel: data.fromLevel,
+      toLevel: data.toLevel
+    }
+  })
+}

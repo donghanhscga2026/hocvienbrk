@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import type { SystemTree } from '@prisma/client'
-import { creditBrkWallet, creditBrkdWallet } from './wallet-service'
+import { creditBrkWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 import { getLevelConfig } from './config-service'
 
 const DEFAULT_MBDT = 12_868_686
@@ -16,6 +16,7 @@ interface AncestorCredit {
   uplineSystem: { autoId: number; userId: number; level: number | null }
   uplineLevel: number
   earnPct: number
+  depth: number
 }
 
 export async function distributeCommission(
@@ -61,12 +62,21 @@ export async function distributeCommission(
     const earnPct = uplinePct - previousPct
     previousPct = Math.max(previousPct, uplinePct)
 
-    ancestorCredits.push({ uplineSystem, uplineLevel, earnPct })
+    ancestorCredits.push({ uplineSystem, uplineLevel, earnPct, depth: closure.depth })
   }
 
   const commissionRefId = `sys_${onSystem}_member_${newMemberUserId}`
+  const pointsRefId = `sys_${onSystem}_member_${newMemberUserId}_points`
 
-  await Promise.all(ancestorCredits.map(async ({ uplineSystem, uplineLevel, earnPct }) => {
+  const newMemberUser = await prisma.user.findUnique({ where: { id: newMemberUserId } })
+  const newMemberName = newMemberUser?.name || 'N/A'
+
+  const parentUser = newMemberSys.refSysId > 0 ? await prisma.user.findUnique({
+    where: { id: newMemberSys.refSysId }
+  }) : null
+  const parentName = parentUser?.name || 'N/A'
+
+  await Promise.all(ancestorCredits.map(async ({ uplineSystem, uplineLevel, earnPct, depth }) => {
     let alreadyProcessed = false
     if (earnPct > 0) {
       const existingComm = await prisma.brkTransaction.findFirst({
@@ -83,29 +93,130 @@ export async function distributeCommission(
         data: { totalPoints: { increment: memberMBP } }
       })
 
+      let leaderChain = ""
+      if (depth === 1) {
+        leaderChain = `${newMemberName} (#${newMemberUserId}) (F1)`
+      } else if (depth === 2 && parentUser) {
+        leaderChain = `${parentName} (#${newMemberSys.refSysId}) (F1) ➔ ${newMemberName} (#${newMemberUserId}) (F2)`
+      } else {
+        leaderChain = `${newMemberName} (#${newMemberUserId}) (F${depth})`
+      }
+
+      // Ghi nhận lịch sử cộng điểm và dồn doanh số dưới dạng transaction BRKD (amount = 0)
+      const existingPoints = await prisma.brkTransaction.findFirst({
+        where: { wallet: { userId: uplineSystem.userId }, refId: pointsRefId }
+      })
+      if (!existingPoints) {
+        const pointsDesc = await makeSystemSnapshotDescription(
+          uplineSystem.userId,
+          onSystem,
+          'F1_CONFIRM',
+          'Tăng trưởng tích lũy',
+          `Cộng +${memberMBP.toFixed(3)} MBP & dồn +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} confirm chính thức`,
+          {
+            newMemberId: newMemberUserId,
+            newMemberName: newMemberName,
+            depth,
+            leaderChain,
+            memberMBDT,
+            memberMBP
+          }
+        )
+        await creditBrkdWallet(
+          uplineSystem.userId,
+          0,
+          pointsDesc,
+          pointsRefId,
+          createdAt
+        )
+      }
+
       if (earnPct > 0) {
         const commissionAmount = (fee * earnPct) / 100
+        const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
+
         if (commissionAmount > 0) {
+          const cashCommDesc = await makeSystemSnapshotDescription(
+            uplineSystem.userId,
+            onSystem,
+            'COMMISSION',
+            'Thu nhập gia tăng',
+            `Hoa hồng (${earnPct}%) từ thành viên mới #${newMemberUserId} - ${newMemberName}`,
+            {
+              newMemberId: newMemberUserId,
+              newMemberName: newMemberName,
+              depth,
+              leaderChain
+            },
+            { cash: commissionAmount, brkd: brkdAmount }
+          )
           await creditBrkWallet(
             uplineSystem.userId,
             commissionAmount,
             'COMMISSION',
-            `Hoa hồng cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
+            cashCommDesc,
             commissionRefId,
             createdAt
           )
         }
 
-        const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
         if (brkdAmount > 0) {
+          const brkdCommDesc = await makeSystemSnapshotDescription(
+            uplineSystem.userId,
+            onSystem,
+            'COMMISSION',
+            'Thu nhập gia tăng',
+            `Hoa hồng (${earnPct}%) từ thành viên mới #${newMemberUserId} - ${newMemberName}`,
+            {
+              newMemberId: newMemberUserId,
+              newMemberName: newMemberName,
+              depth,
+              leaderChain
+            },
+            { cash: commissionAmount, brkd: brkdAmount }
+          )
           await creditBrkdWallet(
             uplineSystem.userId,
             brkdAmount,
-            `BRKD cấp ${uplineLevel} (${earnPct}%) từ thành viên mới #${newMemberUserId}`,
+            brkdCommDesc,
             commissionRefId,
             createdAt
           )
         }
+      }
+
+      if (earnPct > 0) {
+        const commissionAmount = (fee * earnPct) / 100
+        const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
+        await createBrkTimelineRecord({
+          userId: uplineSystem.userId,
+          onSystem,
+          type: 'TRANSACTION',
+          time: createdAt || new Date(),
+          title: 'Thu nhập gia tăng',
+          description: `Hoa hồng (${earnPct}%) từ thành viên mới #${newMemberUserId} - ${newMemberName}`,
+          amountCash: commissionAmount,
+          amountBrkd: brkdAmount,
+          txType: 'COMMISSION',
+          targetMemberId: newMemberUserId,
+          targetMemberName: newMemberName,
+          pathStr: leaderChain
+        })
+      } else {
+        await createBrkTimelineRecord({
+          userId: uplineSystem.userId,
+          onSystem,
+          type: 'TRANSACTION',
+          time: createdAt || new Date(),
+          title: 'Tăng trưởng tích lũy',
+          description: `Cộng +${memberMBP.toFixed(3)} MBP & dồn +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} confirm chính thức`,
+          amountCash: 0,
+          amountBrkd: 0, // amountBrkd = 0 để tránh cộng vào ví thu nhập!
+          txType: 'COMMISSION',
+          targetMemberId: newMemberUserId,
+          targetMemberName: newMemberName,
+          pathStr: leaderChain
+        })
       }
     }
   }))

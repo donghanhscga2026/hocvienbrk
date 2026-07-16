@@ -475,11 +475,10 @@ function GenealogyFlow() {
     if (!selectedSystem || selectedSystem !== 4) return
     if (switchingLogic) return
 
-    const confirmMsg = `Bạn có chắc chắn muốn chuyển sang ${
-      method === 'A'
-        ? 'Phương án A (Real-time thăng cấp & 3 ngày cân nhắc)'
-        : 'Phương án B (Daily thăng cấp lúc 00:00 & 24h cân nhắc)'
-    }? Hệ thống sẽ tiến hành xóa sạch và tính toán lại toàn bộ dữ liệu từ ngày 02/07/2026.`
+    const confirmMsg = `Bạn có chắc chắn muốn chuyển sang ${method === 'A'
+      ? 'Phương án A (Real-time thăng cấp & 3 ngày cân nhắc)'
+      : 'Phương án B (Daily thăng cấp lúc 00:00 & 24h cân nhắc)'
+      }? Hệ thống sẽ tiến hành xóa sạch và tính toán lại toàn bộ dữ liệu từ ngày 02/07/2026.`
 
     if (!confirm(confirmMsg)) return
 
@@ -1637,6 +1636,7 @@ function GenealogyFlow() {
 
 function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDetailInfo, onClose: () => void, selectedSystem: number | null }) {
   const [showHistory, setShowHistory] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
   const [historyLevelConfigs, setHistoryLevelConfigs] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -1662,8 +1662,8 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
   const isLoading = info.loading;
   const isBrk = !!systemData;
 
-  const currentLevelText = isBrk 
-    ? (systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có') 
+  const currentLevelText = isBrk
+    ? (systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có')
     : (tca?.level ? `Cấp ${tca.level}` : 'Học viên');
 
   return (
@@ -1737,7 +1737,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       ) : 'Chưa cập nhật'}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between text-indigo-750 font-semibold pt-1.5 border-t border-indigo-100/30">
                     <span>Nhân mạch chia sẻ:</span>
                     <span className="font-bold text-indigo-900">
@@ -1790,8 +1790,20 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       <InfoItem icon={<Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />} label="Số thành viên nhóm" value={systemData?.teamSize != null ? `${systemData.teamSize.toLocaleString('vi')}` : '0'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Doanh số (VNĐ)" value={systemData?.teamTotalVnd != null ? systemData.teamTotalVnd.toLocaleString('vi') : '0'} valueClassName="text-emerald-600 font-extrabold" />
-                      <InfoItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="DS đối ứng (MDT)" value={systemData?.teamTotalBrkd != null ? systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 }) : '0'} valueClassName="text-rose-600 font-extrabold" />
+                      <InfoItem
+                        icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
+                        label="Doanh số VNĐ"
+                        value={systemData?.teamTotalVnd != null ? `${systemData.teamTotalVnd.toLocaleString('vi')} VNĐ` : '0 VNĐ'}
+                        labelClassName="text-[8px] text-slate-400/80 font-bold uppercase tracking-wider"
+                        valueClassName="text-[8px] font-semibold text-slate-400/80"
+                      />
+                      <InfoItem
+                        icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />}
+                        label="Doanh số MBDT"
+                        value={systemData?.teamTotalBrkd != null ? systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 }) : '0'}
+                        labelClassName="text-[9px] text-emerald-600 font-bold uppercase tracking-wider"
+                        valueClassName="text-[14px] font-extrabold text-red-500"
+                      />
                     </div>
                   </>
                 ) : (
@@ -1810,8 +1822,20 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
               {isBrk && systemData?.wallet && (
                 <div className="mt-2">
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                    <WalletItem icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />} label="Thu nhập (VNĐ)" value={systemData.wallet.balance} valueClassName="text-emerald-600 font-extrabold" />
-                    <WalletItem icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />} label="Đối ứng (MDT)" value={systemData.wallet.brkd} valueClassName="text-rose-600 font-extrabold" />
+                    <WalletItem
+                      icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
+                      label="Thu nhập VNĐ"
+                      value={systemData.wallet.balance}
+                      labelClassName="text-[8px] text-slate-400/80 font-bold uppercase tracking-wider"
+                      valueClassName="text-[8px] font-medium text-slate-400/80"
+                    />
+                    <WalletItem
+                      icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />}
+                      label="Thu nhập MBDT"
+                      value={systemData.wallet.brkd}
+                      labelClassName="text-[9px] text-emerald-600 font-bold uppercase tracking-wider"
+                      valueClassName="text-[14px] font-extrabold text-red-500"
+                    />
                     <WalletItem icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Voucher" value={systemData.wallet.voucherBalance} />
                     <WalletItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Đã rút (VNĐ)" value={systemData.wallet.totalWithdrawn} />
                   </div>
@@ -1850,7 +1874,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 p-5 overflow-y-auto bg-slate-50/50">
+            <div className="flex-1 p-5 overflow-y-auto bg-slate-50/50 flex flex-col gap-4">
               {loadingHistory ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-3">
                   <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent animate-spin rounded-full"></div>
@@ -1862,13 +1886,33 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                   <span className="text-xs font-black uppercase tracking-wide">Chưa ghi nhận lịch sử thăng tiến</span>
                 </div>
               ) : (
-                <div className="relative pl-6 border-l border-slate-200 space-y-5">
-                  {/* Hiển thị totalPoints hiện tại để so sánh */}
-                  {systemData?.totalPoints != null && (
-                    <div className="absolute -top-2 -left-6 px-2 py-0.5 bg-slate-800 text-white text-[10px] font-bold rounded-r-md shadow">
-                      Hiện tại: {systemData.totalPoints.toLocaleString('vi')} MP
+                <>
+                  {/* Toolbar điều khiển (Điểm hiện tại + Bộ lọc sắp xếp) */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-100/85 border border-slate-200/50 p-2.5 rounded-xl text-xs font-bold text-slate-700 shrink-0">
+                    {systemData?.totalPoints != null ? (
+                      <div className="flex items-center gap-1.5">
+                        <span>Điểm số tích lũy:</span>
+                        <span className="bg-slate-800 text-white px-2 py-0.5 rounded-md shadow text-[10px] font-black uppercase tracking-wider">
+                          Hiện tại {systemData.totalPoints.toLocaleString('vi')} MBP
+                        </span>
+                      </div>
+                    ) : (
+                      <div></div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Sắp xếp:</span>
+                      <select
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-black text-slate-700 outline-none cursor-pointer focus:border-slate-300"
+                      >
+                        <option value="desc">Mới nhất trước (Giảm dần)</option>
+                        <option value="asc">Cũ nhất trước (Tăng dần)</option>
+                      </select>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="relative pl-6 border-l border-slate-200 space-y-5">
                   {(() => {
                     const getLevelDetails = (lvl: number) => {
                       const cfg = historyLevelConfigs.find((c: any) => c.level === lvl);
@@ -1887,7 +1931,17 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       }
                     };
 
-                    return historyRecords.map((rec, i) => {
+                    const sortedRecords = [...historyRecords].sort((a, b) => {
+                      const diff = new Date(a.time).getTime() - new Date(b.time).getTime()
+                      if (diff !== 0) {
+                        return sortOrder === 'desc' ? -diff : diff
+                      }
+                      const idA = a.id || 0
+                      const idB = b.id || 0
+                      return sortOrder === 'desc' ? idB - idA : idA - idB
+                    })
+
+                    return sortedRecords.map((rec, i) => {
                       if (rec.type === 'ACTIVATION') {
                         return (
                           <div key={i} className="relative">
@@ -1902,24 +1956,51 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                               </div>
                               <span className="text-slate-800 text-xs font-black">{rec.title}</span>
                               <span className="text-slate-500 text-[11px] font-medium leading-normal">{rec.description}</span>
-                              
+
                               {/* Thông số tăng trưởng tích lũy */}
                               <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
                                 <div className="flex items-center gap-1">
                                   <span className="text-slate-400">Điểm:</span>
-                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MP</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MBP</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-slate-400">Thành viên nhóm:</span>
                                   <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
                                 </div>
-                                <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
-                                  <span>Thu nhập:</span>
-                                  <span>{Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ</span>
-                                </div>
-                                <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
-                                  <span>Đối ứng:</span>
-                                  <span>{Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')} MDT</span>
+
+                                {/* Bố cục 2 cột Trái (Doanh số MBDT) và Phải (Thu nhập MBDT) */}
+                                <div className="col-span-2 grid grid-cols-2 gap-2 mt-1">
+                                  {/* Cột trái: Doanh số MBDT & Doanh số VNĐ */}
+                                  <div className="flex flex-col gap-1 bg-slate-50 border border-slate-100 p-2 rounded-xl">
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-wider">Doanh số (MBDT)</span>
+                                      <span className="font-extrabold text-[14px] text-red-500">
+                                        {Math.round(rec.accumulatedBrkdVolume ?? 0).toLocaleString('vi')}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col border-t border-slate-200/50 pt-1">
+                                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Doanh số VNĐ</span>
+                                      <span className="font-semibold text-[8px] text-slate-400/80">
+                                        {Math.round(rec.accumulatedCashVolume ?? 0).toLocaleString('vi')} VNĐ
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Cột phải: Thu nhập MBDT & Thu nhập VNĐ */}
+                                  <div className="flex flex-col gap-1 bg-emerald-50/50 border border-emerald-100/50 p-2 rounded-xl">
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-wider">Thu nhập </span>
+                                      <span className="font-extrabold text-[14px] text-red-500">
+                                        {Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col border-t border-emerald-100/50 pt-1">
+                                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Thu nhập </span>
+                                      <span className="font-medium text-[8px] text-slate-400/80">
+                                        {Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1942,7 +2023,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                 </span>
                               </div>
                               <span className="text-slate-800 text-xs font-black">
-                                Cấp {rec.details?.fromLevel} (+{rec.accumulatedBrkp?.toLocaleString('vi')} MP) ➔ Cấp {rec.details?.toLevel}
+                                Cấp {rec.details?.fromLevel} (+{rec.accumulatedBrkp?.toLocaleString('vi')} MBP) ➔ Cấp {rec.details?.toLevel}
                               </span>
                               <div className="mt-1 pt-1.5 border-t border-slate-50 flex flex-col gap-1 text-[11px]">
                                 <div className="flex items-center justify-between text-slate-500">
@@ -1957,19 +2038,46 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                               <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
                                 <div className="flex items-center gap-1">
                                   <span className="text-slate-400">Điểm:</span>
-                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MP</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MBP</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <span className="text-slate-400">Thành viên nhóm:</span>
                                   <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
                                 </div>
-                                <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
-                                  <span>Thu nhập:</span>
-                                  <span>{Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ</span>
-                                </div>
-                                <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
-                                  <span>Đối ứng:</span>
-                                  <span>{Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')} MDT</span>
+
+                                {/* Bố cục 2 cột Trái (Doanh số MBDT) và Phải (Thu nhập MBDT) */}
+                                <div className="col-span-2 grid grid-cols-2 gap-2 mt-1">
+                                  {/* Cột trái: Doanh số MBDT & Doanh số VNĐ */}
+                                  <div className="flex flex-col gap-1 bg-slate-50 border border-slate-100 p-2 rounded-xl">
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-wider">Doanh số (MBDT)</span>
+                                      <span className="font-extrabold text-[14px] text-red-500">
+                                        {Math.round(rec.accumulatedBrkdVolume ?? 0).toLocaleString('vi')}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col border-t border-slate-200/50 pt-1">
+                                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Doanh số </span>
+                                      <span className="font-semibold text-[8px] text-slate-400/80">
+                                        {Math.round(rec.accumulatedCashVolume ?? 0).toLocaleString('vi')} VNĐ
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Cột phải: Thu nhập MBDT & Thu nhập VNĐ */}
+                                  <div className="flex flex-col gap-1 bg-emerald-50/50 border border-emerald-100/50 p-2 rounded-xl">
+                                    <div className="flex flex-col">
+                                      <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-wider">Thu nhập </span>
+                                      <span className="font-extrabold text-[14px] text-red-500">
+                                        {Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col border-t border-emerald-100/50 pt-1">
+                                      <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Thu nhập </span>
+                                      <span className="font-medium text-[8px] text-slate-400/80">
+                                        {Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1981,7 +2089,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       const amountCash = rec.details?.amountCash ?? 0;
                       const amountBrkd = rec.details?.amountBrkd ?? 0;
                       const amountVoucher = rec.details?.amountVoucher ?? 0;
-                      
+
                       let dotColor = 'bg-emerald-500';
                       let badgeColor = 'text-emerald-600 bg-emerald-50 border-emerald-100';
 
@@ -2006,27 +2114,27 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                 {new Date(rec.time).toLocaleString('vi-VN')}
                               </span>
                             </div>
-                            
+
                             <div className="flex items-start justify-between gap-4 mt-1">
                               <div className="flex flex-col gap-1 flex-1 min-w-0">
                                 <span className="text-slate-500 text-[11px] font-medium leading-normal">
                                   {rec.description}
                                 </span>
                               </div>
-                              
-                              <div className="flex flex-col items-end shrink-0 gap-0.5 text-right font-black text-xs">
+
+                              <div className="flex flex-col items-end shrink-0 gap-0.5 text-right font-black">
+                                {amountBrkd !== 0 && (
+                                  <span className={`text-sm ${amountBrkd > 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                                    {amountBrkd > 0 ? '+' : ''}{Math.round(amountBrkd).toLocaleString('vi')}
+                                  </span>
+                                )}
                                 {amountCash !== 0 && (
-                                  <span className={amountCash > 0 ? "text-emerald-600" : "text-rose-600"}>
+                                  <span className="text-[10px] text-slate-500 font-semibold">
                                     {amountCash > 0 ? '+' : ''}{Math.round(amountCash).toLocaleString('vi')} VNĐ
                                   </span>
                                 )}
-                                {amountBrkd !== 0 && (
-                                  <span className={amountBrkd > 0 ? "text-rose-600" : "text-rose-700"}>
-                                    {amountBrkd > 0 ? '+' : ''}{Math.round(amountBrkd).toLocaleString('vi')} MDT
-                                  </span>
-                                )}
                                 {amountVoucher !== 0 && (
-                                  <span className="text-amber-600">
+                                  <span className="text-amber-600 text-[10px]">
                                     +{Math.round(amountVoucher).toLocaleString('vi')} VNĐ Voucher
                                   </span>
                                 )}
@@ -2043,19 +2151,46 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                             <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
                               <div className="flex items-center gap-1">
                                 <span className="text-slate-400">Điểm:</span>
-                                <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MP</span>
+                                <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MBP</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <span className="text-slate-400">Thành viên nhóm:</span>
                                 <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
                               </div>
-                              <div className="flex items-center gap-1 col-span-2 bg-emerald-50/50 border border-emerald-100/50 px-2 py-0.5 rounded-lg text-emerald-700 font-bold">
-                                <span>Thu nhập:</span>
-                                <span>{Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ</span>
-                              </div>
-                              <div className="flex items-center gap-1 col-span-2 bg-rose-50/50 border border-rose-100/50 px-2 py-0.5 rounded-lg text-rose-700 font-bold">
-                                <span>Đối ứng:</span>
-                                <span>{Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')} MDT</span>
+
+                              {/* Bố cục 2 cột Trái (Doanh số MBDT) và Phải (Thu nhập MBDT) */}
+                              <div className="col-span-2 grid grid-cols-2 gap-2 mt-1">
+                                {/* Cột trái: Doanh số MBDT & Doanh số VNĐ */}
+                                <div className="flex flex-col gap-1 bg-slate-50 border border-slate-100 p-2 rounded-xl">
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-wider">Doanh số (MBDT)</span>
+                                    <span className="font-extrabold text-[14px] text-red-500">
+                                      {Math.round(rec.accumulatedBrkdVolume ?? 0).toLocaleString('vi')}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col border-t border-slate-200/50 pt-1">
+                                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Doanh số VNĐ</span>
+                                    <span className="font-semibold text-[8px] text-slate-400/80">
+                                      {Math.round(rec.accumulatedCashVolume ?? 0).toLocaleString('vi')} VNĐ
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Cột phải: Thu nhập MBDT & Thu nhập VNĐ */}
+                                <div className="flex flex-col gap-1 bg-emerald-50/50 border border-emerald-100/50 p-2 rounded-xl">
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] text-emerald-600 font-bold uppercase tracking-wider">Thu nhập </span>
+                                    <span className="font-extrabold text-[14px] text-red-500">
+                                      {Math.round(rec.accumulatedBrkd ?? 0).toLocaleString('vi')}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col border-t border-emerald-100/50 pt-1">
+                                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Thu nhập </span>
+                                    <span className="font-medium text-[8px] text-slate-400/80">
+                                      {Math.round(rec.accumulatedCash ?? 0).toLocaleString('vi')} VNĐ
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -2063,7 +2198,8 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       );
                     });
                   })()}
-                </div>
+                  </div>
+                </>
               )}
             </div>
             <div className="p-4 bg-white border-t border-slate-100 flex justify-end shrink-0 rounded-b-3xl">
@@ -2081,28 +2217,28 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
   );
 }
 
-function InfoItem({ icon, label, value, valueClassName }: { icon: any, label: string, value: string, valueClassName?: string }) {
+function InfoItem({ icon, label, value, valueClassName, labelClassName }: { icon: any, label: string, value: string, valueClassName?: string, labelClassName?: string }) {
   return (
     <div className="flex items-start gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
       <div className="mt-0.5 p-1 sm:p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
         {icon}
       </div>
       <div className="flex flex-col min-w-0">
-        <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-widest leading-none mb-0.5 sm:mb-1">{label}</span>
+        <span className={`text-[9px] sm:text-[10px] font-bold tracking-widest leading-none mb-0.5 sm:mb-1 ${labelClassName || 'text-slate-400'}`}>{label}</span>
         <span className={`text-xs sm:text-sm font-black truncate ${valueClassName || 'text-slate-700'}`}>{value}</span>
       </div>
     </div>
   );
 }
 
-function WalletItem({ icon, label, value, valueClassName }: { icon: any, label: string, value: number, valueClassName?: string }) {
+function WalletItem({ icon, label, value, valueClassName, labelClassName }: { icon: any, label: string, value: number, valueClassName?: string, labelClassName?: string }) {
   return (
     <div className="flex items-start gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
       <div className="mt-0.5 p-1 sm:p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
         {icon}
       </div>
       <div className="flex flex-col min-w-0">
-        <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-widest leading-none mb-0.5 sm:mb-1">{label}</span>
+        <span className={`text-[9px] sm:text-[10px] font-bold tracking-widest leading-none mb-0.5 sm:mb-1 ${labelClassName || 'text-slate-400'}`}>{label}</span>
         <span className={`text-xs sm:text-sm font-black truncate ${valueClassName || 'text-slate-700'}`}>{value.toLocaleString('vi', { maximumFractionDigits: 0 })}</span>
       </div>
     </div>

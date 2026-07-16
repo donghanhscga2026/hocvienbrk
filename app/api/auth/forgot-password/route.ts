@@ -52,7 +52,31 @@ export async function POST(request: Request) {
             </div>
         `
 
-        await sendGmail(email, "Mã xác minh đặt lại mật khẩu - Học Viện BRK", htmlBody)
+        const result = await sendGmail(email, "Mã xác minh đặt lại mật khẩu - Học Viện BRK", htmlBody)
+
+        // Gửi thông báo Telegram về trạng thái gửi OTP quên mật khẩu
+        try {
+            const { sendOtpStatusNotification } = await import("@/lib/notifications")
+            await sendOtpStatusNotification(email, user.name || "Học viên", otp, result.success, result.success ? undefined : result.message, user.id)
+        } catch (e) {
+            console.error("Failed to send forgot-password OTP status notification:", e)
+        }
+
+        // Lưu log email vào DB
+        try {
+            const { logEmail } = await import("@/lib/email-logger")
+            await logEmail({
+                userId: user.id,
+                email: email,
+                type: 'forgot_password',
+                provider: result.provider || 'unknown',
+                status: result.success ? 'sent' : 'failed',
+                messageId: result.emailId,
+                error: result.success ? undefined : result.message,
+            })
+        } catch (e) {
+            console.error("Failed to log forgot-password email:", e)
+        }
 
         return NextResponse.json({ 
             success: true, 

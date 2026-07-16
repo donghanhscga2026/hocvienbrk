@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { creditBrkWallet, creditBrkdWallet } from './wallet-service'
+import { creditBrkWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 
 export async function processRevenueShareForSystem(onSystem: number, distributedAt?: Date) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
@@ -144,23 +144,54 @@ export async function processRevenueShareForSystem(onSystem: number, distributed
   const brkdShare = Math.round(brkdPoolAmount / qualifiedCount)
 
   for (const member of qualified) {
+    const cashShareDesc = await makeSystemSnapshotDescription(
+      member.userId,
+      onSystem,
+      'REVENUE_SHARE_CASH',
+      'Đồng chia 2%',
+      `Đồng chia 2% kỳ ${roundNumber}`,
+      {},
+      { cash: amountPerPerson, brkd: brkdShare }
+    )
+
     await creditBrkWallet(
       member.userId,
       amountPerPerson,
       'REVENUE_SHARE',
-      `Chia đều doanh thu kỳ ${roundNumber} (${sharePct}% của ${totalRevenue}$)`,
+      cashShareDesc,
       `pool_${pool.id}`
     )
 
     // BRKD calculated directly from BRKD pool
     if (brkdShare > 0) {
+      const brkdShareDesc = await makeSystemSnapshotDescription(
+        member.userId,
+        onSystem,
+        'REVENUE_SHARE',
+        'Đồng chia 2%',
+        `Đồng chia 2% kỳ ${roundNumber}`,
+        {},
+        { cash: amountPerPerson, brkd: brkdShare }
+      )
       await creditBrkdWallet(
         member.userId,
         brkdShare,
-        `BRKD chia doanh thu kỳ ${roundNumber}`,
+        brkdShareDesc,
         `pool_${pool.id}`
       )
     }
+
+    await createBrkTimelineRecord({
+      userId: member.userId,
+      onSystem: onSystem,
+      type: 'TRANSACTION',
+      time: distDate,
+      title: 'Đồng chia 2%',
+      description: `Đồng chia 2% kỳ ${roundNumber}`,
+      amountCash: amountPerPerson,
+      amountBrkd: brkdShare,
+      txType: 'REVENUE_SHARE'
+    })
 
     await prisma.brkRevenueAward.create({
       data: {
