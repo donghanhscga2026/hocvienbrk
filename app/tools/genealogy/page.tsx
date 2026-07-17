@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile, Award, Star, Coins, Sparkles, Gift, ArrowUpRight } from 'lucide-react'
+import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile, Award, Star, Coins, Sparkles, Gift, ArrowUpRight, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   ReactFlow,
   Node,
@@ -1861,11 +1861,22 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
       {/* History Modal Popup */}
       {showHistory && (
         <div className="fixed inset-0 bg-slate-955/70 backdrop-blur-sm z-[350] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-[90%] max-w-md md:max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[60vh] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-[98%] max-w-md md:max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col h-[90vh] max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0 rounded-t-3xl">
               <div className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-yellow-400" />
                 <h4 className="text-sm font-black uppercase tracking-wider">Lịch sử thăng tiến</h4>
+                <button
+                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  title={sortOrder === 'desc' ? "Mới nhất trước" : "Cũ nhất trước"}
+                  className="p-1 hover:bg-slate-800 active:bg-slate-700 rounded-lg transition-all text-slate-400 hover:text-white flex items-center justify-center ml-2"
+                >
+                  {sortOrder === 'desc' ? (
+                    <ArrowDown className="w-4 h-4 text-emerald-500" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4 text-rose-500" />
+                  )}
+                </button>
               </div>
               <button
                 onClick={() => setShowHistory(false)}
@@ -1887,30 +1898,6 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 </div>
               ) : (
                 <>
-                  {/* Toolbar điều khiển (Điểm hiện tại + Bộ lọc sắp xếp) */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-100/85 border border-slate-200/50 p-2.5 rounded-xl text-xs font-bold text-slate-700 shrink-0">
-                    {systemData?.totalPoints != null ? (
-                      <div className="flex items-center gap-1.5">
-                        <span>Điểm số tích lũy:</span>
-                        <span className="bg-slate-800 text-white px-2 py-0.5 rounded-md shadow text-[10px] font-black uppercase tracking-wider">
-                          Hiện tại {systemData.totalPoints.toLocaleString('vi')} MBP
-                        </span>
-                      </div>
-                    ) : (
-                      <div></div>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Sắp xếp:</span>
-                      <select
-                        value={sortOrder}
-                        onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-black text-slate-700 outline-none cursor-pointer focus:border-slate-300"
-                      >
-                        <option value="desc">Mới nhất trước (Giảm dần)</option>
-                        <option value="asc">Cũ nhất trước (Tăng dần)</option>
-                      </select>
-                    </div>
-                  </div>
 
                   <div className="relative pl-6 border-l border-slate-200 space-y-5">
                   {(() => {
@@ -2202,14 +2189,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 </>
               )}
             </div>
-            <div className="p-4 bg-white border-t border-slate-100 flex justify-end shrink-0 rounded-b-3xl">
-              <button
-                onClick={() => setShowHistory(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black transition-all"
-              >
-                ĐÓNG
-              </button>
-            </div>
+
           </div>
         </div>
       )}

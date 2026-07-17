@@ -26,6 +26,7 @@ export async function activateBrkMember(
   onSystem: number,
   enrollmentReferrerId?: number | null,
   activatedAt?: Date,
+  forcedRefSysId?: number,
 ) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
   if (!systemTree) throw new Error('System not found')
@@ -50,7 +51,7 @@ export async function activateBrkMember(
   }
 
   const effectiveReferrer = enrollmentReferrerId ?? user.referrerId
-  const refSysId = await resolvePlacement(onSystem, effectiveReferrer)
+  const refSysId = forcedRefSysId !== undefined ? forcedRefSysId : await resolvePlacement(onSystem, effectiveReferrer)
 
   const system = await prisma.system.upsert({
     where: { userId_onSystem: { userId, onSystem } },
@@ -111,9 +112,9 @@ export async function activateBrkMember(
       toLevel: 0
     })
 
-    // 2. Ghi nhận log active (F1_ACTIVE / F2_ACTIVE) cho ancestors (depth 1 và 2)
+    // 2. Ghi nhận log active (F1_ACTIVE / F2_ACTIVE / F3_ACTIVE) cho ancestors (tối đa 3 cấp bảo trợ gần nhất)
     const userAncestors = await prisma.systemClosure.findMany({
-      where: { descendantId: system.autoId, depth: { gte: 1, lte: 2 }, systemId: onSystem },
+      where: { descendantId: system.autoId, depth: { gte: 1, lte: 3 }, systemId: onSystem },
       orderBy: { depth: 'asc' },
       include: { ancestor: true }
     })
@@ -124,19 +125,27 @@ export async function activateBrkMember(
       include: { user: true }
     }) : null
 
+    const grandparentClosure = userAncestors.find(c => c.depth === 2)
+    const grandparentSys = grandparentClosure ? await prisma.system.findUnique({
+      where: { autoId: grandparentClosure.ancestorId },
+      include: { user: true }
+    }) : null
+
     for (const closure of userAncestors) {
       const ancestorSys = closure.ancestor
       let descText = ""
       if (closure.depth === 1) {
-        descText = `Học viên mới F1 #${userId} ${user.name || 'N/A'} đăng ký tham gia (Đang cân nhắc)`
+        descText = `Bạn vừa có thêm F1 #${userId} ${user.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
       } else if (closure.depth === 2 && parentSys) {
-        descText = `Học viên mới F2 #${userId} ${user.name || 'N/A'} đăng ký tham gia (Đang cân nhắc) dưới leader F1 #${parentSys.userId} ${parentSys.user?.name || 'N/A'}`
+        descText = `Bạn vừa có thêm F2 #${userId} ${user.name || 'N/A'} dưới F1 #${parentSys.userId} ${parentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
+      } else if (closure.depth === 3 && grandparentSys) {
+        descText = `Bạn vừa có thêm F3 #${userId} ${user.name || 'N/A'} dưới F2 #${grandparentSys.userId} ${grandparentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
       }
 
       const activeLogDesc = await makeSystemSnapshotDescription(
         ancestorSys.userId,
         onSystem,
-        closure.depth === 1 ? 'F1_ACTIVE' : 'F2_ACTIVE',
+        closure.depth === 1 ? 'F1_ACTIVE' : (closure.depth === 2 ? 'F2_ACTIVE' : 'F3_ACTIVE'),
         'Học viên mới đăng ký',
         descText,
         {
@@ -159,7 +168,7 @@ export async function activateBrkMember(
         onSystem,
         type: 'TRANSACTION',
         time: now,
-        title: 'Học viên mới đăng ký',
+        title: 'Tăng trưởng thêm thành viên mới',
         description: descText,
         targetMemberId: userId,
         targetMemberName: user.name ?? undefined,
@@ -303,9 +312,7 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
   return { success: true }
 }
 
-export async function processGracePeriodExpirations() {
-  const now = new Date()
-
+export async function processGracePeriodExpirations(now: Date = new Date()) {
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
 
