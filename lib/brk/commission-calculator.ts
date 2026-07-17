@@ -112,7 +112,7 @@ export async function distributeCommission(
           onSystem,
           'F1_CONFIRM',
           'Tăng trưởng tích lũy',
-          `Cộng +${memberMBP.toFixed(3)} MBP & dồn +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} confirm chính thức`,
+          `Cộng +${memberMBP.toFixed(3)} điểm MBP & Doanh số +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} ${newMemberName} đã chính thức tham gia`,
           {
             newMemberId: newMemberUserId,
             newMemberName: newMemberName,
@@ -141,7 +141,7 @@ export async function distributeCommission(
             onSystem,
             'COMMISSION',
             'Thu nhập gia tăng',
-            `Hoa hồng (${earnPct}%) từ thành viên mới #${newMemberUserId} - ${newMemberName}`,
+            `Hoa hồng (${earnPct}%) từ thành viên mới F${depth} #${newMemberUserId} - ${newMemberName}`,
             {
               newMemberId: newMemberUserId,
               newMemberName: newMemberName,
@@ -166,7 +166,7 @@ export async function distributeCommission(
             onSystem,
             'COMMISSION',
             'Thu nhập gia tăng',
-            `Hoa hồng (${earnPct}%) từ thành viên mới #${newMemberUserId} - ${newMemberName}`,
+            `Hoa hồng (${earnPct}%) từ thành viên mới F${depth} #${newMemberUserId} - ${newMemberName}`,
             {
               newMemberId: newMemberUserId,
               newMemberName: newMemberName,
@@ -194,7 +194,7 @@ export async function distributeCommission(
           type: 'TRANSACTION',
           time: createdAt || new Date(),
           title: 'Thu nhập gia tăng',
-          description: `Hoa hồng (${earnPct}%) từ thành viên mới #${newMemberUserId} - ${newMemberName}`,
+          description: `Hoa hồng (${earnPct}%) từ thành viên mới F${depth} #${newMemberUserId} - ${newMemberName}`,
           amountCash: commissionAmount,
           amountBrkd: brkdAmount,
           txType: 'COMMISSION',
@@ -209,7 +209,7 @@ export async function distributeCommission(
           type: 'TRANSACTION',
           time: createdAt || new Date(),
           title: 'Tăng trưởng tích lũy',
-          description: `Cộng +${memberMBP.toFixed(3)} MBP & dồn +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} confirm chính thức`,
+          description: `Cộng +${memberMBP.toFixed(3)} điểm MBP & Doanh số +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} ${newMemberName} đã chính thức tham gia`,
           amountCash: 0,
           amountBrkd: 0, // amountBrkd = 0 để tránh cộng vào ví thu nhập!
           txType: 'COMMISSION',
