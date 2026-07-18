@@ -6,7 +6,7 @@ import { validateBranchRequirements } from './branch-validator'
 import { creditVoucherWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 import { isTestAccount } from '@/lib/test-account'
 
-export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>) {
+export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>, sourceMemberId?: number) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -91,7 +91,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       0,
       levelUpDesc,
       `level_${currentLevel}_sys_${onSystem}_user_${userId}_points`,
-      promotedAt
+      promotedAt,
+      sourceMemberId
     )
 
     await createBrkTimelineRecord({
@@ -102,7 +103,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       title: 'Thăng tiến cấp bậc',
       description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}`,
       fromLevel: currentLevel - 1,
-      toLevel: currentLevel
+      toLevel: currentLevel,
+      sourceMemberId
     })
 
     // Idempotency: skip voucher if already credited for this level
@@ -126,7 +128,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
           nextConfig.giftValue,
           voucherDesc,
           refId,
-          promotedAt
+          promotedAt,
+          sourceMemberId
         )
 
         await createBrkTimelineRecord({
@@ -137,7 +140,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
           title: 'Thưởng thăng cấp',
           description: `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
           amountVoucher: nextConfig.giftValue,
-          txType: 'VOUCHER_CREDIT'
+          txType: 'VOUCHER_CREDIT',
+          sourceMemberId
         })
       }
     }
@@ -246,7 +250,7 @@ export async function getLevelProgress(userId: number, onSystem: number) {
   }
 }
 
-export async function create2F1Voucher(userId: number, onSystem: number, createdAt?: Date) {
+export async function create2F1Voucher(userId: number, onSystem: number, createdAt?: Date, sourceMemberId?: number) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -286,7 +290,8 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     386_000,
     voucherDesc,
     `referral_2f1_sys_${onSystem}`,
-    createdAt
+    createdAt,
+    sourceMemberId
   )
 
   await createBrkTimelineRecord({
@@ -297,7 +302,8 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     title: 'Thưởng thăng cấp',
     description: `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
     amountVoucher: 386000,
-    txType: 'VOUCHER_CREDIT'
+    txType: 'VOUCHER_CREDIT',
+    sourceMemberId
   })
 
   return bonus

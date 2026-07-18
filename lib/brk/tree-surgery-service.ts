@@ -477,7 +477,7 @@ export async function moveBrkMember(
     } else if (highestQualified > currentLevel) {
       const { checkAndPromoteLevel } = await import('./level-manager')
       try {
-        await checkAndPromoteLevel(affectedId, ON_SYSTEM)
+        await checkAndPromoteLevel(affectedId, ON_SYSTEM, undefined, undefined, affectedId)
         levelsChanged++
       } catch { }
     }

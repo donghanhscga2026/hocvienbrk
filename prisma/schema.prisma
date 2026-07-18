@@ -651,21 +651,23 @@ model BrkWallet {
 }
 
 model BrkTransaction {
-  id            Int               @id @default(autoincrement())
-  walletId      Int
-  amount        Decimal           @db.Decimal(14, 2)
-  type          BrkTransactionType
-  description   String
-  refId         String?
-  balanceType   BalanceType       @default(CASH)
-  balanceBefore Decimal           @db.Decimal(14, 2)
-  balanceAfter  Decimal           @db.Decimal(14, 2)
-  createdAt     DateTime          @default(now())
-  wallet        BrkWallet         @relation(fields: [walletId], references: [id])
+  id              Int               @id @default(autoincrement())
+  walletId        Int
+  amount          Decimal           @db.Decimal(14, 2)
+  type            BrkTransactionType
+  description     String
+  refId           String?
+  sourceMemberId  Int?              // userId của member activation gây ra transaction này
+  balanceType     BalanceType       @default(CASH)
+  balanceBefore   Decimal           @db.Decimal(14, 2)
+  balanceAfter    Decimal           @db.Decimal(14, 2)
+  createdAt       DateTime          @default(now())
+  wallet          BrkWallet         @relation(fields: [walletId], references: [id])
 
   @@index([walletId, createdAt])
   @@index([type])
   @@index([walletId, type, balanceType, refId])
+  @@index([sourceMemberId])
   @@map("brk_transaction")
 }
 
@@ -690,15 +692,17 @@ model BrkRevenuePool {
 }
 
 model BrkRevenueAward {
-  id     Int            @id @default(autoincrement())
-  poolId Int
-  userId Int
-  amount Decimal        @db.Decimal(14, 2)
-  paid   Boolean        @default(false)
-  pool   BrkRevenuePool @relation(fields: [poolId], references: [id])
+  id             Int            @id @default(autoincrement())
+  poolId         Int
+  userId         Int
+  sourceMemberId Int?           // userId của member activation gây ra award này
+  amount         Decimal        @db.Decimal(14, 2)
+  paid           Boolean        @default(false)
+  pool           BrkRevenuePool @relation(fields: [poolId], references: [id])
 
   @@index([poolId])
   @@index([userId])
+  @@index([sourceMemberId])
   @@map("brk_revenue_award")
 }
 
@@ -708,6 +712,7 @@ model BrkLevelUpRecord {
   onSystem     Int
   fromLevel    Int
   toLevel      Int
+  sourceMemberId Int?   // userId của member activation gây ra level-up này
   promotedAt   DateTime @default(now())
   giftClaimed  Boolean  @default(false)
   giftClaimedAt DateTime?
@@ -724,6 +729,7 @@ model BrkReferralBonus {
   onSystem  Int
   f1Count   Int      @default(2)
   courseId  Int?
+  sourceMemberId Int? // userId của F1 member gây ra bonus này
   claimed   Boolean  @default(false)
   claimedAt DateTime?
   system    System   @relation(fields: [userId, onSystem], references: [userId, onSystem])
@@ -752,6 +758,23 @@ model BrkSystemLog {
   @@index([sourceUserId])
   @@index([createdAt])
   @@map("brk_system_log")
+}
+
+model BrkActivationLog {
+  id              Int      @id @default(autoincrement())
+  sourceUserId    Int      // Member kích hoạt
+  onSystem        Int      // System ID
+  enrollmentId    Int?     // Link enrollment
+  eventType       String   // 'ACTIVATION', 'GRACE_EXPIRY', 'DAILY_EVAL'
+  feeAmount       Decimal  @db.Decimal(14, 2)
+  affectedUserIds Json     // [userId, ...] - tất cả user bị ảnh hưởng
+  walletSnapshots Json     // { userId: { balance, brkd, voucherBalance, totalEarned } }
+  metadata        Json?    // Additional info (placement, level, etc.)
+  createdAt       DateTime @default(now())
+
+  @@index([sourceUserId, onSystem])
+  @@index([onSystem])
+  @@map("brk_activation_log")
 }
 
 model ActivityLog {
@@ -1649,6 +1672,8 @@ model BrkTimelineRecord {
   // Thông số thăng cấp (cho type = LEVEL_UP)
   fromLevel            Int?
   toLevel              Int?
+
+  sourceMemberId       Int?             // userId của member activation gây ra record này
   
   createdAt            DateTime @default(now())
 

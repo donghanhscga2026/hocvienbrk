@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Prisma, Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+import { revertMemberActivation } from "@/lib/brk/activation-service"
 
 export async function getPaymentByEnrollmentId(enrollmentId: number) {
   try {
@@ -412,7 +413,8 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
     }
 
     let count = 0
-    const blocked: { enrollmentId: number; reason: string; systemId?: number }[] = []
+    const errors: { enrollmentId: number; reason: string }[] = []
+    const brkReverted: { enrollmentId: number; systemId: number; userId: number }[] = []
 
     for (const enrollmentId of enrollmentIds) {
       const enrollment = await prisma.enrollment.findUnique({
@@ -431,12 +433,21 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
             where: { userId_onSystem: { userId: enrollment.userId, onSystem: brkTree.onSystem } }
           })
           if (brkMember?.status === 'ACTIVE') {
-            blocked.push({
-              enrollmentId,
-              reason: `#${enrollmentId} — ${enrollment.course.name_lop}: Đã kích hoạt BRK system #${brkTree.onSystem}. Cần xóa dữ liệu BRK trước khi revert.`,
-              systemId: brkTree.onSystem
-            })
-            continue
+            // Phẫu thuật revert chỉ member này thay vì chặn
+            try {
+              await revertMemberActivation(enrollment.userId, brkTree.onSystem)
+              brkReverted.push({
+                enrollmentId,
+                systemId: brkTree.onSystem,
+                userId: enrollment.userId
+              })
+            } catch (err: any) {
+              errors.push({
+                enrollmentId,
+                reason: `Lỗi revert BRK member #${enrollment.userId}: ${err.message}`
+              })
+              continue
+            }
           }
         }
       }
@@ -457,13 +468,21 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
     }
 
     revalidatePath('/tools/payments')
+    revalidatePath('/tools/brk')
+    revalidatePath('/tools/genealogy')
 
-    if (blocked.length > 0) {
-      const msg = `Đã revert ${count}/${enrollmentIds.length} enrollment.\n\nBị chặn (${blocked.length}):\n${blocked.map(b => b.reason).join('\n')}`
-      return { success: true, count, blocked, message: msg }
+    const messages: string[] = []
+    if (brkReverted.length > 0) {
+      messages.push(`Đã phẫu thuật revert ${brkReverted.length} BRK member: ${brkReverted.map(r => `#${r.userId} (sys #${r.systemId})`).join(', ')}`)
+    }
+    if (errors.length > 0) {
+      messages.push(`Lỗi (${errors.length}): ${errors.map(e => `#${e.enrollmentId}: ${e.reason}`).join('; ')}`)
+    }
+    if (messages.length === 0) {
+      messages.push(`Đã revert ${count}/${enrollmentIds.length} enrollment.`)
     }
 
-    return { success: true, count }
+    return { success: true, count, brkReverted, errors, message: messages.join('\n') }
   } catch (error: any) {
     console.error('Revert To Pending Error:', error)
     return { success: false, error: error.message }
