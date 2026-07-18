@@ -77,15 +77,15 @@ export async function distributeCommission(
   const parentName = parentUser?.name || 'N/A'
 
   await Promise.all(ancestorCredits.map(async ({ uplineSystem, uplineLevel, earnPct, depth }) => {
-    let alreadyProcessed = false
-    if (earnPct > 0) {
-      const existingComm = await prisma.brkTransaction.findFirst({
-        where: { wallet: { userId: uplineSystem.userId }, type: 'COMMISSION', refId: commissionRefId }
-      })
-      if (existingComm) {
-        alreadyProcessed = true
+    const existingTimeline = await prisma.brkTimelineRecord.findFirst({
+      where: {
+        userId: uplineSystem.userId,
+        onSystem,
+        txType: 'COMMISSION',
+        targetMemberId: newMemberUserId
       }
-    }
+    })
+    const alreadyProcessed = !!existingTimeline
 
     if (!alreadyProcessed) {
       await prisma.system.update({

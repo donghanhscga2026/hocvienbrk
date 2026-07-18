@@ -8,7 +8,7 @@ export type ActivityAction =
   | 'PASSWORD_CHANGE' | 'PASSWORD_RESET'
   | 'PROFILE_UPDATE'
   | 'ENROLL_FREE' | 'ENROLL_PAID' | 'ENROLL_AFTER_REGISTER' | 'BULK_ENROLL'
-  | 'PAYMENT_VERIFIED' | 'PAYMENT_AUTO_VERIFIED' | 'PAYMENT_REJECTED'
+  | 'PAYMENT_VERIFIED' | 'PAYMENT_AUTO_VERIFIED' | 'PAYMENT_REJECTED' | 'PAYMENT_REVERTED' | 'ENROLLMENT_CANCELLED'
   | 'LESSON_COMPLETE' | 'LESSON_SUBMIT'
   | 'AFFILIATE_CLICK' | 'AFFILIATE_CONVERSION'
   | 'WALLET_CHANGE'
@@ -21,6 +21,7 @@ export async function logActivity(data: {
   action: ActivityAction
   detail?: string
   metadata?: Record<string, any>
+  createdAt?: Date
 }): Promise<void> {
   try {
     await prisma.activityLog.create({
@@ -29,6 +30,7 @@ export async function logActivity(data: {
         action: data.action,
         detail: data.detail || null,
         metadata: data.metadata || undefined,
+        ...(data.createdAt ? { createdAt: data.createdAt } : {}),
       }
     })
   } catch (error) {

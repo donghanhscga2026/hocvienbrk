@@ -60,7 +60,7 @@ async function creditBalance(
     ])
 
     return [updatedWallet] as const
-  })
+  }, { timeout: 30000 })
 
   try {
     const { logActivity } = await import('@/lib/activity-logger')
@@ -147,7 +147,7 @@ export async function debitBrkWallet(
     ])
 
     return [updatedWallet] as const
-  })
+  }, { timeout: 30000 })
 
   try {
     const { logActivity } = await import('@/lib/activity-logger')
@@ -265,7 +265,7 @@ export async function createBrkTimelineRecord(data: {
   if (brkdVol === undefined || cashVol === undefined) {
     const lastRec = await prisma.brkTimelineRecord.findFirst({
       where: { userId: data.userId, onSystem: data.onSystem },
-      orderBy: { time: 'desc' }
+      orderBy: { id: 'desc' }
     })
     brkdVol = lastRec ? Number(lastRec.accumulatedBrkdVolume) : 0
     cashVol = lastRec ? Number(lastRec.accumulatedCashVolume) : 0

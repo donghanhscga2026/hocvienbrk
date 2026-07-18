@@ -1782,28 +1782,12 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 {isBrk ? (
                   <>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày kích hoạt" value={systemData?.joinedAt ? new Date(systemData.joinedAt).toLocaleDateString('vi-VN') : '---'} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={systemData?.joinedAt ? new Date(systemData.joinedAt).toLocaleDateString('vi-VN') : '---'} />
                       <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                       <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng" value={systemData?.totalPoints != null ? `${systemData.totalPoints.toLocaleString('vi')} (MP)` : '0 (MP)'} />
                       <InfoItem icon={<Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />} label="Số thành viên nhóm" value={systemData?.teamSize != null ? `${systemData.teamSize.toLocaleString('vi')}` : '0'} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem
-                        icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
-                        label="Doanh số VNĐ"
-                        value={systemData?.teamTotalVnd != null ? `${systemData.teamTotalVnd.toLocaleString('vi')} VNĐ` : '0 VNĐ'}
-                        labelClassName="text-[8px] text-slate-400/80 font-bold uppercase tracking-wider"
-                        valueClassName="text-[8px] font-semibold text-slate-400/80"
-                      />
-                      <InfoItem
-                        icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />}
-                        label="Doanh số MBDT"
-                        value={systemData?.teamTotalBrkd != null ? systemData.teamTotalBrkd.toLocaleString('vi', { maximumFractionDigits: 0 }) : '0'}
-                        labelClassName="text-[9px] text-emerald-600 font-bold uppercase tracking-wider"
-                        valueClassName="text-[14px] font-extrabold text-red-500"
-                      />
                     </div>
                   </>
                 ) : (
@@ -1818,16 +1802,17 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 )}
               </div>
 
-              {/* Wallet Section (BRK only) - mt-2 và bỏ border-t / padding ngăn cách */}
+              {/* Wallet & Revenue Section (BRK only) */}
               {isBrk && systemData?.wallet && (
-                <div className="mt-2">
+                <div className="mt-2 space-y-1.5 sm:space-y-2">
+                  {/* Dòng 1: Doanh số MBDT (trái) & Thu nhập MBDT (phải) */}
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <WalletItem
-                      icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
-                      label="Thu nhập VNĐ"
-                      value={systemData.wallet.balance}
-                      labelClassName="text-[8px] text-slate-400/80 font-bold uppercase tracking-wider"
-                      valueClassName="text-[8px] font-medium text-slate-400/80"
+                      icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />}
+                      label="Doanh số MBDT"
+                      value={systemData?.teamTotalBrkd || 0}
+                      labelClassName="text-[9px] text-emerald-600 font-bold uppercase tracking-wider"
+                      valueClassName="text-[14px] font-extrabold text-red-500"
                     />
                     <WalletItem
                       icon={<Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-500" />}
@@ -1836,8 +1821,34 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       labelClassName="text-[9px] text-emerald-600 font-bold uppercase tracking-wider"
                       valueClassName="text-[14px] font-extrabold text-red-500"
                     />
-                    <WalletItem icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />} label="Voucher" value={systemData.wallet.voucherBalance} />
-                    <WalletItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Đã rút (VNĐ)" value={systemData.wallet.totalWithdrawn} />
+                  </div>
+
+                  {/* Dòng 2: Doanh số VNĐ (trái) & Thu nhập VNĐ (phải) */}
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <InfoItem
+                      icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
+                      label="Doanh số VNĐ"
+                      value={systemData?.teamTotalVnd != null ? systemData.teamTotalVnd.toLocaleString('vi') : '0'}
+                    />
+                    <WalletItem
+                      icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
+                      label="Thu nhập VNĐ"
+                      value={systemData.wallet.totalEarned}
+                    />
+                  </div>
+
+                  {/* Dòng 3: Voucher (trái) & Số dư (VNĐ) (phải) */}
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <WalletItem
+                      icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />}
+                      label="Voucher"
+                      value={systemData.wallet.voucherBalance}
+                    />
+                    <WalletItem
+                      icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />}
+                      label="Số dư (VNĐ)"
+                      value={systemData.wallet.balance}
+                    />
                   </div>
                 </div>
               )}

@@ -557,3 +557,13 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ Thêm thông tin độ sâu F vào Hoa hồng: Cập nhật mô tả hoa hồng chênh lệch "Thu nhập gia tăng" tại `commission-calculator.ts` thành `"Hoa hồng (X%) từ thành viên mới F[depth] #${newMemberUserId} - ${newMemberName}"` để hiển thị rõ ràng tầng F.
 - ✅ Bảo toàn cấu trúc cây bảo trợ 100%: Mở rộng hàm live `activateBrkMember` nhận thêm tham số `forcedRefSysId?: number`. Cập nhật `rebuild-service.ts` để đọc và lưu trữ Map cấu trúc cây bảo trợ (`refSysId`) hiện tại từ DB thật trước khi cleanup, sau đó áp cứng khi rebuild để giữ nguyên 100% cây thật, tránh lệch 11 học viên do thứ tự kích hoạt trùng lặp.
 - ✅ Chạy thành công nạp lại toàn bộ dữ liệu: Thực thi lệnh `npx ts-node --compiler-options '{"module":"CommonJS"}' -r tsconfig-paths/register scripts/replay/run_all_days.ts` hoàn tất trơn tru, làm sạch DB và cập nhật lại toàn bộ phát sinh (điểm, cấp bậc, hoa hồng, timeline lịch sử) từ 2/7 đến 17/7 chuẩn xác 100% theo logic mới.
+- ✅ Khôi phục sơ đồ cây từ file JSON và sửa lỗi reset doanh số dồn:
+  - Cập nhật `rebuild-service.ts` để load trực tiếp Map cơ cấu cây (`userId -> refSysId`) từ file backup `simulation_state.json`, đảm bảo cây dựng lại chuẩn xác tuyệt đối 100% kể cả khi DB cũ bị trống hoặc lệch cấu trúc.
+  - Sửa lỗi lấy sai bản ghi timeline cũ khi tính toán dồn điểm/doanh số trong hàm `createBrkTimelineRecord` bằng cách đổi từ `orderBy: { time: 'desc' }` sang `orderBy: { id: 'desc' }`, giúp hiển thị nhất quán Cấp bậc và Doanh số dồn nhóm trên giao diện Cây bảo trợ (Genealogy).
+- ✅ Đồng bộ hóa và nhất quán hóa Ngày tham gia / Ngày lên cấp:
+  - Cập nhật Server Action `getMemberDetailsAction` để truy vấn Ngày tham gia (`joinedAt`) trực tiếp từ bản ghi timeline có `type: 'ACTIVATION'` (mốc kích hoạt ban đầu) và Ngày lên cấp (`levelUpdatedAt`) từ bản ghi thăng cấp mới nhất có `type: 'LEVEL_UP'` trong bảng `BrkTimelineRecord`. Điều này đồng bộ 100% hai mốc hiển thị này về một bảng lịch sử duy nhất.
+  - Đổi nhãn `"Ngày kích hoạt"` thành `"Ngày tham gia"` trong giao diện popup chi tiết thành viên tại `app/tools/genealogy/page.tsx` để đồng nhất với định nghĩa nghiệp vụ mới.
+- ✅ Tái cấu trúc Layout và thông số hiển thị Popup chi tiết thành viên:
+  - Gom các nhãn thông số tài chính theo dòng ngang: Dòng 1 (Doanh số MBDT - Thu nhập MBDT), Dòng 2 (Doanh số VNĐ - Thu nhập VNĐ), Dòng 3 (Voucher - Số dư VNĐ).
+  - Loại bỏ chữ "VNĐ" ở phần hiển thị số của Doanh số VNĐ.
+  - Đổi nhãn `"Đã rút (VNĐ)"` thành `"Số dư (VNĐ)"` và trỏ giá trị hiển thị về số tiền khả dụng thực tế còn lại trong ví (`wallet.balance`).

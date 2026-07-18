@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { activateBrkMember, processGracePeriodExpirations } from './activation-service';
 import { processRevenueShareForSystem } from './revenue-share-service';
+import { processSystemDailyEval } from './daily-eval-service';
 
 async function cleanup() {
   const systems = await prisma.system.findMany({
@@ -10,6 +11,11 @@ async function cleanup() {
   });
   const userIds = systems.map(r => r.userId);
   const autoIds = systems.map(r => r.autoId);
+
+  // Xóa sạch các log ví thừa WALLET_CHANGE trong activity_log
+  await prisma.activityLog.deleteMany({
+    where: { action: 'WALLET_CHANGE' }
+  });
 
   if (userIds.length === 0) return;
 
@@ -25,6 +31,7 @@ async function cleanup() {
       where: { OR: [{ ancestorId: { in: autoIds } }, { descendantId: { in: autoIds } }] }
     });
   }
+  await prisma.brkTimelineRecord.deleteMany({ where: { onSystem: 4 } });
   await prisma.brkLevelUpRecord.deleteMany({ where: { onSystem: 4 } });
   await prisma.brkReferralBonus.deleteMany({ where: { onSystem: 4 } });
 
@@ -53,12 +60,13 @@ async function executeMethodA(
   enrollments: any[],
   systemTree: any,
   fee: number,
-  savedPlacements: Map<number, number>
+  savedPlacements: Map<number, number>,
+  activationDateMap: Map<number, Date>
 ) {
   const now = new Date();
   for (const enrollment of enrollments) {
     const userId = enrollment.userId;
-    const activatedAt = enrollment.payment?.transferTime || enrollment.payment?.verifiedAt || enrollment.createdAt;
+    const activatedAt = activationDateMap.get(userId) || enrollment.payment?.transferTime || enrollment.payment?.verifiedAt || enrollment.createdAt;
     
     const forcedRefSysId = savedPlacements.get(userId) ?? 0;
 
@@ -68,6 +76,7 @@ async function executeMethodA(
 
   const latestEval = getCurrentEvalTime();
   await processGracePeriodExpirations(latestEval);
+  await processSystemDailyEval(systemTree, latestEval, latestEval);
 
   await processRevenueShareForSystem(
     4,
@@ -79,11 +88,12 @@ async function executeMethodB(
   enrollments: any[],
   systemTree: any,
   fee: number,
-  savedPlacements: Map<number, number>
+  savedPlacements: Map<number, number>,
+  activationDateMap: Map<number, Date>
 ) {
   const enrollByDay: Map<string, any[]> = new Map();
   for (const e of enrollments) {
-    const activatedAt = e.payment?.transferTime || e.payment?.verifiedAt || e.createdAt;
+    const activatedAt = activationDateMap.get(e.userId) || e.payment?.transferTime || e.payment?.verifiedAt || e.createdAt;
     const dayStr = activatedAt.toLocaleDateString('vi-VN');
     if (!enrollByDay.has(dayStr)) enrollByDay.set(dayStr, []);
     enrollByDay.get(dayStr)!.push(e);
@@ -99,7 +109,7 @@ async function executeMethodB(
 
     for (const enrollment of dayEnrollments) {
       const userId = enrollment.userId;
-      const activatedAt = enrollment.payment?.transferTime || enrollment.payment?.verifiedAt || enrollment.createdAt;
+      const activatedAt = activationDateMap.get(userId) || enrollment.payment?.transferTime || enrollment.payment?.verifiedAt || enrollment.createdAt;
 
       const forcedRefSysId = savedPlacements.get(userId) ?? 0;
 
@@ -110,8 +120,11 @@ async function executeMethodB(
     const evalTime = getEvalTime(Number(y), Number(m) - 1, Number(d) + 1);
     if (evalTime > now) break;
 
-    // Chạy confirm cho toàn bộ những người hết hạn grace period tính đến thời điểm evalTime
+    // Chạy confirm (Cron confirm 1) cho toàn bộ những người hết hạn grace period tính đến thời điểm evalTime
     await processGracePeriodExpirations(evalTime);
+
+    // Chạy daily eval (Cron confirm 2 - dồn hoa hồng & thăng tiến cấp bậc) tính đến thời điểm evalTime
+    await processSystemDailyEval(systemTree, evalTime, evalTime);
 
     daysProcessed++;
     if (daysProcessed % 3 === 0) {
@@ -119,17 +132,63 @@ async function executeMethodB(
     }
   }
 
-  // Gọi confirm cho toàn bộ những người hết hạn grace period còn lại tính đến thời điểm hiện tại
+  // Chạy confirm và daily eval cho toàn bộ những người hết hạn grace period còn lại tính đến thời điểm hiện tại
   await processGracePeriodExpirations(now);
+  await processSystemDailyEval(systemTree, now, now);
 }
 
 export async function rebuildSystem4Data(method: 'A' | 'B') {
-  // 1. Lưu trữ cấu trúc cây bảo trợ (refSysId) hiện tại từ DB thực tế trước khi dọn dẹp
-  const currentSystems = await prisma.system.findMany({
-    where: { onSystem: 4 },
-    select: { userId: true, refSysId: true }
+  // 1. Đọc và lưu trữ cấu trúc cây bảo trợ (refSysId) từ file simulation_state.json gốc hoặc DB thực tế trước khi dọn dẹp
+  const savedPlacements = new Map<number, number>();
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const statePath = path.join(process.cwd(), 'plan_temp', 'simulation_state.json');
+    if (fs.existsSync(statePath)) {
+      const data = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+      if (data.memberStates) {
+        for (const m of data.memberStates) {
+          savedPlacements.set(Number(m.userId), Number(m.refSysId));
+        }
+      }
+      console.log(`📦 Đã load thành công ${savedPlacements.size} cấu trúc cây bảo trợ gốc từ simulation_state.json`);
+    } else {
+      throw new Error('simulation_state.json not found');
+    }
+  } catch (err) {
+    console.warn("⚠️ Không thể đọc file simulation_state.json, sẽ dùng DB hiện tại làm fallback:", err);
+    const currentSystems = await prisma.system.findMany({
+      where: { onSystem: 4 },
+      select: { userId: true, refSysId: true }
+    });
+    for (const s of currentSystems) {
+      savedPlacements.set(s.userId, s.refSysId);
+    }
+  }
+
+  // 2. Load map thời gian kích hoạt thực tế từ ActivityLog (action = 'PAYMENT_VERIFIED' hoặc 'PAYMENT_AUTO_VERIFIED' cho khóa học 22)
+  const paymentLogs = await prisma.activityLog.findMany({
+    where: { action: { in: ['PAYMENT_VERIFIED', 'PAYMENT_AUTO_VERIFIED'] } }
   });
-  const savedPlacements = new Map(currentSystems.map(s => [s.userId, s.refSysId]));
+  const activationDateMap = new Map<number, Date>();
+  for (const log of paymentLogs) {
+    const meta = log.metadata as any;
+    if (meta && (meta.courseId === 22 || meta.courseId === '22')) {
+      activationDateMap.set(log.userId, log.createdAt);
+    }
+  }
+  // Bổ sung lấy từ Payment và Enrollment cho những học viên thiếu log
+  const enrollmentsDb = await prisma.enrollment.findMany({
+    where: { courseId: 22 },
+    include: { payment: true }
+  });
+  for (const e of enrollmentsDb) {
+    if (!activationDateMap.has(e.userId)) {
+      const date = e.payment?.transferTime || e.payment?.verifiedAt || e.createdAt;
+      activationDateMap.set(e.userId, date);
+    }
+  }
+  console.log(`📦 Đã tải ${activationDateMap.size} mốc thời gian kích hoạt thực tế từ ActivityLog và Payments.`);
 
   await cleanup();
 
@@ -159,8 +218,8 @@ export async function rebuildSystem4Data(method: 'A' | 'B') {
   });
 
   enrollments.sort((a, b) => {
-    const ta = a.payment?.transferTime || a.payment?.verifiedAt || a.createdAt;
-    const tb = b.payment?.transferTime || b.payment?.verifiedAt || b.createdAt;
+    const ta = activationDateMap.get(a.userId) || a.payment?.transferTime || a.payment?.verifiedAt || a.createdAt;
+    const tb = activationDateMap.get(b.userId) || b.payment?.transferTime || b.payment?.verifiedAt || b.createdAt;
     return ta.getTime() - tb.getTime();
   });
 
@@ -168,8 +227,8 @@ export async function rebuildSystem4Data(method: 'A' | 'B') {
   const fee = Number(systemTree?.fee || 26868);
 
   if (method === 'A') {
-    await executeMethodA(enrollments, systemTree, fee, savedPlacements);
+    await executeMethodA(enrollments, systemTree, fee, savedPlacements, activationDateMap);
   } else {
-    await executeMethodB(enrollments, systemTree, fee, savedPlacements);
+    await executeMethodB(enrollments, systemTree, fee, savedPlacements, activationDateMap);
   }
 }
