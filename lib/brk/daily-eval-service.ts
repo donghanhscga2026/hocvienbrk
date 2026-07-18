@@ -7,7 +7,8 @@ import type { SystemTree } from '@prisma/client'
 export async function processSystemDailyEval(
   systemTree: SystemTree,
   evalTime: Date,
-  now: Date
+  now: Date,
+  sourceMemberId?: number // New optional param
 ) {
   const onSystem = systemTree.onSystem
   const fee = Number(systemTree.fee)
@@ -53,17 +54,18 @@ export async function processSystemDailyEval(
       systemTree,
       evalTime,
       configMap,
-      memberMBDT
+      memberMBDT,
+      member.userId
     )
 
     if (member.refSysId > 0) {
-      await create2F1Voucher(member.refSysId, onSystem, evalTime)
+      await create2F1Voucher(member.refSysId, onSystem, evalTime, member.userId)
     }
 
-    await checkAndPromoteLevel(member.userId, onSystem, evalTime, configMap)
+    await checkAndPromoteLevel(member.userId, onSystem, evalTime, configMap, member.userId)
 
     for (const { uplineSystem } of commissionResult.ancestorCredits) {
-      await checkAndPromoteLevel(uplineSystem.userId, onSystem, evalTime, configMap)
+      await checkAndPromoteLevel(uplineSystem.userId, onSystem, evalTime, configMap, uplineSystem.userId)
     }
 
     confirmed++

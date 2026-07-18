@@ -24,7 +24,8 @@ async function creditBalance(
   type: BrkTransactionType,
   description: string,
   refId?: string,
-  createdAt?: Date
+  createdAt?: Date,
+  sourceMemberId?: number
 ) {
   await ensureBrkWallet(userId)
   const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : 'balance'
@@ -51,6 +52,7 @@ async function creditBalance(
           type,
           description,
           refId,
+          sourceMemberId,
           balanceType,
           balanceBefore: oldVal,
           balanceAfter: newVal,
@@ -81,9 +83,10 @@ export async function creditBrkWallet(
   type: BrkTransactionType,
   description: string,
   refId?: string,
-  createdAt?: Date
+  createdAt?: Date,
+  sourceMemberId?: number
 ) {
-  return creditBalance(userId, amount, 'CASH', type, description, refId, createdAt)
+  return creditBalance(userId, amount, 'CASH', type, description, refId, createdAt, sourceMemberId)
 }
 
 export async function creditBrkdWallet(
@@ -91,9 +94,10 @@ export async function creditBrkdWallet(
   amount: number,
   description: string,
   refId?: string,
-  createdAt?: Date
+  createdAt?: Date,
+  sourceMemberId?: number
 ) {
-  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId, createdAt)
+  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId, createdAt, sourceMemberId)
 }
 
 export async function creditVoucherWallet(
@@ -101,9 +105,10 @@ export async function creditVoucherWallet(
   amount: number,
   description: string,
   refId?: string,
-  createdAt?: Date
+  createdAt?: Date,
+  sourceMemberId?: number
 ) {
-  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt)
+  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt, sourceMemberId)
 }
 
 export async function debitBrkWallet(
@@ -111,7 +116,8 @@ export async function debitBrkWallet(
   amount: number,
   type: BrkTransactionType,
   description: string,
-  refId?: string
+  refId?: string,
+  sourceMemberId?: number
 ) {
   await ensureBrkWallet(userId)
 
@@ -139,6 +145,7 @@ export async function debitBrkWallet(
           type,
           description,
           refId,
+          sourceMemberId,
           balanceType: 'CASH',
           balanceBefore: Number(wallet.balance),
           balanceAfter: newBalance,
@@ -236,6 +243,7 @@ export async function createBrkTimelineRecord(data: {
   pathStr?: string
   fromLevel?: number
   toLevel?: number
+  sourceMemberId?: number
 }) {
   let cash = data.accumulatedCash
   let brkd = data.accumulatedBrkd
@@ -305,7 +313,8 @@ export async function createBrkTimelineRecord(data: {
       targetMemberName: data.targetMemberName,
       pathStr: data.pathStr,
       fromLevel: data.fromLevel,
-      toLevel: data.toLevel
+      toLevel: data.toLevel,
+      sourceMemberId: data.sourceMemberId
     }
   })
 }

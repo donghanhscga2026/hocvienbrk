@@ -208,38 +208,19 @@ export default function PaymentsPage() {
     setBulkLoading(true)
     const result = await revertToPendingAction(enrollmentIds)
     if (result.success) {
-      if (result.blocked && result.blocked.length > 0) {
-        const systemIds = [...new Set(result.blocked.map((b: any) => b.systemId).filter(Boolean))]
-        const blockedIds = result.blocked.map((b: any) => b.enrollmentId)
-
-        const detail = result.blocked.map((b: any) => `  • #${b.enrollmentId}`).join('\n')
-        const msg = systemIds.length > 0
-          ? `${result.blocked.length} enrollment bị chặn do BRK ACTIVE.\n\n${detail}\n\n⚠️ System #${systemIds.join(', #')} có dữ liệu BRK cần xóa TRƯỚC khi revert.\n\nBạn có muốn xóa toàn bộ dữ liệu BRK của system và revert lại?`
-          : `${result.blocked.length} enrollment bị chặn.\n\n${detail}`
-
-        if (systemIds.length > 0 && confirm(msg)) {
-          for (const sysId of systemIds) {
-            const resetResult = await resetSystemForRebuildAction(sysId)
-            if (!resetResult.success) {
-              alert(`❌ Lỗi reset system #${sysId}: ${resetResult.error}`)
-              setBulkLoading(false)
-              return
-            }
-          }
-
-          const retryResult = await revertToPendingAction(blockedIds)
-          if (retryResult.success) {
-            const totalReverted = (result.count || 0) + (retryResult.count || 0)
-            alert(`✅ Đã xóa BRK & revert tổng cộng ${totalReverted} enrollment.`)
-          } else {
-            alert(`❌ Lỗi khi revert lại: ${retryResult.error}`)
-          }
-        } else {
-          alert(`⚠️ Đã revert ${result.count || 0}/${enrollmentIds.length} enrollment.\n\nBị chặn (${result.blocked.length}):\n${result.blocked.map((b: any) => b.reason).join('\n')}`)
-        }
-      } else {
-        alert(`✅ Đã đổi ${result.count} đăng ký về Chờ duyệt.`)
+      const messages: string[] = []
+      
+      if (result.brkReverted && result.brkReverted.length > 0) {
+        messages.push(`✅ Đã phẫu thuật revert ${result.brkReverted.length} BRK member: ${result.brkReverted.map(r => `#${r.userId}`).join(', ')}`)
       }
+      if (result.errors && result.errors.length > 0) {
+        messages.push(`⚠️ Lỗi (${result.errors.length}): ${result.errors.map(e => `#${e.enrollmentId}: ${e.reason}`).join('; ')}`)
+      }
+      if (result.count && result.count > 0) {
+        messages.push(`✅ Đã đổi ${result.count} đăng ký về Chờ duyệt.`)
+      }
+      
+      alert(messages.join('\n'))
       await loadData()
     } else {
       alert(`❌ Lỗi: ${result.error}`)

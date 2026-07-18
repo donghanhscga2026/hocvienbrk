@@ -98,7 +98,8 @@ export async function activateBrkMember(
       0,
       joinDesc,
       `sys_${onSystem}_user_${userId}_join`,
-      now
+      now,
+      userId
     )
 
     await createBrkTimelineRecord({
@@ -109,7 +110,8 @@ export async function activateBrkMember(
       title: 'Đã kích hoạt hệ thống',
       description: `Đang trong thời gian ${graceDays * 24}h cân nhắc, Cấp 0.`,
       fromLevel: undefined,
-      toLevel: 0
+      toLevel: 0,
+      sourceMemberId: userId
     })
 
     // 2. Ghi nhận log active (F1_ACTIVE / F2_ACTIVE / F3_ACTIVE) cho ancestors (tối đa 3 cấp bảo trợ gần nhất)
@@ -160,7 +162,8 @@ export async function activateBrkMember(
         0,
         activeLogDesc,
         `sys_${onSystem}_user_${ancestorSys.userId}_under_${userId}_active`,
-        now
+        now,
+        userId
       )
 
       await createBrkTimelineRecord({
@@ -172,7 +175,8 @@ export async function activateBrkMember(
         description: descText,
         targetMemberId: userId,
         targetMemberName: user.name ?? undefined,
-        txType: 'ADJUSTMENT'
+        txType: 'ADJUSTMENT',
+        sourceMemberId: userId
       })
     }
 
@@ -185,12 +189,12 @@ export async function activateBrkMember(
     where: { userId_onSystem: { userId, onSystem } },
     data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
   })
-  await distributeCommission(userId, onSystem, fee, systemTree, now)
+  await distributeCommission(userId, onSystem, fee, systemTree, now, undefined, undefined, userId)
 
-  await checkAndPromoteLevel(userId, onSystem, now)
+  await checkAndPromoteLevel(userId, onSystem, now, undefined, userId)
 
   if (refSysId > 0) {
-    await create2F1Voucher(refSysId, onSystem, now)
+    await create2F1Voucher(refSysId, onSystem, now, userId)
   }
 
   return system
@@ -442,10 +446,10 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
 
       // 3. Nếu là Method A, thực hiện ngay commission + level check + 2F1 voucher
       if (!isOptionB) {
-        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT)
-        await checkAndPromoteLevel(member.userId, member.onSystem, recordTime)
+        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId)
+        await checkAndPromoteLevel(member.userId, member.onSystem, recordTime, undefined, member.userId)
         if (member.refSysId > 0) {
-          await create2F1Voucher(member.refSysId, member.onSystem, recordTime)
+          await create2F1Voucher(member.refSysId, member.onSystem, recordTime, member.userId)
         }
       }
 
@@ -454,4 +458,173 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
   }
 
   return { processed: count }
+}
+
+export async function revertMemberActivation(
+  sourceMemberId: number,
+  onSystem: number,
+  activatedAt?: Date
+): Promise<void> {
+  const system = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId: sourceMemberId, onSystem } }
+  })
+  if (!system) {
+    throw new Error(`System record not found for user ${sourceMemberId} onSystem ${onSystem}`)
+  }
+
+  // --- BƯỚC 1: Lấy danh sách ancestors trước khi xóa closure ---
+  const ancestorClosures = await prisma.systemClosure.findMany({
+    where: { descendantId: system.autoId, systemId: onSystem, depth: { gte: 1 } },
+    include: { ancestor: true }
+  })
+  const ancestorAutoIds = ancestorClosures.map(c => c.ancestor)
+
+  // --- BƯỚC 2: Xóa dấu vết của member này khỏi ví và timeline của TỪNG ANCESTOR ---
+  // Các refId pattern được tạo bởi commission-calculator và activation-service
+  const commissionRefId = `sys_${onSystem}_member_${sourceMemberId}`
+  const pointsRefId     = `sys_${onSystem}_member_${sourceMemberId}_points`
+
+  for (const ancestorSys of ancestorAutoIds) {
+    const ancestorUserId = ancestorSys.userId
+    const wallet = await prisma.brkWallet.findUnique({ where: { userId: ancestorUserId } })
+    if (!wallet) continue
+
+    // Lấy các transactions liên quan đến member này trên ví của ancestor
+    const relatedTxs = await prisma.brkTransaction.findMany({
+      where: {
+        walletId: wallet.id,
+        OR: [
+          { refId: commissionRefId },
+          { refId: pointsRefId },
+          { sourceMemberId: sourceMemberId },
+        ]
+      }
+    })
+
+    // Tính tổng cần trừ lại theo từng loại ví
+    let cashToDeduct    = 0
+    let brkdToDeduct    = 0
+    let voucherToDeduct = 0
+    let totalEarnedToDeduct = 0
+
+    for (const tx of relatedTxs) {
+      const amt = Number(tx.amount)
+      if (amt <= 0) continue // chỉ trừ các khoản đã credit (dương)
+      if (tx.balanceType === 'CASH')    { cashToDeduct    += amt; totalEarnedToDeduct += amt }
+      if (tx.balanceType === 'BRKD')    { brkdToDeduct    += amt }
+      if (tx.balanceType === 'VOUCHER') { voucherToDeduct += amt }
+    }
+
+    // Trừ ngược balance ví của ancestor (floor at 0 để tránh âm)
+    if (cashToDeduct > 0 || brkdToDeduct > 0 || voucherToDeduct > 0) {
+      await prisma.brkWallet.update({
+        where: { userId: ancestorUserId },
+        data: {
+          balance:        { decrement: cashToDeduct },
+          brkd:           { decrement: brkdToDeduct },
+          voucherBalance: { decrement: voucherToDeduct },
+          totalEarned:    { decrement: totalEarnedToDeduct },
+        }
+      })
+    }
+
+    // Xóa các BrkTransaction liên quan
+    if (relatedTxs.length > 0) {
+      await prisma.brkTransaction.deleteMany({
+        where: { id: { in: relatedTxs.map(t => t.id) } }
+      })
+    }
+
+    // Trừ điểm MBP đã cộng cho ancestor từ member này
+    // Dùng pointsRefId để xác định chính xác, không trừ lại nếu không có transaction
+    const hadPointsTx = relatedTxs.some(t => t.refId === pointsRefId)
+    if (hadPointsTx) {
+      // Tính memberMBP từ MBDT gốc (đọc từ tx hoặc dùng mặc định)
+      const returnBrkdRefId = `return_brkd_sys_${onSystem}_user_${sourceMemberId}`
+      const returnBrkdTx = await prisma.brkTransaction.findFirst({
+        where: { wallet: { userId: sourceMemberId }, refId: returnBrkdRefId }
+      })
+      const memberMBDT = returnBrkdTx ? Math.round(Number(returnBrkdTx.amount) / 0.21) : 12_868_686
+      const MBDT_BASE = 12_000_000
+      const memberMBP = Math.round((memberMBDT / MBDT_BASE) * 16 * 1000) / 1000
+
+      await prisma.system.update({
+        where: { autoId: ancestorSys.autoId },
+        data: { totalPoints: { decrement: memberMBP } }
+      })
+    }
+
+    // Xóa timeline records của ancestor liên quan đến member này
+    await prisma.brkTimelineRecord.deleteMany({
+      where: {
+        userId: ancestorUserId,
+        onSystem,
+        OR: [
+          { targetMemberId: sourceMemberId },
+          { sourceMemberId: sourceMemberId },
+        ]
+      }
+    })
+
+    // Kiểm tra và hạ cấp ancestor nếu điểm tụt dưới ngưỡng
+    const updatedAncestorSys = await prisma.system.findUnique({ where: { autoId: ancestorSys.autoId } })
+    if (updatedAncestorSys && (updatedAncestorSys.level || 0) > 1) {
+      const { getAllLevelConfigs } = await import('./config-service')
+      const allConfigs = await getAllLevelConfigs(onSystem)
+      const currentPts = Number(updatedAncestorSys.totalPoints || 0)
+      // Tìm cấp cao nhất mà ancestor còn đủ điều kiện
+      let eligibleLevel = 1
+      for (const cfg of allConfigs.sort((a, b) => a.level - b.level)) {
+        if (currentPts >= Number(cfg.pointsRequired)) {
+          eligibleLevel = cfg.level
+        }
+      }
+      if (eligibleLevel < (updatedAncestorSys.level || 0)) {
+        await prisma.system.update({
+          where: { autoId: ancestorSys.autoId },
+          data: { level: eligibleLevel }
+        })
+        // Xóa BrkLevelUpRecord cao hơn eligibleLevel
+        await prisma.brkLevelUpRecord.deleteMany({
+          where: { userId: ancestorUserId, onSystem, toLevel: { gt: eligibleLevel } }
+        })
+      }
+    }
+  }
+
+  // --- BƯỚC 3: Xóa toàn bộ BrkTransaction của chính member ---
+  const memberWallet = await prisma.brkWallet.findUnique({ where: { userId: sourceMemberId } })
+  if (memberWallet) {
+    await prisma.brkTransaction.deleteMany({ where: { walletId: memberWallet.id } })
+    // Zero ví của member
+    await prisma.brkWallet.update({
+      where: { userId: sourceMemberId },
+      data: { balance: 0, brkd: 0, voucherBalance: 0, totalEarned: 0, totalWithdrawn: 0 }
+    })
+  }
+
+  // --- BƯỚC 4: Xóa toàn bộ timeline records của chính member ---
+  await prisma.brkTimelineRecord.deleteMany({
+    where: { userId: sourceMemberId, onSystem }
+  })
+
+  // --- BƯỚC 5: Xóa BrkLevelUpRecord + BrkReferralBonus của member ---
+  await prisma.brkLevelUpRecord.deleteMany({ where: { userId: sourceMemberId, onSystem } })
+  await prisma.brkReferralBonus.deleteMany({ where: { userId: sourceMemberId, onSystem } })
+
+  // --- BƯỚC 6: Xóa SystemClosure có liên quan đến member (descendant hoặc ancestor) ---
+  await prisma.systemClosure.deleteMany({
+    where: {
+      OR: [
+        { descendantId: system.autoId, systemId: onSystem },
+        { ancestorId: system.autoId, systemId: onSystem },
+      ]
+    }
+  })
+
+  // --- BƯỚC 7: Set System record về CANCELLED + level 0 ---
+  await prisma.system.update({
+    where: { autoId: system.autoId },
+    data: { status: 'CANCELLED', level: 0, totalPoints: 0 }
+  })
 }

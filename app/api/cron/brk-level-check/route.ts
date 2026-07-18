@@ -23,7 +23,7 @@ async function handler(request: Request) {
       // For Method B, skip members whose grace period hasn't ended (not yet confirmed)
       if (isOptionB && member.gracePeriodEnd && member.gracePeriodEnd > now) continue
 
-      const result = await checkAndPromoteLevel(member.userId, member.onSystem, now)
+      const result = await checkAndPromoteLevel(member.userId, member.onSystem, now, undefined, member.userId)
       if (result) promoted++
     }
 

@@ -26,7 +26,8 @@ export async function distributeCommission(
   systemTree: SystemTree,
   createdAt?: Date,
   levelConfigs?: Map<number, any>,
-  memberMBDT: number = DEFAULT_MBDT
+  memberMBDT: number = DEFAULT_MBDT,
+  sourceMemberId?: number
 ): Promise<{ ancestorCredits: AncestorCredit[] }> {
   const memberMBP = mbdtToMbp(memberMBDT)
   const newMemberSys = await prisma.system.findUnique({
@@ -127,7 +128,8 @@ export async function distributeCommission(
           0,
           pointsDesc,
           pointsRefId,
-          createdAt
+          createdAt,
+          sourceMemberId
         )
       }
 
@@ -156,7 +158,8 @@ export async function distributeCommission(
             'COMMISSION',
             cashCommDesc,
             commissionRefId,
-            createdAt
+            createdAt,
+            sourceMemberId
           )
         }
 
@@ -180,7 +183,8 @@ export async function distributeCommission(
             brkdAmount,
             brkdCommDesc,
             commissionRefId,
-            createdAt
+            createdAt,
+            sourceMemberId
           )
         }
       }
@@ -200,7 +204,8 @@ export async function distributeCommission(
           txType: 'COMMISSION',
           targetMemberId: newMemberUserId,
           targetMemberName: newMemberName,
-          pathStr: leaderChain
+          pathStr: leaderChain,
+          sourceMemberId
         })
       } else {
         await createBrkTimelineRecord({
@@ -215,7 +220,8 @@ export async function distributeCommission(
           txType: 'COMMISSION',
           targetMemberId: newMemberUserId,
           targetMemberName: newMemberName,
-          pathStr: leaderChain
+          pathStr: leaderChain,
+          sourceMemberId
         })
       }
     }

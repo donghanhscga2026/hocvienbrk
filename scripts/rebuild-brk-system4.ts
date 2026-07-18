@@ -134,7 +134,7 @@ async function backfill() {
       })
 
       await distributeCommission(userId, 4, fee, systemTree)
-      await checkAndPromoteLevel(userId, 4)
+      await checkAndPromoteLevel(userId, 4, undefined, undefined, userId)
 
       console.log(`  ✅ user#${userId} ${userName} — activated (autoId=${system.autoId}, level=1, +${BRKP_PER_ACTIVATION}pts)`)
     } catch (err: any) {
