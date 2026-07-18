@@ -813,12 +813,21 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
             orderBy: { id: 'desc' }
         }) : null
 
+        // Lấy timeline record ACTIVATION để làm Ngày tham gia cố định
+        const activationTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
+            where: { userId, onSystem: systemId, type: 'ACTIVATION' }
+        }) : null
+
         const teamTotalBrkd = latestTimeline ? Number(latestTimeline.accumulatedBrkdVolume) : 0
         const teamTotalVnd = latestTimeline ? Number(latestTimeline.accumulatedCashVolume) : 0
 
         const descendantClosures = sysRec ? await prisma.systemClosure.findMany({ where: { ancestorId: sysRec.autoId, systemId } }) : []
 
-        const latestLevelUp = sysRec ? await prisma.brkLevelUpRecord.findFirst({ where: { userId, onSystem: systemId }, orderBy: { promotedAt: 'desc' }, select: { promotedAt: true } }) : null
+        // Lấy timeline record thăng cấp mới nhất để làm Ngày lên cấp
+        const latestLevelUpTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
+            where: { userId, onSystem: systemId, type: 'LEVEL_UP' },
+            orderBy: { id: 'desc' }
+        }) : null
 
         let upline1: { id: number; name: string | null } | null = null
         let upline2: { id: number; name: string | null } | null = null
@@ -858,8 +867,8 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
                 personalScore: 17,
                 seq,
                 status: sysRec?.status ?? null,
-                joinedAt: enrollment?.updatedAt ?? sysRec?.activatedAt ?? null,
-                levelUpdatedAt: latestLevelUp?.promotedAt ?? null,
+                joinedAt: activationTimeline?.time ?? sysRec?.activatedAt ?? null,
+                levelUpdatedAt: latestLevelUpTimeline?.time ?? null,
                 teamTotalBrkd,
                 teamTotalVnd,
                 teamSize: descendantClosures.filter(c => c.depth > 0).length,

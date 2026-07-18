@@ -111,6 +111,27 @@
 - **Quy định bắt buộc**: **Chỉ được sử dụng công cụ nội bộ `replace` hoặc `write_file`** của Agent để chỉnh sửa file. Các công cụ này chạy bằng Node.js nên luôn bảo toàn chính xác mã hóa UTF-8.
 - Nếu phải dùng shell, bắt buộc phải báo trước và giải thích tại sao không dùng được công cụ `replace`.
 
+### 11. DRY-RUN TRƯỚC — THỰC THI SAU (CHO SCRIPT/DATA)
+> Mọi script hoặc code có ghi dữ liệu vào DB đều phải có cơ chế dry-run để user kiểm tra trước.
+
+**Bắt buộc với mọi script/code thực thi trên database:**
+- Script **PHẢI có chế độ dry-run mặc định** — chỉ hiển thị dữ liệu sẽ bị ảnh hưởng, KHÔNG ghi
+- Chế độ thực thi chỉ kích hoạt khi có flag `--execute` (hoặc tương đương)
+- **PHẢI hỏi user xác nhận** trước khi chuyển sang chế độ thực thi
+- **PHẢI hiển thị thống kê trước/sau** để user đối chiếu
+
+**Thứ tự bắt buộc:**
+1. **DRY-RUN trước** → Hiển thị dữ liệu sẽ bị ảnh hưởng (số records, chi tiết cụ thể)
+2. **User kiểm tra** → Xem dry-run output, xác nhận đúng
+3. **Hỏi xác nhận** → "Bạn có chắc muốn thực thi?"
+4. **THỰC THI** → Chạy script với flag `--execute`
+5. **VERIFY sau** → Hiển thị kết quả thực tế, đối chiếu với dự kiến
+
+**Cấm:**
+- ❌ Tự ý chạy script có ghi dữ liệu mà chưa hỏi user
+- ❌ Bỏ qua bước dry-run dù "chắc chắn đúng"
+- ❌ Script không có cơ chế dry-run → phải thêm vào trước khi chạy
+
 ---
 
 ## 🟡 QUY TRÌNH LÀM VIỆC (MANDATORY)

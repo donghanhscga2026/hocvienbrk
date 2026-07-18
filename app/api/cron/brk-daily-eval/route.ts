@@ -1,36 +1,10 @@
 import { NextResponse } from 'next/server'
 import { withCronLogging } from '@/lib/cron-logger'
 import prisma from '@/lib/prisma'
-import { distributeCommission } from '@/lib/brk/commission-calculator'
-import { checkAndPromoteLevel, create2F1Voucher } from '@/lib/brk/level-manager'
-import { creditBrkWallet, creditBrkdWallet } from '@/lib/brk/wallet-service'
-import { getAllLevelConfigs } from '@/lib/brk/config-service'
-import type { SystemTree } from '@prisma/client'
+import { processSystemDailyEval } from '@/lib/brk/daily-eval-service'
 
 const LOCK_KEY = 'brk_daily_eval_lock'
 const LOCK_TIMEOUT_MS = 120_000 // 2 minutes
-const MBDT_BASE = 12_000_000
-const MBDT_MIN = 12_868_686
-const MBDT_MAX = 15_868_686
-
-function generateMBDT(): number {
-  const random = Math.floor(Math.random() * (MBDT_MAX - MBDT_MIN + 1)) + MBDT_MIN
-  return random
-}
-
-function mbdtToMbp(mbdt: number): number {
-  return Math.round((mbdt / MBDT_BASE) * 16 * 1000) / 1000
-}
-
-function getEvalTime(year: number, month: number, day: number): Date {
-  return new Date(Date.UTC(year, month, day - 1, 17, 13, 0))
-}
-
-function getCurrentEvalTime(): Date {
-  const now = new Date()
-  const todayEval = getEvalTime(now.getFullYear(), now.getMonth(), now.getDate())
-  return todayEval <= now ? todayEval : getEvalTime(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-}
 
 async function acquireLock(): Promise<boolean> {
   const now = Date.now()
@@ -59,80 +33,6 @@ async function releaseLock() {
   try {
     await prisma.systemConfig.update({ where: { key: LOCK_KEY }, data: { value: '' } })
   } catch {}
-}
-
-async function processSystem(systemTree: SystemTree, evalTime: Date, now: Date) {
-  const onSystem = systemTree.onSystem
-  const fee = Number(systemTree.fee)
-
-  const dueMembers = await prisma.system.findMany({
-    where: {
-      onSystem,
-      status: 'ACTIVE',
-      gracePeriodEnd: { lt: now },
-    }
-  })
-
-  const allConfigs = await getAllLevelConfigs(onSystem)
-  const configMap = new Map(allConfigs.map(c => [c.level, c]))
-
-  const BATCH_SIZE = 5
-  let confirmed = 0
-
-  for (let i = 0; i < dueMembers.length; i += BATCH_SIZE) {
-    const batch = dueMembers.slice(i, i + BATCH_SIZE)
-    const results = await Promise.all(batch.map(async (member) => {
-      const returnRefId = `return_fee_sys_${onSystem}_user_${member.userId}`
-      const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
-      if (!wallet) return false
-
-      const existingReturn = await prisma.brkTransaction.findFirst({
-        where: {
-          walletId: wallet.id,
-          type: 'RETURN_FEE',
-          refId: returnRefId
-        }
-      })
-      // If the member is not yet confirmed by the grace processing cron, skip them
-      if (!existingReturn) return false
-
-      // Read member's MBDT from their MBDT return transaction (since they only receive MBDT return, not the original deposit)
-      const returnPct = Number(systemTree.returnPct || 21)
-      const returnBrkdRefId = `return_brkd_sys_${onSystem}_user_${member.userId}`
-      const returnBrkdTx = await prisma.brkTransaction.findFirst({
-        where: { walletId: wallet.id, refId: returnBrkdRefId }
-      })
-      const memberMBDT = returnBrkdTx ? Math.round(Number(returnBrkdTx.amount) / (returnPct / 100)) : 12_868_686
-
-      // 1. Distribute commissions and accumulate points to ancestors
-      const commissionResult = await distributeCommission(
-        member.userId,
-        onSystem,
-        fee,
-        systemTree,
-        evalTime,
-        configMap,
-        memberMBDT
-      )
-
-      // 2. Check 2F1 Voucher for parent
-      if (member.refSysId > 0) {
-        await create2F1Voucher(member.refSysId, onSystem, evalTime)
-      }
-
-      // 3. Evaluate level promotions for member and ancestors
-      await checkAndPromoteLevel(member.userId, onSystem, evalTime, configMap)
-
-      for (const { uplineSystem } of commissionResult.ancestorCredits) {
-        await checkAndPromoteLevel(uplineSystem.userId, onSystem, evalTime, configMap)
-      }
-
-      return true
-    }))
-    confirmed += results.filter(Boolean).length
-  }
-
-  return { onSystem, checked: dueMembers.length, confirmed }
 }
 
 async function handler(request: Request) {
@@ -166,7 +66,7 @@ async function handler(request: Request) {
       let totalConfirmed = 0
 
       for (const systemTree of allSystemTrees) {
-        const result = await processSystem(systemTree, evalTime, now)
+        const result = await processSystemDailyEval(systemTree, evalTime, now)
         results.push(result)
         totalChecked += result.checked
         totalConfirmed += result.confirmed

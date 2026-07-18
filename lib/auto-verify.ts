@@ -258,61 +258,46 @@ export async function processPaymentEmails() {
 
             if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
 
-            // Tìm hoặc tạo Payment record (upsert — xử lý cả trường hợp payment chưa tồn tại)
-            await prisma.payment.upsert({
-              where: { enrollmentId: enrollment.id },
-              create: {
-                enrollmentId: enrollment.id,
+            // Use shared activation wrapper — handles Payment upsert, BRK activation, Enrollment → ACTIVE, commission, YTB sync
+            const { processEnrollmentActivation } = await import("@/lib/enrollment-activation");
+            const activationResult = await processEnrollmentActivation({
+              enrollmentId: enrollment.id,
+              method: 'AUTO_EMAIL',
+              transferData: {
                 amount: parsed.amount,
                 phone: parsed.phone,
-                content: parsed.content,
+                courseCode: parsed.courseCode,
                 bankName: 'Sacombank',
-                status: 'VERIFIED',
-                verifiedAt: new Date(),
-                verifyMethod: 'AUTO_EMAIL',
+                accountNumber: null,
                 transferTime: parsed.transferTime,
-              },
-              update: {
-                amount: parsed.amount,
-                phone: parsed.phone,
                 content: parsed.content,
-                bankName: 'Sacombank',
-                status: 'VERIFIED',
-                verifiedAt: new Date(),
-                verifyMethod: 'AUTO_EMAIL',
-                transferTime: parsed.transferTime,
               }
             });
 
-            // [BRK ACTIVATION] — Must run BEFORE enrollment update so failure keeps enrollment PENDING (retriable)
-            let brkPlacementMsg = '';
-            const brkConfig = await prisma.autoVerifyConfig.findUnique({
-              where: { courseId: enrollment.courseId }
-            });
-            if (brkConfig?.enabled && brkConfig.onSystem != null) {
-              try {
-                const { activateBrkMember, getBrkPlacementChain } = await import("@/lib/brk/activation-service");
-                const brkSystem = await activateBrkMember(enrollment.userId, brkConfig.onSystem, enrollment.referrerId);
-                console.log(`  ✅ BRK activated for user#${enrollment.userId} on system ${brkConfig.onSystem}`);
-
-                const placement = await getBrkPlacementChain(enrollment.userId, brkConfig.onSystem);
-                if (placement.parentId) {
-                  brkPlacementMsg = `📍 Vị trí: Dưới <b>#${placement.parentId} ${placement.parentName}</b>\n`;
-                  if (placement.chain.length > 1) {
-                    const upline = placement.chain.slice(1).map(a => `#${a.userId} ${a.name}`).join(' → ');
-                    brkPlacementMsg += `🔗 Tuyến trên: ${upline}\n`;
-                  }
-                }
-              } catch (err) {
-                console.error(`  ⚠️ BRK activation failed for user#${enrollment.userId}:`, err);
-                throw err;
-              }
+            if (!activationResult.success) {
+              throw new Error(activationResult.error || 'Activation failed');
             }
 
-            await prisma.enrollment.update({
-              where: { id: enrollment.id },
-              data: { status: 'ACTIVE' }
-            });
+            const brkPlacementMsg = activationResult.brkResult?.placement
+              ? `📍 Vị trí: Dưới <b>#${activationResult.brkResult.placement.parentId} ${activationResult.brkResult.placement.parentName}</b>\n` +
+                (activationResult.brkResult.placement.chain.length > 1
+                  ? `🔗 Tuyến trên: ${activationResult.brkResult.placement.chain.slice(1).map((a: any) => `#${a.userId} ${a.name}`).join(' → ')}\n`
+                  : '')
+              : '';
+
+            // Ghi activity log PAYMENT_VERIFIED (dùng transferTime từ bank email để đảm bảo đúng thứ tự)
+            try {
+              const { logActivity } = await import('@/lib/activity-logger');
+              await logActivity({
+                userId: enrollment.userId,
+                action: 'PAYMENT_VERIFIED',
+                detail: `Xác minh thanh toán tự động: ${enrollment.course.name_lop} - ${parsed.amount.toLocaleString()}đ`,
+                metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: parsed.amount, bankName: 'Sacombank' },
+                createdAt: parsed.transferTime || new Date(),
+              });
+            } catch (logErr) {
+              console.error(`  ⚠️ Failed to log PAYMENT_VERIFIED for user#${enrollment.userId}:`, logErr);
+            }
 
             // Mark email as read
             await callGmailWithRetry(() => gmail.users.messages.modify({

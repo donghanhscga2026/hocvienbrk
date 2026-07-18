@@ -2,10 +2,8 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { Role } from "@prisma/client"
+import { Prisma, Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
-import { processEnrollmentCommission } from "@/lib/affiliate/commission-calculator"
-import { isTestAccount } from "@/lib/test-account"
 
 export async function getPaymentByEnrollmentId(enrollmentId: number) {
   try {
@@ -73,7 +71,8 @@ export async function updatePaymentProof(enrollmentId: number, proofImageUrl: st
 export async function verifyPaymentAction(
   enrollmentId: number,
   method: 'AUTO_EMAIL' | 'MANUAL_UPLOAD' | 'MANUAL_ADMIN',
-  note?: string
+  note?: string,
+  customUpdatedAt?: Date
 ) {
   try {
     const session = await auth()
@@ -88,145 +87,97 @@ export async function verifyPaymentAction(
       return { success: false, error: "Unauthorized" }
     }
 
-    const enrollment = await prisma.enrollment.findUnique({
+    const preCheck = await prisma.enrollment.findUnique({
       where: { id: enrollmentId },
-      include: { 
-        course: {
-          include: {
-            teacherBankAccount: true
-          }
-        }, 
-        payment: true 
-      }
+      include: { course: { select: { teacherId: true } } }
     })
-
-    if (!enrollment) {
+    if (!preCheck) {
       return { success: false, error: "Enrollment not found" }
     }
-
-    // Tài khoản test không được phép kích hoạt khóa học
-    if (isTestAccount(enrollment.userId)) {
-      return { success: false, error: "Tài khoản test này không được phép kích hoạt khóa học." }
-    }
-
-    if (isTeacher && enrollment.course.teacherId !== userId) {
+    if (isTeacher && preCheck.course.teacherId !== userId) {
       return { success: false, error: "Forbidden" }
     }
 
-    if (enrollment.status === 'ACTIVE') {
-      return { success: false, error: "Enrollment already active" }
+    const { processEnrollmentActivation } = await import('@/lib/enrollment-activation')
+    const result = await processEnrollmentActivation({
+      enrollmentId,
+      method,
+      note,
+      customUpdatedAt
+    })
+
+    if (!result.success) {
+      return { success: false, error: result.error }
     }
 
-    const [payment, updatedEnrollment] = await prisma.$transaction([
-      prisma.payment.update({
-        where: { enrollmentId },
-        data: {
-          status: 'VERIFIED',
-          verifiedAt: new Date(),
-          verifyMethod: method,
-          note: note || null
-        }
-      }),
-      prisma.enrollment.update({
-        where: { id: enrollmentId },
-        data: { status: 'ACTIVE' }
-      })
-    ])
-
-    // Auto-sync vào hệ thống YTB (onSystem=3) nếu là khóa của teacher 327
-    if (enrollment.course.teacherId === 327) {
-        const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
-        await syncUserToYtbSystem(enrollment.userId, enrollment.course.teacherId)
+    // Telegram admin notification
+    const { sendTelegramAdmin } = await import('@/lib/notifications')
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+    let refLink = ''
+    if (result.referrerId) {
+      const affRef = await prisma.affiliateRef.findFirst({ where: { userId: result.referrerId, isActive: true } })
+      const refCode = affRef?.refKey || String(result.referrerId)
+      refLink = `🔗 Link ref: ${appUrl}/khoa-hoc/${result.courseCode}?ref=${refCode}\n`
     }
 
-    // Kích hoạt BRK member nếu course là type SYS
-    if (enrollment.course.type === 'SYS') {
-      const brkTree = await prisma.systemTree.findFirst({
-        where: { courseId: enrollment.courseId }
-      })
-      if (brkTree) {
-        try {
-          const { activateBrkMember, getBrkPlacementChain } = await import("@/lib/brk/activation-service")
-          const { sendTelegramAdmin } = await import("@/lib/notifications")
-          await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId)
-          console.log(`[BRK] Activated user ${enrollment.userId} in system ${brkTree.onSystem}`)
-
-          const brkUser = await prisma.user.findUnique({ where: { id: enrollment.userId }, select: { name: true, phone: true } })
-          const placement = await getBrkPlacementChain(enrollment.userId, brkTree.onSystem)
-          const effectiveAmount = enrollment.payment?.amount || enrollment.course.phi_coc || 0
-          const bankName = enrollment.course.teacherBankAccount?.bankName || enrollment.payment?.bankName || 'N/A'
-
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
-          let refLink = ''
-          if (enrollment.referrerId) {
-            const affRef = await prisma.affiliateRef.findFirst({ where: { userId: enrollment.referrerId, isActive: true } })
-            const refCode = affRef?.refKey || String(enrollment.referrerId)
-            refLink = `🔗 Link ref: ${appUrl}/khoa-hoc/${enrollment.course.id_khoa}?ref=${refCode}\n`
-          }
-          let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
-            `👤 Học viên: <b>${brkUser?.name || 'N/A'}</b>\n` +
-            `📞 SĐT: ${brkUser?.phone || 'N/A'}\n` +
-            `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
-            `${refLink}💰 Số tiền: ${effectiveAmount.toLocaleString()}đ\n` +
-            `🏦 Ngân hàng: ${bankName}\n` +
-            `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
-          if (placement.parentId) {
-            teleMsg += `📍 Vị trí: Dưới <b>#${placement.parentId} ${placement.parentName}</b>\n`
-            if (placement.chain.length > 1) {
-              const upline = placement.chain.slice(1).map(a => `#${a.userId} ${a.name}`).join(' → ')
-              teleMsg += `🔗 Tuyến trên: ${upline}\n`
-            }
-          }
-          await sendTelegramAdmin(teleMsg)
-
-          const { logActivity } = await import('@/lib/activity-logger')
-          await logActivity({
-            userId: enrollment.userId,
-            action: 'PAYMENT_VERIFIED',
-            detail: `Xác minh thanh toán: ${enrollment.course.name_lop} - ${effectiveAmount.toLocaleString()}đ`,
-            metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, amount: Number(effectiveAmount), bankName, studentName: brkUser?.name || null, parentId: placement.parentId || null, uplineChain: placement.chain.map(a => a.userId) }
-          })
-        } catch (brkErr) {
-          console.error(`[BRK ERROR] Kích hoạt thành viên ${enrollment.userId} thất bại:`, brkErr)
-          try {
-            const { sendTelegramAdmin: sendTg } = await import('@/lib/notifications')
-            const errDetail = brkErr instanceof Error ? brkErr.message : String(brkErr)
-            await sendTg(
-              `❌ <b>BRK KÍCH HOẠT THẤT BẠI (THỦ CÔNG)</b>\n\n` +
-              `👤 Học viên ID: <b>#${enrollment.userId}</b>\n` +
-              `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
-              `⚠️ Lỗi: ${errDetail}\n` +
-              `📅 ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
-            )
-          } catch (_) {}
+    if (result.brkResult?.activated && result.brkResult.placement) {
+      const p = result.brkResult.placement
+      let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
+        `👤 Học viên: <b>${result.studentName || 'N/A'}</b>\n` +
+        `📞 SĐT: ${result.studentPhone || 'N/A'}\n` +
+        `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
+        `${refLink}💰 Số tiền: ${(result.effectiveAmount || 0).toLocaleString()}đ\n` +
+        `🏦 Ngân hàng: ${result.bankName}\n` +
+        `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
+      if (p.parentId) {
+        teleMsg += `📍 Vị trí: Dưới <b>#${p.parentId} ${p.parentName}</b>\n`
+        if (p.chain.length > 1) {
+          const upline = p.chain.slice(1).map((a: any) => `#${a.userId} ${a.name}`).join(' → ')
+          teleMsg += `🔗 Tuyến trên: ${upline}\n`
         }
       }
+      await sendTelegramAdmin(teleMsg)
+    } else if (result.brkResult && !result.brkResult.activated) {
+      // Non-BRK course or no BRK config — simple notification
+      const teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
+        `👤 Học viên: <b>${result.studentName || 'N/A'}</b>\n` +
+        `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
+        `${refLink}💰 Số tiền: ${(result.effectiveAmount || 0).toLocaleString()}đ\n` +
+        `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
+      await sendTelegramAdmin(teleMsg)
     }
 
-    // Xử lý affiliate commission cho người giới thiệu (chỉ áp dụng cho course không phải SYS)
-    if (enrollment.course.type !== 'SYS') {
-      const commissionResult = await processEnrollmentCommission(
-        enrollment.userId,
-        enrollmentId,
-        enrollment.payment?.amount || 0
-      )
-      
-      if (commissionResult.success) {
-        console.log('[Payment] Affiliate commission processed:', commissionResult)
-      }
+    // Activity log — chỉ ghi lần đầu, skip nếu đã có (tránh trùng khi re-verify sau revert)
+    const existingVerifiedLogs = await prisma.$queryRaw`SELECT id FROM "activity_log" WHERE action = 'PAYMENT_VERIFIED' AND metadata->>'enrollmentId' = ${String(enrollmentId)} LIMIT 1` as any[]
+    if (existingVerifiedLogs.length === 0) {
+      const { logActivity } = await import('@/lib/activity-logger')
+      await logActivity({
+        userId: preCheck.userId,
+        action: 'PAYMENT_VERIFIED',
+        detail: `Xác minh thanh toán: ${result.courseName} - ${(result.effectiveAmount || 0).toLocaleString()}đ`,
+        metadata: {
+          courseId: preCheck.courseId,
+          enrollmentId,
+          amount: Number(result.effectiveAmount || 0),
+          bankName: result.bankName,
+          studentName: result.studentName || null,
+          parentId: result.brkResult?.placement?.parentId || null,
+          uplineChain: result.brkResult?.placement?.chain?.map((a: any) => a.userId) || []
+        }
+      })
     }
 
     revalidatePath('/')
     revalidatePath('/courses')
-    revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`)
+    revalidatePath(`/courses/${result.courseCode}/learn`)
     revalidatePath('/tools/genealogy')
     revalidatePath('/tools/brk')
 
-    return { 
-      success: true, 
-      payment,
-      enrollment: updatedEnrollment,
-      message: `Đã kích hoạt khóa học "${enrollment.course.name_lop}" thành công!`
+    return {
+      success: true,
+      payment: result.payment,
+      enrollment: result.enrollment,
+      message: `Đã kích hoạt khóa học "${result.courseName}" thành công!`
     }
   } catch (error: any) {
     console.error("Verify Payment Error:", error)
@@ -310,7 +261,11 @@ export async function getPendingPayments() {
       where,
       include: {
         enrollment: {
-          include: {
+          select: {
+            id: true,
+            status: true,
+            referrerId: true,
+            updatedAt: true,
             user: {
               select: { 
                 id: true, 
@@ -367,7 +322,11 @@ export async function getAllPayments() {
       where,
       include: {
         enrollment: {
-          include: {
+          select: {
+            id: true,
+            status: true,
+            referrerId: true,
+            updatedAt: true,
             user: {
               select: { 
                 id: true, 
@@ -401,78 +360,6 @@ export async function getAllPayments() {
     return { success: true, payments }
   } catch (error: any) {
     console.error("Get All Payments Error:", error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function autoVerifyPayment(enrollmentId: number, transferData: {
-  amount: number;
-  phone: string | null;
-  courseCode: string | null;
-  bankName: string | null;
-  accountNumber: string | null;
-  transferTime: Date | null;
-  content: string;
-}) {
-  try {
-    // Lấy enrollment info trước
-    const enrollmentInfo = await prisma.enrollment.findUnique({
-      where: { id: enrollmentId },
-      include: { user: true, course: { select: { teacherId: true, type: true, name_lop: true, id_khoa: true } } }
-    })
-
-    // Tài khoản test không được phép kích hoạt khóa học
-    if (isTestAccount(enrollmentInfo?.userId)) {
-      return { success: false, error: "Tài khoản test này không được phép kích hoạt khóa học." }
-    }
-
-    const payment = await prisma.payment.update({
-      where: { enrollmentId },
-      data: {
-        amount: transferData.amount,
-        phone: transferData.phone,
-        courseCode: transferData.courseCode,
-        bankName: transferData.bankName,
-        accountNumber: transferData.accountNumber,
-        transferTime: transferData.transferTime,
-        content: transferData.content,
-        status: 'VERIFIED',
-        verifiedAt: new Date(),
-        verifyMethod: 'AUTO_EMAIL'
-      }
-    })
-
-    await prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: { status: 'ACTIVE' }
-    })
-
-    const { logActivity } = await import('@/lib/activity-logger')
-    await logActivity({
-      userId: enrollmentInfo!.userId,
-      action: 'PAYMENT_AUTO_VERIFIED',
-      detail: `Auto verify thanh toán: ${transferData.amount.toLocaleString()}đ`,
-      metadata: { courseId: enrollmentInfo!.courseId, enrollmentId, amount: transferData.amount, bankName: transferData.bankName, phone: transferData.phone }
-    })
-
-    // [SYNC-YTB] Đồng bộ học viên vào hệ thống YTB nếu là khóa của teacher 327
-    if (enrollmentInfo?.course?.teacherId === 327) {
-      const { syncUserToYtbSystem } = await import("@/lib/system-closure-helpers")
-      await syncUserToYtbSystem(enrollmentInfo.userId, enrollmentInfo.course.teacherId)
-    }
-
-    // Xử lý affiliate commission cho người giới thiệu
-    if (enrollmentInfo) {
-      await processEnrollmentCommission(
-        enrollmentInfo.userId,
-        enrollmentId,
-        transferData.amount
-      )
-    }
-
-    return { success: true, payment }
-  } catch (error: any) {
-    console.error("Auto Verify Payment Error:", error)
     return { success: false, error: error.message }
   }
 }
@@ -511,5 +398,242 @@ export async function getGmailStatus() {
     return { success: true, penalized: false };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+// ============================================================
+// ADMIN-ONLY: Đổi trạng thái ACTIVE/VERIFIED → PENDING
+// ============================================================
+export async function revertToPendingAction(enrollmentIds: number[]) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
+    }
+
+    let count = 0
+    const blocked: { enrollmentId: number; reason: string; systemId?: number }[] = []
+
+    for (const enrollmentId of enrollmentIds) {
+      const enrollment = await prisma.enrollment.findUnique({
+        where: { id: enrollmentId },
+        include: { course: { select: { name_lop: true, type: true, id_khoa: true } } }
+      })
+      if (!enrollment) continue
+
+      // Guard: Nếu khóa SYS, kiểm tra BRK đã active chưa
+      if (enrollment.course.type === 'SYS') {
+        const brkTree = await prisma.systemTree.findFirst({
+          where: { courseId: enrollment.courseId }
+        })
+        if (brkTree) {
+          const brkMember = await prisma.system.findUnique({
+            where: { userId_onSystem: { userId: enrollment.userId, onSystem: brkTree.onSystem } }
+          })
+          if (brkMember?.status === 'ACTIVE') {
+            blocked.push({
+              enrollmentId,
+              reason: `#${enrollmentId} — ${enrollment.course.name_lop}: Đã kích hoạt BRK system #${brkTree.onSystem}. Cần xóa dữ liệu BRK trước khi revert.`,
+              systemId: brkTree.onSystem
+            })
+            continue
+          }
+        }
+      }
+
+      // Giữ nguyên updatedAt cũ (Prisma @updatedAt sẽ ghi đè bằng now nếu không truyền)
+      await prisma.$transaction([
+        prisma.enrollment.update({
+          where: { id: enrollmentId },
+          data: { status: 'PENDING', updatedAt: enrollment.updatedAt }
+        }),
+        prisma.payment.updateMany({
+          where: { enrollmentId, status: 'VERIFIED' },
+          data: { status: 'PENDING', verifiedAt: null, verifyMethod: null }
+        })
+      ])
+
+      count++
+    }
+
+    revalidatePath('/tools/payments')
+
+    if (blocked.length > 0) {
+      const msg = `Đã revert ${count}/${enrollmentIds.length} enrollment.\n\nBị chặn (${blocked.length}):\n${blocked.map(b => b.reason).join('\n')}`
+      return { success: true, count, blocked, message: msg }
+    }
+
+    return { success: true, count }
+  } catch (error: any) {
+    console.error('Revert To Pending Error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// ============================================================
+// ADMIN-ONLY: Hủy đăng ký (Cancel enrollment)
+// ============================================================
+export async function cancelEnrollmentAction(enrollmentIds: number[]) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
+    }
+
+    let count = 0
+    for (const enrollmentId of enrollmentIds) {
+      const enrollment = await prisma.enrollment.findUnique({
+        where: { id: enrollmentId },
+        include: { course: { select: { name_lop: true } } }
+      })
+      if (!enrollment) continue
+
+      await prisma.$transaction([
+        prisma.enrollment.update({
+          where: { id: enrollmentId },
+          data: { status: 'CANCELLED' }
+        }),
+        prisma.payment.updateMany({
+          where: { enrollmentId },
+          data: { status: 'CANCELLED' }
+        })
+      ])
+
+      const { logActivity } = await import('@/lib/activity-logger')
+      await logActivity({
+        userId: enrollment.userId,
+        action: 'ENROLLMENT_CANCELLED',
+        detail: `Admin hủy đăng ký: ${enrollment.course.name_lop}`,
+        metadata: { enrollmentId, adminId: parseInt(session.user.id) }
+      })
+
+      count++
+    }
+
+    revalidatePath('/tools/payments')
+    return { success: true, count }
+  } catch (error: any) {
+    console.error('Cancel Enrollment Error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// ============================================================
+// ADMIN-ONLY: Reset toàn bộ BRK data của 1 system để rebuild
+// ============================================================
+export async function resetSystemForRebuildAction(systemId: number) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id || session.user.role !== Role.ADMIN) {
+      return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
+    }
+
+    // 1. Lấy tất cả members trong system
+    const systems = await prisma.system.findMany({
+      where: { onSystem: systemId },
+      select: { autoId: true, userId: true }
+    })
+    const userIds = systems.map(r => r.userId)
+    const autoIds = systems.map(r => r.autoId)
+
+    if (userIds.length === 0) {
+      return { success: true, message: `System #${systemId} không có thành viên.`, deletedRecords: {} }
+    }
+
+    const deletedRecords: Record<string, number> = {}
+
+    // 2. Xóa BrkRevenueAward (qua BrkRevenuePool)
+    const revenueAwardCount = await prisma.brkRevenueAward.deleteMany({
+      where: { pool: { systemId } }
+    })
+    deletedRecords['BrkRevenueAward'] = revenueAwardCount.count
+
+    // 3. Xóa BrkRevenuePool
+    const revenuePoolCount = await prisma.brkRevenuePool.deleteMany({
+      where: { systemId }
+    })
+    deletedRecords['BrkRevenuePool'] = revenuePoolCount.count
+
+    // 4. Xóa SystemClosure
+    if (autoIds.length > 0) {
+      const closureCount = await prisma.systemClosure.deleteMany({
+        where: {
+          OR: [
+            { ancestorId: { in: autoIds } },
+            { descendantId: { in: autoIds } }
+          ]
+        }
+      })
+      deletedRecords['SystemClosure'] = closureCount.count
+    }
+
+    // 5. Xóa BrkTimelineRecord
+    const timelineCount = await prisma.brkTimelineRecord.deleteMany({
+      where: { onSystem: systemId }
+    })
+    deletedRecords['BrkTimelineRecord'] = timelineCount.count
+
+    // 6. Xóa BrkLevelUpRecord
+    const levelUpCount = await prisma.brkLevelUpRecord.deleteMany({
+      where: { onSystem: systemId }
+    })
+    deletedRecords['BrkLevelUpRecord'] = levelUpCount.count
+
+    // 7. Xóa BrkReferralBonus
+    const referralCount = await prisma.brkReferralBonus.deleteMany({
+      where: { onSystem: systemId }
+    })
+    deletedRecords['BrkReferralBonus'] = referralCount.count
+
+    // 8. Xóa BrkSystemLog
+    const systemLogCount = await prisma.brkSystemLog.deleteMany({
+      where: { onSystem: systemId }
+    })
+    deletedRecords['BrkSystemLog'] = systemLogCount.count
+
+    // 9. Xóa BrkTransaction + zero BrkWallet
+    if (userIds.length > 0) {
+      const wallets = await prisma.brkWallet.findMany({
+        where: { userId: { in: userIds } }
+      })
+      if (wallets.length > 0) {
+        const walletIds = wallets.map(w => w.id)
+        const txCount = await prisma.brkTransaction.deleteMany({
+          where: { walletId: { in: walletIds } }
+        })
+        deletedRecords['BrkTransaction'] = txCount.count
+
+        await prisma.$executeRaw(
+          Prisma.sql`UPDATE "brk_wallet" SET balance = 0, brkd = 0, "voucherBalance" = 0, "totalEarned" = 0, "totalWithdrawn" = 0 WHERE id IN (${Prisma.join(walletIds)})`
+        )
+        deletedRecords['BrkWallet_reset'] = wallets.length
+      }
+    }
+
+    // 10. Xóa ActivityLog WALLET_CHANGE
+    const activityLogCount = await prisma.activityLog.deleteMany({
+      where: { action: 'WALLET_CHANGE' }
+    })
+    deletedRecords['ActivityLog_WALLET_CHANGE'] = activityLogCount.count
+
+    // 11. Xóa System records
+    const systemCount = await prisma.system.deleteMany({
+      where: { onSystem: systemId }
+    })
+    deletedRecords['System'] = systemCount.count
+
+    revalidatePath('/tools/payments')
+    revalidatePath('/tools/brk')
+    revalidatePath('/tools/genealogy')
+
+    return {
+      success: true,
+      memberCount: systems.length,
+      deletedRecords,
+      message: `Đã xóa toàn bộ dữ liệu BRK system #${systemId} (${systems.length} thành viên).`
+    }
+  } catch (error: any) {
+    console.error('Reset System For Rebuild Error:', error)
+    return { success: false, error: error.message }
   }
 }

@@ -168,7 +168,7 @@ export async function activateBrkMember(
         onSystem,
         type: 'TRANSACTION',
         time: now,
-        title: 'Tăng trưởng thêm thành viên mới',
+        title: 'Tăng trưởng thành viên',
         description: descText,
         targetMemberId: userId,
         targetMemberName: user.name ?? undefined,
@@ -364,15 +364,23 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
       })
 
       // Tạo level up record 0 -> 1
-      await prisma.brkLevelUpRecord.create({
-        data: {
-          userId: member.userId,
-          onSystem: member.onSystem,
-          fromLevel: 0,
-          toLevel: 1,
-          promotedAt: recordTime
+      try {
+        await prisma.brkLevelUpRecord.create({
+          data: {
+            userId: member.userId,
+            onSystem: member.onSystem,
+            fromLevel: 0,
+            toLevel: 1,
+            promotedAt: recordTime
+          }
+        })
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          console.warn(`[Grace] Level-up record for user #${member.userId} already exists, skipping.`)
+        } else {
+          throw err
         }
-      })
+      }
 
       // 2. Hoàn phí cá nhân (Cash + MBDT)
       const returnAmount = (fee * returnPct) / 100
