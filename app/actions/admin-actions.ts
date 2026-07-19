@@ -821,8 +821,6 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         const teamTotalBrkd = latestTimeline ? Number(latestTimeline.accumulatedBrkdVolume) : 0
         const teamTotalVnd = latestTimeline ? Number(latestTimeline.accumulatedCashVolume) : 0
 
-        const descendantClosures = sysRec ? await prisma.systemClosure.findMany({ where: { ancestorId: sysRec.autoId, systemId } }) : []
-
         // Lấy timeline record thăng cấp mới nhất để làm Ngày lên cấp
         const latestLevelUpTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
             where: { userId, onSystem: systemId, type: 'LEVEL_UP' },
@@ -871,7 +869,7 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
                 levelUpdatedAt: latestLevelUpTimeline?.time ?? null,
                 teamTotalBrkd,
                 teamTotalVnd,
-                teamSize: descendantClosures.filter(c => c.depth > 0).length,
+                teamSize: latestTimeline?.accumulatedTeamSize ?? 1,
                 upline1,
                 upline2,
                 wallet: wallet ? {

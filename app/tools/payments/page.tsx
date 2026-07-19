@@ -48,6 +48,7 @@ interface PaymentData {
       id_khoa: string
       name_lop: string
       phi_coc: number
+      type: string
       teacherBankAccount: {
         id: number
         accountHolder: string
@@ -204,7 +205,7 @@ export default function PaymentsPage() {
   }
 
   async function handleRevertToPending(enrollmentIds: number[]) {
-    if (!confirm(`Xác nhận đổi ${enrollmentIds.length} đăng ký về trạng thái CHỜ DUYỆT?`)) return
+    if (!confirm(`Xác nhận đổi ${enrollmentIds.length} đăng ký về trạng thái CHỜ DUYỆT?\n\nTất cả dữ liệu BRK của thành viên sẽ bị xóa, hệ thống giữ nguyên.`)) return
     setBulkLoading(true)
     const result = await revertToPendingAction(enrollmentIds)
     if (result.success) {
@@ -221,6 +222,24 @@ export default function PaymentsPage() {
       }
       
       alert(messages.join('\n'))
+      await loadData()
+    } else {
+      alert(`❌ Lỗi: ${result.error}`)
+    }
+    setBulkLoading(false)
+  }
+
+  async function handleResetSystem(courseId: number) {
+    if (!confirm('⚠️ Xóa TOÀN BỘ dữ liệu BRK của hệ thống này?\n\nTất cả thành viên, ví, hoa hồng, lịch sử sẽ bị xóa sạch.\nBạn sẽ phải rebuild thủ công sau.')) return
+    if (!confirm('Xác nhận LẦN CUỐI: Xóa toàn bộ dữ liệu BRK?')) return
+    setBulkLoading(true)
+    const result = await resetSystemForRebuildAction(undefined, courseId)
+    if (result.success) {
+      const msg = result.message || `✅ Đã xóa toàn bộ dữ liệu.`
+      const details = result.deletedRecords
+        ? `\n${Object.entries(result.deletedRecords).map(([k, v]) => `${k}: ${v}`).join('\n')}`
+        : ''
+      alert(`${msg}${details}`)
       await loadData()
     } else {
       alert(`❌ Lỗi: ${result.error}`)
@@ -736,14 +755,28 @@ export default function PaymentsPage() {
                     {isAdmin && (
                       <div className="flex gap-1.5 flex-wrap">
                         {payment.enrollment.status === 'ACTIVE' && (
-                          <button
-                            onClick={() => handleRevertToPending([payment.enrollment.id])}
-                            disabled={bulkLoading}
-                            className="flex items-center gap-1 px-2 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            Active → Pending
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleRevertToPending([payment.enrollment.id])}
+                              disabled={bulkLoading}
+                              className="flex items-center gap-1 px-2 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
+                              title="Xóa dữ liệu BRK thành viên, giữ nguyên hệ thống"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Revert thành viên
+                            </button>
+                            {payment.enrollment.course.type === 'SYS' && (
+                              <button
+                                onClick={() => handleResetSystem(payment.enrollment.course.id)}
+                                disabled={bulkLoading}
+                                className="flex items-center gap-1 px-2 py-1.5 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
+                                title="Xóa toàn bộ dữ liệu BRK hệ thống, rebuild thủ công"
+                              >
+                                <Ban className="w-3 h-3" />
+                                Xóa toàn bộ system
+                              </button>
+                            )}
+                          </>
                         )}
                         {payment.enrollment.status !== 'CANCELLED' && (
                           <button

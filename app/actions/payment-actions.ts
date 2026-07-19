@@ -285,6 +285,7 @@ export async function getPendingPayments() {
                 id_khoa: true, 
                 name_lop: true, 
                 phi_coc: true,
+                type: true,
                 teacherBankAccount: true
               }
             },
@@ -346,6 +347,7 @@ export async function getAllPayments() {
                 id_khoa: true, 
                 name_lop: true, 
                 phi_coc: true,
+                type: true,
                 teacherBankAccount: true
               }
             },
@@ -432,8 +434,8 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
           const brkMember = await prisma.system.findUnique({
             where: { userId_onSystem: { userId: enrollment.userId, onSystem: brkTree.onSystem } }
           })
-          if (brkMember?.status === 'ACTIVE') {
-            // Phẫu thuật revert chỉ member này thay vì chặn
+          if (brkMember) {
+            // Luôn revert BRK member nếu tồn tại, bất kể trạng thái
             try {
               await revertMemberActivation(enrollment.userId, brkTree.onSystem)
               brkReverted.push({
@@ -540,8 +542,18 @@ export async function cancelEnrollmentAction(enrollmentIds: number[]) {
 // ============================================================
 // ADMIN-ONLY: Reset toàn bộ BRK data của 1 system để rebuild
 // ============================================================
-export async function resetSystemForRebuildAction(systemId: number) {
+export async function resetSystemForRebuildAction(systemId?: number, courseId?: number) {
   try {
+    // Resolve systemId from courseId if not provided
+    if (!systemId && courseId) {
+      const tree = await prisma.systemTree.findFirst({ where: { courseId } })
+      if (!tree) return { success: false, error: `Không tìm thấy SystemTree cho courseId ${courseId}` }
+      systemId = tree.onSystem
+    }
+    if (!systemId) {
+      return { success: false, error: 'Cần cung cấp systemId hoặc courseId' }
+    }
+
     const session = await auth()
     if (!session?.user?.id || session.user.role !== Role.ADMIN) {
       return { success: false, error: 'Chỉ Admin mới có quyền thực hiện thao tác này.' }
@@ -629,9 +641,9 @@ export async function resetSystemForRebuildAction(systemId: number) {
       }
     }
 
-    // 10. Xóa ActivityLog WALLET_CHANGE
+    // 10. Xóa ActivityLog WALLET_CHANGE của các thành viên trong system
     const activityLogCount = await prisma.activityLog.deleteMany({
-      where: { action: 'WALLET_CHANGE' }
+      where: { action: 'WALLET_CHANGE', userId: { in: userIds } }
     })
     deletedRecords['ActivityLog_WALLET_CHANGE'] = activityLogCount.count
 

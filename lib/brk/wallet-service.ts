@@ -195,9 +195,13 @@ export async function makeSystemSnapshotDescription(
   
   let teamCount = 1
   if (system) {
-    teamCount = 1 + await prisma.systemClosure.count({
-      where: { ancestorId: system.autoId, depth: { gte: 1 }, systemId: onSystem }
+    const latestRec = await prisma.brkTimelineRecord.findFirst({
+      where: { userId, onSystem },
+      orderBy: { id: 'desc' }
     })
+    teamCount = latestRec
+      ? (event === 'ACTIVATION' || event.startsWith('F') ? latestRec.accumulatedTeamSize + 1 : latestRec.accumulatedTeamSize)
+      : 1
   }
 
   const cash = (wallet ? Number(wallet.balance) : 0) + (overrides.cash ?? 0)
@@ -257,24 +261,28 @@ export async function createBrkTimelineRecord(data: {
   })
   const wallet = await prisma.brkWallet.findUnique({ where: { userId: data.userId } })
 
+  const lastRec = await prisma.brkTimelineRecord.findFirst({
+    where: { userId: data.userId, onSystem: data.onSystem },
+    orderBy: { id: 'desc' }
+  })
+
   if (cash === undefined) cash = wallet ? Number(wallet.balance) : 0
   if (brkd === undefined) brkd = wallet ? Number(wallet.brkd) : 0
   if (brkp === undefined) brkp = system ? Number(system.totalPoints) : 0
   
   if (teamSize === undefined) {
-    teamSize = 1
-    if (system) {
-      teamSize = 1 + await prisma.systemClosure.count({
-        where: { ancestorId: system.autoId, depth: { gte: 1 }, systemId: data.onSystem }
-      })
+    if (lastRec) {
+      if (data.type === 'ACTIVATION' || data.txType === 'ADJUSTMENT') {
+        teamSize = lastRec.accumulatedTeamSize + 1
+      } else {
+        teamSize = lastRec.accumulatedTeamSize
+      }
+    } else {
+      teamSize = 1
     }
   }
 
   if (brkdVol === undefined || cashVol === undefined) {
-    const lastRec = await prisma.brkTimelineRecord.findFirst({
-      where: { userId: data.userId, onSystem: data.onSystem },
-      orderBy: { id: 'desc' }
-    })
     brkdVol = lastRec ? Number(lastRec.accumulatedBrkdVolume) : 0
     cashVol = lastRec ? Number(lastRec.accumulatedCashVolume) : 0
 
@@ -291,7 +299,7 @@ export async function createBrkTimelineRecord(data: {
     }
   }
 
-  return prisma.brkTimelineRecord.create({
+  const created = await prisma.brkTimelineRecord.create({
     data: {
       userId: data.userId,
       onSystem: data.onSystem,
@@ -317,4 +325,6 @@ export async function createBrkTimelineRecord(data: {
       sourceMemberId: data.sourceMemberId
     }
   })
+
+  return created
 }
