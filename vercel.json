@@ -18,7 +18,7 @@
     },
     {
       "path": "/api/cron/brk-grace-processing",
-      "schedule": "50 16 * * *"
+      "schedule": "5 17 * * *"
     },
     {
       "path": "/api/cron/brk-expiration",

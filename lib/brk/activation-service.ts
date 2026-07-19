@@ -354,7 +354,7 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
         if (existingRefund) continue // Đã hoàn phí rồi cho hệ thống này, bỏ qua
       }
 
-      const recordTime = member.gracePeriodEnd
+      const recordTime = now
       const memberMBDT = generateMBDT()
       const memberMBP = mbdtToMbp(memberMBDT)
 
@@ -612,6 +612,25 @@ export async function revertMemberActivation(
   await prisma.brkLevelUpRecord.deleteMany({ where: { userId: sourceMemberId, onSystem } })
   await prisma.brkReferralBonus.deleteMany({ where: { userId: sourceMemberId, onSystem } })
 
+  // --- BƯỚC 5b: Xóa ActivityLog WALLET_CHANGE của member ---
+  await prisma.activityLog.deleteMany({
+    where: { userId: sourceMemberId, action: 'WALLET_CHANGE' }
+  })
+
+  // --- BƯỚC 5c: Xóa BrkReferralBonus của ancestors do thành viên này gây ra ---
+  // Lưu ý: sourceMemberId trong BrkReferralBonus hiện chưa được populate khi tạo,
+  // nên deleteMany này là best-effort — an toàn vì no-op nếu không match
+  await prisma.brkReferralBonus.deleteMany({
+    where: { onSystem, sourceMemberId }
+  })
+
+  // --- BƯỚC 5d: Xóa BrkRevenueAward do thành viên này gây ra ---
+  // Lưu ý: sourceMemberId trong BrkRevenueAward hiện chưa được populate khi tạo,
+  // nên deleteMany này là best-effort — an toàn vì no-op nếu không match
+  await prisma.brkRevenueAward.deleteMany({
+    where: { sourceMemberId }
+  })
+
   // --- BƯỚC 6: Xóa SystemClosure có liên quan đến member (descendant hoặc ancestor) ---
   await prisma.systemClosure.deleteMany({
     where: {
@@ -622,9 +641,10 @@ export async function revertMemberActivation(
     }
   })
 
-  // --- BƯỚC 7: Set System record về CANCELLED + level 0 ---
-  await prisma.system.update({
-    where: { autoId: system.autoId },
-    data: { status: 'CANCELLED', level: 0, totalPoints: 0 }
+  // --- BƯỚC 7: Xóa System record hoàn toàn ---
+  // Lý do: revert ACTIVE → PENDING để build lại, cần xóa hẳn
+  // để activateBrkMember có thể tạo mới từ đầu (upsert → create)
+  await prisma.system.delete({
+    where: { autoId: system.autoId }
   })
 }

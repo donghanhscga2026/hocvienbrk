@@ -107,7 +107,7 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
   const effectiveAmount = transferData?.amount || enrollment.payment?.amount || 0
   const paymentData: any = {
     status: 'VERIFIED',
-    verifiedAt: new Date(),
+    verifiedAt: finalUpdatedAt,
     verifyMethod: method,
     note: note || null,
     amount: effectiveAmount
