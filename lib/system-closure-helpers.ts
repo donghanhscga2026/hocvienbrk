@@ -30,12 +30,13 @@ export async function addUserToSystemClosure(
     }
 
     const { autoId } = systemRecord
+    const applicationId = systemRecord.applicationId
 
     // 2. Self-closure MUST succeed — this is the gate for all downstream operations
     await prisma.systemClosure.upsert({
         where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } },
-        update: { depth: 0 },
-        create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
+        update: { depth: 0, applicationId },
+        create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId, applicationId }
     })
 
     // 3. Delete old non-self closures before rebuilding (handles refSysId change + stale data)
@@ -48,14 +49,15 @@ export async function addUserToSystemClosure(
     // 4. If upline exists (refSysId > 0), copy all upline closures using upsert (idempotent)
     if (refSysId > 0) {
         const uplineSystem = await prisma.system.findFirst({
-            where: { userId: refSysId, onSystem: systemId }
+            where: { userId: refSysId, onSystem: systemId, applicationId: applicationId ?? null }
         })
 
         if (uplineSystem) {
             const ancestors = await prisma.systemClosure.findMany({
                 where: {
                     systemId,
-                    descendantId: uplineSystem.autoId
+                    descendantId: uplineSystem.autoId,
+                    applicationId: applicationId ?? null
                 },
                 orderBy: { depth: 'desc' }
             })
@@ -70,12 +72,13 @@ export async function addUserToSystemClosure(
                             systemId
                         }
                     },
-                    update: { depth: ancestor.depth + 1 },
+                    update: { depth: ancestor.depth + 1, applicationId },
                     create: {
                         ancestorId: ancestor.ancestorId,
                         descendantId: autoId,
                         depth: ancestor.depth + 1,
-                        systemId
+                        systemId,
+                        applicationId
                     }
                 })
             }

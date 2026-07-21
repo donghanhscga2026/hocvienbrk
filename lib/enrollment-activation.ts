@@ -6,7 +6,7 @@ export interface ActivationOptions {
   enrollmentId: number
   method: 'AUTO_EMAIL' | 'MANUAL_UPLOAD' | 'MANUAL_ADMIN'
   note?: string
-  customUpdatedAt?: Date
+  customActivatedAt?: Date
   transferData?: {
     amount: number
     phone: string | null
@@ -38,7 +38,7 @@ export interface ActivationResult {
 }
 
 export async function processEnrollmentActivation(options: ActivationOptions): Promise<ActivationResult> {
-  const { enrollmentId, method, note, customUpdatedAt, transferData } = options
+  const { enrollmentId, method, note, customActivatedAt, transferData } = options
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
@@ -65,10 +65,8 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     return { success: false, error: 'Enrollment already active' }
   }
 
-  // Tính finalUpdatedAt TRƯỚC — dùng chung cho BRK activation + enrollment update
-  const isReactivation = enrollment.updatedAt.getTime() !== enrollment.createdAt.getTime()
-  const finalUpdatedAt = customUpdatedAt
-    || (isReactivation ? enrollment.updatedAt : new Date())
+  // Mốc kích hoạt bất biến, dùng chung cho BRK, Payment và Enrollment.
+  const finalActivatedAt = customActivatedAt || enrollment.activatedAt || new Date()
 
   // ════════════════════════════════════════════════════════════
   // STEP 1: BRK activation (BEFORE enrollment → ACTIVE)
@@ -83,7 +81,7 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     if (brkTree) {
       try {
         const { activateBrkMember, getBrkPlacementChain } = await import('@/lib/brk/activation-service')
-        await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId, finalUpdatedAt)
+        await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId, finalActivatedAt)
         const placement = await getBrkPlacementChain(enrollment.userId, brkTree.onSystem)
         brkResult = { activated: true, placement }
       } catch (err) {
@@ -107,7 +105,7 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
   const effectiveAmount = transferData?.amount || enrollment.payment?.amount || 0
   const paymentData: any = {
     status: 'VERIFIED',
-    verifiedAt: finalUpdatedAt,
+    verifiedAt: finalActivatedAt,
     verifyMethod: method,
     note: note || null,
     amount: effectiveAmount
@@ -134,7 +132,7 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
       where: { id: enrollmentId },
       data: {
         status: 'ACTIVE',
-        updatedAt: finalUpdatedAt
+        activatedAt: finalActivatedAt
       }
     })
   ])

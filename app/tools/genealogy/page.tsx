@@ -1947,12 +1947,11 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                             <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-blue-500 border-4 border-white shadow-md" />
                             <div className="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-1">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-black text-blue-600">Tham gia hệ thống</span>
+                                <span className="text-[10px] font-black text-blue-600">{rec.title || 'Tham gia hệ thống'}</span>
                                 <span className="text-[10px] font-medium text-slate-400">
                                   {new Date(rec.time).toLocaleString('vi-VN')}
                                 </span>
                               </div>
-                              <span className="text-slate-800 text-xs font-black">{rec.title}</span>
                               <span className="text-slate-500 text-[11px] font-medium leading-normal">{rec.description}</span>
 
                               {/* Thông số tăng trưởng tích lũy */}

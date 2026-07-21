@@ -25,7 +25,8 @@ async function creditBalance(
   description: string,
   refId?: string,
   createdAt?: Date,
-  sourceMemberId?: number
+  sourceMemberId?: number,
+  applicationId?: number
 ) {
   await ensureBrkWallet(userId)
   const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : 'balance'
@@ -53,6 +54,7 @@ async function creditBalance(
           description,
           refId,
           sourceMemberId,
+          applicationId,
           balanceType,
           balanceBefore: oldVal,
           balanceAfter: newVal,
@@ -84,9 +86,10 @@ export async function creditBrkWallet(
   description: string,
   refId?: string,
   createdAt?: Date,
-  sourceMemberId?: number
+  sourceMemberId?: number,
+  applicationId?: number
 ) {
-  return creditBalance(userId, amount, 'CASH', type, description, refId, createdAt, sourceMemberId)
+  return creditBalance(userId, amount, 'CASH', type, description, refId, createdAt, sourceMemberId, applicationId)
 }
 
 export async function creditBrkdWallet(
@@ -95,9 +98,10 @@ export async function creditBrkdWallet(
   description: string,
   refId?: string,
   createdAt?: Date,
-  sourceMemberId?: number
+  sourceMemberId?: number,
+  applicationId?: number
 ) {
-  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId, createdAt, sourceMemberId)
+  return creditBalance(userId, amount, 'BRKD', 'BRKD_CREDIT', description, refId, createdAt, sourceMemberId, applicationId)
 }
 
 export async function creditVoucherWallet(
@@ -106,9 +110,10 @@ export async function creditVoucherWallet(
   description: string,
   refId?: string,
   createdAt?: Date,
-  sourceMemberId?: number
+  sourceMemberId?: number,
+  applicationId?: number
 ) {
-  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt, sourceMemberId)
+  return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt, sourceMemberId, applicationId)
 }
 
 export async function debitBrkWallet(
@@ -179,6 +184,25 @@ export async function getBrkTransactionHistory(userId: number, limit = 50) {
   })
 }
 
+export async function getSystemSnapshotAt(userId: number, onSystem: number, at: Date) {
+  const system = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId, onSystem } },
+  })
+  const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
+  if (!system) {
+    return { cash: 0, brkd: 0, brkp: 0, teamSize: 0, brkdVolume: 0, cashVolume: 0 }
+  }
+
+  return {
+    cash: wallet ? Number(wallet.balance) : 0,
+    brkd: wallet ? Number(wallet.brkd) : 0,
+    brkp: Number(system.totalPoints || 0),
+    teamSize: system.officialTeamSize,
+    brkdVolume: Number(system.totalMbdtVolume),
+    cashVolume: Number(system.totalCashVolume),
+  }
+}
+
 export async function makeSystemSnapshotDescription(
   userId: number,
   onSystem: number,
@@ -193,16 +217,8 @@ export async function makeSystemSnapshotDescription(
   })
   const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
   
-  let teamCount = 1
-  if (system) {
-    const latestRec = await prisma.brkTimelineRecord.findFirst({
-      where: { userId, onSystem },
-      orderBy: { id: 'desc' }
-    })
-    teamCount = latestRec
-      ? (event === 'ACTIVATION' || event.startsWith('F') ? latestRec.accumulatedTeamSize + 1 : latestRec.accumulatedTeamSize)
-      : 1
-  }
+  const snapshot = await getSystemSnapshotAt(userId, onSystem, new Date())
+  const teamCount = snapshot.teamSize
 
   const cash = (wallet ? Number(wallet.balance) : 0) + (overrides.cash ?? 0)
   const brkd = (wallet ? Number(wallet.brkd) : 0) + (overrides.brkd ?? 0)
@@ -248,6 +264,11 @@ export async function createBrkTimelineRecord(data: {
   fromLevel?: number
   toLevel?: number
   sourceMemberId?: number
+  eventStatus?: string
+  eventMbp?: number
+  eventMbdtVolume?: number
+  eventCashVolume?: number
+  applicationId?: number
 }) {
   let cash = data.accumulatedCash
   let brkd = data.accumulatedBrkd
@@ -256,45 +277,38 @@ export async function createBrkTimelineRecord(data: {
   let brkdVol = data.accumulatedBrkdVolume
   let cashVol = data.accumulatedCashVolume
 
-  const system = await prisma.system.findUnique({
-    where: { userId_onSystem: { userId: data.userId, onSystem: data.onSystem } }
-  })
-  const wallet = await prisma.brkWallet.findUnique({ where: { userId: data.userId } })
-
-  const lastRec = await prisma.brkTimelineRecord.findFirst({
-    where: { userId: data.userId, onSystem: data.onSystem },
-    orderBy: { id: 'desc' }
-  })
-
-  if (cash === undefined) cash = wallet ? Number(wallet.balance) : 0
-  if (brkd === undefined) brkd = wallet ? Number(wallet.brkd) : 0
-  if (brkp === undefined) brkp = system ? Number(system.totalPoints) : 0
-  
-  if (teamSize === undefined) {
-    if (lastRec) {
-      if (data.type === 'ACTIVATION' || data.txType === 'ADJUSTMENT') {
-        teamSize = lastRec.accumulatedTeamSize + 1
-      } else {
-        teamSize = lastRec.accumulatedTeamSize
-      }
-    } else {
-      teamSize = 1
+  if (data.applicationId != null) {
+    const snapshot = await getSystemSnapshotAt(data.userId, data.onSystem, data.time)
+    if (cash === undefined) cash = snapshot.cash
+    if (brkd === undefined) brkd = snapshot.brkd
+    if (brkp === undefined) brkp = snapshot.brkp
+    if (teamSize === undefined) teamSize = snapshot.teamSize
+    if (brkdVol === undefined) brkdVol = snapshot.brkdVolume
+    if (cashVol === undefined) cashVol = snapshot.cashVolume
+  } else {
+    const [system, wallet, lastRec] = await Promise.all([
+      prisma.system.findUnique({ where: { userId_onSystem: { userId: data.userId, onSystem: data.onSystem } } }),
+      prisma.brkWallet.findUnique({ where: { userId: data.userId } }),
+      prisma.brkTimelineRecord.findFirst({
+        where: { userId: data.userId, onSystem: data.onSystem },
+        orderBy: { id: 'desc' },
+      }),
+    ])
+    if (cash === undefined) cash = wallet ? Number(wallet.balance) : 0
+    if (brkd === undefined) brkd = wallet ? Number(wallet.brkd) : 0
+    if (brkp === undefined) brkp = system ? Number(system.totalPoints) : 0
+    if (teamSize === undefined) {
+      teamSize = lastRec
+        ? lastRec.accumulatedTeamSize + (data.type === 'ACTIVATION' || data.txType === 'ADJUSTMENT' ? 1 : 0)
+        : 1
     }
-  }
-
-  if (brkdVol === undefined || cashVol === undefined) {
-    brkdVol = lastRec ? Number(lastRec.accumulatedBrkdVolume) : 0
-    cashVol = lastRec ? Number(lastRec.accumulatedCashVolume) : 0
-
-    if (data.type === 'TRANSACTION') {
-      const sysTree = await prisma.systemTree.findUnique({
-        where: { onSystem: data.onSystem },
-        select: { fee: true }
-      })
-      const sysFee = sysTree ? Number(sysTree.fee) : 26866666
-      if (data.txType === 'RETURN_FEE') {
+    if (brkdVol === undefined || cashVol === undefined) {
+      brkdVol = lastRec ? Number(lastRec.accumulatedBrkdVolume) : 0
+      cashVol = lastRec ? Number(lastRec.accumulatedCashVolume) : 0
+      if (data.type === 'TRANSACTION' && data.txType === 'RETURN_FEE') {
+        const sysTree = await prisma.systemTree.findUnique({ where: { onSystem: data.onSystem }, select: { fee: true } })
         brkdVol += data.amountBrkd ? Math.round(data.amountBrkd / 0.21) : 0
-        cashVol += sysFee
+        cashVol += sysTree ? Number(sysTree.fee) : 26866666
       }
     }
   }
@@ -322,7 +336,12 @@ export async function createBrkTimelineRecord(data: {
       pathStr: data.pathStr,
       fromLevel: data.fromLevel,
       toLevel: data.toLevel,
-      sourceMemberId: data.sourceMemberId
+      sourceMemberId: data.sourceMemberId,
+      eventStatus: data.eventStatus,
+      eventMbp: data.eventMbp ?? 0,
+      eventMbdtVolume: data.eventMbdtVolume ?? 0,
+      eventCashVolume: data.eventCashVolume ?? 0,
+      applicationId: data.applicationId,
     }
   })
 

@@ -5,6 +5,7 @@ const CRON_JOBS = [
   'brk-daily-eval',
   'brk-level-check',
   'brk-grace-processing',
+  'mbtca-orchestrator',
   'brk-revenue-share',
   'brk-expiration',
   'gmail-watch',

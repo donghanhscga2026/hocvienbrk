@@ -26,6 +26,7 @@ interface PaymentData {
     status: string
     referrerId: number | null
     updatedAt: Date
+    activatedAt: Date | null
     referrer: {
       id: number
       name: string | null
@@ -76,7 +77,7 @@ function dateToLocalDatetime(d: Date | string | null | undefined): string {
 }
 
 type FilterType = 'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED' | 'CANCELLED'
-type SortField = 'createdAt' | 'updatedAt'
+type SortField = 'createdAt' | 'activatedAt'
 
 export default function PaymentsPage() {
   const { data: session } = useSession()
@@ -110,9 +111,9 @@ export default function PaymentsPage() {
 
     return [...filtered].sort((a, b) => {
       let aVal: number, bVal: number
-      if (sortBy === 'updatedAt') {
-        aVal = new Date(a.enrollment.updatedAt).getTime()
-        bVal = new Date(b.enrollment.updatedAt).getTime()
+      if (sortBy === 'activatedAt') {
+        aVal = a.enrollment.activatedAt ? new Date(a.enrollment.activatedAt).getTime() : 0
+        bVal = b.enrollment.activatedAt ? new Date(b.enrollment.activatedAt).getTime() : 0
       } else {
         aVal = new Date(a.createdAt).getTime()
         bVal = new Date(b.createdAt).getTime()
@@ -143,9 +144,9 @@ export default function PaymentsPage() {
     const initial: Record<number, string> = {}
     allPayments.forEach(p => {
       if (p.status === 'PENDING') {
-        const hasMeaningfulDate = p.enrollment.updatedAt &&
-          new Date(p.enrollment.updatedAt).getTime() !== new Date(p.createdAt).getTime()
-        initial[p.enrollment.id] = hasMeaningfulDate ? dateToLocalDatetime(p.enrollment.updatedAt) : ''
+        initial[p.enrollment.id] = p.enrollment.activatedAt
+          ? dateToLocalDatetime(p.enrollment.activatedAt)
+          : ''
       }
     })
     setEnrollmentDates(initial)
@@ -181,8 +182,8 @@ export default function PaymentsPage() {
     if (!payment) { setActionLoading(null); return }
     const enrollmentId = payment.enrollment.id
     const dateStr = enrollmentDates[enrollmentId]
-    const customUpdatedAt = dateStr ? localDatetimeToDate(dateStr) : undefined
-    const result = await verifyPaymentAction(enrollmentId, 'MANUAL_ADMIN', 'Admin xác nhận thủ công', customUpdatedAt)
+    const customActivatedAt = dateStr ? localDatetimeToDate(dateStr) : undefined
+    const result = await verifyPaymentAction(enrollmentId, 'MANUAL_ADMIN', 'Admin xác nhận thủ công', customActivatedAt)
     if (result.success) {
       await loadData()
     } else {
@@ -378,7 +379,7 @@ export default function PaymentsPage() {
                 className="text-[11px] font-semibold text-gray-700 bg-transparent border-none outline-none cursor-pointer pr-1 appearance-none"
               >
                 <option value="createdAt">📅 Đăng ký</option>
-                <option value="updatedAt">📅 updatedAt</option>
+                <option value="activatedAt">📅 Kích hoạt</option>
               </select>
               <button
                 onClick={() => setSortDesc(!sortDesc)}

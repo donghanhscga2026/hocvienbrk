@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma'
 import { distributeCommission } from './commission-calculator'
-import { checkAndPromoteLevel, create2F1Voucher } from './level-manager'
+import { checkAndPromoteLevel } from './level-manager'
 import { getAllLevelConfigs } from './config-service'
 import type { SystemTree } from '@prisma/client'
 
@@ -58,14 +58,10 @@ export async function processSystemDailyEval(
       member.userId
     )
 
-    if (member.refSysId > 0) {
-      await create2F1Voucher(member.refSysId, onSystem, evalTime, member.userId)
-    }
-
     await checkAndPromoteLevel(member.userId, onSystem, evalTime, configMap, member.userId)
 
     for (const { uplineSystem } of commissionResult.ancestorCredits) {
-      await checkAndPromoteLevel(uplineSystem.userId, onSystem, evalTime, configMap, uplineSystem.userId)
+      await checkAndPromoteLevel(uplineSystem.userId, onSystem, evalTime, configMap, member.userId)
     }
 
     confirmed++

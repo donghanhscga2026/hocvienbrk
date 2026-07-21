@@ -801,25 +801,30 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         }
 
         // Non-TCA system (BRK / KTC / YTB)
-        const sysRec = await prisma.system.findUnique({ where: { userId_onSystem: { userId, onSystem: systemId } } })
+        const sysRec = await prisma.system.findUnique({
+            where: { userId_onSystem: { userId, onSystem: systemId } },
+            include: { planApplication: { include: { businessPlan: true } } }
+        })
         const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
 
         const rootSys = await prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } })
         const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true, fee: true } })
         const seq = rootSys && sysRec ? sysRec.autoId - rootSys.autoId : null
-        // Lấy timeline record mới nhất để lấy doanh số dồn đồng bộ 100%
-        const latestTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
-            where: { userId, onSystem: systemId },
-            orderBy: { id: 'desc' }
-        }) : null
-
         // Lấy timeline record ACTIVATION để làm Ngày tham gia cố định
         const activationTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
             where: { userId, onSystem: systemId, type: 'ACTIVATION' }
         }) : null
 
-        const teamTotalBrkd = latestTimeline ? Number(latestTimeline.accumulatedBrkdVolume) : 0
-        const teamTotalVnd = latestTimeline ? Number(latestTimeline.accumulatedCashVolume) : 0
+        const latestLegacyTimeline = sysRec?.applicationId == null ? await prisma.brkTimelineRecord.findFirst({
+            where: { userId, onSystem: systemId, applicationId: null },
+            orderBy: { id: 'desc' }
+        }) : null
+        const teamTotalBrkd = sysRec?.applicationId != null
+            ? Number(sysRec.totalMbdtVolume)
+            : Number(latestLegacyTimeline?.accumulatedBrkdVolume || 0)
+        const teamTotalVnd = sysRec?.applicationId != null
+            ? Number(sysRec.totalCashVolume)
+            : Number(latestLegacyTimeline?.accumulatedCashVolume || 0)
 
         // Lấy timeline record thăng cấp mới nhất để làm Ngày lên cấp
         const latestLevelUpTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
@@ -860,6 +865,9 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
             enrollment,
             systemData: {
                 systemName: systemTree?.nameSystem || `Hệ thống ${systemId}`,
+                applicationId: sysRec?.applicationId ?? null,
+                applicationCode: sysRec?.planApplication?.applicationCode ?? null,
+                businessPlanCode: sysRec?.planApplication?.businessPlan.code ?? null,
                 level: sysRec?.level ?? null,
                 totalPoints: sysRec?.totalPoints != null ? Number(sysRec.totalPoints) : null,
                 personalScore: 17,
@@ -869,7 +877,9 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
                 levelUpdatedAt: latestLevelUpTimeline?.time ?? null,
                 teamTotalBrkd,
                 teamTotalVnd,
-                teamSize: latestTimeline?.accumulatedTeamSize ?? 1,
+                teamSize: sysRec?.applicationId != null
+                    ? sysRec.officialTeamSize
+                    : latestLegacyTimeline?.accumulatedTeamSize ?? 1,
                 upline1,
                 upline2,
                 wallet: wallet ? {
@@ -1612,7 +1622,12 @@ export async function getMemberPromotionHistoryAction(userId: number, systemId: 
                 targetMemberName: r.targetMemberName,
                 pathStr: r.pathStr,
                 fromLevel: r.fromLevel,
-                toLevel: r.toLevel
+                toLevel: r.toLevel,
+                applicationId: r.applicationId,
+                eventStatus: r.eventStatus,
+                eventMbp: Number(r.eventMbp),
+                eventMbdtVolume: Number(r.eventMbdtVolume),
+                eventCashVolume: Number(r.eventCashVolume)
             }
         }))
 

@@ -15,6 +15,7 @@ import * as readline from 'readline'
 const prisma = new PrismaClient()
 const ON_SYSTEM = 4
 const COURSE_ID = 22
+const EXPECTED_ENROLLMENT_COUNT = 92
 
 // ═══════════════════════════════════════════════════════
 // HELPERS
@@ -100,14 +101,19 @@ async function showPreCleanupStats() {
 
   const referralCount = await prisma.brkReferralBonus.count({ where: { onSystem: ON_SYSTEM } })
   console.log(`\n📋 brk_referral_bonus (onSystem=${ON_SYSTEM}): ${referralCount} records`)
+  const workflowRunCount = await prisma.mbtcaWorkflowRun.count({ where: { planApplication: { onSystem: ON_SYSTEM } } })
+  const commissionSnapshotCount = await prisma.mbtcaCommissionLevelSnapshot.count({ where: { planApplication: { onSystem: ON_SYSTEM } } })
+  console.log(`📋 MB TCA workflow/snapshot: ${workflowRunCount}/${commissionSnapshotCount}`)
 
-  const walletChangeCount = await prisma.activityLog.count({ where: { action: 'WALLET_CHANGE' } })
+  const walletChangeCount = await prisma.activityLog.count({
+    where: { action: 'WALLET_CHANGE', userId: { in: systemUserIds } },
+  })
   console.log(`\n📋 activity_log (action=WALLET_CHANGE): ${walletChangeCount} records`)
 
   const enrollmentCount = await prisma.enrollment.count({
-    where: { courseId: COURSE_ID, status: 'ACTIVE' },
+    where: { courseId: COURSE_ID },
   })
-  console.log(`\n✅ enrollment (courseId=${COURSE_ID}, status=ACTIVE): ${enrollmentCount} records — GIỮ NGUYÊN`)
+  console.log(`\n✅ enrollment (courseId=${COURSE_ID}): ${enrollmentCount} records — GIỮ NGUYÊN trạng thái và thời gian gốc`)
 
   return {
     systemCount,
@@ -119,6 +125,8 @@ async function showPreCleanupStats() {
     poolCount,
     awardCount,
     referralCount,
+    workflowRunCount,
+    commissionSnapshotCount,
     walletChangeCount,
     enrollmentCount,
     systemUserIds,
@@ -131,6 +139,10 @@ async function showPreCleanupStats() {
 
 async function executeCleanup(systemUserIds: number[]) {
   divider('PHASE 2: THỰC HIỆN XÓA DỮ LIỆU')
+
+  await prisma.mbtcaWorkflowStep.deleteMany({ where: { run: { planApplication: { onSystem: ON_SYSTEM } } } })
+  await prisma.mbtcaWorkflowRun.deleteMany({ where: { planApplication: { onSystem: ON_SYSTEM } } })
+  await prisma.mbtcaCommissionLevelSnapshot.deleteMany({ where: { planApplication: { onSystem: ON_SYSTEM } } })
 
   console.log('\n🔄 Deleting brk_revenue_award...')
   const deletedAwards = await prisma.brkRevenueAward.deleteMany({
@@ -192,7 +204,7 @@ async function executeCleanup(systemUserIds: number[]) {
 
   console.log('🔄 Deleting activity_log (WALLET_CHANGE)...')
   const deletedLogs = await prisma.activityLog.deleteMany({
-    where: { action: 'WALLET_CHANGE' },
+    where: { action: 'WALLET_CHANGE', userId: { in: systemUserIds } },
   })
   console.log(`   ✅ Deleted ${deletedLogs.count} WALLET_CHANGE logs`)
 
@@ -216,7 +228,9 @@ async function showPostCleanupStats(systemUserIds: number[]) {
   const timelineCount = await prisma.brkTimelineRecord.count({ where: { onSystem: ON_SYSTEM } })
   const poolCount = await prisma.brkRevenuePool.count({ where: { systemId: ON_SYSTEM } })
   const referralCount = await prisma.brkReferralBonus.count({ where: { onSystem: ON_SYSTEM } })
-  const walletChangeCount = await prisma.activityLog.count({ where: { action: 'WALLET_CHANGE' } })
+  const walletChangeCount = await prisma.activityLog.count({
+    where: { action: 'WALLET_CHANGE', userId: { in: systemUserIds } },
+  })
 
   let txCount = 0
   let walletBalancesNonZero = 0
@@ -235,7 +249,7 @@ async function showPostCleanupStats(systemUserIds: number[]) {
   }
 
   const enrollmentCount = await prisma.enrollment.count({
-    where: { courseId: COURSE_ID, status: 'ACTIVE' },
+    where: { courseId: COURSE_ID },
   })
 
   console.log(`\n📋 system:              ${systemCount} (mong đợi: 0)`)
@@ -247,7 +261,7 @@ async function showPostCleanupStats(systemUserIds: number[]) {
   console.log(`📋 brk_revenue_pool:    ${poolCount} (mong đợi: 0)`)
   console.log(`📋 brk_referral:        ${referralCount} (mong đợi: 0)`)
   console.log(`📋 activity_log WL:     ${walletChangeCount} (mong đợi: 0)`)
-  console.log(`\n✅ enrollment courseId=22 ACTIVE: ${enrollmentCount} (GIỮ NGUYÊN)`)
+  console.log(`\n✅ enrollment courseId=22: ${enrollmentCount} (GIỮ NGUYÊN)`)
 
   const allClean =
     systemCount === 0 &&
@@ -282,7 +296,7 @@ async function main() {
   const stats = await showPreCleanupStats()
 
   if (stats.enrollmentCount === 0) {
-    console.error('\n❌ KHÔNG TÌM THẤY enrollment nào courseId=22 ACTIVE!')
+    console.error('\n❌ KHÔNG TÌM THẤY enrollment nào courseId=22!')
     console.error('   Dừng lại để tránh xóa nhầm.')
     return
   }
@@ -301,10 +315,10 @@ async function main() {
     return
   }
 
-  console.log(`\n⚠️  SỐ LƯỢNG ENROLLMENT: ${stats.enrollmentCount} (mong đợi 88)`)
-  if (stats.enrollmentCount !== 88) {
+  console.log(`\n⚠️  SỐ LƯỢNG ENROLLMENT courseId=22: ${stats.enrollmentCount} (mong đợi ${EXPECTED_ENROLLMENT_COUNT})`)
+  if (stats.enrollmentCount !== EXPECTED_ENROLLMENT_COUNT) {
     const proceed = await askConfirmation(
-      `Enrollment ACTIVE courseId=22 = ${stats.enrollmentCount} (khác 88). Bạn có chắc muốn tiếp tục?`
+      `Enrollment courseId=22 = ${stats.enrollmentCount} (khác ${EXPECTED_ENROLLMENT_COUNT}). Bạn có chắc muốn tiếp tục?`
     )
     if (!proceed) {
       console.log('❌ Đã hủy.')

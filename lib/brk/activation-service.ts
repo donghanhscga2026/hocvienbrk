@@ -4,17 +4,20 @@ import prisma from '@/lib/prisma'
 import { ensureBrkWallet, creditBrkWallet, creditBrkdWallet, creditVoucherWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
 import { distributeCommission } from './commission-calculator'
-import { checkAndPromoteLevel, create2F1Voucher } from './level-manager'
+import { checkAndPromoteLevel } from './level-manager'
 import { resolvePlacement } from './placement-rules'
+import { MB_TCA_PLAN_CODE } from './business-plan-service'
 
-const BRKP_PER_ACTIVATION = 17
 const BRKD_PER_ACTIVATION = 12_868_686
+const BRKP_PER_ACTIVATION = 17
 const MBDT_BASE = 12_000_000
 const MBDT_MIN = 12_868_686
 const MBDT_MAX = 14_686_868
 
-function generateMBDT(): number {
-  return Math.floor(Math.random() * (MBDT_MAX - MBDT_MIN + 1)) + MBDT_MIN
+function generateMBDT(userId: number, onSystem: number): number {
+  const range = MBDT_MAX - MBDT_MIN + 1
+  const seed = (Math.imul(userId, 1_103_515_245) + Math.imul(onSystem, 12_345)) >>> 0
+  return MBDT_MIN + (seed % range)
 }
 
 function mbdtToMbp(mbdt: number): number {
@@ -27,16 +30,25 @@ export async function activateBrkMember(
   enrollmentReferrerId?: number | null,
   activatedAt?: Date,
   forcedRefSysId?: number,
+  applicationId?: number,
 ) {
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
   if (!systemTree) throw new Error('System not found')
+  const planApplication = applicationId
+    ? await prisma.systemPlanApplication.findUnique({ where: { id: applicationId }, include: { businessPlan: true } })
+    : null
+  const isMbtca = planApplication?.businessPlan.code === MB_TCA_PLAN_CODE
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error('User not found')
 
   const now = activatedAt || new Date()
-  const graceDays = systemTree.graceDays || 1
-  const graceEnd = new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000)
+  const applicationRules = planApplication?.configurationSnapshot as Record<string, unknown> | null
+  const configuredGraceHours = Number(applicationRules?.gracePeriodHours)
+  const gracePeriodHours = isMbtca && Number.isFinite(configuredGraceHours)
+    ? configuredGraceHours
+    : systemTree.gracePeriodHours || (systemTree.graceDays || 1) * 24
+  const graceEnd = new Date(now.getTime() + gracePeriodHours * 60 * 60 * 1000)
   const expiresAt = new Date(now.getTime() + systemTree.durationDays * 24 * 60 * 60 * 1000)
   const fee = Number(systemTree.fee)
 
@@ -62,6 +74,7 @@ export async function activateBrkMember(
       gracePeriodEnd: graceEnd,
       expiresAt,
       level: 0, // Chưa qua grace period → chưa được xét cấp
+      applicationId,
     },
     create: {
       userId,
@@ -73,6 +86,7 @@ export async function activateBrkMember(
       expiresAt,
       level: 0, // Chưa qua grace period → chưa được xét cấp
       totalPoints: 0,
+      applicationId,
     }
   })
 
@@ -83,7 +97,7 @@ export async function activateBrkMember(
   // Check if Method B (24h cooling-off — defer commissions/points)
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
-  if (isOptionB) {
+  if (isOptionB || isMbtca) {
     // 1. Ghi nhận giao dịch JOIN cho chính học viên đó
     const joinDesc = await makeSystemSnapshotDescription(
       userId,
@@ -99,7 +113,8 @@ export async function activateBrkMember(
       joinDesc,
       `sys_${onSystem}_user_${userId}_join`,
       now,
-      userId
+      userId,
+      applicationId
     )
 
     await createBrkTimelineRecord({
@@ -108,10 +123,11 @@ export async function activateBrkMember(
       type: 'ACTIVATION',
       time: now,
       title: 'Đã kích hoạt hệ thống',
-      description: `Đang trong thời gian ${graceDays * 24}h cân nhắc, Cấp 0.`,
+      description: `Đang trong thời gian ${gracePeriodHours}h cân nhắc, Cấp 0.`,
       fromLevel: undefined,
       toLevel: 0,
-      sourceMemberId: userId
+      sourceMemberId: userId,
+      applicationId
     })
 
     // 2. Ghi nhận log active (F1_ACTIVE / F2_ACTIVE / F3_ACTIVE) cho ancestors (tối đa 3 cấp bảo trợ gần nhất)
@@ -140,8 +156,8 @@ export async function activateBrkMember(
         descText = `Bạn vừa có thêm F1 #${userId} ${user.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
       } else if (closure.depth === 2 && parentSys) {
         descText = `Bạn vừa có thêm F2 #${userId} ${user.name || 'N/A'} dưới F1 #${parentSys.userId} ${parentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
-      } else if (closure.depth === 3 && grandparentSys) {
-        descText = `Bạn vừa có thêm F3 #${userId} ${user.name || 'N/A'} dưới F2 #${grandparentSys.userId} ${grandparentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
+      } else if (closure.depth === 3 && parentSys && grandparentSys) {
+        descText = `Bạn vừa có thêm F3 #${userId} ${user.name || 'N/A'} dưới F2 #${parentSys.userId} ${parentSys.user?.name || 'N/A'} dưới F1 #${grandparentSys.userId} ${grandparentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
       }
 
       const activeLogDesc = await makeSystemSnapshotDescription(
@@ -163,7 +179,8 @@ export async function activateBrkMember(
         activeLogDesc,
         `sys_${onSystem}_user_${ancestorSys.userId}_under_${userId}_active`,
         now,
-        userId
+        userId,
+        applicationId
       )
 
       await createBrkTimelineRecord({
@@ -176,15 +193,16 @@ export async function activateBrkMember(
         targetMemberId: userId,
         targetMemberName: user.name ?? undefined,
         txType: 'ADJUSTMENT',
-        sourceMemberId: userId
+        sourceMemberId: userId,
+        applicationId
       })
     }
 
     return system
   }
 
-  // Method A: immediate commissions + points + level-up + 2F1 voucher
-  // Self points +17 (same as Method B cron)
+  // Method A: immediate commissions + level-up + 2F1 voucher.
+  // Aggregate points/volumes/team size only begin when the member becomes OFFICIAL.
   await prisma.system.update({
     where: { userId_onSystem: { userId, onSystem } },
     data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
@@ -192,10 +210,6 @@ export async function activateBrkMember(
   await distributeCommission(userId, onSystem, fee, systemTree, now, undefined, undefined, userId)
 
   await checkAndPromoteLevel(userId, onSystem, now, undefined, userId)
-
-  if (refSysId > 0) {
-    await create2F1Voucher(refSysId, onSystem, now, userId)
-  }
 
   return system
 }
@@ -316,14 +330,20 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
   return { success: true }
 }
 
-export async function processGracePeriodExpirations(now: Date = new Date()) {
+export async function processGracePeriodExpirations(now: Date = new Date(), onSystem?: number, applicationId?: number) {
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
+  const targetApplication = applicationId != null
+    ? await prisma.systemPlanApplication.findUnique({ where: { id: applicationId } })
+    : null
+  const targetRules = targetApplication?.configurationSnapshot as Record<string, unknown> | null
 
   const expiredGrace = await prisma.system.findMany({
     where: {
       status: 'ACTIVE',
-      gracePeriodEnd: { lte: now }
+      gracePeriodEnd: { lte: now },
+      ...(onSystem != null ? { onSystem } : {}),
+      applicationId: applicationId ?? null,
     }
   })
 
@@ -338,65 +358,49 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
       if (!memberSystemTree) continue
 
       const fee = Number(memberSystemTree.fee)
-      const returnPct = Number(memberSystemTree.returnPct)
+      const configuredReturnPct = Number(targetRules?.returnPercent)
+      const returnPct = applicationId != null && Number.isFinite(configuredReturnPct)
+        ? configuredReturnPct
+        : Number(memberSystemTree.returnPct)
 
       // KIỂM TRA CHỐNG TRÙNG LẶP — Per-system refId để tránh bỏ qua user multi-system:
-      const returnRefId = `return_fee_sys_${member.onSystem}_user_${member.userId}`
+      const applicationSuffix = member.applicationId != null ? `_app_${member.applicationId}` : ''
+      const returnRefId = `return_fee_sys_${member.onSystem}_user_${member.userId}${applicationSuffix}`
       const wallet = await prisma.brkWallet.findUnique({ where: { userId: member.userId } })
-      if (wallet) {
-        const existingRefund = await prisma.brkTransaction.findFirst({
+      const existingRefund = wallet
+        ? await prisma.brkTransaction.findFirst({
           where: {
             walletId: wallet.id,
             type: 'RETURN_FEE',
             refId: returnRefId
           }
         })
-        if (existingRefund) continue // Đã hoàn phí rồi cho hệ thống này, bỏ qua
-      }
+        : null
+      const existingOfficial = await prisma.brkTimelineRecord.findFirst({
+        where: {
+          userId: member.userId,
+          onSystem: member.onSystem,
+          eventStatus: 'OFFICIAL',
+          ...(member.applicationId != null ? { applicationId: member.applicationId } : {}),
+        },
+      })
+      if (existingRefund && existingOfficial) continue
 
       const recordTime = now
-      const memberMBDT = generateMBDT()
+      const memberMBDT = generateMBDT(member.userId, member.onSystem)
       const memberMBP = mbdtToMbp(memberMBDT)
 
-      // 1. Credit self points & thăng lên Cấp 1
-      await prisma.system.update({
-        where: { userId_onSystem: { userId: member.userId, onSystem: member.onSystem } },
-        data: {
-          totalPoints: { increment: memberMBP },
-          level: 1
-        }
-      })
-
-      // Tạo level up record 0 -> 1
-      try {
-        await prisma.brkLevelUpRecord.create({
-          data: {
-            userId: member.userId,
-            onSystem: member.onSystem,
-            fromLevel: 0,
-            toLevel: 1,
-            promotedAt: recordTime
-          }
-        })
-      } catch (err: any) {
-        if (err.code === 'P2002') {
-          console.warn(`[Grace] Level-up record for user #${member.userId} already exists, skipping.`)
-        } else {
-          throw err
-        }
-      }
-
-      // 2. Hoàn phí cá nhân (Cash + MBDT)
+      // 1. Hoàn phí cá nhân (Cash + MBDT) — idempotent độc lập với aggregate OFFICIAL
       const returnAmount = (fee * returnPct) / 100
       const brkdReturn = Math.round((memberMBDT * returnPct) / 100)
-      if (returnAmount > 0) {
+      if (returnAmount > 0 && !existingRefund) {
         // Cash refund snapshot description
         const cashDesc = await makeSystemSnapshotDescription(
           member.userId,
           member.onSystem,
           'RETURN_FEE_CASH',
           'Chính thức tham gia',
-          `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc`,
+          `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.gracePeriodHours} giờ cân nhắc`,
           { cashVolume: fee, mBdtVolume: memberMBDT },
           { cash: returnAmount, brkd: brkdReturn }
         )
@@ -406,17 +410,19 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
           'RETURN_FEE',
           cashDesc,
           returnRefId,
-          recordTime
+          recordTime,
+          member.userId,
+          member.applicationId ?? undefined
         )
         // MBDT refund snapshot description (includes thăng cấp 1)
         if (brkdReturn > 0) {
-          const brkdRefId = `return_brkd_sys_${member.onSystem}_user_${member.userId}`
+          const brkdRefId = `return_brkd_sys_${member.onSystem}_user_${member.userId}${applicationSuffix}`
           const brkdDesc = await makeSystemSnapshotDescription(
             member.userId,
             member.onSystem,
             'RETURN_FEE',
             'Chính thức tham gia',
-            `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
+            `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.gracePeriodHours} giờ cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
             { cashVolume: fee, mBdtVolume: memberMBDT },
             { cash: returnAmount, brkd: brkdReturn }
           )
@@ -425,32 +431,163 @@ export async function processGracePeriodExpirations(now: Date = new Date()) {
             brkdReturn,
             brkdDesc,
             brkdRefId,
-            recordTime
+            recordTime,
+            member.userId,
+            member.applicationId ?? undefined
           )
         }
 
+      }
+
+      if (member.applicationId == null) {
+        await prisma.system.update({
+          where: { autoId: member.autoId },
+          data: { totalPoints: { increment: memberMBP }, level: 1 },
+        })
+        try {
+          await prisma.brkLevelUpRecord.create({
+            data: {
+              userId: member.userId,
+              onSystem: member.onSystem,
+              fromLevel: 0,
+              toLevel: 1,
+              sourceMemberId: member.userId,
+              promotedAt: recordTime,
+            },
+          })
+        } catch (error: any) {
+          if (error.code !== 'P2002') throw error
+        }
         await createBrkTimelineRecord({
           userId: member.userId,
           onSystem: member.onSystem,
-          type: 'TRANSACTION',
+          type: 'ACTIVATION',
           time: recordTime,
           title: 'Chính thức tham gia',
-          description: `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.graceDays} ngày cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
+          description: `Hết thời gian ${memberSystemTree.gracePeriodHours}h cân nhắc. Được xếp là Cấp 1. Được hoàn ${returnPct}% phí trên Doanh số cá nhân.`,
           amountCash: returnAmount,
           amountBrkd: brkdReturn,
           txType: 'RETURN_FEE',
           fromLevel: 0,
-          toLevel: 1
+          toLevel: 1,
+          sourceMemberId: member.userId,
         })
+        if (!isOptionB) {
+          await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId)
+          await checkAndPromoteLevel(member.userId, member.onSystem, recordTime, undefined, member.userId)
+        }
+        count++
+        continue
       }
 
-      // 3. Nếu là Method A, thực hiện ngay commission + level check + 2F1 voucher
-      if (!isOptionB) {
-        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId)
-        await checkAndPromoteLevel(member.userId, member.onSystem, recordTime, undefined, member.userId)
-        if (member.refSysId > 0) {
-          await create2F1Voucher(member.refSysId, member.onSystem, recordTime, member.userId)
-        }
+      // 2. Ghi nhận OFFICIAL và cộng contribution lên toàn bộ tuyến trên đúng một lần
+      if (!existingOfficial) {
+        const chain = await prisma.systemClosure.findMany({
+          where: {
+            descendantId: member.autoId,
+            systemId: member.onSystem,
+            applicationId: member.applicationId ?? null,
+          },
+          orderBy: { depth: 'asc' },
+          include: { ancestor: true },
+        })
+        const ancestorAutoIds = chain.map(row => row.ancestorId)
+
+        const depthByAncestorAutoId = new Map(chain.map(row => [row.ancestorId, row.depth]))
+        const allInvolvedUserIds = [member.userId, ...chain.map(row => row.ancestor.userId)]
+        const allInvolvedUsers = await prisma.user.findMany({
+          where: { id: { in: allInvolvedUserIds } },
+          select: { id: true, name: true }
+        })
+        const userNameMap = new Map(allInvolvedUsers.map(u => [u.id, u.name?.trim() || 'N/A']))
+        const memberName = userNameMap.get(member.userId) || 'N/A'
+        await prisma.$transaction(async tx => {
+          await tx.system.updateMany({
+            where: { autoId: { in: ancestorAutoIds } },
+            data: {
+              officialTeamSize: { increment: 1 },
+              totalPoints: { increment: memberMBP },
+              totalMbdtVolume: { increment: memberMBDT },
+              totalCashVolume: { increment: fee },
+            },
+          })
+          await tx.system.update({ where: { autoId: member.autoId }, data: { level: 1 } })
+          await tx.brkLevelUpRecord.create({
+            data: {
+              userId: member.userId,
+              onSystem: member.onSystem,
+              fromLevel: 0,
+              toLevel: 1,
+              sourceMemberId: member.userId,
+              applicationId: member.applicationId,
+              promotedAt: recordTime,
+            },
+          })
+
+          const updatedSystems = await tx.system.findMany({
+            where: { autoId: { in: ancestorAutoIds } },
+          })
+          const updatedWallets = await tx.brkWallet.findMany({
+            where: { userId: { in: updatedSystems.map(row => row.userId) } },
+          })
+          const walletByUser = new Map(updatedWallets.map(row => [row.userId, row]))
+          for (const updated of updatedSystems) {
+            const updatedWallet = walletByUser.get(updated.userId)
+            const isMember = updated.userId === member.userId
+
+            let growthDesc = ''
+            if (!isMember) {
+              const depth = depthByAncestorAutoId.get(updated.autoId) ?? 0
+              const fLabel = depth > 0 ? `F${depth}` : ''
+              growthDesc = `Nhóm có thêm thành viên chính thức ${fLabel} #${member.userId} - ${memberName}`
+              if (depth > 1) {
+                const chainParts = chain
+                  .filter(c => c.depth < depth)
+                  .map(c => {
+                    const chainUserName = userNameMap.get(c.ancestor.userId) || 'N/A'
+                    return `F${c.depth} #${c.ancestor.userId} - ${chainUserName}`
+                  })
+                if (chainParts.length > 0) {
+                  growthDesc += ` (${chainParts.join(', ')})`
+                }
+              }
+            }
+
+            await tx.brkTimelineRecord.create({
+              data: {
+                userId: updated.userId,
+                onSystem: member.onSystem,
+                type: isMember ? 'ACTIVATION' : 'TRANSACTION',
+                time: recordTime,
+                title: isMember ? 'Chính thức tham gia' : 'Tăng trưởng tích lũy',
+                description: isMember
+                  ? `Hết thời gian ${memberSystemTree.gracePeriodHours}h cân nhắc. Được xếp là Cấp 1. Được hoàn ${returnPct}% phí trên Doanh số cá nhân.`
+                  : growthDesc,
+                accumulatedCash: Number(updatedWallet?.balance || 0),
+                accumulatedBrkd: Number(updatedWallet?.brkd || 0),
+                accumulatedBrkp: Number(updated.totalPoints),
+                accumulatedTeamSize: updated.officialTeamSize,
+                accumulatedBrkdVolume: Number(updated.totalMbdtVolume),
+                accumulatedCashVolume: Number(updated.totalCashVolume),
+                amountCash: isMember ? returnAmount : 0,
+                amountBrkd: isMember ? brkdReturn : 0,
+                txType: isMember ? 'RETURN_FEE' : 'OFFICIAL_CONTRIBUTION',
+                targetMemberId: isMember ? null : member.userId,
+                targetMemberName: isMember ? null : memberName,
+                fromLevel: isMember ? 0 : null,
+                toLevel: isMember ? 1 : null,
+                sourceMemberId: member.userId,
+                eventStatus: isMember ? 'OFFICIAL' : null,
+                eventMbp: isMember ? memberMBP : 0,
+                eventMbdtVolume: isMember ? memberMBDT : 0,
+                eventCashVolume: isMember ? fee : 0,
+                applicationId: member.applicationId,
+              },
+            })
+          }
+        }, { timeout: 120_000 })
+
+        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId, { applicationId: member.applicationId })
       }
 
       count++
