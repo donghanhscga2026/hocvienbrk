@@ -6,7 +6,7 @@ import { validateBranchRequirements } from './branch-validator'
 import { creditVoucherWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 import { isTestAccount } from '@/lib/test-account'
 
-export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>, sourceMemberId?: number) {
+export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>, sourceMemberId?: number, applicationId?: number) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }
   })
@@ -33,7 +33,12 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
 
     // Idempotency: skip if this promotion already recorded
     const existing = await prisma.brkLevelUpRecord.findFirst({
-      where: { userId, onSystem, toLevel: currentLevel }
+      where: {
+        userId,
+        onSystem,
+        toLevel: currentLevel,
+        ...(applicationId != null ? { applicationId } : { applicationId: null }),
+      }
     })
     if (existing) continue
 
@@ -44,6 +49,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
           onSystem,
           fromLevel: currentLevel - 1,
           toLevel: currentLevel,
+          sourceMemberId,
+          applicationId,
           promotedAt,
         }
       })
@@ -92,7 +99,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       levelUpDesc,
       `level_${currentLevel}_sys_${onSystem}_user_${userId}_points`,
       promotedAt,
-      sourceMemberId
+      sourceMemberId,
+      applicationId
     )
 
     await createBrkTimelineRecord({
@@ -104,12 +112,13 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}`,
       fromLevel: currentLevel - 1,
       toLevel: currentLevel,
-      sourceMemberId
+      sourceMemberId,
+      applicationId
     })
 
     // Idempotency: skip voucher if already credited for this level
-    if (nextConfig.giftValue > 0 && currentLevel > 2) {
-      const refId = `level_${currentLevel}_sys_${onSystem}_user_${userId}`
+    if (nextConfig.giftValue > 0 && currentLevel >= 2) {
+      const refId = `level_${currentLevel}_sys_${onSystem}_user_${userId}${applicationId != null ? `_app_${applicationId}` : ''}`
       const existingVoucher = await prisma.brkTransaction.findFirst({
         where: { refId, type: 'VOUCHER_CREDIT' }
       })
@@ -129,7 +138,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
           voucherDesc,
           refId,
           promotedAt,
-          sourceMemberId
+          sourceMemberId,
+          applicationId
         )
 
         await createBrkTimelineRecord({
@@ -141,7 +151,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
           description: `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
           amountVoucher: nextConfig.giftValue,
           txType: 'VOUCHER_CREDIT',
-          sourceMemberId
+          sourceMemberId,
+          applicationId
         })
       }
     }
@@ -152,6 +163,7 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       where: { autoId: systemRec.autoId },
       data: { level: maxPromotedLevel }
     })
+
     return promoted
   }
 
@@ -267,12 +279,12 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
   if (f1Count < 2) return null
 
   const existing = await prisma.brkReferralBonus.findFirst({
-    where: { userId, onSystem, claimed: false }
+    where: { userId, onSystem }
   })
-  if (existing) return existing
+  if (existing?.claimed) return existing
 
-  const bonus = await prisma.brkReferralBonus.create({
-    data: { userId, onSystem, f1Count }
+  const bonus = existing ?? await prisma.brkReferralBonus.create({
+    data: { userId, onSystem, f1Count, sourceMemberId }
   })
 
   // Auto-credit voucher to wallet with snapshot description
@@ -289,7 +301,7 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     userId,
     386_000,
     voucherDesc,
-    `referral_2f1_sys_${onSystem}`,
+    `referral_2f1_sys_${onSystem}_user_${userId}`,
     createdAt,
     sourceMemberId
   )
@@ -306,5 +318,8 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     sourceMemberId
   })
 
-  return bonus
+  return prisma.brkReferralBonus.update({
+    where: { id: bonus.id },
+    data: { f1Count, sourceMemberId, claimed: true, claimedAt: createdAt || new Date() },
+  })
 }

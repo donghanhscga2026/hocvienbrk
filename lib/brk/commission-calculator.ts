@@ -19,6 +19,13 @@ interface AncestorCredit {
   depth: number
 }
 
+interface CommissionOptions {
+  applicationId?: number
+  commissionCycleNumber?: number
+  levelByUserId?: Map<number, number>
+  creditPoints?: boolean
+}
+
 export async function distributeCommission(
   newMemberUserId: number,
   onSystem: number,
@@ -27,7 +34,8 @@ export async function distributeCommission(
   createdAt?: Date,
   levelConfigs?: Map<number, any>,
   memberMBDT: number = DEFAULT_MBDT,
-  sourceMemberId?: number
+  sourceMemberId?: number,
+  options: CommissionOptions = {},
 ): Promise<{ ancestorCredits: AncestorCredit[] }> {
   const memberMBP = mbdtToMbp(memberMBDT)
   const newMemberSys = await prisma.system.findUnique({
@@ -39,7 +47,8 @@ export async function distributeCommission(
     where: {
       descendantId: newMemberSys.autoId,
       depth: { gte: 1 },
-      systemId: onSystem
+      systemId: onSystem,
+      applicationId: options.applicationId ?? null,
     },
     orderBy: { depth: 'asc' },
     include: {
@@ -47,7 +56,7 @@ export async function distributeCommission(
     }
   })
 
-  const newMemberLevel = newMemberSys.level || 1
+  const newMemberLevel = options.levelByUserId?.get(newMemberUserId) ?? (newMemberSys.level || 1)
   const newMemberConfig = levelConfigs?.get(newMemberLevel) ?? await getLevelConfig(onSystem, newMemberLevel)
   let previousPct = newMemberConfig ? Number(newMemberConfig.personalFeePct) : 0
 
@@ -55,7 +64,7 @@ export async function distributeCommission(
 
   for (const closure of ancestors) {
     const uplineSystem = closure.ancestor
-    const uplineLevel = uplineSystem.level || 1
+    const uplineLevel = options.levelByUserId?.get(uplineSystem.userId) ?? (uplineSystem.level || 1)
     const config = levelConfigs?.get(uplineLevel) ?? await getLevelConfig(onSystem, uplineLevel)
     if (!config) continue
 
@@ -66,8 +75,13 @@ export async function distributeCommission(
     ancestorCredits.push({ uplineSystem, uplineLevel, earnPct, depth: closure.depth })
   }
 
-  const commissionRefId = `sys_${onSystem}_member_${newMemberUserId}`
-  const pointsRefId = `sys_${onSystem}_member_${newMemberUserId}_points`
+  const applicationSuffix = options.applicationId != null ? `_app_${options.applicationId}` : ''
+  const cycleSuffix = options.commissionCycleNumber != null ? `_cycle_${options.commissionCycleNumber}` : ''
+  const commissionRefId = `sys_${onSystem}_member_${newMemberUserId}${applicationSuffix}${cycleSuffix}`
+  const pointsRefId = `sys_${onSystem}_member_${newMemberUserId}_points${applicationSuffix}${cycleSuffix}`
+  const timelineTxType = options.commissionCycleNumber != null
+    ? `TEAM_COMMISSION_CYCLE_${options.commissionCycleNumber}`
+    : 'COMMISSION'
 
   const newMemberUser = await prisma.user.findUnique({ where: { id: newMemberUserId } })
   const newMemberName = newMemberUser?.name || 'N/A'
@@ -82,17 +96,20 @@ export async function distributeCommission(
       where: {
         userId: uplineSystem.userId,
         onSystem,
-        txType: 'COMMISSION',
-        targetMemberId: newMemberUserId
+        txType: timelineTxType,
+        targetMemberId: newMemberUserId,
+        applicationId: options.applicationId ?? null
       }
     })
     const alreadyProcessed = !!existingTimeline
 
     if (!alreadyProcessed) {
-      await prisma.system.update({
-        where: { autoId: uplineSystem.autoId },
-        data: { totalPoints: { increment: memberMBP } }
-      })
+      if (options.creditPoints !== false) {
+        await prisma.system.update({
+          where: { autoId: uplineSystem.autoId },
+          data: { totalPoints: { increment: memberMBP } }
+        })
+      }
 
       let leaderChain = ""
       if (depth === 1) {
@@ -107,7 +124,7 @@ export async function distributeCommission(
       const existingPoints = await prisma.brkTransaction.findFirst({
         where: { wallet: { userId: uplineSystem.userId }, refId: pointsRefId }
       })
-      if (!existingPoints) {
+      if (options.creditPoints !== false && !existingPoints) {
         const pointsDesc = await makeSystemSnapshotDescription(
           uplineSystem.userId,
           onSystem,
@@ -129,15 +146,23 @@ export async function distributeCommission(
           pointsDesc,
           pointsRefId,
           createdAt,
-          sourceMemberId
+          sourceMemberId,
+          options.applicationId
         )
       }
 
       if (earnPct > 0) {
         const commissionAmount = (fee * earnPct) / 100
         const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
+        const uplineWallet = await prisma.brkWallet.findUnique({ where: { userId: uplineSystem.userId } })
+        const [existingCashCommission, existingBrkdCommission] = uplineWallet
+          ? await Promise.all([
+            prisma.brkTransaction.findFirst({ where: { walletId: uplineWallet.id, refId: commissionRefId, balanceType: 'CASH' } }),
+            prisma.brkTransaction.findFirst({ where: { walletId: uplineWallet.id, refId: commissionRefId, balanceType: 'BRKD' } }),
+          ])
+          : [null, null]
 
-        if (commissionAmount > 0) {
+        if (commissionAmount > 0 && !existingCashCommission) {
           const cashCommDesc = await makeSystemSnapshotDescription(
             uplineSystem.userId,
             onSystem,
@@ -159,11 +184,12 @@ export async function distributeCommission(
             cashCommDesc,
             commissionRefId,
             createdAt,
-            sourceMemberId
+            sourceMemberId,
+            options.applicationId
           )
         }
 
-        if (brkdAmount > 0) {
+        if (brkdAmount > 0 && !existingBrkdCommission) {
           const brkdCommDesc = await makeSystemSnapshotDescription(
             uplineSystem.userId,
             onSystem,
@@ -184,7 +210,8 @@ export async function distributeCommission(
             brkdCommDesc,
             commissionRefId,
             createdAt,
-            sourceMemberId
+            sourceMemberId,
+            options.applicationId
           )
         }
       }
@@ -201,11 +228,12 @@ export async function distributeCommission(
           description: `Hoa hồng (${earnPct}%) từ thành viên mới F${depth} #${newMemberUserId} - ${newMemberName}`,
           amountCash: commissionAmount,
           amountBrkd: brkdAmount,
-          txType: 'COMMISSION',
+          txType: timelineTxType,
           targetMemberId: newMemberUserId,
           targetMemberName: newMemberName,
           pathStr: leaderChain,
-          sourceMemberId
+          sourceMemberId,
+          applicationId: options.applicationId
         })
       } else {
         await createBrkTimelineRecord({
@@ -217,11 +245,12 @@ export async function distributeCommission(
           description: `Cộng +${memberMBP.toFixed(3)} điểm MBP & Doanh số +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} ${newMemberName} đã chính thức tham gia`,
           amountCash: 0,
           amountBrkd: 0, // amountBrkd = 0 để tránh cộng vào ví thu nhập!
-          txType: 'COMMISSION',
+          txType: timelineTxType,
           targetMemberId: newMemberUserId,
           targetMemberName: newMemberName,
           pathStr: leaderChain,
-          sourceMemberId
+          sourceMemberId,
+          applicationId: options.applicationId
         })
       }
     }

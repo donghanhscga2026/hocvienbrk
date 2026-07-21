@@ -76,15 +76,15 @@ export async function getBrkDashboard() {
   const walletBalance = wallet ? Number(wallet.balance) : 0
 
   const systemInfos = await Promise.all(systems.map(async (sys) => {
-    const [f1Count, latestTimeline, levelProgress] = await Promise.all([
+    const [f1Count, levelProgress, latestLegacyTimeline] = await Promise.all([
       prisma.systemClosure.count({
         where: { ancestorId: sys.autoId, depth: 1, systemId: sys.onSystem }
       }),
-      prisma.brkTimelineRecord.findFirst({
-        where: { userId, onSystem: sys.onSystem },
+      getLevelProgress(userId, sys.onSystem),
+      sys.applicationId == null ? prisma.brkTimelineRecord.findFirst({
+        where: { userId, onSystem: sys.onSystem, applicationId: null },
         orderBy: { id: 'desc' }
-      }),
-      getLevelProgress(userId, sys.onSystem)
+      }) : null
     ])
 
     return {
@@ -93,7 +93,9 @@ export async function getBrkDashboard() {
       level: sys.level,
       totalPoints: Number(sys.totalPoints),
       f1Count,
-      totalDownline: latestTimeline?.accumulatedTeamSize ?? 1,
+      totalDownline: sys.applicationId != null
+        ? sys.officialTeamSize
+        : latestLegacyTimeline?.accumulatedTeamSize ?? 1,
       activatedAt: sys.activatedAt?.toISOString() || null,
       expiresAt: sys.expiresAt?.toISOString() || null,
       gracePeriodEnd: sys.gracePeriodEnd?.toISOString() || null,

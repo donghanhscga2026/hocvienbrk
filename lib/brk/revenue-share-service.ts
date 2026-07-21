@@ -1,227 +1,316 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { creditBrkWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
+import {
+  creditBrkWallet,
+  creditBrkdWallet,
+  makeSystemSnapshotDescription,
+  createBrkTimelineRecord,
+} from './wallet-service'
+import { getEffectivePlanApplication, MB_TCA_PLAN_CODE } from './business-plan-service'
 
-export async function processRevenueShareForSystem(onSystem: number, distributedAt?: Date) {
+const DONG_CHIA_SYSTEM_ID = 4
+const DONG_CHIA_INTERVAL_MS = 7 * 60 * 60 * 1000
+
+function configString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+async function getDongChiaPeriod(runTime: Date, applicationStartsAt?: Date) {
+  const config = await prisma.systemConfig.findUnique({
+    where: { key: 'dongchia_start_time' },
+  })
+  const rawStart = configString(config?.value)
+  if (!applicationStartsAt && !rawStart) throw new Error('Missing dongchia_start_time config')
+
+  const startTime = applicationStartsAt ?? new Date(rawStart!)
+  if (Number.isNaN(startTime.getTime())) {
+    throw new Error('Invalid dongchia_start_time config')
+  }
+
+  const completedRound = Math.floor(
+    (runTime.getTime() - startTime.getTime()) / DONG_CHIA_INTERVAL_MS,
+  ) - 1
+  if (completedRound < 0) return null
+
+  const periodStart = new Date(
+    startTime.getTime() + completedRound * DONG_CHIA_INTERVAL_MS,
+  )
+  return {
+    roundNumber: completedRound,
+    periodStart,
+    periodEnd: new Date(periodStart.getTime() + DONG_CHIA_INTERVAL_MS),
+  }
+}
+
+async function syncDongChiaMembers(onSystem: number, at: Date, applicationId?: number) {
+  const officialEvents = await prisma.brkTimelineRecord.findMany({
+    where: { onSystem, eventStatus: 'OFFICIAL', time: { lte: at }, applicationId: applicationId ?? null },
+    distinct: ['userId'],
+    select: { userId: true },
+  })
+  const officialUserIds = officialEvents.map(event => event.userId)
+  const officialMembers = await prisma.system.findMany({
+    where: {
+      onSystem,
+      applicationId: applicationId ?? null,
+      userId: { in: officialUserIds },
+      status: 'ACTIVE',
+      expiresAt: { gte: at },
+    },
+    select: { autoId: true },
+  })
+
+  const qualifiedIds: number[] = []
+  for (const member of officialMembers) {
+    const officialF1Count = await prisma.systemClosure.count({
+      where: {
+        ancestorId: member.autoId,
+        systemId: onSystem,
+        depth: 1,
+        descendant: {
+          userId: { in: officialUserIds },
+          status: 'ACTIVE',
+          expiresAt: { gte: at },
+        },
+      },
+    })
+    if (officialF1Count > 0) qualifiedIds.push(member.autoId)
+  }
+
+  await prisma.$transaction([
+    prisma.system.updateMany({
+      where: { onSystem, applicationId: applicationId ?? null, inDongChia: true },
+      data: { inDongChia: false },
+    }),
+    prisma.system.updateMany({
+      where: { autoId: { in: qualifiedIds } },
+      data: { inDongChia: true },
+    }),
+  ])
+
+  return prisma.system.findMany({
+    where: { autoId: { in: qualifiedIds } },
+    select: { autoId: true, userId: true },
+  })
+}
+
+async function getOfficialRevenue(
+  onSystem: number,
+  periodStart: Date,
+  periodEnd: Date,
+  applicationId?: number,
+) {
+  const aggregate = await prisma.brkTimelineRecord.aggregate({
+    where: {
+      onSystem,
+      eventStatus: 'OFFICIAL',
+      applicationId: applicationId ?? null,
+      time: { gte: periodStart, lt: periodEnd },
+    },
+    _count: { _all: true },
+    _sum: { eventCashVolume: true, eventMbdtVolume: true },
+  })
+
+  return {
+    officialCount: aggregate._count._all,
+    totalCashRevenue: Number(aggregate._sum.eventCashVolume || 0),
+    totalMbdtRevenue: Number(aggregate._sum.eventMbdtVolume || 0),
+  }
+}
+
+async function hasPoolCredit(userId: number, refId: string, balanceType: 'CASH' | 'BRKD') {
+  const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
+  if (!wallet) return false
+  const transaction = await prisma.brkTransaction.findFirst({
+    where: { walletId: wallet.id, refId, balanceType },
+    select: { id: true },
+  })
+  return Boolean(transaction)
+}
+
+export async function processRevenueShareForSystem(
+  onSystem: number,
+  distributedAt: Date = new Date(),
+  applicationId?: number,
+) {
+  if (onSystem !== DONG_CHIA_SYSTEM_ID) {
+    return { processed: false, reason: 'Dong chia only applies to system 4' }
+  }
+
   const systemTree = await prisma.systemTree.findUnique({ where: { onSystem } })
   if (!systemTree) return { processed: false, reason: 'System not found' }
 
-  const distDate = distributedAt || new Date()
-  const intervalDays = systemTree.revenueShareIntervalDays || 3
-  const sharePct = Number(systemTree.revenueSharePct || 2.0)
-  const periodStart = new Date(distDate.getTime() - intervalDays * 24 * 60 * 60 * 1000)
-  const periodEnd = distDate
+  const planApplication = applicationId != null
+    ? await prisma.systemPlanApplication.findUnique({ where: { id: applicationId } })
+    : null
+  const period = await getDongChiaPeriod(distributedAt, planApplication?.startsAt)
+  if (!period) return { processed: false, reason: 'Dong chia has not started' }
 
-  // Check if Method B (need to filter by gracePeriodEnd)
-  const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
-  const isOptionB = promoConfig?.value === 'B'
+  const existingPool = applicationId != null
+    ? await prisma.brkRevenuePool.findFirst({ where: { applicationId, roundNumber: period.roundNumber } })
+    : await prisma.brkRevenuePool.findFirst({
+      where: { systemId: onSystem, applicationId: null, roundNumber: period.roundNumber },
+    })
+  if (existingPool?.status === 'DISTRIBUTED') {
+    return {
+      processed: false,
+      reason: 'Round already distributed',
+      roundNumber: period.roundNumber,
+    }
+  }
+  if (existingPool && (
+    existingPool.periodStart.getTime() !== period.periodStart.getTime()
+    || existingPool.periodEnd.getTime() !== period.periodEnd.getTime()
+  )) {
+    throw new Error(`Round ${period.roundNumber} conflicts with legacy revenue pool`)
+  }
 
-  const lastPool = await prisma.brkRevenuePool.findFirst({
-    where: { systemId: onSystem },
-    orderBy: { roundNumber: 'desc' }
-  })
-  const roundNumber = (lastPool?.roundNumber || 0) + 1
-
-  const newActivationsQuery: any = {
+  const qualified = await syncDongChiaMembers(onSystem, period.periodEnd, applicationId)
+  const revenue = await getOfficialRevenue(
     onSystem,
-    status: 'ACTIVE',
-    activatedAt: {
-      gte: periodStart,
-      lt: periodEnd
-    }
-  }
-  if (isOptionB) {
-    newActivationsQuery.gracePeriodEnd = { lt: distDate }
-  }
+    period.periodStart,
+    period.periodEnd,
+    applicationId,
+  )
+  const sharePct = Number(systemTree.revenueSharePct || 2)
+  const cashPoolAmount = (revenue.totalCashRevenue * sharePct) / 100
+  const mbdtPoolAmount = (revenue.totalMbdtRevenue * sharePct) / 100
+  const amountCash = qualified.length > 0
+    ? Math.floor((cashPoolAmount * 100) / qualified.length) / 100
+    : 0
+  const amountBrkd = qualified.length > 0
+    ? Math.floor(mbdtPoolAmount / qualified.length)
+    : 0
 
-  const newActivations = await prisma.system.findMany({
-    where: newActivationsQuery
-  })
-
-  const totalRevenue = newActivations.length * Number(systemTree.fee)
-  if (totalRevenue <= 0) {
-    await prisma.brkRevenuePool.create({
-      data: {
-        systemId: onSystem,
-        roundNumber,
-        periodStart,
-        periodEnd,
-        totalRevenue: 0,
-        poolAmount: 0,
-        qualifiedCount: 0,
-        status: 'DISTRIBUTED',
-        distributedAt: distDate,
-      }
-    })
-    return { processed: true, poolAmount: 0, qualifiedCount: 0 }
-  }
-
-  const poolAmount = (totalRevenue * sharePct) / 100
-
-  const activeMembers = await prisma.system.findMany({
-    where: {
-      onSystem,
-      status: 'ACTIVE',
-      gracePeriodEnd: { lte: periodEnd }, // Phải chính thức hết cân nhắc trong kỳ này
-      activatedAt: { lte: periodEnd },
-      expiresAt: { gte: periodStart }
-    }
-  })
-
-  const qualified: typeof activeMembers = []
-  for (const member of activeMembers) {
-    const f1Count = await prisma.systemClosure.count({
-      where: {
-        ancestorId: member.autoId,
-        depth: 1,
-        systemId: onSystem,
-        descendant: {
-          status: 'ACTIVE',
-          gracePeriodEnd: { lte: periodEnd } // F1 con cũng phải chính thức hết cân nhắc
-        }
-      }
-    })
-    if (f1Count >= 1) {
-      qualified.push(member)
-    }
-  }
-
-  const qualifiedCount = qualified.length
-  if (qualifiedCount === 0) {
-    await prisma.brkRevenuePool.create({
-      data: {
-        systemId: onSystem,
-        roundNumber,
-        periodStart,
-        periodEnd,
-        totalRevenue,
-        poolAmount,
-        qualifiedCount: 0,
-        status: 'DISTRIBUTED',
-        distributedAt: distDate,
-      }
-    })
-    return { processed: true, poolAmount, qualifiedCount: 0 }
-  }
-
-  const amountPerPerson = Math.floor((poolAmount * 100) / qualifiedCount) / 100
-
-  const pool = await prisma.brkRevenuePool.create({
+  const pool = existingPool ?? await prisma.brkRevenuePool.create({
     data: {
       systemId: onSystem,
-      roundNumber,
-      periodStart,
-      periodEnd,
-      totalRevenue,
-      poolAmount,
-      qualifiedCount,
-      status: 'DISTRIBUTED',
-      distributedAt: distDate,
-    }
+      applicationId,
+      roundNumber: period.roundNumber,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
+      totalRevenue: revenue.totalCashRevenue,
+      poolAmount: cashPoolAmount,
+      qualifiedCount: qualified.length,
+      status: 'PENDING',
+    },
   })
-
-  const BRKD_PER_ACTIVATION = 12_868_686
-
-  let totalBrkdRevenue = 0
-  for (const act of newActivations) {
-    const returnBrkdRefId = `return_brkd_sys_${onSystem}_user_${act.userId}`
-    const wallet = await prisma.brkWallet.findUnique({ where: { userId: act.userId } })
-    let mMBDT = BRKD_PER_ACTIVATION
-    if (wallet) {
-      const returnBrkdTx = await prisma.brkTransaction.findFirst({
-        where: { walletId: wallet.id, refId: returnBrkdRefId }
-      })
-      if (returnBrkdTx) {
-        // Reverse refund percent to reconstruct original MBDT
-        mMBDT = Math.round(Number(returnBrkdTx.amount) / (Number(systemTree.returnPct || 21) / 100))
-      }
-    }
-    totalBrkdRevenue += mMBDT
-  }
-
-  const brkdPoolAmount = (totalBrkdRevenue * sharePct) / 100
-  const brkdShare = Math.round(brkdPoolAmount / qualifiedCount)
 
   for (const member of qualified) {
-    const cashShareDesc = await makeSystemSnapshotDescription(
+    const cashRefId = `dongchia_pool_${pool.id}_cash`
+    const brkdRefId = `dongchia_pool_${pool.id}_brkd`
+    const description = await makeSystemSnapshotDescription(
       member.userId,
       onSystem,
-      'REVENUE_SHARE_CASH',
-      'Đồng chia 2%',
-      `Đồng chia 2% kỳ ${roundNumber}`,
-      {},
-      { cash: amountPerPerson, brkd: brkdShare }
-    )
-
-    await creditBrkWallet(
-      member.userId,
-      amountPerPerson,
       'REVENUE_SHARE',
-      cashShareDesc,
-      `pool_${pool.id}`
+      'Đồng chia 2%',
+      `Đồng chia 2% kỳ ${period.roundNumber}`,
+      {},
+      { cash: amountCash, brkd: amountBrkd },
     )
 
-    // BRKD calculated directly from BRKD pool
-    if (brkdShare > 0) {
-      const brkdShareDesc = await makeSystemSnapshotDescription(
+    if (amountCash > 0 && !(await hasPoolCredit(member.userId, cashRefId, 'CASH'))) {
+      await creditBrkWallet(
         member.userId,
-        onSystem,
+        amountCash,
         'REVENUE_SHARE',
-        'Đồng chia 2%',
-        `Đồng chia 2% kỳ ${roundNumber}`,
-        {},
-        { cash: amountPerPerson, brkd: brkdShare }
+        description,
+        cashRefId,
+        period.periodEnd,
+        undefined,
+        applicationId,
       )
+    }
+    if (amountBrkd > 0 && !(await hasPoolCredit(member.userId, brkdRefId, 'BRKD'))) {
       await creditBrkdWallet(
         member.userId,
-        brkdShare,
-        brkdShareDesc,
-        `pool_${pool.id}`
+        amountBrkd,
+        description,
+        brkdRefId,
+        period.periodEnd,
+        undefined,
+        applicationId,
       )
     }
 
-    await createBrkTimelineRecord({
-      userId: member.userId,
-      onSystem: onSystem,
-      type: 'TRANSACTION',
-      time: distDate,
-      title: 'Đồng chia 2%',
-      description: `Đồng chia 2% kỳ ${roundNumber}`,
-      amountCash: amountPerPerson,
-      amountBrkd: brkdShare,
-      txType: 'REVENUE_SHARE'
+    const existingAward = await prisma.brkRevenueAward.findFirst({
+      where: { poolId: pool.id, userId: member.userId },
     })
+    if (!existingAward) {
+      await prisma.brkRevenueAward.create({
+        data: {
+          poolId: pool.id,
+          userId: member.userId,
+          applicationId,
+          amount: amountCash,
+          paid: true,
+        },
+      })
+    }
 
-    await prisma.brkRevenueAward.create({
-      data: {
-        poolId: pool.id,
+    const existingTimeline = await prisma.brkTimelineRecord.findFirst({
+      where: {
         userId: member.userId,
-        amount: amountPerPerson,
-        paid: true,
-      }
+        onSystem,
+        time: period.periodEnd,
+        txType: 'REVENUE_SHARE',
+        applicationId,
+      },
     })
+    if (!existingTimeline) {
+      await createBrkTimelineRecord({
+        userId: member.userId,
+        onSystem,
+        type: 'TRANSACTION',
+        time: period.periodEnd,
+        title: 'Đồng chia 2%',
+        description: `Đồng chia 2% kỳ ${period.roundNumber}`,
+        amountCash,
+        amountBrkd,
+        txType: 'REVENUE_SHARE',
+        applicationId,
+      })
+    }
   }
 
-  return { processed: true, poolAmount, qualifiedCount, amountPerPerson, roundNumber }
-}
-
-export async function processAllBrkRevenueShares() {
-  const brkSystems = await prisma.systemTree.findMany({
-    where: { fee: { gt: 0 } }
+  await prisma.brkRevenuePool.update({
+    where: { id: pool.id },
+    data: {
+      totalRevenue: revenue.totalCashRevenue,
+      poolAmount: cashPoolAmount,
+      qualifiedCount: qualified.length,
+      status: 'DISTRIBUTED',
+      distributedAt,
+    },
   })
 
-  const results = []
-  for (const sys of brkSystems) {
-    const result = await processRevenueShareForSystem(sys.onSystem)
-    results.push({ systemId: sys.onSystem, ...result })
+  return {
+    processed: true,
+    roundNumber: period.roundNumber,
+    periodStart: period.periodStart,
+    periodEnd: period.periodEnd,
+    officialCount: revenue.officialCount,
+    qualifiedCount: qualified.length,
+    totalCashRevenue: revenue.totalCashRevenue,
+    totalMbdtRevenue: revenue.totalMbdtRevenue,
+    cashPoolAmount,
+    mbdtPoolAmount,
+    amountCash,
+    amountBrkd,
   }
-  return results
+}
+
+export async function processAllBrkRevenueShares(runTime: Date = new Date()) {
+  const application = await getEffectivePlanApplication(DONG_CHIA_SYSTEM_ID, runTime)
+  const applicationId = application?.businessPlan.code === MB_TCA_PLAN_CODE ? application.id : undefined
+  const result = await processRevenueShareForSystem(DONG_CHIA_SYSTEM_ID, runTime, applicationId)
+  return [{ systemId: DONG_CHIA_SYSTEM_ID, ...result }]
 }
 
 export async function getRevenueShareHistory(userId: number, onSystem: number, limit = 20) {
   const awards = await prisma.brkRevenueAward.findMany({
-    where: { userId },
+    where: { userId, pool: { systemId: onSystem } },
     include: {
       pool: {
         select: {
@@ -231,12 +320,11 @@ export async function getRevenueShareHistory(userId: number, onSystem: number, l
           poolAmount: true,
           qualifiedCount: true,
           distributedAt: true,
-        }
-      }
+        },
+      },
     },
     orderBy: { pool: { roundNumber: 'desc' } },
-    take: limit
+    take: limit,
   })
-
-  return awards.filter(a => a.pool.systemId === onSystem)
+  return awards
 }

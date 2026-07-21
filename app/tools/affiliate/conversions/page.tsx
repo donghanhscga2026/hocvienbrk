@@ -93,7 +93,7 @@ export default async function AffiliateConversionsPage() {
         name: enrollment.course.name_khoa || enrollment.course.name_lop
       } : null,
       status: enrollment ? enrollment.status : 'NO_ENROLL',
-      activatedAt: enrollment && enrollment.status === 'ACTIVE' ? enrollment.updatedAt : null
+      activatedAt: enrollment && enrollment.status === 'ACTIVE' ? enrollment.activatedAt : null
     }
   })
 

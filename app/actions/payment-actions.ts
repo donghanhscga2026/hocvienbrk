@@ -73,7 +73,7 @@ export async function verifyPaymentAction(
   enrollmentId: number,
   method: 'AUTO_EMAIL' | 'MANUAL_UPLOAD' | 'MANUAL_ADMIN',
   note?: string,
-  customUpdatedAt?: Date
+  customActivatedAt?: Date
 ) {
   try {
     const session = await auth()
@@ -104,7 +104,7 @@ export async function verifyPaymentAction(
       enrollmentId,
       method,
       note,
-      customUpdatedAt
+      customActivatedAt
     })
 
     if (!result.success) {
@@ -267,6 +267,7 @@ export async function getPendingPayments() {
             status: true,
             referrerId: true,
             updatedAt: true,
+            activatedAt: true,
             user: {
               select: { 
                 id: true, 
@@ -329,6 +330,7 @@ export async function getAllPayments() {
             status: true,
             referrerId: true,
             updatedAt: true,
+            activatedAt: true,
             user: {
               select: { 
                 id: true, 

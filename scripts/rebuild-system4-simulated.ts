@@ -22,7 +22,7 @@ interface SimMember {
   refSysId: number
   referrerId: number | null
   dayIndex: number
-  enrollmentUpdatedAt: Date
+  enrollmentActivatedAt: Date
 }
 
 interface CheckpointData {
@@ -131,11 +131,11 @@ async function loadSimulationState(): Promise<Map<number, { refSysId: number; ac
 
 async function loadEnrollments() {
   return prisma.enrollment.findMany({
-    where: { courseId: 22, status: 'ACTIVE' },
+    where: { courseId: 22, status: 'ACTIVE', activatedAt: { not: null } },
     include: {
       user: { select: { id: true, name: true, referrerId: true } },
     },
-    orderBy: { updatedAt: 'asc' },
+    orderBy: { activatedAt: 'asc' },
   })
 }
 
@@ -161,7 +161,7 @@ async function buildMemberList(): Promise<SimMember[]> {
         refSysId: simData.refSysId,
         referrerId: enrollment.user.referrerId,
         dayIndex: dateToDayIndex(activatedAt),
-        enrollmentUpdatedAt: enrollment.updatedAt,
+        enrollmentActivatedAt: enrollment.activatedAt!,
       })
     } else {
       const fallbackTime = new Date(Date.UTC(2026, 6, 17, 12, 0, 0))
@@ -172,12 +172,12 @@ async function buildMemberList(): Promise<SimMember[]> {
         refSysId: -1,
         referrerId: enrollment.user.referrerId,
         dayIndex: dateToDayIndex(fallbackTime),
-        enrollmentUpdatedAt: enrollment.updatedAt,
+        enrollmentActivatedAt: enrollment.activatedAt!,
       })
     }
   }
 
-  members.sort((a, b) => a.enrollmentUpdatedAt.getTime() - b.enrollmentUpdatedAt.getTime())
+  members.sort((a, b) => a.enrollmentActivatedAt.getTime() - b.enrollmentActivatedAt.getTime())
 
   return members
 }

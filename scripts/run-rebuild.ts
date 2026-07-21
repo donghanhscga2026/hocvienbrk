@@ -140,9 +140,6 @@ async function main() {
         if (brkdReturn > 0) {
           await (await import('../lib/brk/wallet-service')).creditBrkdWallet(member.userId, brkdReturn, 'BRKD hoàn 21% sau 1 ngày cân nhắc', undefined, evalTime)
         }
-        if (member.refSysId > 0) {
-          await (await import('../lib/brk/level-manager')).create2F1Voucher(member.refSysId, 4, evalTime, member.userId)
-        }
         await (await import('../lib/brk/level-manager')).checkAndPromoteLevel(member.userId, 4, evalTime, undefined, member.userId)
 
         const memberSys = await prisma.system.findUnique({ where: { userId_onSystem: { userId: member.userId, onSystem: 4 } } })
@@ -183,9 +180,6 @@ async function main() {
         const brkdReturn = Math.round((12868698 * 21) / 100)
         if (brkdReturn > 0) {
           await (await import('../lib/brk/wallet-service')).creditBrkdWallet(member.userId, brkdReturn, 'BRKD hoàn 21% sau 1 ngày cân nhắc', undefined, latestEval)
-        }
-        if (member.refSysId > 0) {
-          await (await import('../lib/brk/level-manager')).create2F1Voucher(member.refSysId, 4, latestEval, member.userId)
         }
         await (await import('../lib/brk/level-manager')).checkAndPromoteLevel(member.userId, 4, latestEval, undefined, member.userId)
 

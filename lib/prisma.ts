@@ -12,7 +12,7 @@ const prisma =
     datasources: {
       db: {
         // Tăng timeout và connection limit để tránh treo server khi DB chậm phản hồi
-        url: process.env.DATABASE_URL?.replace('?connection_limit=1', '?connection_limit=5&pool_timeout=10'),
+        url: process.env.DATABASE_URL?.replace('?connection_limit=1', '?connection_limit=5&pool_timeout=30'),
       },
     },
   });

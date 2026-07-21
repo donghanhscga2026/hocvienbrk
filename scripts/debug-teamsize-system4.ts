@@ -56,10 +56,12 @@ async function main() {
 
   const enrollments = await prisma.enrollment.findMany({
     where: { courseId: 22, status: 'ACTIVE' },
-    select: { userId: true, updatedAt: true, createdAt: true },
+    select: { userId: true, activatedAt: true },
   })
   const enrollMap = new Map<number, Date>()
-  for (const e of enrollments) enrollMap.set(e.userId, e.updatedAt || e.createdAt)
+  for (const e of enrollments) {
+    if (e.activatedAt) enrollMap.set(e.userId, e.activatedAt)
+  }
 
   systems.sort((a, b) => {
     const ta = enrollMap.get(a.userId) || a.activatedAt || a.createdAt

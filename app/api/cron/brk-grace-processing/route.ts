@@ -9,7 +9,7 @@ async function handler(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await processGracePeriodExpirations()
+    const result = await processGracePeriodExpirations(new Date())
 
     const { sendTelegramAdmin } = await import('@/lib/notifications')
     const details = result as Record<string, unknown>
