@@ -228,6 +228,12 @@ export async function distributeCommission(
           description: `Hoa hồng (${earnPct}%) từ thành viên mới F${depth} #${newMemberUserId} - ${newMemberName}`,
           amountCash: commissionAmount,
           amountBrkd: brkdAmount,
+          accumulatedCash: 0,
+          accumulatedBrkd: 0,
+          accumulatedBrkp: 0,
+          accumulatedTeamSize: 0,
+          accumulatedBrkdVolume: 0,
+          accumulatedCashVolume: 0,
           txType: timelineTxType,
           targetMemberId: newMemberUserId,
           targetMemberName: newMemberName,
@@ -235,7 +241,7 @@ export async function distributeCommission(
           sourceMemberId,
           applicationId: options.applicationId
         })
-      } else {
+      } else if (options.commissionCycleNumber != null) {
         await createBrkTimelineRecord({
           userId: uplineSystem.userId,
           onSystem,
