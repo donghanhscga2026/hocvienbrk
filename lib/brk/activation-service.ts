@@ -587,7 +587,7 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
           }
         }, { timeout: 120_000 })
 
-        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId, { applicationId: member.applicationId })
+        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId, { applicationId: member.applicationId, creditPoints: false })
       }
 
       count++

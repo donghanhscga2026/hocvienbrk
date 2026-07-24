@@ -81,7 +81,13 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     if (brkTree) {
       try {
         const { activateBrkMember, getBrkPlacementChain } = await import('@/lib/brk/activation-service')
-        await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId, finalActivatedAt)
+        const { MB_TCA_SYSTEM_ID, requireMbtcaApplication } = await import('@/lib/brk/business-plan-service')
+        let applicationId: number | undefined
+        if (brkTree.onSystem === MB_TCA_SYSTEM_ID) {
+          const app = await requireMbtcaApplication(finalActivatedAt)
+          applicationId = app.id
+        }
+        await activateBrkMember(enrollment.userId, brkTree.onSystem, enrollment.referrerId, finalActivatedAt, undefined, applicationId)
         const placement = await getBrkPlacementChain(enrollment.userId, brkTree.onSystem)
         brkResult = { activated: true, placement }
       } catch (err) {
