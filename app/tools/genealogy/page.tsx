@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile, Award, Star, Coins, Sparkles, Gift, ArrowUpRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { ArrowLeft, Home, User, Users, ChevronRight, X, Zap, ChevronDown, Search, Phone, Mail, Calendar, Smile, Award, Star, Coins, Sparkles, Gift, ArrowUpRight, ArrowUp, ArrowDown, Copy } from 'lucide-react'
 import {
   ReactFlow,
   Node,
@@ -1656,6 +1656,14 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
     }
   }, [showHistory, info.userId, selectedSystem]);
 
+  const formatFullDate = (dateStr: string | Date | null | undefined) => {
+    if (!dateStr) return '---';
+    const d = new Date(dateStr);
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const pad3 = (n: number) => String(n).padStart(3, '0');
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
+  };
+
   if (!info.show) return null;
 
   const { user, tca, systemData, enrollment } = info.data || {};
@@ -1701,8 +1709,19 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       #{info.userId}
                     </span>
                   </div>
-                  <span className="text-white/85 text-[10px] sm:text-xs font-semibold truncate mt-1 select-all">
-                    {user?.phone ? `📞 ${user.phone}` : 'Chưa cập nhật SĐT'}
+                  <span className="text-white/85 text-[10px] sm:text-xs font-semibold mt-1 select-all flex items-center gap-1 flex-wrap">
+                    {user?.phone ? (
+                      <>
+                        <span>📞 {user.phone}</span>
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(user.phone); }}
+                          className="p-0.5 hover:bg-white/20 rounded transition-all"
+                          title="Sao chép số điện thoại"
+                        >
+                          <Copy className="w-3 h-3 text-white/70 hover:text-white" />
+                        </button>
+                      </>
+                    ) : 'Chưa cập nhật SĐT'}
                   </span>
                 </div>
                 {/* Badge Cấp bậc nổi bật được hạ thấp xuống và dịch sát bên phải */}
@@ -1782,7 +1801,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 {isBrk ? (
                   <>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={systemData?.joinedAt ? new Date(systemData.joinedAt).toLocaleDateString('vi-VN') : '---'} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={formatFullDate(systemData?.joinedAt)} />
                       <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
@@ -1796,7 +1815,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       <InfoItem icon={<User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
                     </div>
                     <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString('vi-VN') : '---'} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={formatFullDate(user?.createdAt)} />
                     </div>
                   </>
                 )}
@@ -1829,11 +1848,13 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
                       label="Doanh số VNĐ"
                       value={systemData?.teamTotalVnd != null ? systemData.teamTotalVnd.toLocaleString('vi') : '0'}
+                      valueClassName="text-[11px] font-semibold text-slate-500"
                     />
                     <WalletItem
                       icon={<Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />}
                       label="Thu nhập VNĐ"
                       value={systemData.wallet.totalEarned}
+                      valueClassName="text-[11px] font-semibold text-slate-500"
                     />
                   </div>
 
@@ -1872,7 +1893,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
       {/* History Modal Popup */}
       {showHistory && (
         <div className="fixed inset-0 bg-slate-955/70 backdrop-blur-sm z-[350] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-[98%] max-w-md md:max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col h-[90vh] max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-[98%] max-w-md md:max-w-lg rounded-3xl shadow-2xl border border-slate-100 flex flex-col h-[75vh] max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0 rounded-t-3xl">
               <div className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-yellow-400" />
