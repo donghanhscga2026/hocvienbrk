@@ -1,5 +1,5 @@
 # PLAN.md — Tài liệu kỹ thuật & Lịch sử cập nhật HocVien-BRK
-> Cập nhật lần cuối: **2026-07-24** (Gmail Watch — Khôi phục push notification sau CRON_SECRET fix)  
+> Cập nhật lần cuối: **2026-07-25** (System #4 — Deep scan & targeted data cleanup: 136 duplicate transactions + 2 ghost members fixed)  
 > Dùng để tiếp tục công việc khi bị ngắt đột ngột  
 > ⚡ Cập nhật **ngay sau mỗi thay đổi code**
 
@@ -1740,3 +1740,104 @@ Chuẩn hóa logic thời gian chạy và ghi nhận dữ liệu (Cấp bậc, �
 - ✅ Cron `gmail-watch` sẵn sàng chạy đúng lịch (daily).
 - ✅ Không thay đổi tần suất cron (daily là đủ vì push notification xử lý real-time).
 - ❌ 27 enrollment pending cũ không được scan (email ngoài 2 ngày) — cần xử lý thủ công nếu muốn.
+
+---
+
+## ✅ Fix MB TCA Data Discrepancy — Duplicate Level-Up Records (2026-07-25)
+
+### Vấn đề
+- **68 thành viên** trên System #4 (MB TCA) có bản ghi `BrkLevelUpRecord` trùng lặp: cùng `(userId, onSystem, toLevel)` nhưng khác `applicationId` (một bản `applicationId=1` hợp lệ + một bản `applicationId=null` rác).
+- **Nguyên nhân gốc**: `brk-level-check` cron gọi `checkAndPromoteLevel()` mà không truyền `applicationId`. Idempotency check trong `level-manager.ts` tìm `applicationId: null` → không thấy bản `applicationId=1` → tạo duplicate.
+- **Hệ quả**: Dữ liệu level-up không nhất quán, có thể gây sai lệch tính toán hoa hồng và UI hiển thị.
+
+### Các file đã sửa
+
+#### `lib/brk/level-manager.ts` (Fix 1 — ROOT CAUSE)
+- **Vấn đề**: Idempotency check tại dòng 34-43 dùng `{ applicationId }` filter. Khi `applicationId` là `undefined`, filter变成 `{ applicationId: null }` → bỏ sót bản ghi có `applicationId` thật.
+- **Fix**: Bỏ `applicationId` khỏi idempotency check — chỉ match `(userId, onSystem, toLevel)`:
+```typescript
+const existing = await prisma.brkLevelUpRecord.findFirst({
+  where: { userId, onSystem, toLevel: currentLevel }
+})
+```
+
+#### `app/api/cron/brk-level-check/route.ts` (Fix 2)
+- **Vấn đề**: Line 26 gọi `checkAndPromoteLevel(member.userId, member.onSystem, now, undefined, member.userId)` — thiếu `applicationId`.
+- **Fix**: Thêm `member.applicationId ?? undefined` làm tham số cuối.
+
+#### `lib/brk/daily-eval-service.ts` (Fix 3)
+- **Vấn đề**: refId lookup chỉ tìm `return_fee_sys_X_user_Y` mà không thử `_app_X` suffix → MBTCA members bị skip. `distributeCommission()` và `checkAndPromoteLevel()` không nhận `applicationId`.
+- **Fix**: 
+  - refId lookup thử `_app_X` trước, fallback plain version
+  - Truyền `member.applicationId` đến `distributeCommission` (options) và `checkAndPromoteLevel`
+
+### Data Cleanup
+- **68 bản ghi rác** `BrkLevelUpRecord` (applicationId=null, toLevel=1, system #4) đã bị xóa
+- Verification: Không còn duplicate level-up records trên System #4
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — Exit code 0
+- ✅ 68 duplicate records đã cleanup
+- ✅ Idempotency check giờ match bất kể applicationId nào
+- ✅ `brk-level-check` cron giờ truyền đúng applicationId
+- ✅ `daily-eval-service` hỗ trợ MBTCA refId pattern + truyền applicationId
+
+---
+
+## ✅ System #4 — Deep Scan & Targeted Data Cleanup (2026-07-25)
+
+### Mục tiêu
+Sau khi fix 3 bug code, tiến hành scan toàn diện System #4 để phát hiện và dọn sạch mọi data corruption còn tồn đọng.
+
+### Kết quả Scan (trước cleanup)
+
+| Category | Kết quả |
+|---|---|
+| Duplicate Level-Ups | 0 ✅ (đã cleanup trước) |
+| Duplicate OFFICIAL Events | 0 ✅ |
+| Duplicate Transactions (exact refId) | 0 ✅ |
+| **Semantic Duplicate RETURN_FEE** | **68 users** (mỗi user có `_app_1` + plain) |
+| **Semantic Duplicate BRKD_RETURN** | **68 users** |
+| Ghost Members (missing applicationId) | **2 (#1121, #1139)** |
+| Wallet Drift | 0 (cả balance và transaction đều bị inflated) |
+| Commission duplicates | 0 ✅ |
+| Revenue pool/award duplicates | 0 ✅ |
+| Workflow failed | 0 ✅ |
+| Closures orphan | 0 ✅ |
+
+### Data Cleanup đã thực hiện
+
+#### Xóa duplicate RETURN_FEE transactions
+- **68 RETURN_FEE** (CASH, refId plain: `return_fee_sys_4_user_X`) — bản `_app_1` giữ lại
+- **68 BRKD_RETURN** (BRKD_CREDIT, refId plain: `return_brkd_sys_4_user_X`) — bản `_app_1` giữ lại
+- Tổng CASH thừa đã xóa: **383,675.04**
+- Tổng BRKD thừa đã xóa: **196,383,427.00** (MBDT points)
+
+#### Fix wallet balances
+- **68 wallets** đã được trừ đúng số tiền thừa (CASH + BRKD + totalEarned)
+
+#### Fix ghost members
+- **#1121**: `applicationId` null → 1, System + SystemClosure records đã cập nhật
+- **#1139**: `applicationId` null → 1, System + SystemClosure records đã cập nhật
+
+### Kết quả Scan (sau cleanup)
+
+| Category | Kết quả |
+|---|---|
+| Missing applicationId (System) | **0** ✅ |
+| Ghost members (L0 past grace) | **0** ✅ |
+| Duplicate Level-Ups | **0** ✅ |
+| Duplicate OFFICIAL | **0** ✅ |
+| Exact Duplicate Tx | **0** ✅ |
+| Semantic Duplicate RETURN_FEE | **0** ✅ |
+| RETURN_FEE total | **95** (khớp số thành viên) |
+| Wallet drift | **0** ✅ |
+| Failed Workflows | **0** ✅ |
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — Exit code 0
+- ✅ 136 duplicate transactions đã cleanup (68 RETURN_FEE + 68 BRKD_RETURN)
+- ✅ 68 wallet balances đã fix
+- ✅ 2 ghost members đã fix applicationId
+- ✅ Toàn bộ System #4 data giờ sạch 100%
+- ✅ Patch backup: `plan_temp/data_cleanup_before_cleanup_20260725.patch`
