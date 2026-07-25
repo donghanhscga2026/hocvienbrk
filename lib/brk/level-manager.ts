@@ -31,13 +31,12 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
     currentLevel++
     if (currentLevel > maxPromotedLevel) maxPromotedLevel = currentLevel
 
-    // Idempotency: skip if this promotion already recorded
+    // Idempotency: skip if this promotion already recorded (any applicationId)
     const existing = await prisma.brkLevelUpRecord.findFirst({
       where: {
         userId,
         onSystem,
         toLevel: currentLevel,
-        ...(applicationId != null ? { applicationId } : { applicationId: null }),
       }
     })
     if (existing) continue
