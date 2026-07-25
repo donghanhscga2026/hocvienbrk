@@ -1,0 +1,84 @@
+name: Cron Jobs
+
+on:
+  schedule:
+    - cron: '8 * * * *'
+    - cron: '5 * * * *'
+    - cron: '6 * * * *'
+    - cron: '0 0 * * *'
+    - cron: '0 5 * * *'
+    - cron: '5 17 * * *'
+  workflow_dispatch:
+
+jobs:
+  brk-daily-eval:
+    if: github.event.schedule == '8 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call brk-daily-eval
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/brk-daily-eval" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  mbtca-orchestrator:
+    if: github.event.schedule == '5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call mbtca-orchestrator
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/mbtca-orchestrator" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  brk-revenue-share:
+    if: github.event.schedule == '6 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call brk-revenue-share
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/brk-revenue-share" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  gmail-watch:
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call gmail-watch
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/gmail-watch" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  reset-sender-quota:
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call reset-sender-quota
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/reset-sender-quota" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  brk-expiration:
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call brk-expiration
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/brk-expiration" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  scan-bounces:
+    if: github.event.schedule == '0 5 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call scan-bounces
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/scan-bounces" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  brk-grace-processing:
+    if: github.event.schedule == '5 17 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call brk-grace-processing
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/brk-grace-processing" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
