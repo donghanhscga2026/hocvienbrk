@@ -74,7 +74,7 @@ async function creditBalance(
       detail: `${balanceType} +${amount.toLocaleString()}đ: ${description}`,
       metadata: { balanceType, amount, type, refId }
     })
-  } catch {}
+  } catch { }
 
   return updated
 }
@@ -169,7 +169,7 @@ export async function debitBrkWallet(
       detail: `CASH -${amount.toLocaleString()}đ: ${description}`,
       metadata: { balanceType: 'CASH', amount: -amount, type, refId }
     })
-  } catch {}
+  } catch { }
 
   return updated
 }
@@ -216,7 +216,7 @@ export async function makeSystemSnapshotDescription(
     where: { userId_onSystem: { userId, onSystem } }
   })
   const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
-  
+
   const snapshot = await getSystemSnapshotAt(userId, onSystem, new Date())
   const teamCount = snapshot.teamSize
 
@@ -344,6 +344,10 @@ export async function createBrkTimelineRecord(data: {
       applicationId: data.applicationId,
     }
   })
+
+  if (data.onSystem === 4) {
+    console.log(`    📝 Thành viên #${data.userId} | "${data.description}" | CASH: +${data.amountCash ?? 0} | MBDT: +${data.amountBrkd ?? 0} | Voucher: +${data.amountVoucher ?? 0}`)
+  }
 
   return created
 }

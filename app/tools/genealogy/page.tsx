@@ -19,11 +19,12 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, getSystemPromotionLogicAction, switchSystemPromotionLogicAction, getMemberPromotionHistoryAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, getSystemPromotionLogicAction, switchSystemPromotionLogicAction, getMemberPromotionHistoryAction, getSystemConnectionPathAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import { Role } from '@prisma/client'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
 import GroupModal, { GroupMember } from '@/components/genealogy/GroupModal'
+import SystemConnectionPathModal from '@/components/genealogy/SystemConnectionPathModal'
 
 // Constants cho tree layout
 const NODE_WIDTH = 200
@@ -1641,6 +1642,70 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
   const [historyLevelConfigs, setHistoryLevelConfigs] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  const [nhanDuyenOpen, setNhanDuyenOpen] = useState(false);
+  const [nhanDuyenA, setNhanDuyenA] = useState<number | null>(null);
+  const [nhanDuyenZ, setNhanDuyenZ] = useState<number | null>(null);
+
+  const handleShowNhanDuyen = (ancId: number, descId: number) => {
+    setNhanDuyenA(ancId);
+    setNhanDuyenZ(descId);
+    setNhanDuyenOpen(true);
+  };
+
+  const renderDescriptionWithNhanDuyen = (description: string, targetMemberId?: number, targetMemberName?: string) => {
+    if (!targetMemberId) return <span>{description}</span>;
+
+    const normalizedDesc = description.toLowerCase();
+    let nameIndex = -1;
+    let matchLength = 0;
+
+    if (targetMemberName) {
+      const normalizedName = targetMemberName.toLowerCase().trim();
+      nameIndex = normalizedDesc.indexOf(normalizedName);
+      matchLength = targetMemberName.trim().length;
+    }
+
+    if (nameIndex === -1) {
+      const idPattern = `#${targetMemberId}`;
+      nameIndex = normalizedDesc.indexOf(idPattern);
+      matchLength = idPattern.length;
+    }
+
+    if (nameIndex === -1) {
+      return (
+        <span className="inline-flex flex-wrap items-center gap-1 leading-normal">
+          <span>{description}</span>
+          <button
+            onClick={() => handleShowNhanDuyen(info.userId, targetMemberId)}
+            className="inline-flex items-center gap-0.5 text-[9px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1 py-0.5 rounded border border-indigo-100 font-bold transition-all shadow-sm shrink-0"
+            title="Xem nhân duyên"
+          >
+            <Users className="w-2.5 h-2.5 inline mr-0.5" />
+            Xem nhân duyên
+          </button>
+        </span>
+      );
+    }
+
+    const before = description.substring(0, nameIndex + matchLength);
+    const after = description.substring(nameIndex + matchLength);
+
+    return (
+      <span className="leading-normal">
+        <span>{before}</span>
+        <button
+          onClick={() => handleShowNhanDuyen(info.userId, targetMemberId)}
+          className="inline-flex items-center gap-0.5 text-[9px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1 py-0.5 mx-1 rounded border border-indigo-100 font-bold transition-all shadow-sm shrink-0"
+          title="Xem nhân duyên"
+        >
+          <Users className="w-2.5 h-2.5 inline mr-0.5" />
+          Xem nhân duyên
+        </button>
+        <span>{after}</span>
+      </span>
+    );
+  };
+
   useEffect(() => {
     if (showHistory && info.userId && selectedSystem) {
       setLoadingHistory(true);
@@ -1664,6 +1729,56 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
     return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
   };
 
+  const formatDateWithSmallTime = (dateStr: string | Date | null | undefined) => {
+    if (!dateStr) return '---';
+    const d = new Date(dateStr);
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const datePart = `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+    const timePart = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    return (
+      <span className="flex items-baseline gap-1 select-all">
+        <span className="font-extrabold text-slate-700">{datePart}</span>
+        <span className="text-[10px] text-slate-400 font-semibold">{timePart}</span>
+      </span>
+    );
+  };
+
+  const formatMbpPoints = (points: number | null | undefined) => {
+    if (points == null) return '0 (MP)';
+    const formattedStr = points.toLocaleString('en-US', { 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: 3 
+    });
+    const parts = formattedStr.split('.');
+    const integerPart = parts[0];
+    const decimalPart = parts[1];
+    return (
+      <span className="flex items-baseline font-mono select-all">
+        <span className="text-slate-800 text-sm sm:text-base font-black">{integerPart}</span>
+        {decimalPart && (
+          <span className="text-slate-400 text-[10px] font-semibold">.{decimalPart}</span>
+        )}
+        <span className="text-slate-400 text-[10px] font-extrabold ml-1">MBP</span>
+      </span>
+    );
+  };
+
+  const getLevelDetails = (lvl: number) => {
+    const cfg = historyLevelConfigs.find((c: any) => c.level === lvl);
+    if (cfg) return { pct: cfg.pct, gift: cfg.gift };
+    switch (lvl) {
+      case 1: return { pct: '21%', gift: 0 };
+      case 2: return { pct: '30%', gift: 500000 };
+      case 3: return { pct: '39%', gift: 1000000 };
+      case 4: return { pct: '52.5%', gift: 2000000 };
+      case 5: return { pct: '64.5%', gift: 4000000 };
+      case 6: return { pct: '70.5%', gift: 8000000 };
+      case 7: return { pct: '75%', gift: 16000000 };
+      case 8: return { pct: '78%', gift: 32000000 };
+      default: return { pct: '21%', gift: 0 };
+    }
+  };
+
   if (!info.show) return null;
 
   const { user, tca, systemData, enrollment } = info.data || {};
@@ -1681,7 +1796,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
         <div className={`rounded-t-[24px] sm:rounded-t-[32px] bg-gradient-to-r ${isBrk ? 'from-teal-600 to-emerald-600' : tca ? 'from-indigo-600 to-violet-600' : 'from-emerald-600 to-teal-600'} relative`}>
           <button
             onClick={onClose}
-            className="absolute top-1 right-1 sm:top-4 sm:right-4 p-1.5 sm:p-2 bg-rose-500 hover:bg-rose-600 rounded-full transition-all text-white shadow-md z-20"
+            className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 bg-rose-500 hover:bg-rose-600 rounded-full transition-all text-white shadow-md z-20"
           >
             <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
@@ -1699,17 +1814,12 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
               <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300 mb-1">
                 {isBrk ? 'MB - Ngân hàng phước báu' : 'Hệ thống'}
               </span>
-              <div className="flex items-end justify-between gap-2 w-full pr-1 sm:pr-2">
+              <div className="flex items-center justify-between gap-2 w-full pr-1 sm:pr-2">
                 <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="text-white text-sm sm:text-base font-bold tracking-tight leading-tight uppercase select-all">
-                      {tca?.name || user?.name || 'Học viên'}
-                    </h3>
-                    <span className="bg-yellow-400 text-teal-950 font-black text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-lg shadow-sm border border-yellow-300 select-all inline-flex items-center h-4.5 sm:h-5 shrink-0 font-mono">
-                      #{info.userId}
-                    </span>
-                  </div>
-                  <span className="text-white/85 text-[10px] sm:text-xs font-semibold mt-1 select-all flex items-center gap-1 flex-wrap">
+                  <h3 className="text-white text-sm sm:text-base font-bold tracking-tight leading-tight uppercase select-all">
+                    {tca?.name || user?.name || 'Học viên'}
+                  </h3>
+                  <span className="text-white/85 text-[10px] sm:text-xs font-semibold mt-1 select-all flex items-center gap-1">
                     {user?.phone ? (
                       <>
                         <span>📞 {user.phone}</span>
@@ -1723,10 +1833,6 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       </>
                     ) : 'Chưa cập nhật SĐT'}
                   </span>
-                </div>
-                {/* Badge Cấp bậc nổi bật được hạ thấp xuống và dịch sát bên phải */}
-                <div className="bg-red-500 text-white font-black text-xs sm:text-sm px-3.5 py-0.5 rounded-full shadow-md border border-white select-none shrink-0 mb-0.5 ml-auto">
-                  {currentLevelText}
                 </div>
               </div>
             </div>
@@ -1769,43 +1875,52 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                     </span>
                   </div>
 
-                  {isBrk && (
-                    <>
-                      <div className="flex items-center justify-between text-indigo-750 font-semibold pt-1.5 border-t border-indigo-100/30">
-                        <span>MB upline 1:</span>
-                        <span className="font-bold text-indigo-900">
-                          {systemData.upline1 ? (
-                            <>
-                              {systemData.upline1.name}{' '}
-                              <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{systemData.upline1.id}</code>
-                            </>
-                          ) : 'Chưa cập nhật'}
-                        </span>
-                      </div>
+                </div>
 
-                      <div className="flex items-center justify-between text-indigo-750 font-semibold pt-1.5 border-t border-indigo-100/30">
-                        <span>MB upline 2:</span>
-                        <span className="font-bold text-indigo-900">
-                          {systemData.upline2 ? (
-                            <>
-                              {systemData.upline2.name}{' '}
-                              <code className="bg-indigo-100/70 px-1 py-0.5 rounded text-[10px] font-mono font-bold">#{systemData.upline2.id}</code>
-                            </>
-                          ) : 'Chưa cập nhật'}
+                {/* Khối thông tin 2 cột mới: Trái (ID/Xem nhân duyên), Phải (Cấp/Hoa hồng) */}
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-2">
+                  <div className="flex flex-col gap-1.5 p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-none">Mã thành viên</span>
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap w-full">
+                      <span className="bg-yellow-300 text-purple-950 font-black text-[10px] px-2.5 py-0.5 rounded-full border border-emerald-500 shadow-sm select-all shrink-0">
+                        #{info.userId}
+                      </span>
+                      {isBrk && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowNhanDuyen(selectedSystem === 4 ? 3773 : 0, info.userId); }}
+                          className="inline-flex items-center gap-0.5 text-[9px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-100 font-bold transition-all shadow-sm shrink-0 font-mono ml-auto"
+                          title="Xem nhân duyên từ gốc hệ thống"
+                        >
+                          <Users className="w-2.5 h-2.5 inline mr-0.5" />
+                          Xem nhân duyên
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
+                    <span className="text-[9px] sm:text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-none">Cấp bậc & Hoa hồng</span>
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      <span className="bg-purple-950 text-yellow-300 font-black text-[10px] px-2.5 py-0.5 rounded-full border border-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)] select-none shrink-0 font-extrabold">
+                        {currentLevelText}
+                      </span>
+                      {isBrk && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded">
+                          {getLevelDetails(systemData?.level || 1).pct} Hoa hồng
                         </span>
-                      </div>
-                    </>
-                  )}
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {isBrk ? (
                   <>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={formatFullDate(systemData?.joinedAt)} />
-                      <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={systemData?.levelUpdatedAt ? new Date(systemData.levelUpdatedAt).toLocaleDateString('vi-VN') : '---'} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={formatDateWithSmallTime(systemData?.joinedAt)} />
+                      <InfoItem icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500" />} label="Ngày lên cấp" value={formatDateWithSmallTime(systemData?.levelUpdatedAt)} />
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm tăng trưởng" value={systemData?.totalPoints != null ? `${systemData.totalPoints.toLocaleString('vi')} (MP)` : '0 (MP)'} />
+                      <InfoItem icon={<Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />} label="Điểm MBP" value={formatMbpPoints(systemData?.totalPoints)} />
                       <InfoItem icon={<Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />} label="Số thành viên nhóm" value={systemData?.teamSize != null ? `${systemData.teamSize.toLocaleString('vi')}` : '0'} />
                     </div>
                   </>
@@ -1815,7 +1930,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       <InfoItem icon={<User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} label="ID Hệ thống" value={tca?.tcaId ? `#${tca.tcaId}` : 'Chưa cập nhật'} />
                     </div>
                     <div className="grid grid-cols-1 gap-1.5 sm:gap-2">
-                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={formatFullDate(user?.createdAt)} />
+                      <InfoItem icon={<Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />} label="Ngày tham gia" value={formatDateWithSmallTime(user?.createdAt)} />
                     </div>
                   </>
                 )}
@@ -1933,23 +2048,6 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
 
                   <div className="relative pl-6 border-l border-slate-200 space-y-5">
                   {(() => {
-                    const getLevelDetails = (lvl: number) => {
-                      const cfg = historyLevelConfigs.find((c: any) => c.level === lvl);
-                      if (cfg) return { pct: cfg.pct, gift: cfg.gift };
-                      // Fallback nếu chưa load configs
-                      switch (lvl) {
-                        case 1: return { pct: '21%', gift: 0 };
-                        case 2: return { pct: '30%', gift: 500000 };
-                        case 3: return { pct: '39%', gift: 1000000 };
-                        case 4: return { pct: '52.5%', gift: 2000000 };
-                        case 5: return { pct: '64.5%', gift: 4000000 };
-                        case 6: return { pct: '70.5%', gift: 8000000 };
-                        case 7: return { pct: '75%', gift: 16000000 };
-                        case 8: return { pct: '78%', gift: 32000000 };
-                        default: return { pct: '21%', gift: 0 };
-                      }
-                    };
-
                     const sortedRecords = [...historyRecords].sort((a, b) => {
                       const diff = new Date(a.time).getTime() - new Date(b.time).getTime()
                       if (diff !== 0) {
@@ -2050,6 +2148,14 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                     {fromLvlDetails.pct} ➔ <span className="text-emerald-600 font-black">{toLvlDetails.pct}</span>
                                   </span>
                                 </div>
+                                {rec.details?.amountVoucher > 0 && (
+                                  <div className="flex items-center justify-between text-slate-500 mt-1">
+                                    <span>Quà tặng thăng cấp:</span>
+                                    <span className="font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                                      +{Math.round(rec.details.amountVoucher).toLocaleString('vi')} VNĐ Voucher
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Thông số tăng trưởng tích lũy */}
@@ -2136,7 +2242,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                             <div className="flex items-start justify-between gap-4 mt-1">
                               <div className="flex flex-col gap-1 flex-1 min-w-0">
                                 <span className="text-slate-500 text-[11px] font-medium leading-normal">
-                                  {rec.description}
+                                  {renderDescriptionWithNhanDuyen(rec.description, rec.details?.targetMemberId, rec.details?.targetMemberName)}
                                 </span>
                               </div>
 
@@ -2159,11 +2265,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                               </div>
                             </div>
 
-                            {rec.details?.pathStr && (
-                              <div className="text-[9px] text-slate-500 font-medium bg-slate-50 p-1.5 rounded-lg border border-slate-100/50 mt-1 leading-relaxed w-full">
-                                Nhánh bảo trợ: {rec.details.pathStr}
-                              </div>
-                            )}
+
 
                             {/* Thông số tăng trưởng tích lũy */}
                             <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
@@ -2220,15 +2322,23 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                 </>
               )}
             </div>
-
           </div>
         </div>
       )}
+
+      {/* POPUP CÂY NHÂN DUYÊN */}
+      <SystemConnectionPathModal
+        isOpen={nhanDuyenOpen}
+        onClose={() => setNhanDuyenOpen(false)}
+        ancestorId={nhanDuyenA}
+        descendantId={nhanDuyenZ || 0}
+        systemId={selectedSystem || 4}
+      />
     </div>
   );
 }
 
-function InfoItem({ icon, label, value, valueClassName, labelClassName }: { icon: any, label: string, value: string, valueClassName?: string, labelClassName?: string }) {
+function InfoItem({ icon, label, value, valueClassName, labelClassName }: { icon: any, label: string, value: React.ReactNode, valueClassName?: string, labelClassName?: string }) {
   return (
     <div className="flex items-start gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-50 border border-slate-100/50">
       <div className="mt-0.5 p-1 sm:p-1.5 bg-white rounded-lg shadow-sm text-slate-500">
