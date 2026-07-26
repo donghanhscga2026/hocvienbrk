@@ -24,6 +24,7 @@ interface CommissionOptions {
   commissionCycleNumber?: number
   levelByUserId?: Map<number, number>
   creditPoints?: boolean
+  skipTimeline?: boolean
 }
 
 export async function distributeCommission(
@@ -216,7 +217,7 @@ export async function distributeCommission(
         }
       }
 
-      if (earnPct > 0) {
+      if (earnPct > 0 && options.skipTimeline !== true) {
         const commissionAmount = (fee * earnPct) / 100
         const brkdAmount = Math.round((memberMBDT * earnPct) / 100)
         await createBrkTimelineRecord({
@@ -228,36 +229,13 @@ export async function distributeCommission(
           description: `Hoa hồng (${earnPct}%) từ thành viên mới F${depth} #${newMemberUserId} - ${newMemberName}`,
           amountCash: commissionAmount,
           amountBrkd: brkdAmount,
-          accumulatedCash: 0,
-          accumulatedBrkd: 0,
-          accumulatedBrkp: 0,
-          accumulatedTeamSize: 0,
-          accumulatedBrkdVolume: 0,
-          accumulatedCashVolume: 0,
           txType: timelineTxType,
           targetMemberId: newMemberUserId,
           targetMemberName: newMemberName,
           pathStr: leaderChain,
           sourceMemberId,
           applicationId: options.applicationId
-        })
-      } else if (options.commissionCycleNumber != null) {
-        await createBrkTimelineRecord({
-          userId: uplineSystem.userId,
-          onSystem,
-          type: 'TRANSACTION',
-          time: createdAt || new Date(),
-          title: 'Tăng trưởng tích lũy',
-          description: `Cộng +${memberMBP.toFixed(3)} điểm MBP & Doanh số +${memberMBDT.toLocaleString()} MBDT từ F${depth} #${newMemberUserId} ${newMemberName} đã chính thức tham gia`,
-          amountCash: 0,
-          amountBrkd: 0, // amountBrkd = 0 để tránh cộng vào ví thu nhập!
-          txType: timelineTxType,
-          targetMemberId: newMemberUserId,
-          targetMemberName: newMemberName,
-          pathStr: leaderChain,
-          sourceMemberId,
-          applicationId: options.applicationId
-        })
+         })
       }
     }
   }))

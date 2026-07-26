@@ -103,8 +103,8 @@ export async function activateBrkMember(
       userId,
       onSystem,
       'JOIN',
-      'Tham gia hệ thống',
-      'Bắt đầu tham gia hệ thống, đang trong thời gian cân nhắc, cấp 0.',
+      'Đăng ký tham gia',
+      'Đang trong thời gian cân nhắc, cấp 0.',
       { mBdtVolume: 0, cashVolume: 0 }
     )
     await creditBrkdWallet(
@@ -122,7 +122,7 @@ export async function activateBrkMember(
       onSystem,
       type: 'ACTIVATION',
       time: now,
-      title: 'Đã kích hoạt hệ thống',
+      title: 'Đăng ký tham gia',
       description: `Đang trong thời gian ${gracePeriodHours}h cân nhắc, Cấp 0.`,
       fromLevel: undefined,
       toLevel: 0,
@@ -151,20 +151,13 @@ export async function activateBrkMember(
 
     for (const closure of userAncestors) {
       const ancestorSys = closure.ancestor
-      let descText = ""
-      if (closure.depth === 1) {
-        descText = `Bạn vừa có thêm F1 #${userId} ${user.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
-      } else if (closure.depth === 2 && parentSys) {
-        descText = `Bạn vừa có thêm F2 #${userId} ${user.name || 'N/A'} dưới F1 #${parentSys.userId} ${parentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
-      } else if (closure.depth === 3 && parentSys && grandparentSys) {
-        descText = `Bạn vừa có thêm F3 #${userId} ${user.name || 'N/A'} dưới F2 #${parentSys.userId} ${parentSys.user?.name || 'N/A'} dưới F1 #${grandparentSys.userId} ${grandparentSys.user?.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc)`
-      }
+      const descText = `Chào đón thành viên F${closure.depth} #${userId} ${user.name || 'N/A'} đăng ký và đang trong thời gian cân nhắc`
 
       const activeLogDesc = await makeSystemSnapshotDescription(
         ancestorSys.userId,
         onSystem,
         closure.depth === 1 ? 'F1_ACTIVE' : (closure.depth === 2 ? 'F2_ACTIVE' : 'F3_ACTIVE'),
-        'Học viên mới đăng ký',
+        'Thành viên mới đăng ký',
         descText,
         {
           newMemberId: userId,
@@ -188,11 +181,11 @@ export async function activateBrkMember(
         onSystem,
         type: 'TRANSACTION',
         time: now,
-        title: 'Tăng trưởng thành viên',
+        title: 'Thành viên đăng ký mới',
         description: descText,
+        txType: closure.depth === 1 ? 'F1_ACTIVE' : (closure.depth === 2 ? 'F2_ACTIVE' : 'F3_ACTIVE'),
         targetMemberId: userId,
-        targetMemberName: user.name ?? undefined,
-        txType: 'ADJUSTMENT',
+        targetMemberName: user.name || 'N/A',
         sourceMemberId: userId,
         applicationId
       })
@@ -422,7 +415,7 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
             member.onSystem,
             'RETURN_FEE',
             'Chính thức tham gia',
-            `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.gracePeriodHours} giờ cân nhắc. Cấp 1. Tỷ lệ hoa hồng: 21%.`,
+            `Được hoàn ${returnPct}% phí tham gia sau ${memberSystemTree.gracePeriodHours} giờ cân nhắc. Được xếp vào Cấp 1. Tỷ lệ hoa hồng: 21%.`,
             { cashVolume: fee, mBdtVolume: memberMBDT },
             { cash: returnAmount, brkd: brkdReturn }
           )
@@ -464,7 +457,7 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
           type: 'ACTIVATION',
           time: recordTime,
           title: 'Chính thức tham gia',
-          description: `Hết thời gian ${memberSystemTree.gracePeriodHours}h cân nhắc. Được xếp là Cấp 1. Được hoàn ${returnPct}% phí trên Doanh số cá nhân.`,
+          description: `Hết thời gian ${memberSystemTree.gracePeriodHours}h cân nhắc. Được xếp vào Cấp 1. Được hoàn ${returnPct}% phí trên Doanh số cá nhân.`,
           amountCash: returnAmount,
           amountBrkd: brkdReturn,
           txType: 'RETURN_FEE',
@@ -501,6 +494,20 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
         })
         const userNameMap = new Map(allInvolvedUsers.map(u => [u.id, u.name?.trim() || 'N/A']))
         const memberName = userNameMap.get(member.userId) || 'N/A'
+
+        // Tính toán hoa hồng trước (skipTimeline: true) để gộp vào dòng Tăng trưởng tích lũy
+        const { ancestorCredits } = await distributeCommission(
+          member.userId,
+          member.onSystem,
+          fee,
+          memberSystemTree,
+          recordTime,
+          undefined,
+          memberMBDT,
+          member.userId,
+          { applicationId: member.applicationId, creditPoints: false, skipTimeline: true }
+        )
+
         await prisma.$transaction(async tx => {
           await tx.system.updateMany({
             where: { autoId: { in: ancestorAutoIds } },
@@ -536,20 +543,20 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
             const isMember = updated.userId === member.userId
 
             let growthDesc = ''
+            let commissionAmount = 0
+            let brkdAmount = 0
+            let earnPct = 0
+
             if (!isMember) {
               const depth = depthByAncestorAutoId.get(updated.autoId) ?? 0
               const fLabel = depth > 0 ? `F${depth}` : ''
-              growthDesc = `Nhóm có thêm thành viên chính thức ${fLabel} #${member.userId} - ${memberName}`
-              if (depth > 1) {
-                const chainParts = chain
-                  .filter(c => c.depth < depth)
-                  .map(c => {
-                    const chainUserName = userNameMap.get(c.ancestor.userId) || 'N/A'
-                    return `F${c.depth} #${c.ancestor.userId} - ${chainUserName}`
-                  })
-                if (chainParts.length > 0) {
-                  growthDesc += ` (${chainParts.join(', ')})`
-                }
+              growthDesc = `Chào mừng thành viên chính thức ${fLabel} #${member.userId} - ${memberName}`
+
+              const creditInfo = ancestorCredits.find(c => c.uplineSystem.userId === updated.userId)
+              if (creditInfo) {
+                earnPct = creditInfo.earnPct
+                commissionAmount = (fee * earnPct) / 100
+                brkdAmount = Math.round((memberMBDT * earnPct) / 100)
               }
             }
 
@@ -569,9 +576,9 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
                 accumulatedTeamSize: updated.officialTeamSize,
                 accumulatedBrkdVolume: Number(updated.totalMbdtVolume),
                 accumulatedCashVolume: Number(updated.totalCashVolume),
-                amountCash: isMember ? returnAmount : 0,
-                amountBrkd: isMember ? brkdReturn : 0,
-                txType: isMember ? 'RETURN_FEE' : 'OFFICIAL_CONTRIBUTION',
+                amountCash: isMember ? returnAmount : commissionAmount,
+                amountBrkd: isMember ? brkdReturn : brkdAmount,
+                txType: isMember ? 'RETURN_FEE' : (earnPct > 0 ? 'COMMISSION' : 'OFFICIAL_CONTRIBUTION'),
                 targetMemberId: isMember ? null : member.userId,
                 targetMemberName: isMember ? null : memberName,
                 fromLevel: isMember ? 0 : null,
@@ -587,7 +594,11 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
           }
         }, { timeout: 120_000 })
 
-        await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId, { applicationId: member.applicationId, creditPoints: false })
+        // Xét thăng cấp lập tức cho các ancestors và chính thành viên đó
+        await checkAndPromoteLevel(member.userId, member.onSystem, recordTime, undefined, member.userId, member.applicationId ?? undefined)
+        for (const ancestor of chain) {
+          await checkAndPromoteLevel(ancestor.ancestor.userId, member.onSystem, recordTime, undefined, member.userId, member.applicationId ?? undefined)
+        }
       }
 
       count++
@@ -619,7 +630,7 @@ export async function revertMemberActivation(
   // --- BƯỚC 2: Xóa dấu vết của member này khỏi ví và timeline của TỪNG ANCESTOR ---
   // Các refId pattern được tạo bởi commission-calculator và activation-service
   const commissionRefId = `sys_${onSystem}_member_${sourceMemberId}`
-  const pointsRefId     = `sys_${onSystem}_member_${sourceMemberId}_points`
+  const pointsRefId = `sys_${onSystem}_member_${sourceMemberId}_points`
 
   for (const ancestorSys of ancestorAutoIds) {
     const ancestorUserId = ancestorSys.userId
@@ -639,16 +650,16 @@ export async function revertMemberActivation(
     })
 
     // Tính tổng cần trừ lại theo từng loại ví
-    let cashToDeduct    = 0
-    let brkdToDeduct    = 0
+    let cashToDeduct = 0
+    let brkdToDeduct = 0
     let voucherToDeduct = 0
     let totalEarnedToDeduct = 0
 
     for (const tx of relatedTxs) {
       const amt = Number(tx.amount)
       if (amt <= 0) continue // chỉ trừ các khoản đã credit (dương)
-      if (tx.balanceType === 'CASH')    { cashToDeduct    += amt; totalEarnedToDeduct += amt }
-      if (tx.balanceType === 'BRKD')    { brkdToDeduct    += amt }
+      if (tx.balanceType === 'CASH') { cashToDeduct += amt; totalEarnedToDeduct += amt }
+      if (tx.balanceType === 'BRKD') { brkdToDeduct += amt }
       if (tx.balanceType === 'VOUCHER') { voucherToDeduct += amt }
     }
 
@@ -657,10 +668,10 @@ export async function revertMemberActivation(
       await prisma.brkWallet.update({
         where: { userId: ancestorUserId },
         data: {
-          balance:        { decrement: cashToDeduct },
-          brkd:           { decrement: brkdToDeduct },
+          balance: { decrement: cashToDeduct },
+          brkd: { decrement: brkdToDeduct },
           voucherBalance: { decrement: voucherToDeduct },
-          totalEarned:    { decrement: totalEarnedToDeduct },
+          totalEarned: { decrement: totalEarnedToDeduct },
         }
       })
     }

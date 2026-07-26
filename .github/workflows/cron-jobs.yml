@@ -1,13 +1,13 @@
 name: Cron Jobs
 
 on:
-  schedule:
-    - cron: '8 * * * *'
-    - cron: '5 * * * *'
-    - cron: '6 * * * *'
-    - cron: '0 0 * * *'
-    - cron: '0 5 * * *'
-    - cron: '5 17 * * *'
+  # schedule:
+  #   - cron: '8 * * * *'
+  #   - cron: '5 * * * *'
+  #   - cron: '6 * * * *'
+  #   - cron: '0 0 * * *'
+  #   - cron: '0 5 * * *'
+  #   - cron: '5 17 * * *'
   workflow_dispatch:
 
 jobs:

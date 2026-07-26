@@ -58,10 +58,10 @@ async function showPreCleanupStats() {
   const closureCount = await prisma.systemClosure.count({ where: { systemId: ON_SYSTEM } })
   console.log(`\n📋 system_closure (systemId=${ON_SYSTEM}): ${closureCount} records`)
 
-  const systemUserIds = (await prisma.system.findMany({
-    where: { onSystem: ON_SYSTEM },
+  const systemUserIds = (await prisma.enrollment.findMany({
+    where: { courseId: COURSE_ID },
     select: { userId: true },
-  })).map(s => s.userId)
+  })).map(e => e.userId)
 
   const walletCount = await prisma.brkWallet.count({
     where: { userId: { in: systemUserIds } },

@@ -102,21 +102,9 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       applicationId
     )
 
-    await createBrkTimelineRecord({
-      userId,
-      onSystem,
-      type: 'LEVEL_UP',
-      time: promotedAt || new Date(),
-      title: 'Thăng tiến cấp bậc',
-      description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}`,
-      fromLevel: currentLevel - 1,
-      toLevel: currentLevel,
-      sourceMemberId,
-      applicationId
-    })
-
     // Idempotency: skip voucher if already credited for this level
-    if (nextConfig.giftValue > 0 && currentLevel >= 2) {
+    const hasVoucherGift = nextConfig.giftValue > 0 && currentLevel >= 2
+    if (hasVoucherGift) {
       const refId = `level_${currentLevel}_sys_${onSystem}_user_${userId}${applicationId != null ? `_app_${applicationId}` : ''}`
       const existingVoucher = await prisma.brkTransaction.findFirst({
         where: { refId, type: 'VOUCHER_CREDIT' }
@@ -140,21 +128,23 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
           sourceMemberId,
           applicationId
         )
-
-        await createBrkTimelineRecord({
-          userId,
-          onSystem,
-          type: 'TRANSACTION',
-          time: promotedAt || new Date(),
-          title: 'Thưởng thăng cấp',
-          description: `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
-          amountVoucher: nextConfig.giftValue,
-          txType: 'VOUCHER_CREDIT',
-          sourceMemberId,
-          applicationId
-        })
       }
     }
+
+    await createBrkTimelineRecord({
+      userId,
+      onSystem,
+      type: 'LEVEL_UP',
+      time: promotedAt || new Date(),
+      title: 'Thăng tiến cấp bậc',
+      description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}${hasVoucherGift ? ` & nhận Quà tặng thăng cấp (${nextConfig.giftValue.toLocaleString()} VND)` : ''}`,
+      fromLevel: currentLevel - 1,
+      toLevel: currentLevel,
+      amountVoucher: hasVoucherGift ? nextConfig.giftValue : 0,
+      txType: hasVoucherGift ? 'VOUCHER_CREDIT' : undefined,
+      sourceMemberId,
+      applicationId
+    })
   }
 
   if (maxPromotedLevel > (systemRec.level || 1)) {

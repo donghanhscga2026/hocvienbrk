@@ -89,44 +89,11 @@ async function processTeamCommission(
   applicationStart: Date,
   runTime: Date,
 ) {
+  // Bỏ qua tính hoa hồng tập trung ở chu kỳ 30h vì đã được phân bổ real-time khi học viên chính thức
   const previousCycle = cycleNumber - 30
-  if (previousCycle < 30) return { baseline: true, processedEvents: 0 }
-  const snapshots = await prisma.mbtcaCommissionLevelSnapshot.findMany({
-    where: { applicationId, cycleNumber: previousCycle },
-  })
-  if (!snapshots.length) throw new Error(`Missing level snapshot for commission cycle ${previousCycle}`)
-  const levelByUserId = new Map(snapshots.map(snapshot => [snapshot.userId, snapshot.level]))
-  const systems = await prisma.system.findMany({ where: { applicationId }, select: { userId: true } })
-  for (const system of systems) if (!levelByUserId.has(system.userId)) levelByUserId.set(system.userId, 1)
-
   const periodStart = new Date(applicationStart.getTime() + previousCycle * HOUR_MS)
   const periodEnd = new Date(applicationStart.getTime() + cycleNumber * HOUR_MS)
-  const events = await prisma.brkTimelineRecord.findMany({
-    where: {
-      applicationId,
-      eventStatus: 'OFFICIAL',
-      time: { gte: periodStart, lt: periodEnd },
-    },
-    orderBy: [{ time: 'asc' }, { id: 'asc' }],
-  })
-  const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: MB_TCA_SYSTEM_ID } })
-  if (!systemTree) throw new Error('System #4 not found')
-  const configs = await getAllLevelConfigs(MB_TCA_SYSTEM_ID)
-  const configMap = new Map(configs.map(config => [config.level, config]))
-  for (const event of events) {
-    await distributeCommission(
-      event.userId,
-      MB_TCA_SYSTEM_ID,
-      Number(event.eventCashVolume),
-      systemTree,
-      runTime,
-      configMap,
-      Number(event.eventMbdtVolume),
-      event.userId,
-      { applicationId, commissionCycleNumber: cycleNumber, levelByUserId, creditPoints: false },
-    )
-  }
-  return { baseline: false, periodStart, periodEnd, processedEvents: events.length }
+  return { baseline: true, periodStart, periodEnd, processedEvents: 0 }
 }
 
 export async function runMbtcaOrchestrator(runTime: Date = new Date()) {

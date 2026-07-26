@@ -1683,3 +1683,41 @@ export async function getStudentActivityLogAction(
 
     return { success: true, logs, total }
 }
+
+export async function getSystemConnectionPathAction(ancestorId: number, descendantId: number, systemId: number) {
+    try {
+        const path: { userId: number; name: string; level: number }[] = []
+        let currentUserId = descendantId
+        let limit = 30
+        
+        while (currentUserId && limit > 0) {
+            const sysRec = await prisma.system.findUnique({
+                where: { userId_onSystem: { userId: currentUserId, onSystem: systemId } },
+                include: { user: { select: { name: true } } }
+            })
+            if (!sysRec) break
+
+            path.unshift({
+                userId: currentUserId,
+                name: sysRec.user?.name || 'N/A',
+                level: sysRec.level
+            })
+
+            if (currentUserId === ancestorId) {
+                break
+            }
+
+            // Nếu đến gốc refSysId = 0 hoặc refSysId = chính nó thì dừng
+            if (sysRec.refSysId === 0 || sysRec.refSysId === currentUserId) {
+                break
+            }
+
+            currentUserId = sysRec.refSysId
+            limit--
+        }
+
+        return { success: true, path }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
