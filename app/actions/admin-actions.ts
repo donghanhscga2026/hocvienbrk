@@ -769,29 +769,31 @@ export async function getCurrentUserRoleAction(systemId?: number) {
 export async function getMemberDetailsAction(userId: number, systemId?: number) {
     try {
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true,
-                createdAt: true,
-                image: true,
-                referrerId: true,
-                referrer: { select: { id: true, name: true } }
-            }
-        })
 
-        // Lấy thông tin enrollment chung cho cả 2 hệ thống
-        const enrollment = await prisma.enrollment.findFirst({
-            where: { userId, courseId: 22 },
-            select: {
-                updatedAt: true,
-                referrerId: true,
-                referrer: { select: { id: true, name: true } }
-            }
-        })
+        // Parallel queries phase 1: User & Enrollment info
+        const [user, enrollment] = await Promise.all([
+            prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    createdAt: true,
+                    image: true,
+                    referrerId: true,
+                    referrer: { select: { id: true, name: true } }
+                }
+            }),
+            prisma.enrollment.findFirst({
+                where: { userId, courseId: 22 },
+                select: {
+                    updatedAt: true,
+                    referrerId: true,
+                    referrer: { select: { id: true, name: true } }
+                }
+            })
+        ])
 
         // TCA system — keep existing logic
         if (!systemId || systemId === 1) {
@@ -801,24 +803,29 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         }
 
         // Non-TCA system (BRK / KTC / YTB)
-        const sysRec = await prisma.system.findUnique({
-            where: { userId_onSystem: { userId, onSystem: systemId } },
-            include: { planApplication: { include: { businessPlan: true } } }
-        })
-        const wallet = await prisma.brkWallet.findUnique({ where: { userId } })
+        // Parallel queries phase 2: System record, wallet, root, systemTree and timelines
+        const [sysRec, wallet, rootSys, systemTree, activationTimeline, latestLegacyTimeline, latestLevelUpTimeline] = await Promise.all([
+            prisma.system.findUnique({
+                where: { userId_onSystem: { userId, onSystem: systemId } },
+                include: { planApplication: { include: { businessPlan: true } } }
+            }),
+            prisma.brkWallet.findUnique({ where: { userId } }),
+            prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } }),
+            prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true, fee: true } }),
+            prisma.brkTimelineRecord.findFirst({
+                where: { userId, onSystem: systemId, type: 'ACTIVATION' }
+            }),
+            prisma.brkTimelineRecord.findFirst({
+                where: { userId, onSystem: systemId, applicationId: null },
+                orderBy: { id: 'desc' }
+            }),
+            prisma.brkTimelineRecord.findFirst({
+                where: { userId, onSystem: systemId, type: 'LEVEL_UP' },
+                orderBy: { id: 'desc' }
+            })
+        ])
 
-        const rootSys = await prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } })
-        const systemTree = await prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true, fee: true } })
         const seq = rootSys && sysRec ? sysRec.autoId - rootSys.autoId : null
-        // Lấy timeline record ACTIVATION để làm Ngày tham gia cố định
-        const activationTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
-            where: { userId, onSystem: systemId, type: 'ACTIVATION' }
-        }) : null
-
-        const latestLegacyTimeline = sysRec?.applicationId == null ? await prisma.brkTimelineRecord.findFirst({
-            where: { userId, onSystem: systemId, applicationId: null },
-            orderBy: { id: 'desc' }
-        }) : null
         const teamTotalBrkd = sysRec?.applicationId != null
             ? Number(sysRec.totalMbdtVolume)
             : Number(latestLegacyTimeline?.accumulatedBrkdVolume || 0)
@@ -826,37 +833,9 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
             ? Number(sysRec.totalCashVolume)
             : Number(latestLegacyTimeline?.accumulatedCashVolume || 0)
 
-        // Lấy timeline record thăng cấp mới nhất để làm Ngày lên cấp
-        const latestLevelUpTimeline = sysRec ? await prisma.brkTimelineRecord.findFirst({
-            where: { userId, onSystem: systemId, type: 'LEVEL_UP' },
-            orderBy: { id: 'desc' }
-        }) : null
-
-        let upline1: { id: number; name: string | null } | null = null
-        let upline2: { id: number; name: string | null } | null = null
-
-        if (sysRec && sysRec.refSysId > 0) {
-            const up1 = await prisma.user.findUnique({
-                where: { id: sysRec.refSysId },
-                select: { id: true, name: true }
-            })
-            if (up1) {
-                upline1 = { id: up1.id, name: up1.name }
-                const up1Sys = await prisma.system.findUnique({
-                    where: { userId_onSystem: { userId: up1.id, onSystem: systemId } },
-                    select: { refSysId: true }
-                })
-                if (up1Sys && up1Sys.refSysId > 0) {
-                    const up2 = await prisma.user.findUnique({
-                        where: { id: up1Sys.refSysId },
-                        select: { id: true, name: true }
-                    })
-                    if (up2) {
-                        upline2 = { id: up2.id, name: up2.name }
-                    }
-                }
-            }
-        }
+        // Upline queries bypassed since they are not rendered in the UI anymore
+        const upline1 = null
+        const upline2 = null
 
         return {
             success: true,
@@ -1595,11 +1574,18 @@ async function getPathFromAncestorToDescendant(ancestorId: number, descendantId:
 
 export async function getMemberPromotionHistoryAction(userId: number, systemId: number) {
     try {
-        // Lấy toàn bộ timeline records của học viên từ CSDL
-        const records = await prisma.brkTimelineRecord.findMany({
-            where: { userId, onSystem: systemId },
-            orderBy: { time: 'asc' }
-        })
+        // Parallel queries: Load timeline records & level configs concurrently
+        const [records, levelConfigsRaw] = await Promise.all([
+            prisma.brkTimelineRecord.findMany({
+                where: { userId, onSystem: systemId },
+                orderBy: { time: 'asc' }
+            }),
+            prisma.brkLevelConfig.findMany({
+                where: { systemId },
+                orderBy: { level: 'asc' },
+                select: { level: true, personalFeePct: true, giftValue: true }
+            })
+        ])
 
         const events = records.map(r => ({
             id: r.id,
@@ -1631,12 +1617,6 @@ export async function getMemberPromotionHistoryAction(userId: number, systemId: 
             }
         }))
 
-        // Lấy level configs để client hiển thị đúng % và gift cho từng cấp
-        const levelConfigsRaw = await prisma.brkLevelConfig.findMany({
-            where: { systemId },
-            orderBy: { level: 'asc' },
-            select: { level: true, personalFeePct: true, giftValue: true }
-        })
         const levelConfigs = levelConfigsRaw.map(c => ({
             level: c.level,
             pct: `${Number(c.personalFeePct)}%`,

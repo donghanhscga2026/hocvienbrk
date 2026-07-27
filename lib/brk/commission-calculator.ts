@@ -13,10 +13,13 @@ function mbdtToMbp(mbdt: number): number {
 }
 
 interface AncestorCredit {
-  uplineSystem: { autoId: number; userId: number; level: number | null }
+  uplineSystem: { autoId: number; userId: number; level: number | null; user?: { name: string | null } | null }
   uplineLevel: number
   earnPct: number
   depth: number
+  blockerId?: number | null
+  blockerName?: string | null
+  blockerDepth?: number | null
 }
 
 interface CommissionOptions {
@@ -53,7 +56,13 @@ export async function distributeCommission(
     },
     orderBy: { depth: 'asc' },
     include: {
-      ancestor: true
+      ancestor: {
+        include: {
+          user: {
+            select: { name: true }
+          }
+        }
+      }
     }
   })
 
@@ -62,6 +71,12 @@ export async function distributeCommission(
   let previousPct = newMemberConfig ? Number(newMemberConfig.personalFeePct) : 0
 
   const ancestorCredits: AncestorCredit[] = []
+
+  const newMemberUser = await prisma.user.findUnique({ where: { id: newMemberUserId } })
+  const newMemberName = newMemberUser?.name || 'N/A'
+
+  let prevMemberId = newMemberUserId
+  let prevMemberName = newMemberName
 
   for (const closure of ancestors) {
     const uplineSystem = closure.ancestor
@@ -73,7 +88,26 @@ export async function distributeCommission(
     const earnPct = uplinePct - previousPct
     previousPct = Math.max(previousPct, uplinePct)
 
-    ancestorCredits.push({ uplineSystem, uplineLevel, earnPct, depth: closure.depth })
+    let blockerId: number | null = null
+    let blockerName: string | null = null
+
+    if (earnPct <= 0) {
+      blockerId = prevMemberId
+      blockerName = prevMemberName
+    }
+
+    ancestorCredits.push({
+      uplineSystem,
+      uplineLevel,
+      earnPct,
+      depth: closure.depth,
+      blockerId,
+      blockerName,
+      blockerDepth: earnPct <= 0 ? 1 : null
+    })
+
+    prevMemberId = uplineSystem.userId
+    prevMemberName = uplineSystem.user?.name || 'N/A'
   }
 
   const applicationSuffix = options.applicationId != null ? `_app_${options.applicationId}` : ''
@@ -84,8 +118,7 @@ export async function distributeCommission(
     ? `TEAM_COMMISSION_CYCLE_${options.commissionCycleNumber}`
     : 'COMMISSION'
 
-  const newMemberUser = await prisma.user.findUnique({ where: { id: newMemberUserId } })
-  const newMemberName = newMemberUser?.name || 'N/A'
+
 
   const parentUser = newMemberSys.refSysId > 0 ? await prisma.user.findUnique({
     where: { id: newMemberSys.refSysId }

@@ -538,6 +538,8 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
             where: { userId: { in: updatedSystems.map(row => row.userId) } },
           })
           const walletByUser = new Map(updatedWallets.map(row => [row.userId, row]))
+          const timelineRecordsData: any[] = []
+
           for (const updated of updatedSystems) {
             const updatedWallet = walletByUser.get(updated.userId)
             const isMember = updated.userId === member.userId
@@ -550,55 +552,65 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
             if (!isMember) {
               const depth = depthByAncestorAutoId.get(updated.autoId) ?? 0
               const fLabel = depth > 0 ? `F${depth}` : ''
-              growthDesc = `Chào mừng thành viên chính thức ${fLabel} #${member.userId} - ${memberName}`
 
               const creditInfo = ancestorCredits.find(c => c.uplineSystem.userId === updated.userId)
               if (creditInfo) {
                 earnPct = creditInfo.earnPct
                 commissionAmount = (fee * earnPct) / 100
                 brkdAmount = Math.round((memberMBDT * earnPct) / 100)
+
+                if (earnPct > 0) {
+                  growthDesc = `Chào mừng thành viên chính thức ${fLabel} #${member.userId} - ${memberName} (+${earnPct}% hoa hồng chênh lệch)`
+                } else if (creditInfo.blockerId) {
+                  const blockerLabel = creditInfo.blockerDepth && creditInfo.blockerDepth > 0 ? `F${creditInfo.blockerDepth} ` : ''
+                  growthDesc = `Chào mừng thành viên chính thức ${fLabel} #${member.userId} - ${memberName} (0% hoa hồng chênh lệch do đồng cấp với ${blockerLabel}#${creditInfo.blockerId} - ${creditInfo.blockerName})`
+                } else {
+                  growthDesc = `Chào mừng thành viên chính thức ${fLabel} #${member.userId} - ${memberName} (0% hoa hồng chênh lệch)`
+                }
+              } else {
+                growthDesc = `Chào mừng thành viên chính thức ${fLabel} #${member.userId} - ${memberName}`
               }
             }
 
-            await tx.brkTimelineRecord.create({
-              data: {
-                userId: updated.userId,
-                onSystem: member.onSystem,
-                type: isMember ? 'ACTIVATION' : 'TRANSACTION',
-                time: recordTime,
-                title: isMember ? 'Chính thức tham gia' : 'Tăng trưởng tích lũy',
-                description: isMember
-                  ? `Hết thời gian ${memberSystemTree.gracePeriodHours}h cân nhắc. Được xếp là Cấp 1. Được hoàn ${returnPct}% phí trên Doanh số cá nhân.`
-                  : growthDesc,
-                accumulatedCash: Number(updatedWallet?.balance || 0),
-                accumulatedBrkd: Number(updatedWallet?.brkd || 0),
-                accumulatedBrkp: Number(updated.totalPoints),
-                accumulatedTeamSize: updated.officialTeamSize,
-                accumulatedBrkdVolume: Number(updated.totalMbdtVolume),
-                accumulatedCashVolume: Number(updated.totalCashVolume),
-                amountCash: isMember ? returnAmount : commissionAmount,
-                amountBrkd: isMember ? brkdReturn : brkdAmount,
-                txType: isMember ? 'RETURN_FEE' : (earnPct > 0 ? 'COMMISSION' : 'OFFICIAL_CONTRIBUTION'),
-                targetMemberId: isMember ? null : member.userId,
-                targetMemberName: isMember ? null : memberName,
-                fromLevel: isMember ? 0 : null,
-                toLevel: isMember ? 1 : null,
-                sourceMemberId: member.userId,
-                eventStatus: isMember ? 'OFFICIAL' : null,
-                eventMbp: isMember ? memberMBP : 0,
-                eventMbdtVolume: isMember ? memberMBDT : 0,
-                eventCashVolume: isMember ? fee : 0,
-                applicationId: member.applicationId,
-              },
+            timelineRecordsData.push({
+              userId: updated.userId,
+              onSystem: member.onSystem,
+              type: isMember ? 'ACTIVATION' : 'TRANSACTION',
+              time: recordTime,
+              title: isMember ? 'Chính thức tham gia' : 'Tăng trưởng tích lũy',
+              description: isMember
+                ? `Hết thời gian ${memberSystemTree.gracePeriodHours}h cân nhắc. Được xếp là Cấp 1. Được hoàn ${returnPct}% phí trên Doanh số cá nhân.`
+                : growthDesc,
+              accumulatedCash: Number(updatedWallet?.balance || 0),
+              accumulatedBrkd: Number(updatedWallet?.brkd || 0),
+              accumulatedBrkp: Number(updated.totalPoints),
+              accumulatedTeamSize: updated.officialTeamSize,
+              accumulatedBrkdVolume: Number(updated.totalMbdtVolume),
+              accumulatedCashVolume: Number(updated.totalCashVolume),
+              amountCash: isMember ? returnAmount : commissionAmount,
+              amountBrkd: isMember ? brkdReturn : brkdAmount,
+              txType: isMember ? 'RETURN_FEE' : (earnPct > 0 ? 'COMMISSION' : 'OFFICIAL_CONTRIBUTION'),
+              targetMemberId: isMember ? null : member.userId,
+              targetMemberName: isMember ? null : memberName,
+              fromLevel: isMember ? 0 : null,
+              toLevel: isMember ? 1 : null,
+              sourceMemberId: member.userId,
+              eventStatus: isMember ? 'OFFICIAL' : null,
+              eventMbp: isMember ? memberMBP : 0,
+              eventMbdtVolume: isMember ? memberMBDT : 0,
+              eventCashVolume: isMember ? fee : 0,
+              applicationId: member.applicationId,
+            })
+          }
+
+          if (timelineRecordsData.length > 0) {
+            await tx.brkTimelineRecord.createMany({
+              data: timelineRecordsData
             })
           }
         }, { timeout: 120_000 })
 
-        // Xét thăng cấp lập tức cho các ancestors và chính thành viên đó
-        await checkAndPromoteLevel(member.userId, member.onSystem, recordTime, undefined, member.userId, member.applicationId ?? undefined)
-        for (const ancestor of chain) {
-          await checkAndPromoteLevel(ancestor.ancestor.userId, member.onSystem, recordTime, undefined, member.userId, member.applicationId ?? undefined)
-        }
+        // Lệnh thăng cấp lập tức đã được loại bỏ hoàn toàn để tuân thủ quy ước thăng cấp theo lịch trình cấu hình sẵn của hệ thống
       }
 
       count++

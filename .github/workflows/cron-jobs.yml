@@ -1,13 +1,12 @@
 name: Cron Jobs
 
 on:
-  # schedule:
-  #   - cron: '8 * * * *'
-  #   - cron: '5 * * * *'
-  #   - cron: '6 * * * *'
-  #   - cron: '0 0 * * *'
-  #   - cron: '0 5 * * *'
-  #   - cron: '5 17 * * *'
+  schedule:
+    - cron: '8 * * * *'
+    - cron: '5 * * * *'
+    - cron: '0 0 * * *'
+    - cron: '0 5 * * *'
+    - cron: '5 17 * * *'
   workflow_dispatch:
 
 jobs:
@@ -27,15 +26,6 @@ jobs:
       - name: Call mbtca-orchestrator
         run: |
           curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/mbtca-orchestrator" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-
-  brk-revenue-share:
-    if: github.event.schedule == '6 * * * *' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call brk-revenue-share
-        run: |
-          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/brk-revenue-share" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
   gmail-watch:

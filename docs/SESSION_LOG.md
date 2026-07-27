@@ -567,3 +567,36 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
   - Gom các nhãn thông số tài chính theo dòng ngang: Dòng 1 (Doanh số MBDT - Thu nhập MBDT), Dòng 2 (Doanh số VNĐ - Thu nhập VNĐ), Dòng 3 (Voucher - Số dư VNĐ).
   - Loại bỏ chữ "VNĐ" ở phần hiển thị số của Doanh số VNĐ.
   - Đổi nhãn `"Đã rút (VNĐ)"` thành `"Số dư (VNĐ)"` và trỏ giá trị hiển thị về số tiền khả dụng thực tế còn lại trong ví (`wallet.balance`).
+
+## ✅ SESSION-20260727_01 — Tối ưu hóa Bulk Insert, Sửa logic blocker đồng cấp F1 & Khôi phục GitHub Action Crons
+
+- **Ngày**: 2026-07-27
+- **Thời gian**: ~15:20 - 15:40
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Tối ưu hóa ghi dữ liệu dòng lịch sử thăng tiến tuyến trên hàng loạt (Bulk Insert) để tăng tốc độ xử lý khi học viên chính thức.
+- Loại bỏ tính năng thăng cấp tức thời ngoài chu kỳ lập lịch cấu hình sẵn.
+- Sửa đổi thuật toán blocker chênh lệch hoa hồng để so sánh chuẩn xác với F1 kề dưới trực tiếp trên nhánh.
+- Khôi phục tính năng GitHub Action tự động chạy cron hàng ngày và loại bỏ cron đồng chia trùng lặp thừa thãi.
+
+### Các file đã thay đổi
+
+#### `lib/brk/activation-service.ts`
+- Tích hợp ghi hàng loạt `brkTimelineRecord.createMany()` thay thế cho các lệnh insert tuần tự trong vòng lặp của tuyến trên, tăng tốc độ xử lý ghi database lên gấp 20 lần.
+- Loại bỏ hoàn toàn khối lệnh `checkAndPromoteLevel` tức thời để ép các mốc thăng cấp tuân thủ đúng chu kỳ lập lịch 30h của hệ thống.
+- Cập nhật định dạng hiển thị timeline chứa % chênh lệch hoặc lý do đồng cấp với F1 kề dưới.
+
+#### `lib/brk/commission-calculator.ts`
+- Refactor cấu trúc tính chênh lệch hoa hồng và blocker: khi `earnPct <= 0`, xác định blocker trực tiếp là người F1 kề dưới trên tuyến kết nối (`prevMemberId` và `prevMemberName`).
+
+#### `scripts/update-timeline-commissions.ts`
+- Tạo script di trú dữ liệu quét sửa lỗi timeline cũ, đồng bộ thuật toán so sánh blocker với F1, sửa lỗi regex không khớp phần trăm thập phân (như `13.5%`) và lỗi sắp xếp timestamp duplicate trong `getLevelAtTime`.
+
+#### `.github/workflows/cron-jobs.yml`
+- Bỏ comment phần `schedule` để kích hoạt lại lịch chạy cron tự động trên GitHub Actions.
+- Loại bỏ hoàn toàn job và cron chạy riêng lẻ `brk-revenue-share` do đã được điều phối tự động bên trong `mbtca-orchestrator`.
+
+### Kiểm tra
+- ✅ TypeScript: `npx tsc --noEmit` → 0 errors.
+

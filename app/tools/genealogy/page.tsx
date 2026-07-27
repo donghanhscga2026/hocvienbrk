@@ -1744,7 +1744,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
   };
 
   const formatMbpPoints = (points: number | null | undefined) => {
-    if (points == null) return '0 (MP)';
+    if (points == null) return '0';
     const formattedStr = points.toLocaleString('en-US', { 
       minimumFractionDigits: 0, 
       maximumFractionDigits: 3 
@@ -1787,7 +1787,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
 
   const currentLevelText = isBrk
     ? (systemData?.level ? `Cấp ${systemData.level}` : 'Chưa có')
-    : (tca?.level ? `Cấp ${tca.level}` : 'Học viên');
+    : (tca?.level ? `Cấp ${tca.level}` : 'Thành viên');
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[300] flex items-center justify-center p-3 sm:p-4 transition-all duration-300">
@@ -1817,7 +1817,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
               <div className="flex items-center justify-between gap-2 w-full pr-1 sm:pr-2">
                 <div className="flex flex-col min-w-0">
                   <h3 className="text-white text-sm sm:text-base font-bold tracking-tight leading-tight uppercase select-all">
-                    {tca?.name || user?.name || 'Học viên'}
+                    {tca?.name || user?.name || 'Thành viên'}
                   </h3>
                   <span className="text-white/85 text-[10px] sm:text-xs font-semibold mt-1 select-all flex items-center gap-1">
                     {user?.phone ? (
@@ -1892,7 +1892,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                           title="Xem nhân duyên từ gốc hệ thống"
                         >
                           <Users className="w-2.5 h-2.5 inline mr-0.5" />
-                          Xem nhân duyên
+                          Nhân duyên
                         </button>
                       )}
                     </div>
@@ -1906,7 +1906,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                       </span>
                       {isBrk && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded">
-                          {getLevelDetails(systemData?.level || 1).pct} Hoa hồng
+                          {getLevelDetails(systemData?.level || 1).pct} 
                         </span>
                       )}
                     </div>
@@ -1996,7 +1996,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                     onClick={() => setShowHistory(true)}
                     className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-md hover:scale-[1.02] transition-all uppercase tracking-wider"
                   >
-                    Xem lịch sử thăng tiến
+                    Xem lịch sử phát triển
                   </button>
                 </div>
               )}
@@ -2012,7 +2012,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
             <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0 rounded-t-3xl">
               <div className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-yellow-400" />
-                <h4 className="text-sm font-black uppercase tracking-wider">Lịch sử thăng tiến</h4>
+                <h4 className="text-sm font-black uppercase tracking-wider">Lịch sử Phát triển</h4>
                 <button
                   onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
                   title={sortOrder === 'desc' ? "Mới nhất trước" : "Cũ nhất trước"}
