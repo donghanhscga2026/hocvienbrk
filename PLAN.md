@@ -1841,3 +1841,34 @@ Sau khi fix 3 bug code, tiến hành scan toàn diện System #4 để phát hi�
 - ✅ 2 ghost members đã fix applicationId
 - ✅ Toàn bộ System #4 data giờ sạch 100%
 - ✅ Patch backup: `plan_temp/data_cleanup_before_cleanup_20260725.patch`
+
+## ✅ Tối ưu hóa Bulk Insert, Sửa logic blocker đồng cấp F1 & Khôi phục GitHub Action Crons (2026-07-27)
+
+### Mục tiêu
+- Tăng tốc độ ghi nhận lịch sử thăng tiến tuyến trên (Timeline) khi học viên trở thành thành viên chính thức.
+- Xóa bỏ thăng cấp tức thời ngoài chu kỳ lập lịch để đồng bộ hóa hoàn toàn với tiến trình quét 30 giờ.
+- Sửa đổi thuật toán chênh lệch hoa hồng để tính blocker đồng cấp luôn luôn là F1 kề dưới trực tiếp trên tuyến.
+- Mở lại và khôi phục lịch trình cron tự động trên GitHub Actions và dọn dẹp cron trùng lặp.
+
+### Các thay đổi đã thực hiện
+
+#### `lib/brk/activation-service.ts`
+- **Tối ưu hóa Bulk Insert**: Thay thế vòng lặp gọi `await tx.brkTimelineRecord.create` tuần tự bằng phương thức gộp mảng và thực thi duy nhất một câu lệnh **`tx.brkTimelineRecord.createMany()`** hàng loạt, giảm số lượng kết nối DB từ 20 câu xuống còn 1 câu.
+- **Xóa thăng cấp tức thời**: Gỡ bỏ hoàn toàn khối lệnh `checkAndPromoteLevel` khi kích hoạt chính thức. Việc thăng cấp của toàn hệ thống sẽ tuân thủ tuyệt đối theo chu kỳ lập lịch quét 30h.
+- **Cập nhật hiển thị timeline**: Bổ sung hiển thị `(+X% hoa hồng chênh lệch)` hoặc ghi chú `(0% hoa hồng chênh lệch do đồng cấp với F1 #[ID] - [Name])` khi kích hoạt.
+
+#### `lib/brk/commission-calculator.ts`
+- **Sửa logic blocker chênh lệch**: Thay thế thuật toán tìm blocker cũ. Khi chênh lệch hoa hồng `earnPct <= 0`, blocker trực tiếp được gán là thành viên kề dưới (F1) của người nhận trên tuyến kết nối (`prevMemberId` và `prevMemberName`).
+
+#### `scripts/update-timeline-commissions.ts`
+- Tạo script di trú dữ liệu hỗ trợ cả Dry-run mặc định và Execute thực tế để quét sửa lỗi timeline cũ, đồng bộ thuật toán so sánh blocker với F1, sửa lỗi regex không khớp phần trăm thập phân (như `13.5%`) và sửa lỗi sắp xếp timestamp trong `getLevelAtTime` khi có nhiều bản ghi thăng cấp cùng một mốc thời gian.
+
+#### `.github/workflows/cron-jobs.yml`
+- Uncomment cấu hình `schedule` để kích hoạt lại lịch chạy cron tự động trên GitHub Actions.
+- Xóa bỏ hoàn toàn cron và job `brk-revenue-share` do đã được điều phối tự động bên trong `mbtca-orchestrator`.
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — Exit code 0
+- ✅ Cấu hình GitHub Actions đã được khôi phục và tinh giản.
+- ✅ Logic tính toán hoa hồng chênh lệch và thăng cấp đã khớp nghiệp vụ thực tế 100%.
+

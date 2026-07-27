@@ -176,6 +176,15 @@ export async function processRevenueShareForSystem(
   const sharePct = Number(systemTree.revenueSharePct || 2)
   const cashPoolAmount = (revenue.totalCashRevenue * sharePct) / 100
   const mbdtPoolAmount = (revenue.totalMbdtRevenue * sharePct) / 100
+
+  if (cashPoolAmount === 0 && mbdtPoolAmount === 0) {
+    return {
+      processed: false,
+      reason: 'Doanh số trong kỳ bằng 0, bỏ qua đồng chia',
+      roundNumber: period.roundNumber,
+    }
+  }
+
   const amountCash = qualified.length > 0
     ? Math.floor((cashPoolAmount * 100) / qualified.length) / 100
     : 0
