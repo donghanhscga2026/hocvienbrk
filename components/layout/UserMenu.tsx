@@ -131,22 +131,6 @@ export default function UserMenu() {
                     </div>
 
                     <div className="border-t border-brk-outline pt-2 mt-2" />
-
-                    <Link
-                        href="/tools"
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors font-bold"
-                    >
-                        <Settings className="h-4 w-4" />
-                        Công cụ hỗ trợ
-                    </Link>
-                    <button
-                        onClick={() => { setIsUserMenuOpen(false); openMbw() }}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-primary hover:bg-brk-background transition-colors font-bold"
-                    >
-                        <Wallet className="h-4 w-4" />
-                        Ví Ngân hàng Phước Báu
-                    </button>
                     <Link
                         href="/account-settings"
                         onClick={() => setIsUserMenuOpen(false)}

@@ -19,7 +19,7 @@ import {
   useStore,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, getSystemPromotionLogicAction, switchSystemPromotionLogicAction, getMemberPromotionHistoryAction, getSystemConnectionPathAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
+import { getGenealogyTreeAction, getGenealogyChildrenAction, getSystemTreeAction, getSystemChildrenAction, searchGenealogyByIdAction, getAvailableSystemsAction, getCurrentUserRoleAction, createSystemRootAction, getMemberDetailsAction, getSystemRootUserAction, getSystemPromotionLogicAction, switchSystemPromotionLogicAction, getMemberPromotionHistoryAction, getSystemConnectionPathAction, getSharingSponsorTreeAction, GenealogyNode, SystemTreeInfo } from '@/app/actions/admin-actions'
 import { Role } from '@prisma/client'
 import MainHeader from '@/components/layout/MainHeader'
 import * as d3 from 'd3-hierarchy'
@@ -200,6 +200,7 @@ const GenealogyCard = (props: NodeProps) => {
     onDeleteNode?: (nodeId: number) => void;
     onShowDetails?: (userId: number) => void;
     onSearchNode?: (userId: number) => void;
+    onShowSharingTree?: (userId: number, name: string | null) => void;
     currentUserId?: number | null;
   }
 
@@ -271,13 +272,23 @@ const GenealogyCard = (props: NodeProps) => {
 
       {/* Information Box - Tiếp ngay dưới circle, chèn lùi lên trên */}
       <div
-        onClick={(e) => { e.stopPropagation(); data.onSearchNode?.(data.id); }}
-        className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center cursor-pointer hover:ring-2 hover:ring-indigo-400 transition-all`}
+        className={`${getChucDanhStyle(data.chucDanh)} px-2 pb-2 pt-12 -mt-8 rounded-2xl shadow-[0_15px_50px_rgb(0,0,0,0.12)] border border-slate-100 w-full text-center relative z-0 flex flex-col items-center hover:ring-2 hover:ring-indigo-400 transition-all`}
       >
         {/* Số thứ tự tham gia hệ thống (góc trên bên trái) */}
         {data.seq != null && (
           <div className="absolute -top-2.5 -left-1.5 z-20 px-1.5 py-0.5 bg-indigo-500 text-white text-[10px] font-black rounded-full shadow-md leading-none">
             @{data.seq}
+          </div>
+        )}
+
+        {/* Số học viên phát triển được theo nhân mạch chia sẻ (góc trên bên phải) */}
+        {data.sharingCount !== undefined && (
+          <div 
+            onClick={(e) => { e.stopPropagation(); data.onShowSharingTree?.(data.id, data.name); }}
+            className="absolute -top-2.5 -right-1.5 z-20 px-1.5 py-0.5 bg-emerald-600 text-white text-[10px] font-black rounded-full shadow-md leading-none cursor-pointer hover:scale-110 active:scale-95 transition-transform" 
+            title="Số học viên phát triển được (nhân mạch chia sẻ) - Click để xem danh sách"
+          >
+            ${data.sharingCount}
           </div>
         )}
 
@@ -296,8 +307,10 @@ const GenealogyCard = (props: NodeProps) => {
               <span>{pScore.toLocaleString('vi')}</span>
             </div>
             {/* Tổng thành viên */}
-            <div className="flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black bg-violet-50 text-violet-600 leading-tight"
-              title="Tổng thành viên đội nhóm">
+            <div 
+              onClick={(e) => { e.stopPropagation(); data.onSearchNode?.(data.id); }}
+              className="flex-1 flex flex-col items-center py-0.5 rounded-lg text-[9px] font-black bg-violet-50 text-violet-600 leading-tight cursor-pointer hover:bg-violet-100 active:scale-95 transition-all"
+              title="Tổng thành viên đội nhóm - Click để xem cây">
               <span className="text-[8px] font-medium opacity-70">ĐỘI NHÓM</span>
               <span>{data.totalSubCount || 0}</span>
             </div>
@@ -312,7 +325,11 @@ const GenealogyCard = (props: NodeProps) => {
           /* --- CHẾ ĐỘ KHÔNG CÓ TCA DATA (Học viên): chỉ hiện tổng thành viên gọn nhẹ --- */
           (data.totalSubCount || 0) > 0 ? (
             <div className="flex items-center justify-center w-full mb-1.5">
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black">
+              <div 
+                onClick={(e) => { e.stopPropagation(); data.onSearchNode?.(data.id); }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black cursor-pointer hover:bg-violet-100 active:scale-95 transition-all"
+                title="Click để xem cây"
+              >
                 <Users className="w-2.5 h-2.5" />
                 <span>{data.totalSubCount} thành viên</span>
               </div>
@@ -447,6 +464,9 @@ function GenealogyFlow() {
   }, [fullTree, showActiveOnly])
   const [modalData, setModalData] = useState<{ users: GroupMember[], type: 'A' | 'B', totalSub: number } | null>(null)
   const [expandedF2Id, setExpandedF2Id] = useState<number | null>(null)
+  const [sharingTreeModal, setSharingTreeModal] = useState<{ show: boolean, userId: number, userName: string | null } | null>(null)
+  const [sharingTreeData, setSharingTreeData] = useState<{ totalDescendants: number, flatTree: any[] } | null>(null)
+  const [loadingSharingTree, setLoadingSharingTree] = useState(false)
   const lastExpandedIdRef = useRef<number | null>(null)
   const activeFocusMapRef = useRef<Map<number, number>>(new Map())
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null) // Mặc định: TCA (system 1)
@@ -586,6 +606,23 @@ function GenealogyFlow() {
       setMemberDetail(prev => ({ ...prev, loading: false }))
     }
   }, [selectedSystem])
+  const handleShowSharingTree = useCallback(async (userId: number, userName: string | null) => {
+    setSharingTreeModal({ show: true, userId, userName })
+    setSharingTreeData(null)
+    setLoadingSharingTree(true)
+    try {
+      const res = await getSharingSponsorTreeAction(userId)
+      if (res.success && res.flatTree) {
+        setSharingTreeData({ totalDescendants: res.totalDescendants || 0, flatTree: res.flatTree })
+      } else {
+        alert(res.error || 'Lỗi khi tải sơ đồ chia sẻ')
+      }
+    } catch (e) {
+      alert('Lỗi kết nối')
+    } finally {
+      setLoadingSharingTree(false)
+    }
+  }, [])
 
   const mergeSubtree = useCallback((root: GenealogyNode, subtree: GenealogyNode): GenealogyNode => {
     if (root.id === subtree.id) return { ...root, ...subtree }
@@ -663,6 +700,7 @@ function GenealogyFlow() {
           onDeleteNode: (nodeId: number) => setDeleteNodeModal({ nodeId, show: true }),
           onShowDetails: handleShowDetails,
           onSearchNode: handleSearchNodeClick,
+          onShowSharingTree: actions.onShowSharingTree,
           currentUserId: currentUserId
         },
       })
@@ -1034,7 +1072,7 @@ function GenealogyFlow() {
         console.error('[Tree] Position map error:', e)
       }
 
-      const { resNodes, resEdges } = generateGraphNodes(treeToRender, 0, 0, { onToggleExpand: handleToggleExpand, onFocusSubtree: handleFocusSubtree, onShowDetails: handleShowDetails }, activeFocusMapRef.current, true, editMode, isFocusMode ? 'full' : displayMode, positionMapRef.current)
+      const { resNodes, resEdges } = generateGraphNodes(treeToRender, 0, 0, { onToggleExpand: handleToggleExpand, onFocusSubtree: handleFocusSubtree, onShowDetails: handleShowDetails, onShowSharingTree: handleShowSharingTree }, activeFocusMapRef.current, true, editMode, isFocusMode ? 'full' : displayMode, positionMapRef.current)
 
       const uniqueNodes = Array.from(new Map(resNodes.map(item => [item.id, item])).values())
       const uniqueEdges = Array.from(new Map(resEdges.map(item => [item.id, item])).values())
@@ -1481,6 +1519,90 @@ function GenealogyFlow() {
             <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
               <GenealogyAdminTab />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sharing Tree Modal */}
+      {sharingTreeModal?.show && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-black text-slate-800">Cây chia sẻ của #{sharingTreeModal.userId}</h2>
+              <button 
+                onClick={() => { setSharingTreeModal(null); setSharingTreeData(null); }} 
+                className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="text-sm font-semibold text-slate-500 mb-4 uppercase tracking-wider">
+              {sharingTreeModal.userName || 'Học viên'}
+            </div>
+
+            {loadingSharingTree ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-10 gap-2">
+                <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-xs font-bold text-slate-400">Đang tải sơ đồ chia sẻ...</span>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                <div className="bg-emerald-50 text-emerald-700 rounded-xl p-3 mb-4 text-xs font-bold flex items-center justify-between">
+                  <span>TỔNG SỐ HỌC VIÊN PHÁT TRIỂN:</span>
+                  <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[11px]">
+                    {sharingTreeData?.totalDescendants || 0} người
+                  </span>
+                </div>
+
+                {(!sharingTreeData || sharingTreeData.totalDescendants === 0) ? (
+                  <div className="text-center text-slate-400 text-xs py-8 font-medium">
+                    Thành viên này chưa phát triển được học viên nào qua nhân mạch chia sẻ.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 py-1">
+                    {sharingTreeData.flatTree.map((member) => (
+                      <div 
+                        key={member.userId}
+                        className="flex items-center gap-2 py-1.5 px-3 rounded-lg hover:bg-slate-50 transition-colors"
+                        style={{ paddingLeft: `${(member.depth - 1) * 20 + 12}px` }}
+                      >
+                        {/* Connector line indicator */}
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                        
+                        {member.image ? (
+                          <img 
+                            src={member.image} 
+                            alt={member.name} 
+                            className="w-6 h-6 rounded-full object-cover border border-slate-200"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-200">
+                            {member.name.substring(0, 1).toUpperCase()}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[13px] font-bold text-slate-700 truncate leading-snug">
+                            {member.name}
+                          </span>
+                          <span className="text-[10px] font-black text-slate-400 tracking-tighter leading-none">
+                            #{member.userId} • F{member.depth} chia sẻ
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <button 
+              onClick={() => { setSharingTreeModal(null); setSharingTreeData(null); }}
+              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-bold mt-4 transition-colors"
+            >
+              Đóng
+            </button>
           </div>
         </div>
       )}

@@ -24,6 +24,7 @@ export interface GenealogyNode {
     image?: string | null
     referrerId: number | null
     seq?: number  // 0-based join order trong hệ thống (chỉ có ở SYSTEM tree)
+    sharingCount?: number // Số học viên phát triển được theo nhân mạch chia sẻ
     totalSubCount: number
     f1aCount: number
     f1bCount: number
@@ -106,6 +107,32 @@ async function buildStandardTree(
     try {
         const isSystem = type === 'SYSTEM'
 
+        // Load sharing sponsor map for Course 22 to calculate descendants recursively
+        const courseEnrollments = await prisma.enrollment.findMany({
+            where: { courseId: 22 },
+            select: { userId: true, referrerId: true }
+        })
+        const parentToChildrenMap = new Map<number, number[]>()
+        courseEnrollments.forEach(e => {
+            if (e.referrerId) {
+                if (!parentToChildrenMap.has(e.referrerId)) {
+                    parentToChildrenMap.set(e.referrerId, [])
+                }
+                parentToChildrenMap.get(e.referrerId)!.push(e.userId)
+            }
+        })
+        const countSharingDescendants = (userId: number): number => {
+            const queue = [userId]
+            let count = 0
+            while (queue.length > 0) {
+                const current = queue.shift()!
+                const children = parentToChildrenMap.get(current) || []
+                count += children.length
+                queue.push(...children)
+            }
+            return count
+        }
+
         // 1. Lấy thông tin Root
         const rootUser = await prisma.user.findUnique({
             where: { id: rootId },
@@ -146,6 +173,7 @@ async function buildStandardTree(
         if (f1Data.length === 0) {
             return {
                 id: rootUser.id, name: rootUser.name, referrerId: rootUser.referrerId || null,
+                sharingCount: countSharingDescendants(rootUser.id),
                 totalSubCount: 1, f1aCount: 0, f1bCount: 0, f1cCount: 0,
                 groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
                 groupA: [], groupB: [], children: [], isRoot: true, seq: 0
@@ -357,6 +385,7 @@ async function buildStandardTree(
 
                 return {
                     id: child.userId, name: child.name, image: child.image, referrerId: null,
+                    sharingCount: countSharingDescendants(child.userId),
                     totalSubCount: childClosures.length,
                     f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC_count,
                     groupATotalSub: gA.reduce((sum: number, n: any) => sum + n.totalSubCount, 0),
@@ -387,6 +416,7 @@ async function buildStandardTree(
                 const f2tca = tcaMemberMap.get(f2.userId) ?? tcaMemberMap.get(f2.autoId)
                 return {
                     id: f2.userId, name: f2.name, image: f2.image, referrerId: null,
+                    sharingCount: countSharingDescendants(f2.userId),
                     totalSubCount: (closureByAncestor.get(f2.autoId) || []).length,
                     f1aCount: 0, f1bCount: 0, f1cCount: 0, groupATotalSub: 0, groupBTotalSub: 0, groupCTotalSub: 0,
                     groupA: [], groupB: [], children: grandchildren,
@@ -417,6 +447,7 @@ async function buildStandardTree(
             const f1tca = tcaMemberMap.get(f1Info.id) ?? tcaMemberMap.get(f1Record?.autoId)
             return {
                 id: f1Info.id, name: f1Info.name, image: f1Info.image, referrerId: null,
+                sharingCount: countSharingDescendants(f1Info.id),
                 totalSubCount: f1Closures.length, f1aCount: gA.length, f1bCount: gB.length, f1cCount: gC.length,
                 groupATotalSub: gATotal, groupBTotalSub: gBTotal, groupCTotalSub: gCTotal,
                 groupA: gA, groupB: gB, children: f2Subtrees,
@@ -438,6 +469,7 @@ async function buildStandardTree(
 
         return {
             id: rootUser.id, name: rootUser.name, image: rootUser.image, referrerId: rootUser.referrerId || null,
+            sharingCount: countSharingDescendants(rootUser.id),
             totalSubCount: totalCount, f1aCount: groupA.length, f1bCount: groupB.length, f1cCount: groupC.length,
             groupATotalSub, groupBTotalSub, groupCTotalSub,
             children: forceFull ? buildFullSubtree(rootAutoId) : children,
@@ -1701,3 +1733,71 @@ export async function getSystemConnectionPathAction(ancestorId: number, descenda
         return { success: false, error: error.message }
     }
 }
+
+export async function getSharingSponsorTreeAction(userId: number) {
+    try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        
+        // Lấy tất cả enrollment của khóa học #22 để dựng cây chia sẻ
+        const enrollments = await prisma.enrollment.findMany({
+            where: { courseId: 22 },
+            include: {
+                user: {
+                    select: { id: true, name: true, image: true }
+                }
+            }
+        })
+
+        // Ánh xạ userId -> Tên & hình ảnh
+        const userMap = new Map<number, { name: string; image: string | null }>()
+        enrollments.forEach(e => {
+            userMap.set(e.userId, { name: e.user.name || 'N/A', image: e.user.image })
+        })
+
+        // Dựng bản đồ quan hệ: referrerId -> danh sách userId được giới thiệu
+        const parentToChildren = new Map<number, number[]>()
+        enrollments.forEach(e => {
+            if (e.referrerId) {
+                if (!parentToChildren.has(e.referrerId)) {
+                    parentToChildren.set(e.referrerId, [])
+                }
+                parentToChildren.get(e.referrerId)!.push(e.userId)
+            }
+        })
+
+        // Dựng danh sách phẳng có thụt lề (flat tree with indent) để hiển thị trong panel
+        interface FlatSharingNode {
+            userId: number
+            name: string
+            image: string | null
+            depth: number
+        }
+
+        const flatTree: FlatSharingNode[] = []
+
+        function traverse(uId: number, depth: number) {
+            const kids = parentToChildren.get(uId) || []
+            kids.forEach(kidId => {
+                const info = userMap.get(kidId) || { name: `Học viên #${kidId}`, image: null }
+                flatTree.push({
+                    userId: kidId,
+                    name: info.name,
+                    image: info.image,
+                    depth
+                })
+                traverse(kidId, depth + 1)
+            })
+        }
+
+        traverse(userId, 1)
+
+        return {
+            success: true,
+            totalDescendants: flatTree.length,
+            flatTree
+        }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
