@@ -600,3 +600,47 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 ### Kiểm tra
 - ✅ TypeScript: `npx tsc --noEmit` → 0 errors.
 
+## ✅ SESSION-20260728_01 — Tối ưu hóa Webhook, Hủy Cron ngày, và Tích hợp luồng Telegram Bot cá nhân
+
+- **Ngày**: 2026-07-28
+- **Thời gian**: ~13:11 - 23:59
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Xử lý dứt điểm 20 giao dịch hoa hồng chênh lệch retroactive phát sinh sai lệch điểm trên System 4.
+- Giải phóng khóa quét `gmail_scan_lock` bị kẹt mốc thời gian tương lai, phục hồi tính năng duyệt học viên tự động real-time.
+- Loại bỏ hoàn toàn Cron ngày `brk-daily-eval` và dọn dẹp các liên kết liên quan.
+- Tích hợp luồng liên kết tài khoản Telegram Bot cá nhân của học viên thông qua mã Token dùng một lần UUID bảo mật.
+- Triển khai API nội bộ bảo mật gửi thông báo cá nhân đến học viên qua ID người dùng.
+
+### Các file đã thay đổi
+
+#### `scripts/reconcile-system4.ts`
+- Cập nhật thuật toán đối soát động: So khớp thời gian giao dịch với ngày kích hoạt F kề dưới, xóa 20 timeline record lỗi, điều chỉnh điểm/level chuẩn xác cho 5 Leader và khấu trừ CASH/MBDT đã cộng thừa khỏi 13 ví học viên.
+
+#### `app/api/cron/status/route.ts` & `app/actions/admin-cron-actions.ts` & `.github/workflows/cron-jobs.yml`
+- Loại bỏ hoàn toàn các liên kết, route API, giao diện trigger và workflow chạy tự động của Cron ngày `brk-daily-eval`. Đã xóa thư mục `app/api/cron/brk-daily-eval/`.
+
+#### `prisma/schema.prisma`
+- Thêm trường lưu vết Telegram vào model `User` (`telegramChatId`, `telegramUserId`, `telegramUsername`, `telegramConnectedAt`).
+- Tạo bảng `telegram_link_tokens` quản lý token liên kết dùng 1 lần (hiệu lực 15 phút).
+
+#### `lib/telegram-bot.ts` & `app/api/webhooks/telegram/route.ts`
+- Mở rộng bot helper: Bổ sung hàm `linkTelegramAccount` cập nhật thông tin trong transaction, và `sendTelegramToUser` gửi tin nhắn qua `userId` của học viên.
+- Cập nhật webhook để hỗ trợ lệnh `/start <TOKEN>` dạng UUID để liên kết tài khoản.
+
+#### `app/actions/telegram-actions.ts` & `app/api/telegram/send/route.ts`
+- Tạo Server Action `generateTelegramLinkAction` sinh token liên kết cho người dùng hiện tại và sinh link chuyển hướng sang Bot Telegram.
+- Tạo API Handler `/api/telegram/send` nhận `userId` và `message`, kiểm tra Bearer token `TELEGRAM_WEBHOOK_SECRET` để gửi thông báo cá nhân bảo mật.
+
+### Các file đã tạo
+- #### `docs/TELEGRAM_INTEGRATION.md`
+  - Tài liệu hướng dẫn kỹ thuật chi tiết, luồng liên kết, và hướng dẫn gửi thông báo cá nhân cho học viên qua API.
+
+### Kiểm tra
+- ✅ `npx prisma db push` và rebuild Prisma Client thành công.
+- ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+- ✅ Hệ thống duyệt tự động được giải phóng khóa kẹt (`gmail_scan_lock` reset), hoạt động thời gian thực hoàn hảo (đã tự động duyệt kích hoạt học viên mới thành công chỉ trong vòng 8-9 giây từ lúc mail báo về).
+- ✅ Liên kết tài khoản Telegram Bot cá nhân và API gửi thông báo đã được kiểm thử độc lập thành công.
+- ✅ Đã đẩy toàn bộ code mới nhất lên Git master branch thành công.
+
