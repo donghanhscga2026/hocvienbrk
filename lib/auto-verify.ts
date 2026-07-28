@@ -96,14 +96,11 @@ async function callGmailWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs 
           const maxPenalty = new Date(Date.now() + 24 * 60 * 60 * 1000);
           const cappedTimeStr = penaltyDate > maxPenalty ? maxPenalty.toISOString() : penaltyTimeStr;
 
-          const { PrismaClient } = await import('@prisma/client');
-          const prismaClient = new PrismaClient();
-          await prismaClient.systemConfig.upsert({
+          await prisma.systemConfig.upsert({
             where: { key: 'gmail_rate_limit_until' },
             update: { value: cappedTimeStr },
             create: { key: 'gmail_rate_limit_until', value: cappedTimeStr }
           });
-          console.log(`⏳ Đã ghi nhận mốc phạt Rate Limit của Google đến: ${cappedTimeStr}${penaltyDate > maxPenalty ? ' (capped from ' + penaltyTimeStr + ')' : ''}`);
         } catch (dbErr) {
           console.error('⚠️ Lỗi ghi nhận mốc phạt vào DB:', dbErr);
         }

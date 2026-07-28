@@ -309,10 +309,13 @@ export async function sendGmailFromSender(
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
-  await gmail.users.messages.send({ 
-    userId: 'me', 
-    requestBody: { raw: encodedMessage }, 
-  }); 
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw: encodedMessage },
+  });
+  if (res.status < 200 || res.status >= 300) {
+    console.error(`❌ sendGmailFromSender: Gmail API returned ${res.status}:`, res.statusText);
+  } 
 }
 
 export async function sendViaBrevo(
