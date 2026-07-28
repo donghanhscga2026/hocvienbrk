@@ -23,6 +23,10 @@ model User {
   updatedAt                    DateTime              @updatedAt
   passwordChanged              Boolean               @default(false)
   affiliateCode                String?               @unique
+  telegramChatId               BigInt?
+  telegramUserId               BigInt?
+  telegramUsername             String?
+  telegramConnectedAt          DateTime?
   accounts                     Account[]
   commissions                  AffiliateCommission[]
   affiliateLinks               AffiliateLink[]
@@ -1818,3 +1822,17 @@ model BrkTimelineRecord {
   @@index([applicationId, time])
   @@map("brk_timeline_record")
 }
+
+model TelegramLinkToken {
+  id        String    @id @default(uuid())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("telegram_link_tokens")
+}
+

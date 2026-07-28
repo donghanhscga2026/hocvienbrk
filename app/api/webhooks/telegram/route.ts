@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { sendTelegramMessage, parseBotCommand, setPendingConfirmation, getPendingConfirmation, clearPendingConfirmation } from "@/lib/telegram-bot"
+import {
+  sendTelegramMessage,
+  parseBotCommand,
+  setPendingConfirmation,
+  getPendingConfirmation,
+  clearPendingConfirmation,
+  linkTelegramAccount
+} from "@/lib/telegram-bot"
 
 export async function POST(request: NextRequest) {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET
@@ -27,6 +34,35 @@ export async function POST(request: NextRequest) {
 
   const { command, payload } = parsed
 
+  // 1. Luồng liên kết tài khoản học viên qua UUID Token gửi từ lệnh /start
+  if (command === 'start' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload)) {
+    const fromUser = update.message.from
+    const linkResult = await linkTelegramAccount(payload, {
+      chatId: chatId,
+      telegramUserId: fromUser?.id || chatId,
+      username: fromUser?.username || undefined
+    })
+
+    if (linkResult.success) {
+      await sendTelegramMessage(
+        chatId,
+        `<b>🎉 KẾT NỐI TÀI KHOẢN THÀNH CÔNG!</b>\n\n` +
+        `✅ Tài khoản Telegram của bạn đã được liên kết thành công với Học Viện BRK.\n\n` +
+        `Bạn sẽ nhận được các thông báo học tập quan trọng (lịch học Zoom, thông tin tài khoản, xác nhận thanh toán) trực tiếp tại đây.`
+      )
+    } else {
+      await sendTelegramMessage(
+        chatId,
+        `<b>❌ LIÊN KẾT THẤT BẠI</b>\n\n` +
+        `Yêu cầu liên kết không hợp lệ hoặc đã hết hạn.\n` +
+        `Chi tiết: <i>${linkResult.error}</i>\n\n` +
+        `Vui lòng truy cập lại trang cá nhân trên Website để lấy liên kết mới.`
+      )
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  // 2. Luồng kích hoạt OTP qua /start otp_ hoặc gửi trực tiếp /otp
   if (command === 'otp' || (command === 'start' && payload.startsWith('otp_'))) {
     const email = payload.startsWith('otp_') ? payload.slice(4) : payload
 
@@ -65,6 +101,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
+  // 3. Luồng xác nhận nhận OTP
   if (command === 'confirm') {
     const pending = getPendingConfirmation(chatId)
 
