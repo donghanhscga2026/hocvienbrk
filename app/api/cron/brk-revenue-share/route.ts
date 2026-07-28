@@ -24,7 +24,9 @@ async function handler(request: Request) {
       const { sendTelegramAdmin } = await import('@/lib/notifications')
       const errMsg = error instanceof Error ? error.message : String(error)
       await sendTelegramAdmin(`❌ <b>[CRON] BRK Revenue Share FAILED</b>\n⚠️ ${errMsg}`)
-    } catch (_) {}
+    } catch (notifyErr) {
+      console.error('❌ brk-revenue-share: Failed to send Telegram error notification:', notifyErr);
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

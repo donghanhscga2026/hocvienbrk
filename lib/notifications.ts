@@ -74,10 +74,13 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
     CHANGE: process.env.TELEGRAM_CHAT_ID_CHANGE || process.env.TELEGRAM_CHAT_ID,
   };
   const chatId = chatIdMap[type];
-  if (!token || !chatId) return;
+  if (!token || !chatId) {
+    console.warn(`⚠️ sendTelegram(${type}): Missing TELEGRAM_BOT_TOKEN or chatId env var`)
+    return;
+  }
   try {
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -86,6 +89,10 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
         parse_mode: 'HTML',
       }),
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ Telegram API Error (${res.status}): ${errText}`);
+    }
   } catch (error) {
     console.error(`❌ Telegram Error:`, error);
   }
@@ -651,7 +658,7 @@ export async function sendEmailCampaignNotification(data: CampaignNotificationDa
 
   try {
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -660,6 +667,10 @@ export async function sendEmailCampaignNotification(data: CampaignNotificationDa
         parse_mode: 'HTML',
       }),
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[EmailCampaign] Telegram API Error (${res.status}): ${errText}`);
+    }
   } catch (err) {
     console.error("[EmailCampaign] Telegram error:", err);
   }

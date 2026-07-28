@@ -18,7 +18,9 @@ async function handler(request: Request) {
     try {
       const { sendTelegramAdmin } = await import('@/lib/notifications')
       await sendTelegramAdmin(`❌ <b>[CRON] MB TCA FAILED</b>\n⚠️ ${message}`)
-    } catch {}
+    } catch (notifyErr) {
+      console.error('❌ mbtca-orchestrator: Failed to send Telegram error notification:', notifyErr);
+    }
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }

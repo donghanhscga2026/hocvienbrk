@@ -72,7 +72,9 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
         `🖥️ Hệ thống: #${onSystem}\n` +
         `⏰ ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
       )
-    } catch (_) {}
+    } catch (err) {
+      console.error('❌ level-manager: Failed to send Telegram notification:', err);
+    }
 
     // Tạm thời update system level trong DB để makeSystemSnapshotDescription đọc đúng level mới
     await prisma.system.update({

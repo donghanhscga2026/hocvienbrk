@@ -3,7 +3,12 @@ import { processPaymentEmails } from '@/lib/auto-verify';
 
 export async function POST(req: NextRequest) {
   try {
-    // Nhận thông báo từ Google Pub/Sub
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
+      console.warn('⚠️ Gmail webhook: Unauthorized access attempt')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     console.log('📩 Nhận được thông báo Push từ Gmail!');
 
     // Gọi trực tiếp logic xử lý thanh toán

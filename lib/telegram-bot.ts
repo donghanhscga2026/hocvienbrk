@@ -26,20 +26,25 @@ export function clearPendingConfirmation(chatId: number) {
 }
 
 export async function sendTelegramMessage(chatId: number, text: string) {
-  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-    }),
-  })
-  if (!res.ok) {
-    console.error('❌ Telegram sendMessage error:', await res.text())
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+      }),
+    })
+    if (!res.ok) {
+      console.error('❌ Telegram sendMessage error:', await res.text())
+    }
+    return res.json()
+  } catch (error) {
+    console.error('❌ Telegram sendMessage network error:', error)
+    return null
   }
-  return res.json()
 }
 
 export function parseBotCommand(text: string): { command: string; payload: string } | null {
