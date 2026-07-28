@@ -5,7 +5,6 @@ import { Role } from '@prisma/client'
 import prisma from '@/lib/prisma'
 
 const CRON_ROUTES: Record<string, string> = {
-  'brk-daily-eval': '/api/cron/brk-daily-eval',
   'brk-level-check': '/api/cron/brk-level-check',
   'brk-grace-processing': '/api/cron/brk-grace-processing',
   'brk-revenue-share': '/api/cron/brk-revenue-share',

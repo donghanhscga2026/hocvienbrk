@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
 const CRON_JOBS = [
-  'brk-daily-eval',
   'brk-level-check',
   'brk-grace-processing',
   'mbtca-orchestrator',

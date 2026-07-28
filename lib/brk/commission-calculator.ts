@@ -130,7 +130,7 @@ export async function distributeCommission(
       where: {
         userId: uplineSystem.userId,
         onSystem,
-        txType: timelineTxType,
+        txType: { in: [timelineTxType, 'OFFICIAL_CONTRIBUTION'] },
         targetMemberId: newMemberUserId,
         applicationId: options.applicationId ?? null
       }
