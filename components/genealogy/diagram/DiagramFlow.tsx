@@ -36,8 +36,6 @@ import MemberDetailsModal from '@/components/genealogy/modals/MemberDetailsModal
 import SlidePanel from '@/components/genealogy/ui/SlidePanel'
 import DiagramHeader from './DiagramHeader'
 import DiagramToolbar from './DiagramToolbar'
-import DiagramStatusBar from './DiagramStatusBar'
-
 export default function DiagramFlow({ selectedSystem }: { selectedSystem: number | null }) {
   const { fitView, setCenter } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -673,10 +671,11 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
         const pos = positionMapRef.current.get(centerNodeId)!
         setTimeout(() => {
           setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT * 2, { zoom: 1.2, duration: 600 })
-        }, 120)
+        }, 150)
         pendingCenterNodeIdRef.current = null
       } else {
-        setTimeout(() => fitView({ padding: 0.15, duration: 700 }), 100)
+        setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 200)
+        setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 800)
       }
     }
   }, [filteredTree, focusedSubtreeNode, focusMapVersion, generateGraphNodes, handleToggleExpand, setNodes, setEdges, fitView, setCenter, getNodePosition, editMode, displayMode])
@@ -832,9 +831,10 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
               fitViewOptions={{ padding: 0.2 }}
               minZoom={0.1}
               maxZoom={2}
+              proOptions={{ hideAttribution: true }}
             >
               <Background color="#e2e8f0" gap={40} size={1} />
-              <Controls className="!bg-white !shadow-xl !rounded-2xl !border-slate-100" />
+              <Controls className="!bg-white !shadow-xl !rounded-2xl !border-slate-100 !top-4 !left-4 !bottom-auto" />
             </ReactFlow>
             {loading && (
               <div className="absolute top-8 right-8 z-50 bg-white/90 backdrop-blur px-4 py-2 rounded-full border border-slate-200 shadow-xl flex items-center gap-3">
@@ -845,15 +845,6 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
           </div>
         )}
       </div>
-
-      <DiagramStatusBar
-        fullTree={fullTree}
-        showMyTeamOnly={showMyTeamOnly}
-        showActiveOnly={showActiveOnly}
-        currentUserId={currentUserId}
-        selectedSystem={selectedSystem}
-        loading={loading}
-      />
 
       {modalData && (
         <GroupModal

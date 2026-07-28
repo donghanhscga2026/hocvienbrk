@@ -28,9 +28,9 @@ export default function MainHeader({ title }: MainHeaderProps) {
     const [showShare, setShowShare] = useState(false)
     const { homeSlug, isReady } = useHomeSlug()
     const { open: openMbw } = useMbwDashboard()
-    
+
     const userId = session?.user?.id != null ? String(session.user.id) : null
-    
+
     const isHomePage = pathname === '/'
     const isToolsRoot = pathname === '/tools'
     const hasCustomHome = isReady && homeSlug
@@ -64,7 +64,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
         const resetInactivity = () => {
             // Tắt highlight khi có hoạt động
             setActiveIndex(null)
-            
+
             // Xóa các bộ hẹn giờ cũ
             clearTimeout(inactivityTimer)
             clearInterval(cycleInterval)
@@ -125,8 +125,8 @@ export default function MainHeader({ title }: MainHeaderProps) {
         const tooltip = visibleItems.find(x => x.id === id)?.tooltip || ''
 
         return {
-            className: isActive 
-                ? 'transition-all duration-500 transform scale-125 ring-2 ring-amber-400 ring-offset-2 rounded-xl shadow-[0_0_20px_rgba(251,191,36,0.8)] bg-white/10 z-30' 
+            className: isActive
+                ? 'transition-all duration-500 transform scale-125 ring-2 ring-amber-400 ring-offset-2 rounded-xl shadow-[0_0_20px_rgba(251,191,36,0.8)] bg-white/10 z-30'
                 : 'transition-all duration-300',
             isActive,
             tooltip
@@ -137,13 +137,12 @@ export default function MainHeader({ title }: MainHeaderProps) {
     const HighlightWrapper = ({ id, children }: { id: string; children: React.ReactNode }) => {
         const { className, isActive, tooltip } = getHighlightStatus(id)
         return (
-            <div className={`relative flex items-center justify-center p-0.5 ${className}`}>
+            <div className={`relative flex items-center justify-center ${className}`}>
                 {children}
                 {isActive && (
-                    <div className="absolute top-[130%] left-1/2 -translate-x-1/2 bg-yellow-400 text-slate-950 text-[11px] font-black px-2.5 py-1.5 rounded-lg shadow-[0_10px_25px_rgba(234,179,8,0.3)] border border-yellow-500 whitespace-nowrap z-50 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 bg-yellow-400/80 backdrop-blur-sm text-slate-950 text-[7px] font-black px-2 py-1 rounded-md shadow-lg border border-yellow-500/50 whitespace-nowrap z-50 animate-in fade-in zoom-in-95 duration-200">
                         {tooltip}
-                        {/* Mũi tên tooltip */}
-                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-yellow-400 rotate-45 border-t border-l border-yellow-500"></div>
+                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-yellow-400/80 rotate-45 border-t border-l border-yellow-500/50"></div>
                     </div>
                 )}
             </div>
@@ -168,7 +167,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                                 />
                             </Link>
                         </HighlightWrapper>
-                        
+
                         <HighlightWrapper id="home">
                             <button
                                 onClick={() => router.push(hasCustomHome ? `/page/${homeSlug}` : '/page/brk')}
@@ -186,7 +185,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                                 />
                             </button>
                         </HighlightWrapper>
-                        
+
                         {showBackButton && (
                             <HighlightWrapper id="back">
                                 <button

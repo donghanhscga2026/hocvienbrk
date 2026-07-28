@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ReactFlowProvider } from '@xyflow/react'
 import { useSession } from 'next-auth/react'
 import { Role } from '@prisma/client'
+import { Zap } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import TabNavigation from '@/components/genealogy/ui/tab-navigation'
 import DashboardTab from '@/components/genealogy/dashboard/DashboardTab'
@@ -23,6 +24,7 @@ export default function GenealogyPage() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
   const [mySystems, setMySystems] = useState<{ onSystem: number; nameSystem: string | null }[]>([])
+  const [systemsLoaded, setSystemsLoaded] = useState(false)
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === Role.ADMIN
 
@@ -36,11 +38,31 @@ export default function GenealogyPage() {
           setSelectedSystem(maxSystem)
         }
       }
+      setSystemsLoaded(true)
     }
     load()
   }, [])
 
   const tabs = isAdmin ? allTabs : allTabs.filter(t => t.id !== 'settings')
+
+  if (!systemsLoaded) {
+    return (
+      <ReactFlowProvider>
+        <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+          <MainHeader title="NHÂN MẠCH" toolSlug="genealogy" />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 flex items-center justify-center">
+              <Zap className="w-6 h-6 text-indigo-400 animate-pulse" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Đang tải dữ liệu hệ thống...</span>
+              <span className="text-[10px] font-bold text-slate-400">Vui lòng chờ trong giây lát</span>
+            </div>
+          </div>
+        </div>
+      </ReactFlowProvider>
+    )
+  }
 
   return (
     <ReactFlowProvider>
