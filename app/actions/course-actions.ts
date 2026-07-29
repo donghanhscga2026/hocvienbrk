@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { Role } from "@prisma/client"
+import { Role, Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { cookies, headers } from "next/headers"
 import { createPaymentQR } from "@/lib/vietqr"
@@ -543,13 +543,11 @@ export async function submitAssignmentAction({
 
         // 3. Tính toán các đầu điểm
         const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
+        const isYouTube = /youtu\.be\/|youtube\.com\/|v=|live\//.test(rawUrl)
 
         let videoScore = 0
-        const isNonTrackable = rawUrl === "" || rawUrl.toLowerCase() === "null" ||
-          !(/youtu\.be\/|youtube\.com\/|\.mp4(\?|#|$)|vimeo\.com\/|dailymotion\.com\//i.test(rawUrl))
-
-        if (isNonTrackable) {
-            videoScore = 2 // Không có video hoặc video không track được -> Auto +2
+        if (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) {
+            videoScore = 2 // Không dùng video Youtube -> Auto +2
         } else {
             // Lấy dữ liệu mới nhất
             const currentProg = await prisma.lessonProgress.findUnique({
@@ -746,15 +744,16 @@ export async function createCourseAction(formData: FormData) {
             if (cat) categoryName = cat.name
         }
 
-        const courseData: any = {
+        const pin = parseInt(formData.get('pin') as string) || 0
+        const courseData: Record<string, unknown> = {
             id_khoa: id_khoa.toUpperCase(),
             name_lop,
             name_khoa: formData.get('name_khoa') as string || null,
             category: categoryName,
             categoryId,
-            type: (formData.get('type') as any) || 'NORMAL',
+            type: (formData.get('type') as string) || 'NORMAL',
             status: formData.get('status') === 'true',
-            pin: parseInt(formData.get('pin') as string) || 0,
+            pin,
             date_join: formData.get('date_join') as string || null,
             mo_ta_ngan: formData.get('mo_ta_ngan') as string || null,
             mo_ta_dai: formData.get('mo_ta_dai') as string || null,
@@ -765,6 +764,16 @@ export async function createCourseAction(formData: FormData) {
             link_zalo: formData.get('link_zalo') as string || null,
             file_email: formData.get('file_email') as string || null,
             noidung_email: formData.get('noidung_email') as string || null,
+        }
+ 
+        // ✅ Enforce a maximum of 3 pinned courses on course creation
+        if (pin > 0) {
+            const pinnedCount = await prisma.course.count({
+               where: { pin: { gt: 0 } }
+            })
+            if (pinnedCount >= 3) {
+               return { success: false, error: 'Chỉ được ghim tối đa 3 khóa học. Vui lòng bỏ ghim một khóa trước khi ghim khóa khác.' }
+            }
         }
 
             // ✅ Gán teacherId nếu có
@@ -778,7 +787,7 @@ export async function createCourseAction(formData: FormData) {
             }
 
         const newCourse = await prisma.course.create({
-            data: courseData
+            data: courseData as Prisma.CourseCreateInput
         })
 
         // Create accepted voucher records
