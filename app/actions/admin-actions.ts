@@ -1025,7 +1025,7 @@ export async function updateCourseAction(courseId: number, data: {
         // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
         const course = await prisma.course.findUnique({
             where: { id: courseId },
-            select: { teacherId: true }
+            select: { teacherId: true, pin: true }
         })
 
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
@@ -1043,6 +1043,23 @@ export async function updateCourseAction(courseId: number, data: {
                 if (cat) data.category = cat.name
             } else {
                 data.category = 'Khác'
+            }
+        }
+
+        // ✅ Only allow a maximum of 3 pinned courses across the catalog
+        const isCurrentlyPinned = course.pin != null && course.pin > 0
+        if (data.pin !== undefined && data.pin > 0 && !isCurrentlyPinned) {
+            const pinnedCount = await prisma.course.count({
+                where: {
+                    pin: { gt: 0 },
+                    id: { not: courseId }
+                }
+            })
+            if (pinnedCount >= 3) {
+                return {
+                    success: false,
+                    error: 'Chỉ được ghim tối đa 3 khóa học. Vui lòng bỏ ghim một khóa trước khi ghim khóa khác.'
+                }
             }
         }
 
@@ -1148,9 +1165,15 @@ export async function updateLessonAction(lessonId: string, data: {
             data
         })
 
+        await prisma.course.update({
+            where: { id: lesson.courseId },
+            data: { updatedAt: new Date() }
+        })
+
         if (lesson.course.id_khoa) {
             revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
         }
+        revalidatePath('/')
         return { success: true, lesson: updatedLesson }
     } catch (error: any) {
         console.error("Update Lesson Error:", error)
@@ -1182,9 +1205,15 @@ export async function deleteLessonAction(lessonId: string) {
             where: { id: lessonId }
         })
 
+        await prisma.course.update({
+            where: { id: lesson.courseId },
+            data: { updatedAt: new Date() }
+        })
+
         if (lesson.course.id_khoa) {
             revalidatePath(`/courses/${lesson.course.id_khoa}/learn`)
         }
+        revalidatePath('/')
         return { success: true }
     } catch (error: any) {
         console.error("Delete Lesson Error:", error)
