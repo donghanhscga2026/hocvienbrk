@@ -543,11 +543,13 @@ export async function submitAssignmentAction({
 
         // 3. Tính toán các đầu điểm
         const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
-        const isYouTube = /youtu\.be\/|youtube\.com\/|v=|live\//.test(rawUrl)
 
         let videoScore = 0
-        if (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) {
-            videoScore = 2 // Không dùng video Youtube -> Auto +2
+        const isNonTrackable = rawUrl === "" || rawUrl.toLowerCase() === "null" ||
+          !(/youtu\.be\/|youtube\.com\/|\.mp4(\?|#|$)|vimeo\.com\/|dailymotion\.com\//i.test(rawUrl))
+
+        if (isNonTrackable) {
+            videoScore = 2 // Không có video hoặc video không track được -> Auto +2
         } else {
             // Lấy dữ liệu mới nhất
             const currentProg = await prisma.lessonProgress.findUnique({
