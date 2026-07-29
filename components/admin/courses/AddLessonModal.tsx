@@ -51,15 +51,15 @@ export function AddLessonModal({ courseId, onClose, onComplete }: { courseId: st
                     <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại bài học</label>
                         <select value={lessonType} onChange={(e) => setLessonType(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
-                            <option value="VIDEO">Video (YouTube)</option>
+                            <option value="VIDEO">Video (YouTube, Vimeo, MP4...)</option>
                             <option value="DOCS">Tài liệu (Docs)</option>
                             <option value="TEXT">Văn bản (Text)</option>
                         </select>
                     </div>
                     {(lessonType === 'VIDEO' || lessonType === 'DOCS') && (
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{lessonType === 'VIDEO' ? 'Link Video (YouTube)' : 'Link Tài liệu (Docs)'}</label>
-                            <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com/..." : "https://docs.google.com/..."} />
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">{lessonType === 'VIDEO' ? 'Link Video' : 'Link Tài liệu (Docs)'}</label>
+                            <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com, vimeo.com, fb.com, .mp4..." : "https://docs.google.com/..."} />
                         </div>
                     )}
                     {lessonType === 'TEXT' && (
