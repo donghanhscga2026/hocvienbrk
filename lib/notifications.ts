@@ -54,6 +54,15 @@ function randomPick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════════
  * TELEGRAM NOTIFICATIONS
@@ -78,13 +87,20 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
     console.warn(`⚠️ sendTelegram(${type}): Missing TELEGRAM_BOT_TOKEN or chatId env var`)
     return;
   }
+
+  const normalizedChatId = String(chatId).trim();
+  if (!/^[-]?\d+$/.test(normalizedChatId)) {
+    console.warn(`⚠️ sendTelegram(${type}): Invalid chat ID format: ${normalizedChatId}`)
+    return;
+  }
+
   try {
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: normalizedChatId,
         text: message,
         parse_mode: 'HTML',
       }),
@@ -113,11 +129,11 @@ async function notifyEmailSuccess(to: string, subject: string, emailId: string, 
   
   const msg = `📧 <b>EMAIL ĐƯỢC GỬI THÀNH CÔNG</b>\n\n` +
     `━━━━━━━━━━━━━━\n` +
-    `📧 To: <code>${to}</code>\n` +
-    `📝 Subject: ${subject}\n` +
-    `🆔 Email ID: <code>${emailId}</code>\n` +
-    `📡 Provider: <code>${provider}</code>\n` +
-    `⏰ Time: ${time}`;
+    `📧 To: <code>${escapeHtml(to)}</code>\n` +
+    `📝 Subject: ${escapeHtml(subject)}\n` +
+    `🆔 Email ID: <code>${escapeHtml(emailId)}</code>\n` +
+    `📡 Provider: <code>${escapeHtml(provider)}</code>\n` +
+    `⏰ Time: ${escapeHtml(time)}`;
   
   await sendTelegram(msg, 'ACTIVATE');
 }
@@ -139,11 +155,11 @@ async function notifyEmailError(to: string, subject: string, errorMsg: string, p
   
   const msg = `⚠️ <b>LỖI GỬI EMAIL</b>\n\n` +
     `━━━━━━━━━━━━━━\n` +
-    `📧 To: <code>${to}</code>\n` +
-    `📝 Subject: ${subject}\n` +
-    `📡 Provider: <code>${provider}</code>\n` +
-    `❌ Error: ${errorMsg}${fallbackMsg}\n` +
-    `⏰ Time: ${time}`;
+    `📧 To: <code>${escapeHtml(to)}</code>\n` +
+    `📝 Subject: ${escapeHtml(subject)}\n` +
+    `📡 Provider: <code>${escapeHtml(provider)}</code>\n` +
+    `❌ Error: ${escapeHtml(errorMsg)}${fallbackMsg}\n` +
+    `⏰ Time: ${escapeHtml(time)}`;
   
   await sendTelegram(msg, 'ACTIVATE');
 }
@@ -611,28 +627,38 @@ export async function sendEmailCampaignNotification(data: CampaignNotificationDa
     return;
   }
 
+  const normalizedChatId = String(chatId).trim();
+  if (!/^[-]?\d+$/.test(normalizedChatId)) {
+    console.warn(`[EmailCampaign] Telegram: Invalid chat ID format: ${normalizedChatId}`);
+    return;
+  }
+
   let message = "";
   const { event, campaignTitle, total, sent, success, failed, pauseMinutes, resumeTime, error } = data;
+
+  const safeCampaignTitle = escapeHtml(campaignTitle);
+  const safeError = error ? escapeHtml(error) : '';
+  const safeResumeTime = resumeTime ? escapeHtml(resumeTime) : '';
 
   switch (event) {
     case 'START':
       message = `📤 <b>BẮT ĐẦU CAMPAIGN</b>\n\n` +
-        `📋 Chiến dịch: <b>${campaignTitle}</b>\n` +
+        `📋 Chiến dịch: <b>${safeCampaignTitle}</b>\n` +
         `📧 Tổng: <b>${total}</b> emails\n` +
         `⏱️ Dự kiến: ~${Math.ceil(total / 30)} phút`;
       break;
 
     case 'PAUSE':
       message = `⏸️ <b>PAUSE - ${sent}/${total}</b>\n\n` +
-        `📋 Chiến dịch: ${campaignTitle}\n` +
+        `📋 Chiến dịch: ${safeCampaignTitle}\n` +
         `⏳ Pause: <b>${pauseMinutes} phút</b>\n` +
-        `▶️ Tiếp tục: <b>${resumeTime}</b>\n\n` +
+        `▶️ Tiếp tục: <b>${safeResumeTime}</b>\n\n` +
         `📊 Đã gửi: ${sent} | ✅ Thành công: ${success} | ❌ Thất bại: ${failed}`;
       break;
 
     case 'RESUME':
       message = `▶️ <b>TIẾP TỤC GỬI</b>\n\n` +
-        `📋 Chiến dịch: ${campaignTitle}\n` +
+        `📋 Chiến dịch: ${safeCampaignTitle}\n` +
         `📧 Đã: <b>${sent}/${total}</b>\n` +
         `✅ Thành công: ${success} | ❌ Thất bại: ${failed}`;
       break;
@@ -640,19 +666,19 @@ export async function sendEmailCampaignNotification(data: CampaignNotificationDa
     case 'COMPLETE':
       const rate = total > 0 ? ((success / total) * 100).toFixed(1) : 0;
       message = `✅ <b>HOÀN THÀNH</b>\n\n` +
-        `📋 Chiến dịch: <b>${campaignTitle}</b>\n` +
+        `📋 Chiến dịch: <b>${safeCampaignTitle}</b>\n` +
         `📧 Tổng: ${total}\n` +
         `✅ Thành công: <b>${success}</b>\n` +
         `❌ Thất bại: ${failed}\n\n` +
         `📈 Tỷ lệ thành công: <b>${rate}%</b>` +
-        (data.sheetUrl ? `\n📊 <a href="${data.sheetUrl}">Xem danh sách trên Google Sheets</a>` : '');
+        (data.sheetUrl ? `\n📊 <a href="${escapeHtml(data.sheetUrl)}">Xem danh sách trên Google Sheets</a>` : '');
       break;
 
     case 'ERROR':
       message = `⚠️ <b>LỖI CAMPAIGN</b>\n\n` +
-        `📋 Chiến dịch: ${campaignTitle}\n` +
+        `📋 Chiến dịch: ${safeCampaignTitle}\n` +
         `📧 Đã gửi: ${sent}/${total}\n` +
-        `❌ Lỗi: <b>${error}</b>`;
+        `❌ Lỗi: <b>${safeError}</b>`;
       break;
   }
 
@@ -662,7 +688,7 @@ export async function sendEmailCampaignNotification(data: CampaignNotificationDa
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: normalizedChatId,
         text: message,
         parse_mode: 'HTML',
       }),
