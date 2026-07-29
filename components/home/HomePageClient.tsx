@@ -58,9 +58,18 @@ function HomePageContent({
   const { open: openMbw } = useMbwDashboard()
 
   useEffect(() => {
-    if (session?.user) {
-      setTimeout(() => openMbw(), 500)
-    }
+    if (!session?.user) return
+
+    if (typeof window === 'undefined') return
+
+    const autoOpenKey = 'mbw-auto-opened'
+    const hasAutoOpened = window.sessionStorage.getItem(autoOpenKey) === '1'
+    if (hasAutoOpened) return
+
+    window.sessionStorage.setItem(autoOpenKey, '1')
+    const timer = window.setTimeout(() => openMbw(), 500)
+
+    return () => window.clearTimeout(timer)
   }, [session?.user, openMbw])
 
   useEffect(() => {
@@ -101,9 +110,10 @@ function HomePageContent({
   // Dynamic section titles từ profile
   const surveyTitle = profile.surveyTitle || 'Thiết kế lộ trình'
   const roadmapTitle = profile.roadmapTitle || 'Lộ trình Zero 2 Hero'
-  const coursesTitle = profile.coursesTitle || 'Khóa học của tôi'
+  const coursesTitle = 'Khóa học của tôi'
   const allCoursesTitle = profile.allCoursesTitle || 'Tất cả khóa học'
   const communityTitle = profile.communityTitle || 'Bảng tin'
+  const topCoursesTitle = 'Khóa học mới cập nhật'
 
   // Auto-hide: Survey section khi không có survey
   const showSurvey = survey && (survey.flow || (survey.questions && survey.questions.length > 0))
@@ -128,7 +138,6 @@ function HomePageContent({
       .filter((course) => !pinnedCourses.some((p) => p.id === course.id))
       .slice(0, Math.max(0, 3 - pinnedCourses.length))
   ]
-  const topCoursesTitle = profile.topCoursesTitle || 'Khóa học nổi bật'
   
   return (
     <>

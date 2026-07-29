@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import PaymentModal from './PaymentModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
-import { Share2, BookOpen } from 'lucide-react'
+import { Share2, BookOpen, Users } from 'lucide-react'
 
 // Chuyển URL thành link clickable (cho phần mô tả khóa học)
 const makeLinksClickable = (html: string): string => {
@@ -146,7 +147,11 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         <>
             <div className="group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full bg-brk-surface border-brk-outline">
                 {/* Ảnh bìa - Đã tối ưu hóa */}
-                <div className="relative aspect-[16/9] w-full overflow-hidden shrink-0 bg-brk-background">
+                <Link
+                    href={`/khoa-hoc/${course.id_khoa || course.id}`}
+                    className="relative block aspect-[16/9] w-full overflow-hidden shrink-0 bg-brk-background"
+                    title={course.name_lop}
+                >
                     <Image
                         src={course.link_anh_bia || 'https://i.postimg.cc/PJPkm7vB/1.jpg'}
                         alt={course.name_lop}
@@ -155,7 +160,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
-                </div>
+                </Link>
 
                 {/* Nội dung - Giữ nguyên 100% */}
                 <div className="p-3 flex flex-col flex-grow">
@@ -217,6 +222,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         >
                             Mục lục
                         </button>
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
+                            <Users className="w-3 h-3" />
+                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')}
+                        </span>
                     </div>
 
                     {/* Mô tả - URL trong text sẽ được chuyển thành link clickable */}

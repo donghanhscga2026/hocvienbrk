@@ -171,11 +171,16 @@ export async function getCoursesForProfile(profile: any) {
   try {
     // Nếu có courseIds cụ thể
     if (profile.courseIds && Array.isArray(profile.courseIds) && profile.courseIds.length > 0) {
-      return await prisma.course.findMany({
+      const courses = await prisma.course.findMany({
         where: { id: { in: profile.courseIds }, status: true },
-        include: { courseCategory: true, teacherBankAccount: true },
+        include: {
+          courseCategory: true,
+          teacherBankAccount: true,
+          _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } }
+        },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
+      return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
     }
 
     // Nếu là Teacher → khóa của teacher đó và các cộng sự
@@ -183,19 +188,29 @@ export async function getCoursesForProfile(profile: any) {
       const associateIds = profile.members?.map((m: any) => m.userId) || []
       const allTeacherIds = [profile.userId, ...associateIds]
 
-      return await prisma.course.findMany({
+      const courses = await prisma.course.findMany({
         where: { teacherId: { in: allTeacherIds }, status: true },
-        include: { courseCategory: true, teacherBankAccount: true },
+        include: {
+          courseCategory: true,
+          teacherBankAccount: true,
+          _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } }
+        },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
+      return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
     }
 
     // BRK gốc → tất cả khóa học
-    return await prisma.course.findMany({
+    const courses = await prisma.course.findMany({
       where: { status: true },
-      include: { courseCategory: true, teacherBankAccount: true },
+      include: {
+        courseCategory: true,
+        teacherBankAccount: true,
+        _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } }
+      },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
+    return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
   } catch (error) {
     console.error("[DB ERROR] getCoursesForProfile:", error)
     return FALLBACK_COURSES as any[]

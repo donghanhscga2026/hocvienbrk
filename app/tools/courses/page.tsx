@@ -307,9 +307,13 @@ function CoursesTab() {
                                                 )}
                                             </div>
                                             <div className="flex items-start justify-between gap-2">
-                                                <div className="font-black text-orange-600 text-sm leading-tight break-words">
+                                                <Link
+                                                    href={`/khoa-hoc/${course.id_khoa || course.id}`}
+                                                    className="font-black text-orange-600 text-sm leading-tight break-words hover:text-orange-700 hover:underline underline-offset-2"
+                                                    title={course.name_lop}
+                                                >
                                                     {course.name_lop}
-                                                </div>
+                                                </Link>
                                                 <Link
                                                     href={`/tools/courses/${course.id}`}
                                                     className="shrink-0 inline-flex items-center justify-center w-8 h-8 bg-black text-yellow-400 rounded-full hover:bg-zinc-800 active:scale-90 transition-all shadow-md"
