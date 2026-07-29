@@ -10,6 +10,7 @@ interface DiagramHeaderProps {
   onExitFocus: () => void
   onResetToRoot: () => void
   onOpenSettings: () => void
+  onOpenMembersList: () => void
 }
 
 export default function DiagramHeader({
@@ -20,6 +21,7 @@ export default function DiagramHeader({
   onExitFocus,
   onResetToRoot,
   onOpenSettings,
+  onOpenMembersList,
 }: DiagramHeaderProps) {
   return (
     <div className="flex items-center gap-2 px-3 py-3 bg-white border-b shadow-sm z-40 sticky top-0">
@@ -56,11 +58,15 @@ export default function DiagramHeader({
 
       {/* --- Member count badge --- */}
       {selectedSystem !== null && totalMembers > 0 && (
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 shrink-0">
+        <button
+          onClick={onOpenMembersList}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 shrink-0 hover:bg-indigo-100 transition-colors"
+          title="Xem danh sách thành viên"
+        >
           <Users className="w-3 h-3 text-indigo-500" />
           <span className="text-[10px] font-black text-indigo-700 tracking-tight">{totalMembers}</span>
           <span className="text-[9px] font-bold text-indigo-400 uppercase hidden sm:inline">thành viên</span>
-        </div>
+        </button>
       )}
 
       {/* --- Right: Settings trigger --- */}

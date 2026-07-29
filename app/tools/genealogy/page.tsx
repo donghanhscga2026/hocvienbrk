@@ -23,6 +23,7 @@ const allTabs = [
 export default function GenealogyPage() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [selectedSystem, setSelectedSystem] = useState<number | null>(null)
+  const [diagramViewKey, setDiagramViewKey] = useState(0)
   const [mySystems, setMySystems] = useState<{ onSystem: number; nameSystem: string | null }[]>([])
   const [systemsLoaded, setSystemsLoaded] = useState(false)
   const { data: session } = useSession()
@@ -44,6 +45,13 @@ export default function GenealogyPage() {
   }, [])
 
   const tabs = isAdmin ? allTabs : allTabs.filter(t => t.id !== 'settings')
+
+  const handleTabChange = (id: TabId) => {
+    setActiveTab(id)
+    if (id === 'diagram') {
+      setDiagramViewKey(prev => prev + 1)
+    }
+  }
 
   if (!systemsLoaded) {
     return (
@@ -68,7 +76,7 @@ export default function GenealogyPage() {
     <ReactFlowProvider>
       <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
         <MainHeader title="NHÂN MẠCH" toolSlug="genealogy" />
-        <TabNavigation tabs={tabs} active={activeTab} onChange={(id) => setActiveTab(id as TabId)} />
+        <TabNavigation tabs={tabs} active={activeTab} onChange={(id) => handleTabChange(id as TabId)} />
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className={activeTab === 'dashboard' ? 'flex-1 flex flex-col overflow-hidden min-h-0' : 'hidden'}>
             <DashboardTab
@@ -78,7 +86,7 @@ export default function GenealogyPage() {
             />
           </div>
           <div className={activeTab === 'diagram' ? 'flex-1 flex flex-col overflow-hidden min-h-0' : 'hidden'}>
-            <DiagramTab selectedSystem={selectedSystem} />
+            <DiagramTab selectedSystem={selectedSystem} diagramViewKey={diagramViewKey} />
           </div>
           {isAdmin && (
             <div className={activeTab === 'settings' ? 'flex-1 flex flex-col overflow-hidden min-h-0' : 'hidden'}>
