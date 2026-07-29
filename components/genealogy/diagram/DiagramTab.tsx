@@ -2,6 +2,6 @@
 
 import DiagramFlow from './DiagramFlow'
 
-export default function DiagramTab({ selectedSystem }: { selectedSystem: number | null }) {
-  return <DiagramFlow selectedSystem={selectedSystem} />
+export default function DiagramTab({ selectedSystem, diagramViewKey }: { selectedSystem: number | null; diagramViewKey?: number }) {
+  return <DiagramFlow selectedSystem={selectedSystem} diagramViewKey={diagramViewKey} />
 }

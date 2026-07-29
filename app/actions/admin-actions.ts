@@ -753,6 +753,91 @@ export async function getAvailableSystemsAction() {
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
+export async function getSystemMemberListAction(systemId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) throw new Error("Unauthorized")
+
+        const userId = parseInt(session.user.id)
+        const isAdmin = session.user.role === Role.ADMIN
+        const isRootAdmin = userId === 0 || isAdmin
+
+        if (!isRootAdmin) {
+            const membership = await prisma.system.findFirst({
+                where: { userId, onSystem: systemId },
+                select: { autoId: true }
+            })
+            if (!membership) throw new Error("Bạn chưa tham gia hệ thống này")
+        }
+
+        const systems = await prisma.system.findMany({
+            where: { onSystem: systemId },
+            select: {
+                autoId: true,
+                userId: true,
+                level: true,
+                officialTeamSize: true,
+                totalMbdtVolume: true,
+                totalCashVolume: true,
+                status: true,
+                activatedAt: true,
+                user: { select: { name: true, image: true } }
+            },
+            orderBy: { autoId: 'asc' }
+        })
+
+        const memberIds = systems.map(s => s.userId)
+        const [enrollments, wallets] = await Promise.all([
+            prisma.enrollment.findMany({
+                where: { courseId: 22 },
+                select: { userId: true, referrerId: true }
+            }),
+            prisma.brkWallet.findMany({
+                where: { userId: { in: memberIds } },
+                select: { userId: true, totalEarned: true }
+            })
+        ])
+
+        const parentToChildren = new Map<number, number[]>()
+        enrollments.forEach(entry => {
+            if (entry.referrerId) {
+                if (!parentToChildren.has(entry.referrerId)) parentToChildren.set(entry.referrerId, [])
+                parentToChildren.get(entry.referrerId)!.push(entry.userId)
+            }
+        })
+
+        const countCache = new Map<number, number>()
+        const countDescendants = (userId: number): number => {
+            if (countCache.has(userId)) return countCache.get(userId)!
+            const children = parentToChildren.get(userId) || []
+            let total = children.length
+            children.forEach(child => { total += countDescendants(child) })
+            countCache.set(userId, total)
+            return total
+        }
+
+        const walletMap = new Map(wallets.map(wallet => [wallet.userId, Number(wallet.totalEarned)]))
+        const rootAutoId = systems.length > 0 ? Math.min(...systems.map(system => system.autoId)) : 0
+
+        const members = systems.map(system => ({
+            id: system.userId,
+            name: system.user.name || `HV #${system.userId}`,
+            image: system.user.image,
+            joinOrder: system.autoId - rootAutoId,
+            referralCount: countDescendants(system.userId),
+            sales: Number(system.totalMbdtVolume),
+            income: walletMap.get(system.userId) || 0,
+            level: system.level,
+            status: system.status,
+            activatedAt: system.activatedAt
+        }))
+
+        return { success: true, members }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
 export async function getCurrentUserRoleAction(systemId?: number) {
     try {
         const session = await auth()

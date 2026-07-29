@@ -25,6 +25,7 @@ import {
   getSystemPromotionLogicAction,
   switchSystemPromotionLogicAction,
   getSharingSponsorTreeAction,
+  getSystemMemberListAction,
   GenealogyNode,
 } from '@/app/actions/admin-actions'
 import { Role } from '@prisma/client'
@@ -36,7 +37,7 @@ import MemberDetailsModal from '@/components/genealogy/modals/MemberDetailsModal
 import SlidePanel from '@/components/genealogy/ui/SlidePanel'
 import DiagramHeader from './DiagramHeader'
 import DiagramToolbar from './DiagramToolbar'
-export default function DiagramFlow({ selectedSystem }: { selectedSystem: number | null }) {
+export default function DiagramFlow({ selectedSystem, diagramViewKey }: { selectedSystem: number | null; diagramViewKey?: number }) {
   const { fitView, setCenter } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
@@ -66,6 +67,10 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
   const [sharingTreeModal, setSharingTreeModal] = useState<{ show: boolean, userId: number, userName: string | null } | null>(null)
   const [sharingTreeData, setSharingTreeData] = useState<{ totalDescendants: number, flatTree: any[] } | null>(null)
   const [loadingSharingTree, setLoadingSharingTree] = useState(false)
+  const [membersListModalOpen, setMembersListModalOpen] = useState(false)
+  const [membersList, setMembersList] = useState<any[]>([])
+  const [membersListLoading, setMembersListLoading] = useState(false)
+  const [membersSort, setMembersSort] = useState<'join' | 'referral' | 'sales' | 'income'>('join')
   const lastExpandedIdRef = useRef<number | null>(null)
   const activeFocusMapRef = useRef<Map<number, number>>(new Map())
   const [isTreeEmpty, setIsTreeEmpty] = useState<boolean>(false)
@@ -793,6 +798,52 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
     setCreateRootModal({ show: true, systemId: selectedSystem })
   }, [selectedSystem])
 
+  const handleOpenMembersList = useCallback(async () => {
+    if (!selectedSystem || selectedSystem === 0) {
+      setMembersListModalOpen(true)
+      setMembersList([])
+      return
+    }
+
+    setMembersListModalOpen(true)
+    setMembersListLoading(true)
+    try {
+      const res = await getSystemMemberListAction(selectedSystem)
+      if (res.success) {
+        setMembersList(res.members || [])
+      } else {
+        setMembersList([])
+        alert(res.error || 'Không tải được danh sách thành viên')
+      }
+    } catch (error) {
+      console.error('Member list error:', error)
+      setMembersList([])
+    } finally {
+      setMembersListLoading(false)
+    }
+  }, [selectedSystem])
+
+  const sortedMembers = useMemo(() => {
+    const list = [...membersList]
+    switch (membersSort) {
+      case 'referral':
+        return list.sort((a, b) => (b.referralCount || 0) - (a.referralCount || 0))
+      case 'sales':
+        return list.sort((a, b) => (b.sales || 0) - (a.sales || 0))
+      case 'income':
+        return list.sort((a, b) => (b.income || 0) - (a.income || 0))
+      case 'join':
+      default:
+        return list.sort((a, b) => (a.joinOrder || 0) - (b.joinOrder || 0))
+    }
+  }, [membersList, membersSort])
+
+  useEffect(() => {
+    if (diagramViewKey) {
+      setTimeout(() => fitView({ padding: 0.2, duration: 500 }), 180)
+    }
+  }, [diagramViewKey, fitView])
+
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
       <DiagramHeader
@@ -803,6 +854,7 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
         onExitFocus={handleExitFocusSubtree}
         onResetToRoot={handleResetToRoot}
         onOpenSettings={() => setPanelOpen(true)}
+        onOpenMembersList={handleOpenMembersList}
       />
 
       {error && (
@@ -845,6 +897,70 @@ export default function DiagramFlow({ selectedSystem }: { selectedSystem: number
           </div>
         )}
       </div>
+
+      {membersListModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-6 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-800">Danh sách thành viên</h2>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sắp xếp theo tiêu chí bạn chọn</p>
+              </div>
+              <button onClick={() => setMembersListModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {([
+                ['join', 'Tham gia'],
+                ['referral', 'Top giới thiệu'],
+                ['sales', 'Top doanh số'],
+                ['income', 'Top thu nhập']
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setMembersSort(value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-black transition-all ${membersSort === value ? 'bg-indigo-600 text-white shadow' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {membersListLoading ? (
+              <div className="flex-1 flex items-center justify-center py-10 text-sm text-slate-400">Đang tải danh sách...</div>
+            ) : sortedMembers.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center py-10 text-sm text-slate-400">Chưa có dữ liệu thành viên cho hệ thống này.</div>
+            ) : (
+              <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2">
+                {sortedMembers.map((member, index) => (
+                  <div key={`${member.id}-${member.joinOrder}`} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 bg-slate-50">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px] font-black shrink-0">
+                        #{index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-black text-slate-800 truncate">{member.name}</div>
+                        <div className="text-[11px] font-semibold text-slate-400">#{member.id} • Thứ tự tham gia: {member.joinOrder}</div>
+                      </div>
+                    </div>
+                    <div className="text-right text-[11px] font-bold text-slate-600 whitespace-nowrap">
+                      <div>Giới thiệu: {member.referralCount ?? 0}</div>
+                      <div>Doanh số: {Number(member.sales || 0).toLocaleString('vi-VN')}</div>
+                      <div>Thu nhập: {Number(member.income || 0).toLocaleString('vi-VN')}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button onClick={() => setMembersListModalOpen(false)} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-black text-sm mt-4 transition-colors">
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
 
       {modalData && (
         <GroupModal
