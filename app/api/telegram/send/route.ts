@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sendTelegramToUser } from "@/lib/telegram-bot"
+import { isAuthorizedRequest } from "@/lib/request-auth"
 
 /**
  * API nội bộ nhận lệnh gửi tin nhắn Telegram cá nhân cho học viên qua userId
@@ -7,10 +8,13 @@ import { sendTelegramToUser } from "@/lib/telegram-bot"
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("Authorization")
-    const secret = process.env.TELEGRAM_WEBHOOK_SECRET
-    
-    if (secret && authHeader !== `Bearer ${secret}`) {
+    const authResult = isAuthorizedRequest(request as NextRequest & { nextUrl?: { searchParams: URLSearchParams } }, {
+      secretEnv: 'TELEGRAM_WEBHOOK_SECRET',
+      allowedHeaderNames: ['x-telegram-webhook-secret', 'x-webhook-secret'],
+      allowQuerySecret: false,
+    })
+
+    if (!authResult.isAuthorized) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

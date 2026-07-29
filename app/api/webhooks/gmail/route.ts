@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processPaymentEmails } from '@/lib/auto-verify';
+import { isAuthorizedRequest } from '@/lib/request-auth';
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
-    const querySecret = req.nextUrl.searchParams.get('secret')
-    const expectedSecret = process.env.CRON_SECRET?.trim()
-    const hasGooglePubSubHeaders = ['x-goog-topic', 'x-goog-message-id', 'x-goog-subscription-name'].some((header) =>
-      Boolean(req.headers.get(header))
-    )
+    const authResult = isAuthorizedRequest(req, { secretEnv: 'CRON_SECRET' })
 
-    const isAuthorized = Boolean(
-      expectedSecret && (
-        authHeader === `Bearer ${expectedSecret}` ||
-        querySecret === expectedSecret
-      )
-    ) || hasGooglePubSubHeaders
-
-    if (!isAuthorized) {
-      console.warn('⚠️ Gmail webhook: Unauthorized access attempt')
+    if (!authResult.isAuthorized) {
+      console.warn('⚠️ Gmail webhook: Unauthorized access attempt', {
+        hasAuthHeader: authResult.hasAuthHeader,
+        hasAlternateSecret: authResult.hasAlternateSecret,
+        hasGooglePubSubHeaders: authResult.hasGooglePubSubHeaders,
+        hasQuerySecret: authResult.hasQuerySecret,
+        secretConfigured: authResult.secretConfigured,
+      })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
