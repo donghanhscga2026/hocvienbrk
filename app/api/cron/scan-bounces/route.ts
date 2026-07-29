@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { withCronLogging } from '@/lib/cron-logger'
 import { processBounceEmails } from '@/lib/email-campaign-runner'
+import { isAuthorizedRequest } from '@/lib/request-auth'
 
 export const runtime = "nodejs"
 
 async function handler(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
+  const authResult = isAuthorizedRequest(req as Request & { nextUrl?: { searchParams: URLSearchParams } }, { secretEnv: 'CRON_SECRET' })
+  if (!authResult.isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

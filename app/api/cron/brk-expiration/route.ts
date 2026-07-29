@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { withCronLogging } from '@/lib/cron-logger'
 import prisma from '@/lib/prisma'
+import { isAuthorizedRequest } from '@/lib/request-auth'
 
 async function handler(request: Request) {
   try {
-    const authHeader = request.headers.get('Authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET?.trim()}`) {
+    const authResult = isAuthorizedRequest(request as Request & { nextUrl?: { searchParams: URLSearchParams } }, { secretEnv: 'CRON_SECRET' })
+    if (!authResult.isAuthorized) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
