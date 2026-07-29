@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
 import { Role } from '@prisma/client';
@@ -166,6 +167,17 @@ export async function POST(
           });
           created++;
         }
+      }
+    }
+
+    if (created > 0 || updated > 0) {
+      await prisma.course.update({
+        where: { id: courseId },
+        data: { updatedAt: new Date() }
+      })
+      revalidatePath('/')
+      if (course.id_khoa) {
+        revalidatePath(`/courses/${course.id_khoa}/learn`)
       }
     }
 
