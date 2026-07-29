@@ -7,10 +7,7 @@ import {
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { saveVideoProgressAction } from '@/app/actions/course-actions'
-<<<<<<< HEAD
-=======
 import { detectVideoSource, isYouTube, VideoSource } from '@/lib/video-sources'
->>>>>>> feat/top-courses-upgrade
 
 interface VideoPlayerProps {
     enrollmentId: number
@@ -22,11 +19,7 @@ interface VideoPlayerProps {
     onPercentChange: (percent: number) => void
     playlistData?: any
     lastVideoIndex?: number
-<<<<<<< HEAD
-    serverPlaylist?: PlaylistItem[] // [OPTIMIZE] Parse sẵn từ Server, giảm CPU client
-=======
     serverPlaylist?: PlaylistItem[]
->>>>>>> feat/top-courses-upgrade
     courseType?: string
     lessonType?: string
 }
@@ -35,19 +28,6 @@ type PlaylistItem = {
     type: 'video' | 'doc' | 'text'
     title: string
     url: string
-<<<<<<< HEAD
-    id?: string | null
-    content?: string // [FIX] Bắt buộc có content cho TEXT type
-}
-
-function extractVideoId(url: string): string | null {
-    if (!url) return null
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?v=)|(shorts\/)|(live\/)|(\&v=))([^#\&\?]*).*/
-    const match = url.match(regExp)
-    if (match && match.length > 0) {
-        const id = match[match.length - 1]
-        return (id && id.length === 11) ? id : null
-=======
     source?: VideoSource
     content?: string
 }
@@ -103,7 +83,6 @@ function getYouTubeVideoId(item: PlaylistItem): string | null {
     if (isYouTube(item.url)) {
         const detected = detectVideoSource(item.url)
         return detected.videoId
->>>>>>> feat/top-courses-upgrade
     }
     return null
 }
@@ -118,56 +97,6 @@ export default function VideoPlayer({
     onPercentChange,
     playlistData,
     lastVideoIndex = 0,
-<<<<<<< HEAD
-    serverPlaylist, // [OPTIMIZE] Ưu tiên playlist từ Server, chỉ parse client nếu không có
-    courseType,
-    lessonType
-}: VideoPlayerProps) {
-    // Chuyển URL thành link clickable
-    const makeLinksClickable = (text: string): string => {
-        if (!text) return ''
-        const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
-        return text.replace(urlRegex, (match) => {
-            return `<a href="${match}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:700">${match}</a>`
-        })
-    }
-    // [OPTIMIZE] Dùng trực tiếp serverPlaylist từ Server (đã đúng format)
-    const playlist = useMemo(() => {
-        let basePlaylist: PlaylistItem[] = []
-        if (serverPlaylist && serverPlaylist.length > 0) {
-            basePlaylist = serverPlaylist
-        } else if (videoUrl) {
-            basePlaylist = videoUrl.split('|').map((item, index) => {
-                const videoMatch = item.match(/^\[(.*?)\](.*)$/)
-                if (videoMatch) return { type: 'video' as const, title: videoMatch[1], url: videoMatch[2].trim(), id: extractVideoId(videoMatch[2].trim()) }
-                const docMatch = item.match(/^\((.*?)\)(.*)$/)
-                if (docMatch) return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
-                return { type: 'video' as const, title: `Phần ${index + 1}`, url: item.trim(), id: extractVideoId(item.trim()) }
-            })
-        }
-        if (lessonType === 'ALL' && lessonContent) {
-            return [
-                { type: 'text' as const, title: 'Nội dung bài học', url: '', content: lessonContent },
-                ...basePlaylist
-            ]
-        }
-        return basePlaylist
-    }, [videoUrl, serverPlaylist, lessonType, lessonContent])
-    const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
-    const [showPlaylist, setShowPlaylist] = useState(false)
-    const [isMounted, setIsMounted] = useState(false)
-    const [isFullscreen, setIsFullscreen] = useState(false) // State cho lớp phủ toàn màn hình
-
-    // Timer cho tài liệu (30s)
-    const [docTimer, setDocTimer] = useState<number>(0)
-    const [isReading, setIsReading] = useState(false)
-
-    // Tiến độ chi tiết từng mục: { index: { maxTime, duration } }
-    const [granularProgress, setGranularProgress] = useState<Record<number, { maxTime: number, duration: number }>>(() => {
-        return playlistData || {}
-    })
-
-=======
     serverPlaylist,
     courseType,
     lessonType,
@@ -180,16 +109,12 @@ export default function VideoPlayer({
     const [docTimer, setDocTimer] = useState<number>(0)
     const [isReading, setIsReading] = useState(false)
     const [granularProgress, setGranularProgress] = useState<Record<number, { maxTime: number, duration: number }>>(() => playlistData || {})
->>>>>>> feat/top-courses-upgrade
     const playerRef = useRef<any>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const saveIntervalRef = useRef<any>(null)
     const docTimerRef = useRef<any>(null)
-<<<<<<< HEAD
-=======
     const videoContainerRef = useRef<HTMLDivElement>(null)
     const htmlVideoRef = useRef<HTMLVideoElement>(null)
->>>>>>> feat/top-courses-upgrade
     const currentItem = playlist[currentIndex]
 
     if (!currentItem) {
@@ -205,10 +130,6 @@ export default function VideoPlayer({
 
     useEffect(() => { setIsMounted(true) }, [])
 
-<<<<<<< HEAD
-    // Xử lý phím Esc để thoát full màn hình
-=======
->>>>>>> feat/top-courses-upgrade
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') setIsFullscreen(false)
@@ -217,14 +138,8 @@ export default function VideoPlayer({
         return () => window.removeEventListener('keydown', handleEsc)
     }, [])
 
-<<<<<<< HEAD
-    const toggleFullScreen = () => {
-        setIsFullscreen(!isFullscreen)
-    }
-=======
     const toggleFullScreen = () => setIsFullscreen(!isFullscreen)
 
->>>>>>> feat/top-courses-upgrade
     const calculateAggregateProgress = useCallback((updatedGranular: any) => {
         let totalMaxTime = 0
         let totalDuration = 0
@@ -240,44 +155,24 @@ export default function VideoPlayer({
     const saveProgress = useCallback(async (index: number, maxTime: number, duration: number) => {
         const nextGranular = { ...granularProgress, [index]: { maxTime, duration } }
         setGranularProgress(nextGranular)
-<<<<<<< HEAD
-
-        const aggregate = calculateAggregateProgress(nextGranular)
-
-        // [FIX] Sử dụng setTimeout để đẩy các thay đổi state ra khỏi chu kỳ render hiện tại
-        setTimeout(() => {
-=======
         setTimeout(() => {
             const aggregate = calculateAggregateProgress(nextGranular)
->>>>>>> feat/top-courses-upgrade
             onProgress(aggregate.maxTime, aggregate.duration)
             if (aggregate.duration > 0) {
                 onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
             }
-<<<<<<< HEAD
-            // Gọi Server Action an toàn sau render
-=======
->>>>>>> feat/top-courses-upgrade
             saveVideoProgressAction({
                 enrollmentId,
                 lessonId,
                 maxTime: aggregate.maxTime,
                 duration: aggregate.duration,
                 lastIndex: index,
-<<<<<<< HEAD
-                playlistScores: nextGranular
-=======
                 playlistScores: nextGranular,
->>>>>>> feat/top-courses-upgrade
             }).catch(() => { })
         }, 0)
     }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
 
-<<<<<<< HEAD
-    const trackVideoProgress = useCallback(() => {
-=======
     const trackYouTubeProgress = useCallback(() => {
->>>>>>> feat/top-courses-upgrade
         if (!playerRef.current || typeof playerRef.current.getCurrentTime !== 'function') return
         const currentTime = playerRef.current.getCurrentTime()
         const duration = playerRef.current.getDuration()
@@ -285,8 +180,6 @@ export default function VideoPlayer({
         if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
     }, [currentIndex, granularProgress, saveProgress])
 
-<<<<<<< HEAD
-=======
     const trackMp4Progress = useCallback(() => {
         const video = htmlVideoRef.current
         if (!video) return
@@ -416,7 +309,6 @@ export default function VideoPlayer({
         }
     }, [currentIndex, isMounted, currentItem?.type, currentItem?.url])
 
->>>>>>> feat/top-courses-upgrade
     useEffect(() => {
         if (currentItem?.type === 'doc') {
             const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 30 }
@@ -436,107 +328,11 @@ export default function VideoPlayer({
                         return next
                     })
                 }, 1000)
-<<<<<<< HEAD
-            } else { setDocTimer(30); setIsReading(false); }
-=======
             } else { setDocTimer(30); setIsReading(false) }
->>>>>>> feat/top-courses-upgrade
         }
         return () => { if (docTimerRef.current) clearInterval(docTimerRef.current) }
     }, [currentIndex, currentItem?.type])
 
-<<<<<<< HEAD
-    const videoContainerRef = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-        if (!isMounted || currentItem?.type !== 'video' || !currentItem?.id) return
-
-        let player: any = null
-
-        const initPlayer = () => {
-            if (!videoContainerRef.current) return
-
-            const stored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
-            // [FIX] Luôn bắt đầu từ mốc đã lưu (nếu đã xong thì đứng ở cuối)
-            const startTime = Math.floor(stored.maxTime)
-
-            player = new (window as any).YT.Player(videoContainerRef.current, {
-                videoId: currentItem.id,
-                height: '100%',
-                width: '100%',
-                playerVars: {
-                    autoplay: 1,
-                    modestbranding: 1,
-                    rel: 0,
-                    start: startTime,
-                    origin: window.location.origin,
-                    fs: 0
-                },
-                events: {
-                    onStateChange: (e: any) => {
-                        const YTState = (window as any).YT.PlayerState
-                        if (e.data === YTState.PLAYING) {
-                            if (!saveIntervalRef.current) saveIntervalRef.current = setInterval(trackVideoProgress, 5000)
-                        } else {
-                            if (saveIntervalRef.current) { clearInterval(saveIntervalRef.current); saveIntervalRef.current = null; }
-                        }
-                        if (e.data === YTState.ENDED) {
-                            const dur = player.getDuration()
-                            saveProgress(currentIndex, dur, dur)
-                        }
-                    }
-                }
-            })
-            playerRef.current = player
-        }
-
-        if ((window as any).YT && (window as any).YT.Player) {
-            initPlayer()
-        } else {
-            if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-                const tag = document.createElement('script')
-                tag.src = 'https://www.youtube.com/iframe_api'
-                document.head.appendChild(tag)
-
-                const originalCallback = (window as any).onYouTubeIframeAPIReady
-                    ; (window as any).onYouTubeIframeAPIReady = () => {
-                        if (originalCallback) originalCallback()
-                        initPlayer()
-                    }
-            } else {
-                // Script đang tải dở
-                const originalCallback = (window as any).onYouTubeIframeAPIReady
-                    ; (window as any).onYouTubeIframeAPIReady = () => {
-                        if (originalCallback) originalCallback()
-                        initPlayer()
-                    }
-            }
-        }
-
-        return () => {
-            if (saveIntervalRef.current) {
-                clearInterval(saveIntervalRef.current)
-                saveIntervalRef.current = null
-            }
-            if (player && typeof player.destroy === 'function') {
-                player.destroy()
-            }
-            playerRef.current = null
-        }
-    }, [currentIndex, isMounted, currentItem?.type, currentItem?.id])
-
-    const handleNext = () => setCurrentVideoIndex((prev) => (prev + 1) % playlist.length)
-    const handlePrev = () => setCurrentVideoIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
-
-    const getEmbedUrl = (url: string) => {
-        if (!url.includes('docs.google.com')) return url
-        if (url.includes('/pub')) return url
-        const cleanUrl = url.split('/edit')[0].split('/view')[0].split('/preview')[0].replace(/\/+$/, '')
-        return `${cleanUrl}/preview`
-    }
-
-    if (!isMounted) return <div className="w-full aspect-video bg-black animate-pulse" />
-=======
     const handleNext = () => setCurrentVideoIndex((prev) => (prev + 1) % playlist.length)
     const handlePrev = () => setCurrentVideoIndex((prev) => (prev - 1 + playlist.length) % playlist.length)
 
@@ -627,7 +423,6 @@ export default function VideoPlayer({
             </div>
         )
     }
->>>>>>> feat/top-courses-upgrade
 
     return (
         <div className={cn(
@@ -638,44 +433,8 @@ export default function VideoPlayer({
                 "relative bg-black overflow-hidden shadow-2xl transition-all",
                 isFullscreen ? "fixed inset-0 z-[9999] flex flex-col" : "w-full aspect-video"
             )}>
-<<<<<<< HEAD
-                {currentItem?.type === 'video' ? (
-                    <div className="relative w-full h-full flex-1 group">
-                        {/* THE BỌC AN TOÀN CHO REACT QUẢN LÝ */}
-                        <div key={currentIndex} className="absolute inset-0 w-full h-full">
-                            {/* THE ĐÍCH ĐỂ YOUTUBE API REPLACE (SẼ BIẾN THÀNH IFRAME) */}
-                            <div ref={videoContainerRef} />
-                        </div>
-
-                        {/* THE MỘT LỚP PHỦ TRANSPARENT CHẶN CLICK VÀO TITLE VÀ NÚT SHARE Ở TOP */}
-                        {courseType === 'LIB' && (
-                            <div
-                                className="absolute top-0 left-0 right-0 h-[65px] z-[90] bg-transparent opacity-0 cursor-default"
-                                title="Video được bảo vệ"
-                                onContextMenu={(e) => e.preventDefault()}
-                            />
-                        )}
-                    </div>
-                ) : (currentItem?.type === 'text') ? (
-                    <div className="absolute inset-0 bg-white overflow-y-auto p-6">
-                        <div className="text-gray-900 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: makeLinksClickable((currentItem.content || lessonContent || '').replace(/\n/g, '<br>')) }} />
-                    </div>
-                ) : (
-                    <div className="w-full h-full bg-white relative flex flex-col">
-                        <iframe src={getEmbedUrl(currentItem.url)} className="flex-1 border-0" allow="autoplay" title="Tài liệu" />
-                        {isReading && (
-                            <div className="absolute top-0 left-0 right-0 h-1 bg-zinc-200 z-10">
-                                <div className="h-full bg-orange-500 transition-all duration-1000" style={{ width: `${(docTimer / 30) * 100}%` }} />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* PLAYLIST POPUP */}
-=======
                 {currentItem?.type === 'video' ? renderVideo() : renderNonVideo()}
 
->>>>>>> feat/top-courses-upgrade
                 {showPlaylist && (
                     <div className="absolute inset-0 bg-zinc-900 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
                         <div className="flex items-center justify-between p-5 border-b border-zinc-700 shrink-0">
@@ -689,13 +448,6 @@ export default function VideoPlayer({
                                 const isCurrent = idx === currentIndex
                                 const prog = granularProgress[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
                                 const pct = prog.duration > 0 ? Math.round((prog.maxTime / prog.duration) * 100) : 0
-<<<<<<< HEAD
-                                return (
-                                    <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false); }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-orange-500/20 border-orange-400 shadow-lg' : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'}`}>
-                                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-zinc-700 text-zinc-300'}`}>{item.type === 'video' ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}</div>
-                                        <div className="flex-1 text-left min-w-0">
-                                            <p className={`text-xs font-bold truncate ${isCurrent ? 'text-orange-300' : 'text-zinc-200'}`}>{item.title}</p>
-=======
                                 const source = item.source || (item.url ? detectVideoSource(item.url) : null)
                                 const isVideo = item.type === 'video'
                                 const platformLabel = source ? source.platform.toUpperCase() : ''
@@ -709,7 +461,6 @@ export default function VideoPlayer({
                                                 {item.title}
                                                 {platformLabel && <span className="text-[8px] text-zinc-500 ml-1">({platformLabel})</span>}
                                             </p>
->>>>>>> feat/top-courses-upgrade
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="flex-1 h-1 bg-zinc-700 rounded-full overflow-hidden"><div className="h-full transition-all duration-1000 bg-orange-500" style={{ width: `${pct}%` }} /></div>
                                                 <span className="text-[9px] text-zinc-400 font-bold">{pct}%</span>
@@ -724,38 +475,19 @@ export default function VideoPlayer({
                 )}
             </div>
 
-<<<<<<< HEAD
-            {/* ── 2. EXTERNAL CONTROL BAR ──────────────────────────────── */}
-            <div className="bg-zinc-900 border-t border-zinc-700 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
-                {/* Playlist Toggle */}
-                <div className="flex items-center gap-2 shrink-0">
-                    <button
-                        onClick={() => setShowPlaylist(!showPlaylist)}
-                        className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-lg transition-all border border-zinc-600 shadow-sm"
-                    >
-=======
             <div className="bg-zinc-900 border-t border-zinc-700 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
                 <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => setShowPlaylist(!showPlaylist)} className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white rounded-lg transition-all border border-zinc-600 shadow-sm">
->>>>>>> feat/top-courses-upgrade
                         <List className="w-4 h-4 text-brk-accent" />
                         <span className="text-[10px] font-black uppercase tracking-tighter hidden sm:inline">Các học phần của bài học ({currentIndex + 1}/{playlist.length})</span>
                     </button>
                 </div>
 
-<<<<<<< HEAD
-                {/* Info & Type Icon */}
-=======
->>>>>>> feat/top-courses-upgrade
                 <div className="flex-1 flex flex-col items-center min-w-0 px-1">
                     <div className="flex items-center gap-1.5 max-w-full">
                         {currentItem?.type === 'video' ? <PlayCircle className="w-3 h-3 text-zinc-400 shrink-0" /> : <FileText className="w-3 h-3 text-zinc-400 shrink-0" />}
                         <p className="text-[10px] sm:text-[11px] font-black text-orange-400 truncate tracking-tight uppercase">{currentItem?.title}</p>
                     </div>
-<<<<<<< HEAD
-
-=======
->>>>>>> feat/top-courses-upgrade
                     <div className="flex items-center gap-1.5 mt-0.5">
                         {currentItem?.type === 'doc' ? (
                             isReading ? (
@@ -764,9 +496,6 @@ export default function VideoPlayer({
                                 <span className="flex items-center gap-1 text-[8px] sm:text-[9px] text-orange-400 font-bold uppercase"><CheckCircle2 className="w-2.5 h-2.5" /> Xong</span>
                             )
                         ) : (
-<<<<<<< HEAD
-                            <span className="text-[8px] sm:text-[9px] text-zinc-400 font-bold uppercase tracking-widest">Video</span>
-=======
                             <span className="text-[8px] sm:text-[9px] text-zinc-400 font-bold uppercase tracking-widest">
                                 {currentItem?.source?.platform === 'youtube' ? 'YouTube' :
                                  currentItem?.source?.platform === 'mp4' ? 'MP4' :
@@ -776,38 +505,18 @@ export default function VideoPlayer({
                                  currentItem?.source?.platform === 'facebook' ? 'Facebook' :
                                  currentItem?.source?.platform === 'drive' ? 'Google Drive' : 'Video'}
                             </span>
->>>>>>> feat/top-courses-upgrade
                         )}
                     </div>
                 </div>
 
-<<<<<<< HEAD
-                {/* Navigation & Fullscreen Buttons */}
-                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                    <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
-                    <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
-
-                    {/* Fullscreen Button */}
-                    <button
-                        onClick={toggleFullScreen}
-                        className="p-1.5 sm:p-2 bg-orange-500/20 hover:bg-orange-500 text-orange-400 hover:text-white rounded-lg transition-all border border-orange-400/30 active:scale-90 ml-1"
-                        title="Xem toàn màn hình"
-                    >
-=======
                 <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                     <button onClick={handlePrev} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipBack className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
                     <button onClick={handleNext} className="p-1.5 sm:p-2 bg-zinc-800 hover:bg-orange-500 text-zinc-300 hover:text-white rounded-lg transition-all border border-zinc-600 active:scale-90"><SkipForward className="w-3.5 h-3.5 sm:w-4 h-4" /></button>
                     <button onClick={toggleFullScreen} className="p-1.5 sm:p-2 bg-orange-500/20 hover:bg-orange-500 text-orange-400 hover:text-white rounded-lg transition-all border border-orange-400/30 active:scale-90 ml-1" title="Xem toàn màn hình">
->>>>>>> feat/top-courses-upgrade
                         <Maximize2 className="w-3.5 h-3.5 sm:w-4 h-4" />
                     </button>
                 </div>
             </div>
         </div>
     )
-<<<<<<< HEAD
 }
-
-=======
-}
->>>>>>> feat/top-courses-upgrade
