@@ -17,7 +17,7 @@ interface VideoPlayerProps {
     initialMaxTime: number
     onProgress: (maxTime: number, duration: number) => void
     onPercentChange: (percent: number) => void
-    playlistData?: any
+    playlistData?: Record<number, { maxTime: number, duration: number }>
     lastVideoIndex?: number
     serverPlaylist?: PlaylistItem[]
     courseType?: string
@@ -109,10 +109,11 @@ export default function VideoPlayer({
     const [docTimer, setDocTimer] = useState<number>(0)
     const [isReading, setIsReading] = useState(false)
     const [granularProgress, setGranularProgress] = useState<Record<number, { maxTime: number, duration: number }>>(() => playlistData || {})
-    const playerRef = useRef<any>(null)
+    type YTLikePlayer = { getCurrentTime?: () => number; getDuration?: () => number; destroy?: () => void }
+    const playerRef = useRef<YTLikePlayer | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
-    const saveIntervalRef = useRef<any>(null)
-    const docTimerRef = useRef<any>(null)
+    const saveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const docTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const videoContainerRef = useRef<HTMLDivElement>(null)
     const htmlVideoRef = useRef<HTMLVideoElement>(null)
     const currentItem = playlist[currentIndex]
@@ -140,7 +141,7 @@ export default function VideoPlayer({
 
     const toggleFullScreen = () => setIsFullscreen(!isFullscreen)
 
-    const calculateAggregateProgress = useCallback((updatedGranular: any) => {
+    const calculateAggregateProgress = useCallback((updatedGranular: Record<number, { maxTime: number, duration: number }>) => {
         let totalMaxTime = 0
         let totalDuration = 0
         playlist.forEach((item, idx) => {
@@ -173,9 +174,8 @@ export default function VideoPlayer({
     }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
 
     const trackYouTubeProgress = useCallback(() => {
-        if (!playerRef.current || typeof playerRef.current.getCurrentTime !== 'function') return
-        const currentTime = playerRef.current.getCurrentTime()
-        const duration = playerRef.current.getDuration()
+        const currentTime = playerRef.current?.getCurrentTime?.() ?? 0
+        const duration = playerRef.current?.getDuration?.() ?? 0
         const currentStored = granularProgress[currentIndex] || { maxTime: 0, duration: 0 }
         if (currentTime > currentStored.maxTime) saveProgress(currentIndex, currentTime, duration)
     }, [currentIndex, granularProgress, saveProgress])
@@ -217,7 +217,7 @@ export default function VideoPlayer({
                 fs: 0,
             },
             events: {
-                onStateChange: (e: any) => {
+                onStateChange: (e: { data?: number }) => {
                     const YTState = (window as any).YT.PlayerState
                     if (e.data === YTState.PLAYING) {
                         if (!saveIntervalRef.current) saveIntervalRef.current = setInterval(trackYouTubeProgress, 5000)
@@ -225,7 +225,7 @@ export default function VideoPlayer({
                         if (saveIntervalRef.current) { clearInterval(saveIntervalRef.current); saveIntervalRef.current = null }
                     }
                     if (e.data === YTState.ENDED) {
-                        const dur = player.getDuration()
+                        const dur = (player as any)?.getDuration ? (player as any).getDuration() : 0
                         saveProgress(currentIndex, dur, dur)
                     }
                 },
@@ -319,7 +319,7 @@ export default function VideoPlayer({
                     setDocTimer(prev => {
                         const next = prev + 1
                         if (next >= 30) {
-                            clearInterval(docTimerRef.current)
+                            if (docTimerRef.current) { clearInterval(docTimerRef.current) }
                             setIsReading(false)
                             saveProgress(currentIndex, 30, 30)
                             return 30
