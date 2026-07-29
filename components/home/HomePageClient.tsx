@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 import CourseSection from '@/components/home/CourseSection'
+import CourseCard from '@/components/course/CourseCard'
 import RealityMap from '@/components/home/RealityMap'
 import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
 import CommunityBoard from '@/components/home/CommunityBoard'
@@ -110,6 +111,25 @@ function HomePageContent({
   // Auto-hide: Community section khi không có posts HOẶC showCommunity = false
   const showCommunity = profile.showCommunity !== false && posts && posts.length > 0
 
+  // Top courses: ưu tiên ghim (pin > 0), sau đó lấy 3 khóa mới cập nhật nhất
+  const pinnedCourses = courses
+    .filter((course) => course.pin != null && course.pin > 0)
+    .sort((a, b) => a.pin - b.pin)
+  const latestUpdatedCourses = courses
+    .filter((course) => !course.pin || course.pin <= 0)
+    .sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+      return dateB - dateA
+    })
+  const topCourses = [
+    ...pinnedCourses.slice(0, 3),
+    ...latestUpdatedCourses
+      .filter((course) => !pinnedCourses.some((p) => p.id === course.id))
+      .slice(0, Math.max(0, 3 - pinnedCourses.length))
+  ]
+  const topCoursesTitle = profile.topCoursesTitle || 'Khóa học nổi bật'
+  
   return (
     <>
       {/* Survey / Roadmap Section - Auto-hide khi không có survey */}
@@ -145,6 +165,33 @@ function HomePageContent({
         </section>
       )}
 
+      {topCourses.length > 0 && (
+        <section className="container mx-auto px-4 py-8">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
+              {topCoursesTitle}
+            </h2>
+            <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-brk-accent"></div>
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {topCourses.map((course, index: number) => (
+              <div key={course.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
+                <CourseCard
+                  course={course}
+                  isLoggedIn={!!session}
+                  enrollment={enrollmentsMap[course.id] || null}
+                  userPhone={userPhone}
+                  userId={userId}
+                  priority={index === 0}
+                  darkMode={false}
+                  profileSlug={profile.slug}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+ 
       {/* Courses Section */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
         {session?.user ? (
