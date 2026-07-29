@@ -3,6 +3,7 @@
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role, Prisma } from "@prisma/client"
+import type { Enrollment } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { cookies, headers } from "next/headers"
 import { createPaymentQR } from "@/lib/vietqr"
@@ -181,7 +182,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
         const isAutoActive = effectivePhiCoc === 0
-        let newEnrollment: any
+        let newEnrollment: Enrollment | null = null
         try {
             newEnrollment = await prisma.enrollment.create({
                 data: {
@@ -371,7 +372,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 /**
  * Xác nhận ngày bắt đầu hoặc Đặt lại lộ trình
  */
-export async function confirmStartDateAction(courseId: number, date: any) {
+export async function confirmStartDateAction(courseId: number, date: string | Date) {
     const logId = `[RESET-COURSE-${courseId}-${Date.now()}]`
     try {
         const session = await auth()
@@ -416,12 +417,7 @@ export async function confirmStartDateAction(courseId: number, date: any) {
 /**
  * Lưu tiến độ video (Hỗ trợ đa video/playlist)
  */
-export async function saveVideoProgressAction({
-    enrollmentId, lessonId, maxTime, duration, lastIndex, playlistScores
-}: {
-    enrollmentId: number, lessonId: string, maxTime: number, duration: number,
-    lastIndex?: number, playlistScores?: any
-}) {
+export async function saveVideoProgressAction({ enrollmentId, lessonId, maxTime, duration, lastIndex, playlistScores }: { enrollmentId: number; lessonId: string; maxTime: number; duration: number; lastIndex?: number; playlistScores?: Record<number, { maxTime: number; duration: number }> }) {
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false }
@@ -448,7 +444,7 @@ export async function saveVideoProgressAction({
             select: { scores: true, status: true }
         })
 
-        const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as any ?? {})
+        const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as Record<string, unknown> ?? {})
 
         const updatedScores = {
             ...existingScores,
@@ -461,12 +457,12 @@ export async function saveVideoProgressAction({
             where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
             create: {
                 enrollmentId, lessonId, maxTime, duration,
-                scores: updatedScores as any,
+                scores: updatedScores as Prisma.JsonObject,
                 status: "IN_PROGRESS"
             },
             update: {
                 maxTime, duration,
-                scores: updatedScores as any,
+                scores: updatedScores as Prisma.JsonObject,
                 ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
             }
         })
