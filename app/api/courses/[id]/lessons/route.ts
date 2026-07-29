@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
 
@@ -55,6 +56,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 isDailyChallenge: isDailyChallenge ?? false
             }
         })
+
+        await prisma.course.update({
+            where: { id: courseId },
+            data: { updatedAt: new Date() }
+        })
+
+        revalidatePath('/')
 
         return NextResponse.json({ success: true, lesson })
     } catch (error: any) {
