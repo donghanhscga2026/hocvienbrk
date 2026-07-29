@@ -89,15 +89,67 @@
   let precheckDone = false; // Flag để tránh gọi precheck nhiều lần
   let previewCache = {};   // Lưu preview response để dùng khi sync
   let previewRows = [];   // Lưu kết quả preview từ /preview API
+  let injectedScriptLoaded = false;
+  let injectionRetryTimer = null;
 
   function injectScript() {
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('injected-script.js');
-    script.onload = function() {
-      script.remove();
-      console.log('[TCA Sync] Injected script loaded');
-    };
-    (document.head || document.documentElement).appendChild(script);
+    if (injectedScriptLoaded || window.__tcaInjectedScriptLoaded) {
+      return;
+    }
+
+    try {
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', injectScript, { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('injected-script.js');
+      script.async = false;
+      script.setAttribute('data-tca-sync', 'true');
+
+      script.onload = function() {
+        try {
+          script.remove();
+        } catch (e) {
+          // Ignore cleanup failures
+        }
+        injectedScriptLoaded = true;
+        window.__tcaInjectedScriptLoaded = true;
+        console.log('[TCA Sync] Injected script loaded');
+      };
+
+      script.onerror = function() {
+        console.warn('[TCA Sync] Injected script failed to load; retrying...');
+        if (!injectionRetryTimer) {
+          injectionRetryTimer = window.setTimeout(() => {
+            injectionRetryTimer = null;
+            injectScript();
+          }, 1000);
+        }
+      };
+
+      const target = document.head || document.documentElement;
+      if (target) {
+        target.appendChild(script);
+      } else {
+        console.warn('[TCA Sync] DOM root unavailable, deferring injection');
+        if (!injectionRetryTimer) {
+          injectionRetryTimer = window.setTimeout(() => {
+            injectionRetryTimer = null;
+            injectScript();
+          }, 1000);
+        }
+      }
+    } catch (error) {
+      console.warn('[TCA Sync] Script injection failed:', error);
+      if (!injectionRetryTimer) {
+        injectionRetryTimer = window.setTimeout(() => {
+          injectionRetryTimer = null;
+          injectScript();
+        }, 1000);
+      }
+    }
   }
 
   // Bước 1: Gọi /staging-sync (sync Prod→Test trước) hoặc /preview API để lấy bảng tổng hợp
@@ -1276,6 +1328,7 @@ console.log('[TCA Sync] CSV downloaded! Rows:', data.previewRows.length);
     precheckDone = false;
     
     injectScript();
+    window.addEventListener('load', () => injectScript(), { once: true });
     window.addEventListener('message', handleMessage);
     
     // Listen for messages from background script (Chrome messaging)
