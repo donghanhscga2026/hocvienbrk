@@ -1098,7 +1098,9 @@ export async function updateCourseAction(courseId: number, data: {
     teacherBankAccountId?: number | null,
     acceptedVoucherIds?: number[],
     awardVoucherIds?: number[],
-    feeType?: string
+    feeType?: string,
+    requiresReferralActivation?: boolean,
+    referralActivationThreshold?: number
 }) {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
@@ -1161,6 +1163,8 @@ export async function updateCourseAction(courseId: number, data: {
             link_zalo: data.link_zalo ?? null,
             phi_coc: data.phi_coc,
             feeType: data.feeType,
+            requiresReferralActivation: data.requiresReferralActivation,
+            referralActivationThreshold: data.referralActivationThreshold,
             noidung_stk: data.noidung_stk ?? null,
             file_email: data.file_email ?? null,
             noidung_email: data.noidung_email ?? null,

@@ -116,6 +116,56 @@ export async function creditVoucherWallet(
   return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt, sourceMemberId, applicationId)
 }
 
+export async function debitVoucherWallet(
+  userId: number,
+  amount: number,
+  description: string,
+  refId?: string,
+  sourceMemberId?: number
+) {
+  await ensureBrkWallet(userId)
+
+  const [updated] = await prisma.$transaction(async (tx) => {
+    const wallet = await tx.brkWallet.findUnique({ where: { userId } })
+    if (!wallet) throw new Error('Wallet not found')
+    if (Number(wallet.voucherBalance) < amount) {
+      throw new Error('Số dư ví voucher không đủ')
+    }
+
+    const newBalance = Number(wallet.voucherBalance) - amount
+    const [updatedWallet] = await Promise.all([
+      tx.brkWallet.update({ where: { userId }, data: { voucherBalance: newBalance } }),
+      tx.brkTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: -amount,
+          type: 'ADJUSTMENT',
+          description,
+          refId,
+          sourceMemberId,
+          balanceType: 'VOUCHER',
+          balanceBefore: Number(wallet.voucherBalance),
+          balanceAfter: newBalance,
+        }
+      })
+    ])
+
+    return [updatedWallet] as const
+  }, { timeout: 30000 })
+
+  try {
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId,
+      action: 'WALLET_CHANGE',
+      detail: `VOUCHER -${amount.toLocaleString()}đ: ${description}`,
+      metadata: { balanceType: 'VOUCHER', amount: -amount, refId }
+    })
+  } catch { }
+
+  return updated
+}
+
 export async function debitBrkWallet(
   userId: number,
   amount: number,

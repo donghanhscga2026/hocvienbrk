@@ -35,6 +35,8 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                 noidung_email: true,
                 type: true,
                 teacherId: true,
+                requiresReferralActivation: true,
+                referralActivationThreshold: true,
                 teacherBankAccount: {
                     select: { accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true }
                 }
@@ -52,8 +54,8 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         // Xử lý riêng cho loại khóa học LIB
         let effectivePhiCoc = course.phi_coc
         let isLibAllowed = false
-        let appliedUserVoucherId: number | null = null
-        let appliedVoucherType: string | null = null
+        let voucherDeducted = 0
+        let voucherApplied = false
 
         if (course.type === 'LIB') {
             if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")
@@ -66,16 +68,14 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             effectivePhiCoc = 0
             isLibAllowed = true
         } else if (course.type !== 'SYS') {
-            const { checkVoucherForCourse } = await import('@/lib/voucher/voucher-service')
-            const voucherCheck = await checkVoucherForCourse(userId, courseId)
-            if (voucherCheck.applicable) {
-                if (voucherCheck.voucherType === 'CASH') {
-                    effectivePhiCoc = Math.max(0, course.phi_coc - (voucherCheck.discount || 0))
-                } else {
-                    effectivePhiCoc = 0
-                }
-                appliedUserVoucherId = voucherCheck.userVoucherId || null
-                appliedVoucherType = voucherCheck.voucherType || null
+            const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
+            const voucherBalance = Number(brkWallet?.voucherBalance || 0)
+            if (voucherBalance > 0 && effectivePhiCoc > 0) {
+                voucherDeducted = Math.min(voucherBalance, effectivePhiCoc)
+                effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
+                voucherApplied = voucherDeducted > 0
+                const { debitVoucherWallet } = await import('@/lib/brk/wallet-service')
+                await debitVoucherWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
             }
         }
 
@@ -182,6 +182,19 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
         const isAutoActive = effectivePhiCoc === 0
+        let studyMode: 'ACTIVE' | 'AUDITOR' = 'ACTIVE'
+        if (course.requiresReferralActivation && course.referralActivationThreshold > 0) {
+            const referrerActiveCount = enrollmentReferrerId
+                ? await prisma.enrollment.count({
+                    where: {
+                        referrerId: enrollmentReferrerId,
+                        status: 'ACTIVE'
+                    }
+                })
+                : 0
+            studyMode = referrerActiveCount >= course.referralActivationThreshold ? 'ACTIVE' : 'AUDITOR'
+        }
+
         let newEnrollment: Enrollment | null = null
         try {
             newEnrollment = await prisma.enrollment.create({
@@ -189,6 +202,8 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                     userId,
                     courseId,
                     status: isAutoActive ? "ACTIVE" : "PENDING",
+                    studyMode,
+                    phi_coc: effectivePhiCoc,
                     referrerId: enrollmentReferrerId,
                 }
             })
@@ -201,12 +216,6 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                 return { success: true, status: existingRace!.status, enrollment: existingRace }
             }
             throw createErr
-        }
-
-        // Đánh dấu voucher đã dùng (nếu có)
-        if (appliedUserVoucherId) {
-            const { markVoucherUsed } = await import('@/lib/voucher/voucher-service')
-            await markVoucherUsed(appliedUserVoucherId, newEnrollment.id)
         }
 
         // Award voucher từ course
@@ -345,6 +354,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             select: {
                 id: true,
                 status: true,
+                studyMode: true,
                 payment: {
                     select: {
                         id: true,
@@ -362,7 +372,15 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
 
         revalidatePath('/')
         revalidatePath('/courses')
-        return { success: true, status: newEnrollment.status, enrollment: enrolledData, warning: missingBankAccount ? "Khóa học chưa được cấu hình tài khoản ngân hàng. Vui lòng liên hệ Admin để được hỗ trợ." : undefined, voucherApplied: !!appliedUserVoucherId, voucherType: appliedVoucherType }
+        return {
+            success: true,
+            status: newEnrollment.status,
+            enrollment: enrolledData,
+            warning: missingBankAccount ? "Khóa học chưa được cấu hình tài khoản ngân hàng. Vui lòng liên hệ Admin để được hỗ trợ." : undefined,
+            voucherApplied,
+            voucherAmount: voucherDeducted,
+            studyMode
+        }
     } catch (error: any) {
         console.error("Enroll Course Error:", error)
         return { success: false, message: error.message || "Không thể đăng ký khóa học." }
@@ -756,6 +774,8 @@ export async function createCourseAction(formData: FormData) {
             link_anh_bia: formData.get('link_anh_bia') as string || null,
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
             feeType: (formData.get('feeType') as string) || 'MIEN_PHI',
+            requiresReferralActivation: formData.get('requiresReferralActivation') === 'true',
+            referralActivationThreshold: parseInt(formData.get('referralActivationThreshold') as string) || 0,
             noidung_stk: formData.get('noidung_stk') as string || null,
             link_zalo: formData.get('link_zalo') as string || null,
             file_email: formData.get('file_email') as string || null,

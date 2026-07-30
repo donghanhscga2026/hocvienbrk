@@ -52,6 +52,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     
     // ✅ NEW: Section 3 - Fee & Payment
     const [feeType, setFeeType] = useState('MIEN_PHI')
+    const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
+    const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
     const [awardVoucherIds, setAwardVoucherIds] = useState<number[]>([])
     const [allVouchers, setAllVouchers] = useState<any[]>([])
@@ -194,6 +196,8 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setMoTaDai(res.mo_ta_dai || '')
                 setLinkAnhBia(res.link_anh_bia || '')
                 
+                setRequiresReferralActivation(res.requiresReferralActivation || false)
+                setReferralActivationThreshold(res.referralActivationThreshold || 0)
                 setNoidungStk(res.noidung_stk || '')
                 setAcceptedVoucherIds(res.acceptedVouchers?.map((v: any) => v.voucherId) || [])
                 setAwardVoucherIds(res.voucherAwards?.map((v: any) => v.voucherId) || [])
@@ -214,38 +218,42 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         e.preventDefault()
         setSaving(true)
         setMessage(null)
-        // ✅ Send all fields to updateCourseAction
-        const updateData: any = {
-            id_khoa: idKhoa,
-            teacherBankAccountId,
-            name_lop: nameLop,
-            name_khoa: nameKhoa || null,
-            categoryId,
-            type,
-            status,
-            pin,
-            date_join: dateJoin || null,
-            mo_ta_ngan: moTaNgan || null,
-            mo_ta_dai: moTaDai || null,
-            link_anh_bia: linkAnhBia || null,
-            phi_coc: phiCoc,
-            feeType,
-            acceptedVoucherIds,
-            awardVoucherIds,
-            noidung_stk: noidungStk || null,
-            link_zalo: linkZalo || null,
-            file_email: fileEmail || null,
-            noidung_email: noidungEmail || null,
-        }
+        try {
+            const updateData: any = {
+                id_khoa: idKhoa,
+                teacherBankAccountId,
+                name_lop: nameLop,
+                name_khoa: nameKhoa || null,
+                categoryId,
+                type,
+                status,
+                pin,
+                date_join: dateJoin || null,
+                mo_ta_ngan: moTaNgan || null,
+                mo_ta_dai: moTaDai || null,
+                link_anh_bia: linkAnhBia || null,
+                phi_coc: phiCoc,
+                feeType,
+                requiresReferralActivation,
+                referralActivationThreshold,
+                acceptedVoucherIds,
+                awardVoucherIds,
+                noidung_stk: noidungStk || null,
+                link_zalo: linkZalo || null,
+                file_email: fileEmail || null,
+                noidung_email: noidungEmail || null,
+            }
 
-        // Cho phép Admin/Teacher thay đổi Giáo viên
-        if (isAdmin || isTeacher) {
-            updateData.teacherId = teacherId ? parseInt(teacherId) : null
+            const res = await updateCourseAction(parseInt(id), updateData)
+            if (res.success) {
+                setMessage({ type: 'success', text: 'Đã cập nhật khóa học thành công!' })
+                await fetchData()
+            } else {
+                setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
+            }
+        } catch (err: any) {
+            setMessage({ type: 'error', text: err?.message || 'Lỗi khi lưu.' })
         }
-
-        const res = await updateCourseAction(parseInt(id), updateData)
-        if (res.success) setMessage({ type: 'success', text: 'Đã lưu thông tin khóa học!' })
-        else setMessage({ type: 'error', text: res.error || 'Lỗi khi lưu.' })
         setSaving(false)
     }
 
@@ -458,6 +466,20 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                 <option value="PHI_DONG_HANH">Phí đồng hành</option>
                                 <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Yêu cầu kích hoạt referral</label>
+                            <label className="inline-flex items-center gap-2 mt-1 cursor-pointer">
+                                <input type="checkbox" checked={requiresReferralActivation} onChange={(e) => setRequiresReferralActivation(e.target.checked)} className="w-4 h-4 rounded" />
+                                <span className="text-sm font-bold text-gray-600">Bật điều kiện giới thiệu</span>
+                            </label>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số lượng học viên kích hoạt cần thiết</label>
+                            <input type="number" value={referralActivationThreshold} onChange={(e) => setReferralActivationThreshold(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" min={0} />
                         </div>
                     </div>
                     
