@@ -31,6 +31,8 @@ export function isAuthorizedRequest(
     .map((name) => req.headers.get(name))
     .find((value): value is string => Boolean(value)) ?? null
   const hasGooglePubSubHeaders = ['x-goog-topic', 'x-goog-message-id', 'x-goog-subscription-name'].some((header) => Boolean(req.headers.get(header)))
+  const userAgent = req.headers.get('user-agent') || req.headers.get('User-Agent')
+  const isGooglePubSubUserAgent = userAgent === 'Cloudpubsub-Google' || Boolean(userAgent?.startsWith('Cloudpubsub-Google'))
 
   const normalizedAuthHeader = authHeader?.trim()
   const bearerSecret = normalizedAuthHeader?.startsWith('Bearer ')
@@ -44,13 +46,13 @@ export function isAuthorizedRequest(
       alternateSecret === expectedSecret ||
       querySecret === expectedSecret
     )
-  ) || hasGooglePubSubHeaders
+  ) || hasGooglePubSubHeaders || isGooglePubSubUserAgent
 
   return {
     isAuthorized,
     hasAuthHeader: Boolean(authHeader),
     hasAlternateSecret: Boolean(alternateSecret),
-    hasGooglePubSubHeaders,
+    hasGooglePubSubHeaders: hasGooglePubSubHeaders || isGooglePubSubUserAgent,
     hasQuerySecret: Boolean(querySecret),
     secretConfigured: Boolean(expectedSecret),
     authHeader,
