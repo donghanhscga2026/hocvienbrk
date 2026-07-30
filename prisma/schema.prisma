@@ -1531,6 +1531,8 @@ enum EnrollmentStatus {
 
 enum EnrollmentMode {
   ACTIVE
+  FREE
+  COMPANION
   AUDITOR
 }
 

@@ -42,7 +42,8 @@ export default function PaymentModal({ course, enrollment, userPhone = null, use
     const isPending = paymentStatus === 'PENDING' || paymentStatus === undefined
     
     // Use payment amount directly — server handles voucher logic
-    const effectiveAmount = payment?.amount || course.phi_coc || 0
+    const effectiveAmount = payment?.amount ?? course.phi_coc ?? 0
+    const voucherSaved = course.phi_coc ? Math.max(0, course.phi_coc - effectiveAmount) : 0
     
     // Format nội dung thống nhất với lib/vietqr: SDT [6_cuối] HV [userId] COC [courseCode]
     const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-6) : ''
@@ -145,7 +146,12 @@ export default function PaymentModal({ course, enrollment, userPhone = null, use
                                 <p className="text-lg sm:text-xl font-black text-[#7c3aed]">
                                     {effectiveAmount?.toLocaleString()}đ
                                 </p>
-                                {effectiveAmount === 0 && (
+                                {voucherSaved > 0 && (
+                                    <p className="text-[9px] font-bold text-green-600 italic">
+                                        * Đã sử dụng voucher {voucherSaved.toLocaleString()}đ
+                                    </p>
+                                )}
+                                {effectiveAmount === 0 && voucherSaved === 0 && (
                                     <p className="text-[9px] font-bold text-green-600 italic">
                                         * Miễn phí
                                     </p>

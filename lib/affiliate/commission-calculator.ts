@@ -31,6 +31,17 @@ export async function processEnrollmentCommission(
             return { success: true, message: 'Already processed' }
         }
 
+        // Fetch courseId from enrollment
+        const currentEnrollment = await prisma.enrollment.findUnique({
+            where: { id: enrollmentId },
+            select: { courseId: true }
+        })
+        if (!currentEnrollment) {
+            console.error('[Commission] Enrollment not found:', enrollmentId)
+            return { success: false, error: 'Enrollment not found' }
+        }
+        const courseId = currentEnrollment.courseId
+
         // 1. Tìm thông tin user và referrer
         const user = await prisma.user.findUnique({
             where: { id: userId },
@@ -134,8 +145,23 @@ export async function processEnrollmentCommission(
                 continue
             }
 
-            // Tính hoa hồng
-            const grossAmount = Math.floor(coursePrice * (levelConfig.percentage / 100))
+            // Kiểm tra người nhận hoa hồng (upline.userId) đã kích hoạt khóa học này chưa
+            const uplineEnrollment = await prisma.enrollment.findUnique({
+                where: {
+                    userId_courseId: {
+                        userId: upline.userId,
+                        courseId: courseId
+                    }
+                },
+                select: { status: true }
+            })
+            const isUplineActive = uplineEnrollment?.status === 'ACTIVE'
+
+            // Tính hoa hồng (giảm 50% nếu chưa kích hoạt khóa học)
+            const basePercentage = levelConfig.percentage
+            const finalPercentage = isUplineActive ? basePercentage : basePercentage * 0.5
+
+            const grossAmount = Math.floor(coursePrice * (finalPercentage / 100))
             const taxAmount = grossAmount * (campaign.taxRate / 100)
             const feeAmount = campaign.feeAmount
             const netAmount = grossAmount - taxAmount - feeAmount
@@ -148,7 +174,7 @@ export async function processEnrollmentCommission(
                     conversionId: conversion.id,
                     affiliateId: upline.userId,
                     level: upline.level,
-                    percentage: levelConfig.percentage,
+                    percentage: finalPercentage,
                     grossAmount,
                     taxAmount,
                     feeAmount,
@@ -167,7 +193,7 @@ export async function processEnrollmentCommission(
             commissionResults.push({
                 affiliateId: upline.userId,
                 level: upline.level,
-                percentage: levelConfig.percentage,
+                percentage: finalPercentage,
                 grossAmount,
                 netAmount,
                 landingSlug

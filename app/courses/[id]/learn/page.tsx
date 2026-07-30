@@ -75,6 +75,7 @@ export default async function CourseLearnPage({
     select: {
       id: true,
       status: true,
+      studyMode: true,
       startedAt: true,
       resetAt: true,
       lastLessonId: true,
