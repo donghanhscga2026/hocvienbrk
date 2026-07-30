@@ -243,6 +243,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const completedCount = Object.values(progressMap).filter((p: any) => p.status === 'COMPLETED').length
     const startedAt = enrollment.startedAt ? new Date(enrollment.startedAt) : null
+    const isAuditor = enrollment.studyMode === 'AUDITOR'
 
     // [HYDRATION SAFEGUARD] Trả về giao diện trống tối giản trên server
     if (!isMounted) {
@@ -251,6 +252,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     return (
         <div className="flex flex-col h-full bg-black text-zinc-300">
+            {isAuditor && (
+                <div className="bg-yellow-500/15 border border-yellow-500 text-yellow-900 px-4 py-3 text-sm font-bold text-center">
+                    ⚠️ Bạn đang học ở chế độ DỰ THÍNH. Bạn vẫn xem được video, nhưng không được nhận link Zoom/live trực tiếp và quyền lợi đồng hành đầy đủ.
+                </div>
+            )}
             {/* Header */}
             <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900 z-50 fixed top-0 left-0 right-0">
                 <div className="flex items-center gap-3 min-w-0">

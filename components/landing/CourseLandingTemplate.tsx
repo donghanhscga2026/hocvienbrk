@@ -38,17 +38,24 @@ interface CourseLandingTemplateProps {
         mo_ta_dai?: string | null
         link_anh_bia?: string | null
         phi_coc: number
+        feeType?: string
         category?: string | null
         courseCategory?: { name: string } | null
     }
     lessons: CourseLesson[]
     testimonials: CourseTestimonial[]
-    enrollment?: { status: string } | null
+    enrollment?: { status: string; studyMode?: string } | null
     userPhone: string | null
     userId: number | null
     session: any
     totalHours: number
     activeStudentCount: number
+}
+
+const feeTypeLabels: Record<string, string> = {
+    MIEN_PHI: 'Miễn phí',
+    PHI_TUY_TINH: 'Phí tùy tính',
+    PHI_CAM_KET: 'Phí cam kết'
 }
 
 export default function CourseLandingTemplate({
@@ -70,11 +77,18 @@ export default function CourseLandingTemplate({
     const [localEnrollment, setLocalEnrollment] = useState<any>(null)
     const [hasActivated, setHasActivated] = useState(false)
     const [showActivatedToast, setShowActivatedToast] = useState(false)
-    
+
+    const feeLabel = feeTypeLabels[course.feeType || ''] || 'Phí'
     const effectiveEnrollment = localEnrollment || enrollment
     const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
     const isPending = effectiveEnrollment?.status === 'PENDING'
     const effectivePhiCoc = course.phi_coc
+    const canShare = !!session
+    const shareInfo = !canShare
+        ? 'Đăng nhập để chia sẻ và nhận hoa hồng affiliate.'
+        : isEnrolled
+            ? 'Chia sẻ link để nhận 100% hoa hồng khi đã kích hoạt.'
+            : 'Chia sẻ link để nhận 50% hoa hồng khi chưa kích hoạt.'
 
     // Polling: tự động kiểm tra trạng thái ghi danh sau thanh toán
     useEffect(() => {
@@ -215,17 +229,14 @@ export default function CourseLandingTemplate({
                                 {course.name_khoa && (
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>
                                 )}
-                                <div className="mt-2">
-                                    {effectivePhiCoc === 0 ? (
-                                        <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
-                                            Miễn phí
-                                        </span>
-                                    ) : (
-                                        <p className="text-2xl font-black text-brk-primary">
-                                            {effectivePhiCoc.toLocaleString('vi-VN')}đ
-                                        </p>
-                                    )}
-                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
+                                    {feeLabel}
+                                </span>
+                                <p className="text-2xl font-black text-brk-primary">
+                                    {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                </p>
+                            </div>
                             </div>
                             
                             {isEnrolled && (
@@ -247,22 +258,17 @@ export default function CourseLandingTemplate({
                             )}
                             
                             {getCTAButton()}
-
-                            {isEnrolled && (
+                            <div className="mt-4 space-y-3">
                                 <button
                                     onClick={handleCopyShareLink}
-                                    className="w-full mt-3 bg-white border-2 border-brk-primary text-brk-primary py-3 rounded-2xl font-bold text-sm hover:bg-brk-primary/5 transition-all flex items-center justify-center gap-2"
+                                    disabled={!canShare}
+                                    className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wide transition-all flex items-center justify-center gap-2 ${canShare ? 'bg-white border-2 border-brk-primary text-brk-primary hover:bg-brk-primary/5 shadow-sm shadow-brk-primary/10' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
                                 >
                                     <Link2 className="w-4 h-4" />
                                     {copied ? '✓ Đã sao chép' : 'Chia sẻ link giới thiệu'}
                                 </button>
-                            )}
-
-                            {!session && (
-                                <p className="mt-3 text-center text-xs text-brk-muted">
-                                    Đăng nhập để xem tiến độ học tập
-                                </p>
-                            )}
+                                <p className="text-center text-xs text-brk-muted">{shareInfo}</p>
+                            </div>
 
                             {/* Stats */}
                             <div className="mt-6 pt-6 border-t border-brk-outline">
@@ -301,7 +307,7 @@ export default function CourseLandingTemplate({
                             Giới thiệu khóa học
                         </h2>
                         <div 
-                            className="text-brk-on-surface leading-relaxed whitespace-pre-line"
+                            className="text-brk-on-surface leading-relaxed whitespace-pre-line text-justify"
                             dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || 'Khóa học đang được cập nhật...' }}
                         />
                     </div>
@@ -427,47 +433,6 @@ export default function CourseLandingTemplate({
                 </div>
             </section>
             
-            {/* Final CTA - Share Section */}
-            <section className="py-16 bg-brk-surface">
-                <div className="container mx-auto px-4 text-center">
-                    <div className="max-w-2xl mx-auto">
-                        {isEnrolled ? (
-                            <>
-                                <Link2 className="w-12 h-12 mx-auto text-brk-primary mb-4" />
-                                <h2 className="text-3xl font-black text-brk-on-surface mb-4">
-                                    Chia sẻ khóa học này
-                                </h2>
-                                <p className="text-brk-muted mb-8 leading-relaxed">
-                                    Giới thiệu khóa học đến bạn bè và nhận tri ân tương xứng
-                                </p>
-                                <button
-                                    onClick={handleCopyShareLink}
-                                    className="inline-flex items-center gap-2 bg-brk-primary text-brk-on-primary px-8 py-4 rounded-2xl font-black text-lg hover:brightness-110 transition-all shadow-xl shadow-brk-primary/20"
-                                >
-                                    {copied ? (
-                                        <>Đã sao chép!</>
-                                    ) : (
-                                        <>
-                                            <Link2 className="w-5 h-5" />
-                                            Sao chép link giới thiệu
-                                        </>
-                                    )}
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <h2 className="text-3xl font-black text-brk-on-surface mb-4">
-                                    Sẵn sàng bắt đầu?
-                                </h2>
-                                <p className="text-brk-muted mb-8 leading-relaxed">
-                                    Tham gia khóa học để chia sẻ và nhận tri ân tương xứng
-                                </p>
-                                {getCTAButton()}
-                            </>
-                        )}
-                    </div>
-                </div>
-            </section>
             
             {/* Footer */}
             <footer className="py-8 text-center text-brk-muted text-sm">

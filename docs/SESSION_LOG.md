@@ -644,3 +644,35 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ Liên kết tài khoản Telegram Bot cá nhân và API gửi thông báo đã được kiểm thử độc lập thành công.
 - ✅ Đã đẩy toàn bộ code mới nhất lên Git master branch thành công.
 
+
+## ✅ SESSION-20260730_01 — Sửa lỗi cấu hình Cron quét email & Hoàn thiện nâng cấp khóa học (studyMode & 50% hoa hồng)
+
+- **Ngày**: 2026-07-30
+- **Thời gian**: ~17:15 - 18:25
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Sửa lỗi quét email duyệt tự động bị chậm trễ do thiếu lịch chạy 15 phút.
+- Hoàn thiện 2 yêu cầu còn thiếu của kế hoạch nâng cấp trang khóa học:
+  1. Hiển thị cảnh báo trạng thái Dự thính (Auditor Warning) trên giao diện học.
+  2. Áp dụng luật giảm 50% hoa hồng ở Backend cho người chia sẻ chưa kích hoạt khóa học.
+
+### Các file đã thay đổi
+
+#### `.github/workflows/cron-jobs.yml`
+- Khôi phục mốc chạy tự động mỗi 15 phút (`- cron: '*/15 * * * *'`) vào phần schedule và cập nhật điều kiện check `if` của job `gmail-watch` để kích hoạt quét email thường xuyên hơn.
+
+#### `components/course/CoursePlayer.tsx`
+- Bổ sung định nghĩa biến `isAuditor = enrollment.studyMode === 'AUDITOR'` để kích hoạt render banner cảnh báo Dự thính trên giao diện trang học.
+
+#### `lib/affiliate/commission-calculator.ts`
+- Cập nhật hàm `processEnrollmentCommission`: Truy vấn `courseId` từ `enrollmentId`, sau đó kiểm tra xem người giới thiệu (`upline.userId`) đã có đăng ký học `ACTIVE` trong khóa học đó chưa. Nếu chưa kích hoạt, áp dụng mức hoa hồng giảm 50% (`finalPercentage = basePercentage * 0.5`).
+
+#### `app/actions/course-actions.ts` & `app/api/enroll-after-register/route.ts`
+- Bổ sung trường `feeType` vào câu lệnh truy vấn select `prisma.course.findUnique`.
+- Nhập `EnrollmentMode` từ `@prisma/client` và sử dụng giá trị enum chính xác (`EnrollmentMode.FREE` / `EnrollmentMode.COMPANION` / `EnrollmentMode.AUDITOR`) để đảm bảo an toàn kiểu dữ liệu.
+
+### Kiểm tra
+- ✅ Đã chạy `npx prisma generate` để cập nhật Prisma Client cho enum `EnrollmentMode`.
+- ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+

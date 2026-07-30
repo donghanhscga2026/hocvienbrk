@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { Role, Prisma } from "@prisma/client"
+import { Role, Prisma, EnrollmentMode } from "@prisma/client"
 import type { Enrollment } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { cookies, headers } from "next/headers"
@@ -37,6 +37,7 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
                 teacherId: true,
                 requiresReferralActivation: true,
                 referralActivationThreshold: true,
+                feeType: true,
                 teacherBankAccount: {
                     select: { accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true }
                 }
@@ -182,17 +183,17 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
         const isAutoActive = effectivePhiCoc === 0
-        let studyMode: 'ACTIVE' | 'AUDITOR' = 'ACTIVE'
-        if (course.requiresReferralActivation && course.referralActivationThreshold > 0) {
-            const referrerActiveCount = enrollmentReferrerId
-                ? await prisma.enrollment.count({
-                    where: {
-                        referrerId: enrollmentReferrerId,
-                        status: 'ACTIVE'
-                    }
-                })
-                : 0
-            studyMode = referrerActiveCount >= course.referralActivationThreshold ? 'ACTIVE' : 'AUDITOR'
+        let studyMode: EnrollmentMode = course.feeType === 'MIEN_PHI' ? EnrollmentMode.FREE : EnrollmentMode.COMPANION
+
+        if (course.requiresReferralActivation && course.referralActivationThreshold > 0 && course.feeType !== 'MIEN_PHI') {
+            const referrerActiveCount = await prisma.enrollment.count({
+                where: {
+                    referrerId: userId,
+                    courseId,
+                    status: 'ACTIVE'
+                }
+            })
+            studyMode = referrerActiveCount >= course.referralActivationThreshold ? EnrollmentMode.COMPANION : EnrollmentMode.AUDITOR
         }
 
         let newEnrollment: Enrollment | null = null

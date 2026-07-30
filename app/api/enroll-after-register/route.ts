@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { isTestAccount } from "@/lib/test-account"
+import { EnrollmentMode } from "@prisma/client"
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
         noidung_email: true,
         requiresReferralActivation: true,
         referralActivationThreshold: true,
+        feeType: true,
       }
     })
 
@@ -73,17 +75,16 @@ export async function POST(request: NextRequest) {
     }
 
     const isAutoActive = effectivePhiCoc === 0
-    let studyMode: 'ACTIVE' | 'AUDITOR' = 'ACTIVE'
-    if (course.requiresReferralActivation && course.referralActivationThreshold > 0) {
-      const referrerActiveCount = user?.referrerId
-        ? await prisma.enrollment.count({
-            where: {
-              referrerId: user.referrerId,
-              status: 'ACTIVE'
-            }
-          })
-        : 0
-      studyMode = referrerActiveCount >= course.referralActivationThreshold ? 'ACTIVE' : 'AUDITOR'
+    let studyMode: EnrollmentMode = course.feeType === 'MIEN_PHI' ? EnrollmentMode.FREE : EnrollmentMode.COMPANION
+    if (course.requiresReferralActivation && course.referralActivationThreshold > 0 && course.feeType !== 'MIEN_PHI') {
+      const referrerActiveCount = await prisma.enrollment.count({
+        where: {
+          referrerId: userIdNum,
+          courseId: course.id,
+          status: 'ACTIVE'
+        }
+      })
+      studyMode = referrerActiveCount >= course.referralActivationThreshold ? EnrollmentMode.COMPANION : EnrollmentMode.AUDITOR
     }
 
     const newEnrollment = await prisma.enrollment.create({
