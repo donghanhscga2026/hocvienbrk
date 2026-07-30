@@ -354,6 +354,8 @@ model Course {
   link_zalo            String?
   phi_coc              Int                     @default(0)
   feeType              FeeType                 @default(MIEN_PHI)
+  requiresReferralActivation Boolean          @default(false)
+  referralActivationThreshold Int                 @default(0)
   vipExempt            Boolean                 @default(false)
   noidung_stk          String?
   file_email           String?
@@ -419,6 +421,7 @@ model Enrollment {
   userId         Int
   courseId       Int
   status         EnrollmentStatus @default(PENDING)
+  studyMode      EnrollmentMode   @default(ACTIVE)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   activatedAt    DateTime?
@@ -1524,6 +1527,11 @@ enum EnrollmentStatus {
   ACTIVE
   REJECTED
   CANCELLED
+}
+
+enum EnrollmentMode {
+  ACTIVE
+  AUDITOR
 }
 
 enum Role {

@@ -53,6 +53,8 @@ function CreateCourseContent() {
     // Section3: Học phí & Thanh toán
     const [phiCoc, setPhiCoc] = useState(0)
     const [feeType, setFeeType] = useState('MIEN_PHI')
+    const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
+    const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
     const [awardVoucherIds, setAwardVoucherIds] = useState<number[]>([])
     const [allVouchers, setAllVouchers] = useState<any[]>([])
@@ -188,6 +190,8 @@ function CreateCourseContent() {
                         
                         setPhiCoc(courseRes.phi_coc || 0)
                         setFeeType(courseRes.feeType || 'MIEN_PHI')
+                        setRequiresReferralActivation(courseRes.requiresReferralActivation || false)
+                        setReferralActivationThreshold(courseRes.referralActivationThreshold || 0)
                         setAcceptedVoucherIds(courseRes.acceptedVouchers?.map((v: any) => v.voucherId) || [])
                         setAwardVoucherIds(courseRes.voucherAwards?.map((v: any) => v.voucherId) || [])
                         setNoidungStk(courseRes.noidung_stk || '')
@@ -290,6 +294,8 @@ function CreateCourseContent() {
             if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
             formData.append('phi_coc', phiCoc.toString())
             formData.append('feeType', feeType)
+            formData.append('requiresReferralActivation', requiresReferralActivation ? 'true' : 'false')
+            formData.append('referralActivationThreshold', referralActivationThreshold.toString())
             formData.append('acceptedVoucherIds', JSON.stringify(acceptedVoucherIds))
             formData.append('awardVoucherIds', JSON.stringify(awardVoucherIds))
             if (teacherBankAccountId) formData.append('teacherBankAccountId', teacherBankAccountId.toString())
@@ -660,6 +666,20 @@ function CreateCourseContent() {
                                 <option value="PHI_DONG_HANH">Phí đồng hành</option>
                                 <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
                             </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Yêu cầu kích hoạt referral</label>
+                            <label className="inline-flex items-center gap-2 mt-1 cursor-pointer">
+                                <input type="checkbox" checked={requiresReferralActivation} onChange={(e) => setRequiresReferralActivation(e.target.checked)} className="w-4 h-4 rounded" />
+                                <span className="text-sm font-bold text-gray-600">Bật điều kiện giới thiệu</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số lượng học viên kích hoạt cần thiết</label>
+                            <input type="number" value={referralActivationThreshold} onChange={(e) => setReferralActivationThreshold(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" min={0} />
                         </div>
                     </div>
                     

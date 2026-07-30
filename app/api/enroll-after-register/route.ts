@@ -30,6 +30,8 @@ export async function POST(request: NextRequest) {
         type: true,
         teacherId: true,
         noidung_email: true,
+        requiresReferralActivation: true,
+        referralActivationThreshold: true,
       }
     })
 
@@ -55,37 +57,45 @@ export async function POST(request: NextRequest) {
     }
 
     let effectivePhiCoc = course.phi_coc
-    let appliedUserVoucherId: number | null = null
+    let voucherDeducted = 0
+    let voucherApplied = false
 
     if (course.type !== 'LIB' && course.type !== 'SYS') {
-      const { checkVoucherForCourse } = await import('@/lib/voucher/voucher-service')
-      const voucherCheck = await checkVoucherForCourse(userIdNum, course.id)
-      if (voucherCheck.applicable) {
-        if (voucherCheck.voucherType === 'CASH') {
-          effectivePhiCoc = Math.max(0, course.phi_coc - (voucherCheck.discount || 0))
-        } else {
-          effectivePhiCoc = 0
-        }
-        appliedUserVoucherId = voucherCheck.userVoucherId || null
+      const brkWallet = await prisma.brkWallet.findUnique({ where: { userId: userIdNum } })
+      const voucherBalance = Number(brkWallet?.voucherBalance || 0)
+      if (voucherBalance > 0 && effectivePhiCoc > 0) {
+        voucherDeducted = Math.min(voucherBalance, effectivePhiCoc)
+        effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
+        voucherApplied = voucherDeducted > 0
+        const { debitVoucherWallet } = await import('@/lib/brk/wallet-service')
+        await debitVoucherWallet(userIdNum, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${course.id}`, userIdNum)
       }
     }
 
     const isAutoActive = effectivePhiCoc === 0
+    let studyMode: 'ACTIVE' | 'AUDITOR' = 'ACTIVE'
+    if (course.requiresReferralActivation && course.referralActivationThreshold > 0) {
+      const referrerActiveCount = user?.referrerId
+        ? await prisma.enrollment.count({
+            where: {
+              referrerId: user.referrerId,
+              status: 'ACTIVE'
+            }
+          })
+        : 0
+      studyMode = referrerActiveCount >= course.referralActivationThreshold ? 'ACTIVE' : 'AUDITOR'
+    }
 
     const newEnrollment = await prisma.enrollment.create({
       data: {
         userId: userIdNum,
         courseId: course.id,
         status: isAutoActive ? "ACTIVE" : "PENDING",
+        studyMode,
+        phi_coc: effectivePhiCoc,
         referrerId: user?.referrerId || null,
       }
     })
-
-    // Đánh dấu voucher đã dùng (nếu có)
-    if (appliedUserVoucherId) {
-      const { markVoucherUsed } = await import('@/lib/voucher/voucher-service')
-      await markVoucherUsed(appliedUserVoucherId, newEnrollment.id)
-    }
 
     // Award voucher từ course
     const { awardVoucher } = await import('@/lib/voucher/voucher-service')
