@@ -665,7 +665,7 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - Khôi phục mốc chạy tự động mỗi 15 phút (`- cron: '*/15 * * * *'`) vào phần schedule và cập nhật điều kiện check `if` của job `gmail-watch` để kích hoạt quét email thường xuyên hơn.
 
 #### `lib/request-auth.ts`
-- Thêm cơ chế nhận dạng User-Agent đặc trưng của Google Cloud Pub/Sub (`Cloudpubsub-Google`) để tự động thông qua lớp xác thực Webhook Gmail bảo mật.
+- Thêm cơ chế nhận dạng không phân biệt chữ hoa/thường đối với toàn bộ các User-Agent của Google Cloud Pub/Sub (`apis-google`, `cloudpubsub-google`, `google-cloud-pubsub`) để cho phép các gói tin Push từ Google tự động vượt qua bộ lọc bảo mật Gmail Webhook.
 
 #### `lib/notifications.ts`
 - Điều chỉnh độ ưu tiên định tuyến tin nhắn: Nhóm thông báo `ACTIVATE` ưu tiên gửi về `TELEGRAM_CHAT_ID_ACTIVATE` trước `TELEGRAM_CHAT_ID_MBC_LOG` để trả về đúng nhóm "MBC Kích hoạt khóa học" (tránh bị lỗi chat not found ở nhóm log).
