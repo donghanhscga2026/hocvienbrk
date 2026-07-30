@@ -645,15 +645,16 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ Đã đẩy toàn bộ code mới nhất lên Git master branch thành công.
 
 
-## ✅ SESSION-20260730_01 — Sửa cấu hình Cron quét email, sửa bảo mật Webhook & Hoàn thiện nâng cấp khóa học
+## ✅ SESSION-20260730_01 — Sửa cấu hình Cron quét email, sửa bảo mật Webhook, định tuyến Telegram & Hoàn thiện nâng cấp khóa học
 
 - **Ngày**: 2026-07-30
-- **Thời gian**: ~17:15 - 18:25
+- **Thời gian**: ~17:15 - 22:45
 - **Trạng thái**: ✅ Hoàn thành
 
 ### Mục tiêu
 - Sửa lỗi quét email duyệt tự động bị chậm trễ do thiếu lịch chạy 15 phút.
 - Sửa lỗi bảo mật Webhook `/api/webhooks/gmail` chặn yêu cầu Push từ Google Cloud Pub/Sub do thiếu nhận diện User-Agent.
+- Đồng bộ định tuyến thông báo kích hoạt khóa học về đúng nhóm chuyên trách (`TELEGRAM_CHAT_ID_ACTIVATE`) thay vì chuyển tiếp sang kênh Log hệ thống bị lỗi.
 - Hoàn thiện 2 yêu cầu còn thiếu của kế hoạch nâng cấp trang khóa học:
   1. Hiển thị cảnh báo trạng thái Dự thính (Auditor Warning) trên giao diện học.
   2. Áp dụng luật giảm 50% hoa hồng ở Backend cho người chia sẻ chưa kích hoạt khóa học.
@@ -665,6 +666,9 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 
 #### `lib/request-auth.ts`
 - Thêm cơ chế nhận dạng User-Agent đặc trưng của Google Cloud Pub/Sub (`Cloudpubsub-Google`) để tự động thông qua lớp xác thực Webhook Gmail bảo mật.
+
+#### `lib/notifications.ts`
+- Điều chỉnh độ ưu tiên định tuyến tin nhắn: Nhóm thông báo `ACTIVATE` ưu tiên gửi về `TELEGRAM_CHAT_ID_ACTIVATE` trước `TELEGRAM_CHAT_ID_MBC_LOG` để trả về đúng nhóm "MBC Kích hoạt khóa học" (tránh bị lỗi chat not found ở nhóm log).
 
 #### `components/course/CoursePlayer.tsx`
 - Bổ sung định nghĩa biến `isAuditor = enrollment.studyMode === 'AUDITOR'` để kích hoạt render banner cảnh báo Dự thính trên giao diện trang học.
@@ -678,6 +682,8 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 
 ### Kiểm tra
 - ✅ Đã chạy `npx prisma generate` để cập nhật Prisma Client cho enum `EnrollmentMode`.
+- ✅ Đã đồng bộ cấu hình schema Enum và Database thông qua `npx prisma db push` thành công.
 - ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+
 
 
