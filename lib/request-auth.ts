@@ -32,7 +32,11 @@ export function isAuthorizedRequest(
     .find((value): value is string => Boolean(value)) ?? null
   const hasGooglePubSubHeaders = ['x-goog-topic', 'x-goog-message-id', 'x-goog-subscription-name'].some((header) => Boolean(req.headers.get(header)))
   const userAgent = req.headers.get('user-agent') || req.headers.get('User-Agent')
-  const isGooglePubSubUserAgent = userAgent === 'Cloudpubsub-Google' || Boolean(userAgent?.startsWith('Cloudpubsub-Google'))
+  const userAgentLower = userAgent?.toLowerCase() || ''
+  const isGooglePubSubUserAgent = 
+    userAgentLower.includes('cloudpubsub-google') ||
+    userAgentLower.includes('apis-google') ||
+    userAgentLower.includes('google-cloud-pubsub')
 
   const normalizedAuthHeader = authHeader?.trim()
   const bearerSecret = normalizedAuthHeader?.startsWith('Bearer ')
