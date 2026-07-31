@@ -123,10 +123,14 @@ function CreateCampaignContent() {
   const getRecipientSources = () => {
     const sources = [
       { value: 'DB_ACTIVE', label: 'Học viên đang học trong khóa' },
-      { value: 'CSV', label: 'Danh sách CSV/JSON tự nhập' },
+      { value: 'CSV', label: 'Danh sách tự nhập thủ công (Email/Tên)' },
+      { value: 'GOOGLE_SHEET', label: 'Link Google Sheet chứa Email' },
     ]
     if (!isTeacher) {
-      sources.unshift({ value: 'DB_ALL', label: 'Tất cả học viên (đã xác thực email)' })
+      sources.unshift(
+        { value: 'DB_ALL', label: 'Tất cả học viên (đã xác thực email)' },
+        { value: 'DB_ALL_INCLUDING_UNVERIFIED', label: 'Tất cả học viên (cả chưa xác thực email)' }
+      )
     }
     return sources
   }
@@ -135,14 +139,29 @@ function CreateCampaignContent() {
     setPreviewLoading(true)
     setRecipientPreview(null)
     try {
-      let url = `/api/admin/campaigns/potential-recipients?source=${recipientSource}`
-      if (recipientSource === 'DB_ACTIVE' && recipientCourseId) {
-        url += `&courseId=${recipientCourseId}`
-      }
-      const res = await fetch(url)
-      if (res.ok) {
-        const data = await res.json()
-        setRecipientPreview(Array.isArray(data) ? data : [])
+      if (recipientSource === 'CSV' || recipientSource === 'GOOGLE_SHEET') {
+        const res = await fetch('/api/admin/campaigns/potential-recipients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: recipientSource, recipientCsvData })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setRecipientPreview(Array.isArray(data) ? data : [])
+        } else {
+          const errText = await res.text()
+          alert(errText || 'Lỗi phân tích nguồn dữ liệu')
+        }
+      } else {
+        let url = `/api/admin/campaigns/potential-recipients?source=${recipientSource}`
+        if (recipientSource === 'DB_ACTIVE' && recipientCourseId) {
+          url += `&courseId=${recipientCourseId}`
+        }
+        const res = await fetch(url)
+        if (res.ok) {
+          const data = await res.json()
+          setRecipientPreview(Array.isArray(data) ? data : [])
+        }
       }
     } catch {}
     setPreviewLoading(false)
@@ -165,37 +184,31 @@ function CreateCampaignContent() {
       body.recipientFilter = { courseId: parseInt(recipientCourseId) || 0 }
     }
 
-    if (recipientSource === 'CSV') {
+    if (recipientSource === 'CSV' || recipientSource === 'GOOGLE_SHEET') {
       body.recipientCsvData = recipientCsvData
     }
 
     try {
-      const res = await fetch('/api/admin/campaigns', {
-        method: 'POST',
+      const url = isEditMode ? `/api/admin/campaigns/${campaignId}` : '/api/admin/campaigns'
+      const method = isEditMode ? 'PUT' : 'POST'
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
 
       if (res.ok) {
         const campaign = await res.json()
-        setMessage({ type: 'success', text: 'Đã tạo chiến dịch thành công!' })
+        setMessage({ type: 'success', text: isEditMode ? 'Đã cập nhật chiến dịch thành công!' : 'Đã tạo chiến dịch thành công!' })
         setTimeout(() => router.push(`/tools/email-mkt/${campaign.id}`), 1200)
       } else {
         const errText = await res.text()
-        setMessage({ type: 'error', text: errText || 'Lỗi khi tạo chiến dịch' })
+        setMessage({ type: 'error', text: errText || 'Lỗi khi lưu chiến dịch' })
       }
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Lỗi kết nối' })
     }
     setLoading(false)
-  }
-
-  if (fetching) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-      </div>
-    )
   }
 
   return (
@@ -233,7 +246,7 @@ function CreateCampaignContent() {
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nguồn</label>
-              <select value={recipientSource} onChange={e => { setRecipientSource(e.target.value); setRecipientPreview(null) }}
+              <select value={recipientSource} onChange={e => { setRecipientSource(e.target.value); setRecipientPreview(null); setRecipientCsvData('') }}
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
                 {getRecipientSources().map(s => (
                   <option key={s.value} value={s.value}>{s.label}</option>
@@ -256,11 +269,23 @@ function CreateCampaignContent() {
 
             {recipientSource === 'CSV' && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Dữ liệu CSV/JSON</label>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh sách người nhận (Email/Tên)</label>
                 <textarea value={recipientCsvData} onChange={e => setRecipientCsvData(e.target.value)}
-                  rows={5}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none resize-y font-mono"
-                  placeholder='[{"email":"user@example.com","name":"Nguyen Van A"}]' />
+                  rows={6}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none resize-y font-sans font-bold"
+                  placeholder={`Mỗi người một dòng. Hỗ trợ định dạng:\nnguyenvana@gmail.com, Nguyễn Văn A\ntranthib@gmail.com; Trần Thị B\nhoangvanc@gmail.com`} />
+              </div>
+            )}
+
+            {recipientSource === 'GOOGLE_SHEET' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Link Google Sheet công khai</label>
+                <input type="url" value={recipientCsvData} onChange={e => setRecipientCsvData(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none"
+                  placeholder="https://docs.google.com/spreadsheets/d/.../edit" required />
+                <p className="text-[10px] text-gray-400 ml-1">
+                  * Yêu cầu: Sheet phải chia sẻ ở chế độ "Bất kỳ ai có liên kết đều xem được" (Anyone with the link can view). Sheet phải chứa cột có tên "Email" hoặc "mail".
+                </p>
               </div>
             )}
 
