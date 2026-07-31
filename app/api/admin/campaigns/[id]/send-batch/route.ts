@@ -301,11 +301,19 @@ export async function POST(
             });
           }
 
+          // Đếm số lượng thực tế từ log DB để cập nhật chính xác tránh bị lệch lũy kế
+          const currentSentCount = await prisma.emailCampaignLog.count({
+            where: { campaignId, status: { in: ['SENT', 'SKIPPED'] } }
+          });
+          const currentFailedCount = await prisma.emailCampaignLog.count({
+            where: { campaignId, status: 'FAILED' }
+          });
+
           await prisma.emailCampaign.update({
             where: { id: campaignId },
             data: {
-              sentCount: { increment: results.sent },
-              failedCount: { increment: results.failed },
+              sentCount: currentSentCount,
+              failedCount: currentFailedCount,
               status: "RUNNING",
               startedAt: campaign.startedAt || new Date(),
             }
@@ -350,11 +358,19 @@ export async function POST(
     const remainingAfterBatch = unsentRecipients.length - recipientsBatch.length;
     const isCompleted = remainingAfterBatch <= 0;
 
+    // Đếm số lượng thực tế từ log DB để cập nhật chính xác tránh bị lệch lũy kế
+    const finalSentCount = await prisma.emailCampaignLog.count({
+      where: { campaignId, status: { in: ['SENT', 'SKIPPED'] } }
+    });
+    const finalFailedCount = await prisma.emailCampaignLog.count({
+      where: { campaignId, status: 'FAILED' }
+    });
+
     await prisma.emailCampaign.update({
       where: { id: campaignId },
       data: {
-        sentCount: { increment: results.sent },
-        failedCount: { increment: results.failed },
+        sentCount: finalSentCount,
+        failedCount: finalFailedCount,
         status: isCompleted ? "COMPLETED" : "RUNNING",
         startedAt: campaign.startedAt || new Date(),
         completedAt: isCompleted ? new Date() : null,
