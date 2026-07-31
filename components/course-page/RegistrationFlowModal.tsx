@@ -65,9 +65,8 @@ export default function RegistrationFlowModal({
     }
   }, [liveSession, step])
 
-  // Load user voucher balance on entering voucher_confirm
   useEffect(() => {
-    if (step === 'voucher_confirm' && effectiveSession) {
+    if (step === 'voucher_confirm' && effectiveSession && course.voucherConfig === 'WALLET') {
       setLoadingVoucher(true)
       getBrkVoucherBalanceAction().then((bal) => {
         setVoucherBalance(bal)
@@ -79,7 +78,7 @@ export default function RegistrationFlowModal({
         setLoadingVoucher(false)
       }).catch(() => setLoadingVoucher(false))
     }
-  }, [step, effectiveSession, course.phi_coc])
+  }, [step, effectiveSession, course.phi_coc, course.voucherConfig])
 
   // ──────────────────────────────────────────────────────────────────────────
   // Enroll & get payment QR
@@ -254,81 +253,83 @@ export default function RegistrationFlowModal({
                 </div>
 
                 {/* Voucher select box */}
-                <div style={{
-                  background: 'rgba(200, 107, 61, 0.04)',
-                  border: '1px solid rgba(200, 107, 61, 0.15)',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  marginBottom: '28px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-                    <input
-                      type="checkbox"
-                      id="useVoucherCheckbox"
-                      checked={useVoucher}
-                      onChange={(e) => {
-                        const active = e.target.checked
-                        setUseVoucher(active)
-                        if (active) {
-                          setVoucherAmountToUse(Math.min(voucherBalance, course.phi_coc || 0))
-                        } else {
-                          setVoucherAmountToUse(0)
-                        }
-                      }}
-                      disabled={voucherBalance === 0}
-                      style={{ width: '18px', height: '18px', cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed' }}
-                    />
-                    <label
-                      htmlFor="useVoucherCheckbox"
-                      style={{
-                        fontFamily: 'Inter, sans-serif',
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        color: voucherBalance > 0 ? '#F8F1E6' : '#A8A39C',
-                        cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed',
-                      }}
-                    >
-                      Áp dụng ví Voucher để giảm học phí
-                    </label>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#C8C3BA', marginBottom: useVoucher ? '18px' : '0' }}>
-                    <Coins size={14} color="#C86B3D" />
-                    <span>Số dư ví Voucher khả dụng: <strong>{voucherBalance.toLocaleString('vi-VN')} VND</strong></span>
-                  </div>
-
-                  {useVoucher && (
-                    <div style={{ borderTop: '1px solid rgba(200, 107, 61, 0.1)', paddingTop: '16px' }}>
-                      <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#A8A39C', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Nhập số tiền muốn trừ từ ví Voucher:
+                {course.voucherConfig === 'WALLET' && (
+                  <div style={{
+                    background: 'rgba(200, 107, 61, 0.04)',
+                    border: '1px solid rgba(200, 107, 61, 0.15)',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    marginBottom: '28px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                      <input
+                        type="checkbox"
+                        id="useVoucherCheckbox"
+                        checked={useVoucher}
+                        onChange={(e) => {
+                          const active = e.target.checked
+                          setUseVoucher(active)
+                          if (active) {
+                            setVoucherAmountToUse(Math.min(voucherBalance, course.phi_coc || 0))
+                          } else {
+                            setVoucherAmountToUse(0)
+                          }
+                        }}
+                        disabled={voucherBalance === 0}
+                        style={{ width: '18px', height: '18px', cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed' }}
+                      />
+                      <label
+                        htmlFor="useVoucherCheckbox"
+                        style={{
+                          fontFamily: 'Inter, sans-serif',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          color: voucherBalance > 0 ? '#F8F1E6' : '#A8A39C',
+                          cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Áp dụng ví Voucher để giảm học phí
                       </label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <input
-                          type="number"
-                          value={voucherAmountToUse || ''}
-                          onChange={(e) => {
-                            const val = Math.max(0, parseInt(e.target.value) || 0)
-                            const maxAllowed = Math.min(voucherBalance, course.phi_coc || 0)
-                            setVoucherAmountToUse(Math.min(val, maxAllowed))
-                          }}
-                          style={{
-                            flex: 1,
-                            background: '#171823',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: '8px',
-                            color: '#F8F1E6',
-                            padding: '10px 14px',
-                            fontSize: '14px',
-                            fontWeight: 700,
-                            fontFamily: 'Inter, sans-serif',
-                            outline: 'none',
-                          }}
-                        />
-                        <span style={{ fontSize: '14px', color: '#C8C3BA', fontWeight: 600 }}>VND</span>
-                      </div>
                     </div>
-                  )}
-                </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#C8C3BA', marginBottom: useVoucher ? '18px' : '0' }}>
+                      <Coins size={14} color="#C86B3D" />
+                      <span>Số dư ví Voucher khả dụng: <strong>{voucherBalance.toLocaleString('vi-VN')} VND</strong></span>
+                    </div>
+
+                    {useVoucher && (
+                      <div style={{ borderTop: '1px solid rgba(200, 107, 61, 0.1)', paddingTop: '16px' }}>
+                        <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#A8A39C', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Nhập số tiền muốn trừ từ ví Voucher:
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <input
+                            type="number"
+                            value={voucherAmountToUse || ''}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0)
+                              const maxAllowed = Math.min(voucherBalance, course.phi_coc || 0)
+                              setVoucherAmountToUse(Math.min(val, maxAllowed))
+                            }}
+                            style={{
+                              flex: 1,
+                              background: '#171823',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '8px',
+                              color: '#F8F1E6',
+                              padding: '10px 14px',
+                              fontSize: '14px',
+                              fontWeight: 700,
+                              fontFamily: 'Inter, sans-serif',
+                              outline: 'none',
+                            }}
+                          />
+                          <span style={{ fontSize: '14px', color: '#C8C3BA', fontWeight: 600 }}>VND</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Final calculation preview */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px', fontSize: '14px' }}>
@@ -336,7 +337,7 @@ export default function RegistrationFlowModal({
                     <span>Học phí cọc gốc:</span>
                     <span>{(course.phi_coc || 0).toLocaleString('vi-VN')} VND</span>
                   </div>
-                  {useVoucher && (
+                  {course.voucherConfig === 'WALLET' && useVoucher && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#647B5E', fontWeight: 500 }}>
                       <span>Khấu trừ từ ví Voucher:</span>
                       <span>-{voucherAmountToUse.toLocaleString('vi-VN')} VND</span>

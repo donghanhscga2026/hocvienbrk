@@ -11,7 +11,7 @@ import { enrollInCourseAction, checkEnrollmentStatusAction } from '@/app/actions
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { useRouter } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
-import PaymentModal from '@/components/course/PaymentModal'
+import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 
 interface CourseLesson {
     id: string
@@ -55,7 +55,9 @@ interface CourseLandingTemplateProps {
 const feeTypeLabels: Record<string, string> = {
     MIEN_PHI: 'Miễn phí',
     PHI_TUY_TINH: 'Phí tùy tâm',
-    PHI_CAM_KET: 'Phí cam kết'
+    PHI_CAM_KET: 'Phí cam kết',
+    PHI_TOI_THIEU: 'Phí tối thiểu',
+    PHI_DONG_HANH: 'Phí đồng hành'
 }
 
 export default function CourseLandingTemplate({
@@ -73,7 +75,7 @@ export default function CourseLandingTemplate({
     const [loading, setLoading] = useState(false)
     const [showAllLessons, setShowAllLessons] = useState(false)
     const [copied, setCopied] = useState(false)
-    const [showPayment, setShowPayment] = useState(false)
+    const [showRegistration, setShowRegistration] = useState(false)
     const [localEnrollment, setLocalEnrollment] = useState<any>(null)
     const [hasActivated, setHasActivated] = useState(false)
     const [showActivatedToast, setShowActivatedToast] = useState(false)
@@ -98,7 +100,7 @@ export default function CourseLandingTemplate({
                 const res = await checkEnrollmentStatusAction(course.id)
                 if (res.status === 'ACTIVE' && !hasActivated) {
                     setHasActivated(true)
-                    setShowPayment(false)
+                    setShowRegistration(false)
                     setShowActivatedToast(true)
                     setLocalEnrollment((prev: any) => prev ? { ...prev, status: 'ACTIVE' } : { status: 'ACTIVE' })
                     router.refresh()
@@ -118,26 +120,8 @@ export default function CourseLandingTemplate({
             return
         }
         
-        setLoading(true)
-        try {
-            const res: any = await enrollInCourseAction(course.id, getClientRef())
-            if (res.success) {
-                if (res.enrollment) {
-                    setLocalEnrollment(res.enrollment)
-                }
-                if (effectivePhiCoc === 0) {
-                    router.push(`/courses/${course.id_khoa}/learn`)
-                } else {
-                    setTimeout(() => setShowPayment(true), 100)
-                }
-            } else {
-                alert((res as any).message || 'Có lỗi xảy ra')
-            }
-        } catch (err: any) {
-            alert(err.message || 'Có lỗi xảy ra')
-        } finally {
-            setLoading(false)
-        }
+        // Luôn mở Modal Đăng Ký (RegistrationFlowModal) để người dùng có thể chọn Voucher trước khi thanh toán
+        setShowRegistration(true)
     }
     
     const handleCopyShareLink = async () => {
@@ -168,7 +152,7 @@ export default function CourseLandingTemplate({
         if (isPending) {
             return (
                 <button
-                    onClick={() => setShowPayment(true)}
+                    onClick={() => setShowRegistration(true)}
                     className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-lg uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20"
                 >
                     <Clock className="w-6 h-6 animate-pulse" />
@@ -243,7 +227,7 @@ export default function CourseLandingTemplate({
                                 )}
                                 <div className="mt-2 flex flex-wrap items-center gap-3">
                                     <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
-                                        Dạng phí: {feeLabel}
+                                        {feeLabel}
                                     </span>
                                     <p className="text-lg font-black text-brk-primary">
                                         {effectivePhiCoc.toLocaleString('vi-VN')}đ
@@ -451,13 +435,18 @@ export default function CourseLandingTemplate({
                 <p>© 2026 Học viện BRK. All rights reserved.</p>
             </footer>
 
-            {showPayment && (
-                <PaymentModal
+            {showRegistration && (
+                <RegistrationFlowModal
                     course={course}
-                    enrollment={effectiveEnrollment}
+                    session={session}
                     userPhone={userPhone}
                     userId={userId}
-                    onClose={() => setShowPayment(false)}
+                    initialEnrollment={effectiveEnrollment}
+                    onClose={() => setShowRegistration(false)}
+                    onEnrolled={(enr) => {
+                        setLocalEnrollment(enr)
+                        if (enr?.status === 'ACTIVE') setHasActivated(true)
+                    }}
                 />
             )}
 
