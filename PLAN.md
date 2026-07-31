@@ -1908,5 +1908,128 @@ Sau khi fix 3 bug code, tiến hành scan toàn diện System #4 để phát hi�
 - ✅ Hệ thống duyệt tự động được giải phóng khóa kẹt (`gmail_scan_lock` reset), hoạt động thời gian thực hoàn hảo (đã tự động duyệt kích hoạt học viên mới thành công chỉ trong vòng 8-9 giây từ lúc mail báo về).
 - ✅ Liên kết tài khoản Telegram Bot cá nhân và API gửi thông báo đã được kiểm thử độc lập thành công.
 - ✅ Tài liệu kỹ thuật chi tiết & Hướng dẫn sử dụng đã được lưu tại `docs/TELEGRAM_INTEGRATION.md`.
+ 
+ 
+## ✅ Sửa cấu hình Cron quét email, sửa bảo mật Webhook, định tuyến Telegram & Hoàn thiện nâng cấp khóa học (2026-07-30)
+
+### Mục tiêu
+- Sửa lỗi quét email duyệt tự động bị chậm trễ do thiếu lịch chạy 15 phút.
+- Sửa lỗi bảo mật Webhook `/api/webhooks/gmail` chặn yêu cầu Push từ Google Cloud Pub/Sub do thiếu nhận diện User-Agent.
+- Đồng bộ định tuyến thông báo kích hoạt khóa học về đúng nhóm chuyên trách (`TELEGRAM_CHAT_ID_ACTIVATE`) thay vì chuyển tiếp sang kênh Log hệ thống bị lỗi.
+- Hoàn thiện 2 yêu cầu còn thiếu của kế hoạch nâng cấp trang khóa học:
+  1. Hiển thị cảnh báo trạng thái Dự thính (Auditor Warning) trên giao diện học.
+  2. Áp dụng luật giảm 50% hoa hồng ở Backend cho người chia sẻ chưa kích hoạt khóa học.
+
+### Các thay đổi đã thực hiện
+
+#### `.github/workflows/cron-jobs.yml`
+- Khôi phục mốc chạy tự động mỗi 15 phút (`- cron: '*/15 * * * *'`) vào phần schedule và cập nhật điều kiện check `if` của job `gmail-watch` để kích hoạt quét email thường xuyên hơn.
+
+#### `lib/request-auth.ts`
+- Thêm cơ chế nhận dạng không phân biệt chữ hoa/thường đối với toàn bộ các User-Agent của Google Cloud Pub/Sub (`apis-google`, `cloudpubsub-google`, `google-cloud-pubsub`) để cho phép các gói tin Push từ Google tự động vượt qua bộ lọc bảo mật Gmail Webhook.
+
+#### `lib/notifications.ts`
+- Điều chỉnh độ ưu tiên định tuyến tin nhắn: Nhóm thông báo `ACTIVATE` ưu tiên gửi về `TELEGRAM_CHAT_ID_ACTIVATE` trước `TELEGRAM_CHAT_ID_MBC_LOG` để trả về đúng nhóm "MBC Kích hoạt khóa học" (tránh bị lỗi chat not found ở nhóm log).
+
+#### `components/course/CoursePlayer.tsx`
+- Bổ sung định nghĩa biến `isAuditor = enrollment.studyMode === 'AUDITOR'` để kích hoạt render banner cảnh báo Dự thính trên giao diện trang học.
+
+#### `lib/affiliate/commission-calculator.ts`
+- Cập nhật hàm `processEnrollmentCommission`: Truy vấn `courseId` từ `enrollmentId`, sau đó kiểm tra xem người giới thiệu (`upline.userId`) đã có đăng ký học `ACTIVE` trong khóa học đó chưa. Nếu chưa kích hoạt, áp dụng mức hoa hồng giảm 50% (`finalPercentage = basePercentage * 0.5`).
+
+#### `app/actions/course-actions.ts` & `app/api/enroll-after-register/route.ts`
+- Bổ sung trường `feeType` vào câu lệnh truy vấn select `prisma.course.findUnique`.
+- Nhập `EnrollmentMode` từ `@prisma/client` và sử dụng giá trị enum chính xác (`EnrollmentMode.FREE` / `EnrollmentMode.COMPANION` / `EnrollmentMode.AUDITOR`) để đảm bảo an toàn kiểu dữ liệu.
+
+### Trạng thái
+- ✅ Đã chạy `npx prisma generate` để cập nhật Prisma Client cho enum `EnrollmentMode`.
+- ✅ Đã đồng bộ cấu hình schema Enum và Database thông qua `npx prisma db push` thành công.
+- ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+
+
+## ✅ Chuyển đổi Landing Page khóa học sang Template Động & Tích hợp quản trị (2026-07-31)
+
+### Mục tiêu
+- Chuyển đổi Landing Page khóa học tĩnh sang cơ chế điều khiển bằng Database (Dynamic Template) theo đặc tả kỹ thuật `TAI_LIEU_KY_THUAT_DYNAMIC_COURSE_TEMPLATE.md`.
+- Hỗ trợ ẩn/hiện thông minh (`visibility: 'all' | 'unregistered' | 'registered'`) để tối giản giao diện khi học viên đã kích hoạt.
+- Tích hợp tính năng quản lý template và bật/tắt (Toggle) trực tiếp trên trang Danh sách khóa học `/tools/courses`.
+
+### Các thay đổi đã thực hiện
+
+#### `prisma/schema.prisma`
+- Thêm các model: `CoursePage`, `CourseSection`, `CoursePageVersion` quản lý trang khóa học động và các section.
+- Thêm trường `useTemplate` vào model `CoursePage` để quản lý bật/tắt áp dụng template.
+
+#### `lib/course-page/types.ts` & `lib/course-page/schemas.ts`
+- Định nghĩa TypeScript types và Zod validation schemas cho cấu trúc Landing Page, Theme, SEO, Checkout và các Section.
+
+#### `app/actions/course-page-actions.ts`
+- Cung cấp các Server Actions CRUD quản lý trang khóa học động (`getCoursePages`, `getCoursePage`, `createCoursePage`, `updateCoursePage`, `saveCourseSections`, `deleteCoursePage`).
+
+#### `components/course-page/`
+- Tạo `CourseThemeProvider.tsx` nạp cấu hình màu sắc HEX của database thành CSS variables.
+- Tạo `SectionRenderer.tsx` xử lý lọc section theo trạng thái kích hoạt, thứ tự `sortOrder`, hỗ trợ thuộc tính `sectionType` của database.
+- Tạo component `CoursePageView.tsx` quản lý Header, Footer, Thanh tiến trình cuộn trang chuỗi hạt (Bead trail), tích hợp Checkout Modal.
+
+#### `components/course-page/sections/`
+- Xây dựng 14 section components động: `HeroSection` (hỗ trợ ảnh bìa gốc, thống kê thật, link giới thiệu affiliate), `QuoteSection`, `PainPointsSection`, `BenefitsSection`, `OutcomesSection`, `InstructorSection`, `CommitmentSection`, `BonusesSection`, `ValueStackSection`, `RoadmapSection`, `PricingSection`, `ClosingMessageSection`, `CurriculumSection` (hiển thị bài học thật), `TestimonialsSection` (hiển thị đánh giá thật).
+
+#### `app/khoa-hoc/[id]/page.tsx`
+- Tích hợp kiểm tra nếu tồn tại trang động đã cấu hình trong DB và có `useTemplate: true`, render `CoursePageView` với SEO metadata động. Ngược lại, tự động fallback về giao diện tĩnh nguyên bản.
+
+#### `app/tools/courses/page.tsx`
+- Tái cấu hình giao diện Thẻ khóa học (Course Card) để hỗ trợ Responsive tối đa cho Mobile (Tên khóa học riêng một hàng, chỉ số ở giữa, các nút tác vụ ở dưới).
+- Di chuyển nút gạt **Publish** (Hiển thị) và nút gạt **Template** (Template động) lên hàng tác vụ chính.
+- Ẩn/hiện thông minh nút **Thiết lập giao diện (Palette 🎨)**: Chỉ hiển thị khi nút gạt Template động đang được bật.
+- Tự động gọi Server Action để lưu trạng thái trực tiếp khi gạt nút.
+
+#### `app/tools/courses/[id]/edit/`
+- Tạo Router `/edit` và component form `EditCoursePageForm.tsx` quản lý cấu hình giao diện chi tiết, điều hướng chuẩn xác về `/tools/courses` sau khi lưu/hủy.
+
+#### `app/tools/pages/page.tsx`
+- Dọn dẹp, loại bỏ tab quản lý trang khóa học cũ để tập trung hoàn toàn về `/tools/courses`.
+
+### Trạng thái
+- ✅ Cập nhật DB schema thành công (`npx prisma db push`).
+- ✅ Khởi tạo dữ liệu hàng loạt thành công, 37 khóa học đã sẵn sàng quản trị template.
+- ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+
+---
+
+## ✅ Đồng bộ dữ liệu Landing Page khóa học 100-NGAY-LAN-TOA-TRI-THUC & Seed DB (2026-07-31)
+
+### Mục tiêu
+Trích xuất và chuyển đổi toàn bộ cấu trúc nội dung Landing Page (Hero, Quote, Pain Points, Benefits, Outcomes, Instructor, Commitment, Bonuses, Value Stack, Roadmap, Pricing, Closing Message) từ trang mẫu tĩnh sang định dạng JSON động của `CoursePage` và `CourseSection` cho khóa học `#39` (`100-NGAY-LAN-TOA-TRI-THUC`) trong database.
+
+### Các file đã sửa / tạo mới
+#### `plan_temp/seed-lan-toa-tri-thuc.js`
+- Tạo mới file seed dữ liệu JavaScript bằng Prisma Client để tìm/tạo CoursePage, xóa sạch các sections cũ và nạp 13 sections động đúng chuẩn Zod schema.
+
+### Trạng thái
+- ✅ Đã chạy script seed thành công, nạp đầy đủ các sections giao diện cho khóa học `#39`.
+- ✅ Lớp biên dịch TypeScript hoạt động tốt với `npx tsc --noEmit` (Exit code: 0).
+
+---
+
+## ✅ Sửa lỗi Font chữ tiếng Việt & Phối màu nền tương phản các Section (2026-07-31)
+
+### Mục tiêu
+Sửa lỗi font chữ hiển thị không chính xác khi gõ tiếng Việt có dấu (mất nét diacritics/font mismatch) và đồng bộ độ tương phản màu nền (nền tối Ink `#1A1B26` xen kẽ nền sáng giấy cũ `#FAF6F0` của các sections) theo đúng nguyên bản mockup.
+
+### Các file đã sửa
+#### `components/course-page/CourseThemeProvider.tsx`
+- Tích hợp tải Google Fonts tiếng Việt chuẩn (`Outfit`, `Inter`, `Playfair Display`).
+- Khai báo các class `.section-ink` và `.section-paper` động để cập nhật cục bộ CSS Variables `--course-bg`, `--course-text`, `--course-muted`, `--course-border` tương ứng.
+#### `components/course-page/sections/` (6 files)
+- Cập nhật `PainPointsSection.tsx`, `BenefitsSection.tsx`, `OutcomesSection.tsx`, `BonusesSection.tsx`, `ValueStackSection.tsx`, `PricingSection.tsx` sử dụng class `.section-paper` thay cho hardcode.
+- Cập nhật `InstructorSection.tsx` sử dụng class `.section-ink`.
+
+### Trạng thái
+- ✅ Đã khắc phục lỗi vỡ font tiếng Việt.
+- ✅ Phối màu nền xen kẽ tương phản hiển thị sắc nét.
+- ✅ Lớp biên dịch TypeScript hoạt động tốt với `npx tsc --noEmit` (Exit code: 0).
+
+
+
 
 

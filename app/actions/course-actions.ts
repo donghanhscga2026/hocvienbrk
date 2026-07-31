@@ -13,7 +13,12 @@ import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 /**
  * Đăng ký khóa học mới
  */
-export async function enrollInCourseAction(courseId: number, clientRef?: number | null) {
+export async function enrollInCourseAction(
+    courseId: number,
+    clientRef?: number | null,
+    useVoucher: boolean = false,
+    voucherAmountToUse: number = 0
+) {
     try {
         const session = await auth()
         if (!session?.user?.id) throw new Error("Vui lòng đăng nhập để tiếp tục.")
@@ -68,13 +73,14 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
             // Bypass phi_coc, chuyển thẳng trạng thái ACTIVE
             effectivePhiCoc = 0
             isLibAllowed = true
-        } else if (course.type !== 'SYS') {
+        } else if (course.type !== 'SYS' && useVoucher && voucherAmountToUse > 0) {
             const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
             const voucherBalance = Number(brkWallet?.voucherBalance || 0)
-            if (voucherBalance > 0 && effectivePhiCoc > 0) {
-                voucherDeducted = Math.min(voucherBalance, effectivePhiCoc)
+            const actualDeduct = Math.min(voucherBalance, voucherAmountToUse, effectivePhiCoc)
+            if (actualDeduct > 0) {
+                voucherDeducted = actualDeduct
                 effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
-                voucherApplied = voucherDeducted > 0
+                voucherApplied = true
                 const { debitVoucherWallet } = await import('@/lib/brk/wallet-service')
                 await debitVoucherWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
             }
@@ -85,21 +91,92 @@ export async function enrollInCourseAction(courseId: number, clientRef?: number 
         })
 
         if (existing && existing.status !== 'REJECTED') {
-            const existingWithPayment = await prisma.enrollment.findUnique({
-                where: { id: existing.id },
-                select: {
-                    id: true,
-                    status: true,
-                    payment: {
-                        select: {
-                            id: true, status: true, amount: true,
-                            qrCodeUrl: true, transferContent: true,
-                            bankName: true, accountNumber: true, proofImage: true
+            if (existing.status === 'PENDING') {
+                // Xoá bản ghi payment cũ
+                await prisma.payment.deleteMany({
+                    where: { enrollmentId: existing.id }
+                })
+                
+                // Đồng thời cập nhật số tiền cọc (phi_coc) mới
+                const updatedEnrollment = await prisma.enrollment.update({
+                    where: { id: existing.id },
+                    data: { phi_coc: effectivePhiCoc }
+                })
+
+                // Sinh bản ghi payment mới với QR mới theo cấu hình giáo viên hiện tại
+                const bankAcc = course.teacherBankAccount
+                if (effectivePhiCoc > 0 && bankAcc?.accountNumber && bankAcc?.accountHolder) {
+                    let qrCodeUrl = null
+                    let transferContent = null
+
+                    try {
+                        const qrResult = await createPaymentQR({
+                            phone: user?.phone || '',
+                            userId: userId,
+                            courseId: courseId,
+                            courseCode: course.id_khoa,
+                            accountNo: bankAcc.accountNumber,
+                            accountName: bankAcc.accountHolder,
+                            acqId: bankAcc.bankName || 'SACOMBANK',
+                            amount: effectivePhiCoc
+                        })
+                        qrCodeUrl = qrResult.qrCodeUrl
+                        transferContent = qrResult.transferContent
+                    } catch (qrError) {
+                        console.error("Failed to regenerate QR:", qrError)
+                    }
+
+                    const cleanPhone = user?.phone ? user.phone.replace(/\D/g, '').slice(-6) : ''
+                    if (!transferContent) {
+                        transferContent = `SDT ${cleanPhone} HV ${userId} COC ${course.id_khoa}`.toUpperCase()
+                    }
+
+                    if (!qrCodeUrl) {
+                        const bankId = resolveBankBin(bankAcc.bankName)
+                        qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectivePhiCoc}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
+                    }
+
+                    const newPayment = await prisma.payment.create({
+                        data: {
+                            enrollmentId: existing.id,
+                            amount: effectivePhiCoc,
+                            status: 'PENDING',
+                            transferContent: transferContent,
+                            qrCodeUrl: qrCodeUrl,
+                            bankName: bankAcc.bankName || 'Sacombank',
+                            accountNumber: bankAcc.accountNumber,
+                            phone: user?.phone
+                        }
+                    })
+
+                    return {
+                        success: true,
+                        status: 'PENDING',
+                        enrollment: {
+                            ...updatedEnrollment,
+                            payment: newPayment
                         }
                     }
                 }
-            })
-            return { success: true, status: existing.status, enrollment: existingWithPayment }
+
+                return { success: true, status: 'PENDING', enrollment: updatedEnrollment }
+            } else {
+                const existingWithPayment = await prisma.enrollment.findUnique({
+                    where: { id: existing.id },
+                    select: {
+                        id: true,
+                        status: true,
+                        payment: {
+                            select: {
+                                id: true, status: true, amount: true,
+                                qrCodeUrl: true, transferContent: true,
+                                bankName: true, accountNumber: true, proofImage: true
+                            }
+                        }
+                    }
+                })
+                return { success: true, status: existing.status, enrollment: existingWithPayment }
+            }
         }
 
         // [ENROLL-DEBUG] Đọc affiliate cookie
@@ -959,3 +1036,22 @@ export async function checkEnrollmentStatusAction(courseId: number) {
         return { status: null }
     }
 }
+
+/**
+ * Lấy số dư ví Voucher của User hiện tại
+ */
+export async function getBrkVoucherBalanceAction() {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return 0
+        const userId = Number(session.user.id)
+        const wallet = await prisma.brkWallet.findUnique({
+            where: { userId },
+            select: { voucherBalance: true }
+        })
+        return Number(wallet?.voucherBalance || 0)
+    } catch {
+        return 0
+    }
+}
+

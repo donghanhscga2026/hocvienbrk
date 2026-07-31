@@ -221,6 +221,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
         try {
             const updateData: any = {
                 id_khoa: idKhoa,
+                teacherId: teacherId ? parseInt(teacherId) : null,
                 teacherBankAccountId,
                 name_lop: nameLop,
                 name_khoa: nameKhoa || null,
@@ -432,7 +433,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             <DollarSign className="w-5 h-5 text-yellow-500" /> Học phí & Thanh toán
                         </h2>
                         
-                        {teacherBankAccounts.length > 0 && (
+                        {teacherBankAccounts.length > 0 ? (
                         <div className="space-y-1.5 mb-4">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Chọn từ tài khoản đã lưu</label>
                             <select
@@ -450,6 +451,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                    ) : (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl text-xs text-yellow-700 font-bold">
+                            ⚠️ Giáo viên này chưa cấu hình tài khoản ngân hàng nào trên hệ thống. 
+                            Vui lòng cấu hình tài khoản ngân hàng cho giáo viên này tại mục quản lý User hoặc Bank Accounts trước.
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-4">

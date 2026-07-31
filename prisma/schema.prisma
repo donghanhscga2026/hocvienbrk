@@ -24,9 +24,9 @@ model User {
   passwordChanged              Boolean               @default(false)
   affiliateCode                String?               @unique
   telegramChatId               BigInt?
+  telegramConnectedAt          DateTime?
   telegramUserId               BigInt?
   telegramUsername             String?
-  telegramConnectedAt          DateTime?
   accounts                     Account[]
   commissions                  AffiliateCommission[]
   affiliateLinks               AffiliateLink[]
@@ -35,29 +35,29 @@ model User {
   wallet                       AffiliateWallet?
   courses                      Course[]
   emailCampaigns               EmailCampaign[]       @relation("UserToEmailCampaign")
-  enrollments                  Enrollment[]          @relation("StudentEnrollment")
+  emailLogs                    EmailLog[]
   enrollmentReferrals          Enrollment[]          @relation("EnrollmentReferrer")
+  enrollments                  Enrollment[]          @relation("StudentEnrollment")
   lessonComments               LessonComment[]       @relation("UserToLessonComment")
   posts                        Post[]                @relation("UserToPost")
   postComments                 PostComment[]         @relation("UserToPostComment")
   registrationPointsAsReferee  RegistrationPoint[]   @relation("RefereeRegistration")
   registrationPointsAsReferrer RegistrationPoint[]   @relation("ReferrerRegistration")
   sessions                     Session[]
-  emailLogs                    EmailLog[]
   siteProfile                  SiteProfile?
+  profileMemberships           SiteProfileMember[]
   referrer                     User?                 @relation("ReferrerToReferee", fields: [referrerId], references: [id])
   referrals                    User[]                @relation("ReferrerToReferee")
+  bankAccounts                 UserBankAccount[]
   roadmap                      UserRoadmap?
+  brkTimelineRecords           BrkTimelineRecord[]
+  brkWallet                    BrkWallet?
   systems                      System[]
+  brkSystemsCreated            SystemTree[]
   tcaMembers                   TCAMember[]
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
-  profileMemberships           SiteProfileMember[]
-  brkWallet                    BrkWallet?
-  brkSystemsCreated            SystemTree[]
-  bankAccounts                 UserBankAccount[]
   userVouchers                 UserVoucher[]
-  brkTimelineRecords           BrkTimelineRecord[]
 
   @@index([email])
   @@index([phone])
@@ -164,20 +164,19 @@ model EmailLog {
   messageId String?
   error     String?
   createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 model EmailSenderLog {
   id              Int         @id @default(autoincrement())
   senderId        Int
-  sender          EmailSender @relation(fields: [senderId], references: [id])
   date            DateTime    @default(now())
   sentCount       Int         @default(0)
   failedCount     Int         @default(0)
   bounceCount     Int         @default(0)
   cooldownCount   Int         @default(0)
   cooldownMinutes Int         @default(0)
+  sender          EmailSender @relation(fields: [senderId], references: [id])
 
   @@unique([senderId, date])
 }
@@ -342,44 +341,44 @@ model CourseCategory {
 }
 
 model Course {
-  id                   Int                     @id @default(autoincrement())
-  id_khoa              String                  @unique
-  name_lop             String
-  name_khoa            String?
-  date_join            String?
-  status               Boolean                 @default(true)
-  mo_ta_ngan           String?
-  mo_ta_dai            String?
-  link_anh_bia         String?                 @map("link_anh_bia_khoa")
-  link_zalo            String?
-  phi_coc              Int                     @default(0)
-  feeType              FeeType                 @default(MIEN_PHI)
-  requiresReferralActivation Boolean          @default(false)
-  referralActivationThreshold Int                 @default(0)
-  vipExempt            Boolean                 @default(false)
-  noidung_stk          String?
-  file_email           String?
-  noidung_email        String?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  type                 CourseType              @default(NORMAL)
-  pin                  Int                     @default(0)
-  category             String                  @default("Khác")
-  categoryId           Int?
-  courseCategory       CourseCategory?         @relation(fields: [categoryId], references: [id])
-  teacherId            Int?
-  teacher              User?                   @relation(fields: [teacherId], references: [id])
-  teacherBankAccountId Int?
-  teacherBankAccount   UserBankAccount?        @relation("CourseTeacherBank", fields: [teacherBankAccountId], references: [id])
-  libAccesses          CourseLibAccess[]
-  testimonials         CourseTestimonial[]
-  enrollments          Enrollment[]
-  landingPages         LandingPage[]
-  lessons              Lesson[]
-  systemTree           SystemTree?
-  autoVerifyConfig     AutoVerifyConfig?
-  acceptedVouchers     CourseAcceptedVoucher[]
-  voucherAwards        CourseVoucherAward[]
+  id                          Int                     @id @default(autoincrement())
+  id_khoa                     String                  @unique
+  name_lop                    String
+  name_khoa                   String?
+  date_join                   String?
+  status                      Boolean                 @default(true)
+  mo_ta_ngan                  String?
+  mo_ta_dai                   String?
+  link_anh_bia                String?                 @map("link_anh_bia_khoa")
+  link_zalo                   String?
+  phi_coc                     Int                     @default(0)
+  noidung_stk                 String?
+  file_email                  String?
+  noidung_email               String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  type                        CourseType              @default(NORMAL)
+  pin                         Int                     @default(0)
+  category                    String                  @default("Khác")
+  teacherId                   Int?
+  categoryId                  Int?
+  teacherBankAccountId        Int?
+  vipExempt                   Boolean                 @default(false)
+  feeType                     FeeType                 @default(MIEN_PHI)
+  requiresReferralActivation  Boolean                 @default(false)
+  referralActivationThreshold Int                     @default(0)
+  courseCategory              CourseCategory?         @relation(fields: [categoryId], references: [id])
+  teacherBankAccount          UserBankAccount?        @relation("CourseTeacherBank", fields: [teacherBankAccountId], references: [id])
+  teacher                     User?                   @relation(fields: [teacherId], references: [id])
+  libAccesses                 CourseLibAccess[]
+  testimonials                CourseTestimonial[]
+  enrollments                 Enrollment[]
+  landingPages                LandingPage[]
+  lessons                     Lesson[]
+  autoVerifyConfig            AutoVerifyConfig?
+  acceptedVouchers            CourseAcceptedVoucher[]
+  voucherAwards               CourseVoucherAward[]
+  systemTree                  SystemTree?
 
   @@index([teacherId])
 }
@@ -387,14 +386,14 @@ model Course {
 model AutoVerifyConfig {
   id               Int      @id @default(autoincrement())
   courseId         Int      @unique
-  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  emailFrom        String // địa chỉ gửi email TBGD, VD: info@sacombank.com.vn
-  bankName         String // tên ngân hàng, VD: Sacombank
-  emailQuery       String // câu query Gmail, VD: "sacombank thong bao giao dich"
-  onSystem         Int? // BRK system ID để auto-activate (null = không kích hoạt BRK)
-  alternativeCodes String? // JSON array string mã khóa học thay thế, VD: '["BRK","MB"]'
+  emailFrom        String
+  bankName         String
+  emailQuery       String
+  onSystem         Int?
   enabled          Boolean  @default(true)
   createdAt        DateTime @default(now())
+  alternativeCodes String?
+  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@index([enabled])
   @@map("auto_verify_config")
@@ -421,10 +420,8 @@ model Enrollment {
   userId         Int
   courseId       Int
   status         EnrollmentStatus @default(PENDING)
-  studyMode      EnrollmentMode   @default(ACTIVE)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  activatedAt    DateTime?
   link_anh_coc   String?
   phi_coc        Int              @default(0)
   startedAt      DateTime?
@@ -432,9 +429,11 @@ model Enrollment {
   resetAt        DateTime?
   lastLessonId   String?
   referrerId     Int?
+  activatedAt    DateTime?
+  studyMode      EnrollmentMode   @default(ACTIVE)
   course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
   referrer       User?            @relation("EnrollmentReferrer", fields: [referrerId], references: [id])
+  user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
   lessonProgress LessonProgress[]
   payment        Payment?
 
@@ -552,21 +551,21 @@ model SystemTree {
   createdAt                DateTime                @default(now())
   nameSystem               String                  @map("name_system")
   courseId                 Int?                    @unique
-  course                   Course?                 @relation(fields: [courseId], references: [id])
   creatorId                Int?
-  creator                  User?                   @relation(fields: [creatorId], references: [id])
   fee                      Decimal                 @default(1) @db.Decimal(12, 2)
   durationDays             Int                     @default(30)
   graceDays                Int                     @default(3)
-  gracePeriodHours         Int                     @default(24)
   returnPct                Decimal                 @default(21.0) @db.Decimal(5, 2)
   revenueSharePct          Decimal                 @default(2.0) @db.Decimal(5, 2)
   revenueShareIntervalDays Int                     @default(3)
   pointsPerDollar          Decimal                 @default(17) @db.Decimal(10, 2)
+  gracePeriodHours         Int                     @default(24)
   brkLevelConfigs          BrkLevelConfig[]
   brkRevenuePools          BrkRevenuePool[]
   systems                  System[]
   planApplications         SystemPlanApplication[]
+  course                   Course?                 @relation(fields: [courseId], references: [id])
+  creator                  User?                   @relation(fields: [creatorId], references: [id])
 
   @@index([courseId])
   @@index([creatorId])
@@ -599,18 +598,18 @@ model SystemPlanApplication {
   configurationSnapshot Json?
   createdAt             DateTime                       @default(now())
   updatedAt             DateTime                       @updatedAt
-  systemTree            SystemTree                     @relation(fields: [onSystem], references: [onSystem])
-  businessPlan          BusinessPlan                   @relation(fields: [businessPlanId], references: [id])
-  systems               System[]
-  closures              SystemClosure[]
-  transactions          BrkTransaction[]
-  revenuePools          BrkRevenuePool[]
-  revenueAwards         BrkRevenueAward[]
   levelUpRecords        BrkLevelUpRecord[]
   referralBonuses       BrkReferralBonus[]
+  revenueAwards         BrkRevenueAward[]
+  revenuePools          BrkRevenuePool[]
   timelineRecords       BrkTimelineRecord[]
-  workflowRuns          MbtcaWorkflowRun[]
+  transactions          BrkTransaction[]
   commissionSnapshots   MbtcaCommissionLevelSnapshot[]
+  workflowRuns          MbtcaWorkflowRun[]
+  systems               System[]
+  closures              SystemClosure[]
+  businessPlan          BusinessPlan                   @relation(fields: [businessPlanId], references: [id])
+  systemTree            SystemTree                     @relation(fields: [onSystem], references: [onSystem])
 
   @@index([onSystem, startsAt, endsAt])
   @@index([businessPlanId])
@@ -629,7 +628,7 @@ model MbtcaWorkflowRun {
   completedAt     DateTime?
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
-  planApplication SystemPlanApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  planApplication SystemPlanApplication @relation(fields: [applicationId], references: [id])
   steps           MbtcaWorkflowStep[]
 
   @@unique([applicationId, cycleNumber])
@@ -665,7 +664,7 @@ model MbtcaCommissionLevelSnapshot {
   level           Int
   effectiveAt     DateTime
   createdAt       DateTime              @default(now())
-  planApplication SystemPlanApplication @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  planApplication SystemPlanApplication @relation(fields: [applicationId], references: [id])
 
   @@unique([applicationId, cycleNumber, userId], map: "mbtca_commission_snapshot_cycle_user_key")
   @@index([applicationId, userId, cycleNumber], map: "mbtca_commission_snapshot_user_cycle_idx")
@@ -684,19 +683,19 @@ model System {
   gracePeriodEnd       DateTime?
   level                Int                    @default(1)
   totalPoints          Decimal                @default(0) @db.Decimal(14, 2)
+  giftClaimed          Boolean                @default(false)
+  inDongChia           Boolean                @default(false)
   officialTeamSize     Int                    @default(0)
   totalMbdtVolume      Decimal                @default(0) @db.Decimal(20, 2)
   totalCashVolume      Decimal                @default(0) @db.Decimal(14, 2)
-  giftClaimed          Boolean                @default(false)
-  inDongChia           Boolean                @default(false)
   applicationId        Int?
-  user                 User                   @relation(fields: [userId], references: [id])
-  systemTree           SystemTree             @relation(fields: [onSystem], references: [onSystem])
-  closuresAsAncestor   SystemClosure[]        @relation("SystemClosureAncestor")
-  closuresAsDescendant SystemClosure[]        @relation("SystemClosureDescendant")
   brkLevelUpRecords    BrkLevelUpRecord[]
   brkReferralBonuses   BrkReferralBonus[]
   planApplication      SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  systemTree           SystemTree             @relation(fields: [onSystem], references: [onSystem])
+  user                 User                   @relation(fields: [userId], references: [id])
+  closuresAsAncestor   SystemClosure[]        @relation("SystemClosureAncestor")
+  closuresAsDescendant SystemClosure[]        @relation("SystemClosureDescendant")
 
   @@unique([userId, onSystem])
   @@index([userId])
@@ -714,8 +713,8 @@ model SystemClosure {
   systemId        Int
   applicationId   Int?
   ancestor        System                 @relation("SystemClosureAncestor", fields: [ancestorId], references: [autoId])
-  descendant      System                 @relation("SystemClosureDescendant", fields: [descendantId], references: [autoId])
   planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  descendant      System                 @relation("SystemClosureDescendant", fields: [descendantId], references: [autoId])
 
   @@id([ancestorId, descendantId, systemId])
   @@index([ancestorId])
@@ -734,8 +733,8 @@ model BrkLevelConfig {
   personalFeePct Decimal             @db.Decimal(5, 2)
   giftValue      Int                 @default(0)
   timeLimitDays  Int?
-  systemTree     SystemTree          @relation(fields: [systemId], references: [onSystem])
   branchReqs     BrkLevelBranchReq[]
+  systemTree     SystemTree          @relation(fields: [systemId], references: [onSystem])
 
   @@unique([systemId, level])
   @@index([systemId])
@@ -757,14 +756,14 @@ model BrkWallet {
   id             Int              @id @default(autoincrement())
   userId         Int              @unique
   balance        Decimal          @default(0) @db.Decimal(14, 2)
-  brkd           Decimal          @default(0) @db.Decimal(14, 2)
-  voucherBalance Decimal          @default(0) @db.Decimal(14, 2)
   totalEarned    Decimal          @default(0) @db.Decimal(14, 2)
   totalWithdrawn Decimal          @default(0) @db.Decimal(14, 2)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-  user           User             @relation(fields: [userId], references: [id])
+  brkd           Decimal          @default(0) @db.Decimal(14, 2)
+  voucherBalance Decimal          @default(0) @db.Decimal(14, 2)
   transactions   BrkTransaction[]
+  user           User             @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@map("brk_wallet")
@@ -777,14 +776,14 @@ model BrkTransaction {
   type            BrkTransactionType
   description     String
   refId           String?
-  sourceMemberId  Int? // userId của member activation gây ra transaction này
-  applicationId   Int?
-  balanceType     BalanceType            @default(CASH)
   balanceBefore   Decimal                @db.Decimal(14, 2)
   balanceAfter    Decimal                @db.Decimal(14, 2)
   createdAt       DateTime               @default(now())
-  wallet          BrkWallet              @relation(fields: [walletId], references: [id])
+  balanceType     BalanceType            @default(CASH)
+  sourceMemberId  Int?
+  applicationId   Int?
   planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  wallet          BrkWallet              @relation(fields: [walletId], references: [id])
 
   @@index([walletId, createdAt])
   @@index([type])
@@ -797,7 +796,6 @@ model BrkTransaction {
 model BrkRevenuePool {
   id              Int                    @id @default(autoincrement())
   systemId        Int
-  applicationId   Int?
   roundNumber     Int
   periodStart     DateTime
   periodEnd       DateTime
@@ -807,9 +805,10 @@ model BrkRevenuePool {
   status          BrkRevenuePoolStatus   @default(PENDING)
   distributedAt   DateTime?
   createdAt       DateTime               @default(now())
-  systemTree      SystemTree             @relation(fields: [systemId], references: [onSystem])
+  applicationId   Int?
   awards          BrkRevenueAward[]
   planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  systemTree      SystemTree             @relation(fields: [systemId], references: [onSystem])
 
   @@index([systemId])
   @@index([applicationId, roundNumber])
@@ -820,12 +819,12 @@ model BrkRevenueAward {
   id              Int                    @id @default(autoincrement())
   poolId          Int
   userId          Int
-  sourceMemberId  Int? // userId của member activation gây ra award này
-  applicationId   Int?
   amount          Decimal                @db.Decimal(14, 2)
   paid            Boolean                @default(false)
-  pool            BrkRevenuePool         @relation(fields: [poolId], references: [id])
+  sourceMemberId  Int?
+  applicationId   Int?
   planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  pool            BrkRevenuePool         @relation(fields: [poolId], references: [id])
 
   @@index([poolId])
   @@index([userId])
@@ -840,13 +839,13 @@ model BrkLevelUpRecord {
   onSystem        Int
   fromLevel       Int
   toLevel         Int
-  sourceMemberId  Int? // userId của member activation gây ra level-up này
-  applicationId   Int?
   promotedAt      DateTime               @default(now())
   giftClaimed     Boolean                @default(false)
   giftClaimedAt   DateTime?
-  system          System                 @relation(fields: [userId, onSystem], references: [userId, onSystem])
+  sourceMemberId  Int?
+  applicationId   Int?
   planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  system          System                 @relation(fields: [userId, onSystem], references: [userId, onSystem])
 
   @@index([userId, onSystem])
   @@index([applicationId, userId, toLevel])
@@ -859,12 +858,12 @@ model BrkReferralBonus {
   onSystem        Int
   f1Count         Int                    @default(2)
   courseId        Int?
-  sourceMemberId  Int? // userId của F1 member gây ra bonus này
-  applicationId   Int?
   claimed         Boolean                @default(false)
   claimedAt       DateTime?
-  system          System                 @relation(fields: [userId, onSystem], references: [userId, onSystem])
+  sourceMemberId  Int?
+  applicationId   Int?
   planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  system          System                 @relation(fields: [userId, onSystem], references: [userId, onSystem])
 
   @@index([userId, onSystem])
   @@index([applicationId, userId])
@@ -873,7 +872,7 @@ model BrkReferralBonus {
 
 model BrkSystemLog {
   id            Int      @id @default(autoincrement())
-  action        String // 'MOVE_MEMBER'
+  action        String
   onSystem      Int
   sourceUserId  Int
   oldRefSysId   Int
@@ -895,14 +894,14 @@ model BrkSystemLog {
 
 model BrkActivationLog {
   id              Int      @id @default(autoincrement())
-  sourceUserId    Int // Member kích hoạt
-  onSystem        Int // System ID
-  enrollmentId    Int? // Link enrollment
-  eventType       String // 'ACTIVATION', 'GRACE_EXPIRY', 'DAILY_EVAL'
+  sourceUserId    Int
+  onSystem        Int
+  enrollmentId    Int?
+  eventType       String
   feeAmount       Decimal  @db.Decimal(14, 2)
-  affectedUserIds Json // [userId, ...] - tất cả user bị ảnh hưởng
-  walletSnapshots Json // { userId: { balance, brkd, voucherBalance, totalEarned } }
-  metadata        Json? // Additional info (placement, level, etc.)
+  affectedUserIds Json
+  walletSnapshots Json
+  metadata        Json?
   createdAt       DateTime @default(now())
 
   @@index([sourceUserId, onSystem])
@@ -1439,8 +1438,8 @@ model SiteProfile {
   landingPages         LandingPage[]
   theme                Theme?              @relation(fields: [themeId], references: [id])
   user                 User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  surveys              Survey[]
   members              SiteProfileMember[]
+  surveys              Survey[]
 
   @@index([slug])
   @@index([userId])
@@ -1507,6 +1506,202 @@ model AssistantGuide {
   @@index([toolSlug])
 }
 
+model UserBankAccount {
+  id            Int             @id @default(autoincrement())
+  userId        Int
+  accountType   BankAccountType @default(BANK)
+  accountHolder String
+  accountNumber String
+  bankName      String?
+  qrCodeUrl     String?
+  isDefault     Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  courses       Course[]        @relation("CourseTeacherBank")
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Voucher {
+  id              Int                     @id @default(autoincrement())
+  code            String                  @unique
+  name            String
+  type            VoucherType
+  value           Int                     @default(0)
+  durationDays    Int?
+  description     String?
+  isActive        Boolean                 @default(true)
+  createdAt       DateTime                @default(now())
+  acceptedCourses CourseAcceptedVoucher[]
+  awardedCourses  CourseVoucherAward[]
+  userVouchers    UserVoucher[]
+
+  @@index([type])
+  @@index([code])
+}
+
+model UserVoucher {
+  id                  Int               @id @default(autoincrement())
+  userId              Int
+  voucherId           Int
+  status              UserVoucherStatus @default(ACTIVE)
+  awardedFromCourseId Int?
+  expiresAt           DateTime?
+  usedAt              DateTime?
+  usedForCourseId     Int?
+  createdAt           DateTime          @default(now())
+  user                User              @relation(fields: [userId], references: [id])
+  voucher             Voucher           @relation(fields: [voucherId], references: [id])
+
+  @@unique([userId, voucherId, awardedFromCourseId])
+  @@index([userId, status])
+  @@index([voucherId])
+  @@map("user_voucher")
+}
+
+model CourseVoucherAward {
+  id        Int     @id @default(autoincrement())
+  courseId  Int
+  voucherId Int
+  course    Course  @relation(fields: [courseId], references: [id])
+  voucher   Voucher @relation(fields: [voucherId], references: [id])
+
+  @@unique([courseId, voucherId])
+  @@map("course_voucher_award")
+}
+
+model CourseAcceptedVoucher {
+  id        Int     @id @default(autoincrement())
+  courseId  Int
+  voucherId Int
+  course    Course  @relation(fields: [courseId], references: [id])
+  voucher   Voucher @relation(fields: [voucherId], references: [id])
+
+  @@unique([courseId, voucherId])
+  @@map("course_accepted_voucher")
+}
+
+model CronRun {
+  id          Int       @id @default(autoincrement())
+  jobName     String
+  status      String    @default("RUNNING")
+  details     Json?
+  error       String?
+  triggeredBy String    @default("CRON")
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  durationMs  Int?
+
+  @@index([jobName, startedAt])
+  @@map("cron_run")
+}
+
+model BrkTimelineRecord {
+  id                    Int                    @id @default(autoincrement())
+  userId                Int
+  onSystem              Int
+  type                  String
+  time                  DateTime
+  title                 String
+  description           String
+  accumulatedCash       Decimal                @default(0) @db.Decimal(12, 2)
+  accumulatedBrkd       Decimal                @default(0) @db.Decimal(20, 2)
+  accumulatedBrkp       Decimal                @default(0) @db.Decimal(12, 3)
+  accumulatedTeamSize   Int                    @default(1)
+  accumulatedBrkdVolume Decimal                @default(0) @db.Decimal(20, 2)
+  accumulatedCashVolume Decimal                @default(0) @db.Decimal(12, 2)
+  amountCash            Decimal                @default(0) @db.Decimal(12, 2)
+  amountBrkd            Decimal                @default(0) @db.Decimal(20, 2)
+  amountVoucher         Decimal                @default(0) @db.Decimal(12, 2)
+  txType                String?
+  targetMemberId        Int?
+  targetMemberName      String?
+  pathStr               String?
+  fromLevel             Int?
+  toLevel               Int?
+  createdAt             DateTime               @default(now())
+  sourceMemberId        Int?
+  eventStatus           String?
+  eventMbp              Decimal                @default(0) @db.Decimal(12, 3)
+  eventMbdtVolume       Decimal                @default(0) @db.Decimal(20, 2)
+  eventCashVolume       Decimal                @default(0) @db.Decimal(14, 2)
+  applicationId         Int?
+  planApplication       SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  user                  User                   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([onSystem])
+  @@index([time])
+  @@index([onSystem, eventStatus, time])
+  @@index([applicationId, time])
+  @@map("brk_timeline_record")
+}
+
+model TelegramLinkToken {
+  id        String    @id @default(uuid())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("telegram_link_tokens")
+}
+
+model CoursePage {
+  id             String              @id @default(uuid())
+  slug           String              @unique
+  name           String
+  status         String              @default("draft")
+  seo            Json                @default("{}")
+  theme          Json                @default("{}")
+  navigation     Json                @default("{}")
+  checkoutConfig Json                @default("{}") @map("checkout_config")
+  publishedAt    DateTime?           @map("published_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  useTemplate    Boolean             @default(true) @map("use_template")
+  versions       CoursePageVersion[]
+  sections       CourseSection[]
+
+  @@map("course_pages")
+}
+
+model CourseSection {
+  id           String     @id @default(uuid())
+  coursePageId String     @map("course_page_id")
+  sectionKey   String     @map("section_key")
+  sectionType  String     @map("section_type")
+  variant      String?
+  anchorId     String?    @map("anchor_id")
+  enabled      Boolean    @default(true)
+  sortOrder    Int        @default(0) @map("sort_order")
+  content      Json       @default("{}")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  visibility   String     @default("all")
+  coursePage   CoursePage @relation(fields: [coursePageId], references: [id], onDelete: Cascade)
+
+  @@unique([coursePageId, sectionKey])
+  @@index([coursePageId, sortOrder])
+  @@map("course_sections")
+}
+
+model CoursePageVersion {
+  id            String     @id @default(uuid())
+  coursePageId  String     @map("course_page_id")
+  versionNumber Int        @map("version_number")
+  snapshot      Json
+  createdAt     DateTime   @default(now()) @map("created_at")
+  coursePage    CoursePage @relation(fields: [coursePageId], references: [id], onDelete: Cascade)
+
+  @@unique([coursePageId, versionNumber])
+  @@map("course_page_versions")
+}
+
 enum CampaignStatus {
   DRAFT
   ACTIVE
@@ -1531,9 +1726,9 @@ enum EnrollmentStatus {
 
 enum EnrollmentMode {
   ACTIVE
+  AUDITOR
   FREE
   COMPANION
-  AUDITOR
 }
 
 enum Role {
@@ -1691,158 +1886,3 @@ enum UserVoucherStatus {
   USED
   EXPIRED
 }
-
-model UserBankAccount {
-  id            Int             @id @default(autoincrement())
-  userId        Int
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountType   BankAccountType @default(BANK)
-  accountHolder String
-  accountNumber String
-  bankName      String?
-  qrCodeUrl     String?
-  isDefault     Boolean         @default(false)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  courses       Course[]        @relation("CourseTeacherBank")
-
-  @@index([userId])
-}
-
-model Voucher {
-  id           Int         @id @default(autoincrement())
-  code         String      @unique
-  name         String
-  type         VoucherType
-  value        Int         @default(0)
-  durationDays Int?
-  description  String?
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-
-  userVouchers    UserVoucher[]
-  awardedCourses  CourseVoucherAward[]
-  acceptedCourses CourseAcceptedVoucher[]
-
-  @@index([type])
-  @@index([code])
-}
-
-model UserVoucher {
-  id                  Int               @id @default(autoincrement())
-  userId              Int
-  voucherId           Int
-  status              UserVoucherStatus @default(ACTIVE)
-  awardedFromCourseId Int?
-  expiresAt           DateTime?
-  usedAt              DateTime?
-  usedForCourseId     Int?
-  createdAt           DateTime          @default(now())
-
-  user    User    @relation(fields: [userId], references: [id])
-  voucher Voucher @relation(fields: [voucherId], references: [id])
-
-  @@unique([userId, voucherId, awardedFromCourseId])
-  @@index([userId, status])
-  @@index([voucherId])
-  @@map("user_voucher")
-}
-
-model CourseVoucherAward {
-  id        Int     @id @default(autoincrement())
-  courseId  Int
-  voucherId Int
-  course    Course  @relation(fields: [courseId], references: [id])
-  voucher   Voucher @relation(fields: [voucherId], references: [id])
-
-  @@unique([courseId, voucherId])
-  @@map("course_voucher_award")
-}
-
-model CourseAcceptedVoucher {
-  id        Int     @id @default(autoincrement())
-  courseId  Int
-  voucherId Int
-  course    Course  @relation(fields: [courseId], references: [id])
-  voucher   Voucher @relation(fields: [voucherId], references: [id])
-
-  @@unique([courseId, voucherId])
-  @@map("course_accepted_voucher")
-}
-
-model CronRun {
-  id          Int       @id @default(autoincrement())
-  jobName     String
-  status      String    @default("RUNNING") // RUNNING, SUCCESS, FAILURE, SKIPPED
-  details     Json?
-  error       String?
-  triggeredBy String    @default("CRON") // CRON, ADMIN
-  startedAt   DateTime  @default(now())
-  endedAt     DateTime?
-  durationMs  Int?
-
-  @@index([jobName, startedAt])
-  @@map("cron_run")
-}
-
-model BrkTimelineRecord {
-  id                    Int      @id @default(autoincrement())
-  userId                Int
-  onSystem              Int
-  applicationId         Int?
-  type                  String // 'ACTIVATION', 'LEVEL_UP', 'TRANSACTION'
-  time                  DateTime
-  title                 String
-  description           String
-  accumulatedCash       Decimal  @default(0) @db.Decimal(12, 2)
-  accumulatedBrkd       Decimal  @default(0) @db.Decimal(20, 2)
-  accumulatedBrkp       Decimal  @default(0) @db.Decimal(12, 3)
-  accumulatedTeamSize   Int      @default(1)
-  accumulatedBrkdVolume Decimal  @default(0) @db.Decimal(20, 2)
-  accumulatedCashVolume Decimal  @default(0) @db.Decimal(12, 2)
-
-  // Thông số giao dịch (cho type = TRANSACTION)
-  amountCash       Decimal @default(0) @db.Decimal(12, 2)
-  amountBrkd       Decimal @default(0) @db.Decimal(20, 2)
-  amountVoucher    Decimal @default(0) @db.Decimal(12, 2)
-  txType           String? // 'COMMISSION', 'RETURN_FEE', 'REVENUE_SHARE', 'VOUCHER_CREDIT', etc.
-  targetMemberId   Int?
-  targetMemberName String?
-  pathStr          String? // Nhánh bảo trợ
-
-  // Thông số thăng cấp (cho type = LEVEL_UP)
-  fromLevel Int?
-  toLevel   Int?
-
-  sourceMemberId  Int? // userId của member activation gây ra record này
-  eventStatus     String? // 'OFFICIAL' chỉ ghi duy nhất một lần cho mỗi thành viên/hệ thống
-  eventMbp        Decimal @default(0) @db.Decimal(12, 3)
-  eventMbdtVolume Decimal @default(0) @db.Decimal(20, 2)
-  eventCashVolume Decimal @default(0) @db.Decimal(14, 2)
-
-  createdAt DateTime @default(now())
-
-  user            User                   @relation(fields: [userId], references: [id])
-  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
-
-  @@index([userId])
-  @@index([onSystem])
-  @@index([time])
-  @@index([onSystem, eventStatus, time])
-  @@index([applicationId, time])
-  @@map("brk_timeline_record")
-}
-
-model TelegramLinkToken {
-  id        String    @id @default(uuid())
-  userId    Int
-  token     String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([token])
-  @@index([userId])
-  @@map("telegram_link_tokens")
-}
-
