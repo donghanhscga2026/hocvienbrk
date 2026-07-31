@@ -17,8 +17,8 @@ export async function GET(req: Request) {
   const userId = parseInt(session.user.id || "0");
 
   try {
-    // TEACHER không được preview DB_ALL
-    if (role === "TEACHER" && source === "DB_ALL") {
+    // TEACHER không được preview DB_ALL hoặc DB_ALL_INCLUDING_UNVERIFIED
+    if (role === "TEACHER" && (source === "DB_ALL" || source === "DB_ALL_INCLUDING_UNVERIFIED")) {
       return new NextResponse("Không có quyền", { status: 403 });
     }
 
@@ -28,6 +28,14 @@ export async function GET(req: Request) {
       users = await prisma.user.findMany({
         where: {
           emailVerified: { not: null },
+          email: { contains: "@" }
+        },
+        select: { id: true, email: true, name: true, role: true, emailVerified: true },
+        orderBy: { createdAt: "desc" }
+      });
+    } else if (source === "DB_ALL_INCLUDING_UNVERIFIED") {
+      users = await prisma.user.findMany({
+        where: {
           email: { contains: "@" }
         },
         select: { id: true, email: true, name: true, role: true, emailVerified: true },
@@ -48,7 +56,7 @@ export async function GET(req: Request) {
         where: { 
           courseId: parseInt(courseId),
           status: "ACTIVE",
-          user: { emailVerified: { not: null } }
+          user: { email: { contains: "@" } }
         },
         include: {
           user: { 
@@ -60,6 +68,39 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json(users);
+  } catch (error: any) {
+    return new NextResponse(error.message, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session) return new NextResponse("Unauthorized", { status: 401 });
+  const role = session.user.role;
+  if (role !== "ADMIN" && role !== "TEACHER") {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const { source, recipientCsvData } = await req.json();
+
+    if (source === "CSV") {
+      const { parseEmailsFromRawText } = await import("@/lib/email-campaign-parser");
+      const parsed = parseEmailsFromRawText(recipientCsvData || "");
+      return NextResponse.json(parsed);
+    }
+
+    if (source === "GOOGLE_SHEET") {
+      const { parseEmailsFromGoogleSheet } = await import("@/lib/email-campaign-parser");
+      try {
+        const parsed = await parseEmailsFromGoogleSheet(recipientCsvData || "");
+        return NextResponse.json(parsed);
+      } catch (err: any) {
+        return new NextResponse(err.message || "Lỗi tải Google Sheet", { status: 400 });
+      }
+    }
+
+    return NextResponse.json([]);
   } catch (error: any) {
     return new NextResponse(error.message, { status: 500 });
   }

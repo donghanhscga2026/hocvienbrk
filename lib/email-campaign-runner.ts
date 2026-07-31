@@ -368,11 +368,30 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
 
   if (!campaign) return [];
 
-  if (campaign.recipientSource === "CSV" || campaign.recipientSource === "SELECTED_LIST" || campaign.recipientSource === "GOOGLE_SHEET") {
-    // Giả định recipientCsvData là chuỗi JSON mảng [{email, name, userId}]
-    return JSON.parse(campaign.recipientCsvData || "[]");
+  // 1. Nguồn danh sách CSV/JSON hoặc Google Sheet hoặc Nhập thủ công dán text
+  if (campaign.recipientSource === "CSV" || campaign.recipientSource === "SELECTED_LIST") {
+    const rawData = campaign.recipientCsvData || "[]";
+    // Kiểm tra xem có phải JSON hợp lệ hay không, nếu không phải thì tự động parse từ text thô
+    try {
+      if (rawData.trim().startsWith("[")) {
+        return JSON.parse(rawData);
+      }
+    } catch {}
+    const { parseEmailsFromRawText } = await import("./email-campaign-parser");
+    return parseEmailsFromRawText(rawData);
   }
 
+  if (campaign.recipientSource === "GOOGLE_SHEET") {
+    const { parseEmailsFromGoogleSheet } = await import("./email-campaign-parser");
+    try {
+      return await parseEmailsFromGoogleSheet(campaign.recipientCsvData || "");
+    } catch (err) {
+      console.error("[resolveRecipients] Lỗi parse Google Sheet:", err);
+      return [];
+    }
+  }
+
+  // 2. Tất cả học viên đã xác thực email
   if (campaign.recipientSource === "DB_ALL") {
     const users = await prisma.user.findMany({
       where: {
@@ -384,6 +403,18 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
     return users.map(u => ({ email: u.email, name: u.name || "", userId: u.id }));
   }
 
+  // 3. Tất cả học viên (gồm cả chưa xác thực email)
+  if (campaign.recipientSource === "DB_ALL_INCLUDING_UNVERIFIED") {
+    const users = await prisma.user.findMany({
+      where: {
+        email: { contains: "@" }
+      },
+      select: { email: true, name: true, id: true },
+    });
+    return users.map(u => ({ email: u.email, name: u.name || "", userId: u.id }));
+  }
+
+  // 4. Học viên đang active trong khóa học cụ thể
   if (campaign.recipientSource === "DB_ACTIVE") {
     const filter = campaign.recipientFilter as any;
     const courseId = filter?.courseId ? parseInt(filter.courseId) : null;
@@ -394,7 +425,7 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
       where: {
         courseId: courseId,
         status: "ACTIVE",
-        user: { emailVerified: { not: null } }
+        user: { email: { contains: "@" } } // cho phép cả chưa active email
       },
       include: {
         user: { select: { email: true, name: true, id: true } }
