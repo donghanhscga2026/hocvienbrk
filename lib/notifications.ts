@@ -69,10 +69,10 @@ function escapeHtml(value: string): string {
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
-/**
- * Gửi thông báo đến Telegram (Hỗ trợ 3 Group khác nhau)
- */
-export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' | 'FAILED_LOGIN' | 'CHANGE' = 'ACTIVATE') {
+export async function sendTelegram(
+  message: string, 
+  type: 'REGISTER' | 'ACTIVATE' | 'LESSON' | 'TOOL_CLICK' | 'FAILED_LOGIN' | 'CHANGE' | 'CRON_LOG' | 'SURVEY' = 'ACTIVATE'
+) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIdMap = {
     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
@@ -81,6 +81,8 @@ export async function sendTelegram(message: string, type: 'REGISTER' | 'ACTIVATE
     TOOL_CLICK: process.env.TELEGRAM_CHAT_ID_AFFILIATE || process.env.TELEGRAM_CHAT_ID,
     FAILED_LOGIN: process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID,
     CHANGE: process.env.TELEGRAM_CHAT_ID_CHANGE || process.env.TELEGRAM_CHAT_ID,
+    CRON_LOG: process.env.TELEGRAM_CHAT_ID_CRON || process.env.TELEGRAM_CHAT_ID,
+    SURVEY: process.env.TELEGRAM_CHAT_ID_SURVEY || process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
   };
   const chatId = chatIdMap[type];
   if (!token || !chatId) {
@@ -521,7 +523,7 @@ export async function sendActivationEmail(to: string, studentName: string, stude
 
 export async function sendLoginNotification(user: { id: number; name: string }, _ip: string, _userAgent: string) {
   const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})`;
-  await sendTelegram(msg, 'FAILED_LOGIN');
+  await sendTelegram(msg, 'CHANGE'); // Chuyển từ FAILED_LOGIN sang CHANGE (Kênh biến động tài khoản bảo mật hơn)
 }
 
 export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }, newPassword?: string) {
@@ -590,10 +592,10 @@ export async function sendSurveyNotification(data: {
     `<b>📚 LỘ TRÌNH KHÓA HỌC:</b>\n${coursesList}\n\n` +
     `#Survey #Roadmap #HocVienBRK`;
 
-  await sendTelegram(msg, 'ACTIVATE');
+  await sendTelegram(msg, 'SURVEY'); // Chuyển khảo sát từ ACTIVATE sang SURVEY (Kênh riêng biệt cho khảo sát)
 }
 
-export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'ACTIVATE');
+export const sendTelegramAdmin = (msg: string) => sendTelegram(msg, 'CRON_LOG'); // Đổi log admin / cron tự động từ ACTIVATE sang CRON_LOG (Kênh kỹ thuật)
 export const sendSuccessEmail = (to: string, name: string, course: string) => sendActivationEmail(to, name, 0, course, null);
 export { sendGmail };
 

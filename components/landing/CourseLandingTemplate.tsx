@@ -54,7 +54,7 @@ interface CourseLandingTemplateProps {
 
 const feeTypeLabels: Record<string, string> = {
     MIEN_PHI: 'Miễn phí',
-    PHI_TUY_TINH: 'Phí tùy tính',
+    PHI_TUY_TINH: 'Phí tùy tâm',
     PHI_CAM_KET: 'Phí cam kết'
 }
 
@@ -88,7 +88,7 @@ export default function CourseLandingTemplate({
         ? 'Đăng nhập để chia sẻ và nhận hoa hồng affiliate.'
         : isEnrolled
             ? 'Chia sẻ link để nhận 100% hoa hồng khi đã kích hoạt.'
-            : 'Chia sẻ link để nhận 50% hoa hồng khi chưa kích hoạt.'
+            : ''
 
     // Polling: tự động kiểm tra trạng thái ghi danh sau thanh toán
     useEffect(() => {
@@ -164,6 +164,18 @@ export default function CourseLandingTemplate({
                 </button>
             )
         }
+
+        if (isPending) {
+            return (
+                <button
+                    onClick={() => setShowPayment(true)}
+                    className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-lg uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20"
+                >
+                    <Clock className="w-6 h-6 animate-pulse" />
+                    Chờ thanh toán
+                </button>
+            )
+        }
         
         if (effectivePhiCoc === 0) {
             return (
@@ -195,7 +207,7 @@ export default function CourseLandingTemplate({
                 ) : (
                     <>
                         <ArrowRight className="w-6 h-6" />
-                        Kích hoạt ngay - {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                        Kích hoạt ngay
                     </>
                 )}
             </button>
@@ -230,13 +242,13 @@ export default function CourseLandingTemplate({
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>
                                 )}
                                 <div className="mt-2 flex flex-wrap items-center gap-3">
-                                <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
-                                    {feeLabel}
-                                </span>
-                                <p className="text-2xl font-black text-brk-primary">
-                                    {effectivePhiCoc.toLocaleString('vi-VN')}đ
-                                </p>
-                            </div>
+                                    <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
+                                        Dạng phí: {feeLabel}
+                                    </span>
+                                    <p className="text-lg font-black text-brk-primary">
+                                        {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                    </p>
+                                </div>
                             </div>
                             
                             {isEnrolled && (
@@ -267,7 +279,7 @@ export default function CourseLandingTemplate({
                                     <Link2 className="w-4 h-4" />
                                     {copied ? '✓ Đã sao chép' : 'Chia sẻ link giới thiệu'}
                                 </button>
-                                <p className="text-center text-xs text-brk-muted">{shareInfo}</p>
+                                {shareInfo && <p className="text-center text-xs text-brk-muted">{shareInfo}</p>}
                             </div>
 
                             {/* Stats */}
