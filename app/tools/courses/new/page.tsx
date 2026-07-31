@@ -53,6 +53,7 @@ function CreateCourseContent() {
     // Section3: Học phí & Thanh toán
     const [phiCoc, setPhiCoc] = useState(0)
     const [feeType, setFeeType] = useState('MIEN_PHI')
+    const [voucherConfig, setVoucherConfig] = useState('WALLET')
     const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
     const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
@@ -190,6 +191,7 @@ function CreateCourseContent() {
                         
                         setPhiCoc(courseRes.phi_coc || 0)
                         setFeeType(courseRes.feeType || 'MIEN_PHI')
+                        setVoucherConfig(courseRes.voucherConfig || 'WALLET')
                         setRequiresReferralActivation(courseRes.requiresReferralActivation || false)
                         setReferralActivationThreshold(courseRes.referralActivationThreshold || 0)
                         setAcceptedVoucherIds(courseRes.acceptedVouchers?.map((v: any) => v.voucherId) || [])
@@ -257,6 +259,7 @@ function CreateCourseContent() {
                 link_anh_bia: linkAnhBia || null,
                 phi_coc: phiCoc,
                 feeType,
+                voucherConfig,
                 acceptedVoucherIds,
                 awardVoucherIds,
                 noidung_stk: noidungStk || null,
@@ -293,8 +296,9 @@ function CreateCourseContent() {
             if (moTaDai) formData.append('mo_ta_dai', moTaDai)
             if (linkAnhBia) formData.append('link_anh_bia', linkAnhBia)
             formData.append('phi_coc', phiCoc.toString())
-            formData.append('feeType', feeType)
-            formData.append('requiresReferralActivation', requiresReferralActivation ? 'true' : 'false')
+             formData.append('feeType', feeType)
+             formData.append('voucherConfig', voucherConfig)
+             formData.append('requiresReferralActivation', requiresReferralActivation ? 'true' : 'false')
             formData.append('referralActivationThreshold', referralActivationThreshold.toString())
             formData.append('acceptedVoucherIds', JSON.stringify(acceptedVoucherIds))
             formData.append('awardVoucherIds', JSON.stringify(awardVoucherIds))
@@ -665,6 +669,14 @@ function CreateCourseContent() {
                                 <option value="PHI_CAM_KET">Phí cam kết</option>
                                 <option value="PHI_DONG_HANH">Phí đồng hành</option>
                                 <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Áp dụng Voucher</label>
+                            <select value={voucherConfig} onChange={(e) => setVoucherConfig(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                <option value="NONE">Không áp dụng</option>
+                                <option value="WALLET">Áp dụng - ví Voucher</option>
+                                <option value="SPECIAL">Áp dụng các Voucher đặc biệt (ví dụ: MB1, ...)</option>
                             </select>
                         </div>
                         <div className="space-y-1.5">

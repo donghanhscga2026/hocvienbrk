@@ -1099,6 +1099,7 @@ export async function updateCourseAction(courseId: number, data: {
     acceptedVoucherIds?: number[],
     awardVoucherIds?: number[],
     feeType?: string,
+    voucherConfig?: string,
     requiresReferralActivation?: boolean,
     referralActivationThreshold?: number
 }) {
@@ -1163,6 +1164,7 @@ export async function updateCourseAction(courseId: number, data: {
             link_zalo: data.link_zalo ?? null,
             phi_coc: data.phi_coc,
             feeType: data.feeType,
+            voucherConfig: data.voucherConfig,
             requiresReferralActivation: data.requiresReferralActivation,
             referralActivationThreshold: data.referralActivationThreshold,
             noidung_stk: data.noidung_stk ?? null,

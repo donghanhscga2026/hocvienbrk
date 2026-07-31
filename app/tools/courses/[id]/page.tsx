@@ -52,6 +52,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     
     // ✅ NEW: Section 3 - Fee & Payment
     const [feeType, setFeeType] = useState('MIEN_PHI')
+    const [voucherConfig, setVoucherConfig] = useState('WALLET')
     const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
     const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
@@ -180,6 +181,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setNameLop(res.name_lop || '')
                 setPhiCoc(res.phi_coc || 0)
                 setFeeType(res.feeType || 'MIEN_PHI')
+                setVoucherConfig(res.voucherConfig || 'WALLET')
                 setIdKhoa(res.id_khoa || '')
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
@@ -235,6 +237,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 link_anh_bia: linkAnhBia || null,
                 phi_coc: phiCoc,
                 feeType,
+                voucherConfig,
                 requiresReferralActivation,
                 referralActivationThreshold,
                 acceptedVoucherIds,
@@ -473,6 +476,15 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                                 <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div className="space-y-1.5 mt-4">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Áp dụng Voucher</label>
+                        <select value={voucherConfig} onChange={(e) => setVoucherConfig(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                            <option value="NONE">Không áp dụng</option>
+                            <option value="WALLET">Áp dụng - ví Voucher</option>
+                            <option value="SPECIAL">Áp dụng các Voucher đặc biệt (ví dụ: MB1, ...)</option>
+                        </select>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mt-4">
