@@ -684,6 +684,84 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ Đã chạy `npx prisma generate` để cập nhật Prisma Client cho enum `EnrollmentMode`.
 - ✅ Đã đồng bộ cấu hình schema Enum và Database thông qua `npx prisma db push` thành công.
 - ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+ 
+ 
+## ✅ SESSION-20260731_01 — Chuyển đổi Landing Page khóa học sang Template Động & Tích hợp quản trị
+
+- **Ngày**: 2026-07-31
+- **Thời gian**: ~08:00 - 11:15
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Chuyển đổi Landing Page khóa học tĩnh sang cơ chế điều khiển bằng Database (Dynamic Template) theo đặc tả kỹ thuật `TAI_LIEU_KY_THUAT_DYNAMIC_COURSE_TEMPLATE.md`.
+- Hỗ trợ ẩn/hiện thông minh (`visibility: 'all' | 'unregistered' | 'registered'`) để tối giản giao diện khi học viên đã kích hoạt.
+- Tích hợp tính năng quản lý template và bật/tắt (Toggle) trực tiếp trên trang Danh sách khóa học `/tools/courses`.
+
+### Các file đã thay đổi
+
+#### `prisma/schema.prisma`
+- Thêm các model: `CoursePage`, `CourseSection`, `CoursePageVersion` quản lý trang khóa học động và các section.
+- Thêm trường `useTemplate` vào model `CoursePage` để quản lý bật/tắt áp dụng template.
+
+#### `lib/course-page/types.ts` & `lib/course-page/schemas.ts`
+- Định nghĩa TypeScript types và Zod validation schemas cho cấu trúc Landing Page, Theme, SEO, Checkout và các Section.
+
+#### `app/actions/course-page-actions.ts`
+- Cung cấp các Server Actions CRUD quản lý trang khóa học động (`getCoursePages`, `getCoursePage`, `createCoursePage`, `updateCoursePage`, `saveCourseSections`, `deleteCoursePage`).
+
+#### `components/course-page/`
+- Tạo `CourseThemeProvider.tsx` nạp cấu hình màu sắc HEX của database thành CSS variables.
+- Tạo `SectionRenderer.tsx` xử lý lọc section theo trạng thái kích hoạt, thứ tự `sortOrder`, hỗ trợ thuộc tính `sectionType` của database.
+- Tạo component `CoursePageView.tsx` quản lý Header, Footer, Thanh tiến trình cuộn trang chuỗi hạt (Bead trail), tích hợp Checkout Modal.
+
+#### `components/course-page/sections/`
+- Xây dựng 14 section components động: `HeroSection` (hỗ trợ ảnh bìa gốc, thống kê thật, link giới thiệu affiliate), `QuoteSection`, `PainPointsSection`, `BenefitsSection`, `OutcomesSection`, `InstructorSection`, `CommitmentSection`, `BonusesSection`, `ValueStackSection`, `RoadmapSection`, `PricingSection`, `ClosingMessageSection`, `CurriculumSection` (hiển thị bài học thật), `TestimonialsSection` (hiển thị đánh giá thật).
+
+#### `app/khoa-hoc/[id]/page.tsx`
+- Tích hợp kiểm tra nếu tồn tại trang động đã cấu hình trong DB và có `useTemplate: true`, render `CoursePageView` với SEO metadata động. Ngược lại, tự động fallback về giao diện tĩnh nguyên bản.
+
+#### `app/tools/courses/page.tsx`
+- Tích hợp trực tiếp cột trạng thái bật/tắt **Template động** (dạng nút Toggle) và nút **Thiết lập giao diện (Palette 🎨)** cùng hàng với cấu hình khóa học trong danh sách `/tools/courses`.
+- Tự động gọi Server Action để lưu trạng thái trực tiếp khi gạt nút.
+- Đồng thời gộp nút Published trạng thái của khóa học sang dạng nút Toggle cùng hàng.
+
+#### `app/tools/courses/[id]/edit/`
+- Tạo Router `/edit` và component form `EditCoursePageForm.tsx` quản lý cấu hình giao diện chi tiết, điều hướng chuẩn xác về `/tools/courses` sau khi lưu/hủy.
+
+#### `app/tools/pages/page.tsx`
+- Dọn dẹp, loại bỏ tab quản lý trang khóa học cũ để tập trung hoàn toàn về `/tools/courses`.
+
+### Các file đã tạo
+- #### `plan_temp/seed-zalo-mastery.js`
+  - Script nạp dữ liệu giao diện mẫu hoàn chỉnh cho khóa `ZALO_MASTERY`.
+- #### `plan_temp/init-all-course-pages.js`
+  - Script quét toàn hệ thống và tự động khởi tạo cấu hình template (tắt mặc định) cho 36 khóa học còn lại.
+
+### Kiểm tra
+- ✅ Cập nhật DB schema thành công (`npx prisma db push`).
+- ✅ Khởi tạo dữ liệu hàng loạt thành công, 37 khóa học đã sẵn sàng quản trị template.
+- ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+
+
+## ✅ SESSION-20260731_02 — Đồng bộ dữ liệu Landing Page khóa học 100-NGAY-LAN-TOA-TRI-THUC & Seed DB
+
+- **Ngày**: 2026-07-31
+- **Thời gian**: ~11:20 - 11:35
+- **Trạng thái**: ✅ Hoàn thành
+
+### Mục tiêu
+- Trích xuất toàn bộ dữ liệu nội dung Landing Page mẫu của khóa học 100 ngày tại `https://100-ngay-dong-hanh-lan-toa-tri-thuc.vercel.app/`
+- Chuyển đổi và nạp dữ liệu này vào định dạng JSON của `CoursePage` và `CourseSection` cho khóa học `#39` (`100-NGAY-LAN-TOA-TRI-THUC`) trong database.
+
+### Các file đã tạo mới
+#### `plan_temp/seed-lan-toa-tri-thuc.js`
+- Script nạp dữ liệu giao diện mẫu hoàn chỉnh cho khóa `100-NGAY-LAN-TOA-TRI-THUC`, bao gồm 13 sections động đúng chuẩn Zod schema.
+
+### Kiểm tra
+- ✅ Khởi chạy kịch bản seed thành công, nạp đầy đủ các sections động cho khóa học `#39` trong DB.
+- ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
+
+
 
 
 

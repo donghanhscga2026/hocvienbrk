@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, getStudentsAction } from '@/app/actions/admin-actions'
-import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2 } from 'lucide-react'
+import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
+import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
 
 export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
@@ -37,6 +38,7 @@ export default function ToolsCoursesPage() {
 
 function CoursesTab() {
     const [courses, setCourses] = useState<any[]>([])
+    const [coursePages, setCoursePages] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
@@ -64,10 +66,43 @@ function CoursesTab() {
                     setFilterTeacher(String(res.userId))
                 }
             }
+            const pages = await getCoursePages()
+            setCoursePages(pages)
             setLoading(false)
         }
         fetchCourses()
     }, [])
+
+    const handleToggleTemplate = async (slug: string, page: any, currentVal: boolean) => {
+        if (page) {
+            const res = await updateCoursePage(page.id, { useTemplate: !currentVal })
+            if (res.success) {
+                setCoursePages(prev => prev.map(p => p.id === page.id ? { ...p, useTemplate: !currentVal } : p))
+            } else {
+                alert(res.error || 'Có lỗi xảy ra khi cập nhật cấu hình')
+            }
+        } else {
+            const res = await createCoursePage({
+                slug,
+                name: slug,
+                useTemplate: true
+            })
+            if (res.success && res.page) {
+                setCoursePages(prev => [...prev, res.page])
+            } else {
+                alert(res.error || 'Có lỗi xảy ra khi khởi tạo cấu hình')
+            }
+        }
+    }
+
+    const handleToggleCourseStatus = async (courseId: number, currentStatus: boolean) => {
+        const res = await bulkToggleCourseStatusAction([courseId], !currentStatus)
+        if (res.success) {
+            setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: !currentStatus } : c))
+        } else {
+            alert(res.error || 'Có lỗi xảy ra khi cập nhật trạng thái hiển thị')
+        }
+    }
 
     const categories = useMemo(() => {
         const cats = new Set(courses.map((c: any) => c.courseCategory?.name || c.category || 'Khác'))
@@ -306,7 +341,7 @@ function CoursesTab() {
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex items-start justify-between gap-2">
+                                            <div className="mb-2.5">
                                                 <Link
                                                     href={`/khoa-hoc/${course.id_khoa || course.id}`}
                                                     className="font-black text-orange-600 text-sm leading-tight break-words hover:text-orange-700 hover:underline underline-offset-2"
@@ -314,26 +349,20 @@ function CoursesTab() {
                                                 >
                                                     {course.name_lop}
                                                 </Link>
-                                                <Link
-                                                    href={`/tools/courses/${course.id}`}
-                                                    className="shrink-0 inline-flex items-center justify-center w-8 h-8 bg-black text-yellow-400 rounded-full hover:bg-zinc-800 active:scale-90 transition-all shadow-md"
-                                                >
-                                                    <Settings className="w-4 h-4" />
-                                                </Link>
                                             </div>
 
-                                            <div className="flex items-center gap-3 mt-2">
-                                                <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold">
+                                            <div className="flex items-center gap-3 text-[10px] text-gray-500 font-bold flex-wrap pb-2.5 border-b border-gray-100">
+                                                <div className="flex items-center gap-1">
                                                     <DollarSign className="w-3 h-3 text-green-500" />
                                                     {course.phi_coc.toLocaleString()}đ
                                                 </div>
-                                                <div className="flex items-center gap-1 text-[10px] text-gray-500 font-bold">
+                                                <div className="flex items-center gap-1">
                                                     <BookOpen className="w-3 h-3 text-blue-400" />
                                                     {course._count?.lessons} bài
                                                 </div>
                                                 <button
                                                     onClick={() => handleViewStudents(course.id, course.name_lop)}
-                                                    className="flex items-center gap-1 text-[10px] text-gray-500 font-bold hover:text-purple-600 transition-colors"
+                                                    className="flex items-center gap-1 hover:text-purple-600 transition-colors"
                                                     title="Xem học viên đã đăng ký"
                                                 >
                                                     <Users className="w-3 h-3 text-purple-500" />
@@ -344,6 +373,72 @@ function CoursesTab() {
                                                         GV: {course.teacher.name || course.teacher.email}
                                                     </span>
                                                 )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-2 pt-2.5 flex-wrap">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    {/* Nút bật/tắt Publish (Hiển thị) */}
+                                                    <div className="flex items-center gap-1 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-lg">
+                                                        <span className="text-[9px] font-black text-gray-500">Đăng:</span>
+                                                        <button
+                                                            onClick={() => handleToggleCourseStatus(course.id, course.status)}
+                                                            className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                                course.status ? 'bg-green-600' : 'bg-gray-300'
+                                                            }`}
+                                                            title={course.status ? "Đang hiển thị" : "Đang ẩn"}
+                                                        >
+                                                            <span
+                                                                className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                                    course.status ? 'translate-x-3' : 'translate-x-0'
+                                                                }`}
+                                                            />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Nút bật/tắt Template Động */}
+                                                    {(() => {
+                                                        const page = coursePages.find((p) => p.slug === course.id_khoa)
+                                                        const isTemplateApplied = page ? page.useTemplate !== false : false
+                                                        return (
+                                                            <div className="flex items-center gap-1 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-lg">
+                                                                <span className="text-[9px] font-black text-purple-700">Mẫu:</span>
+                                                                <button
+                                                                    onClick={() => handleToggleTemplate(course.id_khoa, page, isTemplateApplied)}
+                                                                    className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                                        isTemplateApplied ? 'bg-purple-700' : 'bg-gray-300'
+                                                                    }`}
+                                                                    title={isTemplateApplied ? "Đang áp dụng template động" : "Đang dùng giao diện gốc"}
+                                                                >
+                                                                    <span
+                                                                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                                            isTemplateApplied ? 'translate-x-3' : 'translate-x-0'
+                                                                        }`}
+                                                                    />
+                                                                </button>
+                                                                {isTemplateApplied && page && (
+                                                                    <Link
+                                                                        href={`/tools/courses/${page.id}/edit`}
+                                                                        className="inline-flex items-center justify-center w-5 h-5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full transition-all ml-1"
+                                                                        title="Thiết lập giao diện Template"
+                                                                    >
+                                                                        <Palette className="w-3 h-3" />
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })()}
+                                                </div>
+
+                                                <div className="flex items-center gap-2 ml-auto">
+                                                    <Link
+                                                        href={`/tools/courses/${course.id}`}
+                                                        className="inline-flex items-center justify-center gap-1 px-3 py-1 bg-black text-yellow-400 rounded-lg hover:bg-zinc-800 active:scale-95 transition-all text-xs font-black shadow-sm"
+                                                        title="Sửa cấu hình khóa học"
+                                                    >
+                                                        <Settings className="w-3.5 h-3.5" />
+                                                        <span>Sửa</span>
+                                                    </Link>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

@@ -3,6 +3,8 @@ import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { CourseLandingClient } from '@/components/landing/LandingPageClient'
+import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
+import CoursePageView from '@/components/course-page/CoursePageView'
 
 const DEFAULT_OG_TITLE = 'BRK - Ngân hàng Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
@@ -23,6 +25,31 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     if (!course) return { title: 'Không tìm thấy khóa học' }
 
     const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
+    
+    // Check if dynamic course page exists
+    const coursePage = await prisma.coursePage.findFirst({
+        where: { slug: id, status: 'published' }
+    })
+
+    if (coursePage) {
+        const seo = (coursePage.seo as any) || {}
+        return {
+            title: seo.title || course.name_lop,
+            description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+            openGraph: {
+                title: seo.title || course.name_lop,
+                description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+                images: seo.image ? [seo.image] : [courseImg || DEFAULT_OG_IMAGE],
+            },
+            twitter: {
+                card: 'summary_large_image',
+                title: seo.title || course.name_lop,
+                description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+                images: seo.image ? [seo.image] : [courseImg || DEFAULT_OG_IMAGE],
+            }
+        }
+    }
+
     return {
         title: course.name_lop,
         description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
@@ -47,7 +74,8 @@ export default async function KhoaHocPage({ params }: PageProps) {
     id = id.replace(/\$+$/, '')
 
     let course = await prisma.course.findUnique({
-        where: { id_khoa: id }
+        where: { id_khoa: id },
+        include: { teacherBankAccount: true }
     })
 
     if (!course) notFound()
@@ -140,6 +168,25 @@ export default async function KhoaHocPage({ params }: PageProps) {
                 rating: 5,
             }))
     ].slice(0, 5)
+
+    // Check if dynamic course page exists in database
+    const coursePage = await getPublishedCoursePageBySlug(id)
+    if (coursePage && (coursePage as any).useTemplate !== false) {
+        return (
+            <CoursePageView
+                coursePage={coursePage as any}
+                course={course}
+                enrollment={enrollment}
+                userPhone={userPhone}
+                userId={userId}
+                session={session}
+                lessons={lessons}
+                testimonials={testimonials}
+                totalHours={totalHours}
+                activeStudentCount={activeStudentCount}
+            />
+        )
+    }
 
     return (
         <CourseLandingClient
