@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import prisma from '@/lib/prisma';
-import { sendTelegramAdmin, sendSuccessEmail } from './notifications';
+import { sendTelegramAdmin, sendSuccessEmail, sendTelegram } from './notifications';
 import { isTestAccount } from '@/lib/test-account';
 
 function extractTextFromHtml(html: string): string {
@@ -318,7 +318,7 @@ export async function processPaymentEmails() {
               `🏦 Ngân hàng: Sacombank\n` +
               `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n` +
               brkPlacementMsg;
-            await sendTelegramAdmin(msgAdmin);
+            await sendTelegram(msgAdmin, 'ACTIVATE');
 
             // Activation email
             if (enrollment.user.email) {
