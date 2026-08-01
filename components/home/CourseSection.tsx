@@ -52,7 +52,7 @@ function CourseCategoryGroup({
                         <LayoutGrid className="w-5 h-5" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-black uppercase tracking-widest text-brk-on-surface">
+                        <h3 className="text-sm font-black text-brk-on-surface">
                             {categoryName}
                         </h3>
                         <p className="text-[10px] font-bold text-brk-accent uppercase">

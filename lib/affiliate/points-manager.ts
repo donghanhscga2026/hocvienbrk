@@ -18,6 +18,14 @@ export async function onEmailVerified(userId: number) {
             return { success: false, error: 'User not found or email not verified' }
         }
 
+        // Tặng quà đăng ký 386.386 MBDT cho chính user mới (Đồng bộ mọi trường hợp ref hay không ref)
+        try {
+            const { awardSignupGift } = await import('@/lib/brk/wallet-service')
+            await awardSignupGift(userId)
+        } catch (giftError) {
+            console.error('[SignupGift] Lỗi tặng quà đăng ký:', giftError)
+        }
+
         // 2. Nếu không có referrer, không có điểm thưởng
         if (!user.referrerId) {
             return { success: true, message: 'No referrer' }

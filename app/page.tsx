@@ -6,7 +6,6 @@ import MainHeader from '@/components/layout/MainHeader'
 import MessageCard from '@/components/home/MessageCard'
 import HomePageClient from '@/components/home/HomePageClient'
 import FooterSection from '@/components/home/FooterSection'
-import { MbwDashboardProvider } from '@/components/mbw/MbwDashboardContext'
 
 import prisma from '@/lib/prisma'
 import { getDefaultProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
@@ -164,7 +163,6 @@ export default async function Home() {
   })
 
   return (
-    <MbwDashboardProvider>
     <main className="min-h-screen" style={{
       backgroundColor: safeProfile.backgroundColor || undefined
     }}>
@@ -203,6 +201,5 @@ export default async function Home() {
       
       <FooterSection profile={safeProfile as any} />
     </main>
-    </MbwDashboardProvider>
   )
 }

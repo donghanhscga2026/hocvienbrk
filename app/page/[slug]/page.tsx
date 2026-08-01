@@ -7,7 +7,7 @@ import MessageCard from '@/components/home/MessageCard'
 import HomePageClient from '@/components/home/HomePageClient'
 import FooterSection from '@/components/home/FooterSection'
 import SetHomeSlug from '@/components/home/SetHomeSlug'
-import { MbwDashboardProvider } from '@/components/mbw/MbwDashboardContext'
+
 import { getSiteProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getHeroMessageForProfile } from '@/app/actions/message-actions'
 
@@ -170,7 +170,6 @@ export default async function PageSlugPage({ params }: PageProps) {
     const { resetSurveyAction } = await import('@/app/actions/survey-actions')
 
     return (
-        <MbwDashboardProvider>
         <main className="min-h-screen" style={{
             backgroundColor: profile.backgroundColor || undefined
         }}>
@@ -213,6 +212,5 @@ export default async function PageSlugPage({ params }: PageProps) {
 
             <FooterSection profile={profile} />
         </main>
-        </MbwDashboardProvider>
     )
 }
