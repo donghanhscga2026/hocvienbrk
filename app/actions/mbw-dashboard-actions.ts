@@ -9,6 +9,7 @@ export interface MbwDashboardData {
     cash: number
     brkd: number
     voucherBalance: number
+    mbvBalance: number
   }
   vouchers: {
     id: number
@@ -45,6 +46,7 @@ export async function getMbwDashboard(): Promise<MbwDashboardData> {
       cash: Number(brkWallet?.balance ?? 0),
       brkd: Number(brkWallet?.brkd ?? 0),
       voucherBalance: Number(brkWallet?.voucherBalance ?? 0),
+      mbvBalance: Number(brkWallet?.mbvBalance ?? 0),
     },
     vouchers: userVouchers.map((uv: any) => ({
       id: uv.id,

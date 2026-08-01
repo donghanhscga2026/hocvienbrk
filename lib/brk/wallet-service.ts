@@ -29,7 +29,7 @@ async function creditBalance(
   applicationId?: number
 ) {
   await ensureBrkWallet(userId)
-  const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : 'balance'
+  const field = balanceType === 'BRKD' ? 'brkd' : balanceType === 'VOUCHER' ? 'voucherBalance' : balanceType === 'MBV' ? 'mbvBalance' : 'balance'
 
   const [updated] = await prisma.$transaction(async (tx) => {
     // Read wallet INSIDE transaction to prevent race condition
@@ -116,6 +116,18 @@ export async function creditVoucherWallet(
   return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt, sourceMemberId, applicationId)
 }
 
+export async function creditMbvWallet(
+  userId: number,
+  amount: number,
+  description: string,
+  refId?: string,
+  createdAt?: Date,
+  sourceMemberId?: number,
+  applicationId?: number
+) {
+  return creditBalance(userId, amount, 'MBV', 'MBV_CREDIT', description, refId, createdAt, sourceMemberId, applicationId)
+}
+
 export async function awardSignupGift(userId: number) {
   try {
     const user = await prisma.user.findUnique({
@@ -132,8 +144,8 @@ export async function awardSignupGift(userId: number) {
       const hasGift = await prisma.brkTransaction.findFirst({
         where: {
           walletId: wallet.id,
-          balanceType: 'VOUCHER',
-          type: 'VOUCHER_CREDIT',
+          balanceType: 'MBV',
+          type: 'MBV_CREDIT',
           description: { contains: 'Quà tặng đăng ký thành công' }
         }
       })
@@ -144,13 +156,13 @@ export async function awardSignupGift(userId: number) {
     }
 
     const giftAmount = 386386
-    await creditVoucherWallet(
+    await creditMbvWallet(
       userId,
       giftAmount,
-      'Quà tặng đăng ký thành công ví MBDT'
+      'Quà tặng đăng ký thành công ví MBV'
     )
 
-    console.log(`🎁 [SignupGift] Đã tặng ${giftAmount} MBDT cho user #${userId}`)
+    console.log(`🎁 [SignupGift] Đã tặng ${giftAmount} MBV cho user #${userId}`)
     return { success: true }
   } catch (e: any) {
     console.error(`[SignupGift] Lỗi tặng quà đăng ký cho user #${userId}:`, e)
@@ -202,6 +214,56 @@ export async function debitVoucherWallet(
       action: 'WALLET_CHANGE',
       detail: `VOUCHER -${amount.toLocaleString()}đ: ${description}`,
       metadata: { balanceType: 'VOUCHER', amount: -amount, refId }
+    })
+  } catch { }
+
+  return updated
+}
+
+export async function debitMbvWallet(
+  userId: number,
+  amount: number,
+  description: string,
+  refId?: string,
+  sourceMemberId?: number
+) {
+  await ensureBrkWallet(userId)
+
+  const [updated] = await prisma.$transaction(async (tx) => {
+    const wallet = await tx.brkWallet.findUnique({ where: { userId } })
+    if (!wallet) throw new Error('Wallet not found')
+    if (Number(wallet.mbvBalance) < amount) {
+      throw new Error('Số dư ví MBV không đủ')
+    }
+
+    const newBalance = Number(wallet.mbvBalance) - amount
+    const [updatedWallet] = await Promise.all([
+      tx.brkWallet.update({ where: { userId }, data: { mbvBalance: newBalance } }),
+      tx.brkTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: -amount,
+          type: 'ADJUSTMENT',
+          description,
+          refId,
+          sourceMemberId,
+          balanceType: 'MBV',
+          balanceBefore: Number(wallet.mbvBalance),
+          balanceAfter: newBalance,
+        }
+      })
+    ])
+
+    return [updatedWallet] as const
+  }, { timeout: 30000 })
+
+  try {
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId,
+      action: 'WALLET_CHANGE',
+      detail: `MBV -${amount.toLocaleString()}đ: ${description}`,
+      metadata: { balanceType: 'MBV', amount: -amount, refId }
     })
   } catch { }
 

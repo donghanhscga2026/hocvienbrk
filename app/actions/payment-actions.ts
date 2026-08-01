@@ -124,7 +124,7 @@ export async function verifyPaymentAction(
     if (result.brkResult?.activated && result.brkResult.placement) {
       const p = result.brkResult.placement
       let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
-        `👤 Học viên: <b>${result.studentName || 'N/A'}</b>\n` +
+        `👤 Học viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId || preCheck.userId})\n` +
         `📞 SĐT: ${result.studentPhone || 'N/A'}\n` +
         `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
         `${refLink}💰 Số tiền: ${(result.effectiveAmount || 0).toLocaleString()}đ\n` +
@@ -141,7 +141,7 @@ export async function verifyPaymentAction(
     } else if (result.brkResult && !result.brkResult.activated) {
       // Non-BRK course or no BRK config — simple notification
       const teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
-        `👤 Học viên: <b>${result.studentName || 'N/A'}</b>\n` +
+        `👤 Học viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId || preCheck.userId})\n` +
         `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
         `${refLink}💰 Số tiền: ${(result.effectiveAmount || 0).toLocaleString()}đ\n` +
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
@@ -637,7 +637,7 @@ export async function resetSystemForRebuildAction(systemId?: number, courseId?: 
         deletedRecords['BrkTransaction'] = txCount.count
 
         await prisma.$executeRaw(
-          Prisma.sql`UPDATE "brk_wallet" SET balance = 0, brkd = 0, "voucherBalance" = 0, "totalEarned" = 0, "totalWithdrawn" = 0 WHERE id IN (${Prisma.join(walletIds)})`
+          Prisma.sql`UPDATE "brk_wallet" SET balance = 0, brkd = 0, "voucherBalance" = 0, "mbvBalance" = 0, "totalEarned" = 0, "totalWithdrawn" = 0 WHERE id IN (${Prisma.join(walletIds)})`
         )
         deletedRecords['BrkWallet_reset'] = wallets.length
       }

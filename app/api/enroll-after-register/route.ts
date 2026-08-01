@@ -64,13 +64,13 @@ export async function POST(request: NextRequest) {
 
     if (course.type !== 'LIB' && course.type !== 'SYS') {
       const brkWallet = await prisma.brkWallet.findUnique({ where: { userId: userIdNum } })
-      const voucherBalance = Number(brkWallet?.voucherBalance || 0)
-      if (voucherBalance > 0 && effectivePhiCoc > 0) {
-        voucherDeducted = Math.min(voucherBalance, effectivePhiCoc)
+      const mbvBalance = Number(brkWallet?.mbvBalance || 0)
+      if (mbvBalance > 0 && effectivePhiCoc > 0) {
+        voucherDeducted = Math.min(mbvBalance, effectivePhiCoc)
         effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
         voucherApplied = voucherDeducted > 0
-        const { debitVoucherWallet } = await import('@/lib/brk/wallet-service')
-        await debitVoucherWallet(userIdNum, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${course.id}`, userIdNum)
+        const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
+        await debitMbvWallet(userIdNum, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${course.id}`, userIdNum)
       }
     }
 

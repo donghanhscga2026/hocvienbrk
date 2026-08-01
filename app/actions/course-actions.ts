@@ -76,14 +76,14 @@ export async function enrollInCourseAction(
             isLibAllowed = true
         } else if (course.type !== 'SYS' && course.voucherConfig === 'WALLET' && useVoucher && voucherAmountToUse > 0) {
             const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
-            const voucherBalance = Number(brkWallet?.voucherBalance || 0)
-            const actualDeduct = Math.min(voucherBalance, voucherAmountToUse, effectivePhiCoc)
+            const mbvBalance = Number(brkWallet?.mbvBalance || 0)
+            const actualDeduct = Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc)
             if (actualDeduct > 0) {
                 voucherDeducted = actualDeduct
                 effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
                 voucherApplied = true
-                const { debitVoucherWallet } = await import('@/lib/brk/wallet-service')
-                await debitVoucherWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
+                const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
+                await debitMbvWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
             }
         }
 
@@ -1052,6 +1052,24 @@ export async function getBrkVoucherBalanceAction() {
             select: { voucherBalance: true }
         })
         return Number(wallet?.voucherBalance || 0)
+    } catch {
+        return 0
+    }
+}
+
+/**
+ * Lấy số dư ví MBV (Merit Bank Voucher) của User hiện tại
+ */
+export async function getBrkMbvBalanceAction() {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return 0
+        const userId = Number(session.user.id)
+        const wallet = await prisma.brkWallet.findUnique({
+            where: { userId },
+            select: { mbvBalance: true }
+        })
+        return Number(wallet?.mbvBalance || 0)
     } catch {
         return 0
     }
