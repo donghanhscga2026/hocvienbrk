@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import PaymentModal from './PaymentModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
-import { enrollInCourseAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, getBrkVoucherBalanceAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
@@ -93,11 +93,9 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
             setAffiliateCode(String(userId))
             
             // Lấy số dư ví MBDT từ server action
-            import('@/app/actions/course-actions').then(({ getUserVoucherBalance }) => {
-                getUserVoucherBalance(Number(userId))
-                    .then(bal => setVoucherBalance(bal))
-                    .catch(err => console.error("Error fetching MBDT balance:", err))
-            })
+            getBrkVoucherBalanceAction()
+                .then(bal => setVoucherBalance(bal))
+                .catch(err => console.error("Error fetching MBDT balance:", err))
         }
     }, [isLoggedIn, userId])
 
