@@ -82,7 +82,7 @@ export async function sendTelegram(
     FAILED_LOGIN: process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID,
     CHANGE: process.env.TELEGRAM_CHAT_ID_CHANGE || process.env.TELEGRAM_CHAT_ID,
     CRON_LOG: process.env.TELEGRAM_CHAT_ID_CRON || process.env.TELEGRAM_CHAT_ID,
-    SURVEY: process.env.TELEGRAM_CHAT_ID_SURVEY || process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
+    SURVEY: process.env.TELEGRAM_CHAT_ID_SURVEY || process.env.TELEGRAM_CHAT_ID_CRON || process.env.TELEGRAM_CHAT_ID,
   };
   const chatId = chatIdMap[type];
   if (!token || !chatId) {
@@ -137,7 +137,7 @@ async function notifyEmailSuccess(to: string, subject: string, emailId: string, 
     `📡 Provider: <code>${escapeHtml(provider)}</code>\n` +
     `⏰ Time: ${escapeHtml(time)}`;
   
-  await sendTelegram(msg, 'ACTIVATE');
+  await sendTelegram(msg, 'CRON_LOG');
 }
 
 /**
@@ -163,7 +163,7 @@ async function notifyEmailError(to: string, subject: string, errorMsg: string, p
     `❌ Error: ${escapeHtml(errorMsg)}${fallbackMsg}\n` +
     `⏰ Time: ${escapeHtml(time)}`;
   
-  await sendTelegram(msg, 'ACTIVATE');
+  await sendTelegram(msg, 'CRON_LOG');
 }
 
 export async function sendToolShareClickNotification(data: {
@@ -488,7 +488,7 @@ export async function sendOtpStatusNotification(
               `📧 Email: <code>${email}</code>\n` +
               `🔑 Mã OTP: <code>${otpCode}</code>${errorInfo}`;
   
-  await sendTelegram(msg, 'FAILED_LOGIN');
+  await sendTelegram(msg, 'CRON_LOG');
 }
 
 export async function sendVerificationEmail(to: string, studentName: string, token: string, userId?: number) {
