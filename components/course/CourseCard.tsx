@@ -9,7 +9,7 @@ import { enrollInCourseAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
-import { Share2, BookOpen, Users } from 'lucide-react'
+import { Share2, BookOpen, Users, ChevronDown, ChevronUp } from 'lucide-react'
 
 // Chuyển URL thành link clickable (cho phần mô tả khóa học)
 const makeLinksClickable = (html: string): string => {
@@ -55,10 +55,49 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
     const [loading, setLoading] = useState(false)
     const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
 
+    // ✅ Mô tả mở rộng và tự động co lại sau 5 giây không tương tác
+    const [descExpanded, setDescExpanded] = useState(false)
+    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+
+    const resetCollapseTimer = React.useCallback(() => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current)
+        }
+        if (descExpanded) {
+            timeoutRef.current = setTimeout(() => {
+                setDescExpanded(false)
+            }, 5000)
+        }
+    }, [descExpanded])
+
+    useEffect(() => {
+        if (descExpanded) {
+            resetCollapseTimer()
+        }
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        }
+    }, [descExpanded, resetCollapseTimer])
+
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        }
+    }, [])
+
+    const [voucherBalance, setVoucherBalance] = useState(0)
+
     useEffect(() => {
         // Dùng != null để handle userId = 0 (ID hợp lệ)
         if (isLoggedIn && userId != null) {
             setAffiliateCode(String(userId))
+            
+            // Lấy số dư ví MBDT từ server action
+            import('@/app/actions/course-actions').then(({ getUserVoucherBalance }) => {
+                getUserVoucherBalance(Number(userId))
+                    .then(bal => setVoucherBalance(bal))
+                    .catch(err => console.error("Error fetching MBDT balance:", err))
+            })
         }
     }, [isLoggedIn, userId])
 
@@ -145,7 +184,11 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
 
     return (
         <>
-            <div className="group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full bg-brk-surface border-brk-outline">
+            <div 
+                onMouseMove={resetCollapseTimer}
+                onTouchStart={resetCollapseTimer}
+                className="group overflow-hidden rounded-2xl shadow-lg transition-all hover:shadow-2xl flex flex-col h-full bg-brk-surface border-brk-outline"
+            >
                 {/* Ảnh bìa - Đã tối ưu hóa */}
                 <Link
                     href={`/khoa-hoc/${course.id_khoa || course.id}`}
@@ -175,43 +218,42 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
 
                     {/* Badges - [Số tiền/Dạng phí] [Chia sẻ] [Kích hoạt] [Mục lục] */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                        {effectivePhiCoc === 0 ? (
-                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary">
-                                Miễn phí
-                            </span>
-                        ) : (
-                            <>
-                                <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface text-brk-accent border border-brk-primary/30">
-                                    {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                        {!isActive && (
+                            effectivePhiCoc === 0 ? (
+                                <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary">
+                                    Miễn phí
                                 </span>
-                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
-                                    {feeTypeDisplay.label}
-                                </span>
-                            </>
+                            ) : (
+                                <>
+                                    {course.voucherConfig === 'WALLET' && voucherBalance >= effectivePhiCoc ? (
+                                        <>
+                                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface text-brk-muted border border-brk-primary/30 line-through decoration-brk-accent decoration-2">
+                                                {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                            </span>
+                                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary animate-pulse">
+                                                0đ (-MBDT)
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface text-brk-accent border border-brk-primary/30">
+                                                {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                            </span>
+                                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
+                                                {feeTypeDisplay.label}
+                                            </span>
+                                        </>
+                                    )}
+                                </>
+                            )
                         )}
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setShowShare(true)
-                            }}
-                            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-primary px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm hover:brightness-110 transition-colors"
-                        >
-                            <Share2 className="w-2.5 h-2.5" />
-                            Chia sẻ
-                        </button>
-                        {isActive && effectivePhiCoc > 0 && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-background-dark px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm border border-brk-primary/50">
-                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
-                                Kích hoạt {formattedStartDate || ''}
-                            </span>
-                        )}
-                        {isPending && (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-accent px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm border border-brk-accent/50">
-                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
-                                Chờ thanh toán
-                            </span>
-                        )}
+                        {/* Số học viên */}
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
+                            <Users className="w-3 h-3" />
+                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')}
+                        </span>
+
+                        {/* Mục lục */}
                         <button
                             onClick={(e) => {
                                 e.preventDefault()
@@ -222,60 +264,99 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         >
                             Mục lục
                         </button>
-                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
-                            <Users className="w-3 h-3" />
-                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')}
-                        </span>
+
+                        {/* Chia sẻ */}
+                        <button
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setShowShare(true)
+                            }}
+                            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-primary px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm hover:brightness-110 transition-colors ml-auto"
+                        >
+                            <Share2 className="w-2.5 h-2.5" />
+                            Chia sẻ
+                        </button>
+
+                        {/* Chờ thanh toán (Nếu có) */}
+                        {isPending && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brk-accent px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-primary shadow-sm border border-brk-accent/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-brk-on-primary animate-pulse shrink-0" />
+                                Chờ thanh toán
+                            </span>
+                        )}
                     </div>
 
-                    {/* Mô tả - URL trong text sẽ được chuyển thành link clickable */}
-                    <div
-                        className="mb-5 flex-grow text-[14px] font-medium leading-relaxed text-justify break-words text-brk-on-surface [&_a]:text-brk-accent [&_a]:hover:underline [&_a]:font-bold"
-                        dangerouslySetInnerHTML={{ __html: makeLinksClickable(course.mo_ta_ngan || '') }}
-                    />
+                    {/* Mô tả - Dùng line-clamp-3 mặc định và mở rộng khi descExpanded */}
+                    {course.mo_ta_ngan && (
+                        <div className="mb-5 flex-grow">
+                            <div
+                                className={`text-[14px] font-medium leading-relaxed text-justify break-words text-brk-on-surface [&_a]:text-brk-accent [&_a]:hover:underline [&_a]:font-bold transition-all duration-300 ${
+                                    descExpanded ? '' : 'line-clamp-3'
+                                }`}
+                                dangerouslySetInnerHTML={{ __html: makeLinksClickable(course.mo_ta_ngan) }}
+                            />
+                        </div>
+                    )}
 
-                    {/* Button */}
-                    <button
-                        onClick={handleAction}
-                        disabled={loading}
-                        className={`group/btn relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full py-1.5 text-sm sm:text-base font-black shadow-xl transition-all active:scale-[0.97]
-                            ${loading ? 'bg-brk-muted text-brk-on-surface cursor-not-allowed' :
-                                isActive ? 'bg-brk-primary text-brk-on-primary hover:bg-brk-accent hover:brightness-110' :
-                                    isPending ? 'bg-brk-accent text-brk-on-primary hover:brightness-110' :
-                                        'bg-brk-primary text-brk-on-primary hover:brightness-110'}`}
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2 relative z-10">
-                                <svg className="h-5 w-5 animate-spin text-brk-on-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                Đang kết nối...
-                            </span>
-                        ) : (
-                            <>
-                                {isActive && enrollment && enrollment.totalLessons > 0 && (
-                                    <span
-                                        className="absolute inset-0 transition-all duration-700"
-                                        style={{ width: `${progressPct}%`, background: 'rgba(255,255,255,0.18)' }}
-                                        aria-hidden="true"
-                                    />
-                                )}
-                                <span className="relative z-10 flex items-center gap-2">
-                                    <span>{isActive ? '📖' : isPending ? '💰' : '⚡'}</span>
-                                    <span>
-                                        {isActive ? 'Vào học tiếp' : isPending ? 'Xem thông tin thanh toán' : effectivePhiCoc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
-                                        {isActive && enrollment && enrollment.totalLessons > 0 && (
-                                            <span className="ml-1.5 font-normal opacity-90 text-[12px]">
-                                                {enrollment.completedCount}/{enrollment.totalLessons} bài · {progressPct}%
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span>{isActive ? '▶' : '🚀'}</span>
-                                </span>
-                            </>
+                    {/* Hàng nút hành động dưới chân card */}
+                    <div className="flex gap-2 w-full mt-auto">
+                        {/* Nút Xem thêm / Thu gọn mô tả ngắn (Bên trái) */}
+                        {course.mo_ta_ngan && (
+                            <button
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setDescExpanded(!descExpanded)
+                                }}
+                                className="shrink-0 flex items-center justify-center gap-1 rounded-full px-3 py-2 text-xs sm:text-sm font-black transition-all active:scale-[0.97] bg-brk-primary/10 text-brk-primary border border-brk-primary/30 hover:bg-brk-primary/20 shadow-md"
+                            >
+                                <span>{descExpanded ? 'Thu gọn' : 'Xem thêm'}</span>
+                                {descExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
                         )}
-                    </button>
+
+                        {/* Nút hành động chính (Bên phải) */}
+                        <button
+                            onClick={handleAction}
+                            disabled={loading}
+                            className={`group/btn relative flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-full py-2 text-xs sm:text-sm font-black shadow-md transition-all active:scale-[0.97]
+                                ${loading ? 'bg-brk-muted text-brk-on-surface cursor-not-allowed' :
+                                    isActive ? 'bg-brk-primary text-brk-on-primary hover:bg-brk-accent hover:brightness-110' :
+                                        isPending ? 'bg-brk-accent text-brk-on-primary hover:brightness-110' :
+                                            'bg-brk-primary text-brk-on-primary hover:brightness-110'}`}
+                        >
+                            {loading ? (
+                                <span className="flex items-center gap-2 relative z-10">
+                                    <svg className="h-4 w-4 animate-spin text-brk-on-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Đang kết nối...
+                                </span>
+                            ) : (
+                                <>
+                                    {isActive && enrollment && enrollment.totalLessons > 0 && (
+                                        <span
+                                            className="absolute inset-0 transition-all duration-700"
+                                            style={{ width: `${progressPct}%`, background: 'rgba(255,255,255,0.18)' }}
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    <span className="relative z-10 flex items-center justify-center text-center">
+                                        <span>
+                                            {isActive ? 'Vào học tiếp' : isPending ? 'Thanh toán' : effectivePhiCoc === 0 ? 'Kích hoạt miễn phí' : 'Kích hoạt ngay'}
+                                            {isActive && enrollment && enrollment.totalLessons > 0 && (
+                                                <span className="ml-1 font-normal opacity-90 text-[10px] whitespace-nowrap">
+                                                    ({enrollment.completedCount}/{enrollment.totalLessons})
+                                                </span>
+                                            )}
+                                        </span>
+                                    </span>
+                                </>
+                            )}
+                        </button>
+                    </div>
 
 
                 </div>

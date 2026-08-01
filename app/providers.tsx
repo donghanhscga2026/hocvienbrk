@@ -4,6 +4,7 @@ import { SessionProvider } from 'next-auth/react'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AccountAssistantProvider } from '@/components/auth/AccountAssistantContext'
 import { AssistantProvider } from '@/components/assistant/AssistantProvider'
+import { MbwDashboardProvider } from '@/components/mbw/MbwDashboardContext'
 import { Session } from 'next-auth'
 
 export default function Providers({ 
@@ -18,7 +19,9 @@ export default function Providers({
       <ThemeProvider>
         <AccountAssistantProvider>
           <AssistantProvider>
-            {children}
+            <MbwDashboardProvider>
+              {children}
+            </MbwDashboardProvider>
           </AssistantProvider>
         </AccountAssistantProvider>
       </ThemeProvider>

@@ -121,12 +121,12 @@ function HomePageContent({
   // Auto-hide: Community section khi không có posts HOẶC showCommunity = false
   const showCommunity = profile.showCommunity !== false && posts && posts.length > 0
 
-  // Top courses: ưu tiên ghim (pin > 0), sau đó lấy 3 khóa mới cập nhật nhất
+  // Top courses: ưu tiên ghim (pin > 0), sau đó lấy 3 khóa mới cập nhật nhất (loại bỏ các khóa học đã kích hoạt)
   const pinnedCourses = courses
-    .filter((course) => course.pin != null && course.pin > 0)
+    .filter((course) => course.pin != null && course.pin > 0 && enrollmentsMap[course.id]?.status !== 'ACTIVE')
     .sort((a, b) => a.pin - b.pin)
   const latestUpdatedCourses = courses
-    .filter((course) => !course.pin || course.pin <= 0)
+    .filter((course) => (!course.pin || course.pin <= 0) && enrollmentsMap[course.id]?.status !== 'ACTIVE')
     .sort((a, b) => {
       const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
       const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0

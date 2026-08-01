@@ -116,6 +116,48 @@ export async function creditVoucherWallet(
   return creditBalance(userId, amount, 'VOUCHER', 'VOUCHER_CREDIT', description, refId, createdAt, sourceMemberId, applicationId)
 }
 
+export async function awardSignupGift(userId: number) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true }
+    })
+    if (!user) return { success: false, error: 'User not found' }
+
+    const wallet = await prisma.brkWallet.findUnique({
+      where: { userId }
+    })
+    
+    if (wallet) {
+      const hasGift = await prisma.brkTransaction.findFirst({
+        where: {
+          walletId: wallet.id,
+          balanceType: 'VOUCHER',
+          type: 'VOUCHER_CREDIT',
+          description: { contains: 'Quà tặng đăng ký thành công' }
+        }
+      })
+      if (hasGift) {
+        console.log(`[SignupGift] User #${userId} đã nhận quà đăng ký từ trước.`)
+        return { success: true, message: 'Signup gift already awarded' }
+      }
+    }
+
+    const giftAmount = 386386
+    await creditVoucherWallet(
+      userId,
+      giftAmount,
+      'Quà tặng đăng ký thành công ví MBDT'
+    )
+
+    console.log(`🎁 [SignupGift] Đã tặng ${giftAmount} MBDT cho user #${userId}`)
+    return { success: true }
+  } catch (e: any) {
+    console.error(`[SignupGift] Lỗi tặng quà đăng ký cho user #${userId}:`, e)
+    return { success: false, error: e.message }
+  }
+}
+
 export async function debitVoucherWallet(
   userId: number,
   amount: number,
