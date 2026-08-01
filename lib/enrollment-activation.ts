@@ -25,6 +25,7 @@ export interface ActivationResult {
   payment?: any
   brkResult?: { activated: boolean; placement?: any; error?: string }
   commissionResult?: any
+  studentId?: number
   studentName?: string | null
   studentPhone?: string | null
   studentEmail?: string | null
@@ -190,6 +191,7 @@ export async function processEnrollmentActivation(options: ActivationOptions): P
     payment,
     brkResult,
     commissionResult,
+    studentId: enrollment.userId,
     studentName: user?.name,
     studentPhone: user?.phone,
     studentEmail: user?.email,

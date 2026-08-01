@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { X, CheckCircle2, ExternalLink, Loader2, Coins } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import AccountAssistantModal from '@/components/auth/AccountAssistantModal'
-import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkVoucherBalanceAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
 import { resolveBankBin } from '@/lib/bank-bin'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 
@@ -68,7 +68,7 @@ export default function RegistrationFlowModal({
   useEffect(() => {
     if (step === 'voucher_confirm' && effectiveSession && course.voucherConfig === 'WALLET') {
       setLoadingVoucher(true)
-      getBrkVoucherBalanceAction().then((bal) => {
+      getBrkMbvBalanceAction().then((bal) => {
         setVoucherBalance(bal)
         // Default check if they have balance
         if (bal > 0) {
@@ -231,7 +231,7 @@ export default function RegistrationFlowModal({
             {loadingVoucher ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <Loader2 size={32} color="#C86B3D" className="animate-spin mx-auto mb-2" />
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#A8A39C' }}>Đang tải số dư ví Voucher...</p>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#A8A39C' }}>Đang tải số dư ví MBV...</p>
               </div>
             ) : (
               <>
@@ -288,19 +288,19 @@ export default function RegistrationFlowModal({
                           cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed',
                         }}
                       >
-                        Áp dụng ví Voucher để giảm học phí
+                        Áp dụng ví MBV để giảm học phí
                       </label>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#C8C3BA', marginBottom: useVoucher ? '18px' : '0' }}>
                       <Coins size={14} color="#C86B3D" />
-                      <span>Số dư ví Voucher khả dụng: <strong>{voucherBalance.toLocaleString('vi-VN')} VND</strong></span>
+                      <span>Số dư ví MBV khả dụng: <strong>{voucherBalance.toLocaleString('vi-VN')} VND</strong></span>
                     </div>
 
                     {useVoucher && (
                       <div style={{ borderTop: '1px solid rgba(200, 107, 61, 0.1)', paddingTop: '16px' }}>
                         <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#A8A39C', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Nhập số tiền muốn trừ từ ví Voucher:
+                          Nhập số tiền muốn trừ từ ví MBV:
                         </label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <input
@@ -339,7 +339,7 @@ export default function RegistrationFlowModal({
                   </div>
                   {course.voucherConfig === 'WALLET' && useVoucher && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#647B5E', fontWeight: 500 }}>
-                      <span>Khấu trừ từ ví Voucher:</span>
+                      <span>Khấu trừ từ ví MBV:</span>
                       <span>-{voucherAmountToUse.toLocaleString('vi-VN')} VND</span>
                     </div>
                   )}
@@ -507,7 +507,7 @@ export default function RegistrationFlowModal({
                 <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#C8C3BA', marginTop: '4px' }}>VNĐ</div>
                 {finalPaidWithVoucher > 0 && (
                   <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#647B5E', fontWeight: 'bold', marginTop: '6px' }}>
-                    * Đã giảm trừ {finalPaidWithVoucher.toLocaleString('vi-VN')} VND bằng ví Voucher
+                    * Đã giảm trừ {finalPaidWithVoucher.toLocaleString('vi-VN')} VND bằng ví MBV
                   </div>
                 )}
               </div>

@@ -763,6 +763,7 @@ model BrkWallet {
   updatedAt      DateTime         @updatedAt
   brkd           Decimal          @default(0) @db.Decimal(14, 2)
   voucherBalance Decimal          @default(0) @db.Decimal(14, 2)
+  mbvBalance     Decimal          @default(0) @db.Decimal(14, 2)
   transactions   BrkTransaction[]
   user           User             @relation(fields: [userId], references: [id])
 
@@ -1847,6 +1848,7 @@ enum BrkTransactionType {
   ADJUSTMENT
   BRKD_CREDIT
   VOUCHER_CREDIT
+  MBV_CREDIT
   BRKD_RETURN
 }
 
@@ -1854,6 +1856,7 @@ enum BalanceType {
   CASH
   BRKD
   VOUCHER
+  MBV
 }
 
 enum BrkRevenuePoolStatus {

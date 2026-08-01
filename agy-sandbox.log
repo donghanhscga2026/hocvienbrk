@@ -1,0 +1,47 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260801152851
+Username: 3EB340BD-0D2B-4\WDAGUtilityAccount
+RunAs User: 3EB340BD-0D2B-4\WDAGUtilityAccount
+Configuration Name: 
+Machine: 3EB340BD-0D2B-4 (Microsoft Windows NT 10.0.26100.0)
+Host Application: powershell.exe -NoLogo -NoExit -ExecutionPolicy Bypass -File C:\SandboxConfig\start-agy-sandbox-fixed.ps1
+Process ID: 6208
+PSVersion: 5.1.26100.8972
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8972
+BuildVersion: 10.0.26100.8972
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+========================================
+  AGY Sandbox - HocVien-BRK
+========================================
+
+[1/4] Kiem tra ket noi Internet...
+[2/4] Dang cai dat Antigravity CLI...
+ERROR: logging before google.Init: I0801 15:29:05.975056       1 installer.go:27] Running Antigravity CLI setup...
+ERROR: logging before google.Init: I0801 15:29:05.975056       1 installer_windows.go:45] Configuring Windows user PATH
+registry environment...
+ERROR: logging before google.Init: I0801 15:29:05.975056       1 installer_windows.go:117] Successfully added %LOCALAPPD
+ATA%\agy\bin to User PATH registry variable.
+ERROR: logging before google.Init: I0801 15:29:05.975056       1 installer_windows.go:148] Broadcasting environment upda
+te system-wide...
+ERROR: logging before google.Init: I0801 15:29:06.001748       1 installer_windows.go:167] Environment update broadcast
+completed.
+
+Warning: C:\Users\WDAGUtilityAccount\AppData\Local\agy\bin is not present in your active Environment PATH.
+Please restart your active terminal session, or add it manually if needed.
+
+
+✅✅ Antigravity CLI binary placed successfully at C:\Users\WDAGUtilityAccount\AppData\Local\agy\bin\agy.exe
+Note: The binary is installed, but it is not in your active PATH. Please follow the instructions above to add it, then r
+estart your terminal session.
+[3/4] Dang nap lai PATH...
+[4/4] Dang mo AGY tai thu muc du an...
+Project: C:\Workspace
+AGY:     C:\Users\WDAGUtilityAccount\AppData\Local\agy\bin\agy.exe
+Log:     C:\Workspace\agy-sandbox.log
+

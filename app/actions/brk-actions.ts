@@ -163,6 +163,7 @@ export async function getBrkWalletData() {
       balance: Number(wallet.balance),
       brkd: Number(wallet.brkd),
       voucherBalance: Number(wallet.voucherBalance),
+      mbvBalance: Number(wallet.mbvBalance),
       totalEarned: Number(wallet.totalEarned),
       totalWithdrawn: Number(wallet.totalWithdrawn),
     } : null,

@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import PaymentModal from './PaymentModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
-import { enrollInCourseAction, getBrkVoucherBalanceAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
@@ -92,8 +92,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         if (isLoggedIn && userId != null) {
             setAffiliateCode(String(userId))
             
-            // Lấy số dư ví MBDT từ server action
-            getBrkVoucherBalanceAction()
+            // Lấy số dư ví MBV từ server action
+            getBrkMbvBalanceAction()
                 .then(bal => setVoucherBalance(bal))
                 .catch(err => console.error("Error fetching MBDT balance:", err))
         }
@@ -229,7 +229,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                                                 {effectivePhiCoc.toLocaleString('vi-VN')}đ
                                             </span>
                                             <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary animate-pulse">
-                                                0đ (-MBDT)
+                                                0đ (-MBV)
                                             </span>
                                         </>
                                     ) : (
