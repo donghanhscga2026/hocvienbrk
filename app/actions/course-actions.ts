@@ -93,16 +93,36 @@ export async function enrollInCourseAction(
 
         if (existing && existing.status !== 'REJECTED') {
             if (existing.status === 'PENDING') {
+                const isAutoActiveExisting = effectivePhiCoc === 0
+
                 // Xoá bản ghi payment cũ
                 await prisma.payment.deleteMany({
                     where: { enrollmentId: existing.id }
                 })
                 
-                // Đồng thời cập nhật số tiền cọc (phi_coc) mới
+                // Cập nhật số tiền cọc (phi_coc) mới và tự động ACTIVE nếu số tiền sau giảm = 0đ
                 const updatedEnrollment = await prisma.enrollment.update({
                     where: { id: existing.id },
-                    data: { phi_coc: effectivePhiCoc }
+                    data: {
+                        phi_coc: effectivePhiCoc,
+                        status: isAutoActiveExisting ? 'ACTIVE' : 'PENDING'
+                    }
                 })
+
+                if (isAutoActiveExisting) {
+                    const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
+                    const msgAdmin = `🎁 <b>KÍCH HOẠT VÍ MBV 100%</b>\n\n` +
+                        `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
+                        `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
+                        `💳 Trừ ví MBV: ${voucherDeducted.toLocaleString('vi-VN')} VNĐ\n` +
+                        `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+                    await sendTelegram(msgAdmin, 'ACTIVATE');
+
+                    if (user?.email) {
+                        await sendActivationEmail(user.email, user.name || '', user.id, course.name_lop || course.id_khoa, course.noidung_email);
+                    }
+                    return { success: true, status: 'ACTIVE', enrollment: updatedEnrollment }
+                }
 
                 // Sinh bản ghi payment mới với QR mới theo cấu hình giáo viên hiện tại
                 const bankAcc = course.teacherBankAccount

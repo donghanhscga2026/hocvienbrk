@@ -13,7 +13,7 @@ type FlowStep = 'auth' | 'voucher_confirm' | 'payment' | 'thankyou'
 
 interface RegistrationFlowModalProps {
   course: any
-  session: any
+  session?: any
   userPhone: string | null
   userId: number | null
   initialEnrollment?: any
@@ -618,7 +618,7 @@ export default function RegistrationFlowModal({
               Chào mừng bạn!
             </h3>
             <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '15px', color: 'rgba(248,241,230,0.85)', margin: 0 }}>
-              Đăng ký thành công. Hành trình 100 ngày bắt đầu từ đây.
+              Đăng ký thành công.
             </p>
           </div>
 
