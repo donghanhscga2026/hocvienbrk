@@ -74,18 +74,43 @@ export async function getBrkDashboard() {
   ])
 
   const walletBalance = wallet ? Number(wallet.balance) : 0
+  if (systems.length === 0) return { walletBalance, systems: [] }
 
-  const systemInfos = await Promise.all(systems.map(async (sys) => {
-    const [f1Count, levelProgress, latestLegacyTimeline] = await Promise.all([
-      prisma.systemClosure.count({
-        where: { ancestorId: sys.autoId, depth: 1, systemId: sys.onSystem }
-      }),
-      getLevelProgress(userId, sys.onSystem),
-      sys.applicationId == null ? prisma.brkTimelineRecord.findFirst({
-        where: { userId, onSystem: sys.onSystem, applicationId: null },
-        orderBy: { id: 'desc' }
-      }) : null
-    ])
+  // Load config level cho tất cả system chỉ 1 lần (thay vì query lại trong từng system)
+  const onSystems = [...new Set(systems.map(s => s.onSystem))]
+  const allConfigsBySystem = new Map<number, Awaited<ReturnType<typeof getAllLevelConfigs>>>()
+  const configRows = await prisma.brkLevelConfig.findMany({
+    where: { systemId: { in: onSystems } },
+    include: { branchReqs: true },
+    orderBy: { level: 'asc' }
+  })
+  for (const onSystem of onSystems) {
+    allConfigsBySystem.set(onSystem, configRows.filter(c => c.systemId === onSystem))
+  }
+
+  // Gộp toàn bộ count F1 thành 1 query groupBy
+  const f1Groups = await prisma.systemClosure.groupBy({
+    by: ['ancestorId'],
+    where: { ancestorId: { in: systems.map(s => s.autoId) }, depth: 1, systemId: { in: onSystems } },
+    _count: { _all: true }
+  })
+  const f1CountByAutoId = new Map(f1Groups.map(g => [g.ancestorId, g._count._all]))
+
+  // Gộp timeline legacy (applicationId null) thành 1 query
+  const legacyTimelineRecs = await prisma.brkTimelineRecord.findMany({
+    where: { userId, onSystem: { in: onSystems }, applicationId: null },
+    orderBy: { id: 'desc' },
+    distinct: ['onSystem']
+  })
+  const latestLegacyBySystem = new Map(legacyTimelineRecs.map(r => [r.onSystem, r]))
+
+  const systemInfos = systems.map((sys) => {
+    const f1Count = f1CountByAutoId.get(sys.autoId) ?? 0
+    const levelProgress = getInlineLevelProgress(
+      { level: sys.level, totalPoints: Number(sys.totalPoints) },
+      allConfigsBySystem.get(sys.onSystem) ?? []
+    )
+    const latestLegacyTimeline = latestLegacyBySystem.get(sys.onSystem)
 
     return {
       onSystem: sys.onSystem,
@@ -108,9 +133,34 @@ export async function getBrkDashboard() {
       } : null,
       bonusEligible: f1Count >= 2,
     }
-  }))
+  })
 
   return { walletBalance, systems: systemInfos }
+}
+
+// Tính tiến trình level inline từ system record + config đã load, không query DB
+function getInlineLevelProgress(
+  systemRec: { level: number | null; totalPoints: number | null },
+  allConfigs: Awaited<ReturnType<typeof getAllLevelConfigs>>
+) {
+  const currentLevel = systemRec.level || 1
+  const totalPoints = Number(systemRec.totalPoints || 0)
+
+  const nextConfig = allConfigs.find(c => c.level === currentLevel + 1)
+  const currentConfig = allConfigs.find(c => c.level === currentLevel)
+
+  let progress = 0
+  let pointsNeeded = 0
+  if (nextConfig) {
+    pointsNeeded = Math.max(0, Number(nextConfig.pointsRequired) - totalPoints)
+    const range = Number(nextConfig.pointsRequired) - (currentConfig ? Number(currentConfig.pointsRequired) : 0)
+    const earned = totalPoints - (currentConfig ? Number(currentConfig.pointsRequired) : 0)
+    progress = range > 0 ? Math.min(100, Math.round((earned / range) * 100)) : 0
+  } else {
+    progress = 100
+  }
+
+  return { currentLevel, totalPoints, currentConfig, nextConfig, progress, pointsNeeded }
 }
 
 export async function joinBrkSystem(onSystem: number) {

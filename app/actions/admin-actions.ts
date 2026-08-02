@@ -746,6 +746,86 @@ export async function bulkToggleCourseStatusAction(courseIds: number[], newStatu
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
+export async function bulkUpdateCoursesOptionsAction(
+    courseIds: number[],
+    options: {
+        status?: boolean
+        categoryId?: number | null
+        type?: string
+        feeType?: string
+        requiresReferralActivation?: boolean
+        acceptedVoucherIds?: number[]
+        useTemplate?: boolean
+    }
+) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+        if (session.user.role !== Role.ADMIN) return { success: false, error: "Only admin can perform bulk actions" }
+
+        // 1. Build scalar update data for Course model
+        const courseData: Record<string, any> = {}
+        if (options.status !== undefined) courseData.status = options.status
+        if (options.type !== undefined) courseData.type = options.type
+        if (options.feeType !== undefined) courseData.feeType = options.feeType
+        if (options.requiresReferralActivation !== undefined) courseData.requiresReferralActivation = options.requiresReferralActivation
+        if (options.categoryId !== undefined) {
+            courseData.categoryId = options.categoryId
+            if (options.categoryId) {
+                const cat = await prisma.courseCategory.findUnique({ where: { id: options.categoryId } })
+                if (cat) courseData.category = cat.name
+            } else {
+                courseData.category = 'Khác'
+            }
+        }
+
+        if (Object.keys(courseData).length > 0) {
+            await prisma.course.updateMany({
+                where: { id: { in: courseIds } },
+                data: courseData
+            })
+        }
+
+        // 2. Handle acceptedVouchers relation (junction table)
+        if (options.acceptedVoucherIds !== undefined) {
+            for (const courseId of courseIds) {
+                await prisma.courseAcceptedVoucher.deleteMany({ where: { courseId } })
+                if (options.acceptedVoucherIds.length > 0) {
+                    await prisma.courseAcceptedVoucher.createMany({
+                        data: options.acceptedVoucherIds.map(voucherId => ({ courseId, voucherId })),
+                        skipDuplicates: true
+                    })
+                }
+            }
+        }
+
+        // 3. Handle useTemplate on CoursePage model
+        if (options.useTemplate !== undefined) {
+            const courses = await prisma.course.findMany({
+                where: { id: { in: courseIds } },
+                select: { id_khoa: true }
+            })
+            for (const course of courses) {
+                const existingPage = await prisma.coursePage.findUnique({ where: { slug: course.id_khoa } })
+                if (existingPage) {
+                    await prisma.coursePage.update({
+                        where: { id: existingPage.id },
+                        data: { useTemplate: options.useTemplate }
+                    })
+                } else if (options.useTemplate) {
+                    await prisma.coursePage.create({
+                        data: { slug: course.id_khoa, name: course.id_khoa, useTemplate: true }
+                    })
+                }
+            }
+        }
+
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
 export async function getAvailableSystemsAction() {
     try {
         const systems = await prisma.systemTree.findMany({ orderBy: { onSystem: 'asc' }, select: { onSystem: true, nameSystem: true } })
@@ -924,10 +1004,13 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         const [sysRec, wallet, rootSys, systemTree, activationTimeline, latestLegacyTimeline, latestLevelUpTimeline] = await Promise.all([
             prisma.system.findUnique({
                 where: { userId_onSystem: { userId, onSystem: systemId } },
-                include: { planApplication: { include: { businessPlan: true } } }
+                include: { planApplication: { select: { applicationCode: true, businessPlan: { select: { code: true } } } } }
             }),
-            prisma.brkWallet.findUnique({ where: { userId } }),
-            prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 } }),
+            prisma.brkWallet.findUnique({
+                where: { userId },
+                select: { balance: true, brkd: true, voucherBalance: true, mbvBalance: true, totalEarned: true, totalWithdrawn: true }
+            }),
+            prisma.system.findFirst({ where: { onSystem: systemId, refSysId: 0 }, select: { autoId: true } }),
             prisma.systemTree.findUnique({ where: { onSystem: systemId }, select: { nameSystem: true, fee: true } }),
             prisma.brkTimelineRecord.findFirst({
                 where: { userId, onSystem: systemId, type: 'ACTIVATION' }
@@ -1727,11 +1810,13 @@ async function getPathFromAncestorToDescendant(ancestorId: number, descendantId:
 
 export async function getMemberPromotionHistoryAction(userId: number, systemId: number) {
     try {
+        const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
         // Parallel queries: Load timeline records & level configs concurrently
         const [records, levelConfigsRaw] = await Promise.all([
             prisma.brkTimelineRecord.findMany({
                 where: { userId, onSystem: systemId },
-                orderBy: { time: 'asc' }
+                orderBy: { time: 'asc' },
+                take: 100
             }),
             prisma.brkLevelConfig.findMany({
                 where: { systemId },

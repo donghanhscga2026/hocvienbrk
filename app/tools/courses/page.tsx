@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { getAdminCoursesAction, bulkToggleCourseStatusAction, getStudentsAction } from '@/app/actions/admin-actions'
+import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getStudentsAction } from '@/app/actions/admin-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
@@ -54,6 +54,20 @@ function CoursesTab() {
     const [filterCategory, setFilterCategory] = useState('ALL')
     const [filterTeacher, setFilterTeacher] = useState('ALL')
 
+    const [showBulkOptions, setShowBulkOptions] = useState(false)
+    const [bulkOptionsLoading, setBulkOptionsLoading] = useState(false)
+    const [allVouchers, setAllVouchers] = useState<any[]>([])
+    const defaultBulkOpts = {
+        applyStatus: false, status: true,
+        applyTemplate: false, useTemplate: false,
+        applyCategory: false, categoryId: null as number | null,
+        applyType: false, type: 'NORMAL',
+        applyFeeType: false, feeType: 'MIEN_PHI',
+        applyReferral: false, requiresReferralActivation: false,
+        applyVouchers: false, acceptedVoucherIds: [] as number[],
+    }
+    const [bulkOpts, setBulkOpts] = useState(defaultBulkOpts)
+
     useEffect(() => {
         const fetchCourses = async () => {
             setLoading(true)
@@ -72,6 +86,18 @@ function CoursesTab() {
         }
         fetchCourses()
     }, [])
+
+    useEffect(() => {
+        fetch('/api/vouchers').then(r => r.json()).then(data => setAllVouchers(data.vouchers || [])).catch(() => {})
+    }, [])
+
+    const categoryOptions = useMemo(() => {
+        const map = new Map<number, string>()
+        courses.forEach((c: any) => {
+            if (c.courseCategory) map.set(c.courseCategory.id, c.courseCategory.name)
+        })
+        return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+    }, [courses])
 
     const handleToggleTemplate = async (slug: string, page: any, currentVal: boolean) => {
         if (page) {
@@ -189,6 +215,41 @@ function CoursesTab() {
         setStudentsLoading(false)
     }
 
+    const handleBulkOptionsApply = async () => {
+        const opts: any = {}
+        let hasChange = false
+        if (bulkOpts.applyStatus) { opts.status = bulkOpts.status; hasChange = true }
+        if (bulkOpts.applyTemplate) { opts.useTemplate = bulkOpts.useTemplate; hasChange = true }
+        if (bulkOpts.applyCategory) { opts.categoryId = bulkOpts.categoryId; hasChange = true }
+        if (bulkOpts.applyType) { opts.type = bulkOpts.type; hasChange = true }
+        if (bulkOpts.applyFeeType) { opts.feeType = bulkOpts.feeType; hasChange = true }
+        if (bulkOpts.applyReferral) { opts.requiresReferralActivation = bulkOpts.requiresReferralActivation; hasChange = true }
+        if (bulkOpts.applyVouchers) { opts.acceptedVoucherIds = bulkOpts.acceptedVoucherIds; hasChange = true }
+
+        if (!hasChange) { alert('Vui lòng chọn ít nhất một tùy chỉnh để áp dụng'); return }
+        if (!confirm(`Xác nhận áp dụng tùy chỉnh cho ${selectedIds.size} khóa học?`)) return
+
+        setBulkOptionsLoading(true)
+        try {
+            const res = await bulkUpdateCoursesOptionsAction(Array.from(selectedIds), opts)
+            if (res.success) {
+                const refreshed = await getAdminCoursesAction()
+                if (refreshed.success) setCourses(refreshed.courses || [])
+                const pages = await getCoursePages()
+                setCoursePages(pages)
+                setShowBulkOptions(false)
+                setBulkOpts({...defaultBulkOpts})
+                setSelectedIds(new Set())
+            } else {
+                alert(res.error || 'Có lỗi xảy ra')
+            }
+        } catch {
+            alert('Có lỗi xảy ra')
+        } finally {
+            setBulkOptionsLoading(false)
+        }
+    }
+
     return (
         <>
             <div className="flex items-center justify-between mt-4">
@@ -269,6 +330,13 @@ function CoursesTab() {
                         >
                             {batchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <EyeOff className="w-3 h-3" />}
                             Ẩn
+                        </button>
+                        <button
+                            onClick={() => { setBulkOpts({...defaultBulkOpts}); setShowBulkOptions(true) }}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-gray-800 transition-colors"
+                        >
+                            <Settings className="w-3 h-3" />
+                            Tùy chỉnh
                         </button>
                         <button
                             onClick={() => setSelectedIds(new Set())}
@@ -495,6 +563,163 @@ function CoursesTab() {
                                 className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors"
                             >
                                 Đóng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showBulkOptions && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                    onClick={() => setShowBulkOptions(false)}>
+                    <div className="bg-white w-full max-w-lg max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                        onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white shrink-0">
+                            <div>
+                                <h2 className="font-black text-sm uppercase tracking-wider">Tùy chỉnh hàng loạt</h2>
+                                <p className="text-[10px] text-gray-300 mt-0.5">Áp dụng cho {selectedIds.size} khóa học đã chọn</p>
+                            </div>
+                            <button onClick={() => setShowBulkOptions(false)} className="p-1 rounded-lg hover:bg-white/20">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                            {/* 1. Trạng thái hiển thị */}
+                            <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${bulkOpts.applyStatus ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <input type="checkbox" checked={bulkOpts.applyStatus} onChange={() => setBulkOpts(p => ({ ...p, applyStatus: !p.applyStatus }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                <span className="text-xs font-black text-gray-700 uppercase flex-1">Trạng thái</span>
+                                <button type="button" disabled={!bulkOpts.applyStatus}
+                                    onClick={() => setBulkOpts(p => ({ ...p, status: !p.status }))}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${bulkOpts.applyStatus ? (bulkOpts.status ? 'bg-green-600' : 'bg-gray-300') : 'bg-gray-200 opacity-40'}`}>
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 mt-0.5 ${bulkOpts.status ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                                <span className={`text-[10px] font-bold w-8 text-right ${bulkOpts.applyStatus ? (bulkOpts.status ? 'text-green-600' : 'text-gray-400') : 'text-gray-300'}`}>
+                                    {bulkOpts.status ? 'Hiện' : 'Ẩn'}
+                                </span>
+                            </div>
+
+                            {/* 2. Template động */}
+                            <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${bulkOpts.applyTemplate ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <input type="checkbox" checked={bulkOpts.applyTemplate} onChange={() => setBulkOpts(p => ({ ...p, applyTemplate: !p.applyTemplate }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                <span className="text-xs font-black text-gray-700 uppercase flex-1">Template động</span>
+                                <button type="button" disabled={!bulkOpts.applyTemplate}
+                                    onClick={() => setBulkOpts(p => ({ ...p, useTemplate: !p.useTemplate }))}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${bulkOpts.applyTemplate ? (bulkOpts.useTemplate ? 'bg-purple-600' : 'bg-gray-300') : 'bg-gray-200 opacity-40'}`}>
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 mt-0.5 ${bulkOpts.useTemplate ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                                <span className={`text-[10px] font-bold w-8 text-right ${bulkOpts.applyTemplate ? (bulkOpts.useTemplate ? 'text-purple-600' : 'text-gray-400') : 'text-gray-300'}`}>
+                                    {bulkOpts.useTemplate ? 'Bật' : 'Tắt'}
+                                </span>
+                            </div>
+
+                            {/* 3. Yêu cầu kích hoạt referral */}
+                            <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${bulkOpts.applyReferral ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <input type="checkbox" checked={bulkOpts.applyReferral} onChange={() => setBulkOpts(p => ({ ...p, applyReferral: !p.applyReferral }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                <span className="text-xs font-black text-gray-700 uppercase flex-1">Kích hoạt Referral</span>
+                                <button type="button" disabled={!bulkOpts.applyReferral}
+                                    onClick={() => setBulkOpts(p => ({ ...p, requiresReferralActivation: !p.requiresReferralActivation }))}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${bulkOpts.applyReferral ? (bulkOpts.requiresReferralActivation ? 'bg-orange-600' : 'bg-gray-300') : 'bg-gray-200 opacity-40'}`}>
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 mt-0.5 ${bulkOpts.requiresReferralActivation ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                                <span className={`text-[10px] font-bold w-8 text-right ${bulkOpts.applyReferral ? (bulkOpts.requiresReferralActivation ? 'text-orange-600' : 'text-gray-400') : 'text-gray-300'}`}>
+                                    {bulkOpts.requiresReferralActivation ? 'Bật' : 'Tắt'}
+                                </span>
+                            </div>
+
+                            {/* 4. Danh mục */}
+                            <div className={`p-3 rounded-xl border transition-all ${bulkOpts.applyCategory ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={bulkOpts.applyCategory} onChange={() => setBulkOpts(p => ({ ...p, applyCategory: !p.applyCategory }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                    <span className="text-xs font-black text-gray-700 uppercase">Danh mục</span>
+                                </label>
+                                <select disabled={!bulkOpts.applyCategory}
+                                    value={bulkOpts.categoryId ?? ''}
+                                    onChange={e => setBulkOpts(p => ({ ...p, categoryId: e.target.value ? parseInt(e.target.value) : null }))}
+                                    className="w-full mt-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-bold outline-none disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <option value="">Không có (Khác)</option>
+                                    {categoryOptions.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                                </select>
+                            </div>
+
+                            {/* 5. Loại khóa học */}
+                            <div className={`p-3 rounded-xl border transition-all ${bulkOpts.applyType ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={bulkOpts.applyType} onChange={() => setBulkOpts(p => ({ ...p, applyType: !p.applyType }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                    <span className="text-xs font-black text-gray-700 uppercase">Loại khóa học</span>
+                                </label>
+                                <select disabled={!bulkOpts.applyType}
+                                    value={bulkOpts.type}
+                                    onChange={e => setBulkOpts(p => ({ ...p, type: e.target.value }))}
+                                    className="w-full mt-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-bold outline-none disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <option value="NORMAL">Thường</option>
+                                    <option value="CHALLENGE">Thử thách</option>
+                                    <option value="LIB">Thư viện</option>
+                                    <option value="SYS">Hệ thống</option>
+                                </select>
+                            </div>
+
+                            {/* 6. Loại học phí */}
+                            <div className={`p-3 rounded-xl border transition-all ${bulkOpts.applyFeeType ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={bulkOpts.applyFeeType} onChange={() => setBulkOpts(p => ({ ...p, applyFeeType: !p.applyFeeType }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                    <span className="text-xs font-black text-gray-700 uppercase">Loại học phí</span>
+                                </label>
+                                <select disabled={!bulkOpts.applyFeeType}
+                                    value={bulkOpts.feeType}
+                                    onChange={e => setBulkOpts(p => ({ ...p, feeType: e.target.value }))}
+                                    className="w-full mt-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-bold outline-none disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <option value="MIEN_PHI">Miễn phí</option>
+                                    <option value="PHI_TUY_TINH">Phí tùy tâm</option>
+                                    <option value="PHI_CAM_KET">Phí cam kết</option>
+                                    <option value="PHI_DONG_HANH">Phí đồng hành</option>
+                                    <option value="PHI_TOI_THIEU">Phí tối thiểu</option>
+                                </select>
+                            </div>
+
+                            {/* 7. Áp dụng Voucher — toggle cho từng voucher */}
+                            <div className={`p-3 rounded-xl border transition-all ${bulkOpts.applyVouchers ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-100'}`}>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" checked={bulkOpts.applyVouchers} onChange={() => setBulkOpts(p => ({ ...p, applyVouchers: !p.applyVouchers }))} className="rounded accent-yellow-500 shrink-0 cursor-pointer" />
+                                    <span className="text-xs font-black text-gray-700 uppercase">Áp dụng Voucher</span>
+                                </label>
+                                {allVouchers.length > 0 ? (
+                                    <div className="mt-2 space-y-1.5">
+                                        {allVouchers.map((v: any) => {
+                                            const isOn = bulkOpts.acceptedVoucherIds.includes(v.id)
+                                            return (
+                                                <div key={v.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all ${bulkOpts.applyVouchers ? 'bg-white border border-gray-200' : 'bg-gray-100/50 border border-transparent opacity-40'}`}>
+                                                    <button type="button" disabled={!bulkOpts.applyVouchers}
+                                                        onClick={() => setBulkOpts(p => ({
+                                                            ...p,
+                                                            acceptedVoucherIds: isOn
+                                                                ? p.acceptedVoucherIds.filter(id => id !== v.id)
+                                                                : [...p.acceptedVoucherIds, v.id]
+                                                        }))}
+                                                        className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${bulkOpts.applyVouchers ? (isOn ? 'bg-blue-600' : 'bg-gray-300') : 'bg-gray-200'}`}>
+                                                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 mt-0.5 ${isOn ? 'translate-x-3' : 'translate-x-0.5'}`} />
+                                                    </button>
+                                                    <span className={`text-xs font-bold flex-1 ${bulkOpts.applyVouchers ? 'text-gray-700' : 'text-gray-400'}`}>{v.name}</span>
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${v.type === 'VIP' ? 'bg-amber-100 text-amber-700' : v.type === 'CASH' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{v.type}</span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="mt-2 text-[10px] text-gray-400 font-medium">Không có voucher nào trong hệ thống</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-gray-50 border-t shrink-0 flex items-center gap-3">
+                            <button onClick={handleBulkOptionsApply} disabled={bulkOptionsLoading}
+                                className="flex-1 bg-black text-yellow-400 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-zinc-800 transition-colors">
+                                {bulkOptionsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Áp dụng
+                            </button>
+                            <button onClick={() => setShowBulkOptions(false)}
+                                className="px-6 py-3 bg-gray-200 text-gray-600 rounded-xl text-xs font-black uppercase hover:bg-gray-300 transition-colors">
+                                Hủy
                             </button>
                         </div>
                     </div>
