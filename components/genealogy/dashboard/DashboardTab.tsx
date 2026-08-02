@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, Users, GitBranch, Loader2, ChevronDown, UserCheck, UserX, Clock, Award, Handshake, Layers, Crown } from 'lucide-react'
+import { BarChart3, Users, GitBranch, Loader2, ChevronDown, UserCheck, UserX, Clock, Award, Handshake, Layers, Crown, X, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import TabShell from '@/components/genealogy/ui/TabShell'
 import { getSystemDetailStatsAction, getLeaderboardAction, type LeaderboardCriteria } from '@/app/actions/system-actions'
+import { getSystemMemberListAction } from '@/app/actions/admin-actions'
 
 interface DashboardTabProps {
   selectedSystem: number | null
@@ -40,6 +42,24 @@ interface SystemDetailStats {
   }
 }
 
+export type ModalFilterType = 'ALL' | 'ACTIVE' | 'EXPIRED' | 'PENDING' | 'BDH' | 'DONGCHIA'
+export type SortOption = 'join' | 'expiry' | 'referral' | 'sales' | 'income'
+
+interface MemberRecord {
+  id: number
+  name: string
+  image: string | null
+  joinOrder: number
+  referralCount: number
+  sales: number
+  income: number
+  level: number
+  status: string
+  activatedAt?: string | Date | null
+  expiresAt?: string | Date | null
+  inDongChia?: boolean
+}
+
 const criteriaOptions: { value: LeaderboardCriteria; label: string; shortFormat: (v: LeaderboardEntry) => string; format: (v: LeaderboardEntry) => string }[] = [
   { value: 'teamSize', label: 'Top chia sẻ', shortFormat: (m) => `${m.teamSize} NGƯỜI`, format: (m) => `${m.teamSize.toLocaleString('vi')} người` },
   { value: 'revenue', label: 'Top Doanh số', shortFormat: (m) => `${m.revenue.toLocaleString('vi')}đ`, format: (m) => `${m.revenue.toLocaleString('vi')}đ` },
@@ -53,6 +73,12 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
   const [criteria, setCriteria] = useState<LeaderboardCriteria>('teamSize')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalFilter, setModalFilter] = useState<ModalFilterType>('ALL')
+  const [modalMembers, setModalMembers] = useState<MemberRecord[]>([])
+  const [modalLoading, setModalLoading] = useState(false)
+  const [modalSort, setModalSort] = useState<SortOption>('join')
 
   useEffect(() => {
     if (selectedSystem === null) { setDetailStats(null); setLeaderboard([]); return }
@@ -68,6 +94,25 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
     }).catch(err => setError(err.message || 'Lỗi kết nối'))
       .finally(() => setLoading(false))
   }, [selectedSystem, criteria])
+
+  const openMembersModal = async (filterType: ModalFilterType) => {
+    if (selectedSystem === null) return
+    setModalFilter(filterType)
+    if (filterType === 'EXPIRED') setModalSort('expiry')
+    else setModalSort('join')
+    setModalOpen(true)
+    setModalLoading(true)
+    try {
+      const res = await getSystemMemberListAction(selectedSystem)
+      if (res.success && res.members) {
+        setModalMembers(res.members as MemberRecord[])
+      }
+    } catch (e) {
+      console.error('Lỗi tải danh sách thành viên:', e)
+    } finally {
+      setModalLoading(false)
+    }
+  }
 
   const selectedName = mySystems.find(s => s.onSystem === selectedSystem)?.nameSystem || `#${selectedSystem}`
 
@@ -121,15 +166,58 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
   const rest = leaderboard.slice(3, 10)
   const currentCriteria = criteriaOptions.find(c => c.value === criteria) || criteriaOptions[0]
 
+  const filteredModalMembers = modalMembers.filter(m => {
+    if (modalFilter === 'ALL') return true
+    if (modalFilter === 'ACTIVE') return m.status === 'ACTIVE'
+    if (modalFilter === 'EXPIRED') return m.status === 'EXPIRED'
+    if (modalFilter === 'PENDING') return m.status === 'PENDING'
+    if (modalFilter === 'BDH') return m.level >= 2
+    if (modalFilter === 'DONGCHIA') return !!m.inDongChia
+    return true
+  })
+
+  const now = new Date().getTime()
+  const sortedModalMembers = [...filteredModalMembers].sort((a, b) => {
+    if (modalSort === 'expiry') {
+      const isExpiredA = a.status === 'EXPIRED' || (a.expiresAt && new Date(a.expiresAt).getTime() <= now)
+      const isExpiredB = b.status === 'EXPIRED' || (b.expiresAt && new Date(b.expiresAt).getTime() <= now)
+      if (isExpiredA && !isExpiredB) return -1
+      if (!isExpiredA && isExpiredB) return 1
+      const timeA = a.expiresAt ? new Date(a.expiresAt).getTime() : Number.MAX_SAFE_INTEGER
+      const timeB = b.expiresAt ? new Date(b.expiresAt).getTime() : Number.MAX_SAFE_INTEGER
+      return timeA - timeB
+    }
+    if (modalSort === 'referral') return b.referralCount - a.referralCount
+    if (modalSort === 'sales') return b.sales - a.sales
+    if (modalSort === 'income') return b.income - a.income
+    return a.joinOrder - b.joinOrder
+  })
+
+  const getExpiryStatusBadge = (m: MemberRecord) => {
+    if (m.status === 'EXPIRED') return <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-red-100 text-red-700 border border-red-200">Đã hết hạn</span>
+    if (!m.expiresAt) return <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-700">Hoạt động</span>
+    const expTime = new Date(m.expiresAt).getTime()
+    const diffDays = Math.ceil((expTime - now) / (1000 * 60 * 60 * 24))
+    if (diffDays <= 0) return <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-red-100 text-red-700 border border-red-200">Quá hạn ({Math.abs(diffDays)} ngày)</span>
+    if (diffDays <= 3) return <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">Sắp hết hạn ({diffDays} ngày)</span>
+    return <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-700">Còn {diffDays} ngày</span>
+  }
+
+  const modalTitleMap: Record<ModalFilterType, string> = {
+    ALL: 'Tổng thành viên',
+    ACTIVE: 'Thành viên đang hoạt động',
+    EXPIRED: 'Danh sách thành viên hết hạn / quá hạn',
+    PENDING: 'Thành viên chờ kích hoạt',
+    BDH: 'Danh sách Ban Điều Hành (Level 2+)',
+    DONGCHIA: 'Danh sách đủ điều kiện đồng chia',
+  }
+
   return (
     <TabShell header={header}>
       <div className="p-3 sm:p-4 overflow-y-auto">
         {error && <div className="p-3 bg-red-50 rounded-2xl text-red-600 text-xs font-bold mb-4">{error}</div>}
 
-        {/* ===== 2-COLUMN DESKTOP / STACKED MOBILE ===== */}
         <div className="flex flex-col lg:flex-row gap-4">
-
-          {/* LEFT: VINH DANH */}
           <div className="lg:w-1/2">
             <div className="bg-gradient-to-br from-white via-amber-50/30 to-white rounded-2xl border border-amber-200/50 shadow-lg overflow-hidden h-full">
               <div className="px-4 py-3 flex items-center justify-between border-b border-amber-100/50">
@@ -150,14 +238,11 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
 
               {top3.length > 0 ? (
                 <div className="p-4">
-                  {/* PODIUM: Top 3 */}
                   <div className="flex items-end justify-center gap-3 mb-4">
                     {top3[1] && <PodiumCard entry={top3[1]} crown="gold" height="h-20" shortFormat={currentCriteria.shortFormat} />}
                     {top3[0] && <PodiumCard entry={top3[0]} crown="diamond" height="h-28" shortFormat={currentCriteria.shortFormat} />}
                     {top3[2] && <PodiumCard entry={top3[2]} crown="silver" height="h-16" shortFormat={currentCriteria.shortFormat} />}
                   </div>
-
-                  {/* TOP 4-10 LIST */}
                   {rest.length > 0 && (
                     <div className="space-y-1 mt-3 pt-3 border-t border-slate-100">
                       {rest.map((entry) => (
@@ -183,19 +268,18 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
             </div>
           </div>
 
-          {/* RIGHT: THỐNG KÊ PHÂN TÍCH */}
           <div className="lg:w-1/2 space-y-4">
             {s && (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatCard icon={<Users className="w-4 h-4 text-indigo-500" />} label="Tổng thành viên" value={s.totalMembers} />
-                  <StatCard icon={<UserCheck className="w-4 h-4 text-emerald-500" />} label="Đang hoạt động" value={s.activeMembers} />
-                  <StatCard icon={<UserX className="w-4 h-4 text-red-500" />} label="Hết hạn" value={s.expiredMembers} />
-                  <StatCard icon={<Clock className="w-4 h-4 text-amber-500" />} label="Chờ kích hoạt" value={s.pendingMembers} />
+                  <StatCard icon={<Users className="w-4 h-4 text-indigo-500" />} label="Tổng thành viên" value={s.totalMembers} onClick={() => openMembersModal('ALL')} />
+                  <StatCard icon={<UserCheck className="w-4 h-4 text-emerald-500" />} label="Đang hoạt động" value={s.activeMembers} onClick={() => openMembersModal('ACTIVE')} />
+                  <StatCard icon={<UserX className="w-4 h-4 text-red-500" />} label="Hết hạn" value={s.expiredMembers} onClick={() => openMembersModal('EXPIRED')} />
+                  <StatCard icon={<Clock className="w-4 h-4 text-amber-500" />} label="Chờ kích hoạt" value={s.pendingMembers} onClick={() => openMembersModal('PENDING')} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <StatCard icon={<Award className="w-4 h-4 text-violet-500" />} label="BDH (Lv2+)" value={s.bdhMembers} />
-                  <StatCard icon={<Handshake className="w-4 h-4 text-pink-500" />} label="Đồng chia" value={s.dhttMembers} />
+                  <StatCard icon={<Award className="w-4 h-4 text-violet-500" />} label="BDH (Lv2+)" value={s.bdhMembers} onClick={() => openMembersModal('BDH')} />
+                  <StatCard icon={<Handshake className="w-4 h-4 text-pink-500" />} label="Đồng chia" value={s.dhttMembers} onClick={() => openMembersModal('DONGCHIA')} />
                   <StatCard icon={<GitBranch className="w-4 h-4 text-cyan-500" />} label="Closures" value={s.closureCount} />
                   <StatCard icon={<Layers className="w-4 h-4 text-orange-500" />} label="Chiều sâu" value={s.maxDepth} />
                 </div>
@@ -219,20 +303,126 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
                     </div>
                   </div>
                 )}
-
-                <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Tóm tắt</h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-slate-500">Tỷ lệ hoạt động:</span><span className="font-black text-slate-800">{s.totalMembers ? Math.round((s.activeMembers / s.totalMembers) * 100) : 0}%</span></div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-violet-500" /><span className="text-slate-500">Tỷ lệ BDH:</span><span className="font-black text-slate-800">{s.totalMembers ? Math.round((s.bdhMembers / s.totalMembers) * 100) : 0}%</span></div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-pink-500" /><span className="text-slate-500">Tỷ lệ đồng chia:</span><span className="font-black text-slate-800">{s.totalMembers ? Math.round((s.dhttMembers / s.totalMembers) * 100) : 0}%</span></div>
-                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-cyan-500" /><span className="text-slate-500">Closures/Member:</span><span className="font-black text-slate-800">{s.totalMembers ? (s.closureCount / s.totalMembers).toFixed(1) : 0}</span></div>
-                  </div>
-                </div>
               </>
             )}
           </div>
         </div>
+
+        {modalOpen && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-100">
+              <div className="px-5 py-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
+                <div>
+                  <h2 className="text-sm sm:text-base font-black tracking-tight uppercase flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-400" />
+                    {modalTitleMap[modalFilter]}
+                  </h2>
+                  <p className="text-[10px] text-slate-300 font-bold tracking-wider mt-0.5">
+                    Hệ thống #{selectedSystem} • {sortedModalMembers.length} thành viên
+                  </p>
+                </div>
+                <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto custom-scrollbar shrink-0">
+                {([
+                  ['ALL', 'Tất cả'],
+                  ['ACTIVE', 'Hoạt động'],
+                  ['EXPIRED', 'Hết hạn/Quá hạn'],
+                  ['PENDING', 'Chờ kích hoạt'],
+                  ['BDH', 'BDH (Lv2+)'],
+                  ['DONGCHIA', 'Đồng chia'],
+                ] as const).map(([type, label]) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setModalFilter(type)
+                      if (type === 'EXPIRED') setModalSort('expiry')
+                      else setModalSort('join')
+                    }}
+                    className={cn(
+                      'px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap',
+                      modalFilter === type
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="px-5 py-2 bg-slate-100/60 flex items-center gap-2 text-[10px] font-bold text-slate-500 shrink-0 overflow-x-auto">
+                <span className="uppercase tracking-wider shrink-0">Sắp xếp:</span>
+                {([
+                  ['join', 'Tham gia'],
+                  ['expiry', 'Thời hạn / Quá hạn'],
+                  ['referral', 'Giới thiệu'],
+                  ['sales', 'Doanh số'],
+                  ['income', 'Thu nhập'],
+                ] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => setModalSort(val)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap',
+                      modalSort === val ? 'bg-slate-800 text-white font-black' : 'text-slate-600 hover:bg-slate-200'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-slate-50/50">
+                {modalLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Đang tải danh sách thành viên...</span>
+                  </div>
+                ) : sortedModalMembers.length === 0 ? (
+                  <div className="text-center py-16 text-xs text-slate-400 font-bold uppercase tracking-wider">
+                    Không có thành viên nào trong mục này
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sortedModalMembers.map((m, index) => (
+                      <div key={`${m.id}-${index}`} className="bg-white p-3 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <AvatarCircle image={m.image} name={m.name} size="w-9 h-9" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black text-slate-900 truncate">#{m.id} {m.name}</span>
+                              <span className="px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[8px] font-black shrink-0">Lv{m.level}</span>
+                              {m.inDongChia && <span className="px-1.5 py-0.5 rounded-full bg-pink-100 text-pink-700 border border-pink-200 text-[8px] font-black shrink-0">Đồng chia</span>}
+                              {getExpiryStatusBadge(m)}
+                            </div>
+                            <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold mt-1 flex-wrap">
+                              <span>GT: <strong className="text-slate-700">{m.referralCount}</strong></span>
+                              <span>DS: <strong className="text-emerald-600">{Number(m.sales || 0).toLocaleString('vi')}đ</strong></span>
+                              <span>TN: <strong className="text-indigo-600">{Number(m.income || 0).toLocaleString('vi')}đ</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                        <Link href={`/tools/students/${m.id}`} target="_blank" className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-black hover:bg-indigo-100 transition-colors shrink-0" title="Xem hồ sơ học viên">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Hồ sơ</span>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between shrink-0">
+                <span className="text-[11px] text-slate-500 font-bold">Hiển thị {sortedModalMembers.length} / {modalMembers.length} thành viên</span>
+                <button onClick={() => setModalOpen(false)} className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black rounded-xl transition-colors">Đóng</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </TabShell>
   )
@@ -251,36 +441,16 @@ function PodiumCard({ entry, crown, height, shortFormat }: { entry: LeaderboardE
       crownSvg: (
         <svg viewBox="0 0 60 44" className="w-10 h-7">
           <defs>
-            <linearGradient id="diamondGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#a5f3fc" />
-              <stop offset="25%" stopColor="#22d3ee" />
-              <stop offset="50%" stopColor="#ffffff" />
-              <stop offset="75%" stopColor="#22d3ee" />
-              <stop offset="100%" stopColor="#0891b2" />
-            </linearGradient>
+            <linearGradient id="diamondGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#a5f3fc" /><stop offset="25%" stopColor="#22d3ee" /><stop offset="50%" stopColor="#ffffff" /><stop offset="75%" stopColor="#22d3ee" /><stop offset="100%" stopColor="#0891b2" /></linearGradient>
             <filter id="diamondGlow"><feGaussianBlur stdDeviation="1" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             <filter id="diamondSparkle"><feGaussianBlur stdDeviation="0.5" /></filter>
           </defs>
           <path d="M6 38 L12 14 L20 26 L30 4 L40 26 L48 14 L54 38 Z" fill="url(#diamondGrad)" stroke="#06b6d4" strokeWidth="1.5" filter="url(#diamondGlow)" />
           <path d="M12 14 L20 26 L30 4 L40 26 L48 14" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1" />
           <path d="M6 38 L54 38" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" />
-          {/* Sparkles */}
-          <circle cx="30" cy="4" r="2.5" fill="#ffffff" filter="url(#diamondSparkle)">
-            <animate attributeName="r" values="2.5;1;2.5" dur="1.5s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="20" cy="22" r="1.5" fill="#ffffff" filter="url(#diamondSparkle)">
-            <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="40" cy="22" r="1.5" fill="#ffffff" filter="url(#diamondSparkle)">
-            <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2.2s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="12" cy="14" r="1" fill="#ffffff" filter="url(#diamondSparkle)">
-            <animate attributeName="opacity" values="0.6;0.1;0.6" dur="1.8s" repeatCount="indefinite" />
-          </circle>
-          <circle cx="48" cy="14" r="1" fill="#ffffff" filter="url(#diamondSparkle)">
-            <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2.5s" repeatCount="indefinite" />
-          </circle>
+          <circle cx="30" cy="4" r="2.5" fill="#ffffff" filter="url(#diamondSparkle)"><animate attributeName="r" values="2.5;1;2.5" dur="1.5s" repeatCount="indefinite" /><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite" /></circle>
+          <circle cx="20" cy="22" r="1.5" fill="#ffffff" filter="url(#diamondSparkle)"><animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite" /></circle>
+          <circle cx="40" cy="22" r="1.5" fill="#ffffff" filter="url(#diamondSparkle)"><animate attributeName="opacity" values="0.8;0.2;0.8" dur="2.2s" repeatCount="indefinite" /></circle>
         </svg>
       ),
     },
@@ -295,24 +465,16 @@ function PodiumCard({ entry, crown, height, shortFormat }: { entry: LeaderboardE
       crownSvg: (
         <svg viewBox="0 0 60 44" className="w-10 h-7">
           <defs>
-            <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#fde68a" />
-              <stop offset="30%" stopColor="#fbbf24" />
-              <stop offset="60%" stopColor="#f59e0b" />
-              <stop offset="100%" stopColor="#b45309" />
-            </linearGradient>
+            <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#fde68a" /><stop offset="30%" stopColor="#fbbf24" /><stop offset="60%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#b45309" /></linearGradient>
             <filter id="goldShine"><feGaussianBlur stdDeviation="0.5" /></filter>
           </defs>
           <path d="M6 38 L12 16 L20 26 L30 6 L40 26 L48 16 L54 38 Z" fill="url(#goldGrad)" stroke="#b45309" strokeWidth="1.5" />
           <path d="M12 16 L20 26 L30 6 L40 26 L48 16" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
           <path d="M6 38 L54 38" stroke="#b45309" strokeWidth="2" strokeLinecap="round" />
-          {/* Gems */}
           <circle cx="30" cy="6" r="3" fill="#fef3c7" stroke="#b45309" strokeWidth="1" filter="url(#goldShine)" />
           <circle cx="12" cy="16" r="2" fill="#fef3c7" stroke="#b45309" strokeWidth="0.8" />
           <circle cx="48" cy="16" r="2" fill="#fef3c7" stroke="#b45309" strokeWidth="0.8" />
-          <circle cx="30" cy="6" r="1" fill="#ffffff" opacity="0.6">
-            <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite" />
-          </circle>
+          <circle cx="30" cy="6" r="1" fill="#ffffff" opacity="0.6"><animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite" /></circle>
         </svg>
       ),
     },
@@ -327,42 +489,28 @@ function PodiumCard({ entry, crown, height, shortFormat }: { entry: LeaderboardE
       crownSvg: (
         <svg viewBox="0 0 60 44" className="w-10 h-7">
           <defs>
-            <linearGradient id="silverGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#f1f5f9" />
-              <stop offset="30%" stopColor="#cbd5e1" />
-              <stop offset="60%" stopColor="#94a3b8" />
-              <stop offset="100%" stopColor="#64748b" />
-            </linearGradient>
+            <linearGradient id="silverGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#f1f5f9" /><stop offset="30%" stopColor="#cbd5e1" /><stop offset="60%" stopColor="#94a3b8" /><stop offset="100%" stopColor="#64748b" /></linearGradient>
           </defs>
           <path d="M6 38 L12 16 L20 26 L30 6 L40 26 L48 16 L54 38 Z" fill="url(#silverGrad)" stroke="#64748b" strokeWidth="1.5" />
           <path d="M12 16 L20 26 L30 6 L40 26 L48 16" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1" />
           <path d="M6 38 L54 38" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
-          {/* Gems */}
           <circle cx="30" cy="6" r="2.5" fill="#e2e8f0" stroke="#64748b" strokeWidth="1" />
           <circle cx="12" cy="16" r="1.8" fill="#e2e8f0" stroke="#64748b" strokeWidth="0.8" />
           <circle cx="48" cy="16" r="1.8" fill="#e2e8f0" stroke="#64748b" strokeWidth="0.8" />
-          <circle cx="30" cy="6" r="1" fill="#ffffff" opacity="0.5">
-            <animate attributeName="opacity" values="0.5;0.15;0.5" dur="2.5s" repeatCount="indefinite" />
-          </circle>
+          <circle cx="30" cy="6" r="1" fill="#ffffff" opacity="0.5"><animate attributeName="opacity" values="0.5;0.15;0.5" dur="2.5s" repeatCount="indefinite" /></circle>
         </svg>
       ),
     },
   }
   const c = crownConfig[crown]
-
   return (
     <div className={cn('flex flex-col items-center', crown === 'gold' ? 'order-first' : crown === 'diamond' ? 'order-2' : 'order-3')}>
-      {/* Crown */}
       {c.crownSvg}
-      {/* Avatar */}
       <div className={cn('rounded-full ring-4 ring-offset-2 mt-1.5', c.ring)}>
         <AvatarCircle image={entry.image} name={entry.name} size="w-12 h-12" />
       </div>
-      {/* userId centered below avatar */}
       <span className="text-[8px] font-black text-slate-400 mt-1">#{entry.userId}</span>
-      {/* Name - pushed down */}
       <span className={cn('text-[10px] font-black mt-1 w-20 text-center leading-tight break-words', c.text)}>{entry.name}</span>
-      {/* Pedestal with achievement inside */}
       <div className={cn('mt-2 w-20 rounded-t-xl bg-gradient-to-b border-t-2 border-x-2 flex flex-col items-center justify-center gap-0.5', c.bg, c.border, c.glow, height)}>
         <span className={cn('text-[10px] font-black uppercase tracking-widest', c.text)}>{c.label}</span>
         <span className={cn('text-[9px] font-black leading-none', c.text)}>{c.value}</span>
@@ -382,9 +530,15 @@ function AvatarCircle({ image, name, size = 'w-10 h-10' }: { image: string | nul
   )
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function StatCard({ icon, label, value, onClick }: { icon: React.ReactNode; label: string; value: number; onClick?: () => void }) {
   return (
-    <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm">
+    <div
+      onClick={onClick}
+      className={cn(
+        'bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm transition-all duration-200',
+        onClick ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md hover:scale-[1.02] active:scale-95' : ''
+      )}
+    >
       <div className="flex items-center gap-2 mb-2">{icon}<span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span></div>
       <p className="text-xl sm:text-2xl font-black text-slate-800">{value.toLocaleString('vi')}</p>
     </div>

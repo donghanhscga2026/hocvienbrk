@@ -861,6 +861,8 @@ export async function getSystemMemberListAction(systemId: number) {
                 totalCashVolume: true,
                 status: true,
                 activatedAt: true,
+                expiresAt: true,
+                inDongChia: true,
                 user: { select: { name: true, image: true } }
             },
             orderBy: { autoId: 'asc' }
@@ -909,7 +911,9 @@ export async function getSystemMemberListAction(systemId: number) {
             income: walletMap.get(system.userId) || 0,
             level: system.level,
             status: system.status,
-            activatedAt: system.activatedAt
+            activatedAt: system.activatedAt,
+            expiresAt: system.expiresAt,
+            inDongChia: system.inDongChia
         }))
 
         return { success: true, members }
