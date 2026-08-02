@@ -32,11 +32,15 @@ export async function getMbwDashboard(): Promise<MbwDashboardData> {
       where: { id: userId },
       select: { id: true, name: true, email: true }
     }),
-    prisma.brkWallet.findUnique({ where: { userId } }),
+    prisma.brkWallet.findUnique({
+      where: { userId },
+      select: { balance: true, brkd: true, voucherBalance: true, mbvBalance: true }
+    }),
     prisma.userVoucher.findMany({
       where: { userId, status: 'ACTIVE' },
-      include: { voucher: true },
-      orderBy: { createdAt: 'desc' }
+      include: { voucher: { select: { code: true, name: true, type: true, description: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50
     }),
   ])
 

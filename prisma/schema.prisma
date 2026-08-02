@@ -1635,6 +1635,8 @@ model BrkTimelineRecord {
   @@index([userId])
   @@index([onSystem])
   @@index([time])
+  @@index([userId, onSystem, time])
+  @@index([userId, onSystem, type, time])
   @@index([onSystem, eventStatus, time])
   @@index([applicationId, time])
   @@map("brk_timeline_record")

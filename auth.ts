@@ -238,8 +238,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.isTempLogin = (user as any).isTempLogin;
             }
 
-            // Luôn fetch role + phone mới từ DB để đồng bộ khi role thay đổi
-            if (token.sub != null) {
+            // Chỉ fetch role + phone từ DB khi cần đồng bộ (trigger update) hoặc token chưa có role.
+            // Tránh 1 DB round-trip trên mọi lần gọi auth() → giảm latency cho server actions/API.
+            if (token.sub != null && (trigger === "update" || token.role == null)) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: parseInt(token.sub as string) },
