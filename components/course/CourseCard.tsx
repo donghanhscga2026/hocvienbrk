@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import PaymentModal from './PaymentModal'
+import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
@@ -47,7 +49,9 @@ interface CourseCardProps {
 }
 
 export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
+    const router = useRouter()
     const [showPayment, setShowPayment] = useState(false)
+    const [showRegistrationModal, setShowRegistrationModal] = useState(false)
     const [showShare, setShowShare] = useState(false)
     const [localEnrollment, setLocalEnrollment] = useState<any>(null)
     const enrollment = localEnrollment || propEnrollment
@@ -152,27 +156,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                 setLoading(false)
             }
         } else {
-            if (isPending) {
-                setShowPayment(true)
-            } else {
-                setLoading(true)
-                try {
-                    const res: any = await enrollInCourseAction(course.id, getClientRef())
-                    if (res.success) {
-                        if (res.enrollment) {
-                            setLocalEnrollment(res.enrollment)
-                        }
-                        if (res.warning) {
-                            alert(res.warning)
-                        }
-                        setTimeout(() => setShowPayment(true), 100)
-                    }
-                } catch (err: any) {
-                    alert(err.message)
-                } finally {
-                    setLoading(false)
-                }
-            }
+            // Trường hợp có học phí cọc: Mở RegistrationFlowModal (hỗ trợ áp dụng ví MBV & tự động kích hoạt)
+            setShowRegistrationModal(true)
         }
     }
 
@@ -225,19 +210,28 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                                 <>
                                     {course.voucherConfig === 'WALLET' && voucherBalance >= effectivePhiCoc ? (
                                         <>
-                                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface text-brk-muted border border-brk-primary/30 line-through decoration-brk-accent decoration-2">
+                                            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200 line-through decoration-red-500 decoration-2">
                                                 {effectivePhiCoc.toLocaleString('vi-VN')}đ
                                             </span>
-                                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary animate-pulse">
-                                                0đ (-MBV)
+                                            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary animate-pulse">
+                                                0đ (-{effectivePhiCoc.toLocaleString('vi-VN')} MBV)
+                                            </span>
+                                        </>
+                                    ) : course.voucherConfig === 'WALLET' && voucherBalance > 0 ? (
+                                        <>
+                                            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-red-50 text-red-600 border border-red-200">
+                                                {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                            </span>
+                                            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-amber-500 text-white">
+                                                Bù {(effectivePhiCoc - voucherBalance).toLocaleString('vi-VN')}đ (-{voucherBalance.toLocaleString('vi-VN')} MBV)
                                             </span>
                                         </>
                                     ) : (
                                         <>
-                                            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface text-brk-accent border border-brk-primary/30">
+                                            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-red-50 text-red-600 border border-red-200">
                                                 {effectivePhiCoc.toLocaleString('vi-VN')}đ
                                             </span>
-                                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
+                                            <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
                                                 {feeTypeDisplay.label}
                                             </span>
                                         </>
@@ -367,6 +361,21 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                     userPhone={userPhone}
                     userId={userId}
                     onClose={() => setShowPayment(false)}
+                />
+            )}
+
+            {showRegistrationModal && (
+                <RegistrationFlowModal
+                    course={course}
+                    userPhone={userPhone}
+                    userId={userId}
+                    initialEnrollment={enrollment}
+                    onClose={() => setShowRegistrationModal(false)}
+                    onEnrolled={(newEnroll) => {
+                        setLocalEnrollment(newEnroll)
+                        getBrkMbvBalanceAction().then(bal => setVoucherBalance(bal)).catch(() => {})
+                        router.refresh()
+                    }}
                 />
             )}
 
