@@ -83,17 +83,17 @@ export default function MbwDashboardPopup() {
           ) : data ? (
             <>
               <div className="space-y-2.5">
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 flex items-center justify-between">
-                  <p className="text-xs font-bold text-green-700">Thu nhập (VNĐ)</p>
-                  <p className="text-sm font-black text-green-600">{formatMoney(data.balance.cash)}đ</p>
-                </div>
                 <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200 flex items-center justify-between">
                   <p className="text-xs font-bold text-amber-700">Thu nhập đối ứng (MBDT)</p>
-                  <p className="text-sm font-black text-amber-600">{formatMoney(data.balance.brkd)}đ</p>
+                  <p className="text-sm font-black text-amber-600">{formatMoney(data.balance.brkd)}</p>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl p-3 border border-purple-200 flex items-center justify-between">
-                  <p className="text-xs font-bold text-purple-700">Voucher quy đổi</p>
-                  <p className="text-sm font-black text-purple-600">{formatMoney(data.balance.voucherBalance)}đ</p>
+                  <p className="text-xs font-bold text-purple-700">Voucher quy đổi (MBV)</p>
+                  <p className="text-sm font-black text-purple-600">{formatMoney(data.balance.mbvBalance)}</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 flex items-center justify-between">
+                  <p className="text-xs font-bold text-green-700">Thu nhập (VNĐ)</p>
+                  <p className="text-sm font-black text-green-600">{formatMoney(data.balance.cash)}</p>
                 </div>
               </div>
 
