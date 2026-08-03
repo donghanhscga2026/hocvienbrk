@@ -26,6 +26,23 @@ const makeLinksClickable = (html: string): string => {
     return processed
 }
 
+// Dùng chung 1 request lấy số dư MBV cho tất cả card (tránh gọi trùng server action)
+let sharedMbvBalancePromise: Promise<number> | null = null
+const getSharedMbvBalance = () => {
+    if (!sharedMbvBalancePromise) {
+        sharedMbvBalancePromise = getBrkMbvBalanceAction()
+            .then(bal => {
+                sharedMbvBalancePromise = null
+                return bal
+            })
+            .catch(err => {
+                sharedMbvBalancePromise = null
+                throw err
+            })
+    }
+    return sharedMbvBalancePromise
+}
+
 interface CourseCardProps {
     course: any
     isLoggedIn: boolean
@@ -96,8 +113,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         if (isLoggedIn && userId != null) {
             setAffiliateCode(String(userId))
             
-            // Lấy số dư ví MBV từ server action
-            getBrkMbvBalanceAction()
+            // Lấy số dư ví MBV từ server action (dùng chung 1 request giữa các card)
+            getSharedMbvBalance()
                 .then(bal => setVoucherBalance(bal))
                 .catch(err => console.error("Error fetching MBDT balance:", err))
         }
@@ -240,13 +257,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                                 </>
                             )
                         )}
-                        {/* Số học viên */}
-                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
-                            <Users className="w-3 h-3" />
-                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')}
-                        </span>
-
-                        {/* Mục lục */}
+                        {/* Số bài học */}
                         <button
                             onClick={(e) => {
                                 e.preventDefault()
@@ -257,6 +268,12 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         >
                             {course._count?.lessons ?? 0} bài
                         </button>
+
+                        {/* Số học viên */}
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
+                            <Users className="w-3 h-3" />
+                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')} học viên
+                        </span>
 
                         {/* Chia sẻ */}
                         <button

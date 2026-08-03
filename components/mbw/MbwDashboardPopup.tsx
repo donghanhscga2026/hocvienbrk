@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect } from 'react'
 import { X, Wallet, Ticket, Loader2 } from 'lucide-react'
 import { useMbwDashboard } from './MbwDashboardContext'
-import { getMbwDashboard, type MbwDashboardData } from '@/app/actions/mbw-dashboard-actions'
 
 function formatMoney(v: number) {
   return v.toLocaleString('vi-VN', { maximumFractionDigits: 0 })
@@ -23,27 +22,14 @@ function VoucherTypeBadge({ type }: { type: string }) {
 }
 
 export default function MbwDashboardPopup() {
-  const { isOpen, close } = useMbwDashboard()
-  const [data, setData] = useState<MbwDashboardData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { isOpen, close, data, refresh } = useMbwDashboard()
 
-  const fetchData = useCallback(async () => {
-    if (!isOpen) return
-    setLoading(true)
-    try {
-      const result = await getMbwDashboard()
-      setData(result)
-    } catch (err) {
-      console.error('MBW Dashboard fetch error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [isOpen])
-
+  // Refresh nền khi mở để số dư luôn mới, hiển thị data cache ngay lập tức
   useEffect(() => {
-    if (isOpen) fetchData()
-    else setData(null)
-  }, [isOpen, fetchData])
+    if (isOpen) {
+      refresh()
+    }
+  }, [isOpen, refresh])
 
   useEffect(() => {
     function handleEsc(e: KeyboardEvent) {
@@ -75,12 +61,12 @@ export default function MbwDashboardPopup() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-          {loading && !data ? (
+          {!data ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="w-8 h-8 text-brk-primary animate-spin" />
               <p className="text-xs text-gray-400">Đang tải dữ liệu...</p>
             </div>
-          ) : data ? (
+          ) : (
             <>
               <div className="space-y-2.5">
                 <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200 flex items-center justify-between">
@@ -130,11 +116,6 @@ export default function MbwDashboardPopup() {
                 )}
               </div>
             </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <p className="text-xs text-gray-400">Không thể tải dữ liệu</p>
-              <button onClick={fetchData} className="text-xs text-brk-primary font-bold hover:underline">Thử lại</button>
-            </div>
           )}
         </div>
       </div>
