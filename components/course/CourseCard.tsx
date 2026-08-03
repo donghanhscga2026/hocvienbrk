@@ -255,7 +255,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             }}
                             className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
                         >
-                            Mục lục [{course._count?.lessons ?? 0}] bài
+                            {course._count?.lessons ?? 0} bài
                         </button>
 
                         {/* Chia sẻ */}
