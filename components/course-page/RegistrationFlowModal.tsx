@@ -66,7 +66,7 @@ export default function RegistrationFlowModal({
   }, [liveSession, step])
 
   useEffect(() => {
-    if (step === 'voucher_confirm' && effectiveSession && course.voucherConfig === 'WALLET') {
+    if (step === 'voucher_confirm' && effectiveSession && course.voucherConfig === 'WALLET' && course.allowMbvDeduction) {
       setLoadingVoucher(true)
       getBrkMbvBalanceAction().then((bal) => {
         setVoucherBalance(bal)
@@ -253,7 +253,7 @@ export default function RegistrationFlowModal({
                 </div>
 
                 {/* Voucher select box */}
-                {course.voucherConfig === 'WALLET' && (
+                {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && (
                   <div style={{
                     background: 'rgba(200, 107, 61, 0.04)',
                     border: '1px solid rgba(200, 107, 61, 0.15)',
@@ -337,7 +337,7 @@ export default function RegistrationFlowModal({
                     <span>Học phí cọc gốc:</span>
                     <span>{(course.phi_coc || 0).toLocaleString('vi-VN')} VND</span>
                   </div>
-                  {course.voucherConfig === 'WALLET' && useVoucher && (
+                  {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && useVoucher && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#647B5E', fontWeight: 500 }}>
                       <span>Khấu trừ từ ví MBV:</span>
                       <span>-{voucherAmountToUse.toLocaleString('vi-VN')} VND</span>

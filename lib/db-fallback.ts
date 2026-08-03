@@ -47,6 +47,8 @@ export const FALLBACK_COURSES = [
     category: 'Công nghệ',
     link_anh_bia: null,
     phi_coc: 0,
+    voucherConfig: 'WALLET',
+    allowMbvDeduction: true,
     pin: 1,
   },
   {
@@ -58,6 +60,8 @@ export const FALLBACK_COURSES = [
     category: 'Kỹ năng',
     link_anh_bia: null,
     phi_coc: 0,
+    voucherConfig: 'WALLET',
+    allowMbvDeduction: true,
     pin: 2,
   }
 ];

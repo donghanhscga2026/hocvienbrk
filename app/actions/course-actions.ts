@@ -44,6 +44,7 @@ export async function enrollInCourseAction(
                 referralActivationThreshold: true,
                 feeType: true,
                 voucherConfig: true,
+                allowMbvDeduction: true,
                 teacherBankAccount: {
                     select: { accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true }
                 }
@@ -74,7 +75,7 @@ export async function enrollInCourseAction(
             // Bypass phi_coc, chuyển thẳng trạng thái ACTIVE
             effectivePhiCoc = 0
             isLibAllowed = true
-        } else if (course.type !== 'SYS' && course.voucherConfig === 'WALLET' && useVoucher && voucherAmountToUse > 0) {
+        } else if (course.allowMbvDeduction && course.voucherConfig === 'WALLET' && useVoucher && voucherAmountToUse > 0) {
             const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
             const mbvBalance = Number(brkWallet?.mbvBalance || 0)
             const actualDeduct = Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc)
@@ -880,6 +881,7 @@ export async function createCourseAction(formData: FormData) {
             file_email: formData.get('file_email') as string || null,
             noidung_email: formData.get('noidung_email') as string || null,
             voucherConfig: (formData.get('voucherConfig') as string) || 'WALLET',
+            allowMbvDeduction: formData.get('allowMbvDeduction') !== 'false',
         }
  
         // ✅ Enforce a maximum of 3 pinned courses on course creation

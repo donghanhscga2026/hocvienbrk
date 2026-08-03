@@ -53,6 +53,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
     // ✅ NEW: Section 3 - Fee & Payment
     const [feeType, setFeeType] = useState('MIEN_PHI')
     const [voucherConfig, setVoucherConfig] = useState('WALLET')
+    const [allowMbvDeduction, setAllowMbvDeduction] = useState(true)
     const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
     const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
@@ -182,6 +183,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 setPhiCoc(res.phi_coc || 0)
                 setFeeType(res.feeType || 'MIEN_PHI')
                 setVoucherConfig(res.voucherConfig || 'WALLET')
+                setAllowMbvDeduction(res.allowMbvDeduction !== false)
                 setIdKhoa(res.id_khoa || '')
                 setNoidungEmail(res.noidung_email || '')
                 setType(res.type || 'NORMAL')
@@ -238,6 +240,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 phi_coc: phiCoc,
                 feeType,
                 voucherConfig,
+                allowMbvDeduction,
                 requiresReferralActivation,
                 referralActivationThreshold,
                 acceptedVoucherIds,
@@ -485,6 +488,14 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             <option value="WALLET">Áp dụng - ví Voucher</option>
                             <option value="SPECIAL">Áp dụng các Voucher đặc biệt (ví dụ: MB1, ...)</option>
                         </select>
+                    </div>
+
+                    <div className="space-y-1.5 mt-4">
+                        <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trừ MBV khi thanh toán</label>
+                        <label className="inline-flex items-center gap-2 mt-1 cursor-pointer">
+                            <input type="checkbox" checked={allowMbvDeduction} onChange={(e) => setAllowMbvDeduction(e.target.checked)} className="w-4 h-4 rounded" />
+                            <span className="text-sm font-bold text-gray-600">Cho phép trừ MBV</span>
+                        </label>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mt-4">

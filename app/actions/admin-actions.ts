@@ -1188,6 +1188,7 @@ export async function updateCourseAction(courseId: number, data: {
     awardVoucherIds?: number[],
     feeType?: string,
     voucherConfig?: string,
+    allowMbvDeduction?: boolean,
     requiresReferralActivation?: boolean,
     referralActivationThreshold?: number
 }) {
@@ -1253,6 +1254,7 @@ export async function updateCourseAction(courseId: number, data: {
             phi_coc: data.phi_coc,
             feeType: data.feeType,
             voucherConfig: data.voucherConfig,
+            allowMbvDeduction: data.allowMbvDeduction,
             requiresReferralActivation: data.requiresReferralActivation,
             referralActivationThreshold: data.referralActivationThreshold,
             noidung_stk: data.noidung_stk ?? null,

@@ -54,6 +54,7 @@ function CreateCourseContent() {
     const [phiCoc, setPhiCoc] = useState(0)
     const [feeType, setFeeType] = useState('MIEN_PHI')
     const [voucherConfig, setVoucherConfig] = useState('WALLET')
+    const [allowMbvDeduction, setAllowMbvDeduction] = useState(true)
     const [requiresReferralActivation, setRequiresReferralActivation] = useState(false)
     const [referralActivationThreshold, setReferralActivationThreshold] = useState(0)
     const [acceptedVoucherIds, setAcceptedVoucherIds] = useState<number[]>([])
@@ -192,6 +193,7 @@ function CreateCourseContent() {
                         setPhiCoc(courseRes.phi_coc || 0)
                         setFeeType(courseRes.feeType || 'MIEN_PHI')
                         setVoucherConfig(courseRes.voucherConfig || 'WALLET')
+                        setAllowMbvDeduction(courseRes.allowMbvDeduction !== false)
                         setRequiresReferralActivation(courseRes.requiresReferralActivation || false)
                         setReferralActivationThreshold(courseRes.referralActivationThreshold || 0)
                         setAcceptedVoucherIds(courseRes.acceptedVouchers?.map((v: any) => v.voucherId) || [])
@@ -260,6 +262,7 @@ function CreateCourseContent() {
                 phi_coc: phiCoc,
                 feeType,
                 voucherConfig,
+                allowMbvDeduction,
                 acceptedVoucherIds,
                 awardVoucherIds,
                 noidung_stk: noidungStk || null,
@@ -298,6 +301,7 @@ function CreateCourseContent() {
             formData.append('phi_coc', phiCoc.toString())
              formData.append('feeType', feeType)
              formData.append('voucherConfig', voucherConfig)
+             formData.append('allowMbvDeduction', allowMbvDeduction ? 'true' : 'false')
              formData.append('requiresReferralActivation', requiresReferralActivation ? 'true' : 'false')
             formData.append('referralActivationThreshold', referralActivationThreshold.toString())
             formData.append('acceptedVoucherIds', JSON.stringify(acceptedVoucherIds))
@@ -678,6 +682,13 @@ function CreateCourseContent() {
                                 <option value="WALLET">Áp dụng - ví Voucher</option>
                                 <option value="SPECIAL">Áp dụng các Voucher đặc biệt (ví dụ: MB1, ...)</option>
                             </select>
+                        </div>
+                        <div className="space-y-1.5 mt-3">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trừ MBV khi thanh toán</label>
+                            <label className="inline-flex items-center gap-2 mt-1 cursor-pointer">
+                                <input type="checkbox" checked={allowMbvDeduction} onChange={(e) => setAllowMbvDeduction(e.target.checked)} className="w-4 h-4 rounded" />
+                                <span className="text-sm font-bold text-gray-600">Cho phép trừ MBV</span>
+                            </label>
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Yêu cầu kích hoạt referral</label>

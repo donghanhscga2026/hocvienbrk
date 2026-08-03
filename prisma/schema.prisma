@@ -366,6 +366,7 @@ model Course {
   vipExempt                   Boolean                 @default(false)
   feeType                     FeeType                 @default(MIEN_PHI)
   voucherConfig               String                  @default("WALLET")
+  allowMbvDeduction           Boolean                 @default(true)
   requiresReferralActivation  Boolean                 @default(false)
   referralActivationThreshold Int                     @default(0)
   courseCategory              CourseCategory?         @relation(fields: [categoryId], references: [id])

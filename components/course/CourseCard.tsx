@@ -208,7 +208,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                                 </span>
                             ) : (
                                 <>
-                                    {course.voucherConfig === 'WALLET' && voucherBalance >= effectivePhiCoc ? (
+                                    {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && voucherBalance >= effectivePhiCoc ? (
                                         <>
                                             <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200 line-through decoration-red-500 decoration-2">
                                                 {effectivePhiCoc.toLocaleString('vi-VN')}đ
@@ -217,13 +217,14 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                                                 0đ (-{effectivePhiCoc.toLocaleString('vi-VN')} MBV)
                                             </span>
                                         </>
-                                    ) : course.voucherConfig === 'WALLET' && voucherBalance > 0 ? (
+                                    ) : course.voucherConfig === 'WALLET' && course.allowMbvDeduction && voucherBalance > 0 ? (
                                         <>
-                                            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-red-50 text-red-600 border border-red-200">
+                                            <span className="relative inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-blue-50 text-blue-600 border border-blue-200 overflow-hidden">
                                                 {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                                <span className="absolute left-1 right-0 h-[1.5px] bg-red-400" style={{ top: '50%' }} />
                                             </span>
                                             <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-black tracking-wider shadow-sm bg-amber-500 text-white">
-                                                Bù {(effectivePhiCoc - voucherBalance).toLocaleString('vi-VN')}đ (-{voucherBalance.toLocaleString('vi-VN')} MBV)
+                                                {(effectivePhiCoc - voucherBalance).toLocaleString('vi-VN')}đ (Đã -{voucherBalance.toLocaleString('vi-VN')} MBV)
                                             </span>
                                         </>
                                     ) : (
@@ -254,7 +255,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             }}
                             className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-surface px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-primary shadow-sm border border-brk-primary/30 hover:bg-brk-primary/10 transition-colors"
                         >
-                            Mục lục
+                            Mục lục [{course._count?.lessons ?? 0}] bài
                         </button>
 
                         {/* Chia sẻ */}
