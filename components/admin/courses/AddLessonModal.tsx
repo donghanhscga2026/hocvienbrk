@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { Loader2, X, Save } from 'lucide-react'
 
-export function AddLessonModal({ courseId, onClose, onComplete }: { courseId: string, onClose: () => void, onComplete: () => void }) {
+export function AddLessonModal({ courseId, defaultOrder, onClose, onComplete }: { courseId: string, defaultOrder?: number, onClose: () => void, onComplete: () => void }) {
     const [title, setTitle] = useState('')
     const [videoUrl, setVideoUrl] = useState('')
-    const [order, setOrder] = useState(1)
+    const [order, setOrder] = useState(defaultOrder ?? 1)
     const [lessonType, setLessonType] = useState('VIDEO')
     const [content, setContent] = useState('')
     const [isDailyChallenge, setIsDailyChallenge] = useState(false)

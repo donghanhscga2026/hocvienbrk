@@ -699,6 +699,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                 {showAddLesson && (
                     <AddLessonModal
                         courseId={id}
+                        defaultOrder={(course?.lessons?.reduce((m: number, l: any) => Math.max(m, Number(l.order) || 0), 0) || 0) + 1}
                         onClose={() => setShowAddLesson(false)}
                         onComplete={() => { fetchData(); setShowAddLesson(false) }}
                     />

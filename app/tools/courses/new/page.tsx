@@ -873,6 +873,7 @@ function CreateCourseContent() {
             {showAddLesson && (
                 <AddLessonModal
                     courseId={courseId || ''}
+                    defaultOrder={(lessons?.reduce((m: number, l: any) => Math.max(m, Number(l.order) || 0), 0) || 0) + 1}
                     onClose={() => setShowAddLesson(false)}
                     onComplete={async () => {
                         const courseRes = await fetch(`/api/courses/${courseId}`).then(r => r.json())
