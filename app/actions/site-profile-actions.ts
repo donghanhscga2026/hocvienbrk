@@ -176,7 +176,7 @@ export async function getCoursesForProfile(profile: any) {
         include: {
           courseCategory: true,
           teacherBankAccount: true,
-          _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } }
+          _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
         },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
@@ -193,7 +193,7 @@ export async function getCoursesForProfile(profile: any) {
         include: {
           courseCategory: true,
           teacherBankAccount: true,
-          _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } }
+          _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
         },
         orderBy: [{ pin: 'asc' }, { id: 'asc' }]
       })
@@ -206,7 +206,7 @@ export async function getCoursesForProfile(profile: any) {
       include: {
         courseCategory: true,
         teacherBankAccount: true,
-        _count: { select: { enrollments: { where: { status: 'ACTIVE' } } } }
+        _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
       },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
