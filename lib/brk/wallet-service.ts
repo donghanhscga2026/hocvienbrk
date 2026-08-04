@@ -270,6 +270,56 @@ export async function debitMbvWallet(
   return updated
 }
 
+export async function debitBrkCashBalance(
+  userId: number,
+  amount: number,
+  description: string,
+  refId?: string,
+  sourceMemberId?: number
+) {
+  await ensureBrkWallet(userId)
+
+  const [updated] = await prisma.$transaction(async (tx) => {
+    const wallet = await tx.brkWallet.findUnique({ where: { userId } })
+    if (!wallet) throw new Error('Wallet not found')
+    if (Number(wallet.balance) < amount) {
+      throw new Error('Số dư ví VNĐ không đủ')
+    }
+
+    const newBalance = Number(wallet.balance) - amount
+    const [updatedWallet] = await Promise.all([
+      tx.brkWallet.update({ where: { userId }, data: { balance: newBalance } }),
+      tx.brkTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: -amount,
+          type: 'ADJUSTMENT',
+          description,
+          refId,
+          sourceMemberId,
+          balanceType: 'CASH',
+          balanceBefore: Number(wallet.balance),
+          balanceAfter: newBalance,
+        }
+      })
+    ])
+
+    return [updatedWallet] as const
+  }, { timeout: 30000 })
+
+  try {
+    const { logActivity } = await import('@/lib/activity-logger')
+    await logActivity({
+      userId,
+      action: 'WALLET_CHANGE',
+      detail: `CASH -${amount.toLocaleString()}đ: ${description}`,
+      metadata: { balanceType: 'CASH', amount: -amount, refId }
+    })
+  } catch { }
+
+  return updated
+}
+
 export async function debitBrkWallet(
   userId: number,
   amount: number,

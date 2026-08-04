@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { X, CheckCircle2, ExternalLink, Loader2, Coins } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import AccountAssistantModal from '@/components/auth/AccountAssistantModal'
-import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction, getBrkVndWalletBalanceAction } from '@/app/actions/course-actions'
 import { resolveBankBin } from '@/lib/bank-bin'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 
@@ -53,6 +53,8 @@ export default function RegistrationFlowModal({
   const [loadingVoucher, setLoadingVoucher] = useState<boolean>(false)
   const [useVoucher, setUseVoucher] = useState<boolean>(false)
   const [voucherAmountToUse, setVoucherAmountToUse] = useState<number>(0)
+  const [vndBalance, setVndBalance] = useState<number>(0)
+  const [useVndWallet, setUseVndWallet] = useState<boolean>(false)
 
   // Effective session = server-passed OR live from hook
   const effectiveSession = session || liveSession
@@ -68,12 +70,19 @@ export default function RegistrationFlowModal({
   useEffect(() => {
     if (step === 'voucher_confirm' && effectiveSession && course.voucherConfig === 'WALLET' && course.allowMbvDeduction) {
       setLoadingVoucher(true)
-      getBrkMbvBalanceAction().then((bal) => {
-        setVoucherBalance(bal)
+      Promise.all([
+        getBrkMbvBalanceAction(),
+        getBrkVndWalletBalanceAction()
+      ]).then(([mbvBal, vndBal]) => {
+        setVoucherBalance(mbvBal)
+        setVndBalance(vndBal)
         // Default check if they have balance
-        if (bal > 0) {
+        if (mbvBal > 0) {
           setUseVoucher(true)
-          setVoucherAmountToUse(Math.min(bal, course.phi_coc || 0))
+          setVoucherAmountToUse(Math.min(mbvBal, course.phi_coc || 0))
+        }
+        if (vndBal > 0) {
+          setUseVndWallet(true)
         }
         setLoadingVoucher(false)
       }).catch(() => setLoadingVoucher(false))
@@ -92,14 +101,15 @@ export default function RegistrationFlowModal({
         course.id,
         getClientRef(),
         useVoucher,
-        voucherAmountToUse
+        voucherAmountToUse,
+        useVndWallet
       )
       if (res.success) {
         setEnrollment(res.enrollment)
         if (onEnrolled) onEnrolled(res.enrollment)
 
         // Calculate final effective amount that client expected
-        const finalDue = Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0))
+        const finalDue = Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - (useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0))) : 0))
 
         if (finalDue === 0) {
           setStep('thankyou')
@@ -115,7 +125,7 @@ export default function RegistrationFlowModal({
     } finally {
       setEnrolling(false)
     }
-  }, [enrollment, enrolling, course.id, course.phi_coc, useVoucher, voucherAmountToUse, onEnrolled])
+  }, [enrollment, enrolling, course.id, course.phi_coc, useVoucher, voucherAmountToUse, useVndWallet, vndBalance, onEnrolled])
 
   // Poll every 10s for payment verification (only when active)
   useEffect(() => {
@@ -150,7 +160,8 @@ export default function RegistrationFlowModal({
   // ──────────────────────────────────────────────────────────────────────────
   const payment = enrollment?.payment
   const finalPaidWithVoucher = useVoucher ? Math.min(voucherBalance, voucherAmountToUse, course.phi_coc || 0) : 0
-  const effectiveAmount = payment?.amount ?? Math.max(0, (course.phi_coc || 0) - finalPaidWithVoucher)
+  const finalPaidWithVnd = useVndWallet ? Math.min(vndBalance, Math.max(0, (course.phi_coc || 0) - finalPaidWithVoucher)) : 0
+  const effectiveAmount = payment?.amount ?? Math.max(0, (course.phi_coc || 0) - finalPaidWithVoucher - finalPaidWithVnd)
   const cleanPhone = userPhone ? userPhone.replace(/\D/g, '').slice(-6) : ''
   const effectiveContent = payment?.transferContent || `SDT ${cleanPhone} HV ${effectiveUserId} COC ${course.id_khoa}`.toUpperCase().slice(0, 50)
   const bankAcc = course.teacherBankAccount
@@ -328,6 +339,35 @@ export default function RegistrationFlowModal({
                         </div>
                       </div>
                     )}
+
+                    {/* VNĐ wallet select box */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(200, 107, 61, 0.1)' }}>
+                      <input
+                        type="checkbox"
+                        id="useVndWalletCheckbox"
+                        checked={useVndWallet}
+                        onChange={(e) => setUseVndWallet(e.target.checked)}
+                        disabled={vndBalance === 0}
+                        style={{ width: '18px', height: '18px', cursor: vndBalance > 0 ? 'pointer' : 'not-allowed' }}
+                      />
+                      <label
+                        htmlFor="useVndWalletCheckbox"
+                        style={{
+                          fontFamily: 'Inter, sans-serif',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          color: vndBalance > 0 ? '#F8F1E6' : '#A8A39C',
+                          cursor: vndBalance > 0 ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        Áp dụng ví VNĐ để giảm học phí
+                      </label>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#C8C3BA' }}>
+                      <Coins size={14} color="#C86B3D" />
+                      <span>Số dư ví VNĐ khả dụng: <strong>{vndBalance.toLocaleString('vi-VN')} VND</strong></span>
+                    </div>
                   </div>
                 )}
 
@@ -343,11 +383,17 @@ export default function RegistrationFlowModal({
                       <span>-{voucherAmountToUse.toLocaleString('vi-VN')} VND</span>
                     </div>
                   )}
+                  {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && useVndWallet && finalPaidWithVnd > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#647B5E', fontWeight: 500 }}>
+                      <span>Khấu trừ từ ví VNĐ:</span>
+                      <span>-{finalPaidWithVnd.toLocaleString('vi-VN')} VND</span>
+                    </div>
+                  )}
                   <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 700 }}>
                     <span style={{ color: '#F8F1E6' }}>Thanh toán thực tế cần chuyển:</span>
                     <span style={{ color: '#C86B3D' }}>
-                      {Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0)).toLocaleString('vi-VN')} VND
+                      {Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - finalPaidWithVnd).toLocaleString('vi-VN')} VND
                     </span>
                   </div>
                 </div>
