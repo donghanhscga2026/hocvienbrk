@@ -17,7 +17,8 @@ export async function enrollInCourseAction(
     courseId: number,
     clientRef?: number | null,
     useVoucher: boolean = false,
-    voucherAmountToUse: number = 0
+    voucherAmountToUse: number = 0,
+    useVndWallet: boolean = false
 ) {
     try {
         const session = await auth()
@@ -63,7 +64,14 @@ export async function enrollInCourseAction(
         let effectivePhiCoc = course.phi_coc
         let isLibAllowed = false
         let voucherDeducted = 0
+        let cashDeducted = 0
         let voucherApplied = false
+
+        // Lấy wallet + enrollment TRƯỚC khi trừ ví (dùng cho chống trừ kép)
+        const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
+        const existing = await prisma.enrollment.findUnique({
+            where: { userId_courseId: { userId, courseId } }
+        })
 
         if (course.type === 'LIB') {
             if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")
@@ -75,22 +83,44 @@ export async function enrollInCourseAction(
             // Bypass phi_coc, chuyển thẳng trạng thái ACTIVE
             effectivePhiCoc = 0
             isLibAllowed = true
-        } else if (course.allowMbvDeduction && course.voucherConfig === 'WALLET' && useVoucher && voucherAmountToUse > 0) {
-            const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
-            const mbvBalance = Number(brkWallet?.mbvBalance || 0)
-            const actualDeduct = Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc)
-            if (actualDeduct > 0) {
-                voucherDeducted = actualDeduct
-                effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
-                voucherApplied = true
-                const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
-                await debitMbvWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
+        } else if (course.allowMbvDeduction && course.voucherConfig === 'WALLET' && (useVoucher || useVndWallet)) {
+            // Chống trừ kép: kiểm tra đã từng trừ ví cho khóa này chưa (theo wallet của user)
+            const [mbvTx, cashTx] = brkWallet?.id
+                ? await Promise.all([
+                    prisma.brkTransaction.findFirst({ where: { walletId: brkWallet.id, refId: `course_${courseId}` } }),
+                    prisma.brkTransaction.findFirst({ where: { walletId: brkWallet.id, refId: `course_cash_${courseId}` } })
+                ])
+                : [null, null]
+
+            // Đã trừ ví cho khóa này + có enrollment cũ (không REJECTED) → giữ nguyên phi_coc đã giảm, KHÔNG trừ lại
+            if ((mbvTx || cashTx) && existing && existing.status !== 'REJECTED') {
+                effectivePhiCoc = Number(existing.phi_coc)
+            } else {
+                // 1. Trừ MBV theo số tiền user chọn (chỉ khi chưa từng trừ MBV cho khóa này)
+                if (useVoucher && voucherAmountToUse > 0 && !mbvTx) {
+                    const mbvBalance = Number(brkWallet?.mbvBalance || 0)
+                    const actualDeduct = Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc)
+                    if (actualDeduct > 0) {
+                        voucherDeducted = actualDeduct
+                        effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
+                        voucherApplied = true
+                        const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
+                        await debitMbvWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
+                    }
+                }
+
+                // 2. Trừ tiếp ví VNĐ nếu user chọn và còn thiếu học phí (chỉ khi chưa từng trừ VNĐ cho khóa này)
+                if (useVndWallet && effectivePhiCoc > 0 && !cashTx) {
+                    const vndBalance = Number(brkWallet?.balance || 0)
+                    cashDeducted = Math.min(vndBalance, effectivePhiCoc)
+                    if (cashDeducted > 0) {
+                        effectivePhiCoc = Math.max(0, effectivePhiCoc - cashDeducted)
+                        const { debitBrkCashBalance } = await import('@/lib/brk/wallet-service')
+                        await debitBrkCashBalance(userId, cashDeducted, `Thanh toán khóa học ${course.id_khoa} (ví VNĐ)`, `course_cash_${courseId}`, userId)
+                    }
+                }
             }
         }
-
-        const existing = await prisma.enrollment.findUnique({
-            where: { userId_courseId: { userId, courseId } }
-        })
 
         if (existing && existing.status !== 'REJECTED') {
             if (existing.status === 'PENDING') {
@@ -116,6 +146,7 @@ export async function enrollInCourseAction(
                         `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
                         `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
                         `💳 Trừ ví MBV: ${voucherDeducted.toLocaleString('vi-VN')} VNĐ\n` +
+                        (cashDeducted > 0 ? `💳 Trừ ví VNĐ: ${cashDeducted.toLocaleString('vi-VN')} VNĐ\n` : '') +
                         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
                     await sendTelegram(msgAdmin, 'ACTIVATE');
 
@@ -1092,6 +1123,24 @@ export async function getBrkMbvBalanceAction() {
             select: { mbvBalance: true }
         })
         return Number(wallet?.mbvBalance || 0)
+    } catch {
+        return 0
+    }
+}
+
+/**
+ * Lấy số dư ví VNĐ (balance) của User hiện tại
+ */
+export async function getBrkVndWalletBalanceAction() {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return 0
+        const userId = Number(session.user.id)
+        const wallet = await prisma.brkWallet.findUnique({
+            where: { userId },
+            select: { balance: true }
+        })
+        return Number(wallet?.balance || 0)
     } catch {
         return 0
     }

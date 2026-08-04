@@ -342,11 +342,11 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                     />
                   </div>
 
-                  {/* Dòng 3: MBV (trái) & Số dư (VNĐ) (phải) */}
+                  {/* Dòng 3: MB Voucher (trái) & Số dư (VNĐ) (phải) */}
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <WalletItem
                       icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />}
-                      label="MBV"
+                      label="MB Voucher"
                       value={systemData.wallet.mbvBalance}
                     />
                     <WalletItem
