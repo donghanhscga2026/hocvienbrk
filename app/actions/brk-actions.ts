@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { activateBrkMember, cancelBrkMemberWithinGrace, processGracePeriodExpirations } from '@/lib/brk/activation-service'
 import { getBrkWallet, getBrkTransactionHistory } from '@/lib/brk/wallet-service'
-import { getLevelProgress, claimLevelGift } from '@/lib/brk/level-manager'
+import { getLevelProgress } from '@/lib/brk/level-manager'
 import { getSystemTreeByCourseId, getAllLevelConfigs } from '@/lib/brk/config-service'
 import { getRevenueShareHistory } from '@/lib/brk/revenue-share-service'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
@@ -237,16 +237,6 @@ export async function getBrkLevelData(onSystem: number) {
   const progress = await getLevelProgress(userId, onSystem)
   const configs = await getAllLevelConfigs(onSystem)
   return { progress, configs }
-}
-
-export async function claimBrkLevelGift(onSystem: number, courseId: number) {
-  const session = await auth()
-  if (!session?.user?.id) throw new Error('Unauthorized')
-  const userId = Number(session.user.id)
-
-  const result = await claimLevelGift(userId, onSystem, courseId)
-  revalidatePath('/tools/brk')
-  return result
 }
 
 export async function getBrkRevenueShare(onSystem: number) {

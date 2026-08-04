@@ -29,6 +29,7 @@ export interface MemberDetailInfo {
         balance: number
         brkd: number
         voucherBalance: number
+        mbvBalance: number
         totalEarned: number
         totalWithdrawn: number
       } | null

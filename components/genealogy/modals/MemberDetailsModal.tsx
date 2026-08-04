@@ -342,12 +342,12 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                     />
                   </div>
 
-                  {/* Dòng 3: Voucher (trái) & Số dư (VNĐ) (phải) */}
+                  {/* Dòng 3: MBV (trái) & Số dư (VNĐ) (phải) */}
                   <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <WalletItem
                       icon={<Gift className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />}
-                      label="Voucher"
-                      value={systemData.wallet.voucherBalance}
+                      label="MBV"
+                      value={systemData.wallet.mbvBalance}
                     />
                     <WalletItem
                       icon={<ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />}
@@ -520,8 +520,8 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                 {rec.details?.amountVoucher > 0 && (
                                   <div className="flex items-center justify-between text-slate-500 mt-1">
                                     <span>Quà tặng thăng cấp:</span>
-                                    <span className="font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
-                                      +{Math.round(rec.details.amountVoucher).toLocaleString('vi')} VNĐ Voucher
+                                    <span className="font-black text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+                                      +{Math.round(rec.details.amountVoucher).toLocaleString('vi')} MBV
                                     </span>
                                   </div>
                                 )}
@@ -627,8 +627,8 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                                   </span>
                                 )}
                                 {amountVoucher !== 0 && (
-                                  <span className="text-amber-600 text-[10px]">
-                                    +{Math.round(amountVoucher).toLocaleString('vi')} VNĐ Voucher
+                                  <span className="text-purple-600 text-[10px]">
+                                    +{Math.round(amountVoucher).toLocaleString('vi')} MBV
                                   </span>
                                 )}
                               </div>

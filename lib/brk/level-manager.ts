@@ -3,8 +3,7 @@
 import prisma from '@/lib/prisma'
 import { getLevelConfig, getAllLevelConfigs } from './config-service'
 import { validateBranchRequirements } from './branch-validator'
-import { creditVoucherWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
-import { isTestAccount } from '@/lib/test-account'
+import { creditMbvWallet, creditBrkdWallet, makeSystemSnapshotDescription, createBrkTimelineRecord } from './wallet-service'
 
 export async function checkAndPromoteLevel(userId: number, onSystem: number, promotedAt?: Date, levelConfigs?: Map<number, any>, sourceMemberId?: number, applicationId?: number) {
   const systemRec = await prisma.system.findUnique({
@@ -104,27 +103,27 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       applicationId
     )
 
-    // Idempotency: skip voucher if already credited for this level
+    // Idempotency: skip MBV gift if already credited for this level (check cả VOUCHER_CREDIT cũ để tránh tặng kép)
     const hasVoucherGift = nextConfig.giftValue > 0 && currentLevel >= 2
     if (hasVoucherGift) {
       const refId = `level_${currentLevel}_sys_${onSystem}_user_${userId}${applicationId != null ? `_app_${applicationId}` : ''}`
-      const existingVoucher = await prisma.brkTransaction.findFirst({
-        where: { refId, type: 'VOUCHER_CREDIT' }
+      const existingGift = await prisma.brkTransaction.findFirst({
+        where: { refId, type: { in: ['VOUCHER_CREDIT', 'MBV_CREDIT'] } }
       })
-      if (!existingVoucher) {
-        const voucherDesc = await makeSystemSnapshotDescription(
+      if (!existingGift) {
+        const giftDesc = await makeSystemSnapshotDescription(
           userId,
           onSystem,
-          'VOUCHER',
+          'MBV',
           'Thưởng thăng cấp',
-          `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} VND)`,
+          `Quà tặng lên cấp ${currentLevel} (${nextConfig.giftValue.toLocaleString()} MBV)`,
           {},
-          { voucher: nextConfig.giftValue }
+          { mbv: nextConfig.giftValue }
         )
-        await creditVoucherWallet(
+        await creditMbvWallet(
           userId,
           nextConfig.giftValue,
-          voucherDesc,
+          giftDesc,
           refId,
           promotedAt,
           sourceMemberId,
@@ -139,11 +138,11 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       type: 'LEVEL_UP',
       time: promotedAt || new Date(),
       title: 'Thăng tiến cấp bậc',
-      description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}${hasVoucherGift ? ` & nhận Quà tặng thăng cấp (${nextConfig.giftValue.toLocaleString()} VND)` : ''}`,
+      description: `Thăng cấp từ Cấp ${currentLevel - 1} lên Cấp ${currentLevel}${hasVoucherGift ? ` & nhận Quà tặng thăng cấp (${nextConfig.giftValue.toLocaleString()} MBV)` : ''}`,
       fromLevel: currentLevel - 1,
       toLevel: currentLevel,
       amountVoucher: hasVoucherGift ? nextConfig.giftValue : 0,
-      txType: hasVoucherGift ? 'VOUCHER_CREDIT' : undefined,
+      txType: hasVoucherGift ? 'MBV_CREDIT' : undefined,
       sourceMemberId,
       applicationId
     })
@@ -159,58 +158,6 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
   }
 
   return systemRec
-}
-
-export async function claimLevelGift(userId: number, onSystem: number, courseId: number) {
-  const systemRec = await prisma.system.findUnique({
-    where: { userId_onSystem: { userId, onSystem } }
-  })
-  if (!systemRec) throw new Error('Not a member')
-
-  const lastRecord = await prisma.brkLevelUpRecord.findFirst({
-    where: { userId, onSystem },
-    orderBy: { promotedAt: 'desc' }
-  })
-  if (!lastRecord) throw new Error('No level up record found')
-
-  const config = await getLevelConfig(onSystem, lastRecord.toLevel)
-  if (!config || config.giftValue <= 0) throw new Error('No gift available for this level')
-
-  if (config.timeLimitDays) {
-    let baseDate: Date
-    if (config.level === 2) {
-      baseDate = systemRec.activatedAt!
-    } else {
-      const prevLevelUp = await prisma.brkLevelUpRecord.findFirst({
-        where: { userId, onSystem, toLevel: config.level - 1 },
-        orderBy: { promotedAt: 'desc' }
-      })
-      if (!prevLevelUp) throw new Error('Previous level-up record not found')
-      baseDate = prevLevelUp.promotedAt
-    }
-    const deadline = new Date(baseDate.getTime() + config.timeLimitDays * 24 * 60 * 60 * 1000)
-    if (new Date() > deadline) throw new Error('Gift claim period has expired')
-  }
-
-  const course = await prisma.course.findUnique({ where: { id: courseId } })
-  if (!course) throw new Error('Course not found')
-  if (course.phi_coc > config.giftValue) {
-    throw new Error(`Course fee (${course.phi_coc}) exceeds gift value (${config.giftValue})`)
-  }
-
-  if (isTestAccount(userId)) throw new Error('Tài khoản test không được nhận quà tặng level')
-
-  await prisma.enrollment.create({
-    data: {
-      userId,
-      courseId,
-      status: 'ACTIVE',
-      phi_coc: 0,
-      startedAt: new Date(),
-    }
-  })
-
-  return { success: true, courseId }
 }
 
 export async function getLevelProgress(userId: number, onSystem: number) {
@@ -278,20 +225,20 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     data: { userId, onSystem, f1Count, sourceMemberId }
   })
 
-  // Auto-credit voucher to wallet with snapshot description
-  const voucherDesc = await makeSystemSnapshotDescription(
+  // Auto-credit MBV to wallet with snapshot description
+  const giftDesc = await makeSystemSnapshotDescription(
     userId,
     onSystem,
-    'VOUCHER',
+    'MBV',
     'Thưởng thăng cấp',
     `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
     {},
-    { voucher: 386000 }
+    { mbv: 386000 }
   )
-  await creditVoucherWallet(
+  await creditMbvWallet(
     userId,
     386_000,
-    voucherDesc,
+    giftDesc,
     `referral_2f1_sys_${onSystem}_user_${userId}`,
     createdAt,
     sourceMemberId
@@ -305,7 +252,7 @@ export async function create2F1Voucher(userId: number, onSystem: number, created
     title: 'Thưởng thăng cấp',
     description: `Thưởng giới thiệu 2 F1 (hệ thống BRK)`,
     amountVoucher: 386000,
-    txType: 'VOUCHER_CREDIT',
+    txType: 'MBV_CREDIT',
     sourceMemberId
   })
 

@@ -377,6 +377,7 @@ export async function makeSystemSnapshotDescription(
   const cash = (wallet ? Number(wallet.balance) : 0) + (overrides.cash ?? 0)
   const brkd = (wallet ? Number(wallet.brkd) : 0) + (overrides.brkd ?? 0)
   const voucher = (wallet ? Number(wallet.voucherBalance) : 0) + (overrides.voucher ?? 0)
+  const mbv = (wallet ? Number(wallet.mbvBalance) : 0) + (overrides.mbv ?? 0)
 
   return JSON.stringify({
     sys4: true,
@@ -389,7 +390,8 @@ export async function makeSystemSnapshotDescription(
     balances: {
       cash,
       brkd,
-      voucher
+      voucher,
+      mbv
     },
     extra
   })
