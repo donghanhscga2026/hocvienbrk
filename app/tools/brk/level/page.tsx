@@ -39,6 +39,7 @@ interface TimelineItem {
   changeMBDT: number // MBDT biến động
   changeCASH: number // CASH biến động
   changeVoucher: number
+  changeMBV: number
   extra?: {
     newMemberId?: number
     newMemberName?: string
@@ -100,7 +101,7 @@ export default function BrkLevelPage() {
           groupKey = `share-${timeKey}`
         } else if (tx.meta.event === 'LEVEL_UP') {
           groupKey = `levelup-${tx.meta.level}-${timeKey}`
-        } else if (tx.meta.event === 'VOUCHER') {
+        } else if (tx.meta.event === 'VOUCHER' || tx.meta.event === 'MBV') {
           groupKey = `voucher-${timeKey}`
         } else {
           groupKey = `tx-${tx.id}`
@@ -121,11 +122,13 @@ export default function BrkLevelPage() {
         let changeMBDT = 0
         let changeCASH = 0
         let changeVoucher = 0
+        let changeMBV = 0
 
         txs.forEach(t => {
           if (t.balanceType === 'BRKD') changeMBDT += t.amount
           if (t.balanceType === 'CASH') changeCASH += t.amount
           if (t.balanceType === 'VOUCHER') changeVoucher += t.amount
+          if (t.balanceType === 'MBV') changeMBV += t.amount
         })
 
         let title = mainTx.meta.title
@@ -154,6 +157,7 @@ export default function BrkLevelPage() {
           changeMBDT: displayChangeMBDT,
           changeCASH: displayChangeCASH,
           changeVoucher,
+          changeMBV,
           extra: mainTx.meta.extra
         }
       })
@@ -331,9 +335,9 @@ export default function BrkLevelPage() {
                         <h3 className="font-bold text-slate-800 text-base">{item.title}</h3>
                       </div>
 
-                      {/* Cash / MBDT Changes details */}
+                      {/* Cash / MBDT / MBV Changes details */}
                       <div className="text-right">
-                        {(item.changeMBDT !== 0 || item.changeCASH !== 0 || item.changeVoucher !== 0) ? (
+                        {(item.changeMBDT !== 0 || item.changeCASH !== 0 || item.changeVoucher !== 0 || item.changeMBV !== 0) ? (
                           <div className="space-y-0.5">
                             {item.changeMBDT !== 0 && (
                               <div className="text-emerald-600 font-extrabold text-lg leading-tight">
@@ -348,6 +352,11 @@ export default function BrkLevelPage() {
                             {item.changeVoucher > 0 && (
                               <div className="text-pink-600 font-bold text-xs">
                                 +{formatCASH(item.changeVoucher)} Voucher
+                              </div>
+                            )}
+                            {item.changeMBV > 0 && (
+                              <div className="text-purple-600 font-bold text-xs">
+                                +{formatCASH(item.changeMBV)} MBV
                               </div>
                             )}
                           </div>
@@ -427,7 +436,7 @@ export default function BrkLevelPage() {
                 <th className="px-5 py-3 text-left text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Cấp bậc</th>
                 <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Điểm yêu cầu (MBP)</th>
                 <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Hoa hồng chênh lệch</th>
-                <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Quà tặng Voucher</th>
+                <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Quà tặng MBV</th>
                 <th className="px-5 py-3 text-left text-slate-500 font-semibold uppercase tracking-wider text-[11px] pl-8">Yêu cầu nhánh bảo trợ</th>
               </tr>
             </thead>

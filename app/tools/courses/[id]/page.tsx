@@ -485,7 +485,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                         <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Áp dụng Voucher</label>
                         <select value={voucherConfig} onChange={(e) => setVoucherConfig(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                             <option value="NONE">Không áp dụng</option>
-                            <option value="WALLET">Áp dụng - ví Voucher</option>
+                            <option value="WALLET">Áp dụng - ví MBV</option>
                             <option value="SPECIAL">Áp dụng các Voucher đặc biệt (ví dụ: MB1, ...)</option>
                         </select>
                     </div>
