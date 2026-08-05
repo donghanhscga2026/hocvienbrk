@@ -347,20 +347,24 @@ async function buildSharingCountMapForSystem(memberIds: number[]): Promise<Map<n
 
   const parentToChildren = new Map<number, number[]>()
   for (const e of enrollments) {
-    if (e.referrerId) {
+    if (e.referrerId && e.referrerId !== e.userId) {
       if (!parentToChildren.has(e.referrerId)) parentToChildren.set(e.referrerId, [])
       parentToChildren.get(e.referrerId)!.push(e.userId)
     }
   }
 
   const countCache = new Map<number, number>()
+  const visiting = new Set<number>()
   function countDescendants(uid: number): number {
     if (countCache.has(uid)) return countCache.get(uid)!
+    if (visiting.has(uid)) return 0
+    visiting.add(uid)
     const children = parentToChildren.get(uid) || []
     let count = children.length
     for (const child of children) {
       count += countDescendants(child)
     }
+    visiting.delete(uid)
     countCache.set(uid, count)
     return count
   }
