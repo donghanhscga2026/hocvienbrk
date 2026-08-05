@@ -312,6 +312,12 @@ export async function enrollInCourseAction(
         console.log('[ENROLL-DEBUG] FINAL enrollmentReferrerId:', enrollmentReferrerId)
         console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
+        // Chống self-referral: referrerId không được trùng userId (tránh vòng lặp cây chia sẻ)
+        if (enrollmentReferrerId === userId) {
+            enrollmentReferrerId = user?.referrerId ?? null
+            console.log('[ENROLL-DEBUG] Self-referral detected, fallback to user.referrerId =', enrollmentReferrerId)
+        }
+
         const isAutoActive = effectivePhiCoc === 0
         let studyMode: EnrollmentMode = course.feeType === 'MIEN_PHI' ? EnrollmentMode.FREE : EnrollmentMode.COMPANION
 
