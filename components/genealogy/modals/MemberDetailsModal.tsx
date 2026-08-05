@@ -578,6 +578,49 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
                         );
                       }
 
+                      if (rec.type === 'LEVEL_DOWN') {
+                        const fromLvlDetails = getLevelDetails(rec.details?.fromLevel ?? 1);
+                        const toLvlDetails = getLevelDetails(rec.details?.toLevel ?? 1);
+                        return (
+                          <div key={i} className="relative">
+                            <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-rose-500 border-4 border-white shadow-md" />
+                            <div className="bg-white p-3.5 rounded-2xl border border-rose-100 shadow-sm flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-black text-rose-600">Hạ cấp bậc</span>
+                                <span className="text-[10px] font-medium text-slate-400">
+                                  {new Date(rec.time).toLocaleString('vi-VN')}
+                                </span>
+                              </div>
+                              <span className="text-slate-800 text-xs font-black">
+                                Cấp {rec.details?.fromLevel} ➔ Cấp {rec.details?.toLevel}
+                              </span>
+                              {rec.description && (
+                                <span className="text-[11px] text-slate-500">{rec.description}</span>
+                              )}
+                              <div className="mt-1 pt-1.5 border-t border-slate-50 flex flex-col gap-1 text-[11px]">
+                                <div className="flex items-center justify-between text-slate-500">
+                                  <span>Tỷ lệ hoa hồng:</span>
+                                  <span className="font-extrabold text-slate-700">
+                                    {fromLvlDetails.pct} ➔ <span className="text-rose-600 font-black">{toLvlDetails.pct}</span>
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-[10px] text-slate-500 font-semibold">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-400">Điểm:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedBrkp?.toLocaleString('vi')} MBP</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-400">Thành viên nhóm:</span>
+                                  <span className="font-black text-slate-700">{rec.accumulatedTeamSize?.toLocaleString('vi')}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       // TRANSACTION
                       const amountCash = rec.details?.amountCash ?? 0;
                       const amountBrkd = rec.details?.amountBrkd ?? 0;
