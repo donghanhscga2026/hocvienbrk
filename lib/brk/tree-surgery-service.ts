@@ -62,6 +62,7 @@ interface BatchNode {
   autoId: number
   activatedAt: Date | null
   enrolledAt: Date | null
+  applicationId: number | null
 }
 
 async function getSystemRecord(userId: number) {
@@ -347,12 +348,13 @@ export async function moveBrkMember(
 
   const subtreeNodes: BatchNode[] = []
   for (const st of subtrees) {
-    const sys = await prisma.system.findUnique({ where: { autoId: st.autoId }, select: { activatedAt: true, createdAt: true } })
+    const sys = await prisma.system.findUnique({ where: { autoId: st.autoId }, select: { activatedAt: true, createdAt: true, applicationId: true } })
     subtreeNodes.push({
       userId: st.userId,
       autoId: st.autoId,
       activatedAt: sys?.activatedAt || null,
-      enrolledAt: sys?.createdAt || null
+      enrolledAt: sys?.createdAt || null,
+      applicationId: sys?.applicationId ?? null
     })
   }
   subtreeNodes.sort((a, b) => (a.activatedAt || a.enrolledAt || new Date(0)).getTime() - (b.activatedAt || b.enrolledAt || new Date(0)).getTime())
@@ -435,7 +437,7 @@ export async function moveBrkMember(
     const batch = subtreeNodes.slice(i, i + batchSize)
     for (const node of batch) {
       try {
-        await distributeCommission(node.userId, ON_SYSTEM, fee, systemTree)
+        await distributeCommission(node.userId, ON_SYSTEM, fee, systemTree, undefined, undefined, undefined, undefined, { applicationId: node.applicationId ?? undefined })
         newCreditedCount++
       } catch (err) {
         result.warnings.push(`distributeCommission thất bại cho #${node.userId}: ${err}`)
@@ -466,14 +468,11 @@ export async function moveBrkMember(
     }
 
     if (highestQualified < currentLevel) {
-      await prisma.system.update({
-        where: { autoId: sys.autoId },
-        data: { level: Math.max(1, highestQualified) }
-      })
-      await prisma.brkLevelUpRecord.deleteMany({
-        where: { userId: affectedId, onSystem: ON_SYSTEM, toLevel: { gt: highestQualified } }
-      })
-      levelsChanged++
+      const { demoteIfLevelDropped } = await import('./level-manager')
+      try {
+        await demoteIfLevelDropped(affectedId, ON_SYSTEM, 'di chuyển cây thành viên')
+        levelsChanged++
+      } catch { }
     } else if (highestQualified > currentLevel) {
       const { checkAndPromoteLevel } = await import('./level-manager')
       try {
@@ -544,11 +543,11 @@ export async function rebuildSubtree(
   if (!parentSys) { result.warnings.push('Parent user not found'); return result }
   if (parentSys.status !== 'ACTIVE') { result.warnings.push('Parent not active'); return result }
 
-  const memberSystems: { userId: number; autoId: number; refSysId: number; activatedAt: Date | null }[] = []
+  const memberSystems: { userId: number; autoId: number; refSysId: number; activatedAt: Date | null; applicationId: number | null }[] = []
   for (const uid of [...new Set(memberUserIds)]) {
     const sys = await prisma.system.findUnique({
       where: { userId_onSystem: { userId: uid, onSystem } },
-      select: { autoId: true, refSysId: true, activatedAt: true, status: true }
+      select: { autoId: true, refSysId: true, activatedAt: true, status: true, applicationId: true }
     })
     if (!sys || sys.status !== 'ACTIVE') {
       result.warnings.push(`Member #${uid} not found or not active, skipping`)
@@ -562,7 +561,7 @@ export async function rebuildSubtree(
       result.warnings.push(`Cannot rebuild: #${parentUserId} is a descendant of #${uid} (circular)`)
       return result
     }
-    memberSystems.push({ userId: uid, autoId: sys.autoId, refSysId: sys.refSysId, activatedAt: sys.activatedAt })
+    memberSystems.push({ userId: uid, autoId: sys.autoId, refSysId: sys.refSysId, activatedAt: sys.activatedAt, applicationId: sys.applicationId })
   }
 
   if (memberSystems.length === 0) { result.warnings.push('No valid members to process'); return result }
@@ -657,7 +656,7 @@ export async function rebuildSubtree(
     }
 
     try {
-      await distributeCommission(ms.userId, onSystem, fee, systemTree)
+      await distributeCommission(ms.userId, onSystem, fee, systemTree, undefined, undefined, undefined, undefined, { applicationId: ms.applicationId ?? undefined })
       creditedCount++
     } catch (err) {
       result.warnings.push(`distributeCommission thất bại cho #${ms.userId}: ${err}`)
@@ -689,14 +688,11 @@ export async function rebuildSubtree(
     }
 
     if (highestQualified < currentLevel) {
-      await prisma.system.update({
-        where: { autoId: sys.autoId },
-        data: { level: Math.max(1, highestQualified) }
-      })
-      await prisma.brkLevelUpRecord.deleteMany({
-        where: { userId: affectedId, onSystem, toLevel: { gt: highestQualified } }
-      })
-      levelsChanged++
+      const { demoteIfLevelDropped } = await import('./level-manager')
+      try {
+        await demoteIfLevelDropped(affectedId, onSystem, 'rebuilt subtree')
+        levelsChanged++
+      } catch { }
     } else if (highestQualified > currentLevel) {
       const { checkAndPromoteLevel } = await import('./level-manager')
       try {

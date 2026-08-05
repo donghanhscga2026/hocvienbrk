@@ -160,6 +160,84 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
   return systemRec
 }
 
+export async function demoteIfLevelDropped(userId: number, onSystem: number, reason = '') {
+  const systemRec = await prisma.system.findUnique({
+    where: { userId_onSystem: { userId, onSystem } }
+  })
+  if (!systemRec) return null
+  const currentLevel = systemRec.level || 1
+  if (currentLevel <= 1) return systemRec
+
+  const totalPoints = Number(systemRec.totalPoints || 0)
+  const allConfigs = await getAllLevelConfigs(onSystem)
+  let eligibleLevel = 1
+  for (const cfg of allConfigs.sort((a, b) => a.level - b.level)) {
+    if (totalPoints >= Number(cfg.pointsRequired)) {
+      eligibleLevel = cfg.level
+    }
+  }
+
+  if (eligibleLevel >= currentLevel) return systemRec
+
+  const revokedLevels: number[] = []
+  for (let lv = currentLevel; lv > eligibleLevel; lv--) {
+    const cfg = allConfigs.find(c => c.level === lv)
+    if (cfg && Number(cfg.giftValue) > 0) revokedLevels.push(lv)
+  }
+
+  await createBrkTimelineRecord({
+    userId,
+    onSystem,
+    type: 'LEVEL_DOWN',
+    time: new Date(),
+    title: 'Hạ cấp bậc',
+    description: `Điểm MBP giảm dưới ngưỡng yêu cầu${reason ? ` (${reason})` : ''}. Hạ cấp từ Cấp ${currentLevel} xuống Cấp ${eligibleLevel}${
+      revokedLevels.length > 0
+        ? ` & thu hồi quà thăng cấp (${revokedLevels.map(lv => `${Number(allConfigs.find(c => c.level === lv)?.giftValue ?? 0).toLocaleString()} MBV`).join(', ')})`
+        : ''
+    }`,
+    fromLevel: currentLevel,
+    toLevel: eligibleLevel,
+    amountVoucher: 0,
+    txType: revokedLevels.length > 0 ? 'MBV_REVOKE' : undefined,
+  })
+
+  const giftResults: { level: number; debited: boolean; shortfall: number }[] = []
+  for (const lv of revokedLevels) {
+    const cfg = allConfigs.find(c => c.level === lv)
+    if (!cfg) continue
+    const gift = Number(cfg.giftValue)
+    try {
+      await import('@/lib/brk/wallet-service').then(({ debitMbvWallet }) =>
+        debitMbvWallet(
+          userId,
+          gift,
+          `Thu hồi quà thăng cấp Cấp ${lv} (hạ cấp xuống Cấp ${eligibleLevel})`,
+          `level_down_sys_${onSystem}_user_${userId}_lvl_${lv}`
+        )
+      )
+      giftResults.push({ level: lv, debited: true, shortfall: 0 })
+    } catch (err: any) {
+      giftResults.push({ level: lv, debited: false, shortfall: Number(gift) })
+      console.error(`[LevelDown] Cannot revoke MBV gift for user #${userId} level ${lv}:`, err?.message)
+    }
+  }
+
+  await prisma.system.update({
+    where: { autoId: systemRec.autoId },
+    data: { level: eligibleLevel }
+  })
+
+  await prisma.brkLevelUpRecord.deleteMany({
+    where: { userId, onSystem, toLevel: { gt: eligibleLevel } }
+  })
+
+  return {
+    system: { autoId: systemRec.autoId, userId, onSystem, fromLevel: currentLevel, toLevel: eligibleLevel },
+    revokedGifts: giftResults,
+  }
+}
+
 export async function getLevelProgress(userId: number, onSystem: number) {
   const systemRec = await prisma.system.findUnique({
     where: { userId_onSystem: { userId, onSystem } }

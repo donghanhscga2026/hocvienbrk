@@ -200,7 +200,7 @@ export async function activateBrkMember(
     where: { userId_onSystem: { userId, onSystem } },
     data: { totalPoints: { increment: BRKP_PER_ACTIVATION } }
   })
-  await distributeCommission(userId, onSystem, fee, systemTree, now, undefined, undefined, userId)
+  await distributeCommission(userId, onSystem, fee, systemTree, now, undefined, undefined, userId, { applicationId: applicationId ?? undefined })
 
   await checkAndPromoteLevel(userId, onSystem, now, undefined, userId)
 
@@ -466,7 +466,7 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
           sourceMemberId: member.userId,
         })
         if (!isOptionB) {
-          await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId)
+          await distributeCommission(member.userId, member.onSystem, fee, memberSystemTree, recordTime, undefined, memberMBDT, member.userId, { applicationId: member.applicationId ?? undefined })
           await checkAndPromoteLevel(member.userId, member.onSystem, recordTime, undefined, member.userId)
         }
         count++
@@ -727,29 +727,8 @@ export async function revertMemberActivation(
     })
 
     // Kiểm tra và hạ cấp ancestor nếu điểm tụt dưới ngưỡng
-    const updatedAncestorSys = await prisma.system.findUnique({ where: { autoId: ancestorSys.autoId } })
-    if (updatedAncestorSys && (updatedAncestorSys.level || 0) > 1) {
-      const { getAllLevelConfigs } = await import('./config-service')
-      const allConfigs = await getAllLevelConfigs(onSystem)
-      const currentPts = Number(updatedAncestorSys.totalPoints || 0)
-      // Tìm cấp cao nhất mà ancestor còn đủ điều kiện
-      let eligibleLevel = 1
-      for (const cfg of allConfigs.sort((a, b) => a.level - b.level)) {
-        if (currentPts >= Number(cfg.pointsRequired)) {
-          eligibleLevel = cfg.level
-        }
-      }
-      if (eligibleLevel < (updatedAncestorSys.level || 0)) {
-        await prisma.system.update({
-          where: { autoId: ancestorSys.autoId },
-          data: { level: eligibleLevel }
-        })
-        // Xóa BrkLevelUpRecord cao hơn eligibleLevel
-        await prisma.brkLevelUpRecord.deleteMany({
-          where: { userId: ancestorUserId, onSystem, toLevel: { gt: eligibleLevel } }
-        })
-      }
-    }
+    const { demoteIfLevelDropped } = await import('./level-manager')
+    await demoteIfLevelDropped(ancestorUserId, onSystem, 'thành viên trong nhóm bị gỡ khỏi hệ')
   }
 
   // --- BƯỚC 3: Xóa toàn bộ BrkTransaction của chính member ---
