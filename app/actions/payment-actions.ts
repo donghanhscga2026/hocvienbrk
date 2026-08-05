@@ -222,15 +222,25 @@ export async function rejectPaymentAction(enrollmentId: number, reason: string) 
       metadata: { courseId: enrollment.courseId, enrollmentId: enrollment.id, reason, adminId: userId }
     })
 
-    await prisma.$transaction([
-      prisma.enrollment.update({
-        where: { id: enrollmentId },
-        data: { status: 'REJECTED' }
-      }),
-      prisma.payment.delete({
-        where: { enrollmentId }
-      })
-    ])
+    if (isAdmin) {
+      // ADMIN: xóa luôn Payment + LessonProgress + Enrollment
+      await prisma.$transaction([
+        prisma.payment.deleteMany({ where: { enrollmentId } }),
+        prisma.lessonProgress.deleteMany({ where: { enrollmentId } }),
+        prisma.enrollment.delete({ where: { id: enrollmentId } })
+      ])
+    } else {
+      // TEACHER: chỉ đổi Enrollment -> REJECTED + xóa Payment
+      await prisma.$transaction([
+        prisma.enrollment.update({
+          where: { id: enrollmentId },
+          data: { status: 'REJECTED' }
+        }),
+        prisma.payment.delete({
+          where: { enrollmentId }
+        })
+      ])
+    }
 
     revalidatePath('/')
     revalidatePath('/courses')
