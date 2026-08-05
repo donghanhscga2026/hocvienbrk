@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getAllPhoneVariants, maskPhone } from "@/lib/phone-utils"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
   try {
@@ -8,6 +9,13 @@ export async function POST(request: Request) {
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       return NextResponse.json({ error: "Vui lòng nhập email hoặc số điện thoại" }, { status: 400 })
+    }
+
+    // Chặn dò quét hàng loạt email/SĐT tồn tại trong hệ thống
+    const ip = getClientIp(request)
+    const byIp = checkRateLimit(`check-user:ip:${ip}`, { max: 15, windowMs: 10 * 60 * 1000 })
+    if (!byIp.allowed) {
+      return NextResponse.json({ error: "Bạn thử quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
     }
 
     const trimmed = query.trim()

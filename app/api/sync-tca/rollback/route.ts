@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { v4 as uuidv4 } from 'uuid'
+import { requireAdmin } from '@/lib/api-auth'
 
 const prisma = new PrismaClient()
 
@@ -59,6 +60,9 @@ async function createBackupFile(data: {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const body: RollbackPayload = await request.json()
     const { mode, createBackup = true } = body
@@ -481,6 +485,9 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   const { searchParams } = new URL(request.url)
   const syncId = searchParams.get('syncId')
   const limit = parseInt(searchParams.get('limit') || '20')

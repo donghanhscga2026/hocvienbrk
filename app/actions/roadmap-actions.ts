@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { requireAdminAction } from "@/lib/api-auth"
 
 /**
  * Lấy danh sách tất cả các bài khảo sát (CHỈ lấy id, name, isActive - KHÔNG lấy flow)
@@ -72,6 +73,9 @@ export async function getSurveyById(id: number) {
  * Tạo mới một bài khảo sát
  */
 export async function createSurvey(name: string, description: string = '') {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         const newSurvey = await prisma.survey.create({
             data: {
@@ -91,6 +95,9 @@ export async function createSurvey(name: string, description: string = '') {
  * Lưu sơ đồ của bài khảo sát
  */
 export async function saveSurveyFlow(id: number, flow: any) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         await prisma.survey.update({
             where: { id },
@@ -107,6 +114,9 @@ export async function saveSurveyFlow(id: number, flow: any) {
  * Kích hoạt bài khảo sát này và hủy kích hoạt tất cả các bài khác
  */
 export async function activateSurvey(id: number) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         // Sử dụng transaction để đảm bảo tính toàn vẹn (chỉ 1 bài được active)
         await prisma.$transaction([
@@ -131,6 +141,9 @@ export async function activateSurvey(id: number) {
  * Xóa một bài khảo sát
  */
 export async function deleteSurvey(id: number) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         await prisma.survey.delete({ where: { id } })
         revalidatePath('/admin/roadmap')

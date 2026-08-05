@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { sendGmail } from "@/lib/notifications"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 function generateOTP(): string {
     return Math.floor(100000 + Math.random() * 900000).toString()
@@ -12,6 +13,14 @@ export async function POST(request: Request) {
 
         if (!email) {
             return NextResponse.json({ error: "Email là bắt buộc" }, { status: 400 })
+        }
+
+        // Chặn spam gửi OTP hàng loạt (tốn quota email + có thể dùng để enumerate tài khoản)
+        const ip = getClientIp(request)
+        const byEmail = checkRateLimit(`forgot-password:email:${email.toLowerCase().trim()}`, { max: 3, windowMs: 15 * 60 * 1000 })
+        const byIp = checkRateLimit(`forgot-password:ip:${ip}`, { max: 10, windowMs: 60 * 60 * 1000 })
+        if (!byEmail.allowed || !byIp.allowed) {
+            return NextResponse.json({ error: "Bạn yêu cầu quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
         }
 
         const normalizedEmail = email.toLowerCase().trim()

@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { addUserToClosure } from '@/lib/closure-helpers'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
 import { generatePreview, type PreviewRow } from '@/lib/tca-preview-logic'
+import { requireAdmin } from '@/lib/api-auth'
 
 const prisma = new PrismaClient()
 
@@ -70,6 +71,9 @@ function parseDate(dateStr: string | null | undefined): Date | null {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   const syncId = uuidv4()
   const startTime = Date.now()
   let stats = { usersCreated: 0, usersUpdated: 0, systemsCreated: 0, systemsUpdated: 0, tcaMembersCreated: 0, tcaMembersUpdated: 0, failed: 0, totalRecords: 0, skipped: 0 }

@@ -15,6 +15,11 @@ export async function POST(req: Request) {
       return new NextResponse("No file uploaded", { status: 400 });
     }
 
+    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return new NextResponse("Chỉ chấp nhận file ảnh (jpg, png, webp, gif)", { status: 400 });
+    }
+
     // Kiểm tra kích thước ảnh (Giới hạn 1MB cho ổn định)
     if (file.size > 1024 * 1024) {
       return new NextResponse("Kích thước ảnh quá lớn (vui lòng chọn ảnh < 1MB)", { status: 400 });

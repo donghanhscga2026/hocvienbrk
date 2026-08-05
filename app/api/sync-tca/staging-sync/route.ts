@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { normalizePhone } from '@/lib/phone-utils'
+import { requireAdmin } from '@/lib/api-auth'
 
 const prisma = new PrismaClient()
 
@@ -33,6 +34,9 @@ interface PrecheckPayload {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const body: PrecheckPayload = await request.json()
     const { allNodes, memberInfo } = body

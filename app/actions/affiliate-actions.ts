@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { PayoutStatus } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+import { requireAdminAction } from "@/lib/api-auth"
 
 // ==================== WALLET ====================
 
@@ -189,6 +190,9 @@ export async function getPendingPayouts() {
 }
 
 export async function approvePayout(payoutId: number) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         const payout = await prisma.affiliatePayout.update({
             where: { id: payoutId },
@@ -208,6 +212,9 @@ export async function approvePayout(payoutId: number) {
 }
 
 export async function rejectPayout(payoutId: number, notes: string) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         const payout = await prisma.affiliatePayout.update({
             where: { id: payoutId },

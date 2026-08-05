@@ -5,9 +5,9 @@ import { CommissionStatus } from "@prisma/client"
 export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get('Authorization')
-        const cronSecret = process.env.CRON_SECRET || 'your-cron-secret-here'
-        
-        if (authHeader !== `Bearer ${cronSecret}`) {
+        const cronSecret = process.env.CRON_SECRET
+
+        if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 

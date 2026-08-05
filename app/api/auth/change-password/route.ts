@@ -3,13 +3,19 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { sendPasswordChangedNotification } from "@/lib/notifications"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
     try {
         const session = await auth()
-        
+
         if (!session?.user?.id) {
             return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 })
+        }
+
+        const byUser = checkRateLimit(`change-password:user:${session.user.id}`, { max: 5, windowMs: 15 * 60 * 1000 })
+        if (!byUser.allowed) {
+            return NextResponse.json({ error: "Bạn thử quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
         }
 
         const { newPassword } = await request.json()
@@ -39,9 +45,8 @@ export async function POST(request: Request) {
             userId: parseInt(session.user.id),
             action: 'PASSWORD_CHANGE',
             detail: 'Đổi mật khẩu thành công',
-            metadata: { 
-                email: session.user.email || null,
-                newPassword: newPassword
+            metadata: {
+                email: session.user.email || null
             }
         })
 

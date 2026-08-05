@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { onEmailVerified } from "@/lib/affiliate/points-manager";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,6 +9,14 @@ export async function POST(request: NextRequest) {
 
     if (!email || !otp) {
       return NextResponse.json({ error: "Thiếu thông tin email hoặc mã OTP" }, { status: 400 });
+    }
+
+    // OTP chỉ có 6 số — bắt buộc giới hạn số lần thử để chống dò brute-force
+    const ip = getClientIp(request)
+    const byEmail = checkRateLimit(`verify-otp:email:${email}`, { max: 8, windowMs: 15 * 60 * 1000 })
+    const byIp = checkRateLimit(`verify-otp:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 })
+    if (!byEmail.allowed || !byIp.allowed) {
+      return NextResponse.json({ error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút." }, { status: 429 });
     }
 
     // 1. Tìm token trong DB

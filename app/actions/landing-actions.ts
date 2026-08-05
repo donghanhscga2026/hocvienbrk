@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { TEMPLATE_DEFAULTS, TEMPLATE_OPTIONS } from '@/lib/landing/templates'
+import { requireAdminAction } from '@/lib/api-auth'
 
 export async function getLandingPages() {
     const landings = await prisma.landingPage.findMany({
@@ -48,6 +49,9 @@ export async function createLandingPage(data: {
     customCommission?: { f1: number; f2: number; f3: number }
     isActive?: boolean
 }) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         // Check if slug already exists in LandingPage
         const existing = await prisma.landingPage.findUnique({
@@ -112,6 +116,9 @@ export async function updateLandingPage(id: number, data: {
     customCommission?: { f1: number; f2: number; f3: number } | null
     isActive?: boolean
 }) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         // Check if slug already exists (and not this page)
         if (data.slug) {
@@ -172,6 +179,9 @@ export async function updateLandingPage(id: number, data: {
 }
 
 export async function deleteLandingPage(id: number) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         const landing = await prisma.landingPage.delete({
             where: { id }
@@ -187,6 +197,9 @@ export async function deleteLandingPage(id: number) {
 }
 
 export async function toggleLandingStatus(id: number) {
+    const denied = await requireAdminAction()
+    if (denied) return denied
+
     try {
         const landing = await prisma.landingPage.findUnique({
             where: { id }

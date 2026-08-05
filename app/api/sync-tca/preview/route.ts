@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { generatePreview } from '@/lib/tca-preview-logic'
+import { requireAdmin } from '@/lib/api-auth'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const body = await request.json()
     const { allNodes, memberInfo } = body

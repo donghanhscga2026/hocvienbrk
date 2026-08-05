@@ -43,6 +43,13 @@ export function isAuthorizedRequest(
     ? normalizedAuthHeader.slice(7).trim()
     : normalizedAuthHeader
 
+  // LƯU Ý BẢO MẬT: KHÔNG được coi hasGooglePubSubHeaders/isGooglePubSubUserAgent
+  // là bằng chứng xác thực — đây chỉ là header/User-Agent do CHÍNH client tự khai,
+  // ai cũng giả lập được bằng một request POST thường. Việc dựa vào chúng để tự
+  // động authorize (như code cũ) cho phép bất kỳ ai giả header để bỏ qua CRON_SECRET.
+  // Phải luôn yêu cầu secret hợp lệ; nếu dùng Google Pub/Sub push subscription,
+  // hãy cấu hình secret vào query string của push endpoint (?secret=...) khi đăng ký
+  // với Google, hoặc xác thực OIDC token thật (ký bởi Google) thay vì đoán qua header.
   const isAuthorized = Boolean(
     expectedSecret && (
       bearerSecret === expectedSecret ||
@@ -50,7 +57,7 @@ export function isAuthorizedRequest(
       alternateSecret === expectedSecret ||
       querySecret === expectedSecret
     )
-  ) || hasGooglePubSubHeaders || isGooglePubSubUserAgent
+  )
 
   return {
     isAuthorized,

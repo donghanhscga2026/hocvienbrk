@@ -104,6 +104,10 @@ export async function PUT(
     delete body.awardVoucherIds
     delete body.categoryId
     delete body.teacherBankAccountId
+    // Không cho phép client tự set các trường hệ thống qua spread body
+    delete body.id
+    delete body.createdAt
+    delete body.updatedAt
 
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },

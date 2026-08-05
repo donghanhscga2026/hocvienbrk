@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { requireAdmin } from '@/lib/api-auth'
 
 const prisma = new PrismaClient()
 
@@ -14,6 +15,9 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const { searchParams } = new URL(request.url)
     const table = searchParams.get('table')
@@ -39,6 +43,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const body = await request.json()
     const { allNodes, memberInfo } = body

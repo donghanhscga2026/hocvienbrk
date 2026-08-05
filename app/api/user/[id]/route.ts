@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 export async function GET(
     request: NextRequest,
@@ -8,9 +9,17 @@ export async function GET(
     try {
         const { id } = await params
         const userId = parseInt(id)
-        
+
         if (isNaN(userId)) {
             return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+        }
+
+        // Endpoint này công khai (dùng để tra cứu tên người giới thiệu lúc đăng ký),
+        // nhưng phải chặn dò quét hàng loạt id -> tên/email/phone của toàn bộ user.
+        const ip = getClientIp(request)
+        const byIp = checkRateLimit(`user-lookup:ip:${ip}`, { max: 30, windowMs: 10 * 60 * 1000 })
+        if (!byIp.allowed) {
+            return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
         }
         
         const user = await prisma.user.findUnique({

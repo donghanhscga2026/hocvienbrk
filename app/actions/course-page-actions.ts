@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { CourseStatus, CourseSection, SectionVisibility } from '@/lib/course-page/types'
+import { requireAdminAction } from '@/lib/api-auth'
 
 export async function getCoursePages() {
   try {
@@ -63,6 +64,9 @@ export async function createCoursePage(data: {
   checkoutConfig?: Record<string, any>;
   useTemplate?: boolean;
 }) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
   try {
     const existing = await prisma.coursePage.findUnique({
       where: { slug: data.slug }
@@ -122,6 +126,9 @@ export async function updateCoursePage(
     useTemplate?: boolean;
   }
 ) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
   try {
     const updated = await prisma.coursePage.update({
       where: { id },
@@ -160,6 +167,9 @@ export async function saveCourseSections(
     content: Record<string, any>;
   }>
 ) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
   try {
     const page = await prisma.coursePage.findUnique({
       where: { id: coursePageId },
@@ -205,6 +215,9 @@ export async function saveCourseSections(
 }
 
 export async function deleteCoursePage(id: string) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
   try {
     const page = await prisma.coursePage.findUnique({
       where: { id },

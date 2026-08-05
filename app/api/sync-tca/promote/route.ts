@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient, Prisma } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { requireAdmin } from '@/lib/api-auth'
 
 const prisma = new PrismaClient()
 
@@ -19,6 +20,9 @@ export async function OPTIONS() {
  * Sau đó xóa dữ liệu trong bảng Test
  */
 export async function POST(request: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   const startTime = Date.now()
   let stats = { usersPromoted: 0, systemsPromoted: 0, tcaMembersPromoted: 0, testDataCleared: 0 }
 

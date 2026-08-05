@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { google } from "googleapis"
 import prisma from "@/lib/prisma"
+import { requireAdmin } from "@/lib/api-auth"
 
 interface VideoResult {
   stt: number
@@ -220,6 +221,9 @@ async function fetchVideoDetailsWithKey(apiKey: string, videoIds: string[]): Pro
 }
 
 export async function POST(req: Request) {
+  const denied = await requireAdmin()
+  if (denied) return denied
+
   try {
     const body = await req.json()
     const {

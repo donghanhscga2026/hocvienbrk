@@ -8,6 +8,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 class CustomLoginError extends CredentialsSignin {
   constructor(message: string, code: string) {
@@ -84,6 +85,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (!parsedCredentials.success) return null;
 
                 const { identifier, password } = parsedCredentials.data
+
+                // Chặn dò mật khẩu hàng loạt: giới hạn theo identifier VÀ theo IP
+                // (IP để chặn kiểu tấn công dò tuần tự nhiều ID khác nhau từ 1 nguồn).
+                try {
+                    const { headers } = await import("next/headers")
+                    const headerList = await headers()
+                    const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                        headerList.get('x-real-ip') || '127.0.0.1'
+
+                    const byIdentifier = checkRateLimit(`login:id:${identifier}`, { max: 5, windowMs: 15 * 60 * 1000 })
+                    const byIp = checkRateLimit(`login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
+
+                    if (!byIdentifier.allowed || !byIp.allowed) {
+                        console.warn(`⚠️ [Auth] Rate limit đăng nhập: identifier="${identifier}" ip="${ip}"`)
+                        throw new CustomLoginError('Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút.', 'RATE_LIMITED')
+                    }
+                } catch (e) {
+                    if (e instanceof CustomLoginError) throw e
+                    // Nếu không lấy được headers thì bỏ qua rate-limit thay vì chặn đăng nhập hợp lệ
+                }
 
                 let user = null;
                 let potentialId = NaN;
