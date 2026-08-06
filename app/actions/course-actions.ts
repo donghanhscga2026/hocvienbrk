@@ -102,7 +102,7 @@ export async function enrollInCourseAction(
                 // 1. Trừ MBV theo số tiền user chọn (chỉ khi chưa từng trừ MBV cho khóa này)
                 if (useVoucher && voucherAmountToUse > 0 && !mbvTx) {
                     const mbvBalance = Number(brkWallet?.mbvBalance || 0)
-                    const actualDeduct = Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc)
+                    const actualDeduct = Math.floor(Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc))
                     if (actualDeduct > 0) {
                         voucherDeducted = actualDeduct
                         effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
@@ -115,7 +115,7 @@ export async function enrollInCourseAction(
                 // 2. Trừ tiếp ví VNĐ nếu user chọn và còn thiếu học phí (chỉ khi chưa từng trừ VNĐ cho khóa này)
                 if (useVndWallet && effectivePhiCoc > 0 && !cashTx) {
                     const vndBalance = Number(brkWallet?.balance || 0)
-                    cashDeducted = Math.min(vndBalance, effectivePhiCoc)
+                    cashDeducted = Math.floor(Math.min(vndBalance, effectivePhiCoc))
                     if (cashDeducted > 0) {
                         effectivePhiCoc = Math.max(0, effectivePhiCoc - cashDeducted)
                         const { debitBrkCashBalance } = await import('@/lib/brk/wallet-service')
