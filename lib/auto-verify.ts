@@ -251,7 +251,7 @@ export async function processPaymentEmails() {
               }
             }
 
-            const amountMatch = parsed.amount >= enrollment.course.phi_coc;
+            const amountMatch = parsed.amount >= (enrollment.phi_coc || enrollment.course.phi_coc || 0);
 
             if (!((parsed.userId ? userIdMatch : phoneMatch) && courseCodeMatch && amountMatch)) continue;
 
