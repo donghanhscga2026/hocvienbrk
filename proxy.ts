@@ -24,15 +24,28 @@ const RESERVED_PATHS = new Set([
 
 const RESOURCE_PREFIXES = new Set(['khoa-hoc', 'land', 'page', 'du-an'])
 
+// Lớp bảo vệ mặc định (defense-in-depth) cho các nhóm route quản trị/nhạy cảm.
+// Đây là lớp chặn thứ 2 — mỗi route/action bên trong vẫn PHẢI tự kiểm tra quyền
+// (bắt buộc với Server Actions vì proxy không chặn được lời gọi action trực
+// tiếp), lớp này chỉ để tránh lọt route mới thêm sau này mà quên gắn check.
+const ADMIN_ONLY_PREFIXES = ['/api/admin', '/api/sync-tca', '/api/system-tree']
+
 /**
  * proxy.ts (Next.js 16+)
  * Thay thế cho middleware.ts để xử lý routing, auth và affiliate.
  */
 const proxyHandler = auth(async function proxy(request: NextRequest & { auth: any }) {
     const { nextUrl } = request
-    
+
     if (nextUrl.pathname.startsWith('/api/auth')) {
         return NextResponse.next()
+    }
+
+    if (ADMIN_ONLY_PREFIXES.some((p) => nextUrl.pathname.startsWith(p))) {
+        const role = (request.auth as { user?: { role?: string } } | null)?.user?.role
+        if (role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 403 })
+        }
     }
 
     const response = NextResponse.next()
@@ -93,5 +106,9 @@ function saveRefCookie(
 export const config = {
     matcher: [
         "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)).*)",
+        // Các prefix API cần được proxy chặn theo role ADMIN (xem ADMIN_ONLY_PREFIXES ở trên)
+        "/api/admin/:path*",
+        "/api/sync-tca/:path*",
+        "/api/system-tree/:path*",
     ],
 }
