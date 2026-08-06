@@ -1,9 +1,9 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import * as fs from 'fs'
 import * as path from 'path'
 import { execSync, spawnSync } from 'child_process'
 
-const prisma = new PrismaClient()
 const BACKUP_DIR = path.join(process.cwd(), 'backups')
 
 const EXCLUDE_MODELS = new Set(['_prisma_migrations'])

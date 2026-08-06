@@ -32,33 +32,42 @@ export async function enrollInCourseAction(
             throw new Error("Tài khoản test này không được phép tham gia hay kích hoạt khóa học.")
         }
 
-        const course = await prisma.course.findUnique({
-            where: { id: courseId },
-            select: {
-                phi_coc: true,
-                id_khoa: true,
-                name_lop: true,
-                noidung_email: true,
-                type: true,
-                teacherId: true,
-                requiresReferralActivation: true,
-                referralActivationThreshold: true,
-                feeType: true,
-                voucherConfig: true,
-                allowMbvDeduction: true,
-                teacherBankAccount: {
-                    select: { accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true }
+        // [OPTIMIZE] 4 truy vấn độc lập (chỉ cần userId/courseId đã biết trước) —
+        // chạy song song thay vì tuần tự để giảm độ trễ trên đường dẫn mua/đăng ký
+        // khóa học, hành động được gọi nhiều nhất của toàn hệ thống.
+        const [course, user, brkWallet, existing] = await Promise.all([
+            prisma.course.findUnique({
+                where: { id: courseId },
+                select: {
+                    phi_coc: true,
+                    id_khoa: true,
+                    name_lop: true,
+                    noidung_email: true,
+                    type: true,
+                    teacherId: true,
+                    requiresReferralActivation: true,
+                    referralActivationThreshold: true,
+                    feeType: true,
+                    voucherConfig: true,
+                    allowMbvDeduction: true,
+                    teacherBankAccount: {
+                        select: { accountNumber: true, accountHolder: true, bankName: true, qrCodeUrl: true }
+                    }
                 }
-            }
-        })
+            }),
+            // Lấy thông tin user
+            prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true, name: true, phone: true, email: true, referrerId: true }
+            }),
+            // Lấy wallet + enrollment TRƯỚC khi trừ ví (dùng cho chống trừ kép)
+            prisma.brkWallet.findUnique({ where: { userId } }),
+            prisma.enrollment.findUnique({
+                where: { userId_courseId: { userId, courseId } }
+            })
+        ])
 
         if (!course) throw new Error("Khóa học không tồn tại.")
-
-        // Lấy thông tin user
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true, name: true, phone: true, email: true, referrerId: true }
-        })
 
         // Xử lý riêng cho loại khóa học LIB
         let effectivePhiCoc = course.phi_coc
@@ -66,12 +75,6 @@ export async function enrollInCourseAction(
         let voucherDeducted = 0
         let cashDeducted = 0
         let voucherApplied = false
-
-        // Lấy wallet + enrollment TRƯỚC khi trừ ví (dùng cho chống trừ kép)
-        const brkWallet = await prisma.brkWallet.findUnique({ where: { userId } })
-        const existing = await prisma.enrollment.findUnique({
-            where: { userId_courseId: { userId, courseId } }
-        })
 
         if (course.type === 'LIB') {
             if (!user?.email) throw new Error("Chưa có email tài khoản. Vui lòng cập nhật email.")

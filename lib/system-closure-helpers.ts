@@ -62,24 +62,19 @@ export async function addUserToSystemClosure(
                 orderBy: { depth: 'desc' }
             })
 
-            for (const ancestor of ancestors) {
-                // Use upsert instead of create — idempotent, no duplicate key errors
-                await prisma.systemClosure.upsert({
-                    where: {
-                        ancestorId_descendantId_systemId: {
-                            ancestorId: ancestor.ancestorId,
-                            descendantId: autoId,
-                            systemId
-                        }
-                    },
-                    update: { depth: ancestor.depth + 1, applicationId },
-                    create: {
+            // [OPTIMIZE] Bước 3 vừa xóa hết closure không phải self của autoId này
+            // (nếu existing) nên các dòng dưới đây chắc chắn là INSERT mới —
+            // gộp thành 1 createMany thay vì N upsert tuần tự (N = số cấp upline).
+            if (ancestors.length > 0) {
+                await prisma.systemClosure.createMany({
+                    data: ancestors.map(ancestor => ({
                         ancestorId: ancestor.ancestorId,
                         descendantId: autoId,
                         depth: ancestor.depth + 1,
                         systemId,
                         applicationId
-                    }
+                    })),
+                    skipDuplicates: true
                 })
             }
         }
@@ -150,20 +145,22 @@ export async function buildSystemClosuresFromData(
     }
 
     // 3. Create closures for each user
+    // [OPTIMIZE] Bước 1 đã xóa hết closure cũ của systemId này, nên trong cùng 1
+    // lần chạy hàm này mọi dòng closure đều là INSERT mới — gộp self-closure +
+    // toàn bộ ancestor-copy của MỖI user thành 1 createMany (thay vì 1+N upsert
+    // tuần tự cho từng user). Vẫn phải giữ thứ tự xử lý từng `row` theo tuần tự
+    // (không dùng Promise.all) vì user sau có thể cần đọc closure của user
+    // upline vừa được tạo ở vòng lặp trước.
     let closureCount = 0
     for (const row of data) {
         const autoId = systemRecords.get(row.userId)
         if (!autoId) continue
 
-        // Self closure — upsert idempotent
-        await prisma.systemClosure.upsert({
-            where: { ancestorId_descendantId_systemId: { ancestorId: autoId, descendantId: autoId, systemId } },
-            update: { depth: 0 },
-            create: { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
-        })
-        closureCount++
+        const rowsToInsert: { ancestorId: number; descendantId: number; depth: number; systemId: number }[] = [
+            { ancestorId: autoId, descendantId: autoId, depth: 0, systemId }
+        ]
 
-        // If upline exists, copy closures from upline using upsert (idempotent)
+        // Nếu có upline, copy closures từ upline
         if (row.refSysId > 0) {
             const uplineAutoId = systemRecords.get(row.refSysId)
             if (uplineAutoId) {
@@ -173,26 +170,18 @@ export async function buildSystemClosuresFromData(
                 })
 
                 for (const ancestor of ancestors) {
-                    await prisma.systemClosure.upsert({
-                        where: {
-                            ancestorId_descendantId_systemId: {
-                                ancestorId: ancestor.ancestorId,
-                                descendantId: autoId,
-                                systemId
-                            }
-                        },
-                        update: { depth: ancestor.depth + 1 },
-                        create: {
-                            ancestorId: ancestor.ancestorId,
-                            descendantId: autoId,
-                            depth: ancestor.depth + 1,
-                            systemId
-                        }
+                    rowsToInsert.push({
+                        ancestorId: ancestor.ancestorId,
+                        descendantId: autoId,
+                        depth: ancestor.depth + 1,
+                        systemId
                     })
-                    closureCount++
                 }
             }
         }
+
+        const result = await prisma.systemClosure.createMany({ data: rowsToInsert, skipDuplicates: true })
+        closureCount += result.count
     }
 
     return { systemCount: systemRecords.size, closureCount }
@@ -349,13 +338,15 @@ export async function rebuildSystemClosures(systemId: number): Promise<{ deleted
 
     let created = 0
 
+    // [OPTIMIZE] Gộp self-closure + toàn bộ ancestor-copy của MỖI member thành 1
+    // createMany (thay vì 1+N create tuần tự cho từng member). Vẫn phải xử lý
+    // từng member tuần tự theo autoId asc (không Promise.all) vì member sau cần
+    // đọc closure của parent vừa được tạo ở vòng lặp trước.
     for (const member of members) {
         try {
-            // Self-closure
-            await prisma.systemClosure.create({
-                data: { ancestorId: member.autoId, descendantId: member.autoId, depth: 0, systemId }
-            })
-            created++
+            const rowsToInsert: { ancestorId: number; descendantId: number; depth: number; systemId: number }[] = [
+                { ancestorId: member.autoId, descendantId: member.autoId, depth: 0, systemId }
+            ]
 
             // Copy from parent's closures
             if (member.refSysId >= 0) {
@@ -368,18 +359,18 @@ export async function rebuildSystemClosures(systemId: number): Promise<{ deleted
                         orderBy: { depth: 'desc' }
                     })
                     for (const pc of parentClosures) {
-                        await prisma.systemClosure.create({
-                            data: {
-                                ancestorId: pc.ancestorId,
-                                descendantId: member.autoId,
-                                depth: pc.depth + 1,
-                                systemId
-                            }
+                        rowsToInsert.push({
+                            ancestorId: pc.ancestorId,
+                            descendantId: member.autoId,
+                            depth: pc.depth + 1,
+                            systemId
                         })
-                        created++
                     }
                 }
             }
+
+            const result = await prisma.systemClosure.createMany({ data: rowsToInsert, skipDuplicates: true })
+            created += result.count
         } catch (err) {
             const msg = `User #${member.userId} (autoId=${member.autoId}): ${err}`
             errors.push(msg)

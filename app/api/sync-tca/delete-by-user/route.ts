@@ -1,10 +1,9 @@
 'use strict'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Prisma, Role } from '@prisma/client'
+import { Prisma, Role } from '@prisma/client'
 import { auth } from '@/auth'
-
-const prisma = new PrismaClient()
+import prisma from '@/lib/prisma'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

@@ -369,7 +369,12 @@ export async function getAllPayments() {
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      // [OPTIMIZE] Chặn tăng trưởng vô hạn khi số lượng giao dịch lớn dần theo
+      // thời gian — vì sắp xếp mới nhất trước, các giao dịch gần đây vẫn hiển thị
+      // đầy đủ; chỉ lịch sử rất cũ mới bị cắt bớt. Nếu cần xem toàn bộ lịch sử,
+      // nên bổ sung phân trang ở UI thay vì tải hết 1 lần.
+      take: 1000
     })
 
     return { success: true, payments }

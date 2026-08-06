@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { cache } from 'react'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
@@ -14,13 +15,20 @@ interface PageProps {
     params: Promise<{ id: string }>
 }
 
+// [OPTIMIZE] cache() giúp generateMetadata và component trang dùng chung 1 lần
+// query thay vì mỗi bên tự query lại cùng 1 row Course (được gọi 2 lần/request).
+const getCourseByIdKhoa = cache((idKhoa: string) =>
+    prisma.course.findUnique({
+        where: { id_khoa: idKhoa },
+        include: { teacherBankAccount: true }
+    })
+)
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     let { id } = await params
     id = id.replace(/\$+$/, '')
 
-    const course = await prisma.course.findUnique({
-        where: { id_khoa: id }
-    })
+    const course = await getCourseByIdKhoa(id)
 
     if (!course) return { title: 'Không tìm thấy khóa học' }
 
@@ -73,74 +81,71 @@ export default async function KhoaHocPage({ params }: PageProps) {
 
     id = id.replace(/\$+$/, '')
 
-    let course = await prisma.course.findUnique({
-        where: { id_khoa: id },
-        include: { teacherBankAccount: true }
-    })
+    const course = await getCourseByIdKhoa(id)
 
     if (!course) notFound()
 
     const courseId = course.id
-    let userId: number | null = null
-    let userPhone: string | null = null
+    const userId = session?.user?.id ? parseInt(session.user.id) : null
 
-    if (session?.user?.id) {
-        userId = parseInt(session.user.id)
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { phone: true }
-        })
-        userPhone = user?.phone || null
-    }
+    // [OPTIMIZE] Các truy vấn dưới đây độc lập với nhau — chạy song song
+    // thay vì tuần tự để giảm tổng thời gian chờ của trang bán khóa học.
+    const [
+        userRow,
+        enrollment,
+        lessons,
+        durationRows,
+        activeStudentCount,
+        reflectionsLP,
+        lessonComments,
+        coursePage
+    ] = await Promise.all([
+        userId
+            ? prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
+            : Promise.resolve(null),
+        userId
+            ? prisma.enrollment.findFirst({ where: { userId, courseId } })
+            : Promise.resolve(null),
+        prisma.lesson.findMany({
+            where: { courseId },
+            orderBy: { order: 'asc' },
+            select: { id: true, title: true, order: true }
+        }),
+        // Tổng thời lượng video từ lessonProgress.maxTime
+        prisma.lessonProgress.groupBy({
+            by: ['lessonId'],
+            where: { lesson: { courseId }, maxTime: { gt: 0 } },
+            _max: { maxTime: true }
+        }),
+        // Số học viên đang học
+        prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }),
+        // Testimonials từ dữ liệu thật (LessonProgress.assignment.reflection)
+        prisma.lessonProgress.findMany({
+            where: { lesson: { courseId }, status: 'COMPLETED' },
+            include: {
+                enrollment: {
+                    include: { user: { select: { id: true, name: true, image: true } } }
+                },
+                lesson: { select: { title: true, order: true } }
+            },
+            orderBy: { submittedAt: 'desc' },
+            take: 5
+        }),
+        prisma.lessonComment.findMany({
+            where: { lesson: { courseId } },
+            include: {
+                user: { select: { id: true, name: true, image: true } },
+                lesson: { select: { title: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+        }),
+        getPublishedCoursePageBySlug(id)
+    ])
 
-    const enrollment = userId
-        ? await prisma.enrollment.findFirst({
-            where: { userId, courseId }
-        })
-        : null
-
-    const lessons = await prisma.lesson.findMany({
-        where: { courseId },
-        orderBy: { order: 'asc' },
-        select: { id: true, title: true, order: true }
-    })
-
-    // Tổng thời lượng video từ lessonProgress.maxTime
-    const durationRows = await prisma.lessonProgress.groupBy({
-        by: ['lessonId'],
-        where: { lesson: { courseId }, maxTime: { gt: 0 } },
-        _max: { maxTime: true }
-    })
+    const userPhone = userRow?.phone || null
     const totalSeconds = durationRows.reduce((sum, r) => sum + (r._max.maxTime || 0), 0)
     const totalHours = Math.max(1, Math.ceil(totalSeconds / 3600))
-
-    // Số học viên đang học
-    const activeStudentCount = await prisma.enrollment.count({
-        where: { courseId, status: 'ACTIVE' }
-    })
-
-    // Testimonials từ dữ liệu thật (LessonProgress.assignment.reflection + LessonComment)
-    const reflectionsLP = await prisma.lessonProgress.findMany({
-        where: { lesson: { courseId }, status: 'COMPLETED' },
-        include: {
-            enrollment: {
-                include: { user: { select: { id: true, name: true, image: true } } }
-            },
-            lesson: { select: { title: true, order: true } }
-        },
-        orderBy: { submittedAt: 'desc' },
-        take: 5
-    })
-
-    const lessonComments = await prisma.lessonComment.findMany({
-        where: { lesson: { courseId } },
-        include: {
-            user: { select: { id: true, name: true, image: true } },
-            lesson: { select: { title: true } }
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 10
-    })
 
     const testimonials = [
         ...reflectionsLP
@@ -169,8 +174,7 @@ export default async function KhoaHocPage({ params }: PageProps) {
             }))
     ].slice(0, 5)
 
-    // Check if dynamic course page exists in database
-    const coursePage = await getPublishedCoursePageBySlug(id)
+    // coursePage đã được lấy song song ở trên cùng các query khác
     if (coursePage && (coursePage as any).useTemplate !== false) {
         return (
             <CoursePageView

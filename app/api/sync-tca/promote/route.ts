@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { requireAdmin } from '@/lib/api-auth'
-
-const prisma = new PrismaClient()
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

@@ -308,7 +308,7 @@ export async function getPostCategories() {
  */
 export async function createSiteProfile(userId: number, slug: string) {
   const denied = await requireAdminAction()
-  if (denied) return denied
+  if (denied) return { error: denied.error }
 
   try {
         const existing = await prisma.siteProfile.findUnique({ where: { slug } })

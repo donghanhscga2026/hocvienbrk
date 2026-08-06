@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { normalizePhone } from '@/lib/phone-utils'
-
-const prisma = new PrismaClient()
 
 interface TCANode {
   id: number

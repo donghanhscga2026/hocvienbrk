@@ -15,7 +15,9 @@ const ADMIN_ONLY_PREFIXES = [
     "/api/system-tree",
 ]
 
-export default auth((request: NextRequest & { auth: any }) => {
+type AuthedRequest = NextRequest & { auth: { user?: { role?: string } } | null }
+
+export default auth((request: AuthedRequest) => {
     const { pathname } = request.nextUrl
 
     const isAdminOnly = ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p))

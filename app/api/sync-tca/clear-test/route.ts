@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/api-auth'
-
-const prisma = new PrismaClient()
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

@@ -5,7 +5,10 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
 export async function getCommentsByLesson(lessonId: string) {
-    const comments = await prisma.lessonComment.findMany({
+    // [OPTIMIZE] Trước đây không giới hạn số dòng — bài học càng nhiều bình luận
+    // càng tải chậm. Lấy 200 bình luận MỚI NHẤT (desc + take) rồi đảo lại thành
+    // thứ tự cũ->mới để giữ nguyên cách hiển thị hiện tại.
+    const commentsDesc = await prisma.lessonComment.findMany({
         where: { lessonId },
         include: {
             user: {
@@ -23,9 +26,11 @@ export async function getCommentsByLesson(lessonId: string) {
             }
         },
         orderBy: {
-            createdAt: 'asc'
-        }
+            createdAt: 'desc'
+        },
+        take: 200
     })
+    const comments = commentsDesc.reverse()
 
     return comments.map((comment: any) => {
         // Get avatar priority: user.image > Google image > Facebook image > null

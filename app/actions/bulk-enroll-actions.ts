@@ -322,13 +322,19 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
         }, { timeout: 60000 })
 
         // Closure + affiliate tracking sau transaction
-        for (const p of pendingClosures) {
-            try { await addUserToClosure(p.userId, p.referrerId) } catch (e) { /* non-critical */ }
+        // [OPTIMIZE] Chạy song song theo lô thay vì tuần tự từng dòng — import
+        // CSV vài trăm dòng trước đây tốn hàng trăm round-trip nối tiếp nhau.
+        const CONCURRENCY = 10
+        for (let i = 0; i < pendingClosures.length; i += CONCURRENCY) {
+            const batch = pendingClosures.slice(i, i + CONCURRENCY)
+            await Promise.all(batch.map(p => addUserToClosure(p.userId, p.referrerId).catch(() => { /* non-critical */ })))
         }
-        for (const p of pendingAffiliates) {
-            try {
-                await trackAffiliateConversion({ refCode: p.referrerId.toString(), userId: p.userId, type: 'REGISTRATION' })
-            } catch (e) { /* non-critical */ }
+        for (let i = 0; i < pendingAffiliates.length; i += CONCURRENCY) {
+            const batch = pendingAffiliates.slice(i, i + CONCURRENCY)
+            await Promise.all(batch.map(p =>
+                trackAffiliateConversion({ refCode: p.referrerId.toString(), userId: p.userId, type: 'REGISTRATION' })
+                    .catch(() => { /* non-critical */ })
+            ))
         }
 
         // Write log

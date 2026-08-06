@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -7,8 +7,6 @@ import { addUserToClosure } from '@/lib/closure-helpers'
 import { addUserToSystemClosure } from '@/lib/system-closure-helpers'
 import { generatePreview, type PreviewRow } from '@/lib/tca-preview-logic'
 import { requireAdmin } from '@/lib/api-auth'
-
-const prisma = new PrismaClient()
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
