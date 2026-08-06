@@ -621,6 +621,11 @@ export default function PaymentsPage() {
                         </div>
                       )}
                     </div>
+                    {payment.enrollment.course.phi_coc > payment.amount && payment.amount > 0 && (
+                      <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-green-700">
+                        💳 Đã trừ ví (MBV/VNĐ): <b>{(payment.enrollment.course.phi_coc - payment.amount).toLocaleString()}đ</b>
+                      </div>
+                    )}
                     {(payment.bankName || payment.accountNumber) && (
                       <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-slate-600">
                         🏦 <span className="font-medium">{payment.bankName}</span>
@@ -807,7 +812,8 @@ export default function PaymentsPage() {
         const bankId = resolveBankBin(bankAcc.bankName)
         const cleanPhone = p.enrollment.user.phone ? p.enrollment.user.phone.replace(/\D/g, '').slice(-6) : ''
         const standardContent = `SDT ${cleanPhone} HV ${p.enrollment.user.id} COC ${p.enrollment.course.id_khoa}`.toUpperCase()
-        const effectiveAmount = p.enrollment.course.phi_coc || p.amount || 0
+        const effectiveAmount = p.amount || p.enrollment.course.phi_coc || 0
+        const mbvDeducted = Math.max(0, (p.enrollment.course.phi_coc || 0) - (p.amount || 0))
         const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(standardContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
 
         return (
@@ -850,6 +856,22 @@ export default function PaymentsPage() {
                     <span className="font-mono font-bold text-indigo-600 break-all text-[10px]">{standardContent}</span>
                   </div>
                 </div>
+                {mbvDeducted > 0 && (
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-2.5 py-1.5 text-[10px] space-y-0.5">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase">Giá gốc</span>
+                      <span className="font-bold text-gray-800 line-through">{p.enrollment.course.phi_coc.toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400 font-bold uppercase">Đã trừ ví (MBV/VNĐ)</span>
+                      <span className="font-bold text-green-700">-{mbvDeducted.toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex justify-between border-t border-green-200 pt-0.5">
+                      <span className="text-gray-400 font-bold uppercase">Còn cần chuyển khoản</span>
+                      <span className="font-bold text-red-600">{effectiveAmount.toLocaleString()}đ</span>
+                    </div>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setSelectedQR(null)}
