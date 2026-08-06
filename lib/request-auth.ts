@@ -22,10 +22,19 @@ export function isAuthorizedRequest(
   secretConfigured: boolean
   authHeader?: string | null
   alternateSecret?: string | null
+  // Chỉ để CHẨN ĐOÁN khi bị 401 ngoài ý muốn — KHÔNG chứa nội dung secret thật,
+  // chỉ độ dài, để phát hiện lỗi encode/cắt bớt ký tự khi dán secret vào URL.
+  debug?: {
+    expectedSecretLength: number
+    querySecretLength: number
+    matchesIgnoringCase: boolean
+    matchesTrimmed: boolean
+  }
 } {
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
   const expectedSecret = (options.secretEnv ? process.env[options.secretEnv] : process.env.CRON_SECRET)?.trim()
-  const querySecret = options.allowQuerySecret !== false ? req.nextUrl?.searchParams.get('secret') : undefined
+  const rawQuerySecret = options.allowQuerySecret !== false ? req.nextUrl?.searchParams.get('secret') : undefined
+  const querySecret = rawQuerySecret?.trim()
   const allowedHeaderNames = options.allowedHeaderNames ?? ['x-cron-secret', 'x-webhook-secret', 'x-gmail-webhook-secret']
   const alternateSecret = allowedHeaderNames
     .map((name) => req.headers.get(name))
@@ -68,5 +77,11 @@ export function isAuthorizedRequest(
     secretConfigured: Boolean(expectedSecret),
     authHeader,
     alternateSecret,
+    debug: querySecret !== undefined ? {
+      expectedSecretLength: expectedSecret?.length ?? 0,
+      querySecretLength: querySecret?.length ?? 0,
+      matchesIgnoringCase: !!expectedSecret && !!querySecret && expectedSecret.toLowerCase() === querySecret.toLowerCase(),
+      matchesTrimmed: !!expectedSecret && !!querySecret && expectedSecret.trim() === querySecret.trim(),
+    } : undefined,
   }
 }

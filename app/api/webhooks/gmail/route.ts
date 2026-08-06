@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
         hasGooglePubSubHeaders: authResult.hasGooglePubSubHeaders,
         hasQuerySecret: authResult.hasQuerySecret,
         secretConfigured: authResult.secretConfigured,
+        debug: authResult.debug,
       })
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
