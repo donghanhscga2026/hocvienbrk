@@ -51,6 +51,9 @@ nul
 /notebooklm_txt_bundles/
 /code_txt/
 
+# Data exports (có thể chứa PII / mật khẩu thật) — không bao giờ commit
+*.csv
+
 
 
 
