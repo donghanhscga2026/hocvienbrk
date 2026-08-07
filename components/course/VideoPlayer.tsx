@@ -87,6 +87,25 @@ function getYouTubeVideoId(item: PlaylistItem): string | null {
     return null
 }
 
+function PlayOverlay({ thumbnailUrl, onClick }: { thumbnailUrl?: string; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="group/play absolute inset-0 z-20 flex w-full h-full items-center justify-center bg-black"
+            aria-label="Phát video"
+        >
+            {thumbnailUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70" />
+            )}
+            <span className="relative z-10 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-orange-500 shadow-2xl transition-transform group-hover/play:scale-110">
+                <Play className="ml-1 h-8 w-8 sm:h-9 sm:w-9 fill-current text-white" />
+            </span>
+        </button>
+    )
+}
+
 export default function VideoPlayer({
     enrollmentId,
     lessonId,
@@ -109,6 +128,12 @@ export default function VideoPlayer({
     const [docTimer, setDocTimer] = useState<number>(0)
     const [isReading, setIsReading] = useState(false)
     const [granularProgress, setGranularProgress] = useState<Record<number, { maxTime: number, duration: number }>>(() => playlistData || {})
+    // [OPTIMIZE] Chỉ tải YouTube IFrame API / tự phát mp4 sau khi học viên bấm
+    // Play lần đầu — trước đó hiện ảnh đại diện, tránh tải nặng + tự phát ngay
+    // khi vừa vào trang bài học. Chuyển phần tiếp theo trong playlist vẫn tự
+    // phát tiếp bình thường (không hỏi lại) vì hasStarted không đổi theo index.
+    const [hasStarted, setHasStarted] = useState(false)
+    const handleStartPlayback = useCallback(() => setHasStarted(true), [])
     type YTLikePlayer = { getCurrentTime?: () => number; getDuration?: () => number; destroy?: () => void }
     const playerRef = useRef<YTLikePlayer | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -267,7 +292,7 @@ export default function VideoPlayer({
     }, [currentIndex, granularProgress, trackMp4Progress, onMp4Ended])
 
     useEffect(() => {
-        if (currentItem?.type !== 'video' || !isMounted) return
+        if (currentItem?.type !== 'video' || !isMounted || !hasStarted) return
 
         const source = currentItem.source || detectVideoSource(currentItem.url)
 
@@ -307,7 +332,7 @@ export default function VideoPlayer({
             playerRef.current = null
             if (cleanup) cleanup()
         }
-    }, [currentIndex, isMounted, currentItem?.type, currentItem?.url])
+    }, [currentIndex, isMounted, hasStarted, currentItem?.type, currentItem?.url])
 
     useEffect(() => {
         if (currentItem?.type === 'doc') {
@@ -342,11 +367,18 @@ export default function VideoPlayer({
         const source = currentItem.source || detectVideoSource(currentItem.url)
 
         if (source.platform === 'youtube') {
+            const videoId = getYouTubeVideoId(currentItem)
             return (
                 <div className="relative w-full h-full flex-1 group">
                     <div key={currentIndex} className="absolute inset-0 w-full h-full">
                         <div ref={videoContainerRef} />
                     </div>
+                    {!hasStarted && (
+                        <PlayOverlay
+                            thumbnailUrl={videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : undefined}
+                            onClick={handleStartPlayback}
+                        />
+                    )}
                     {courseType === 'LIB' && (
                         <div className="absolute top-0 left-0 right-0 h-[65px] z-[90] bg-transparent opacity-0 cursor-default" title="Video được bảo vệ" onContextMenu={(e) => e.preventDefault()} />
                     )}
@@ -365,6 +397,7 @@ export default function VideoPlayer({
                         playsInline
                         preload="metadata"
                     />
+                    {!hasStarted && <PlayOverlay onClick={handleStartPlayback} />}
                 </div>
             )
         }

@@ -4,6 +4,10 @@ import { google } from "googleapis"
 import prisma from "@/lib/prisma"
 import { requireAdmin } from "@/lib/api-auth"
 
+// [OPTIMIZE] Lấy tới 50 video + chi tiết từng video từ YouTube Data API,
+// có thể chậm hơn giới hạn thời gian mặc định.
+export const maxDuration = 120
+
 interface VideoResult {
   stt: number
   title: string

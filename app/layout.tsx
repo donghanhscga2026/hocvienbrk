@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { Be_Vietnam_Pro, Inter } from "next/font/google";
+import { Be_Vietnam_Pro } from "next/font/google";
 import Script from "next/script";
+import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import "./globals.css";
 import Providers from "./providers";
@@ -9,15 +10,15 @@ import AffiliateTracker from "@/components/AffiliateTracker";
 import AccountAssistantTrigger from "@/components/auth/AccountAssistantTrigger";
 import { auth } from "@/auth";
 
+// [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
+// nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
+// font tải trên mọi trang. Font Inter cũng đã bỏ hẳn: trước đây tải kèm toàn
+// site nhưng chỉ dùng đúng 1 chỗ ở CourseCard.tsx, nay đổi sang dùng chung
+// Be Vietnam Pro.
 const beVietnamPro = Be_Vietnam_Pro({
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   subsets: ["vietnamese", "latin"],
   variable: "--font-be-vietnam-pro",
-});
-
-const inter = Inter({
-  subsets: ["vietnamese", "latin"],
-  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -50,17 +51,24 @@ export const metadata: Metadata = {
   },
 };
 
-async function getSiteTheme() {
-  try {
-    const siteSettings = await prisma.siteSettings.findFirst({
-      include: { theme: true },
-    })
-    return siteSettings?.themeId || 'classic'
-  } catch (error) {
-    console.error('Error fetching site theme:', error)
-    return 'classic'
-  }
-}
+// [OPTIMIZE] Theme gần như không đổi (chỉ khi admin chỉnh trong /tools/settings/theme)
+// nhưng RootLayout bọc MỌI trang — cache 1 giờ, làm mới ngay lập tức khi admin lưu
+// theme mới (xem revalidateTag('site-theme') trong app/api/admin/theme/route.ts).
+const getSiteTheme = unstable_cache(
+  async () => {
+    try {
+      const siteSettings = await prisma.siteSettings.findFirst({
+        include: { theme: true },
+      })
+      return siteSettings?.themeId || 'classic'
+    } catch (error) {
+      console.error('Error fetching site theme:', error)
+      return 'classic'
+    }
+  },
+  ['site-theme'],
+  { tags: ['site-theme'], revalidate: 3600 }
+)
 
 export default async function RootLayout({
   children,
@@ -89,7 +97,7 @@ export default async function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body
-        className={`${beVietnamPro.variable} ${inter.variable} antialiased`}
+        className={`${beVietnamPro.variable} antialiased`}
         suppressHydrationWarning
       >
         <Script

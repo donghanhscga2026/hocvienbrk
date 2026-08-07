@@ -20,6 +20,9 @@ async function brevoFetch<T>(
   body?: unknown,
   apiKey?: string,
 ): Promise<T> {
+  // [OPTIMIZE] Gọi trong luồng gửi email hàng loạt — nếu Brevo treo, không nên
+  // treo luôn cả đợt gửi theo. Giới hạn 15s rồi báo lỗi để đợt gửi bỏ qua và
+  // tiếp tục người nhận kế tiếp.
   const response = await fetch(`${BREVO_API_URL}${path}`, {
     method,
     headers: {
@@ -28,6 +31,7 @@ async function brevoFetch<T>(
       accept: 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15_000),
   })
 
   if (!response.ok) {

@@ -2,15 +2,19 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import CourseSection from '@/components/home/CourseSection'
 import CourseCard from '@/components/course/CourseCard'
 import RealityMap from '@/components/home/RealityMap'
 import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
 import CommunityBoard from '@/components/home/CommunityBoard'
-import PaymentModal from '@/components/course/PaymentModal'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { Check } from 'lucide-react'
+
+// [OPTIMIZE] Chỉ hiện khi học viên bấm mua khoá học — tải khi cần thay vì
+// gói sẵn vào bundle của trang chủ cho mọi lượt truy cập.
+const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 
 interface HomePageClientProps {
   profile: any

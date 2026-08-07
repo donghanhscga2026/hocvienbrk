@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { CommissionStatus } from "@prisma/client"
 
+// [OPTIMIZE] Xử lý tuần tự từng khoản hoa hồng đang chờ — có thể vượt giới
+// hạn thời gian mặc định khi số khoản tồn đọng lớn.
+export const maxDuration = 300
+
 export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get('Authorization')

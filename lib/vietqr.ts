@@ -49,15 +49,26 @@ export async function generateVietQR(options: {
     format: 'text'
   }
 
-  const response = await fetch('https://api.vietqr.io/v2/generate', {
-    method: 'POST',
-    headers: {
-      'x-client-id': process.env.VIETQR_CLIENT_ID || '',
-      'x-api-key': process.env.VIETQR_API_KEY || '',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requestBody)
-  })
+  // [OPTIMIZE] Gọi trực tiếp trong luồng đăng ký khoá học của học viên — nếu
+  // VietQR chậm/treo, request trước đây sẽ treo vô thời hạn theo. Giới hạn 10s.
+  let response: Response
+  try {
+    response = await fetch('https://api.vietqr.io/v2/generate', {
+      method: 'POST',
+      headers: {
+        'x-client-id': process.env.VIETQR_CLIENT_ID || '',
+        'x-api-key': process.env.VIETQR_API_KEY || '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(10_000)
+    })
+  } catch (err: any) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      throw new Error('Không tạo được mã QR: VietQR phản hồi quá chậm, vui lòng thử lại.')
+    }
+    throw err
+  }
 
   if (!response.ok) {
     const errorText = await response.text()

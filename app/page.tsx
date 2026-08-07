@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { Suspense } from 'react'
+import { unstable_cache } from 'next/cache'
 import { auth } from '@/auth'
 
 import MainHeader from '@/components/layout/MainHeader'
@@ -39,6 +40,15 @@ export const metadata: Metadata = {
     images: ['https://giautoandien.io.vn/og-image.png'],
   },
 }
+
+// [OPTIMIZE] Danh sách điểm roadmap do admin quản lý qua script, không có UI
+// chỉnh sửa trực tiếp trong app — cache dài hạn để tránh query lại trên mỗi
+// lượt xem trang chủ.
+const getRoadmapPoints = unstable_cache(
+  () => prisma.roadmapPoint.findMany({ orderBy: { pointId: 'asc' } }),
+  ['roadmap-points'],
+  { tags: ['roadmap-points'], revalidate: 3600 }
+)
 
 export default async function Home() {
   const session = await auth()
@@ -99,7 +109,7 @@ export default async function Home() {
           }
         }), [])
       : [],
-    safeQuery(prisma.roadmapPoint.findMany({ orderBy: { pointId: 'asc' } }), [])
+    safeQuery(getRoadmapPoints(), [])
   ])
 
   // Xử lý enrollments map an toàn

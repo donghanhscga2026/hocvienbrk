@@ -1,21 +1,26 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { 
-  resolveRecipients, 
-  sendGmailFromSender, 
+import {
+  resolveRecipients,
+  sendGmailFromSender,
   sendViaBrevo,
-  getRandomMessageFooter, 
+  getRandomMessageFooter,
   injectFooter,
   getAvailableSender,
   updateSenderCooldown,
   incrementSenderSentCount,
-  checkBatchStatus
+  checkBatchStatus,
+  type Recipient
 } from "@/lib/email-campaign-runner";
 import { spinContent } from "@/lib/email-spin";
 import { getEmailConfig, randomBetween } from "@/lib/email-config";
 import { sendEmailCampaignNotification } from "@/lib/notifications";
 import { exportCampaignToSheet } from "@/lib/email-campaign-export";
 import { NextResponse } from "next/server";
+
+// [OPTIMIZE] Gửi 1 batch email lặp tuần tự qua nhiều người nhận + nhiều nhà
+// cung cấp (Gmail/Brevo), có thể vượt giới hạn thời gian mặc định khi batch lớn.
+export const maxDuration = 300;
 
 async function upsertSenderLog(senderId: number, field: 'sentCount' | 'failedCount' | 'cooldownCount' | 'cooldownMinutes', value: number) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
@@ -27,6 +32,12 @@ async function upsertSenderLog(senderId: number, field: 'sentCount' | 'failedCou
 }
 
 let campaignStats: Map<number, { total: number; sent: number; success: number; failed: number; emailsInBatch: number }> = new Map();
+
+// [OPTIMIZE] resolveRecipients() có thể phải tải + parse cả file CSV/Google
+// Sheet — trước đây bị gọi lại từ đầu ở MỖI lần gửi 1 batch (batch càng về
+// sau của cùng 1 chiến dịch càng tốn công). Cache theo campaignId trong cùng
+// vòng đời tiến trình (giống cách campaignStats đã làm), chỉ resolve 1 lần.
+const recipientsCache: Map<number, Recipient[]> = new Map();
 
 export async function POST(
   req: Request,
@@ -70,7 +81,11 @@ export async function POST(
       }
     }
 
-    const allRecipients = await resolveRecipients(campaignId);
+    let allRecipients = recipientsCache.get(campaignId);
+    if (!allRecipients) {
+      allRecipients = await resolveRecipients(campaignId);
+      recipientsCache.set(campaignId, allRecipients);
+    }
 
     const existingLogs = await prisma.emailCampaignLog.findMany({
       where: { campaignId, status: { in: ['SENT', 'SKIPPED', 'FAILED'] } },
@@ -379,6 +394,7 @@ export async function POST(
 
     if (isCompleted) {
       campaignStats.delete(campaignId);
+      recipientsCache.delete(campaignId);
 
       let sheetUrl: string | undefined;
       if (campaign.notificationType !== "VERIFY_TEST") {

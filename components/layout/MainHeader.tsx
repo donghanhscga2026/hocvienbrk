@@ -10,10 +10,10 @@ import { useHomeSlug } from '@/hooks/useHomeSlug'
 import UserMenu from './UserMenu'
 import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
-import MbwDashboardPopup from '@/components/mbw/MbwDashboardPopup'
 import dynamic from 'next/dynamic'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
+const MbwDashboardPopup = dynamic(() => import('@/components/mbw/MbwDashboardPopup'), { ssr: false })
 
 interface MainHeaderProps {
     title: string

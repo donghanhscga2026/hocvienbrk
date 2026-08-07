@@ -1,7 +1,27 @@
 'use client'
 
 import React from 'react'
+import { Cormorant_Garamond, Inter } from 'next/font/google'
 import { CourseThemeConfig } from '@/lib/course-page/types'
+
+// [OPTIMIZE] Trước đây nạp qua @import trong <style> — cách chậm nhất để tải
+// font (trình duyệt phải đọc xong CSS này rồi mới gọi tiếp tới Google, chặn
+// hiển thị). next/font tự lưu font ngay trên server lúc build, không cần chờ
+// Google lúc người dùng truy cập trang bán khoá học.
+const cormorantGaramond = Cormorant_Garamond({
+  weight: ['400', '600', '700'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+  variable: '--font-course-serif',
+  display: 'swap',
+})
+
+const coursePageInter = Inter({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['latin'],
+  variable: '--font-course-sans',
+  display: 'swap',
+})
 
 interface CourseThemeProviderProps {
   theme: CourseThemeConfig
@@ -48,16 +68,14 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
   }, [theme])
 
   return (
-    <div style={styleVars} className="min-h-screen bg-[var(--bg-dark)] text-[var(--text-body)] antialiased">
+    <div style={styleVars} className={`min-h-screen bg-[var(--bg-dark)] text-[var(--text-body)] antialiased ${cormorantGaramond.variable} ${coursePageInter.variable}`}>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700&display=swap');
-
         /* Typography base */
         .course-page, .course-page * {
           box-sizing: border-box;
         }
         .course-page {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-course-sans), system-ui, sans-serif;
           font-size: 18px;
           line-height: 1.75;
         }
@@ -66,7 +84,7 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
         .course-page h3,
         .course-page h4,
         .course-page .font-serif {
-          font-family: 'Cormorant Garamond', Georgia, serif !important;
+          font-family: var(--font-course-serif), Georgia, serif !important;
           letter-spacing: -0.02em;
           line-height: 1.15;
         }

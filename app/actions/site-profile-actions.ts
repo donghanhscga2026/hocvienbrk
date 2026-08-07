@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } from '@/lib/db-fallback'
 import { auth } from '@/auth'
 import { requireAdminAction } from '@/lib/api-auth'
+import { unstable_cache, revalidateTag } from 'next/cache'
 
 // ─────────────────────────────────────────────────────────
 // GET ACTIONS
@@ -117,34 +118,42 @@ export async function getMySiteProfile(userId: number) {
 }
 
 /**
- * Lấy BRK default profile
+ * Lấy MBC default profile
+ * [OPTIMIZE] Đây là dữ liệu nền cho trang chủ — trang được xem nhiều nhất hệ
+ * thống — nhưng gần như không đổi giữa các lượt truy cập. Cache 10 phút, làm
+ * mới ngay khi admin lưu profile (xem revalidateTag('site-profile') trong
+ * updateSiteProfile bên dưới).
  */
-export async function getDefaultProfile() {
-  try {
-    const profile = await prisma.siteProfile.findFirst({
-      where: { isDefault: true, isActive: true },
-      include: {
-        user: { select: { name: true, image: true } },
-        members: {
-          include: { user: { select: { id: true, name: true, image: true } } }
-        },
-        theme: true,
-        surveys: true,
-        landingPages: {
-          where: { isActive: true },
-          take: 10
-        },
-        affiliateCampaign: {
-          include: { levels: true }
+export const getDefaultProfile = unstable_cache(
+  async () => {
+    try {
+      const profile = await prisma.siteProfile.findFirst({
+        where: { isDefault: true, isActive: true },
+        include: {
+          user: { select: { name: true, image: true } },
+          members: {
+            include: { user: { select: { id: true, name: true, image: true } } }
+          },
+          theme: true,
+          surveys: true,
+          landingPages: {
+            where: { isActive: true },
+            take: 10
+          },
+          affiliateCampaign: {
+            include: { levels: true }
+          }
         }
-      }
-    })
-    return profile || (FALLBACK_PROFILE as any)
-  } catch (error) {
-    console.error("[DB ERROR] getDefaultProfile:", error)
-    return FALLBACK_PROFILE as any
-  }
-}
+      })
+      return profile || (FALLBACK_PROFILE as any)
+    } catch (error) {
+      console.error("[DB ERROR] getDefaultProfile:", error)
+      return FALLBACK_PROFILE as any
+    }
+  },
+  ['default-site-profile'],
+  { tags: ['site-profile'], revalidate: 600 }
+)
 
 /**
  * Lấy tất cả profiles (Admin)
@@ -376,7 +385,8 @@ export async function updateSiteProfile(id: number, data: any) {
     const { revalidatePath } = await import('next/cache')
     revalidatePath(`/tools/site-profiles/${id}/edit`)
     revalidatePath(`/page/${profile.slug}`)
-    
+    revalidateTag('site-profile', { expire: 0 })
+
     return { success: true, profile }
   } catch (error) {
     return { error: 'Lỗi cập nhật database' }

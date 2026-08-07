@@ -750,17 +750,21 @@ async function detectFakeEmails(
 
   console.log(`\n[FAKE-EMAIL] ===== Phát hiện email ảo =====`);
 
-  // Lấy tất cả SENT logs
-  const sentLogs = await prisma.emailCampaignLog.findMany({
+  // [OPTIMIZE] Trước đây tải TOÀN BỘ log SENT (không giới hạn, tăng dần theo
+  // thời gian) về rồi đếm bằng JavaScript. Đếm ngay trong database bằng
+  // groupBy — chỉ trả về số dòng bằng số email khác nhau, không phải tổng số
+  // lần gửi.
+  const sentCounts = await prisma.emailCampaignLog.groupBy({
+    by: ["toEmail"],
     where: { status: "SENT" },
-    select: { toEmail: true }
+    _count: { toEmail: true }
   });
 
-  // Đếm số lần xuất hiện của mỗi email
+  // Đếm số lần xuất hiện của mỗi email (gộp các biến thể hoa/thường)
   const emailCounts: Record<string, number> = {};
-  for (const log of sentLogs) {
-    const email = log.toEmail.toLowerCase();
-    emailCounts[email] = (emailCounts[email] || 0) + 1;
+  for (const row of sentCounts) {
+    const email = row.toEmail.toLowerCase();
+    emailCounts[email] = (emailCounts[email] || 0) + row._count.toEmail;
   }
 
   // Kiểm tra từng email trong sentSet

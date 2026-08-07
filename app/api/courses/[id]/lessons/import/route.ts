@@ -4,6 +4,10 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
 import { Role } from '@prisma/client';
 
+// [OPTIMIZE] Nhập danh sách bài học từ CSV/Google Sheet xử lý tuần tự từng
+// dòng, có thể vượt giới hạn thời gian mặc định với khoá học nhiều bài.
+export const maxDuration = 300;
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -110,6 +114,11 @@ export async function POST(
     let updated = 0;
     let skipped = 0;
 
+    // [OPTIMIZE] Trước đây mỗi dòng CSV tốn 1-2 lượt query riêng (tìm rồi
+    // tạo/cập nhật tuần tự) — khoá học càng nhiều bài càng chậm, dễ vượt thời
+    // gian cho phép. Gộp thành: 1 lượt đọc bài học đã có (mode khác 'append'),
+    // 1 lượt tạo hàng loạt cho các bài mới, và 1 transaction cho các bài cần
+    // cập nhật.
     if (mode === 'append') {
       const maxLesson = await prisma.lesson.findFirst({
         where: { courseId },
@@ -118,55 +127,70 @@ export async function POST(
       });
       const startOrder = (maxLesson?.order ?? 0) + 1;
 
-      for (let i = 0; i < lessons.length; i++) {
-        const lesson = lessons[i];
-        await prisma.lesson.create({
-          data: {
-            courseId,
-            title: lesson.title,
-            videoUrl: lesson.videoUrl || null,
-            content: lesson.content || null,
-            order: startOrder + i,
-            isDailyChallenge: lesson.isDailyChallenge,
-          }
-        });
-        created++;
-      }
+      const result = await prisma.lesson.createMany({
+        data: lessons.map((lesson, i) => ({
+          courseId,
+          title: lesson.title,
+          videoUrl: lesson.videoUrl || null,
+          content: lesson.content || null,
+          order: startOrder + i,
+          isDailyChallenge: lesson.isDailyChallenge,
+        }))
+      });
+      created = result.count;
     } else {
-      for (const lesson of lessons) {
-        const existingLesson = await prisma.lesson.findFirst({
-          where: { courseId, order: lesson.order }
-        });
+      const existingLessons = await prisma.lesson.findMany({
+        where: { courseId },
+        select: { id: true, order: true }
+      });
+      const existingByOrder = new Map(existingLessons.map(l => [l.order, l.id]));
 
-        if (existingLesson) {
+      const toCreate: { courseId: number; title: string; videoUrl: string | null; content: string | null; order: number; isDailyChallenge: boolean }[] = [];
+      const toUpdate: { id: string; title: string; videoUrl: string | null; content: string | null; isDailyChallenge: boolean }[] = [];
+
+      for (const lesson of lessons) {
+        const existingId = existingByOrder.get(lesson.order);
+        if (existingId != null) {
           if (mode === 'skip') {
             skipped++;
             continue;
           }
-          
-          await prisma.lesson.update({
-            where: { id: existingLesson.id },
-            data: {
-              title: lesson.title,
-              videoUrl: lesson.videoUrl || null,
-              content: lesson.content || null,
-              isDailyChallenge: lesson.isDailyChallenge,
-            }
+          toUpdate.push({
+            id: existingId,
+            title: lesson.title,
+            videoUrl: lesson.videoUrl || null,
+            content: lesson.content || null,
+            isDailyChallenge: lesson.isDailyChallenge,
           });
-          updated++;
         } else {
-          await prisma.lesson.create({
-            data: {
-              courseId,
-              title: lesson.title,
-              videoUrl: lesson.videoUrl || null,
-              content: lesson.content || null,
-              order: lesson.order,
-              isDailyChallenge: lesson.isDailyChallenge,
-            }
+          toCreate.push({
+            courseId,
+            title: lesson.title,
+            videoUrl: lesson.videoUrl || null,
+            content: lesson.content || null,
+            order: lesson.order,
+            isDailyChallenge: lesson.isDailyChallenge,
           });
-          created++;
         }
+      }
+
+      if (toCreate.length > 0) {
+        const result = await prisma.lesson.createMany({ data: toCreate });
+        created = result.count;
+      }
+      if (toUpdate.length > 0) {
+        await prisma.$transaction(
+          toUpdate.map(u => prisma.lesson.update({
+            where: { id: u.id },
+            data: {
+              title: u.title,
+              videoUrl: u.videoUrl,
+              content: u.content,
+              isDailyChallenge: u.isDailyChallenge,
+            }
+          }))
+        );
+        updated = toUpdate.length;
       }
     }
 

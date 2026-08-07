@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import prisma from '@/lib/prisma';
 import { requireAdmin } from '@/lib/api-auth';
+import { revalidateTag } from 'next/cache';
 
 export async function GET() {
   try {
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
       },
       include: { theme: true },
     });
+
+    revalidateTag('site-theme', { expire: 0 });
 
     return NextResponse.json({ siteSettings });
   } catch (error) {

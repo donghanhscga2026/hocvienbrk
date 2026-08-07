@@ -11,14 +11,21 @@ export async function GET() {
         }
         
         const userId = Number(session.user.id)
-        
+
+        // [OPTIMIZE] campaign được lấy trước riêng vì getOrCreateLink() cũng cần
+        // đúng dòng này — trước đây getOrCreateLink tự truy vấn lại từ đầu,
+        // thành 2 lần truy vấn giống hệt nhau trong cùng 1 request.
+        const campaign = await prisma.affiliateCampaign.findFirst({
+            where: { slug: 'default', isActive: true },
+            include: { levels: { orderBy: { level: 'asc' } } }
+        })
+
         const [
             wallet,
             confirmedPoints,
             allReferrals,
             commissions,
             recentTransactions,
-            campaign,
             myLink,
             closures
         ] = await Promise.all([
@@ -43,11 +50,7 @@ export async function GET() {
                 orderBy: { createdAt: 'desc' },
                 take: 10
             }),
-            prisma.affiliateCampaign.findFirst({
-                where: { slug: 'default', isActive: true },
-                include: { levels: { orderBy: { level: 'asc' } } }
-            }),
-            getOrCreateLink(userId),
+            getOrCreateLink(userId, campaign?.id ?? null),
             prisma.userClosure.findMany({
                 where: { ancestorId: userId, depth: 1 },
                 include: {
@@ -105,12 +108,8 @@ export async function GET() {
     }
 }
 
-async function getOrCreateLink(userId: number) {
-    const campaign = await prisma.affiliateCampaign.findFirst({
-        where: { slug: 'default', isActive: true }
-    })
-    
-    if (!campaign) return null
+async function getOrCreateLink(userId: number, campaignId: number | null) {
+    if (!campaignId) return null
 
     // Dùng userId trực tiếp làm code
     const code = userId.toString()
@@ -127,7 +126,7 @@ async function getOrCreateLink(userId: number) {
         return await prisma.affiliateLink.create({
             data: {
                 userId,
-                campaignId: campaign.id,
+                campaignId,
                 code,
                 name: 'Link chính',
                 source: 'website'

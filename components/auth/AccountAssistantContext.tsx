@@ -1,7 +1,11 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import AccountAssistantModal from './AccountAssistantModal'
+import dynamic from 'next/dynamic'
+
+// [OPTIMIZE] Modal 948 dòng + thư viện libphonenumber-js chỉ cần tải khi
+// người dùng thực sự mở trợ lý tài khoản, không phải trên mọi trang.
+const AccountAssistantModal = dynamic(() => import('./AccountAssistantModal'), { ssr: false })
 
 interface AccountAssistantContextType {
   isOpen: boolean

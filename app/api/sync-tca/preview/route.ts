@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { generatePreview } from '@/lib/tca-preview-logic'
 import { requireAdmin } from '@/lib/api-auth'
 
+// [OPTIMIZE] generatePreview() xử lý cây node do admin cung cấp, kích thước
+// không giới hạn — có thể chậm hơn giới hạn thời gian mặc định.
+export const maxDuration = 120
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
