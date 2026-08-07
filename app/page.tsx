@@ -139,7 +139,27 @@ export default async function Home() {
 
   const otherCourses = safeCourses.filter((c: any) => !myCourseIds.has(c.id))
 
-  const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
+  const giftCourses = otherCourses
+    .filter((c: any) => c.pin != null && c.pin > 0)
+    .sort((a: any, b: any) => a.pin - b.pin)
+    .slice(0, 3)
+
+  const giftCourseIds = new Set<number>(giftCourses.map((c: any) => c.id))
+
+  const latestCourses = otherCourses
+    .filter((c: any) => !giftCourseIds.has(c.id))
+    .sort((a: any, b: any) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+      return dateB - dateA
+    })
+    .slice(0, 3)
+
+  const latestCourseIds = new Set<number>(latestCourses.map((c: any) => c.id))
+
+  const availableCourses = otherCourses.filter((c: any) => !giftCourseIds.has(c.id) && !latestCourseIds.has(c.id))
+
+  const groupedOtherCourses = availableCourses.reduce((acc: any[], course: any) => {
     const category = course.courseCategory?.name || course.category || "Khác"
     const existingGroup = acc.find(g => g.category === category)
     if (existingGroup) {
@@ -185,6 +205,8 @@ export default async function Home() {
           myActiveCourses={myActiveCourses}
           myCompletedCourses={myCompletedCourses}
           groupedOtherCourses={groupedOtherCourses}
+          giftCourses={giftCourses}
+          latestCourses={latestCourses}
           posts={posts || []}
           session={session}
           enrollmentsMap={enrollmentsMap}

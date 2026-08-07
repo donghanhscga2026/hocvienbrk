@@ -30,6 +30,8 @@ interface HomePageClientProps {
   survey: any | null
   resetSurveyAction: () => Promise<any>
   showAllCourses?: boolean
+  giftCourses?: any[]
+  latestCourses?: any[]
 }
 
 function HomePageContent({
@@ -49,7 +51,9 @@ function HomePageContent({
   roadmapPoints,
   survey,
   resetSurveyAction,
-  showAllCourses = false
+  showAllCourses = false,
+  giftCourses = [],
+  latestCourses = []
 }: HomePageClientProps) {
   const searchParams = useSearchParams()
   const paymentCourseId = searchParams.get('paymentCourseId')
@@ -138,6 +142,9 @@ function HomePageContent({
       .filter((course) => !pinnedCourses.some((p) => p.id === course.id))
       .slice(0, Math.max(0, 3 - pinnedCourses.length))
   ]
+
+  const showGiftSection = giftCourses.length > 0
+  const displayLatestCourses = latestCourses.length > 0 ? latestCourses : topCourses
   
   return (
     <>
@@ -174,7 +181,34 @@ function HomePageContent({
         </section>
       )}
 
-      {topCourses.length > 0 && (
+      {showGiftSection && (
+        <section className="container mx-auto px-4 py-8">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
+              Quà tặng từ trái tim
+            </h2>
+            <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-brk-accent"></div>
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {giftCourses.map((course, index: number) => (
+              <div key={course.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
+                <CourseCard
+                  course={course}
+                  isLoggedIn={!!session}
+                  enrollment={enrollmentsMap[course.id] || null}
+                  userPhone={userPhone}
+                  userId={userId}
+                  priority={index === 0}
+                  darkMode={false}
+                  profileSlug={profile.slug}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {displayLatestCourses.length > 0 && (
         <section className="container mx-auto px-4 py-8">
           <div className="mb-10 text-center">
             <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
@@ -183,7 +217,7 @@ function HomePageContent({
             <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-brk-accent"></div>
           </div>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {topCourses.map((course, index: number) => (
+            {displayLatestCourses.map((course, index: number) => (
               <div key={course.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
                 <CourseCard
                   course={course}
