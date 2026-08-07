@@ -132,6 +132,17 @@
 - ❌ Bỏ qua bước dry-run dù "chắc chắn đúng"
 - ❌ Script không có cơ chế dry-run → phải thêm vào trước khi chạy
 
+### 12. KHÔNG VIẾT HOA TOÀN BỘ (ALL-CAPS) TIẾNG VIỆT
+> Trong mọi nội dung (code string, UI text, docs, dữ liệu DB) **cấm viết hoa toàn bộ từ/câu tiếng Việt có dấu** — chỉ dùng chữ thường hoặc viết hoa đầu câu (Sentence case).
+
+- **Nguyên nhân**: Ký tự hoa tiếng Việt có dấu (`ĐÃ`, `HOÀN`, `CẬP`, `NHẬT`...) khi đứng trước khoảng trắng bị pre-commit hook nhận diện nhầm thành mojibake (vd pattern `'Ã '` trong `ĐÃ HOÀN THÀNH CẬP NHẬT` → false positive chặn commit).
+- ❌ **CẤM**: `ĐÃ HOÀN THÀNH CẬP NHẬT`, `HỌC VIỆN BRK`, `CỘNG ĐỒNG MBC`, `MÃ SỐ`...
+- ✅ **ĐÚNG**: `Đã hoàn thành cập nhật`, `Học viện BRK`, `Cộng đồng MBC`, `Mã số`...
+- **Ngoại lệ** (được phép ALL-CAPS):
+  - Từ/chuỗi không dấu hoặc kỹ thuật: `BRKD`, `BRKP`, `MBC`, `ID`, `API`, `OTP`, `HTML`, `BRK01`...
+  - Text branding in hoa đặc biệt do user yêu cầu rõ ràng
+- Nếu cần nhấn mạnh → dùng **Markdown bold** (`**...**`) hoặc CSS, KHÔNG dùng viết hoa toàn bộ.
+
 ---
 
 ## 🟡 QUY TRÌNH LÀM VIỆC (MANDATORY)
