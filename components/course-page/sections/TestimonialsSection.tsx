@@ -24,7 +24,7 @@ export default function TestimonialsSection({ id, testimonials = [] }: Testimoni
       <div className="max-w-[var(--course-container-max)] mx-auto">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-serif font-black text-[var(--course-text)] mb-8">
-            Học viên nói gì về khóa học
+            Thành viên nói gì về khóa học
           </h2>
           
           {testimonials && testimonials.length > 0 ? (
@@ -79,7 +79,7 @@ export default function TestimonialsSection({ id, testimonials = [] }: Testimoni
                 Chưa có chia sẻ nào
               </h3>
               <p className="text-[var(--course-muted)] max-w-md mx-auto leading-relaxed text-sm">
-                Hãy tham gia khóa học và để lại cảm nhận của bạn để giúp cộng đồng học viên có thêm động lực nhé!
+                Hãy tham gia khóa học và để lại cảm nhận của bạn để giúp cộng đồng thành viên có thêm động lực nhé!
               </p>
             </div>
           )}

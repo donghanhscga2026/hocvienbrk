@@ -8,7 +8,7 @@ const defaultOptions: Record<string, any[]> = {
     { label: 'Tôi đã có tài khoản', action: 'next_step:login_id' },
   ],
   login_id: [
-    { label: 'Tôi không nhớ mã học viên', action: 'next_step:check' },
+    { label: 'Tôi không nhớ mã thành viên', action: 'next_step:check' },
     { label: 'Tiếp tục', action: 'action:check_student_id' },
   ],
   login_confirm: [
@@ -53,7 +53,7 @@ const defaultOptions: Record<string, any[]> = {
 
 const defaultQuestions: Record<string, string> = {
   initial: 'Bạn đã có tài khoản đăng nhập chưa?',
-  login_id: 'Nhập vào mã học viên của bạn?',
+  login_id: 'Nhập vào mã thành viên của bạn?',
   login_confirm: 'Đây có phải là bạn?',
   login_password: 'Nhập mật khẩu của bạn?',
   check: 'Nhập vào số điện thoại hoặc email của bạn để kiểm tra xem đã tồn tại trong hệ thống đăng ký chưa?',

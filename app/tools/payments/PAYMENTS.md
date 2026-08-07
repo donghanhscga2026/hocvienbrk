@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-Trang quản lý & duyệt thanh toán học phí. Cho phép ADMIN/TEACHER xem, xác nhận và từ chối các yêu cầu thanh toán của học viên.
+Trang quản lý & duyệt thanh toán học phí. Cho phép ADMIN/TEACHER xem, xác nhận và từ chối các yêu cầu thanh toán của thành viên.
 
 ## File structure
 
@@ -14,7 +14,7 @@ app/actions/
 └── payment-actions.ts    # Server actions xử lý thanh toán
 
 components/
-├── course/PaymentModal.tsx        # Modal thanh toán (dành cho học viên)
+├── course/PaymentModal.tsx        # Modal thanh toán (dành cho thành viên)
 └── payment/UploadProofModal.tsx   # Modal upload biên lai
 
 app/api/upload/payment/route.ts    # API upload ảnh biên lai
@@ -160,7 +160,7 @@ handleReject(paymentId)
 
 ### Mục tiêu
 
-1. **Phân quyền**: ADMIN xem tất cả, TEACHER chỉ xem payment của học viên trong khóa của mình
+1. **Phân quyền**: ADMIN xem tất cả, TEACHER chỉ xem payment của thành viên trong khóa của mình
 2. **Fix bảo mật**: Thêm `auth()` check role vào tất cả server actions
 3. **Fix lỗi**: Error handling, type safety
 

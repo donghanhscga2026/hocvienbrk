@@ -29,7 +29,7 @@
 
 ### Mục tiêu
 Mỗi Teacher (role `TEACHER`) sẽ có **trang chủ riêng** với URL `domain.com/[slug]`:
-- Giao diện giống BRK nhưng **100% tùy biến từ database**
+- Giao diện giống MBC nhưng **100% tùy biến từ database**
 - Nội dung động: hero, message, survey, roadmap, courses, footer
 - **Full theme customization** cho mỗi Teacher
 - **Affiliate system riêng** cho mỗi Teacher
@@ -72,7 +72,7 @@ giautoandien.io.vn/nhung-dinh-duong
 ┌─────────────────────────────────────────────────────────────┐
 │                      ROUTING LAYER                          │
 ├─────────────────────────────────────────────────────────────┤
-│  /                   → BRK Profile (slug="brk")             │
+│  /                   → MBC Profile (slug="mbc")             │
 │  /[slug]             → SiteProfile theo slug                │
 │  /admin/profiles     → Admin quản lý profiles              │
 │  /tools/my-site      → Teacher chỉnh sửa profile của mình  │
@@ -83,10 +83,10 @@ giautoandien.io.vn/nhung-dinh-duong
 │                      DATA LAYER                             │
 ├─────────────────────────────────────────────────────────────┤
 │  SiteProfile                                                  │
-│    ├── BRK gốc (slug="brk", userId=null, isDefault=true)   │
+│    ├── MBC gốc (slug="mbc", userId=null, isDefault=true)   │
 │    └── Teacher (slug=tùy chỉnh, userId=User.id)            │
 │                                                              │
-│  Fallback: Nếu Teacher chưa set config → dùng BRK default  │
+│  Fallback: Nếu Teacher chưa set config → dùng MBC default  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -145,14 +145,14 @@ model SiteProfile {
   // IDENTITY
   // ─────────────────────────────────────────────────────────
   // 2 loại profile:
-  // 1. BRK gốc: userId = null, slug = "brk", isDefault = true
+  // 1. MBC gốc: userId = null, slug = "mbc", isDefault = true
   // 2. Teacher: userId = User.id, slug = tùy chỉnh
-  userId          Int?      @unique  // null = BRK gốc
+  userId          Int?      @unique  // null = MBC gốc
   user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slug            String    @unique
   
   isActive        Boolean   @default(false)
-  isDefault       Boolean   @default(false)  // true = BRK gốc
+  isDefault       Boolean   @default(false)  // true = MBC gốc
   
   // ─────────────────────────────────────────────────────────
   // HERO SECTION
@@ -245,7 +245,7 @@ model AffiliateCampaign {
   // ... existing fields ...
   
   // THÊM MỚI
-  profileId     Int?      @unique  // null = campaign global (BRK)
+  profileId     Int?      @unique  // null = campaign global (MBC)
   profile       SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }
 ```
@@ -324,7 +324,7 @@ export async function getMySiteProfile(userId: number) {
 }
 
 /**
- * Lấy BRK default profile
+ * Lấy MBC default profile
  */
 export async function getDefaultProfile() {
   return prisma.siteProfile.findFirst({
@@ -360,7 +360,7 @@ export async function getCoursesForProfile(profile: any) {
     })
   }
 
-  // BRK gốc → tất cả khóa học
+  // MBC gốc → tất cả khóa học
   return prisma.course.findMany({
     where: { status: true },
     orderBy: [{ pin: 'asc' }, { id: 'asc' }]
@@ -705,7 +705,7 @@ export default async function TeacherHomePage({ params }: PageProps) {
 import { redirect } from 'next/navigation'
 
 export default function Home() {
-  redirect('/brk')
+  redirect('/mbc')
 }
 ```
 
@@ -958,7 +958,7 @@ main().catch(console.error).finally(() => prisma.$disconnect())
 - [ ] Cập nhật CourseCard share
 
 ### Phase 9: Testing & Deploy (Ngày 5-6)
-- [ ] Test /brk
+- [ ] Test /mbc
 - [ ] Test /[slug]
 - [ ] Test admin
 - [ ] Test teacher dashboard
@@ -992,11 +992,11 @@ plan_temp/
 - [ ] Backup tất cả files
 - [ ] Schema migrated thành công
 - [ ] Prisma client generated
-- [ ] BRK Profile created
+- [ ] MBC Profile created
 - [ ] npm run build không lỗi
 
 ### Testing
-- [ ] /brk load đúng
+- [ ] /mbc load đúng
 - [ ] /[teacher-slug] load đúng
 - [ ] Hero section hiển thị đúng
 - [ ] Survey hoạt động

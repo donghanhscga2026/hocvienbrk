@@ -4,8 +4,8 @@
 
 Xây dựng cây hệ thống (System + SystemClosure) cho onSystem=3 (YTB) với:
 - **Root**: UserID=922
-- **Cấu trúc**: 922 → (327, 330) + học viên được resolve referrer chain
-- **Thành viên**: Học viên role STUDENT có enrollment ACTIVE/PENDING trong khóa của teacher 327
+- **Cấu trúc**: 922 → (327, 330) + thành viên được resolve referrer chain
+- **Thành viên**: role STUDENT có enrollment ACTIVE/PENDING trong khóa của teacher 327
 - **Cơ chế**: Seed 1 lần với dữ liệu hiện có, auto-sync khi kích hoạt khóa học mới
 
 ---
@@ -14,12 +14,12 @@ Xây dựng cây hệ thống (System + SystemClosure) cho onSystem=3 (YTB) vớ
 
 ```
 922 (root, refSysId=0)
-├── 0 (admin — Coach Cương, refSysId=922) → 2 học viên
-├── 327 (refSysId=922) → 1 học viên
-├── 330 (refSysId=922) → 10 học viên
+├── 0 (admin — Coach Cương, refSysId=922) → 2 thành viên
+├── 327 (refSysId=922) → 1 thành viên
+├── 330 (refSysId=922) → 10 thành viên
 ```
 
-**Thống kê:** 17 System records (4 cố định + 13 học viên), 60 closures
+**Thống kê:** 17 System records (4 cố định + 13 thành viên), 60 closures
 
 ---
 
@@ -43,11 +43,11 @@ Xây dựng cây hệ thống (System + SystemClosure) cho onSystem=3 (YTB) vớ
 
 - Root = teacher 327
 - Seed 16 user (gồm non-STUDENT) → sai, lệch với tools/students (13)
-- **Sửa**: thêm filter role=STUDENT → còn 13 học viên
+- **Sửa**: thêm filter role=STUDENT → còn 13 thành viên
 - **Sửa**: root từ 327 → 922, thêm 327 và 330 dưới 922
 - **Sửa logic**: từ "add all ancestors" → resolveSystemReferrer (tìm nearest YTB member)
 
-**Kết quả cuối:** 16 System records (3 cố định + 13 học viên), 42 closures
+**Kết quả cuối:** 16 System records (3 cố định + 13 thành viên), 42 closures
 
 ---
 
@@ -88,7 +88,7 @@ resolveSystemReferrer(userId, systemId, defaultRoot = 922)
 ### ✅ [Build Check] (2025-05-10)
 
 - `npx tsc --noEmit` → 0 lỗi
-- Dữ liệu seed: 13 học viên, khớp tools/students
+- Dữ liệu seed: 13 thành viên, khớp tools/students
 
 ### ✅ [YTB Admin Permission — 327 & 330] (2025-05-10)
 

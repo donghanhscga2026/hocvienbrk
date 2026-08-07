@@ -158,7 +158,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                             <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
                                 <Image
                                     src="/logobrk-50px.png"
-                                    alt="BRK Logo"
+                                    alt="MBC Logo"
                                     width={120}
                                     height={40}
                                     priority
@@ -264,7 +264,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                 <ShareModal
                     isOpen={showShare}
                     onClose={() => setShowShare(false)}
-                    course={{ id_khoa: '', name_lop: 'Trang cá nhân - Học viện BRK' }}
+                    course={{ id_khoa: '', name_lop: 'Trang cá nhân - Cộng đồng MBC' }}
                     affiliateCode={userId}
                     profileSlug={isHomePage ? null : (hasCustomHome ? homeSlug : null)}
                     shareType="header"

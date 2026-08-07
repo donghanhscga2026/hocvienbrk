@@ -1,5 +1,5 @@
 # 02. XÁC THỰC VÀ BẢO MẬT
-> **Mục đích**: Tài liệu này mô tả chi tiết các phương thức xác thực, luồng bảo vệ người dùng, cơ chế cấp phát định danh (ID) và các chính sách an toàn thông tin của dự án Học viện BRK.
+> **Mục đích**: Tài liệu này mô tả chi tiết các phương thức xác thực, luồng bảo vệ người dùng, cơ chế cấp phát định danh (ID) và các chính sách an toàn thông tin của dự án Cộng đồng MBC.
 
 ---
 
@@ -10,7 +10,7 @@ Dự án sử dụng **NextAuth v5 (Auth.js)** với chiến lược session là
 
 | Loại | Chi tiết kỹ thuật | Mô tả |
 |:---|:---|:---|
-| **Credentials** | Email/SĐT/ID + Password | Cho phép học viên đăng nhập bằng bất kỳ định danh nào. |
+| **Credentials** | Email/SĐT/ID + Password | Cho phép thành viên đăng nhập bằng bất kỳ định danh nào. |
 | **Google OAuth**| `@auth/google` | Đăng ký/Đăng nhập nhanh qua tài khoản Google. |
 
 ### 2. Luồng Đăng ký & Kích hoạt (OTP)
@@ -46,7 +46,7 @@ Hệ thống áp dụng chính sách bảo vệ nghiêm ngặt đối với ngư
 
 ## B. HƯỚNG DẪN SỬ DỤNG (USER GUIDE)
 
-### 1. Dành cho Học viên mới
+### 1. Dành cho Thành viên mới
 **Bước 1: Đăng ký**
 - Truy cập trang `/register`.
 - Điền đầy đủ thông tin: Họ tên, Email, Số điện thoại và Mật khẩu.
@@ -58,12 +58,12 @@ Hệ thống áp dụng chính sách bảo vệ nghiêm ngặt đối với ngư
 - **Lưu ý**: Mã có hiệu lực trong **24 tiếng**. Sau thời gian này, bạn cần thực hiện lại quy trình.
 
 **Bước 3: Đăng nhập**
-- Bạn có thể dùng Email hoặc Mã học viên (#ID) được cấp để đăng nhập.
+- Bạn có thể dùng Email hoặc Mã thành viên (#ID) được cấp để đăng nhập.
 
 ### 2. Dành cho người dùng Google OAuth
 - Khi nhấn "Tiếp tục với Google", nếu là lần đầu, bạn sẽ được đưa đến trang **Hoàn tất hồ sơ**.
 - Bạn **bắt buộc** phải cung cấp Số điện thoại để kích hoạt tài khoản.
-- Bạn có thể tùy chọn đặt mật khẩu tại đây để đăng nhập bằng mã học viên sau này.
+- Bạn có thể tùy chọn đặt mật khẩu tại đây để đăng nhập bằng mã thành viên sau này.
 
 ### 3. Xử lý sự cố (Troubleshooting)
 - **Không nhận được OTP**: 

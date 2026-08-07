@@ -13,7 +13,7 @@ export function ChangeUserIdForm() {
     return (
         <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg shadow-sm">
             <p className="text-sm text-blue-700 mb-4">
-                Chức năng này cho phép đổi ID của học viên hiện tại sang một ID mới (thường là số đẹp).
+                Chức năng này cho phép đổi ID của thành viên hiện tại sang một ID mới (thường là số đẹp).
                 <br />Hệ thống sẽ tự động cập nhật mọi dữ liệu liên quan (lịch sử, giới thiệu...).
             </p>
             <form action={formAction} className="flex gap-4 items-end flex-wrap">

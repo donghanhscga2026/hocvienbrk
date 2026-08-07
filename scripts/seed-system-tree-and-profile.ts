@@ -6,7 +6,7 @@ async function seedSystemTree() {
   console.log('📁 Seeding SystemTree...')
 
   const systems = [
-    { onSystem: 0, nameSystem: 'Học viên' },
+    { onSystem: 0, nameSystem: 'Thành viên' },
     { onSystem: 1, nameSystem: 'TCA' },
     { onSystem: 2, nameSystem: 'KTC' },
     { onSystem: 3, nameSystem: 'YTB' },
@@ -59,15 +59,15 @@ async function seedBrkProfile() {
       heroImage: null,
       heroOverlay: 0.3,
       messageContent: 'Học hôm nay, thành công ngày mai',
-      messageDetail: 'BRK mang đến những tri thức thực chiến giúp bạn phát triển bản thân và xây dựng sự nghiệp.',
+      messageDetail: 'MBC mang đến những tri thức thực chiến giúp bạn phát triển bản thân và xây dựng sự nghiệp.',
       messageImage: null,
       showCommunity: true,
       showAllCourses: true,
-      communityTitle: 'Cộng đồng BRK',
+      communityTitle: 'Cộng đồng MBC',
       coursesTitle: 'Khóa học nổi bật',
       allCoursesTitle: 'Tất cả khóa học',
       footerText: '© 2026 Ngân hàng Phước Báu. Mọi quyền được bảo lưu.',
-      metaTitle: 'BRK - Ngân hàng Phước Báu',
+      metaTitle: 'MBC - Ngân hàng Phước Báu',
       metaDescription: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
       themeId: defaultTheme?.id || null,
       ...(defaultCampaign?.id ? { affiliateCampaign: { connect: { id: defaultCampaign.id } } } : {}),

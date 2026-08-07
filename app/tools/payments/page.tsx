@@ -206,14 +206,14 @@ export default function PaymentsPage() {
   }
 
   async function handleRevertToPending(enrollmentIds: number[]) {
-    if (!confirm(`Xác nhận đổi ${enrollmentIds.length} đăng ký về trạng thái CHỜ DUYỆT?\n\nTất cả dữ liệu BRK của thành viên sẽ bị xóa, hệ thống giữ nguyên.`)) return
+    if (!confirm(`Xác nhận đổi ${enrollmentIds.length} đăng ký về trạng thái CHỜ DUYỆT?\n\nTất cả dữ liệu MBC của thành viên sẽ bị xóa, hệ thống giữ nguyên.`)) return
     setBulkLoading(true)
     const result = await revertToPendingAction(enrollmentIds)
     if (result.success) {
       const messages: string[] = []
       
       if (result.brkReverted && result.brkReverted.length > 0) {
-        messages.push(`✅ Đã phẫu thuật revert ${result.brkReverted.length} BRK member: ${result.brkReverted.map(r => `#${r.userId}`).join(', ')}`)
+        messages.push(`✅ Đã phẫu thuật revert ${result.brkReverted.length} MBC member: ${result.brkReverted.map(r => `#${r.userId}`).join(', ')}`)
       }
       if (result.errors && result.errors.length > 0) {
         messages.push(`⚠️ Lỗi (${result.errors.length}): ${result.errors.map(e => `#${e.enrollmentId}: ${e.reason}`).join('; ')}`)
@@ -231,8 +231,8 @@ export default function PaymentsPage() {
   }
 
   async function handleResetSystem(courseId: number) {
-    if (!confirm('⚠️ Xóa TOÀN BỘ dữ liệu BRK của hệ thống này?\n\nTất cả thành viên, ví, hoa hồng, lịch sử sẽ bị xóa sạch.\nBạn sẽ phải rebuild thủ công sau.')) return
-    if (!confirm('Xác nhận LẦN CUỐI: Xóa toàn bộ dữ liệu BRK?')) return
+    if (!confirm('⚠️ Xóa TOÀN BỘ dữ liệu MBC của hệ thống này?\n\nTất cả thành viên, ví, hoa hồng, lịch sử sẽ bị xóa sạch.\nBạn sẽ phải rebuild thủ công sau.')) return
+    if (!confirm('Xác nhận LẦN CUỐI: Xóa toàn bộ dữ liệu MBC?')) return
     setBulkLoading(true)
     const result = await resetSystemForRebuildAction(undefined, courseId)
     if (result.success) {
@@ -506,10 +506,10 @@ export default function PaymentsPage() {
                     </span>
                   </div>
 
-                  {/* Info: Học viên */}
+                  {/* Info: Thành viên */}
                   <div className="bg-gray-50 rounded-lg p-2.5 text-xs space-y-1 mb-2.5">
                     <div className="flex items-center justify-between gap-1.5 border-b border-gray-200 pb-1 mb-1">
-                      <span className="text-[9px] text-gray-400 font-bold uppercase">Học viên</span>
+                      <span className="text-[9px] text-gray-400 font-bold uppercase">Thành viên</span>
                       <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[9px]">
                         #{payment.enrollment.user.id}
                       </span>
@@ -766,7 +766,7 @@ export default function PaymentsPage() {
                               onClick={() => handleRevertToPending([payment.enrollment.id])}
                               disabled={bulkLoading}
                               className="flex items-center gap-1 px-2 py-1.5 bg-yellow-50 border border-yellow-200 text-yellow-700 hover:bg-yellow-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
-                              title="Xóa dữ liệu BRK thành viên, giữ nguyên hệ thống"
+                              title="Xóa dữ liệu MBC thành viên, giữ nguyên hệ thống"
                             >
                               <RotateCcw className="w-3 h-3" />
                               Revert thành viên
@@ -776,7 +776,7 @@ export default function PaymentsPage() {
                                 onClick={() => handleResetSystem(payment.enrollment.course.id)}
                                 disabled={bulkLoading}
                                 className="flex items-center gap-1 px-2 py-1.5 bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 rounded-lg font-bold text-[10px] transition-colors disabled:opacity-50"
-                                title="Xóa toàn bộ dữ liệu BRK hệ thống, rebuild thủ công"
+                                title="Xóa toàn bộ dữ liệu MBC hệ thống, rebuild thủ công"
                               >
                                 <Ban className="w-3 h-3" />
                                 Xóa toàn bộ system

@@ -89,7 +89,7 @@ async function processTeamCommission(
   applicationStart: Date,
   runTime: Date,
 ) {
-  // Bỏ qua tính hoa hồng tập trung ở chu kỳ 30h vì đã được phân bổ real-time khi học viên chính thức
+  // Bỏ qua tính hoa hồng tập trung ở chu kỳ 30h vì đã được phân bổ real-time khi thành viên chính thức
   const previousCycle = cycleNumber - 30
   const periodStart = new Date(applicationStart.getTime() + previousCycle * HOUR_MS)
   const periodEnd = new Date(applicationStart.getTime() + cycleNumber * HOUR_MS)

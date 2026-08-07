@@ -122,14 +122,14 @@ function CreateCampaignContent() {
 
   const getRecipientSources = () => {
     const sources = [
-      { value: 'DB_ACTIVE', label: 'Học viên đang học trong khóa' },
+      { value: 'DB_ACTIVE', label: 'Thành viên đang học trong khóa' },
       { value: 'CSV', label: 'Danh sách tự nhập thủ công (Email/Tên)' },
       { value: 'GOOGLE_SHEET', label: 'Link Google Sheet chứa Email' },
     ]
     if (!isTeacher) {
       sources.unshift(
-        { value: 'DB_ALL', label: 'Tất cả học viên (đã xác thực email)' },
-        { value: 'DB_ALL_INCLUDING_UNVERIFIED', label: 'Tất cả học viên (cả chưa xác thực email)' }
+        { value: 'DB_ALL', label: 'Tất cả thành viên (đã xác thực email)' },
+        { value: 'DB_ALL_INCLUDING_UNVERIFIED', label: 'Tất cả thành viên (cả chưa xác thực email)' }
       )
     }
     return sources

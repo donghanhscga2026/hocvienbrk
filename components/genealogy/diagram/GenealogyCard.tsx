@@ -93,14 +93,14 @@ export const GenealogyCard = (props: NodeProps) => {
           <div 
             onClick={(e) => { e.stopPropagation(); data.onShowSharingTree?.(data.id, data.name); }}
             className="absolute -top-2.5 -right-1.5 z-20 px-1.5 py-0.5 bg-emerald-600 text-white text-[10px] font-black rounded-full shadow-md leading-none cursor-pointer hover:scale-110 active:scale-95 transition-transform" 
-            title="Số học viên phát triển được (nhân mạch chia sẻ) - Click để xem danh sách"
+            title="Số thành viên phát triển được (nhân mạch chia sẻ) - Click để xem danh sách"
           >
             ${data.sharingCount}
           </div>
         )}
 
         <div className="font-bold text-[20px] text-slate-800 line-clamp-2 leading-tight uppercase mb-1.5 w-full px font-sans">
-          {data.name || 'Học viên'}
+          {data.name || 'Thành viên'}
         </div>
 
         {hasTcaData ? (

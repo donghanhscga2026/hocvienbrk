@@ -1,5 +1,5 @@
 # 04. AFFILIATE VÀ HỆ THỐNG GIỚI THIỆU
-> **Mục đích**: Tài liệu này mô tả logic vận hành của hệ thống Tiếp thị liên kết (Affiliate), bao gồm cơ chế theo dõi chuyển đổi, tính toán hoa hồng đa cấp và quản lý ví điện tử của học viên.
+> **Mục đích**: Tài liệu này mô tả logic vận hành của hệ thống Tiếp thị liên kết (Affiliate), bao gồm cơ chế theo dõi chuyển đổi, tính toán hoa hồng đa cấp và quản lý ví điện tử của thành viên.
 
 ---
 
@@ -26,7 +26,7 @@ Dự án hỗ trợ trả hoa hồng lên tới nhiều tầng (mặc định l�
   - Ghi nhận ở trạng thái **PENDING** và tự động chuyển sang **AVAILABLE** sau một khoảng thời gian chờ (vd: 30 ngày) để tránh rủi ro hoàn tiền.
 
 ### 3. Quản lý Ví và Giao dịch (Wallet & Transactions)
-Mỗi học viên có một ví điện tử (`AffiliateWallet`) gồm các số dư:
+Mỗi thành viên có một ví điện tử (`AffiliateWallet`) gồm các số dư:
 - **Balance**: Số dư khả dụng (có thể rút).
 - **Pending Balance**: Hoa hồng đang chờ duyệt.
 - **Points**: Điểm thưởng tích lũy từ việc giới thiệu đăng ký.
@@ -41,7 +41,7 @@ Mỗi học viên có một ví điện tử (`AffiliateWallet`) gồm các số
 
 ### 1. Cách lấy Link giới thiệu
 - Truy cập vào menu **Cá nhân** -> **Hệ thống Affiliate** (nếu có quyền).
-- Copy mã học viên (#ID) của bạn. Link giới thiệu của bạn sẽ có định dạng: `https://giautoandien.io.vn/?ref=YOUR_ID`.
+- Copy mã thành viên (#ID) của bạn. Link giới thiệu của bạn sẽ có định dạng: `https://giautoandien.io.vn/?ref=YOUR_ID`.
 - Bạn có thể gửi link này cho bạn bè hoặc chia sẻ lên mạng xã hội.
 
 ### 2. Xem Thống kê & Thu nhập

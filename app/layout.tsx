@@ -22,29 +22,29 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "BRK - Ngân hàng Phước Báu",
-    template: "%s | BRK - Ngân hàng Phước Báu",
+    default: "MBC - Ngân hàng Phước Báu",
+    template: "%s | MBC - Ngân hàng Phước Báu",
   },
   description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
   openGraph: {
-    title: "BRK - Ngân hàng Phước Báu",
+    title: "MBC - Ngân hàng Phước Báu",
     description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
     type: "website",
     locale: "vi_VN",
     url: "https://giautoandien.io.vn",
-    siteName: "BRK - Ngân hàng Phước Báu",
+    siteName: "MBC - Ngân hàng Phước Báu",
     images: [
       {
         url: "https://giautoandien.io.vn/og-image.png",
         width: 1200,
         height: 630,
-        alt: "BRK - Ngân hàng Phước Báu",
+        alt: "MBC - Ngân hàng Phước Báu",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BRK - Ngân hàng Phước Báu",
+    title: "MBC - Ngân hàng Phước Báu",
     description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
     images: ["https://giautoandien.io.vn/og-image.png"],
   },

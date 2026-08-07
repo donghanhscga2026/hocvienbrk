@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
           const refName = referrerUser?.name || ''
           referrerInfo = `\n📢 Người giới thiệu: #${user.referrerId}${refName ? ' (' + refName + ')' : ''}\n🔗 Link ref: ${appUrl}/?ref=${refCode}`
         }
-        const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${referrerInfo}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
+        const msg = `✅ <b>XÁC MINH THÀNH CÔNG</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${referrerInfo}\n\n🔓 Tài khoản đã chính thức được kích hoạt.`;
         await sendTelegram(msg, 'REGISTER');
 
         const { logActivity } = await import("@/lib/activity-logger");

@@ -98,7 +98,7 @@ export async function activateBrkMember(
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
   if (isOptionB || isMbtca) {
-    // 1. Ghi nhận giao dịch JOIN cho chính học viên đó
+    // 1. Ghi nhận giao dịch JOIN cho chính thành viên đó
     const joinDesc = await makeSystemSnapshotDescription(
       userId,
       onSystem,
@@ -308,7 +308,7 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
       userId,
       fee,
       'RETURN_FEE',
-      `Hoàn 100% phí tham gia BRK (hủy trong thời gian cân nhắc)`,
+      `Hoàn 100% phí tham gia MBC (hủy trong thời gian cân nhắc)`,
       `cancel_grace_sys_${onSystem}`
     )
     // BRKD refund equal to self BRKD

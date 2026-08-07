@@ -42,7 +42,7 @@ export async function getSurveyFlow(id: number) {
 }
 
 /**
- * Lấy bài khảo sát đang được kích hoạt (Cho học viên)
+ * Lấy bài khảo sát đang được kích hoạt (Cho thành viên)
  */
 export async function getActiveSurvey() {
     try {

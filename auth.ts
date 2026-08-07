@@ -58,7 +58,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     logger: {
         error(error: Error) {
             if (error.name === "CredentialsSignin" || error.message?.includes("CredentialsSignin")) {
-                // Chỉ ghi cảnh báo ngắn gọn cho lỗi gõ sai mật khẩu của học viên, ẩn stack trace
+                // Chỉ ghi cảnh báo ngắn gọn cho lỗi gõ sai mật khẩu của thành viên, ẩn stack trace
                 console.warn(`⚠️ [Auth] CredentialsSignin: Đăng nhập thất bại (Sai mật khẩu hoặc thông tin).`);
                 return;
             }
@@ -109,14 +109,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 let user = null;
                 let potentialId = NaN;
 
-                // 1. Thử nhận diện ID học viên (nếu chỉ chứa các ký số)
+                // 1. Thử nhận diện ID thành viên (nếu chỉ chứa các ký số)
                 const isNumericOnly = /^\d+$/.test(identifier);
                 if (isNumericOnly) {
                     potentialId = parseInt(identifier);
                 }
 
                 if (!isNaN(potentialId) && potentialId >= 0 && potentialId < 2147483647) {
-                    console.log(`🔍 [Auth] Đang kiểm tra đăng nhập theo ID học viên: #${potentialId}`);
+                    console.log(`🔍 [Auth] Đang kiểm tra đăng nhập theo ID thành viên: #${potentialId}`);
                     user = await prisma.user.findUnique({
                         where: { id: potentialId }
                     });
@@ -144,7 +144,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                             '+84+84' + cleanPhone,
                             '+8484' + cleanPhone,
                         ];
-                        console.log(`🔍 [Auth] Đang tìm kiếm học viên theo các biến thể SĐT:`, phoneVariants);
+                        console.log(`🔍 [Auth] Đang tìm kiếm thành viên theo các biến thể SĐT:`, phoneVariants);
                         user = await prisma.user.findFirst({
                             where: {
                                 phone: { in: phoneVariants }
@@ -156,7 +156,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 // 3. Thử tìm kiếm theo Email (nếu nhập vào có ký tự @)
                 if (!user && identifier.includes('@')) {
                     const normalizedEmail = identifier.toLowerCase().trim();
-                    console.log(`🔍 [Auth] Đang tìm kiếm học viên theo Email: ${normalizedEmail}`);
+                    console.log(`🔍 [Auth] Đang tìm kiếm thành viên theo Email: ${normalizedEmail}`);
                     user = await prisma.user.findFirst({
                         where: {
                             email: { equals: normalizedEmail, mode: 'insensitive' }
@@ -170,7 +170,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                 if (!user) {
                     isLoginFailed = true;
-                    failReason = "Không tìm thấy tài khoản học viên";
+                    failReason = "Không tìm thấy tài khoản thành viên";
                     if (/^\d+$/.test(identifier)) {
                         errorCode = "STUDENT_ID_NOT_FOUND";
                     } else if (identifier.includes('@')) {
@@ -395,9 +395,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         metadata: { ip, userAgent, provider: account?.provider }
                     });
 
-                    // GỬI THÔNG BÁO XÁC MINH CHO HỌC VIÊN CHƯA XÁC MINH
+                    // GỬI THÔNG BÁO XÁC MINH CHO THÀNH VIÊN CHƯA XÁC MINH
                     if ((user as any).isUnverified) {
-                        console.log(`📧 Gửi nhắc nhở xác minh cho học viên cũ: ${user.email}`);
+                        console.log(`📧 Gửi nhắc nhở xác minh cho thành viên cũ: ${user.email}`);
                         const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                         
                         await prisma.verificationToken.upsert({

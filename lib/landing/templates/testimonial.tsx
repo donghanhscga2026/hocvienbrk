@@ -88,7 +88,7 @@ export function TestimonialTemplate({
                                 <div className="text-3xl md:text-4xl font-bold mb-1" style={{ color: accentColor }}>
                                     {stats.students}
                                 </div>
-                                <div className="text-gray-500">Học viên</div>
+                                <div className="text-gray-500">Thành viên</div>
                             </div>
                             <div>
                                 <div className="text-3xl md:text-4xl font-bold mb-1" style={{ color: accentColor }}>
@@ -112,7 +112,7 @@ export function TestimonialTemplate({
                 <section className="py-16 md:py-24">
                     <div className="container mx-auto px-4">
                         <h2 className="text-3xl font-bold text-center mb-12">
-                            Học viên nói gì về chúng tôi
+                            Thành viên nói gì về chúng tôi
                         </h2>
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {testimonials.map((testimonial, index) => (
@@ -183,7 +183,7 @@ export function TestimonialTemplate({
             <section className="py-16 md:py-24 text-center" style={{ backgroundColor: config.sectionBgColor || '#f9fafb' }}>
                 <div className="container mx-auto px-4">
                     <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                        Trở thành học viên ngay hôm nay
+                        Trở thành thành viên ngay hôm nay
                     </h2>
                     <Link
                         href={finalCtaLink}

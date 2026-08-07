@@ -36,7 +36,7 @@ Hệ thống không sử dụng các dịch vụ SMTP truyền thống (thườn
 
 ### 2. Tạo Chiến dịch mới
 1. Nhấn **"+ Tạo chiến dịch"**.
-2. **Chọn Người nhận**: Bạn có thể chọn gửi cho Toàn bộ học viên, Học viên một khóa học cụ thể, hoặc Tải lên file Excel/CSV.
+2. **Chọn Người nhận**: Bạn có thể chọn gửi cho Toàn bộ thành viên, Thành viên một khóa học cụ thể, hoặc Tải lên file Excel/CSV.
 3. **Soạn thảo**: Viết Tiêu đề và Nội dung thư. Hệ thống hỗ trợ định dạng HTML để bạn có thể chèn ảnh và nút bấm chuyên nghiệp.
 4. **Kiểm tra**: Luôn nhấn "Gửi thử" đến email cá nhân của bạn để xem định dạng hiển thị trước khi chạy chiến dịch thật.
 

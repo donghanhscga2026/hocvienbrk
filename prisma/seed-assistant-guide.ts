@@ -5,14 +5,14 @@ const prisma = new PrismaClient()
 const guides = [
   {
     pagePath: '/',
-    title: 'Chào mừng đến với BRK',
-    script: 'Chào mừng bạn đến với Học viện BRK - Ngân hàng Phước Báu. Tôi là trợ lý ảo của bạn. Tại đây, bạn có thể khám phá các khóa học, theo dõi lộ trình phát triển bản thân và kết nối với cộng đồng. Hãy bắt đầu hành trình của bạn ngay hôm nay!',
-    textContent: `Chào mừng bạn đến với Học viện BRK!
+    title: 'Chào mừng đến với MBC',
+    script: 'Chào mừng bạn đến với Cộng đồng MBC - Ngân hàng Phước Báu. Tôi là trợ lý ảo của bạn. Tại đây, bạn có thể khám phá các khóa học, theo dõi lộ trình phát triển bản thân và kết nối với cộng đồng. Hãy bắt đầu hành trình của bạn ngay hôm nay!',
+    textContent: `Chào mừng bạn đến với Cộng đồng MBC!
 
-BRK - Ngân hàng Phước Báu là nền tảng đào tạo trực tuyến, nơi bạn có thể:
+MBC - Ngân hàng Phước Báu là nền tảng đào tạo trực tuyến, nơi bạn có thể:
 • Khám phá các khóa học đa dạng về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính - Kinh doanh - Đầu tư và Công nghệ AI
 • Theo dõi lộ trình phát triển cá nhân
-• Kết nối với cộng đồng học viên
+• Kết nối với cộng đồng thành viên
 • Tham gia hệ thống Affiliate để kiếm thêm thu nhập
 
 Hãy sử dụng menu điều hướng phía trên để bắt đầu!`,
@@ -22,11 +22,11 @@ Hãy sử dụng menu điều hướng phía trên để bắt đầu!`,
   {
     pagePath: '/tools',
     title: 'Hướng dẫn Tools',
-    script: 'Đây là trang công cụ dành cho học viên và quản trị viên. Bạn có thể quản lý khóa học, học viên, thanh toán, cây nhân mạch và nhiều tính năng khác. Chọn một công cụ từ danh sách để bắt đầu.',
+    script: 'Đây là trang công cụ dành cho thành viên và quản trị viên. Bạn có thể quản lý khóa học, thành viên, thanh toán, cây nhân mạch và nhiều tính năng khác. Chọn một công cụ từ danh sách để bắt đầu.',
     textContent: `Trang Tools tập hợp tất cả công cụ quản trị và học tập:
 
 • Quản lý Khóa học: Thêm, sửa, xóa bài giảng
-• Quản lý Học viên: Xem danh sách, thông tin chi tiết
+• Quản lý Thành viên: Xem danh sách, thông tin chi tiết
 • Quản lý Thanh toán: Xác nhận và theo dõi giao dịch
 • Cây Nhân mạch: Theo dõi hệ thống tổ chức
 • Email Marketing: Tạo chiến dịch email

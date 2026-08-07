@@ -124,7 +124,7 @@ export async function verifyPaymentAction(
     if (result.brkResult?.activated && result.brkResult.placement) {
       const p = result.brkResult.placement
       let teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
-        `👤 Học viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId || preCheck.userId})\n` +
+        `👤 Thành viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId || preCheck.userId})\n` +
         `📞 SĐT: ${result.studentPhone || 'N/A'}\n` +
         `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
         `${refLink}💰 Số tiền: ${(result.effectiveAmount || 0).toLocaleString()}đ\n` +
@@ -141,7 +141,7 @@ export async function verifyPaymentAction(
     } else if (result.brkResult && !result.brkResult.activated) {
       // Non-BRK course or no BRK config — simple notification
       const teleMsg = `✅ <b>KÍCH HOẠT THỦ CÔNG THÀNH CÔNG</b>\n\n` +
-        `👤 Học viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId || preCheck.userId})\n` +
+        `👤 Thành viên: <b>${result.studentName || 'N/A'}</b> (#${result.studentId || preCheck.userId})\n` +
         `🎓 Khóa học: <b>${result.courseName} (${result.courseCode})</b>\n` +
         `${refLink}💰 Số tiền: ${(result.effectiveAmount || 0).toLocaleString()}đ\n` +
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n`
@@ -463,7 +463,7 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
             } catch (err: any) {
               errors.push({
                 enrollmentId,
-                reason: `Lỗi revert BRK member #${enrollment.userId}: ${err.message}`
+                reason: `Lỗi revert MBC member #${enrollment.userId}: ${err.message}`
               })
               continue
             }
@@ -678,7 +678,7 @@ export async function resetSystemForRebuildAction(systemId?: number, courseId?: 
       success: true,
       memberCount: systems.length,
       deletedRecords,
-      message: `Đã xóa toàn bộ dữ liệu BRK system #${systemId} (${systems.length} thành viên).`
+      message: `Đã xóa toàn bộ dữ liệu MBC system #${systemId} (${systems.length} thành viên).`
     }
   } catch (error: any) {
     console.error('Reset System For Rebuild Error:', error)

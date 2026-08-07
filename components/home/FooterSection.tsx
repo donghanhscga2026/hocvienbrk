@@ -13,7 +13,7 @@ interface FooterSectionProps {
 
 export default function FooterSection({ profile }: FooterSectionProps) {
     const [year, setYear] = useState(new Date().getFullYear()) // Sửa lỗi hydration - tính năm ở client
-    const footerText = profile.footerText || `© ${year} ${profile.title || 'BRK'}. All rights reserved.`
+    const footerText = profile.footerText || `© ${year} ${profile.title || 'MBC'}. All rights reserved.`
     const footerLinks = profile.footerLinks || []
     
     // Sửa lỗi hydration: Chỉ cập nhật năm sau khi mount ở client

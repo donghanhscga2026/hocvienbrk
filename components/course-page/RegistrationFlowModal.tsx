@@ -675,7 +675,7 @@ export default function RegistrationFlowModal({
               <>
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                   <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#A8A39C', marginBottom: '16px', lineHeight: 1.6 }}>
-                    Tham gia nhóm Zalo để nhận hỗ trợ trực tiếp từ giảng viên và cộng đồng học viên.
+                    Tham gia nhóm Zalo để nhận hỗ trợ trực tiếp từ giảng viên và cộng đồng thành viên.
                   </div>
                   <a
                     href={course.link_zalo}

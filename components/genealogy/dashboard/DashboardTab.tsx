@@ -406,7 +406,7 @@ export default function DashboardTab({ selectedSystem, setSelectedSystem, mySyst
                             </div>
                           </div>
                         </div>
-                        <Link href={`/tools/students/${m.id}`} target="_blank" className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-black hover:bg-indigo-100 transition-colors shrink-0" title="Xem hồ sơ học viên">
+                        <Link href={`/tools/students/${m.id}`} target="_blank" className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-black hover:bg-indigo-100 transition-colors shrink-0" title="Xem hồ sơ thành viên">
                           <ExternalLink className="w-3.5 h-3.5" />
                           <span className="hidden sm:inline">Hồ sơ</span>
                         </Link>

@@ -15,7 +15,7 @@ export const TEMPLATE_OPTIONS = [
     { id: 'feature-grid', name: 'Feature Grid', description: 'Lưới tính năng với biểu tượng' },
     { id: 'video-intro', name: 'Video Intro', description: 'Giới thiệu bằng video' },
     { id: 'webinar-reg', name: 'Webinar Registration', description: 'Form đăng ký webinar' },
-    { id: 'testimonial', name: 'Testimonial', description: 'Đánh giá từ học viên' },
+    { id: 'testimonial', name: 'Testimonial', description: 'Đánh giá từ thành viên' },
 ] as const
 
 export type TemplateType = typeof TEMPLATE_OPTIONS[number]['id']

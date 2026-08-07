@@ -65,7 +65,7 @@ GenealogyPage (default export)
 ### Server Actions liên quan (16 actions)
 | Action | Purpose |
 |--------|---------|
-| `getGenealogyTreeAction` | Load tree hệ thống Học viên (system=0) |
+| `getGenealogyTreeAction` | Load tree hệ thống Thành viên (system=0) |
 | `getGenealogyChildrenAction` | Lazy-load children (system=0) |
 | `getSystemTreeAction` | Load tree hệ thống số (TCA, BRK...) |
 | `getSystemChildrenAction` | Lazy-load children (hệ thống số) |

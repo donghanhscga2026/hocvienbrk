@@ -1,6 +1,6 @@
-# Hướng dẫn Kỹ thuật & Sử dụng: Tích hợp Telegram Bot cho Học viên
+# Hướng dẫn Kỹ thuật & Sử dụng: Tích hợp Telegram Bot cho Thành viên
 
-Tài liệu này hướng dẫn chi tiết về cấu trúc kỹ thuật, luồng nghiệp vụ và cách sử dụng tính năng **Liên kết tài khoản Telegram** của học viên trong hệ thống Học Viện BRK.
+Tài liệu này hướng dẫn chi tiết về cấu trúc kỹ thuật, luồng nghiệp vụ và cách sử dụng tính năng **Liên kết tài khoản Telegram** của thành viên trong hệ thống Cộng đồng MBC.
 
 ---
 
@@ -38,34 +38,34 @@ model TelegramLinkToken {
 ### B. Các Endpoint API & Server Action mới
 1.  **Server Action (`app/actions/telegram-actions.ts`)**:
     *   Hàm: `generateTelegramLinkAction()`
-    *   Nhiệm vụ: Lấy `userId` của học viên đang đăng nhập, sinh token UUID ngẫu nhiên, lưu vào DB và trả về liên kết: `https://t.me/<BOT_USERNAME>?start=<TOKEN>`.
+    *   Nhiệm vụ: Lấy `userId` của thành viên đang đăng nhập, sinh token UUID ngẫu nhiên, lưu vào DB và trả về liên kết: `https://t.me/<BOT_USERNAME>?start=<TOKEN>`.
 2.  **Webhook Handler (`app/api/webhooks/telegram/route.ts`)**:
-    *   Nhiệm vụ: Đón nhận tin nhắn gửi từ Telegram Bot. Khi nhận lệnh `/start <UUID_TOKEN>`, Webhook sẽ đối soát, liên kết `chatId` của Telegram vào học viên tương ứng, đánh dấu token đã dùng, và gửi tin nhắn chúc mừng thành công.
+    *   Nhiệm vụ: Đón nhận tin nhắn gửi từ Telegram Bot. Khi nhận lệnh `/start <UUID_TOKEN>`, Webhook sẽ đối soát, liên kết `chatId` của Telegram vào thành viên tương ứng, đánh dấu token đã dùng, và gửi tin nhắn chúc mừng thành công.
 3.  **API Gửi thông báo cá nhân (`app/api/telegram/send/route.ts`)**:
     *   Phương thức: `POST`
     *   Headers: `Authorization: Bearer <TELEGRAM_WEBHOOK_SECRET>`
     *   Body: `{ "userId": number, "message": string }`
-    *   Nhiệm vụ: Tìm kiếm `telegramChatId` của học viên theo `userId` và chủ động gửi tin nhắn riêng tư.
+    *   Nhiệm vụ: Tìm kiếm `telegramChatId` của thành viên theo `userId` và chủ động gửi tin nhắn riêng tư.
 
 ---
 
 ## 2. Hướng dẫn Luồng Liên kết Tài khoản (Từng bước)
 
 ### Bước 1: Sinh link kết nối trên Website
-Khi học viên đăng nhập vào trang cá nhân (hoặc Dashboard) và bấm nút **"Liên kết tài khoản Telegram"**:
+Khi thành viên đăng nhập vào trang cá nhân (hoặc Dashboard) và bấm nút **"Liên kết tài khoản Telegram"**:
 1. Frontend sẽ gọi Server Action `generateTelegramLinkAction()`.
 2. Hệ thống tạo ra một Token có dạng UUID (ví dụ: `4f7b6b1a-289e-4c7b-891d-66e2c5e59b4d`) có hiệu lực trong 15 phút.
-3. Website nhận về liên kết và tự động mở tab mới chuyển hướng học viên đến:
+3. Website nhận về liên kết và tự động mở tab mới chuyển hướng thành viên đến:
    `https://t.me/HocVienBRKBot?start=4f7b6b1a-289e-4c7b-891d-66e2c5e59b4d`
 
 ### Bước 2: Kích hoạt liên kết trên ứng dụng Telegram
-1. Ứng dụng Telegram của học viên mở đoạn chat với Bot hệ thống.
-2. Học viên bấm nút **START** ở phía dưới màn hình (Telegram sẽ tự động gửi tin nhắn `/start 4f7b6b1a-289e-4c7b-891d-66e2c5e59b4d` lên Webhook).
+1. Ứng dụng Telegram của thành viên mở đoạn chat với Bot hệ thống.
+2. Thành viên bấm nút **START** ở phía dưới màn hình (Telegram sẽ tự động gửi tin nhắn `/start 4f7b6b1a-289e-4c7b-891d-66e2c5e59b4d` lên Webhook).
 3. Webhook xử lý:
    *   Nếu Token hợp lệ: Đánh dấu đã dùng, cập nhật cột `telegramChatId` trên User, và phản hồi tin nhắn:
        > **🎉 KẾT NỐI TÀI KHOẢN THÀNH CÔNG!**
        >
-       > ✅ Tài khoản Telegram của bạn đã được liên kết thành công với Học Viện BRK.
+       > ✅ Tài khoản Telegram của bạn đã được liên kết thành công với Cộng đồng MBC.
        > Bạn sẽ nhận được các thông báo học tập quan trọng (lịch học Zoom, thông tin tài khoản, xác nhận thanh toán) trực tiếp tại đây.
    *   Nếu Token hết hạn hoặc đã dùng: Bot sẽ phản hồi:
        > **❌ LIÊN KẾT THẤT BẠI**
@@ -81,7 +81,7 @@ Bạn có thể import hàm `sendTelegramToUser` từ `@/lib/telegram-bot` để
 ```typescript
 import { sendTelegramToUser } from "@/lib/telegram-bot"
 
-// Gửi tin nhắn thông báo riêng cho học viên có ID là 1141
+// Gửi tin nhắn thông báo riêng cho thành viên có ID là 1141
 await sendTelegramToUser(
   1141, 
   `<b>🔔 LỊCH HỌC ZOOM MỚI</b>\n\n` +

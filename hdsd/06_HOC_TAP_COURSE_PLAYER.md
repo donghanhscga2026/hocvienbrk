@@ -19,7 +19,7 @@ Hệ thống hỗ trợ 4 định dạng bài học linh hoạt thông qua trư�
 - **YouTube Integration**: Sử dụng `react-player` để nhúng video. Hệ thống tự động trích xuất `videoId` từ link YouTube để tối ưu hóa việc tải.
 - **Tiến độ (Progress Tracking)**: 
   - Hệ thống tự động lưu vị trí đang xem (`maxTime`) mỗi khi người dùng xem thêm 10% thời lượng.
-  - Sử dụng Server Action `saveVideoProgressAction` để đảm bảo dữ liệu không bị mất khi học viên tắt trình duyệt đột ngột.
+  - Sử dụng Server Action `saveVideoProgressAction` để đảm bảo dữ liệu không bị mất khi thành viên tắt trình duyệt đột ngột.
 - **Auto-links**: Toàn bộ các đường dẫn URL trong mô tả bài học được tự động chuyển thành link clickable nhờ hàm `makeLinksClickable`.
 
 ### 3. Hệ thống Ghi nhận & Chấm điểm (Assignment)
@@ -31,8 +31,8 @@ Mỗi bài học (trừ khóa học kho tài liệu - LIB) đều có một Form
 - **Trạng thái Hoàn thành**: Bài học được coi là **COMPLETED** khi tổng điểm đạt từ **5/10** trở lên.
 
 ### 4. Lộ trình học tập (Roadmap Logic)
-- **Khóa bài học**: Học viên bắt buộc phải hoàn thành bài học trước (Status: COMPLETED) thì bài học tiếp theo mới được mở khóa (`unlocked`).
-- **Ngày bắt đầu**: Học viên phải xác nhận "Ngày bắt đầu học" để hệ thống tính toán điểm thưởng hoàn thành đúng hạn.
+- **Khóa bài học**: Thành viên bắt buộc phải hoàn thành bài học trước (Status: COMPLETED) thì bài học tiếp theo mới được mở khóa (`unlocked`).
+- **Ngày bắt đầu**: Thành viên phải xác nhận "Ngày bắt đầu học" để hệ thống tính toán điểm thưởng hoàn thành đúng hạn.
 
 ---
 
@@ -42,7 +42,7 @@ Mỗi bài học (trừ khóa học kho tài liệu - LIB) đều có một Form
 - **Cột Trái (Sidebar)**: Danh sách bài học và tiến độ tổng thể. Các bài học có biểu tượng 🔒 là bài học chưa được mở.
 - **Khu vực Trung tâm**: 
   - **Trình phát**: Xem video hoặc đọc nội dung văn bản.
-  - **Thảo luận**: Chat trực tiếp với giáo viên và các học viên khác ngay dưới mỗi bài học.
+  - **Thảo luận**: Chat trực tiếp với giáo viên và các thành viên khác ngay dưới mỗi bài học.
 - **Cột Phải (Form ghi nhận)**: Nơi bạn viết cảm nhận và nộp bài tập sau khi xem xong video.
 
 ### 2. Trải nghiệm trên Mobile

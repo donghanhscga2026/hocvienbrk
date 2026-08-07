@@ -18,7 +18,7 @@ const LANDINGS = [
                 'Học từ cơ bản đến nâng cao',
                 'Cập nhật xu hướng mới nhất',
                 'Hỗ trợ 1-1 từ giảng viên',
-                'Cộng đồng học viên 5000+ members'
+                'Cộng đồng thành viên 5000+ members'
             ]
         },
         isActive: true,

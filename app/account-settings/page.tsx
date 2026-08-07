@@ -413,7 +413,7 @@ export default function AccountSettingsPage() {
                         <div>
                             <label className="block text-sm text-brk-muted mb-2">
                                 <Hash className="inline h-4 w-4 mr-2" />
-                                ID Học viên
+                                ID Thành viên
                             </label>
                             <input
                                 type="text"

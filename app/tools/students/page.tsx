@@ -31,7 +31,7 @@ interface StudentData {
 
 const roleConfig: Record<string, { label: string; icon: any; color: string; bgColor: string; textColor: string }> = {
   ALL: { label: 'Tất cả', icon: Users, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
-  STUDENT: { label: 'Học viên', icon: GraduationCap, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
+  STUDENT: { label: 'Thành viên', icon: GraduationCap, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
   ADMIN: { label: 'Quản trị', icon: Shield, color: 'text-red-600', bgColor: 'bg-red-100', textColor: 'text-red-700' },
   INSTRUCTOR: { label: 'Giảng viên', icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
   AFFILIATE: { label: 'Đối tác', icon: Handshake, color: 'text-green-600', bgColor: 'bg-green-100', textColor: 'text-green-700' },
@@ -243,7 +243,7 @@ export default function ToolsStudentsPage() {
             <div className="flex gap-2">
               <div className="flex-1 flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl bg-gray-100 text-gray-600 border-2 border-yellow-400 ring-2 ring-yellow-400 ring-offset-1 shadow-lg">
                 <GraduationCap className="w-4 h-4" />
-                <span className="text-[9px] font-black uppercase tracking-tight leading-tight">Học viên</span>
+                <span className="text-[9px] font-black uppercase tracking-tight leading-tight">Thành viên</span>
                 <span className="text-[10px] font-bold">{roleCounts['ALL'] ?? 0}</span>
               </div>
 

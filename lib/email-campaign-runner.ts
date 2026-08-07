@@ -235,7 +235,7 @@ export async function sendGmailFromSender(
   });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-  const fromName = 'Học Viện BRK';
+  const fromName = 'Cộng đồng MBC';
 
   const encodeHeader = (str: string) => { 
     if (!str) return ""; 
@@ -348,7 +348,7 @@ export async function sendViaBrevo(
     subject,
     htmlContent: html,
     sender: {
-      name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Học Viện BRK',
+      name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Cộng đồng MBC',
       email: sender.email || process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com',
     },
     tags: [],
@@ -391,7 +391,7 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
     }
   }
 
-  // 2. Tất cả học viên đã xác thực email
+  // 2. Tất cả thành viên đã xác thực email
   if (campaign.recipientSource === "DB_ALL") {
     const users = await prisma.user.findMany({
       where: {
@@ -403,7 +403,7 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
     return users.map(u => ({ email: u.email, name: u.name || "", userId: u.id }));
   }
 
-  // 3. Tất cả học viên (gồm cả chưa xác thực email)
+  // 3. Tất cả thành viên (gồm cả chưa xác thực email)
   if (campaign.recipientSource === "DB_ALL_INCLUDING_UNVERIFIED") {
     const users = await prisma.user.findMany({
       where: {
@@ -414,7 +414,7 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
     return users.map(u => ({ email: u.email, name: u.name || "", userId: u.id }));
   }
 
-  // 4. Học viên đang active trong khóa học cụ thể
+  // 4. Thành viên đang active trong khóa học cụ thể
   if (campaign.recipientSource === "DB_ACTIVE") {
     const filter = campaign.recipientFilter as any;
     const courseId = filter?.courseId ? parseInt(filter.courseId) : null;

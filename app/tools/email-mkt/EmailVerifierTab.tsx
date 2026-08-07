@@ -91,7 +91,7 @@ export default function EmailVerifierTab() {
         // Select all by default
         setSelectedUserIds(new Set(data.users.map((u: UserItem) => u.id)))
       } else {
-        setErrorMsg(data.error || 'Không thể tải danh sách học viên')
+        setErrorMsg(data.error || 'Không thể tải danh sách thành viên')
       }
     } catch (e: any) {
       setErrorMsg(e.message)
@@ -372,7 +372,7 @@ export default function EmailVerifierTab() {
             Trình Xác Thực & Lọc Email Hoạt Động
           </h2>
           <p className="text-[10px] text-gray-500 mt-0.5">
-            Kiểm tra tính tồn tại của hòm thư học viên bằng phương thức gửi thư mẫu kết nối để loại bỏ email ảo/bị khóa.
+            Kiểm tra tính tồn tại của hòm thư thành viên bằng phương thức gửi thư mẫu kết nối để loại bỏ email ảo/bị khóa.
           </p>
         </div>
 
@@ -430,7 +430,7 @@ export default function EmailVerifierTab() {
               <h3 className="text-[10px] font-black text-gray-900 uppercase tracking-wider">Hành Động</h3>
               <div className="flex flex-col gap-2">
                 <div className="text-[10px] text-gray-400 font-bold">
-                  Đã chọn: <span className="text-orange-600 font-black">{selectedUserIds.size}</span> học viên
+                  Đã chọn: <span className="text-orange-600 font-black">{selectedUserIds.size}</span> thành viên
                 </div>
                 <button
                   onClick={handleStartVerification}
@@ -490,8 +490,8 @@ export default function EmailVerifierTab() {
                         className="rounded text-orange-500 focus:ring-orange-500 cursor-pointer h-3.5 w-3.5"
                       />
                     </th>
-                    <th className="p-3 w-20">Mã HV</th>
-                    <th className="p-3">Học viên</th>
+                    <th className="p-3 w-20">Mã TV</th>
+                    <th className="p-3">Thành viên</th>
                     <th className="p-3">Email</th>
                     <th className="p-3 w-28 text-center">Xác minh</th>
                   </tr>
@@ -685,11 +685,9 @@ export default function EmailVerifierTab() {
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                    <th className="p-3 w-20">Mã HV</th>
-                    <th className="p-3">Học viên</th>
-                    <th className="p-3">Email</th>
-                    <th className="p-3">Trạng thái kỹ thuật</th>
-                    <th className="p-3 w-28 text-center">Kết luận</th>
+                    <th className="p-3 w-20">Mã TV</th>
+                    <th className="p-3">Thành viên</th>
+
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 text-xs">

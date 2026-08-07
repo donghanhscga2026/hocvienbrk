@@ -11,7 +11,7 @@ Hệ thống sử dụng Enum `Role` trong database để phân cấp quyền h�
 | Role | Quyền hạn chính |
 |:---|:---|
 | **ADMIN** | Toàn quyền hệ thống, quản lý mọi khóa học, người dùng và tài chính. |
-| **TEACHER** | Quản lý các khóa học do mình sở hữu, duyệt học viên của chính khóa học đó. |
+| **TEACHER** | Quản lý các khóa học do mình sở hữu, duyệt thành viên của chính khóa học đó. |
 | **STUDENT** | (Mặc định) Tham gia học tập, xem phả hệ cá nhân và quản lý profile. |
 | **INSTRUCTOR** | Role dự phòng cho trợ giảng (tương đương Teacher nhưng giới hạn hơn). |
 | **AFFILIATE** | Role chuyên biệt cho các đối tác phát triển thị trường. |
@@ -60,6 +60,6 @@ Bạn có 2 cách để thay đổi ảnh:
 
 ## C. CÁC TÌNH HUỐNG THƯỜNG GẶP (FAQ)
 - **Tại sao tôi không thể lưu SĐT mới?**
-  - Có thể số điện thoại này đã được một học viên khác sử dụng. Mỗi SĐT chỉ được gắn với một ID duy nhất.
+  - Có thể số điện thoại này đã được một thành viên khác sử dụng. Mỗi SĐT chỉ được gắn với một ID duy nhất.
 - **Tôi lỡ tay xóa ảnh đại diện, làm sao lấy lại?**
   - Bạn chỉ cần tải lại ảnh mới hoặc nhấn "Lưu thay đổi" với ô link ảnh trống để quay về Avatar mặc định (chữ cái đầu của tên).

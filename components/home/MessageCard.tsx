@@ -47,7 +47,7 @@ export default function MessageCard({
     
     // Xác định tiêu đề hiển thị theo yêu cầu mới
     // Dòng 1 = title field, Dòng 2 = subtitle field, Dòng 3 = greeting động
-    const displayLine1 = isDefault ? 'BRK' : (profile.title || 'BRK')
+    const displayLine1 = isDefault ? 'MBC' : (profile.title || 'MBC')
     const displayLine2 = isDefault ? 'NGÂN HÀNG PHƯỚC BÁU' : (profile.subtitle || '')
     const subtitle = profile.subtitle || 'Mến chào bạn hữu đường xa!' // Giữ để dùng cho fallback
     const messageContent = messageContentProp ?? profile.messageContent ?? 'Học hôm nay, thành công ngày mai'
@@ -82,7 +82,7 @@ export default function MessageCard({
         setGreetingMessage(getGreeting())
         // Tính toán greeting prefix
         const prefix = session?.user && userIdStr !== ''
-            ? `Mến chào ${userName || 'Học viên'} [${userIdStr}]`
+            ? `Mến chào ${userName || 'Thành viên'} [${userIdStr}]`
             : ''
         setGreetingPrefix(prefix)
     }, [session?.user, userName, userId, userIdStr])
@@ -261,7 +261,7 @@ export default function MessageCard({
                                 {messageDetail}
                             </div>
                             <p className="text-brk-muted text-[11px] text-center pt-2 italic tracking-widest">
-                                💡 {isDefault ? 'HỌC VIỆN BRK - NGÂN HÀNG PHƯỚC BÁU' : displayLine1?.toUpperCase()}
+                                💡 {isDefault ? 'CỘNG ĐỒNG MBC - NGÂN HÀNG PHƯỚC BÁU' : displayLine1?.toUpperCase()}
                             </p>
                         </div>
 

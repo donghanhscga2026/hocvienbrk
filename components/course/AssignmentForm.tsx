@@ -233,7 +233,7 @@ export default function AssignmentForm({
         const isUpdate = isCompleted
         setLoading(true)
         try {
-            // Lấy múi giờ hiện tại của thiết bị học viên
+            // Lấy múi giờ hiện tại của thiết bị thành viên
             const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
             
             const result = await onSubmit({ 

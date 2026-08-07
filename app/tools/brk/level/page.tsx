@@ -202,7 +202,7 @@ export default function BrkLevelPage() {
             Hồ Sơ Thăng Tiến Cấp Bậc
           </h1>
           <p className="text-indigo-200 text-sm max-w-xl">
-            Theo dõi chi tiết điểm số, doanh số dồn, thu nhập đối ứng và từng mốc thăng hoa của bạn trên hệ thống BRK.
+            Theo dõi chi tiết điểm số, doanh số dồn, thu nhập đối ứng và từng mốc thăng hoa của bạn trên hệ thống MBC.
           </p>
         </div>
       </div>

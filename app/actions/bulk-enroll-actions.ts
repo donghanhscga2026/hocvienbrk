@@ -363,7 +363,7 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                       const refCode = affRef?.refKey || String(row.referrerId)
                       refLink = `\n🔗 Link ref: ${appUrl}/?ref=${refCode}`
                     }
-                    const teleMsg = `🎓 <b>BULK ENROLL - TẠO TÀI KHOẢN MỚI</b>\n👤 Học viên: <b>${row.name}</b> (#${row.userId})\n📧 Email: ${row.email}\n📚 Khóa học: <b>${course.name_lop}</b>${refLink}`
+                    const teleMsg = `🎓 <b>BULK ENROLL - TẠO TÀI KHOẢN MỚI</b>\n👤 Thành viên: <b>${row.name}</b> (#${row.userId})\n📧 Email: ${row.email}\n📚 Khóa học: <b>${course.name_lop}</b>${refLink}`
                     await sendTelegram(teleMsg, 'REGISTER')
 
                     const { logActivity } = await import('@/lib/activity-logger')

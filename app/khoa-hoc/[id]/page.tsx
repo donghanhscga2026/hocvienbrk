@@ -7,7 +7,7 @@ import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 
-const DEFAULT_OG_TITLE = 'BRK - Ngân hàng Phước Báu'
+const DEFAULT_OG_TITLE = 'MBC - Ngân hàng Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
 const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
 
@@ -117,7 +117,7 @@ export default async function KhoaHocPage({ params }: PageProps) {
             where: { lesson: { courseId }, maxTime: { gt: 0 } },
             _max: { maxTime: true }
         }),
-        // Số học viên đang học
+        // Số thành viên đang học
         prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }),
         // Testimonials từ dữ liệu thật (LessonProgress.assignment.reflection)
         prisma.lessonProgress.findMany({
@@ -156,7 +156,7 @@ export default async function KhoaHocPage({ params }: PageProps) {
             })
             .map(lp => ({
                 id: `ref-${lp.id}`,
-                name: lp.enrollment.user.name || 'Học viên',
+                name: lp.enrollment.user.name || 'Thành viên',
                 content: ((lp.assignment as Record<string, unknown>).reflection as string).trim(),
                 avatar: lp.enrollment.user.image,
                 role: `Bài ${lp.lesson.order}`,
@@ -166,7 +166,7 @@ export default async function KhoaHocPage({ params }: PageProps) {
             .filter(c => c.content && c.content.trim().length > 0)
             .map(c => ({
                 id: `cmt-${c.id}`,
-                name: c.user.name || 'Học viên',
+                name: c.user.name || 'Thành viên',
                 content: c.content.trim(),
                 avatar: c.user.image,
                 role: `Bình luận bài: ${c.lesson.title}`,

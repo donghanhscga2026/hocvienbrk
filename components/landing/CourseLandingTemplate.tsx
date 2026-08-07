@@ -279,7 +279,7 @@ export default function CourseLandingTemplate({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Users className="w-4 h-4" />
-                                        <span>{activeStudentCount} học viên</span>
+                                        <span>{activeStudentCount} thành viên</span>
                                     </div>
                                 </div>
                                 {(course.courseCategory?.name || course.category) && (
@@ -368,7 +368,7 @@ export default function CourseLandingTemplate({
                 <div className="container mx-auto px-4">
                     <div className="max-w-4xl">
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
-                            Học viên nói gì về khóa học
+                            Thành viên nói gì về khóa học
                         </h2>
                         
                         {testimonials.length > 0 ? (
@@ -421,7 +421,7 @@ export default function CourseLandingTemplate({
                                     Chưa có chia sẻ nào
                                 </h3>
                                 <p className="text-brk-muted max-w-md mx-auto leading-relaxed">
-                                    Hãy tham gia khóa học và để lại cảm nhận của bạn để giúp cộng đồng học viên có thêm động lực nhé!
+                                    Hãy tham gia khóa học và để lại cảm nhận của bạn để giúp cộng đồng thành viên có thêm động lực nhé!
                                 </p>
                             </div>
                         )}
@@ -432,7 +432,7 @@ export default function CourseLandingTemplate({
             
             {/* Footer */}
             <footer className="py-8 text-center text-brk-muted text-sm">
-                <p>© 2026 Học viện BRK. All rights reserved.</p>
+                <p>© 2026 Cộng đồng MBC. All rights reserved.</p>
             </footer>
 
             {showRegistration && (

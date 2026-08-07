@@ -9,7 +9,7 @@ import { sendSurveyNotification } from "@/lib/notifications"
 
 /**
  * Thuật toán duyệt sơ đồ Mindmap thông minh (Bản vá 6.0 - GOAL FOCUS)
- * Cập nhật Goal dựa trên điểm dừng cuối cùng của học viên
+ * Cập nhật Goal dựa trên điểm dừng cuối cùng của thành viên
  */
 function resolvePathFromFlow(flow: any, answers: Record<string, string>): { customPath: number[], goalName: string, targetPointId: number } {
     const { nodes, edges } = flow
@@ -187,7 +187,7 @@ export async function saveSurveyResultAction(answers: Record<string, string>) {
             ])
 
             sendSurveyNotification({
-                studentName: user?.name || session.user.name || 'Học viên',
+                studentName: user?.name || session.user.name || 'Thành viên',
                 studentId: userId,
                 goal: structuredGoal.mainGoal,
                 targetPointName: roadmapPoint?.name || String(targetPointId),

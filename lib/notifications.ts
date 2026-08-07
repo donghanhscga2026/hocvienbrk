@@ -18,13 +18,13 @@ import { sendTransactionalEmail } from "@/lib/brevo";
 
 // Random subject lines cho verification email (7 biến thể)
 const verificationSubjects = [
-  '[Học Viện BRK] Xác minh tài khoản của bạn',
-  '[Học Viện BRK] Kích hoạt tài khoản ngay',
-  '[Học Viện BRK] Hoàn tất đăng ký - Xác nhận email của bạn',
-  '[Học Viện BRK] Verify your account để bắt đầu học',
-  'Xác nhận đăng ký thành công - Học Viện BRK',
-  '[Học Viện BRK] Chào mừng! Xác minh email để tiếp tục',
-  'Kích hoạt tài khoản Học Viện BRK của bạn',
+  '[Cộng đồng MBC] Xác minh tài khoản của bạn',
+  '[Cộng đồng MBC] Kích hoạt tài khoản ngay',
+  '[Cộng đồng MBC] Hoàn tất đăng ký - Xác nhận email của bạn',
+  '[Cộng đồng MBC] Verify your account để bắt đầu học',
+  'Xác nhận đăng ký thành công - Cộng đồng MBC',
+  '[Cộng đồng MBC] Chào mừng! Xác minh email để tiếp tục',
+  'Kích hoạt tài khoản Cộng đồng MBC của bạn',
 ];
 
 // Random greeting styles
@@ -238,7 +238,7 @@ async function sendViaResend(to: string, subject: string, htmlBody: string): Pro
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Học Viện BRK <onboarding@resend.dev>',
+        from: 'Cộng đồng MBC <onboarding@resend.dev>',
         to: to,
         subject: subject,
         html: htmlBody,
@@ -328,7 +328,7 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
-    const fromName = 'Học Viện BRK';
+    const fromName = 'Cộng đồng MBC';
     const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
     const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
     const messageParts = [
@@ -395,7 +395,7 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
     </div>
     <div style="padding: 30px;">
       <p style="color: #1f2937; font-size: 16px;">${greeting} <span style="font-weight: 600;">${name}</span></p>
-      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Học Viện BRK. Nhập mã này để xác nhận:</p>
+      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Cộng đồng MBC. Nhập mã này để xác nhận:</p>
       <div style="background: #f9fafb; border: 2px dashed #4f46e5; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0;">
         <h1 style="color: #4f46e5; font-size: 40px; margin: 0; letter-spacing: 10px;">${code}</h1>
       </div>
@@ -466,8 +466,8 @@ function getRandomVerificationTemplate(name: string, token: string): { subject: 
  */
 
 export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
-  const subject = `[Học Viện BRK] Chào mừng bạn gia nhập học viện - Mã học tập của bạn là #${studentId}`;
-  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Học Viện BRK,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
+  const subject = `[Cộng đồng MBC] Chào mừng bạn gia nhập cộng đồng - Mã học tập của bạn là #${studentId}`;
+  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Cộng đồng MBC,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
@@ -484,7 +484,7 @@ export async function sendOtpStatusNotification(
   const errorInfo = errorMsg ? `\n❌ Lỗi: <code>${errorMsg}</code>` : '';
   const msg = `📧 <b>GỬI M\u00C3 OTP ${statusStr}</b>\n` +
               `━━━━━━━━━━━━━━\n` +
-              `👤 Học viên: <b>${studentName}</b> ${userId ? `(#${userId})` : ''}\n` +
+              `👤 Thành viên: <b>${studentName}</b> ${userId ? `(#${userId})` : ''}\n` +
               `📧 Email: <code>${email}</code>\n` +
               `🔑 Mã OTP: <code>${otpCode}</code>${errorInfo}`;
   
@@ -515,20 +515,20 @@ export async function sendVerificationEmail(to: string, studentName: string, tok
 }
 
 export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, _customContent: string | null) {
-  const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
+  const subject = `[Cộng đồng MBC] Kích hoạt thành công khóa học: ${courseName}`;
   const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
 
 export async function sendLoginNotification(user: { id: number; name: string }, _ip: string, _userAgent: string) {
-  const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})`;
+  const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})`;
   await sendTelegram(msg, 'CHANGE'); // Chuyển từ FAILED_LOGIN sang CHANGE (Kênh biến động tài khoản bảo mật hơn)
 }
 
 export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }, newPassword?: string) {
   const pwdInfo = newPassword ? `\n🔑 Mật khẩu mới: <code>${newPassword}</code>` : '';
-  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${pwdInfo}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
+  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${pwdInfo}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
   await sendTelegram(msg, 'CHANGE');
 }
 
@@ -582,8 +582,8 @@ export async function sendSurveyNotification(data: {
     if (config.targetVal) configDetails += `• Mục tiêu Follow: ${config.targetVal}\n`;
   }
 
-  const msg = `🎯 <b>HỌC VIÊN HOÀN THÀNH KHẢO SÁT</b>\n\n` +
-    `👤 Học viên: <b>${data.studentName}</b> (#${data.studentId})\n` +
+  const msg = `🎯 <b>THÀNH VIÊN HOÀN THÀNH KHẢO SÁT</b>\n\n` +
+    `👤 Thành viên: <b>${data.studentName}</b> (#${data.studentId})\n` +
     `🏁 Đích đến: <b>Nút ${data.targetPointName}</b>\n` +
     `🏆 Mục tiêu: <b>${data.goal}</b>\n\n` +
     (inputs.length > 0 ? `<b>⌨️ THÔNG TIN NHẬP:</b>\n${inputs.join('\n')}\n\n` : '') +

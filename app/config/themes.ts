@@ -233,10 +233,10 @@ export const THEME_PRESETS: Theme[] = [
     },
   },
 
-  // 1. BRK Classic
+  // 1. MBC Classic
   {
     id: 'classic',
-    name: 'BRK Classic',
+    name: 'MBC Classic',
     description: 'Giao diện cổ điển với màu vàng chủ đạo',
     isLocked: true,
     colors: {

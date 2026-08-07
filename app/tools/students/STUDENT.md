@@ -4,7 +4,7 @@
 
 Trang danh sách & tìm kiếm thành viên trong hệ thống. Hỗ trợ 2 role:
 - **ADMIN**: Xem tất cả user (ADMIN, STUDENT, INSTRUCTOR, AFFILIATE, TEACHER, người học khóa 86 Days)
-- **TEACHER**: Chỉ xem học viên (STUDENT) đã đăng ký khóa học của mình
+- **TEACHER**: Chỉ xem thành viên (STUDENT) đã đăng ký khóa học của mình
 
 ## File structure
 
@@ -12,7 +12,7 @@ Trang danh sách & tìm kiếm thành viên trong hệ thống. Hỗ trợ 2 rol
 app/tools/students/
 ├── page.tsx              # Danh sách (Client Component)
 ├── STUDENT.md            # Tài liệu kỹ thuật
-└── [id]/page.tsx         # Chi tiết học viên (Server Component)
+└── [id]/page.tsx         # Chi tiết thành viên (Server Component)
 ```
 
 ## State management (page.tsx)
@@ -21,7 +21,7 @@ app/tools/students/
 
 | Variable | Type | Initial | Mô tả |
 |----------|------|---------|-------|
-| `students` | `StudentData[]` | `[]` | Danh sách học viên |
+| `students` | `StudentData[]` | `[]` | Danh sách thành viên |
 | `loading` | `boolean` | `true` | Trạng thái loading |
 | `error` | `string \| null` | `null` | Thông báo lỗi (nếu có) |
 | `searchQuery` | `string` | `''` | Nội dung tìm kiếm |
@@ -160,12 +160,12 @@ Giữ nguyên logic cũ (groupBy + count riêng cho ALL và COURSE_86_DAYS).
 ├─────────────────────────────────────────────────┤
 │  1-20 / 156                                      │
 ├─────────────────────────────────────────────────┤
-│  [Tất cả:156] [HV:100] [QT:2] [GV:30] [ĐT:24]  │
+│  [Tất cả:156] [TV:100] [QT:2] [GV:30] [ĐT:24]  │
 │  [🔍 Tìm Tên, SĐT, Email...]        [↕ Mới]     │
 ├─────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────┐ │
 │  │  [Avatar]  #ID                              │ │
-│  │  Tên học viên                                │ │
+│  │  Tên thành viên                                │ │
 │  │  ✉ email@example.com                        │ │
 │  │  📞 0123456789                              │ │
 │  └─────────────────────────────────────────────┘ │
@@ -183,7 +183,7 @@ Giữ nguyên logic cũ (groupBy + count riêng cho ALL và COURSE_86_DAYS).
 ├─────────────────────────────────────────────────┤
 │  1-20 / 45                                       │
 ├─────────────────────────────────────────────────┤
-│  [Học viên:45]   [▼ Chọn khóa học...    ▼]      │
+│  [Thành viên:45]   [▼ Chọn khóa học...    ▼]      │
 │  [🔍 Tìm Tên, SĐT, Email...]        [↕ Mới]     │
 ├─────────────────────────────────────────────────┤
 │  ... (giống ADMIN)                               │
@@ -194,7 +194,7 @@ Giữ nguyên logic cũ (groupBy + count riêng cho ALL và COURSE_86_DAYS).
 
 ```
 ┌─────────────────────────────────────────────┐
-│  MainHeader: "CHI TIẾT HỌC VIÊN"   [← Back] │
+│  MainHeader: "CHI TIẾT THÀNH VIÊN"   [← Back] │
 ├─────────────────────────────────────────────┤
 │  ┌───────────────────────────────────────┐  │
 │  │  [Avatar lớn]                         │  │
@@ -203,7 +203,7 @@ Giữ nguyên logic cũ (groupBy + count riêng cho ALL và COURSE_86_DAYS).
 │  │                                       │  │
 │  │  📧 email@example.com                 │  │
 │  │  📞 0123456789                        │  │
-│  │  🎓 Học viên                          │  │
+│  │  🎓 Thành viên                          │  │
 │  │  📅 Tham gia: 01/01/2024             │  │
 │  └───────────────────────────────────────┘  │
 │                                             │
@@ -261,7 +261,7 @@ Giữ nguyên logic cũ (groupBy + count riêng cho ALL và COURSE_86_DAYS).
 
 ### 2. Role filter
 
-- Chỉ hiện "Học viên" (STUDENT)
+- Chỉ hiện "Thành viên" (STUDENT)
 - `selectedRole` luôn là `'STUDENT'`
 - Không có ADMIN/INSTRUCTOR/AFFILIATE/COURSE_86_DAYS
 
@@ -274,7 +274,7 @@ Giữ nguyên logic cũ (groupBy + count riêng cho ALL và COURSE_86_DAYS).
 ### 4. Search
 
 - Scope tự động thêm `enrollments.course.teacherId = userId`
-- Tìm kiếm chỉ trong phạm vi học viên của teacher
+- Tìm kiếm chỉ trong phạm vi thành viên của teacher
 
 ## File cần tạo/sửa
 

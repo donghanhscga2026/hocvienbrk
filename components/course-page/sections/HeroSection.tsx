@@ -116,7 +116,7 @@ export default function HeroSection({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Users size={16} color="var(--accent)" />
-            <span>{activeStudentCount || 0} học viên</span>
+            <span>{activeStudentCount || 0} thành viên</span>
           </div>
         </div>
 

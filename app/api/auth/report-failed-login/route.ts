@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     });
 
     const typeLabels: Record<IdentifierType, string> = {
-      student_id: 'Mã học viên',
+      student_id: 'Mã thành viên',
       email: 'Email',
       phone: 'Số điện thoại',
       unknown: 'Không xác định',
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     if (userInfo) {
       userDetail =
         `\n📋 Thông tin user:\n` +
-        `  🆔 Mã HV: #${userInfo.id}\n` +
+        `  🆔 Mã TV: #${userInfo.id}\n` +
         `  👤 Họ tên: ${userInfo.name || 'N/A'}\n` +
         `  📧 Email: ${userInfo.email || 'N/A'}\n` +
         `  📞 SĐT: ${userInfo.phone || 'N/A'}`;
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       `${userDetail}\n` +
       `⏰ Thời gian: ${time}\n` +
       `━━━━━━━━━━━━━━━━━━━━━\n` +
-      `💡 Học viên nên: Kiểm tra lại thông tin hoặc dùng tính năng Quên tài khoản/Quên mật khẩu`;
+      `💡 Thành viên nên: Kiểm tra lại thông tin hoặc dùng tính năng Quên tài khoản/Quên mật khẩu`;
 
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID;

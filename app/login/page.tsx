@@ -107,7 +107,7 @@ function LoginForm() {
                     switch (errData.errorType) {
                         case 'NOT_FOUND':
                             if (errData.identifierType === 'student_id') {
-                                errorMsg = `Mã học viên này không tồn tại.`
+                                errorMsg = `Mã thành viên này không tồn tại.`
                                 extraAction = 'forgot_id'
                             } else if (errData.identifierType === 'email') {
                                 errorMsg = `Email này chưa đăng ký tài khoản.`
@@ -130,7 +130,7 @@ function LoginForm() {
                     // report-failed-login thất bại, dùng thông tin cơ bản
                     const identifier = data.identifier
                     if (/^\d+$/.test(identifier)) {
-                        errorMsg = "Mã học viên không tồn tại hoặc mật khẩu không chính xác."
+                        errorMsg = "Mã thành viên không tồn tại hoặc mật khẩu không chính xác."
                     } else if (identifier.includes('@')) {
                         errorMsg = "Email không tồn tại hoặc mật khẩu không chính xác."
                     } else {
@@ -379,7 +379,7 @@ function LoginForm() {
                                     href="/login?redirect=tools"
                                     className="text-xs font-semibold text-brk-primary hover:text-brk-primary underline"
                                 >
-                                    Quên mã học viên? (Tìm bằng email/SĐT)
+                                    Quên mã thành viên? (Tìm bằng email/SĐT)
                                 </Link>
                             </div>
                         )}
@@ -409,13 +409,13 @@ function LoginForm() {
                             </div>
                         )}
                         <div>
-                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã học viên / Số điện thoại</label>
+                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã thành viên / Số điện thoại</label>
                             <input
-                                {...register("identifier", { required: "Vui lòng nhập mã học viên hoặc số điện thoại" })}
+                                {...register("identifier", { required: "Vui lòng nhập mã thành viên hoặc số điện thoại" })}
                                 type="text"
                                 autoComplete="username"
                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
-                                placeholder="Nhập mã học viên hoặc số điện thoại"
+                                placeholder="Nhập mã thành viên hoặc số điện thoại"
                             />
                             {errors.identifier && <p className="mt-1 text-xs text-brk-accent">{errors.identifier.message}</p>}
                         </div>

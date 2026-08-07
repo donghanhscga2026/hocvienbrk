@@ -265,16 +265,16 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
   // ─── LOGIN: Check student ID ───
   const handleCheckStudentId = async () => {
-    if (!data.studentId.trim()) { setError('Vui lòng nhập mã học viên'); return }
+    if (!data.studentId.trim()) { setError('Vui lòng nhập mã thành viên'); return }
     setIsLoading(true); setError(null)
     try {
       const res = await fetch(`/api/user/${data.studentId.trim()}`)
-      if (!res.ok) { setError('Không tìm thấy mã học viên này.'); return }
+      if (!res.ok) { setError('Không tìm thấy mã thành viên này.'); return }
       const json = await res.json()
       if (json.id != null) {
         updateField('email', json.email || ''); updateField('phone', json.phone || '')
         goToStep('login_confirm')
-      } else setError('Không tìm thấy mã học viên này.')
+      } else setError('Không tìm thấy mã thành viên này.')
     } catch { setError('Có lỗi xảy ra. Vui lòng thử lại.')
     } finally { setIsLoading(false) }
   }
@@ -521,7 +521,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             type="text"
             value={data.studentId}
             onChange={e => updateField('studentId', e.target.value.replace(/\D/g, ''))}
-            placeholder="Nhập mã học viên"
+            placeholder="Nhập mã thành viên"
             autoFocus
             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
           />
@@ -538,7 +538,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
           <div className="space-y-2">
             {data.studentId && (
               <p className="text-center text-sm text-brk-muted">
-                Mã học viên: <span className="font-semibold text-brk-on-surface">#{data.studentId}</span>
+                Mã thành viên: <span className="font-semibold text-brk-on-surface">#{data.studentId}</span>
               </p>
             )}
             <div className="relative">
@@ -574,7 +574,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
               <CheckCircle2 className="h-6 w-6 text-brk-accent" />
             </div>
             <p className="text-sm text-brk-on-surface">Bạn đã có tài khoản với</p>
-            <p className="text-xl font-bold text-brk-primary mt-1">Mã học viên: #{data.studentId}</p>
+            <p className="text-xl font-bold text-brk-primary mt-1">Mã thành viên: #{data.studentId}</p>
             <p className="text-xs text-brk-muted mt-3">Đang chuyển đến trang đăng nhập...</p>
           </div>
         )
@@ -656,7 +656,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
               </button>
             </div>
             <p className="text-[10px] text-brk-accent italic text-center">
-              Cần đáp ứng: ≥ 8 ký tự, chữ Hoa, chữ thường, số và ký tự đặc biệt (VD: Brk$9319)
+              Cần đáp ứng: ≥ 8 ký tự, chữ Hoa, chữ thường, số và ký tự đặc biệt (VD: Mbc$9319)
             </p>
           </>
         )
@@ -706,7 +706,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
                 {success || 'Đăng ký tài khoản thành công!'}
               </p>
               <p className="text-xs text-brk-muted">
-                Mã học viên: <span className="font-bold text-brk-primary">#{registeredUserId}</span>
+                Mã thành viên: <span className="font-bold text-brk-primary">#{registeredUserId}</span>
               </p>
             </div>
             <div className="rounded-xl border border-brk-primary/20 bg-brk-primary/5 p-3 space-y-2">
@@ -731,7 +731,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
               className="w-full rounded-xl bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Tiếp tục vào Học viện
+              Tiếp tục vào Cộng đồng
             </button>
           </div>
         )
@@ -832,7 +832,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         {error && (
           <div className="rounded-lg bg-brk-accent/20 border border-brk-accent/50 p-3 text-sm text-brk-accent">{error}</div>
         )}
-        {error && step === 'login_id' && error.includes('Không tìm thấy mã học viên') && (
+        {error && step === 'login_id' && error.includes('Không tìm thấy mã thành viên') && (
           <button
             onClick={goToFindAccount}
             className="w-full rounded-xl border border-brk-primary/40 bg-brk-primary/10 px-4 py-2.5 text-sm font-semibold text-brk-primary hover:bg-brk-primary/20 transition-colors"
@@ -931,7 +931,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-brk-outline/10">
-          <p className="text-[10px] text-brk-muted text-center">BRK - Ngân hàng Phước Báu</p>
+          <p className="text-[10px] text-brk-muted text-center">MBC - Ngân hàng Phước Báu</p>
         </div>
       </div>
 

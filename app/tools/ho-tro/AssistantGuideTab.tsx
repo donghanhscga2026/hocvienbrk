@@ -134,7 +134,7 @@ export default function AssistantGuideTab() {
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase">Tiêu đề *</label>
-                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" placeholder="Chào mừng đến với BRK" />
+                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500" placeholder="Chào mừng đến với MBC" />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-600 uppercase">Script (TTS)</label>

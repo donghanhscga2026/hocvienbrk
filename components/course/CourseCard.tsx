@@ -269,10 +269,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             {course._count?.lessons ?? 0} bài
                         </button>
 
-                        {/* Số học viên */}
+                        {/* Số thành viên */}
                         <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
                             <Users className="w-3 h-3" />
-                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')} học viên
+                            {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')} thành viên
                         </span>
 
                         {/* Chia sẻ */}

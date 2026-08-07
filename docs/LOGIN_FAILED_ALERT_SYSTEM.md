@@ -8,7 +8,7 @@
 
 ## 1. Tổng quan
 
-Khi học viên đăng nhập sai, hệ thống:
+Khi thành viên đăng nhập sai, hệ thống:
 
 1. **Server** (`auth.ts` authorize): throw `CustomLoginError` với error code — **không gửi Telegram**
 2. **Client** (login page / Account Assistant): bắt lỗi, gọi API `/api/auth/report-failed-login`
@@ -21,7 +21,7 @@ Khi học viên đăng nhập sai, hệ thống:
 
 | ErrorType | IdentifierType | Message hiển thị | Action link |
 |---|---|---|---|
-| `NOT_FOUND` | `student_id` | "Mã học viên này không tồn tại." | Tìm tài khoản |
+| `NOT_FOUND` | `student_id` | "Mã thành viên này không tồn tại." | Tìm tài khoản |
 | `NOT_FOUND` | `email` | "Email này chưa đăng ký tài khoản." | Đăng ký |
 | `NOT_FOUND` | `phone` | "Số điện thoại này chưa đăng ký tài khoản." | Đăng ký |
 | `INVALID_PASSWORD` | *any* | "Mật khẩu không chính xác." | Quên mật khẩu? |
@@ -67,23 +67,23 @@ Các tình huống gửi:
 | Tình huống | Nguồn | Nội dung |
 |---|---|---|
 | Login sai → API báo cáo | `report-failed-login` route | `⚠️ ĐĂNG NHẬP THẤT BẠI` — có userInfo đầy đủ |
-| Login thành công | `sendLoginNotification` → `FAILED_LOGIN` | `🔑 THÔNG BÁO ĐĂNG NHẬP` — thông báo HV đã vào được |
+| Login thành công | `sendLoginNotification` → `FAILED_LOGIN` | `🔑 THÔNG BÁO ĐĂNG NHẬP` — thông báo TV đã vào được |
 
 ### Format message (login fail):
 ```
 ⚠️ ĐĂNG NHẬP THẤT BẠI
 ━━━━━━━━━━━━━━━━━━━━━
 📍 Định danh nhập vào: <code>12345</code>
-📋 Loại định danh: Mã học viên
+📋 Loại định danh: Mã thành viên
 ❌ Lỗi: <b>Sai mật khẩu</b>
 📋 Thông tin user:
-  🆔 Mã HV: #12345
+  🆔 Mã TV: #12345
   👤 Họ tên: Nguyễn Văn A
   📧 Email: a@example.com
   📞 SĐT: 0912345678
 ⏰ Thời gian: 07/07/2026 21:30:00
 ━━━━━━━━━━━━━━━━━━━━━
-💡 Học viên nên: Kiểm tra lại thông tin hoặc dùng tính năng Quên tài khoản/Quên mật khẩu
+💡 Thành viên nên: Kiểm tra lại thông tin hoặc dùng tính năng Quên tài khoản/Quên mật khẩu
 ```
 
 ### Các nhóm Telegram khác liên quan

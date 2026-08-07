@@ -14,7 +14,7 @@ Hệ thống áp dụng cơ chế phân quyền dựa trên quyền sở hữu (
 ### 2. Quản lý Bài học (Lesson Management)
 Để tối ưu hiệu năng cho các khóa học có hàng trăm bài học, hệ thống sử dụng các kỹ thuật:
 - **Lazy Loading Modals**: Các Form thêm mới (`AddLessonModal`), chỉnh sửa (`LessonEditModal`) và Import (`ImportLessonsModal`) chỉ được tải khi người dùng nhấn nút tương ứng.
-- **Tự động sắp xếp (Order)**: Khi thêm bài học mới, hệ thống tự động gợi ý số `order` tiếp theo. Khi xóa một bài học, các bài học sau không bị ảnh hưởng (giữ nguyên order) để tránh làm xáo trộn lộ trình học viên đang học.
+- **Tự động sắp xếp (Order)**: Khi thêm bài học mới, hệ thống tự động gợi ý số `order` tiếp theo. Khi xóa một bài học, các bài học sau không bị ảnh hưởng (giữ nguyên order) để tránh làm xáo trộn lộ trình thành viên đang học.
 - **Import hàng loạt**: Hỗ trợ import danh sách bài học từ file Excel hoặc định dạng văn bản thô để tiết kiệm thời gian khởi tạo.
 
 ### 3. Tối ưu hóa Nội dung
@@ -35,7 +35,7 @@ Hệ thống áp dụng cơ chế phân quyền dựa trên quyền sở hữu (
 Nhấn vào biểu tượng **Settings (Bánh răng)** tại dòng khóa học tương ứng:
 - **Tab Nội dung**: Cập nhật mô tả ngắn, mô tả dài và ảnh bìa.
 - **Tab Thanh toán**: Cấu hình Số tài khoản ngân hàng, Tên chủ tài khoản và nội dung chuyển khoản dành riêng cho khóa học này.
-- **Tab Email**: Soạn thảo nội dung email tự động gửi cho học viên khi họ đăng ký hoặc được duyệt vào khóa học.
+- **Tab Email**: Soạn thảo nội dung email tự động gửi cho thành viên khi họ đăng ký hoặc được duyệt vào khóa học.
 
 ### 3. Quản lý Danh sách Bài học
 Kéo xuống phần **"Danh sách bài học"** trong trang chỉnh sửa:
@@ -49,7 +49,7 @@ Kéo xuống phần **"Danh sách bài học"** trong trang chỉnh sửa:
 ## C. CÁC TÌNH HUỐNG THƯỜNG GẶP (FAQ)
 - **Tại sao tôi (Giáo viên) không thấy khóa học mình vừa tạo?**
   - Hãy kiểm tra xem bạn đã được gán làm "Giáo viên phụ trách" của khóa học đó chưa (Liên hệ Admin nếu cần).
-- **Làm sao để học viên thấy link trong phần mô tả bài học?**
-  - Bạn chỉ cần dán link (vd: `https://google.com`) vào phần nội dung, hệ thống sẽ tự động chuyển nó thành link có thể nhấn được cho học viên.
+- **Làm sao để thành viên thấy link trong phần mô tả bài học?**
+  - Bạn chỉ cần dán link (vd: `https://google.com`) vào phần nội dung, hệ thống sẽ tự động chuyển nó thành link có thể nhấn được cho thành viên.
 - **Làm sao để bài học chỉ hiện văn bản mà không hiện Video?**
   - Trong phần chỉnh sửa bài học, chọn **Loại bài học: TEXT**. Khi đó trình phát video sẽ biến mất, nhường chỗ cho nội dung văn bản của bạn.

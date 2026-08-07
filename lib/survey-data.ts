@@ -19,7 +19,7 @@ export const surveyQuestions: Record<string, SurveyQuestion> = {
     q1: {
         id: 'q1',
         question: 'Bạn muốn học để làm gì?',
-        subtitle: 'Xác định hướng đi chính của bạn tại Học viện BRK.',
+        subtitle: 'Xác định hướng đi chính của bạn tại Cộng đồng MBC.',
         type: 'CHOICE',
         options: [
             { id: 'selling', label: 'Bán hàng', nextQuestionId: 'q2_selling' },
@@ -107,7 +107,7 @@ export const surveyQuestions: Record<string, SurveyQuestion> = {
 };
 
 /**
- * Lộ trình chuẩn của Học viện BRK
+ * Lộ trình chuẩn của Cộng đồng MBC
  * ID: 15(MXH), 18(Video CB), 3(1k Follow), 4(Live CB), 19(Video NC), 19(Live NC), 2(Nhân hiệu), 20(Đào tạo), 21(Cộng đồng), 22(Hệ thống)
  */
 export function generatePathFromAnswers(answers: Record<string, any>): number[] {

@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
         const htmlBody = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #f97316;">HỌC VIỆN BRK - QUÊN MẬT KHẨU</h2>
+                <h2 style="color: #f97316;">CỘNG ĐỒNG MBC - QUÊN MẬT KHẨU</h2>
                 <p>Xin chào <b>${user.name}</b>,</p>
                 <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
                 <div style="background: #1f2937; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0;">
@@ -61,12 +61,12 @@ export async function POST(request: Request) {
             </div>
         `
 
-        const result = await sendGmail(email, "Mã xác minh đặt lại mật khẩu - Học Viện BRK", htmlBody)
+        const result = await sendGmail(email, "Mã xác minh đặt lại mật khẩu - Cộng đồng MBC", htmlBody)
 
         // Gửi thông báo Telegram về trạng thái gửi OTP quên mật khẩu
         try {
             const { sendOtpStatusNotification } = await import("@/lib/notifications")
-            await sendOtpStatusNotification(email, user.name || "Học viên", otp, result.success, result.success ? undefined : result.message, user.id)
+            await sendOtpStatusNotification(email, user.name || "Thành viên", otp, result.success, result.success ? undefined : result.message, user.id)
         } catch (e) {
             console.error("Failed to send forgot-password OTP status notification:", e)
         }

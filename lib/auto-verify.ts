@@ -311,7 +311,7 @@ export async function processPaymentEmails() {
               refLink = `🔗 Link ref: ${appUrl}/khoa-hoc/${enrollment.course.id_khoa}?ref=${refCode}\n`
             }
             const msgAdmin = `✅ <b>KÍCH HOẠT TỰ ĐỘNG THÀNH CÔNG</b>\n\n` +
-              `👤 Học viên: <b>${enrollment.user.name}</b> (#${enrollment.userId})\n` +
+              `👤 Thành viên: <b>${enrollment.user.name}</b> (#${enrollment.userId})\n` +
               `📞 SĐT: ${enrollment.user.phone}\n` +
               `🎓 Khóa học: <b>${enrollment.course.name_lop} (${enrollment.course.id_khoa})</b>\n` +
               `${refLink}💰 Số tiền: ${parsed.amount.toLocaleString()}đ\n` +

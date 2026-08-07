@@ -246,7 +246,7 @@ export default function BulkEnrollModal({ isOpen, onClose, courses, isAdmin, isT
                                 <h3 className="text-lg font-bold text-gray-800">✅ Hoàn tất!</h3>
                                 <div className="mt-3 space-y-1 text-sm text-gray-600">
                                     <p>Đã tạo: <strong className="text-emerald-600">{result.created}</strong> user mới</p>
-                                    <p>Đã ghi danh: <strong className="text-blue-600">{result.enrolled}</strong> học viên</p>
+                                    <p>Đã ghi danh: <strong className="text-blue-600">{result.enrolled}</strong> thành viên</p>
                                     {(result.modified || 0) > 0 && <p>Đã cập nhật: <strong className="text-amber-600">{result.modified}</strong> thông tin</p>}
                                     {result.errors && result.errors.length > 0 && (
                                         <div className="mt-2 p-3 bg-red-50 rounded-xl text-left text-xs text-red-700">

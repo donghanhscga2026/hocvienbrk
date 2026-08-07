@@ -403,11 +403,11 @@ Trước khi sửa các files, lưu backup vào `plan_temp/`:
 
 | Tài liệu | Mô tả | Phiên bản |
 |----------|-------|-----------|
-| `docs/COURSE_LEARNING_GUIDE.md` | Hướng dẫn sử dụng cho học viên: Video Player, Playlist, Ghi nhận bài học | v1.0 (29/07/2026) |
+| `docs/COURSE_LEARNING_GUIDE.md` | Hướng dẫn sử dụng cho thành viên: Video Player, Playlist, Ghi nhận bài học | v1.0 (29/07/2026) |
 | `docs/COURSE_VIDEO_PLAYER_TECH.md` | Tài liệu kỹ thuật Universal Video Player: kiến trúc, 7 nền tảng, tracking, playlist | v2.0 (29/07/2026) |
 
-> **Ghi chú**: Các tài liệu trên mô tả chi tiết cơ chế hoạt động của Video Player đa nền tảng (thay thế cho YouTube-only trước đây) và hướng dẫn sử dụng cho học viên. LIB course type sử dụng chung cơ chế Video Player này, điểm khác biệt duy nhất là **không tính điểm/tracking** cho LIB courses.
+> **Ghi chú**: Các tài liệu trên mô tả chi tiết cơ chế hoạt động của Video Player đa nền tảng (thay thế cho YouTube-only trước đây) và hướng dẫn sử dụng cho thành viên. LIB course type sử dụng chung cơ chế Video Player này, điểm khác biệt duy nhất là **không tính điểm/tracking** cho LIB courses.
 
 ---
 
-*Document generated for HocVien-BRK Project*
+*Document generated for MBC Project*

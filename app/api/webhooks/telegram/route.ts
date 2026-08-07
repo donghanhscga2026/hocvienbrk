@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   const { command, payload } = parsed
 
-  // 1. Luồng liên kết tài khoản học viên qua UUID Token gửi từ lệnh /start
+  // 1. Luồng liên kết tài khoản thành viên qua UUID Token gửi từ lệnh /start
   if (command === 'start' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload)) {
     const fromUser = update.message.from
     const linkResult = await linkTelegramAccount(payload, {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       await sendTelegramMessage(
         chatId,
         `<b>🎉 KẾT NỐI TÀI KHOẢN THÀNH CÔNG!</b>\n\n` +
-        `✅ Tài khoản Telegram của bạn đã được liên kết thành công với Học Viện BRK.\n\n` +
+        `✅ Tài khoản Telegram của bạn đã được liên kết thành công với Cộng đồng MBC.\n\n` +
         `Bạn sẽ nhận được các thông báo học tập quan trọng (lịch học Zoom, thông tin tài khoản, xác nhận thanh toán) trực tiếp tại đây.`
       )
     } else {

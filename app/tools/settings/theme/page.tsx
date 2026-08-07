@@ -424,7 +424,7 @@ export default function ThemeSettingsPage() {
               >
                 B
               </div>
-              <span className="font-bold" style={{ color: colors.onSurface }}>Học Viện BRK</span>
+              <span className="font-bold" style={{ color: colors.onSurface }}>Cộng đồng MBC</span>
               <nav className="ml-auto flex gap-4 text-sm" style={{ color: colors.primary }}>
                 Trang chủ
               </nav>

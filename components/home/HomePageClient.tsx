@@ -105,7 +105,7 @@ function HomePageContent({
           setShowActivatedToast(true)
           setTimeout(() => window.location.reload(), 1500)
         }
-      } catch {}
+      } catch { }
     }, 10_000)
     const timeout = setTimeout(() => clearInterval(interval), 20 * 60 * 1000)
     return () => { clearInterval(interval); clearTimeout(timeout) }
@@ -114,14 +114,14 @@ function HomePageContent({
   // Dynamic section titles từ profile
   const surveyTitle = profile.surveyTitle || 'Thiết kế lộ trình'
   const roadmapTitle = profile.roadmapTitle || 'Lộ trình Zero 2 Hero'
-  const coursesTitle = 'Khóa học của tôi'
-  const allCoursesTitle = profile.allCoursesTitle || 'Tất cả khóa học'
+  const coursesTitle = 'Quà tặng của tôi'
+  const allCoursesTitle = profile.allCoursesTitle || 'Tất cả Quà tặng'
   const communityTitle = profile.communityTitle || 'Bảng tin'
-  const topCoursesTitle = 'Khóa học mới cập nhật'
+  const topCoursesTitle = 'Quà tặng mới cập nhật'
 
   // Auto-hide: Survey section khi không có survey
   const showSurvey = survey && (survey.flow || (survey.questions && survey.questions.length > 0))
-  
+
   // Auto-hide: Community section khi không có posts HOẶC showCommunity = false
   const showCommunity = profile.showCommunity !== false && posts && posts.length > 0
 
@@ -145,19 +145,19 @@ function HomePageContent({
 
   const showGiftSection = giftCourses.length > 0
   const displayLatestCourses = latestCourses.length > 0 ? latestCourses : topCourses
-  
+
   return (
     <>
       {/* Survey / Roadmap Section - Auto-hide khi không có survey */}
       {showSurvey && (
         <section className="container mx-auto px-4 py-8">
           {!customPath || customPath.length === 0 ? (
-            <Zero2HeroSurvey 
-              session={session} 
+            <Zero2HeroSurvey
+              session={session}
               survey={survey}
             />
           ) : (
-            <RealityMap 
+            <RealityMap
               customPath={customPath}
               enrollmentsMap={enrollmentsMap}
               allCourses={courses}
@@ -173,7 +173,7 @@ function HomePageContent({
       {/* Community Section - Auto-hide khi không có bài đăng */}
       {showCommunity && (
         <section className="container mx-auto px-4 py-8">
-          <CommunityBoard 
+          <CommunityBoard
             posts={posts}
             isAdmin={session?.user?.role === 'ADMIN'}
             title={communityTitle}
@@ -234,19 +234,19 @@ function HomePageContent({
           </div>
         </section>
       )}
- 
+
       {/* Courses Section */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
         {session?.user ? (
           <>
             {(myActiveCourses.length > 0 || myCompletedCourses.length > 0) && (
-              <CourseSection 
+              <CourseSection
                 title={coursesTitle}
                 courses={myActiveCourses}
                 hiddenCourses={myCompletedCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
-                
+
                 userPhone={userPhone}
                 userId={userId}
                 darkMode={false}
@@ -257,12 +257,12 @@ function HomePageContent({
             )}
 
             {profile.showAllCourses !== false && groupedOtherCourses.length > 0 && (
-              <CourseSection 
+              <CourseSection
                 title={allCoursesTitle}
                 groupedCourses={groupedOtherCourses}
                 session={session}
                 enrollmentsMap={enrollmentsMap}
-                
+
                 userPhone={userPhone}
                 userId={userId}
                 accentColor="bg-blue-600"
@@ -273,12 +273,12 @@ function HomePageContent({
           </>
         ) : (
           profile.showAllCourses !== false && groupedOtherCourses.length > 0 && (
-            <CourseSection 
+            <CourseSection
               title={allCoursesTitle}
               groupedCourses={groupedOtherCourses}
               session={session}
               enrollmentsMap={enrollmentsMap}
-              
+
               userPhone={userPhone}
               userId={userId}
               accentColor="bg-blue-600"
@@ -294,7 +294,7 @@ function HomePageContent({
         <PaymentModal
           course={courseToPay}
           enrollment={enrollmentsMap[courseToPay.id] || null}
-          
+
           userPhone={userPhone}
           userId={userId}
           onClose={handleClosePayment}

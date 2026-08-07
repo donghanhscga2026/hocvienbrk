@@ -507,7 +507,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
                             </label>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số lượng học viên kích hoạt cần thiết</label>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số lượng thành viên kích hoạt cần thiết</label>
                             <input type="number" value={referralActivationThreshold} onChange={(e) => setReferralActivationThreshold(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" min={0} />
                         </div>
                     </div>

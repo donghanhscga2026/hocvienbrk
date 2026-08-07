@@ -14,7 +14,7 @@ export default async function ReservedIdsPage() {
 
             <div className="p-4 max-w-4xl mx-auto space-y-6">
                 <div>
-                    <h2 className="text-lg font-bold mb-3 text-gray-800">Cấp số đẹp cho Học viên</h2>
+                    <h2 className="text-lg font-bold mb-3 text-gray-800">Cấp số đẹp cho Thành viên</h2>
                     <ChangeUserIdForm />
                 </div>
 

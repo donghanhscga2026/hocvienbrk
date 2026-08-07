@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     // TEACHER không được dùng DB_ALL
     if (role === "TEACHER" && recipientSource === "DB_ALL") {
-      return new NextResponse("Không có quyền gửi đến tất cả học viên", { status: 403 });
+      return new NextResponse("Không có quyền gửi đến tất cả thành viên", { status: 403 });
     }
 
     // Tạo chiến dịch DRAFT trước để lấy ID

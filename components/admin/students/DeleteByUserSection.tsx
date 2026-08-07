@@ -173,7 +173,7 @@ export default function DeleteByUserSection() {
         <div className="mt-6 space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Học viên</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Thành viên</p>
               <p className="text-lg font-black text-red-600">{preview.stats.users}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
@@ -189,7 +189,7 @@ export default function DeleteByUserSection() {
               <p className="text-lg font-black text-red-600">{preview.stats.userClosures + preview.stats.systemClosures}</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ví BRK & Giao dịch</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ví MBC & Giao dịch</p>
               <p className="text-sm font-bold text-red-600">{preview.stats.brkWalletCount} ví / {preview.stats.brkTransactionCount} gd</p>
             </div>
             <div className="p-3 bg-white rounded-xl border border-red-100">

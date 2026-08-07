@@ -335,7 +335,7 @@ export async function debitBrkWallet(
     const wallet = await tx.brkWallet.findUnique({ where: { userId } })
     if (!wallet) throw new Error('Wallet not found')
     if (Number(wallet.balance) < amount) {
-      throw new Error('Số dư BRK wallet không đủ')
+      throw new Error('Số dư MBC wallet không đủ')
     }
     const newBalance = Number(wallet.balance) - amount
 

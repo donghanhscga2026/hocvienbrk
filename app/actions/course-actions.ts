@@ -146,7 +146,7 @@ export async function enrollInCourseAction(
                 if (isAutoActiveExisting) {
                     const { sendTelegram, sendActivationEmail } = await import("@/lib/notifications")
                     const msgAdmin = `🎁 <b>KÍCH HOẠT VÍ MBV 100%</b>\n\n` +
-                        `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
+                        `👤 Thành viên: <b>${user?.name}</b> (#${user?.id})\n` +
                         `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>\n` +
                         `💳 Trừ ví MBV: ${voucherDeducted.toLocaleString('vi-VN')} VNĐ\n` +
                         (cashDeducted > 0 ? `💳 Trừ ví VNĐ: ${cashDeducted.toLocaleString('vi-VN')} VNĐ\n` : '') +
@@ -420,7 +420,7 @@ export async function enrollInCourseAction(
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
             const refLink = enrollmentRawRefCode ? `\n🔗 Link ref: ${appUrl}/khoa-hoc/${course.id_khoa}?ref=${enrollmentRawRefCode}` : ''
             const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ</b>\n\n` +
-                `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
+                `👤 Thành viên: <b>${user?.name}</b> (#${user?.id})\n` +
                 `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>${refLink}\n` +
                 `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
             await sendTelegram(msgAdmin, 'ACTIVATE');
@@ -654,15 +654,15 @@ export async function submitAssignmentAction({
         const now = new Date()
         let timingScore = 0
 
-        // 1. Tính timingScore dựa trên múi giờ địa phương của học viên
+        // 1. Tính timingScore dựa trên múi giờ địa phương của thành viên
         if (startedAt && lessonOrder) {
             const startDate = new Date(startedAt)
             if (!isNaN(startDate.getTime())) {
-                // Lấy thời điểm hiện tại theo múi giờ học viên
+                // Lấy thời điểm hiện tại theo múi giờ thành viên
                 const nowStr = new Date().toLocaleString('en-US', { timeZone: clientTimeZone });
                 const nowLocal = new Date(nowStr);
 
-                // Tạo Deadline theo múi giờ học viên
+                // Tạo Deadline theo múi giờ thành viên
                 const deadlineStr = new Date(startDate).toLocaleString('en-US', { timeZone: clientTimeZone });
                 const deadlineLocal = new Date(deadlineStr);
                 deadlineLocal.setDate(deadlineLocal.getDate() + (lessonOrder - 1));
@@ -774,7 +774,7 @@ export async function submitAssignmentAction({
                 })
 
                 const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
-                    `👤 Học viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
+                    `👤 Thành viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
                     `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
                     `📖 Bài học: <b>${lesson?.title}</b>\n` +
                     `🏆 Điểm số: <b>${totalScore}đ</b>\n` +

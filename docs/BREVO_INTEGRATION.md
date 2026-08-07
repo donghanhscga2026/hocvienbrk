@@ -1,5 +1,5 @@
 # TÀI LIỆU KỸ THUẬT HỆ THỐNG BREVO EMAIL
-## HocVien-BRK - Brevo (Sendinblue) Email Integration
+## MBC - Brevo (Sendinblue) Email Integration
 
 **Phiên bản:** 1.0
 **Ngày:** 2026-06-10
@@ -25,7 +25,7 @@
 
 ### 1.1 Mục đích
 
-Tích hợp **Brevo (formerly Sendinblue)** làm provider gửi email chính cho Học Viện BRK, hỗ trợ kiến trúc multi-sender (nhiều tài khoản Brevo free trong pool), tự động chia đều tải. Gmail API và Resend giữ nguyên làm fallback.
+Tích hợp **Brevo (formerly Sendinblue)** làm provider gửi email chính cho Cộng đồng MBC, hỗ trợ kiến trúc multi-sender (nhiều tài khoản Brevo free trong pool), tự động chia đều tải. Gmail API và Resend giữ nguyên làm fallback.
 
 ### 1.2 Luồng gửi email
 

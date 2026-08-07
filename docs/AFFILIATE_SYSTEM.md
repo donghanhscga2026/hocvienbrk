@@ -1,5 +1,5 @@
 # TÀI LIỆU KỸ THUẬT HỆ THỐNG AFFILIATE MARKETING
-## HocVien-BRK - Affiliate Marketing System
+## MBC - Affiliate Marketing System
 
 **Phiên bản:** 1.0  
 **Ngày:** 2026-04-01  
@@ -507,7 +507,7 @@ enum PointStatus {
 ├─────────────────────────────────────────────────────────────┤
 │  Link Affiliate của bạn:                                     │
 │  ┌─────────────────────────────────────────┐ [Copy Link]    │
-│  │ https://hocvien.com/register?ref=BRK123 │                │
+│  │ https://mbc.com/register?ref=MBC123 │                │
 │  └─────────────────────────────────────────┘                │
 ├─────────────────────────────────────────────────────────────┤
 │  Hoa hồng gần đây                    Giao dịch gần đây  │
@@ -666,7 +666,7 @@ Ghi nhận click từ affiliate link.
 **Body:**
 ```json
 {
-    "code": "BRK123"
+    "code": "MBC123"
 }
 ```
 
@@ -686,7 +686,7 @@ Ghi nhận click từ affiliate link.
 
 **Có thể chạy thủ công:**
 ```bash
-curl -X POST https://api.hocvien.com/api/cron/process-commissions \
+curl -X POST https://api.mbc.com/api/cron/process-commissions \
   -H "Authorization: Bearer your-cron-secret"
 ```
 
@@ -766,7 +766,7 @@ npx tsx prisma/backfill-points-v2.ts
 
 ### C. Liên hệ hỗ trợ
 
-Email: support@hocvien.com  
+Email: support@mbc.com  
 Hotline: 1900-xxxx
 
 ---
@@ -818,7 +818,7 @@ Mỗi landing page có thể có commission riêng:
 
 ```typescript
 {
-  "r": "BRK123",      // Ref code
+  "r": "MBC123",      // Ref code
   "l": "hocxaykenh",  // Landing slug (null = homepage)
   "t": 1234567890     // Timestamp
 }

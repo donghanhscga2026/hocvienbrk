@@ -15,7 +15,7 @@ async function main() {
             create: {
                 name: 'Chương trình Affiliate mặc định',
                 slug: 'default',
-                description: 'Chương trình affiliate mặc định cho Học Viện BRK',
+                description: 'Chương trình affiliate mặc định cho Cộng đồng MBC',
                 isActive: true,
                 maxLevels: 3,
                 pendingDays: 30,

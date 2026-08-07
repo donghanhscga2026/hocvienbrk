@@ -66,7 +66,7 @@ export async function POST(
         return new NextResponse("Không có quyền gửi chiến dịch này", { status: 403 });
       }
       if (campaign.recipientSource === "DB_ALL") {
-        return new NextResponse("Không có quyền gửi đến tất cả học viên", { status: 403 });
+        return new NextResponse("Không có quyền gửi đến tất cả thành viên", { status: 403 });
       }
     }
 
@@ -202,7 +202,7 @@ export async function POST(
         const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
 
         let subject = spinContent(campaign.subject || "").trim();
-        subject = subject.replace(/\[Tên\]/g, recipient.name || "Học viên");
+        subject = subject.replace(/\[Tên\]/g, recipient.name || "Thành viên");
         subject = subject.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
         subject = subject.replace(/\[NgauNhien\]/g, randomCode).replace(/\[Random\]/g, randomCode);
 
@@ -226,7 +226,7 @@ export async function POST(
           <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
             <div style="background-color: #000000; padding: 30px; text-align: center;">
               <a href="https://giautoandien.io.vn" style="text-decoration: none;">
-                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="HỌC VIỆN BRK" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
+                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MBC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
               </a>
               <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">NGÂN HÀNG PHƯỚC BÁU</div>
             </div>
@@ -237,7 +237,7 @@ export async function POST(
             </div>
             <div style="padding: 30px; background-color: #f9f9f9; border-top: 1px solid #eeeeee; text-align: center;">
               <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
-                Bạn nhận được thông báo này vì là thành viên của <b>Học Viện BRK</b>.<br>
+                Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MBC</b>.<br>
                 Nếu không muốn nhận những email này, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">Hủy đăng ký tại đây</a>.
               </p>
             </div>

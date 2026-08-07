@@ -256,7 +256,7 @@ function RegisterForm() {
         setSuccess(msg)
 
         if (!registeredUserId) {
-            setError("Không tìm thấy mã học viên. Vui lòng đăng nhập thủ công.")
+            setError("Không tìm thấy mã thành viên. Vui lòng đăng nhập thủ công.")
             setTimeout(() => {
                 router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
             }, 2000)
@@ -404,7 +404,7 @@ function RegisterForm() {
                             <p className="mt-2 text-sm font-bold text-brk-on-surface">{registeredEmail}</p>
                             {registeredUserId && (
                                 <p className="mt-1 text-xs text-brk-accent">
-                                    Mã học viên: <span className="font-bold text-brk-on-surface">#{registeredUserId}</span>
+                                    Mã thành viên: <span className="font-bold text-brk-on-surface">#{registeredUserId}</span>
                                 </p>
                             )}
                         </div>

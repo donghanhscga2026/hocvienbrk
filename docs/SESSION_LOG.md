@@ -761,7 +761,32 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ Khởi chạy kịch bản seed thành công, nạp đầy đủ các sections động cho khóa học `#39` trong DB.
 - ✅ `npx tsc --noEmit` ➔ compile thành công không có lỗi (Exit code: 0).
 
+---
 
+## ✅ SESSION-20260807_01 — Re-brand "Học Viện BRK" → "Cộng đồng MBC" (toàn dự án)
 
+- **Ngày**: 2026-08-07
+- **Trạng thái**: ✅ Hoàn thành
 
+### Mục tiêu
+- Đổi toàn bộ text hiển thị thương hiệu "BRK" / "Học Viện" / "Học viên" → "MBC" / "Cộng đồng" / "Thành viên" trong code cứng, tài liệu và database.
+- Giữ nguyên tuyệt đối định danh kỹ thuật: `BRKD`/`BRKP`, class Tailwind `brk-*`, `lib/brk/`, route `/tools/brk/`, `BrkWalletCard`, mã khóa `BRK01/02`, regex `/BRK/i` (`lib/auto-verify.ts`), `#HocVienBRK` (`lib/notifications.ts`), `TELEGRAM_BOT_USERNAME="HocVienBRKBot"`, `logobrk-50px.png`, tên hệ thống onSystem=4 trong genealogy.
+
+### Phase 1 — Code (1a ~18 file, 1b ~66 file)
+- Giai đoạn 1a: `app/page.tsx`, `app/page/[slug]/page.tsx`, `lib/db-fallback.ts` (`FALLBACK_PROFILE.slug` `'brk'`→`'mbc'`), `lib/survey-data.ts`, `lib/notifications.ts`, `app/api/auth/forgot-password/route.ts`, components landing/home/auth, `app/complete-profile/page.tsx`, `app/tools/students/page.tsx`, seed scripts.
+- Giai đoạn 1b: actions, api routes, auth, courses, email-mkt, genealogy, landing, telegram, brk services, seeds. Đổi "BRK member"→"MBC member", "in BRK system"→"in MBC system", "Ví BRK"→"Ví MBC", "BRK Academy"→"MBC Academy", "Mã HV"→"Mã TV", onSystem 0 → 'Thành viên'.
+
+### Phase 2 — Docs (~30 file .md)
+- `DESIGN_SYSTEM.md`, `PLAN_DYNAMIC_HOMEPAGE.md` (slug `"brk"`→`"mbc"`, `redirect('/brk')`→`'/mbc'`, giữ Section 11.1), `docs/{AFFILIATE_SYSTEM,BREVO_INTEGRATION,COURSE_VIDEO_PLAYER_TECH,GENEALOGY_UI_UPGRADE,LIB_COURSE_TECHNICAL_SPEC,TEST_CHECKLIST,LOGIN_FAILED_ALERT_SYSTEM,COURSE_LEARNING_GUIDE,TELEGRAM_INTEGRATION,telegram-integration-plan}.md`, `app/tools/{email-mkt/EMAIL_MKT_PLAN,students/STUDENT,payments/PAYMENTS}.md`, `hdsd/00`–`hdsd/11`, `app/tools/genealogy/ytb_plan.md`.
+- Giữ nguyên lịch sử: `PLAN.md` & `SESSION_LOG.md` (chỉ thêm entry mới). Giữ định danh kỹ thuật: `chrome-extension-tca/ExtensionTCA.md`, `docs/REF_TRACKING_SYSTEM.md`, "BRK system" (onSystem=4) trong genealogy docs.
+
+### Phase 3 — Database (24 field / 16 bản ghi)
+- Script `plan_temp/rebrand-db.ts` (dry-run → user duyệt → `--execute`).
+- SiteProfile id=1 (messageDetail, communityTitle, metaTitle), Post 3 bài (title, content), PostComment id=3 (content), PostCategory id=1 (description), Survey id=1 (name), Course id 10/2/41/3 (mo_ta_dai, mo_ta_ngan), AssistantGuide id 3&4 (title, script, textContent), EmailSender id 1/2/3 (senderName).
+- Không đổi lịch sử (brk_transaction 3580, activity_log 3628 — audit logs). SystemTree onSystem=4 đã là "MB - Ngân hàng phước báu".
+
+### Kiểm tra
+- ✅ `npx tsc --noEmit` → Exit code 0
+- ✅ Verify DB: không còn chuỗi BRK / Học viện / Học viên trong các field mục tiêu
+- ⏳ Nhắc test & deploy 2 feature đang chờ: catalog "QUÀ TẶNG TỪ TRÁI TIM" (`app/page.tsx` + `HomePageClient.tsx`) và sửa QR MBV (`app/tools/payments/page.tsx`)
 

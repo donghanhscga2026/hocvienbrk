@@ -3,7 +3,7 @@ import { sendTelegramToUser } from "@/lib/telegram-bot"
 import { isAuthorizedRequest } from "@/lib/request-auth"
 
 /**
- * API nội bộ nhận lệnh gửi tin nhắn Telegram cá nhân cho học viên qua userId
+ * API nội bộ nhận lệnh gửi tin nhắn Telegram cá nhân cho thành viên qua userId
  * Xác thực qua Bearer Token sử dụng TELEGRAM_WEBHOOK_SECRET làm mật mã bảo mật
  */
 export async function POST(request: NextRequest) {

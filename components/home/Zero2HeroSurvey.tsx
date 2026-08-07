@@ -16,11 +16,11 @@ function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => 
                 <div className="aspect-video bg-brk-background relative flex items-center justify-center group cursor-pointer" onClick={() => videoUrl && window.open(videoUrl, '_blank')}>
                     <div className="absolute inset-0 bg-gradient-to-t from-brk-surface/50 to-transparent"></div>
                     <Play className="w-16 h-16 text-brk-primary fill-current group-hover:scale-110 transition-transform" />
-                    <p className="absolute bottom-4 left-6 text-brk-on-surface font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình BRK'}</p>
+                    <p className="absolute bottom-4 left-6 text-brk-on-surface font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình MBC'}</p>
                 </div>
                 <div className="p-8 space-y-4">
                     <h3 className="text-2xl font-black text-brk-on-surface uppercase">Cố vấn định hướng</h3>
-                    <p className="text-brk-muted text-sm leading-relaxed font-medium">Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Học viện.</p>
+                    <p className="text-brk-muted text-sm leading-relaxed font-medium">Chúng tôi hiểu bạn đang phân vân. Nội dung tư vấn này sẽ giúp bạn hiểu rõ từng hướng đi tại Cộng đồng.</p>
                     <button onClick={onClose} className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase tracking-widest hover:brightness-110 transition-all active:scale-95">Tôi đã hiểu - Quay lại chọn</button>
                 </div>
             </div>

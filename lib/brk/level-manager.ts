@@ -64,8 +64,8 @@ export async function checkAndPromoteLevel(userId: number, onSystem: number, pro
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, phone: true } })
       const { sendTelegramAdmin } = await import('@/lib/notifications')
       await sendTelegramAdmin(
-        `🎖️ <b>THĂNG CẤP BRK</b>\n\n` +
-        `👤 Học viên: <b>#${userId} ${user?.name || 'N/A'}</b>\n` +
+        `🎖️ <b>THĂNG CẤP MBC</b>\n\n` +
+        `👤 Thành viên: <b>#${userId} ${user?.name || 'N/A'}</b>\n` +
         `📞 SĐT: ${user?.phone || 'N/A'}\n` +
         `🔄 Cấp: ${currentLevel - 1} → <b>${currentLevel}</b>\n` +
         `🖥️ Hệ thống: #${onSystem}\n` +

@@ -76,7 +76,7 @@ export function AddLessonModal({ courseId, defaultOrder, onClose, onComplete }: 
                         <input type="checkbox" checked={isDailyChallenge} onChange={(e) => setIsDailyChallenge(e.target.checked)} className="w-5 h-5 rounded accent-orange-500" />
                         <div>
                             <span className="text-sm font-black text-orange-700">📝 Bài tập bắt buộc</span>
-                            <p className="text-[10px] text-orange-500/70">Học viên phải ghi nhận (làm bài tập) trước khi chuyển sang bài khác</p>
+                            <p className="text-[10px] text-orange-500/70">Thành viên phải ghi nhận (làm bài tập) trước khi chuyển sang bài khác</p>
                         </div>
                     </label>
                     <button type="submit" disabled={saving} className="w-full bg-black text-yellow-400 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2">

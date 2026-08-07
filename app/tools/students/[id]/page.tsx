@@ -23,7 +23,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
   const emailLogs: any[] = logsRes.success && logsRes.logs ? logsRes.logs : []
   const roleLabels: Record<string, string> = {
     ADMIN: "Quản trị",
-    STUDENT: "Học viên",
+    STUDENT: "Thành viên",
     INSTRUCTOR: "Giảng viên",
     AFFILIATE: "Đối tác",
     TEACHER: "Giáo viên",
@@ -31,7 +31,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <MainHeader title="CHI TIẾT HỌC VIÊN" toolSlug="students" />
+      <MainHeader title="CHI TIẾT THÀNH VIÊN" toolSlug="students" />
 
       <div className="p-4">
         <Link

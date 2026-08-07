@@ -80,7 +80,7 @@ export default function GroupModal({ users, type, totalSub, editMode, onClose, o
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-black text-slate-900 truncate">
-                        #{u.id} {u.name || 'Học viên'}
+                        #{u.id} {u.name || 'Thành viên'}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">

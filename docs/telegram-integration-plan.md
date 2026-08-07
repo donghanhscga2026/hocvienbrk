@@ -1,6 +1,6 @@
-# Kế hoạch triển khai: Tích hợp Telegram Bot cho Học viên
+# Kế hoạch triển khai: Tích hợp Telegram Bot cho Thành viên
 
-Tài liệu này lập kế hoạch chi tiết để tích hợp Telegram Bot vào hệ thống **Học Viện BRK**, chuyển đổi từ đặc tả thiết kế Supabase gốc sang kiến trúc hiện tại của dự án (**Next.js 16 App Router + Prisma ORM + NextAuth v5 + PostgreSQL**).
+Tài liệu này lập kế hoạch chi tiết để tích hợp Telegram Bot vào hệ thống **Cộng đồng MBC**, chuyển đổi từ đặc tả thiết kế Supabase gốc sang kiến trúc hiện tại của dự án (**Next.js 16 App Router + Prisma ORM + NextAuth v5 + PostgreSQL**).
 
 ---
 
@@ -75,21 +75,21 @@ model TelegramLinkToken {
 1.  **Tạo Action (`app/actions/telegram-actions.ts`)**:
     *   Server Action tạo link token dùng 1 lần cho User đang đăng nhập, trả về liên kết dạng `https://t.me/<BOT_USERNAME>?start=<TOKEN>`.
 2.  **Thiết kế UI Nút kết nối Telegram**:
-    *   Thêm mục "Kết nối Telegram" trong Trang cá nhân hoặc trang đăng ký thành công của học viên.
-    *   Khi click, gọi Action để sinh link và chuyển hướng học viên sang ứng dụng Telegram.
+    *   Thêm mục "Kết nối Telegram" trong Trang cá nhân hoặc trang đăng ký thành công của thành viên.
+    *   Khi click, gọi Action để sinh link và chuyển hướng thành viên sang ứng dụng Telegram.
 
 ### 📢 Phase 4: Kênh Gửi Thông Báo Nội Bộ
 1.  **Xây dựng API Endpoint Gửi tin nhắn nội bộ (`app/api/telegram/send/route.ts`)**:
     *   Endpoint bảo mật bằng API Key / Bearer Token hoặc phân quyền Admin.
     *   Nhận `userId` và `message`, tìm `telegramChatId` của user và chuyển tiếp tin nhắn qua Telegram Bot.
 2.  **Tích hợp thông báo**:
-    *   Gửi thông báo tự động khi học viên Đăng ký thành công, Thanh toán thành công, hoặc có lịch học mới.
+    *   Gửi thông báo tự động khi thành viên Đăng ký thành công, Thanh toán thành công, hoặc có lịch học mới.
 
 ---
 
 ## 4. Kế hoạch xác nhận & Kiểm thử (Testing)
 
-*   **Test Case 1**: Học viên click "Kết nối", bot mở ra, ấn `/start` ➔ Lưu đúng `chat_id` và gửi tin nhắn chào mừng.
+*   **Test Case 1**: Thành viên click "Kết nối", bot mở ra, ấn `/start` ➔ Lưu đúng `chat_id` và gửi tin nhắn chào mừng.
 *   **Test Case 2**: Sử dụng token đã hết hạn (> 15 phút) ➔ Bot báo lỗi token hết hạn, yêu cầu lấy link mới.
 *   **Test Case 3**: Sử dụng token đã dùng rồi ➔ Bot từ chối kích hoạt.
-*   **Test Case 4**: Gọi API nội bộ `/api/telegram/send` để gửi tin nhắn thử nghiệm tới học viên.
+*   **Test Case 4**: Gọi API nội bộ `/api/telegram/send` để gửi tin nhắn thử nghiệm tới thành viên.

@@ -177,7 +177,7 @@ export async function rebuildSystem4Data(method: 'A' | 'B') {
       activationDateMap.set(log.userId, log.createdAt);
     }
   }
-  // Bổ sung lấy từ Payment và Enrollment cho những học viên thiếu log
+  // Bổ sung lấy từ Payment và Enrollment cho những thành viên thiếu log
   const enrollmentsDb = await prisma.enrollment.findMany({
     where: { courseId: 22 },
     include: { payment: true }

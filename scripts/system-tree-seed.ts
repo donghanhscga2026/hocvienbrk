@@ -8,7 +8,7 @@ async function seedSystemTree() {
   console.log('Seeding SystemTree...')
   
   const systems = [
-    { onSystem: 0, nameSystem: 'Học viên' },
+    { onSystem: 0, nameSystem: 'Thành viên' },
     { onSystem: 1, nameSystem: 'TCA' },
     { onSystem: 2, nameSystem: 'KTC' },
   ]

@@ -11,7 +11,7 @@ import SetHomeSlug from '@/components/home/SetHomeSlug'
 import { getSiteProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getHeroMessageForProfile } from '@/app/actions/message-actions'
 
-const DEFAULT_OG_TITLE = 'BRK - Ngân hàng Phước Báu'
+const DEFAULT_OG_TITLE = 'MBC - Ngân hàng Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
 const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
 

@@ -552,7 +552,7 @@ export default function DiagramFlow({ selectedSystem, diagramViewKey }: { select
       if (systemId === null) {
         setFullTree(null)
       } else if (systemId === 0) {
-        // Hệ thống Học viên - lấy từ user đang đăng nhập
+        // Hệ thống Thành viên - lấy từ user đang đăng nhập
         const result = await getGenealogyTreeAction(currentUserIdLocal)
         if (result.success && result.tree) {
           setFullTree(result.tree)
@@ -989,7 +989,7 @@ export default function DiagramFlow({ selectedSystem, diagramViewKey }: { select
             </div>
             
             <div className="text-sm font-semibold text-slate-500 mb-4 uppercase tracking-wider">
-              {sharingTreeModal.userName || 'Học viên'}
+              {sharingTreeModal.userName || 'Thành viên'}
             </div>
 
             {loadingSharingTree ? (
@@ -1000,7 +1000,7 @@ export default function DiagramFlow({ selectedSystem, diagramViewKey }: { select
             ) : (
               <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
                 <div className="bg-emerald-50 text-emerald-700 rounded-xl p-3 mb-4 text-xs font-bold flex items-center justify-between">
-                  <span>TỔNG SỐ HỌC VIÊN PHÁT TRIỂN:</span>
+                  <span>TỔNG SỐ THÀNH VIÊN PHÁT TRIỂN:</span>
                   <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[11px]">
                     {sharingTreeData?.totalDescendants || 0} người
                   </span>
@@ -1008,7 +1008,7 @@ export default function DiagramFlow({ selectedSystem, diagramViewKey }: { select
 
                 {(!sharingTreeData || sharingTreeData.totalDescendants === 0) ? (
                   <div className="text-center text-slate-400 text-xs py-8 font-medium">
-                    Thành viên này chưa phát triển được học viên nào qua nhân mạch chia sẻ.
+                    Thành viên này chưa phát triển được thành viên nào qua nhân mạch chia sẻ.
                   </div>
                 ) : (
                   <div className="space-y-1.5 py-1">
@@ -1180,7 +1180,7 @@ export default function DiagramFlow({ selectedSystem, diagramViewKey }: { select
                   >
                     <div className="w-10 h-10 rounded-lg bg-brk-bg text-brk-muted flex items-center justify-center font-black text-sm group-hover:bg-brk-primary group-hover:text-brk-on-primary transition-colors">#{u.id}</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-black text-brk-on-surface truncate">{u.name || 'Học viên'}</div>
+                      <div className="text-sm font-black text-brk-on-surface truncate">{u.name || 'Thành viên'}</div>
                       <div className="text-[10px] font-bold text-brk-muted truncate uppercase tracking-widest">{u.email}</div>
                     </div>
                   </button>

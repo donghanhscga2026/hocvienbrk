@@ -35,7 +35,7 @@ interface FormData {
 }
 
 const PRESET_COLORS = [
-  { name: 'Cam BRK', value: '#f97316' },
+  { name: 'Cam MBC', value: '#f97316' },
   { name: 'Xanh lá', value: '#10b981' },
   { name: 'Xanh dương', value: '#3b82f6' },
   { name: 'Đỏ', value: '#ef4444' },

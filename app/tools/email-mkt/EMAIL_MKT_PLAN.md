@@ -673,7 +673,7 @@ export async function sendGmailFromSender(
   });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-  const fromName = 'Học Viện BRK';
+  const fromName = 'Cộng đồng MBC';
 
   const encodeHeader = (str: string) => { 
     if (!str) return ""; 
@@ -1288,13 +1288,13 @@ import { google } from 'googleapis';
 
 // Random subject lines cho verification email (7 biến thể)
 const verificationSubjects = [
-  '[Học Viện BRK] Xác minh tài khoản của bạn',
-  '[Học Viện BRK] Kích hoạt tài khoản ngay',
-  '[Học Viện BRK] Hoàn tất đăng ký - Xác nhận email của bạn',
-  '[Học Viện BRK] Verify your account để bắt đầu học',
-  'Xác nhận đăng ký thành công - Học Viện BRK',
-  '[Học Viện BRK] Chào mừng! Xác minh email để tiếp tục',
-  'Kích hoạt tài khoản Học Viện BRK của bạn',
+  '[Cộng đồng MBC] Xác minh tài khoản của bạn',
+  '[Cộng đồng MBC] Kích hoạt tài khoản ngay',
+  '[Cộng đồng MBC] Hoàn tất đăng ký - Xác nhận email của bạn',
+  '[Cộng đồng MBC] Verify your account để bắt đầu học',
+  'Xác nhận đăng ký thành công - Cộng đồng MBC',
+  '[Cộng đồng MBC] Chào mừng! Xác minh email để tiếp tục',
+  'Kích hoạt tài khoản Cộng đồng MBC của bạn',
 ];
 
 // Random greeting styles
@@ -1481,7 +1481,7 @@ async function sendViaResend(to: string, subject: string, htmlBody: string): Pro
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Học Viện BRK <onboarding@resend.dev>',
+        from: 'Cộng đồng MBC <onboarding@resend.dev>',
         to: to,
         subject: subject,
         html: htmlBody,
@@ -1515,7 +1515,7 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
-    const fromName = 'Học Viện BRK';
+    const fromName = 'Cộng đồng MBC';
     const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
     const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
     const messageParts = [
@@ -1601,7 +1601,7 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
     </div>
     <div style="padding: 30px;">
       <p style="color: #1f2937; font-size: 16px;">${greeting} <span style="font-weight: 600;">${name}</span></p>
-      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Học Viện BRK. Nhập mã này để xác nhận:</p>
+      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Cộng đồng MBC. Nhập mã này để xác nhận:</p>
       <div style="background: #f9fafb; border: 2px dashed #4f46e5; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0;">
         <h1 style="color: #4f46e5; font-size: 40px; margin: 0; letter-spacing: 10px;">${code}</h1>
       </div>
@@ -1672,8 +1672,8 @@ function getRandomVerificationTemplate(name: string, token: string): { subject: 
  */
 
 export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
-  const subject = `[Học Viện BRK] Chào mừng bạn gia nhập học viện - Mã học tập của bạn là #${studentId}`;
-  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Học Viện BRK,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
+  const subject = `[Cộng đồng MBC] Chào mừng bạn gia nhập cộng đồng - Mã học tập của bạn là #${studentId}`;
+  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Cộng đồng MBC,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
@@ -1686,19 +1686,19 @@ export async function sendVerificationEmail(to: string, studentName: string, tok
 }
 
 export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, _customContent: string | null) {
-  const subject = `[Học Viện BRK] Kích hoạt thành công khóa học: ${courseName}`;
+  const subject = `[Cộng đồng MBC] Kích hoạt thành công khóa học: ${courseName}`;
   const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
 
 export async function sendLoginNotification(user: { id: number; name: string }, _ip: string, _userAgent: string) {
-  const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})`;
+  const msg = `🔑 <b>THÔNG BÁO ĐĂNG NHẬP</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})`;
   await sendTelegram(msg, 'LESSON');
 }
 
 export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }) {
-  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
+  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
   await sendTelegram(msg, 'LESSON');
 }
 
@@ -1753,7 +1753,7 @@ export async function sendSurveyNotification(data: {
   }
 
   const msg = `🎯 <b>HỌC VIÊN HOÀN THÀNH KHẢO SÁT</b>\n\n` +
-    `👤 Học viên: <b>${data.studentName}</b> (#${data.studentId})\n` +
+    `👤 Thành viên: <b>${data.studentName}</b> (#${data.studentId})\n` +
     `🏁 Đích đến: <b>Nút ${data.targetPointName}</b>\n` +
     `🏆 Mục tiêu: <b>${data.goal}</b>\n\n` +
     (inputs.length > 0 ? `<b>⌨️ THÔNG TIN NHẬP:</b>\n${inputs.join('\n')}\n\n` : '') +
@@ -2654,7 +2654,7 @@ export async function POST(
         }
 
         let subject = spinContent(campaign.subject || "").trim();
-        subject = subject.replace(/\[Tên\]/g, recipient.name || "Học viên");
+        subject = subject.replace(/\[Tên\]/g, recipient.name || "Thành viên");
         subject = subject.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
 
         let rawHtml = spinContent(campaign.htmlContent || "").trim();
@@ -2676,7 +2676,7 @@ export async function POST(
           <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
             <div style="background-color: #000000; padding: 30px; text-align: center;">
               <a href="https://giautoandien.io.vn" style="text-decoration: none;">
-                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="HỌC VIỆN BRK" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
+                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MBC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
               </a>
               <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">NGÂN HÀNG PHƯỚC BÁU</div>
             </div>
@@ -2687,7 +2687,7 @@ export async function POST(
             </div>
             <div style="padding: 30px; background-color: #f9f9f9; border-top: 1px solid #eeeeee; text-align: center;">
               <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
-                Bạn nhận được thông báo này vì là thành viên của <b>Học Viện BRK</b>.<br>
+                Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MBC</b>.<br>
                 Nếu không muốn nhận những email này, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">Hủy đăng ký tại đây</a>.
               </p>
             </div>
@@ -3052,7 +3052,7 @@ export async function POST(req: Request) {
     const recipients = rows.slice(1).map((row, index) => ({
       id: 9000 + index, // ID tạm để bảng chọn hoạt động
       email: row[0],
-      name: row[1] || "Học viên",
+      name: row[1] || "Thành viên",
     })).filter(r => r.email && r.email.includes("@"));
 
     return NextResponse.json(recipients);
@@ -3528,7 +3528,7 @@ export async function GET(req: Request) {
     return new NextResponse(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1>Đã hủy đăng ký thành công</h1>
-        <p>Bạn sẽ không nhận được các email thông báo từ Học Viện BRK nữa.</p>
+        <p>Bạn sẽ không nhận được các email thông báo từ Cộng đồng MBC nữa.</p>
         <a href="/">Quay lại trang chủ</a>
       </div>
     `, { headers: { "Content-Type": "text/html; charset=utf-8" } });
@@ -4216,8 +4216,8 @@ function CreateCampaignContent() {
   ]
 
   const getRecipientSources = () => [
-    { value: 'DB_ALL', label: 'Tất cả học viên (đã xác thực email)' },
-    { value: 'DB_ACTIVE', label: 'Học viên đang học trong khóa' },
+    { value: 'DB_ALL', label: 'Tất cả thành viên (đã xác thực email)' },
+    { value: 'DB_ACTIVE', label: 'Thành viên đang học trong khóa' },
     { value: 'CSV', label: 'Danh sách CSV/JSON tự nhập' },
   ]
 

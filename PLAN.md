@@ -2029,6 +2029,32 @@ Sửa lỗi font chữ hiển thị không chính xác khi gõ tiếng Việt c�
 - ✅ Phối màu nền xen kẽ tương phản hiển thị sắc nét.
 - ✅ Lớp biên dịch TypeScript hoạt động tốt với `npx tsc --noEmit` (Exit code: 0).
 
+---
+
+## ✅ Re-brand "Học Viện BRK" → "Cộng đồng MBC" (2026-08-07)
+
+### Mục tiêu
+Đổi toàn bộ text hiển thị thương hiệu "BRK" / "Học Viện" / "Học viên" → "MBC" / "Cộng đồng" / "Thành viên" trong code cứng và tài liệu. **Giữ nguyên tuyệt đối các định danh kỹ thuật**: `BRKD`/`BRKP`, class Tailwind `brk-*`, thư mục `lib/brk/`, route `/tools/brk/`, component `BrkWalletCard`, mã khóa `BRK01`/`BRK02`, regex `/BRK/i` (`lib/auto-verify.ts`), hashtag `#HocVienBRK`, `TELEGRAM_BOT_USERNAME="HocVienBRKBot"`, `logobrk-50px.png`, tên hệ thống onSystem=4 trong genealogy (seed giữ `'BRK'`).
+
+### Các file đã sửa (Code — Phase 1a/1b)
+#### Giai đoạn 1a (~18 file)
+- `app/page.tsx`, `app/page/[slug]/page.tsx`, `lib/db-fallback.ts`, `lib/survey-data.ts`, `lib/notifications.ts`, `app/api/auth/forgot-password/route.ts`, `components/landing/CourseLandingTemplate.tsx`, `components/layout/MainHeader.tsx`, `components/home/{RealityMap,Zero2HeroSurvey,MessageCard}.tsx`, `components/auth/AccountAssistantModal.tsx`, `app/complete-profile/page.tsx`, `app/tools/students/page.tsx`, seed scripts.
+- Nội dung: "Học Viện BRK" → "Cộng đồng MBC", "Học viên" → "Thành viên", onSystem 0 → 'Thành viên', `FALLBACK_PROFILE.slug` `'brk'` → `'mbc'`.
+
+#### Giai đoạn 1b (~66 file)
+- actions, api routes, auth, courses, email-mkt, genealogy, landing, telegram, brk services, seeds.
+- Nội dung: đổi toàn bộ chuỗi hiển thị BRK → MBC (layout, label, message, error text): "BRK member" → "MBC member", "in BRK system" → "in MBC system", "Ví BRK" → "Ví MBC", "BRK Academy" → "MBC Academy", "Mã HV" → "Mã TV", ...
+
+### Các file đã sửa (Docs — Phase 2)
+- Đã đổi ~30 file `.md`: `DESIGN_SYSTEM.md`, `PLAN_DYNAMIC_HOMEPAGE.md`, `docs/{AFFILIATE_SYSTEM,BREVO_INTEGRATION,COURSE_VIDEO_PLAYER_TECH,GENEALOGY_UI_UPGRADE,LIB_COURSE_TECHNICAL_SPEC,TEST_CHECKLIST,LOGIN_FAILED_ALERT_SYSTEM,COURSE_LEARNING_GUIDE,TELEGRAM_INTEGRATION,telegram-integration-plan}.md`, `app/tools/{email-mkt/EMAIL_MKT_PLAN,students/STUDENT,payments/PAYMENTS}.md`, `hdsd/00`–`hdsd/11`, `app/tools/genealogy/ytb_plan.md`.
+- Theo quyết định user: `PLAN_DYNAMIC_HOMEPAGE.md` đổi `slug="brk"` → `"mbc"`, `redirect('/brk')` → `'/mbc'`; **giữ nguyên** Section 11.1 (script `create-brk-profile.ts` thật vẫn dùng `'brk'`) và RESERVED_PATHS `'brk'`. Ví dụ data trong docs đổi `BRK123` → `MBC123`, `hocvien.com` → `mbc.com`, tên dự án "HocVien-BRK" → "MBC".
+- **Giữ nguyên lịch sử**: `PLAN.md` & `docs/SESSION_LOG.md` (chỉ thêm entry mới). **Giữ định danh kỹ thuật**: `chrome-extension-tca/ExtensionTCA.md`, `docs/REF_TRACKING_SYSTEM.md` (`activateBrkMember`, `lib/brk/`, "BRK placement"), "BRK system" (onSystem=4) trong genealogy docs.
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — Exit code 0
+- ✅ Code runtime sạch chuỗi "Học Viện/Học viên" và BRK hiển thị (grep xác nhận)
+- ⏳ Còn lại: **Phase 3** — cập nhật dữ liệu DB (SiteProfile, Post, PostComment, PostCategory, Survey, Course mo_ta/mo_ta_ngan, AssistantGuide, EmailSender) theo quy trình dry-run → user duyệt → execute
+
 
 
 

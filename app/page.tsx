@@ -14,27 +14,27 @@ import { resetSurveyAction } from './actions/survey-actions'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 
 export const metadata: Metadata = {
-  title: 'BRK - Ngân hàng Phước Báu',
+  title: 'MBC - Ngân hàng Phước Báu',
   description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
   openGraph: {
-    title: 'BRK - Ngân hàng Phước Báu',
+    title: 'MBC - Ngân hàng Phước Báu',
     description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
     type: 'website',
     locale: 'vi_VN',
     url: 'https://giautoandien.io.vn',
-    siteName: 'BRK - Ngân hàng Phước Báu',
+    siteName: 'MBC - Ngân hàng Phước Báu',
     images: [
       {
         url: 'https://giautoandien.io.vn/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'BRK - Ngân hàng Phước Báu',
+        alt: 'MBC - Ngân hàng Phước Báu',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'BRK - Ngân hàng Phước Báu',
+    title: 'MBC - Ngân hàng Phước Báu',
     description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
     images: ['https://giautoandien.io.vn/og-image.png'],
   },
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 export default async function Home() {
   const session = await auth()
   
-  // Lấy BRK Profile mặc định - Đã có try-catch fallback bên trong action
+  // Lấy MBC Profile mặc định - Đã có try-catch fallback bên trong action
   const profile = await getDefaultProfile()
   const safeProfile = profile || FALLBACK_PROFILE
 

@@ -5,7 +5,7 @@
 
 ---
 
-## 1. TRANG CHỦ BRK (`/`)
+## 1. TRANG CHỦ MBC (`/`)
 
 - [ ] HeroSection full width, sát mép
 - [ ] Ảnh nền hiển thị đúng

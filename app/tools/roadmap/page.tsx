@@ -354,7 +354,7 @@ const RoadmapBuilderContent = () => {
               {selectedNode.type === 'questionNode' && (
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black uppercase text-gray-400 ml-1 italic">Mô tả chi tiết (Tùy chọn)</label>
-                  <textarea className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none focus:border-orange-400 text-black" value={selectedNode.data?.description || ''} onChange={(e) => updateNodeData({ description: e.target.value })} rows={2} placeholder="Giúp học viên hiểu rõ câu hỏi hơn..." />
+                  <textarea className="w-full p-4 text-xs font-bold border-2 border-gray-50 rounded-2xl outline-none focus:border-orange-400 text-black" value={selectedNode.data?.description || ''} onChange={(e) => updateNodeData({ description: e.target.value })} rows={2} placeholder="Giúp thành viên hiểu rõ câu hỏi hơn..." />
                 </div>
               )}
 
@@ -418,7 +418,7 @@ const RoadmapBuilderContent = () => {
                         <option key={num} value={num}>Nút số {num}</option>
                       ))}
                     </select>
-                    <p className="text-[8px] text-gray-400 px-1 italic">Học viên đi qua khối này sẽ được chốt đích đến tại Nút này.</p>
+                    <p className="text-[8px] text-gray-400 px-1 italic">Thành viên đi qua khối này sẽ được chốt đích đến tại Nút này.</p>
                   </div>
                 </div>
               )}

@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         recipientSource: "SELECTED_LIST",
         recipientCsvData: JSON.stringify(formattedRecipients),
         subject: "[Xác thực kết nối] Kiểm tra kỹ thuật tự động #[NgauNhien]",
-        htmlContent: "Xin chào [Tên], đây là email kiểm tra kết nối kỹ thuật tự động từ hệ thống Học Viện BRK.<br/><br/>Mã xác nhận kết nối của bạn: <b>#[NgauNhien]</b> (Mã học viên: #[MãHV]).<br/>Hệ thống đang kiểm tra xem email của bạn có nhận được thư hay không.<br/>Vui lòng bỏ qua email này.<br/><br/>Trân trọng,<br/>Đội ngũ kỹ thuật BRK.",
+        htmlContent: "Xin chào [Tên], đây là email kiểm tra kết nối kỹ thuật tự động từ hệ thống Cộng đồng MBC.<br/><br/>Mã xác nhận kết nối của bạn: <b>#[NgauNhien]</b> (Mã thành viên: #[MãHV]).<br/>Hệ thống đang kiểm tra xem email của bạn có nhận được thư hay không.<br/>Vui lòng bỏ qua email này.<br/><br/>Trân trọng,<br/>Đội ngũ kỹ thuật MBC.",
         totalRecipients: formattedRecipients.length,
         createdBy: userId,
       },

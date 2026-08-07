@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
         referrerInfo = refLink
       }
       const msgAdmin = `🎁 <b>KÍCH HOẠT MIỄN PHÍ (từ ĐK)</b>\n\n` +
-        `👤 Học viên: <b>${user?.name}</b> (#${user?.id})\n` +
+        `👤 Thành viên: <b>${user?.name}</b> (#${user?.id})\n` +
         `🎓 Khóa học: <b>${course.name_lop} (${course.id_khoa})</b>${referrerInfo}\n` +
         `📅 Thời gian: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
       await sendTelegram(msgAdmin, 'ACTIVATE')

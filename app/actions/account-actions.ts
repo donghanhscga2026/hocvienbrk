@@ -69,7 +69,7 @@ export async function updateUserProfile(data: {
             if (data.phone) changed.push(`SĐT: ${user.phone}`);
             if (data.image) changed.push(`ảnh đại diện`);
             if (changed.length > 0) {
-                const msg = `✏️ <b>THAY ĐỔI THÔNG TIN</b>\n👤 Học viên: <b>${user.name}</b> (#${user.id})\n📝 Thay đổi: ${changed.join(', ')}`;
+                const msg = `✏️ <b>THAY ĐỔI THÔNG TIN</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📝 Thay đổi: ${changed.join(', ')}`;
                 await sendTelegram(msg, 'CHANGE');
 
                 const { logActivity } = await import('@/lib/activity-logger')

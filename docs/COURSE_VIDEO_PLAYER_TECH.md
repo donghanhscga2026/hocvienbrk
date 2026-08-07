@@ -366,4 +366,4 @@ model LessonProgress {
 
 ---
 
-*Tài liệu kỹ thuật — Học Viện BRK*
+*Tài liệu kỹ thuật — Cộng đồng MBC*

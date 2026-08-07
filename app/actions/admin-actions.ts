@@ -24,7 +24,7 @@ export interface GenealogyNode {
     image?: string | null
     referrerId: number | null
     seq?: number  // 0-based join order trong hệ thống (chỉ có ở SYSTEM tree)
-    sharingCount?: number // Số học viên phát triển được theo nhân mạch chia sẻ
+    sharingCount?: number // Số thành viên phát triển được theo nhân mạch chia sẻ
     totalSubCount: number
     f1aCount: number
     f1bCount: number
@@ -97,7 +97,7 @@ export async function getSystemRootUserAction(systemId: number) {
     return getSystemRootUser(systemId)
 }
 
-// Hàm xây dựng cây chuẩn dùng chung cho cả Học viên và Hệ thống
+// Hàm xây dựng cây chuẩn dùng chung cho cả Thành viên và Hệ thống
 async function buildStandardTree(
     rootId: number,
     type: 'USER' | 'SYSTEM',
@@ -1426,7 +1426,7 @@ export async function getStudentDetailAction(studentId: number) {
                 }
             }
         })
-        if (!user) return { success: false, error: "Không tìm thấy học viên" }
+        if (!user) return { success: false, error: "Không tìm thấy thành viên" }
 
         if (isTeacher) {
             const hasAccess = user.enrollments.some(e => e.course.teacherId === userId)
@@ -1467,8 +1467,8 @@ export async function resendVerificationAction(studentId: number) {
             where: { id: studentId },
             select: { id: true, name: true, email: true, emailVerified: true },
         })
-        if (!user) return { success: false, error: "Không tìm thấy học viên" }
-        if (!user.email) return { success: false, error: "Học viên không có email" }
+        if (!user) return { success: false, error: "Không tìm thấy thành viên" }
+        if (!user.email) return { success: false, error: "Thành viên không có email" }
         if (user.emailVerified) return { success: false, error: "Email đã được xác minh" }
 
         // Xóa token cũ
@@ -1488,7 +1488,7 @@ export async function resendVerificationAction(studentId: number) {
 
         // Gửi email
         const { sendVerificationEmail } = await import('@/lib/notifications')
-        const result = await sendVerificationEmail(user.email, user.name || 'Học viên', otpCode, studentId)
+        const result = await sendVerificationEmail(user.email, user.name || 'Thành viên', otpCode, studentId)
 
         if (!result.success) {
             return { success: false, error: `Gửi email thất bại: ${result.message}` }
@@ -1540,7 +1540,7 @@ export async function resendAllVerificationAction() {
                 })
 
                 const { sendVerificationEmail } = await import('@/lib/notifications')
-                const result = await sendVerificationEmail(user.email!, user.name || 'Học viên', otpCode, user.id)
+                const result = await sendVerificationEmail(user.email!, user.name || 'Thành viên', otpCode, user.id)
 
                 if (result.success) {
                     sent++
@@ -1990,7 +1990,7 @@ export async function getSharingSponsorTreeAction(userId: number) {
         function traverse(uId: number, depth: number) {
             const kids = parentToChildren.get(uId) || []
             kids.forEach(kidId => {
-                const info = userMap.get(kidId) || { name: `Học viên #${kidId}`, image: null }
+                const info = userMap.get(kidId) || { name: `Thành viên #${kidId}`, image: null }
                 flatTree.push({
                     userId: kidId,
                     name: info.name,

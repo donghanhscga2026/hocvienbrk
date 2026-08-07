@@ -67,7 +67,7 @@ export function parseBotCommand(text: string): { command: string; payload: strin
 }
 
 /**
- * Gửi tin nhắn Telegram cá nhân cho học viên dựa trên userId
+ * Gửi tin nhắn Telegram cá nhân cho thành viên dựa trên userId
  */
 export async function sendTelegramToUser(userId: number, text: string): Promise<boolean> {
   try {
@@ -90,7 +90,7 @@ export async function sendTelegramToUser(userId: number, text: string): Promise<
 }
 
 /**
- * Thực hiện liên kết tài khoản Telegram của học viên qua token dùng một lần
+ * Thực hiện liên kết tài khoản Telegram của thành viên qua token dùng một lần
  */
 export async function linkTelegramAccount(
   tokenStr: string,

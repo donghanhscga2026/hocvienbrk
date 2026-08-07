@@ -53,7 +53,7 @@ export async function GET(req: Request) {
 
       const item = {
         userId: recipientInfo.userId,
-        name: recipientInfo.name || "Học viên",
+        name: recipientInfo.name || "Thành viên",
         email: log.toEmail,
         sentAt: log.sentAt,
         status: log.status,

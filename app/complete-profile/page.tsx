@@ -142,7 +142,7 @@ function CompleteProfileContent() {
                         Hoàn tất hồ sơ
                     </h2>
                     <p className="text-sm text-brk-muted">
-                        Vui lòng bổ sung thông tin để bắt đầu trải nghiệm Học viện BRK
+                        Vui lòng bổ sung thông tin để bắt đầu trải nghiệm Cộng đồng MBC
                     </p>
                 </div>
 
@@ -157,7 +157,7 @@ function CompleteProfileContent() {
                         {/* ID Hiển thị (Chỉ đọc) */}
                         <div>
                             <label className="block text-xs font-medium text-brk-muted mb-1 ml-1">
-                                ID Học viên
+                                ID Thành viên
                             </label>
                             <div className="flex items-center gap-3 px-3 py-2 bg-brk-background/50 rounded-md border border-brk-outline/30 text-brk-muted text-sm font-mono">
                                 <Hash className="h-4 w-4" />
@@ -343,7 +343,7 @@ function CompleteProfileContent() {
                 </form>
 
                 <p className="text-center text-xs text-brk-muted mt-6 italic">
-                    Bằng cách nhấn hoàn tất, bạn đồng ý với điều khoản sử dụng của Học viện BRK.
+                    Bằng cách nhấn hoàn tất, bạn đồng ý với điều khoản sử dụng của Cộng đồng MBC.
                 </p>
             </div>
         </div>

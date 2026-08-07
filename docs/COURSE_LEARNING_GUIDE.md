@@ -34,7 +34,7 @@ Khi vào một khóa học, giao diện chia làm 3 khu vực chính:
 - Click để chuyển bài
 
 ### 1.3 Tab Ghi nhận (Bên phải — Desktop)
-- Nơi học viên ghi lại bài học (phản ánh, đường dẫn, hỗ trợ)
+- Nơi thành viên ghi lại bài học (phản ánh, đường dẫn, hỗ trợ)
 - Chỉ hiển thị với khóa học NORMAL/CHALLENGE
 - **Không hiển thị** với khóa học LIB
 
@@ -65,7 +65,7 @@ Hệ thống hỗ trợ xem video từ **nhiều nền tảng khác nhau**:
 
 ### 2.2 Cách sử dụng
 1. Admin nhập link video vào bài học (bất kỳ nền tảng nào ở trên)
-2. Học viên mở bài học → Video tự động phát
+2. Thành viên mở bài học → Video tự động phát
 3. Tiến độ được lưu tự động (nếu nền tảng hỗ trợ)
 
 ---
@@ -145,7 +145,7 @@ Hệ thống tự động theo dõi tiến độ xem video:
 
 ## 6. GHI NHẬN BÀI HỌC
 
-Sau khi xem video, học viên cần làm **Ghi nhận** (với khóa học NORMAL/CHALLENGE):
+Sau khi xem video, thành viên cần làm **Ghi nhận** (với khóa học NORMAL/CHALLENGE):
 
 ### 6.1 Các mục ghi nhận
 
@@ -186,4 +186,4 @@ Khóa học LIB có các đặc điểm:
 
 ---
 
-*Tài liệu hướng dẫn sử dụng — Học Viện BRK*
+*Tài liệu hướng dẫn sử dụng — Cộng đồng MBC*

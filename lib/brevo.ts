@@ -9,7 +9,7 @@ function getApiKey(overrideKey?: string): string {
 
 function getDefaultSender(): { name: string; email: string } {
   return {
-    name: process.env.BREVO_SENDER_NAME || 'Học Viện BRK',
+    name: process.env.BREVO_SENDER_NAME || 'Cộng đồng MBC',
     email: process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com',
   }
 }

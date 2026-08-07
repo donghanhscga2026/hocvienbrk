@@ -197,7 +197,7 @@ export async function registerUser(prevState: any, formData: FormData) {
             metadata: { studentName: name, email: normalizedEmail, phone: fullPhone, referrerId: refId || null, referrerName: referrerName || null }
         })
         const referrerInfo = refId ? `\n📢 Người giới thiệu: #${refId}${referrerName ? ' (' + referrerName + ')' : ''}` + (refLink ? `\n🔗 Link ref: ${refLink}` : '') : ''
-        const msgAdmin = `🆕 <b>HỌC VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
+        const msgAdmin = `🆕 <b>THÀNH VIÊN MỚI ĐĂNG KÝ (CHỜ XÁC MINH)</b>\n\n` +
                          `🆔 Mã số: <b>#${user.id}</b>\n` +
                          `👤 Họ tên: <b>${user.name}</b>\n` +
                          `📧 Email: ${user.email}\n` +

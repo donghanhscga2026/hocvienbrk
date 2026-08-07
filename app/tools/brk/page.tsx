@@ -212,7 +212,7 @@ export default function BrkDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">BRK Affiliate</h1>
+        <h1 className="text-2xl font-bold text-gray-800">MBC Affiliate</h1>
         <div className="flex gap-2 flex-wrap">
           {(['dashboard', 'systems', 'revenue', 'move', 'rebuild'] as const).map((tab) => (
             <button
@@ -278,7 +278,7 @@ export default function BrkDashboardPage() {
 
             {systems.length === 0 && (
               <div className="text-center py-12 text-gray-400">
-                Bạn chưa tham gia hệ thống BRK nào. Hãy chuyển qua tab "Hệ thống" để tham gia.
+                Bạn chưa tham gia hệ thống MBC nào. Hãy chuyển qua tab "Hệ thống" để tham gia.
               </div>
             )}
           </div>
@@ -315,7 +315,7 @@ export default function BrkDashboardPage() {
 
           {availableSystems.length === 0 && (
             <div className="col-span-full text-center py-12 text-gray-400">
-              Chưa có hệ thống BRK nào được tạo.
+              Chưa có hệ thống MBC nào được tạo.
             </div>
           )}
         </div>

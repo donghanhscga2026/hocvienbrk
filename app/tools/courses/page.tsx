@@ -431,10 +431,10 @@ function CoursesTab() {
                                                 <button
                                                     onClick={() => handleViewStudents(course.id, course.name_lop)}
                                                     className="flex items-center gap-1 hover:text-purple-600 transition-colors"
-                                                    title="Xem học viên đã đăng ký"
+                                                    title="Xem thành viên đã đăng ký"
                                                 >
                                                     <Users className="w-3 h-3 text-purple-500" />
-                                                    {course._count?.enrollments} HV
+                                                    {course._count?.enrollments} TV
                                                 </button>
                                                 {course.teacher && (
                                                     <span className="text-[10px] text-gray-400 font-medium ml-auto">
@@ -527,7 +527,7 @@ function CoursesTab() {
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white shrink-0">
-                            <h2 className="font-bold text-sm">Học viên — {viewStudents!.courseName}</h2>
+                            <h2 className="font-bold text-sm">Thành viên — {viewStudents!.courseName}</h2>
                             <button onClick={() => setViewStudents(null)} className="p-1 rounded-lg hover:bg-white/20">
                                 <X className="w-5 h-5" />
                             </button>
@@ -538,7 +538,7 @@ function CoursesTab() {
                                     <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
                                 </div>
                             ) : studentsList.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 text-sm">Không có học viên nào</div>
+                                <div className="p-8 text-center text-gray-400 text-sm">Không có thành viên nào</div>
                             ) : (
                                 <div className="divide-y divide-gray-100">
                                     {studentsList.map((s: any) => (
@@ -556,7 +556,7 @@ function CoursesTab() {
                         </div>
                         <div className="px-6 py-3 bg-slate-50 border-t shrink-0 flex items-center justify-between">
                             <span className="text-xs text-gray-500 font-medium">
-                                {studentsList.length} học viên
+                                {studentsList.length} thành viên
                             </span>
                             <button
                                 onClick={() => setViewStudents(null)}

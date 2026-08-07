@@ -62,7 +62,7 @@ export function LandingPageClient({ landing }: LandingPageClientProps) {
                     ctaLink={landing.ctaLink || undefined}
                     features={featureItems}
                     stats={stats ? [
-                        { value: stats.students || '0', label: 'Học viên' },
+                        { value: stats.students || '0', label: 'Thành viên' },
                         { value: stats.rating || '5.0', label: 'Đánh giá' },
                         { value: stats.courses || '0', label: 'Khóa học' },
                     ] : undefined}

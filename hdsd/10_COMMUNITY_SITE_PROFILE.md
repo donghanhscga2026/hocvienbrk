@@ -40,7 +40,7 @@ Tính năng Cộng đồng cho phép các Profile "hút" nội dung từ nhiều
 
 ### 2. Quản lý Cộng sự (Associates)
 Nếu bạn là trưởng nhóm, bạn có thể thêm các thành viên khác vào Profile của mình:
-- Thêm mã ID của học viên vào mục **Thành viên đội nhóm**.
+- Thêm mã ID của thành viên vào mục **Thành viên đội nhóm**.
 - Các bài viết của thành viên này sẽ xuất hiện trên trang Profile chung của nhóm, giúp tạo ra một kho nội dung phong phú.
 
 ### 3. Sử dụng Link Profile để Tuyển dụng

@@ -1,5 +1,5 @@
 # 05. NHÂN MẠCH (GENEALOGY TREE)
-> **Mục đích**: Tài liệu này đặc tả hệ thống Sơ đồ phả hệ (Genealogy) - linh hồn của dự án Học viện BRK, bao gồm mô hình dữ liệu Closure Table, các chế độ hiển thị và logic xây dựng cây đa cấp.
+> **Mục đích**: Tài liệu này đặc tả hệ thống Sơ đồ phả hệ (Genealogy) - linh hồn của dự án Cộng đồng MBC, bao gồm mô hình dữ liệu Closure Table, các chế độ hiển thị và logic xây dựng cây đa cấp.
 
 ---
 
@@ -48,7 +48,7 @@
 - **Mở rộng nhánh**: Nhấn vào nút **"N nhánh"** (màu indigo) để xem các thành viên cấp dưới của người đó.
 
 ### 2. Công cụ Tìm kiếm & Lọc
-- **Tìm ID**: Nhập mã học viên (#ID) vào ô tìm kiếm để định vị nhanh thành viên đó trên sơ đồ. Hệ thống sẽ tự động vẽ đường dẫn từ gốc đến người đó.
+- **Tìm ID**: Nhập mã thành viên (#ID) vào ô tìm kiếm để định vị nhanh thành viên đó trên sơ đồ. Hệ thống sẽ tự động vẽ đường dẫn từ gốc đến người đó.
 - **Đội của tôi (My Team)**: Tích vào ô này để sơ đồ chỉ hiển thị bạn và hệ thống cấp dưới của bạn.
 - **Lọc Active**: Chỉ hiển thị các thành viên đã được kích hoạt tài khoản/khóa học.
 

@@ -24,7 +24,7 @@ export default async function AffiliateConversionsPage() {
     }
   })
 
-  // 2. Lấy thông tin khách hàng (học viên mới)
+  // 2. Lấy thông tin khách hàng (thành viên mới)
   const customerIds = conversions.map(c => c.customerId)
   const customers = await prisma.user.findMany({
     where: { id: { in: customerIds } },
@@ -77,7 +77,7 @@ export default async function AffiliateConversionsPage() {
         phone: customer.phone
       } : {
         id: c.customerId,
-        name: `Học viên #${c.customerId}`,
+        name: `Thành viên #${c.customerId}`,
         email: '---',
         phone: '---'
       },
@@ -107,7 +107,7 @@ export default async function AffiliateConversionsPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Lịch sử Đăng ký Affiliate</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Ghi nhận danh sách học viên đăng ký tài khoản và khóa học qua link ref giới thiệu
+              Ghi nhận danh sách thành viên đăng ký tài khoản và khóa học qua link ref giới thiệu
             </p>
           </div>
           
@@ -134,7 +134,7 @@ export default async function AffiliateConversionsPage() {
               <thead>
                 <tr className="bg-gray-50/75 border-b border-gray-100">
                   <th className="px-3 py-2 text-left font-semibold text-gray-500 w-12">STT</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 min-w-[150px]">Học viên đăng ký</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 min-w-[150px]">Thành viên đăng ký</th>
                   <th className="px-3 py-2 text-left font-semibold text-gray-500 w-36">Ngày đăng ký</th>
                   <th className="px-3 py-2 text-left font-semibold text-gray-500 w-36">Link Ref sử dụng</th>
                   <th className="px-3 py-2 text-left font-semibold text-gray-500 min-w-[140px]">Người giới thiệu</th>
@@ -150,7 +150,7 @@ export default async function AffiliateConversionsPage() {
                       {row.stt}
                     </td>
 
-                    {/* Học viên */}
+                    {/* Thành viên */}
                     <td className="px-3 py-2">
                       <div className="font-bold text-gray-800 text-[12px]">
                         {row.customer.name} <span className="text-gray-400 text-[10px] font-normal">#{row.customer.id}</span>

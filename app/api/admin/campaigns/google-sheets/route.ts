@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const recipients = rows.slice(1).map((row, index) => ({
       id: 9000 + index, // ID tạm để bảng chọn hoạt động
       email: row[0],
-      name: row[1] || "Học viên",
+      name: row[1] || "Thành viên",
     })).filter(r => r.email && r.email.includes("@"));
 
     return NextResponse.json(recipients);

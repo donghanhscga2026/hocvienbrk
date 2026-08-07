@@ -44,7 +44,7 @@ function CourseDetailModal({ course, enrollment, onClose }: { course: any, enrol
                             </span>
                         </div>
                         <h3 className="text-xl font-black uppercase tracking-tight leading-tight">{course.name_lop}</h3>
-                        <p className="text-brk-muted text-sm font-medium line-clamp-3">{course.mo_ta_ngan || 'Khám phá những kiến thức thực chiến cùng Học viện BRK.'}</p>
+                        <p className="text-brk-muted text-sm font-medium line-clamp-3">{course.mo_ta_ngan || 'Khám phá những kiến thức thực chiến cùng Cộng đồng MBC.'}</p>
                     </div>
                     {isActive || isCompleted ? (
                         <Link href={`/courses/${course.id_khoa}/learn`} className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:brightness-110 transition-all active:scale-95 shadow-lg shadow-brk-accent/10">

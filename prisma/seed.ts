@@ -81,7 +81,7 @@ async function main() {
             {
                 slug: 'students',
                 name: 'Thành Viên',
-                description: 'bgCyan500|Quản lý học viên',
+                description: 'bgCyan500|Quản lý thành viên',
                 icon: 'Users',
                 url: '/tools/students',
                 roles: [Role.TEACHER],
