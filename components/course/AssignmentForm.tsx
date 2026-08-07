@@ -275,13 +275,13 @@ export default function AssignmentForm({
                         >
                             {loading
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <><Send className="w-3.5 h-3.5" /> {isCompleted ? 'CẬP NHẬT' : 'GHI NHẬN KẾT QUẢ'}</>
+                                : <><Send className="w-3.5 h-3.5" /> {isCompleted ? 'Cập nhật' : 'Ghi nhận kết quả'}</>
                             }
                         </button>
                     )}
                     {isCompleted && isOverdue && (
                         <div className="flex-1 flex items-center justify-center gap-1.5 bg-brk-background text-brk-muted font-black rounded-xl py-2 text-sm">
-                            ĐÃ HOÀN THÀNH CẬP NHẬT
+                            Đã hoàn thành cập nhật
                         </div>
                     )}
                     <button
@@ -297,7 +297,7 @@ export default function AssignmentForm({
 
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-3">
                 <div className="bg-brk-surface rounded-xl border border-brk-outline px-3 py-2.5 shadow-sm">
-                    <SectionHead num={1} label={hasYouTubeVideo ? "Mở TRÍ = học theo Video (2đ)" : "Mở TRÍ = Nội dung bài học (2đ)"} max={2} current={vidScore} />
+                    <SectionHead num={1} label={hasYouTubeVideo ? "Mở Trí = học theo Video (2đ)" : "Mở Trí = Nội dung bài học (2đ)"} max={2} current={vidScore} />
                     <div className="h-1.5 bg-brk-background rounded-full overflow-hidden">
                         <div
                             className={`h-full transition-all duration-500 rounded-full ${!hasYouTubeVideo ? 'bg-brk-accent' : 'bg-brk-accent'}`}
@@ -312,7 +312,7 @@ export default function AssignmentForm({
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={2} label="Bồi NHÂN = Bài học Tâm đắc Ngộ (2đ)" max={2} current={refScore} />
+                    <SectionHead num={2} label="Bồi Nhân = Bài học Tâm đắc Ngộ (2đ)" max={2} current={refScore} />
                     <textarea
                         value={reflection}
                         onChange={e => setReflection(e.target.value)}
@@ -324,7 +324,7 @@ export default function AssignmentForm({
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={3} label="Hành LỄ = Link thực hành mỗi ngày (3đ)" max={3} current={pracScore} />
+                    <SectionHead num={3} label="Hành Lễ = Link thực hành mỗi ngày (3đ)" max={3} current={pracScore} />
                     <div className="flex flex-col gap-1.5">
                         {links.map((link, i) => (
                             <input
@@ -344,7 +344,7 @@ export default function AssignmentForm({
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={4} label="Trọng NGHĨA = hỗ trợ đồng đội (2đ)" max={2} current={supportScore} />
+                    <SectionHead num={4} label="Trọng Nghĩa = hỗ trợ đồng đội (2đ)" max={2} current={supportScore} />
                     <div className="flex flex-col gap-1.5">
                         {[
                             'Giúp người (+1đ)',
@@ -370,7 +370,7 @@ export default function AssignmentForm({
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={5} label="Giữ TÍN = Làm đúng hạn (1đ)" max={1} current={currentTimingScore === 1 ? 1 : 0} />
+                    <SectionHead num={5} label="Giữ Tín = Làm đúng hạn (1đ)" max={1} current={currentTimingScore === 1 ? 1 : 0} />
                     <div className="flex flex-col gap-1 text-sm">
                         <div className="flex justify-between">
                             <span className="text-gray-500">Đúng hạn (Trước 23:59):</span>
