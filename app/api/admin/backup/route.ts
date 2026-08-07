@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     const filter = url.searchParams.get('method') || 'all'
 
     try {
-        const backups = listBackups()
+        const backups = await listBackups()
         const pgDumpStatus = checkPgDump()
 
         let filtered: BackupInfo[]
@@ -66,7 +66,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Missing backup name' }, { status: 400 })
         }
 
-        const result = deleteBackup(name)
+        const result = await deleteBackup(name)
         return NextResponse.json(result)
     } catch (e: any) {
         return NextResponse.json({ success: false, error: e.message }, { status: 500 })

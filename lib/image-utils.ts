@@ -3,6 +3,54 @@ import path from 'path';
 import { supabase } from './supabase';
 
 /**
+ * Lưu 1 file (Buffer) lên Supabase Storage (ưu tiên) — chỉ dự phòng ghi ổ đĩa
+ * cục bộ khi thiếu cấu hình Supabase (chỉ dùng được lúc chạy local/VPS,
+ * KHÔNG chạy được trên Vercel vì filesystem chỉ đọc lúc runtime).
+ * Dùng cho các route nhận file qua FormData (khác saveBase64Image ở trên,
+ * vốn dành cho ảnh dạng base64).
+ */
+export async function saveUploadedFile(
+    buffer: Buffer,
+    filename: string,
+    subDir: string,
+    contentType: string
+): Promise<string> {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('uploads')
+            .upload(`${subDir}/${filename}`, buffer, {
+                contentType,
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (uploadError) {
+            console.error(`❌ [saveUploadedFile] Lỗi Supabase Storage:`, uploadError.message);
+        } else if (uploadData) {
+            const { data: publicUrlData } = supabase.storage
+                .from('uploads')
+                .getPublicUrl(`${subDir}/${filename}`);
+            if (publicUrlData?.publicUrl) {
+                return publicUrlData.publicUrl;
+            }
+        }
+    } else {
+        console.warn('⚠️ [saveUploadedFile] Thiếu biến môi trường SUPABASE_URL hoặc KEY.');
+    }
+
+    // Dự phòng: lưu local
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', subDir);
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(uploadDir, filename), buffer);
+    return `/uploads/${subDir}/${filename}`;
+}
+
+/**
  * Saves a base64 image string to either Supabase Storage (Production)
  * or the local filesystem (Development).
  */

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
-import { existsSync } from 'fs'
 import { requireAuth } from '@/lib/api-auth'
+import { saveUploadedFile } from '@/lib/image-utils'
 
 // Chỉ nhận ảnh, và tự chọn phần mở rộng theo MIME đã kiểm tra
 // (không tin tên file client gửi lên) để tránh upload .svg/.html chứa script.
@@ -46,19 +44,14 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
-
     const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`
     const filename = `payment-${uniqueSuffix}.${ext}`
-    const filepath = path.join(uploadDir, filename)
 
-    await writeFile(filepath, buffer)
-
-    const url = `/uploads/${filename}`
+    // [FIX] Trước đây ghi thẳng vào ổ đĩa server — không hoạt động trên
+    // Vercel (filesystem chỉ đọc lúc runtime), khiến ảnh minh chứng thanh
+    // toán có thể không lưu lại được. Đẩy lên Supabase Storage, chỉ dự phòng
+    // ghi ổ đĩa khi chạy local.
+    const url = await saveUploadedFile(buffer, filename, 'payments', file.type)
 
     return NextResponse.json({ url, filename })
   } catch (error) {

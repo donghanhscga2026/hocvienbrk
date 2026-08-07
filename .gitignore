@@ -57,6 +57,10 @@ nul
 # Data exports (có thể chứa PII / mật khẩu thật) — không bao giờ commit
 *.csv
 
+# Upload local — giờ đã chuyển sang Supabase Storage (xem lib/image-utils.ts),
+# thư mục này chỉ còn là fallback khi chạy local, không nên commit vào git.
+/public/uploads/
+
 
 
 

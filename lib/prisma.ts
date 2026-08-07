@@ -4,17 +4,15 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// Cấu hình Prisma với khả năng chịu lỗi và log chi tiết hơn trong môi trường dev
+// [OPTIMIZE] DATABASE_URL giờ trỏ qua Supabase connection pooler (transaction
+// mode, cổng 6543, pgbouncer=true) thay vì nối thẳng vào Postgres — pooler tự
+// quản lý việc dồn kết nối, nên giữ connection_limit=1 cho mỗi Prisma Client
+// (đúng khuyến nghị của Supabase khi dùng transaction-mode pooler), không cần
+// tự nâng lên 5 như trước (khi còn nối thẳng, phải tự nới để tránh treo).
 const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    datasources: {
-      db: {
-        // Tăng timeout và connection limit để tránh treo server khi DB chậm phản hồi
-        url: process.env.DATABASE_URL?.replace('?connection_limit=1', '?connection_limit=5&pool_timeout=30'),
-      },
-    },
   });
 
 if (process.env.NODE_ENV !== "production") {
