@@ -95,9 +95,17 @@ export async function enrollInCourseAction(
                 ])
                 : [null, null]
 
-            // Đã trừ ví cho khóa này + có enrollment cũ (không REJECTED) → giữ nguyên phi_coc đã giảm, KHÔNG trừ lại
-            if ((mbvTx || cashTx) && existing && existing.status !== 'REJECTED') {
-                effectivePhiCoc = Number(existing.phi_coc)
+            // Đã từng trừ ví cho khóa này → tuyệt đối không trừ lại (chống trừ kép)
+            if (mbvTx || cashTx) {
+                // Có enrollment cũ hợp lệ (không REJECTED) → giữ nguyên phi_coc đã giảm
+                if (existing && existing.status !== 'REJECTED') {
+                    effectivePhiCoc = Number(existing.phi_coc)
+                } else {
+                    // Trừ ví thành công nhưng chưa có enrollment hợp lệ (request trước fail giữa chừng)
+                    // → không trừ lại ví, chỉ giảm phi_coc theo số tiền đã trừ thực tế
+                    const deducted = Math.abs(Number(mbvTx?.amount) || 0) + Math.abs(Number(cashTx?.amount) || 0)
+                    effectivePhiCoc = Math.max(0, effectivePhiCoc - deducted)
+                }
             } else {
                 // 1. Trừ MBV theo số tiền user chọn (chỉ khi chưa từng trừ MBV cho khóa này)
                 if (useVoucher && voucherAmountToUse > 0 && !mbvTx) {

@@ -18,8 +18,11 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    // Tắt Image Optimization để tránh lỗi private IP với i.postimg.cc
-    unoptimized: true,
+    // Đã kiểm tra qua Vercel Preview (2026-08-09): lỗi "resolved to private ip"
+    // trước đây chỉ xảy ra do NAT64/DNS64 trong 1 môi trường dev cụ thể, KHÔNG
+    // tái hiện trên hạ tầng Vercel thật (đã test cả postimg.cc lẫn Supabase,
+    // tải bình thường). Xem CURRENT_STATE.md mục Giai đoạn 3.
+    unoptimized: false,
     // Các mức quality được phép
     qualities: [50, 60, 70, 75, 80, 85, 90],
 
@@ -48,6 +51,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "**.postimg.cc",
+      },
+      {
+        protocol: "https",
+        hostname: "i.ibb.co",
       },
       {
         protocol: "https",
