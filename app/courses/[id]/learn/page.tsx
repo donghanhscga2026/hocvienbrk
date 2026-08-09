@@ -1,4 +1,4 @@
-import { auth } from "@/auth"
+import { getSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
@@ -38,7 +38,7 @@ export default async function CourseLearnPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user?.id) redirect("/login")
 
   const userId = Number(session.user.id)

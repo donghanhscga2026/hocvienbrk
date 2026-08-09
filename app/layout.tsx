@@ -8,7 +8,7 @@ import Providers from "./providers";
 import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
 import AffiliateTracker from "@/components/AffiliateTracker";
 import AccountAssistantTrigger from "@/components/auth/AccountAssistantTrigger";
-import { auth } from "@/auth";
+import { getSession } from "@/lib/get-session";
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -76,7 +76,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const siteThemeId = await getSiteTheme()
-  const session = await auth()
+  const session = await getSession()
 
   const INITIAL_SCRIPT = `
 (function(){

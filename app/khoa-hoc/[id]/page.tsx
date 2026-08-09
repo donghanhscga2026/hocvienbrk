@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { cache } from 'react'
-import { auth } from '@/auth'
+import { getSession } from '@/lib/get-session'
 import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { CourseLandingClient } from '@/components/landing/LandingPageClient'
@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function KhoaHocPage({ params }: PageProps) {
     let { id } = await params
-    const session = await auth()
+    const session = await getSession()
 
     id = id.replace(/\$+$/, '')
 

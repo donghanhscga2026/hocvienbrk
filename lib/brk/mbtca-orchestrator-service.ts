@@ -10,8 +10,10 @@ import { MB_TCA_SYSTEM_ID, requireMbtcaApplication } from './business-plan-servi
 
 const HOUR_MS = 60 * 60 * 1000
 const ORCHESTRATOR_DELAY_MS = 5 * 60 * 1000
+const MAX_CATCHUP_CYCLES = 12
 
 type PhaseCode = 'OFFICIAL_CONFIRMATION' | 'REVENUE_SHARE' | 'LEVEL_PROMOTION' | 'TEAM_COMMISSION'
+type MbtcaApplication = Awaited<ReturnType<typeof requireMbtcaApplication>>
 
 function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
@@ -96,32 +98,13 @@ async function processTeamCommission(
   return { baseline: true, periodStart, periodEnd, processedEvents: 0 }
 }
 
-export async function runMbtcaOrchestrator(runTime: Date = new Date()) {
-  const application = await requireMbtcaApplication(runTime)
-  const elapsed = runTime.getTime() - application.startsAt.getTime()
-  let cycleNumber = Math.floor(elapsed / HOUR_MS)
-  if (cycleNumber < 1) return { processed: false, reason: 'First cycle is not due' }
-  let scheduledAt = new Date(application.startsAt.getTime() + cycleNumber * HOUR_MS + ORCHESTRATOR_DELAY_MS)
-  if (runTime < scheduledAt) return { processed: false, reason: 'Cycle minute 05 is not due', cycleNumber }
-
-  const staleBefore = new Date(runTime.getTime() - 10 * 60 * 1000)
-  await prisma.mbtcaWorkflowRun.updateMany({
-    where: { applicationId: application.id, status: 'RUNNING', startedAt: { lt: staleBefore } },
-    data: { status: 'FAILED', errorMessage: 'Previous invocation ended before completing', completedAt: new Date() },
-  })
-  const failedRun = await prisma.mbtcaWorkflowRun.findFirst({
-    where: { applicationId: application.id, status: 'FAILED', cycleNumber: { lte: cycleNumber } },
-    orderBy: { cycleNumber: 'asc' },
-  })
-  if (failedRun) {
-    cycleNumber = failedRun.cycleNumber
-    scheduledAt = failedRun.scheduledAt
-  }
-
+async function processCycle(application: MbtcaApplication, cycleNumber: number) {
+  const scheduledAt = new Date(application.startsAt.getTime() + cycleNumber * HOUR_MS + ORCHESTRATOR_DELAY_MS)
   const existingRun = await prisma.mbtcaWorkflowRun.findUnique({
     where: { applicationId_cycleNumber: { applicationId: application.id, cycleNumber } },
   })
-  if (existingRun?.status === 'COMPLETED') return { processed: false, reason: 'Cycle already completed', cycleNumber }
+  if (existingRun?.status === 'COMPLETED') return { status: 'SKIPPED' as const, cycleNumber }
+
   const run = await prisma.mbtcaWorkflowRun.upsert({
     where: { applicationId_cycleNumber: { applicationId: application.id, cycleNumber } },
     update: { status: 'RUNNING', errorMessage: null, startedAt: new Date() },
@@ -161,7 +144,7 @@ export async function runMbtcaOrchestrator(runTime: Date = new Date()) {
       where: { id: run.id },
       data: { status: 'COMPLETED', currentPhase: null, completedAt: new Date() },
     })
-    return { processed: true, applicationId: application.id, cycleNumber, scheduledAt }
+    return { status: 'COMPLETED' as const, cycleNumber, scheduledAt }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await prisma.mbtcaWorkflowRun.update({
@@ -169,5 +152,56 @@ export async function runMbtcaOrchestrator(runTime: Date = new Date()) {
       data: { status: 'FAILED', errorMessage: message, completedAt: new Date() },
     })
     throw error
+  }
+}
+
+export async function processCycleForBackfill(cycleNumber: number) {
+  const application = await requireMbtcaApplication(new Date())
+  return processCycle(application, cycleNumber)
+}
+
+export async function runMbtcaOrchestrator(runTime: Date = new Date()) {
+  const application = await requireMbtcaApplication(runTime)
+  const elapsed = runTime.getTime() - application.startsAt.getTime()
+  const latestCycle = Math.floor(elapsed / HOUR_MS)
+  if (latestCycle < 1) return { processed: false, reason: 'First cycle is not due' }
+
+  const staleBefore = new Date(runTime.getTime() - 10 * 60 * 1000)
+  await prisma.mbtcaWorkflowRun.updateMany({
+    where: { applicationId: application.id, status: 'RUNNING', startedAt: { lt: staleBefore } },
+    data: { status: 'FAILED', errorMessage: 'Previous invocation ended before completing', completedAt: new Date() },
+  })
+
+  const completedRuns = await prisma.mbtcaWorkflowRun.findMany({
+    where: { applicationId: application.id, status: 'COMPLETED' },
+    select: { cycleNumber: true },
+  })
+  const completedCycles = new Set(completedRuns.map(run => run.cycleNumber))
+
+  const pendingCycles: number[] = []
+  for (let cycle = 1; cycle <= latestCycle; cycle++) {
+    if (completedCycles.has(cycle)) continue
+    const scheduledAt = new Date(application.startsAt.getTime() + cycle * HOUR_MS + ORCHESTRATOR_DELAY_MS)
+    if (runTime < scheduledAt) continue
+    pendingCycles.push(cycle)
+  }
+  if (pendingCycles.length === 0) {
+    return { processed: false, reason: 'All due cycles are completed', cycleNumber: latestCycle }
+  }
+
+  const processedCycles: Array<{ cycleNumber: number; scheduledAt: Date }> = []
+  for (const cycle of pendingCycles.slice(0, MAX_CATCHUP_CYCLES)) {
+    const result = await processCycle(application, cycle)
+    if (result.status === 'COMPLETED') {
+      processedCycles.push({ cycleNumber: result.cycleNumber, scheduledAt: result.scheduledAt })
+    }
+  }
+
+  return {
+    processed: true,
+    applicationId: application.id,
+    cycleNumber: processedCycles[processedCycles.length - 1]?.cycleNumber ?? pendingCycles[0],
+    scheduledAt: processedCycles[processedCycles.length - 1]?.scheduledAt,
+    processedCycles,
   }
 }

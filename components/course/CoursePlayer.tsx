@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import {
     ArrowLeft, ListVideo, FileText, X, ClipboardCheck,
     Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw
@@ -12,7 +13,10 @@ import LessonSidebar from "./LessonSidebar"
 import VideoPlayer from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
 import ChatSection from "./ChatSection"
-import StartDateModal from "./StartDateModal"
+// [OPTIMIZE] StartDateModal kéo theo react-day-picker + CSS riêng, nhưng chỉ
+// hiện với học viên CHƯA chọn ngày bắt đầu học (thiểu số) — dynamic-import để
+// không tải thư viện này cho mọi học viên vào trang học.
+const StartDateModal = dynamic(() => import("./StartDateModal"), { ssr: false })
 import {
     confirmStartDateAction,
     saveVideoProgressAction,

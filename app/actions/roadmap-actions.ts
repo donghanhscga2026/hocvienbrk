@@ -1,8 +1,22 @@
 'use server'
 
 import prisma from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, unstable_cache } from "next/cache"
 import { requireAdminAction } from "@/lib/api-auth"
+
+/**
+ * Lấy danh sách điểm roadmap hiển thị công khai (trang chủ, trang CMS theo
+ * profile). Danh sách này do admin quản lý qua script, không có UI chỉnh sửa
+ * trực tiếp trong app — cache dài hạn để tránh query lại trên mỗi lượt xem.
+ * [OPTIMIZE] Trước đây app/page.tsx tự định nghĩa bản cache riêng, còn
+ * app/page/[slug]/page.tsx (trang CMS theo profile) lại query thẳng
+ * prisma.roadmapPoint không qua cache — gộp về 1 nguồn dùng chung.
+ */
+export const getRoadmapPoints = unstable_cache(
+  () => prisma.roadmapPoint.findMany({ orderBy: { pointId: 'asc' } }),
+  ['roadmap-points'],
+  { tags: ['roadmap-points'], revalidate: 3600 }
+)
 
 /**
  * Lấy danh sách tất cả các bài khảo sát (CHỈ lấy id, name, isActive - KHÔNG lấy flow)

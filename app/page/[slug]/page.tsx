@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
-import { auth } from '@/auth'
+import { cache } from 'react'
+import { getSession } from '@/lib/get-session'
 import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
@@ -10,6 +11,12 @@ import SetHomeSlug from '@/components/home/SetHomeSlug'
 
 import { getSiteProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getHeroMessageForProfile } from '@/app/actions/message-actions'
+import { getRoadmapPoints } from '@/app/actions/roadmap-actions'
+
+// [OPTIMIZE] cache() giúp generateMetadata và component trang dùng chung 1
+// lần query slug thay vì mỗi bên tự query lại (được gọi 2 lần/request) —
+// cùng pattern đã dùng ở app/khoa-hoc/[id]/page.tsx và app/land/[slug]/page.tsx.
+const getCachedSiteProfile = cache((slug: string) => getSiteProfile(slug))
 
 const DEFAULT_OG_TITLE = 'MBC - Ngân hàng Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
@@ -22,7 +29,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params
 
-    const profile = await getSiteProfile(slug)
+    const profile = await getCachedSiteProfile(slug)
 
     if (!profile) return { title: 'Không tìm thấy' }
 
@@ -49,9 +56,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PageSlugPage({ params }: PageProps) {
     const { slug } = await params
-    const session = await auth()
+    const session = await getSession()
 
-    const profile = await getSiteProfile(slug)
+    const profile = await getCachedSiteProfile(slug)
 
     if (!profile) notFound()
 
@@ -163,9 +170,7 @@ export default async function PageSlugPage({ params }: PageProps) {
     const userGoal = userRoadmap?.goal ?? null
     const targetPointId = userRoadmap?.targetPointId ?? 1
 
-    const roadmapPoints = await prisma.roadmapPoint.findMany({
-        orderBy: { id: 'asc' }
-    })
+    const roadmapPoints = await getRoadmapPoints()
 
     const { resetSurveyAction } = await import('@/app/actions/survey-actions')
 

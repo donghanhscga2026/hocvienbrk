@@ -175,11 +175,23 @@ export async function getAllSiteProfiles() {
   }
 }
 
+// [OPTIMIZE] profile.viewCount/updatedAt đổi trên MỖI lượt xem trang (xem
+// incrementProfileView) — nếu dùng thẳng object profile làm khoá cache của
+// unstable_cache (khoá suy ra từ tham số truyền vào), cache sẽ luôn "miss" vì
+// khoá đổi liên tục. Loại 2 field này trước khi dùng làm tham số cache.
+function stripVolatileProfileFields(profile: any) {
+  if (!profile) return profile
+  const { viewCount, updatedAt, ...rest } = profile
+  return rest
+}
+
 /**
  * Lấy khóa học theo profile
+ * [OPTIMIZE] Cache 10 phút theo tag 'site-profile' — cùng tag với
+ * getDefaultProfile/updateSiteProfile nên tự làm mới khi admin sửa profile.
  */
-export async function getCoursesForProfile(profile: any) {
-  try {
+const getCoursesForProfileCached = unstable_cache(
+  async (profile: any) => {
     // Nếu có courseIds cụ thể
     if (profile.courseIds && Array.isArray(profile.courseIds) && profile.courseIds.length > 0) {
       const courses = await prisma.course.findMany({
@@ -222,6 +234,14 @@ export async function getCoursesForProfile(profile: any) {
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
     return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
+  },
+  ['courses-for-profile'],
+  { tags: ['site-profile'], revalidate: 600 }
+)
+
+export async function getCoursesForProfile(profile: any) {
+  try {
+    return await getCoursesForProfileCached(stripVolatileProfileFields(profile))
   } catch (error) {
     console.error("[DB ERROR] getCoursesForProfile:", error)
     return FALLBACK_COURSES as any[]
@@ -230,27 +250,36 @@ export async function getCoursesForProfile(profile: any) {
 
 /**
  * Lấy survey theo profile - Cá nhân hóa
+ * [OPTIMIZE] Cache 10 phút theo tag 'site-profile', cùng lý do như trên.
  */
-export async function getSurveyForProfile(profile: any) {
-  try {
+const getSurveyForProfileCached = unstable_cache(
+  async (profile: any) => {
     // Ưu tiên 1: selectedSurveyId cụ thể
     if (profile.selectedSurveyId) {
       return await prisma.survey.findUnique({
         where: { id: profile.selectedSurveyId }
       })
     }
-    
+
     // Ưu tiên 2: surveys[] relation (backward compatible)
     if (profile.surveys && profile.surveys.length > 0) {
       return profile.surveys.find((s: any) => s.isActive) || profile.surveys[0]
     }
-    
+
     // Ưu tiên 3: Teacher profile - chỉ lấy survey thuộc về profile này
     const surveyWhere = profile.isDefault
       ? { isActive: true }  // BRK: survey global
       : { profileId: profile.id, isActive: true }  // Teacher: survey riêng
-    
+
     return await prisma.survey.findFirst({ where: surveyWhere })
+  },
+  ['survey-for-profile'],
+  { tags: ['site-profile'], revalidate: 600 }
+)
+
+export async function getSurveyForProfile(profile: any) {
+  try {
+    return await getSurveyForProfileCached(stripVolatileProfileFields(profile))
   } catch (error) {
     console.error("[DB ERROR] getSurveyForProfile:", error)
     return FALLBACK_SURVEY
@@ -259,23 +288,24 @@ export async function getSurveyForProfile(profile: any) {
 
 /**
  * Lấy bài đăng theo profile - Cá nhân hóa Community
+ * [OPTIMIZE] Cache 10 phút theo tag 'site-profile', cùng lý do như trên.
  */
-export async function getPostsForProfile(profile: any) {
-  try {
+const getPostsForProfileCached = unstable_cache(
+  async (profile: any) => {
     const where: any = { published: true }
-    
+
     if (profile.communityCategoryId) {
       where.categoryId = profile.communityCategoryId
     }
-    
+
     if (profile.userId && profile.userId !== 0) {
       const associateIds = profile.members?.map((m: any) => m.userId) || []
       const allAuthorIds = [profile.userId, ...associateIds]
       where.authorId = { in: allAuthorIds }
     }
-    
+
     const limit = profile.communityLimit || 10
-    
+
     return await prisma.post.findMany({
       where,
       orderBy: [
@@ -288,6 +318,14 @@ export async function getPostsForProfile(profile: any) {
         _count: { select: { comments: true } }
       }
     })
+  },
+  ['posts-for-profile'],
+  { tags: ['site-profile'], revalidate: 600 }
+)
+
+export async function getPostsForProfile(profile: any) {
+  try {
+    return await getPostsForProfileCached(stripVolatileProfileFields(profile))
   } catch (error) {
     console.error("[DB ERROR] getPostsForProfile:", error)
     return FALLBACK_POSTS
@@ -438,6 +476,11 @@ export async function addProfileMember(profileId: number, userId: number, role: 
     revalidatePath(`/tools/site-profiles/${profileId}/edit`)
     revalidatePath(`/tools/my-site/edit`)
     revalidatePath(`/page/${profile.slug}`)
+    // [OPTIMIZE] getDefaultProfile/getCoursesForProfile/getSurveyForProfile/
+    // getPostsForProfile đều cache theo tag này (bao gồm members[]) — thiếu
+    // dòng này thì trang chủ vẫn hiện danh sách cộng sự cũ tới khi cache tự
+    // hết hạn (600s).
+    revalidateTag('site-profile', { expire: 0 })
 
     return { success: true, member }
   } catch (error) {
@@ -469,6 +512,7 @@ export async function removeProfileMember(profileId: number, userId: number) {
     revalidatePath(`/tools/site-profiles/${profileId}/edit`)
     revalidatePath(`/tools/my-site/edit`)
     revalidatePath(`/page/${profile.slug}`)
+    revalidateTag('site-profile', { expire: 0 })
 
     return { success: true }
   } catch (error) {

@@ -213,6 +213,8 @@ export default function CourseLandingTemplate({
                                         src={course.link_anh_bia}
                                         alt={course.name_lop}
                                         fill
+                                        priority
+                                        sizes="(max-width: 512px) 100vw, 512px"
                                         className="object-contain"
                                     />
                                 </div>

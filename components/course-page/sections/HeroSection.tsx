@@ -223,7 +223,14 @@ export default function HeroSection({
         {/* Cover image */}
         {imageSrc && (
           <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 'var(--radius-card)', overflow: 'hidden', marginTop: '56px', boxShadow: '0 12px 30px rgba(0,0,0,.25)' }}>
-            <Image src={imageSrc} alt={content.imageAlt || content.title} fill className="object-cover" />
+            <Image
+              src={imageSrc}
+              alt={content.imageAlt || content.title}
+              fill
+              priority
+              sizes="(max-width: 1180px) 100vw, 1180px"
+              className="object-cover"
+            />
           </div>
         )}
       </div>
