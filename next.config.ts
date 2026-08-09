@@ -18,8 +18,10 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    // Tắt Image Optimization để tránh lỗi private IP với i.postimg.cc
-    unoptimized: true,
+    // [TEST] Thử bật lại Image Optimization trên Vercel Preview để kiểm tra
+    // xem lỗi "resolved to private ip" (NAT64/DNS64 false-positive, xem
+    // CURRENT_STATE.md mục Giai đoạn 3) có xảy ra trên hạ tầng Vercel thật hay không.
+    unoptimized: false,
     // Các mức quality được phép
     qualities: [50, 60, 70, 75, 80, 85, 90],
 
