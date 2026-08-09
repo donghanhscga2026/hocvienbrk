@@ -28,6 +28,15 @@ jobs:
           curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/gmail-watch" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
+  process-email-campaigns:
+    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call process-email-campaigns
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/process-email-campaigns" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
   reset-sender-quota:
     if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

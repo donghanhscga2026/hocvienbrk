@@ -814,6 +814,412 @@ async function detectFakeEmails(
   return result;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * CAMPAIGN BATCH PROCESSING - Logic gửi 1 batch, dùng chung cho route tương tác
+ * (admin bấm nút, xem tiến trình trực tiếp) và cron job chạy nền (tiếp tục
+ * chiến dịch khi admin đã đóng tab trình duyệt).
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
+
+export interface CampaignBatchResult {
+  success: boolean;
+  finished: boolean;
+  notFound?: boolean;
+  sentInBatch?: number;
+  failedInBatch?: number;
+  needsCooldown?: boolean;
+  pauseMinutes?: number;
+  error?: string;
+  stats?: { totalSent: number; totalSuccess: number; totalFailed: number };
+}
+
+const campaignStats: Map<number, { total: number; sent: number; success: number; failed: number; emailsInBatch: number }> = new Map();
+const recipientsCache: Map<number, Recipient[]> = new Map();
+
+export async function processCampaignBatch(campaignId: number, batchSize: number = 20): Promise<CampaignBatchResult> {
+  const config = await getEmailConfig();
+
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: campaignId },
+    include: { senders: { include: { sender: true } } }
+  });
+
+  if (!campaign) {
+    return { success: false, finished: false, notFound: true, error: "Campaign not found" };
+  }
+
+  let allRecipients = recipientsCache.get(campaignId);
+  if (!allRecipients) {
+    allRecipients = await resolveRecipients(campaignId);
+    recipientsCache.set(campaignId, allRecipients);
+  }
+
+  const existingLogs = await prisma.emailCampaignLog.findMany({
+    where: { campaignId, status: { in: ['SENT', 'SKIPPED', 'FAILED'] } },
+    select: { toEmail: true }
+  });
+  const sentEmails = new Set(existingLogs.map(l => l.toEmail.toLowerCase().trim()));
+
+  const unsentRecipients = allRecipients.filter(r => !sentEmails.has(r.email.toLowerCase().trim()));
+  const recipientsBatch = unsentRecipients.slice(0, batchSize);
+
+  if (recipientsBatch.length === 0) {
+    const stats = campaignStats.get(campaignId) || { total: allRecipients.length, sent: allRecipients.length, success: 0, failed: 0, emailsInBatch: 0 };
+    return {
+      success: true,
+      finished: true,
+      stats: { totalSent: stats.sent, totalSuccess: stats.success, totalFailed: stats.failed }
+    };
+  }
+
+  if (campaign.totalRecipients !== allRecipients.length) {
+    await prisma.emailCampaign.update({
+      where: { id: campaignId },
+      data: { totalRecipients: allRecipients.length }
+    });
+  }
+
+  if (!campaignStats.has(campaignId)) {
+    campaignStats.set(campaignId, { total: allRecipients.length, sent: 0, success: 0, failed: 0, emailsInBatch: 0 });
+
+    if (config.enableTelegramAlert) {
+      await sendEmailCampaignNotification({
+        event: 'START',
+        campaignTitle: campaign.title,
+        total: allRecipients.length,
+        sent: 0,
+        success: 0,
+        failed: 0
+      });
+    }
+  }
+
+  const stats = campaignStats.get(campaignId)!;
+
+  const results = { sent: 0, failed: 0 };
+
+  for (let i = 0; i < recipientsBatch.length; i++) {
+    const recipient = recipientsBatch[i];
+
+    const sender = await getAvailableSender(campaignId);
+
+    if (!sender) {
+      console.log("[EmailCampaign] Không có sender khả dụng (hết quota hoặc đang cooldown)");
+
+      let pauseMinutes = 7
+      const soonestCooldown = await prisma.emailSender.findFirst({
+        where: { cooldownUntil: { gt: new Date() } },
+        orderBy: { cooldownUntil: 'asc' },
+        select: { cooldownUntil: true }
+      })
+      if (soonestCooldown?.cooldownUntil) {
+        pauseMinutes = Math.ceil((soonestCooldown.cooldownUntil.getTime() - Date.now()) / 60000)
+        if (pauseMinutes < 1) pauseMinutes = 1
+      }
+
+      if (config.enableTelegramAlert) {
+        await sendEmailCampaignNotification({
+          event: 'PAUSE',
+          campaignTitle: campaign.title,
+          total: allRecipients.length,
+          sent: stats.sent,
+          success: stats.success,
+          failed: stats.failed,
+          pauseMinutes,
+          resumeTime: new Date(Date.now() + pauseMinutes * 60 * 1000)
+            .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        });
+      }
+
+      return {
+        success: false,
+        finished: false,
+        error: "Tất cả email sender đã hết quota hoặc đang trong thời gian chờ.",
+        needsCooldown: true,
+        pauseMinutes
+      };
+    }
+
+    try {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!recipient.email || !emailRegex.test(recipient.email)) {
+        await prisma.emailCampaignLog.create({
+          data: {
+            campaignId,
+            toEmail: recipient.email || "N/A",
+            status: "FAILED",
+            errorType: "INVALID_FORMAT",
+            errorCode: "Định dạng email không hợp lệ",
+          }
+        });
+        results.failed++;
+        stats.failed++;
+        continue;
+      }
+
+      const isBlacklisted = await prisma.emailBlacklist.findUnique({
+        where: { email: recipient.email.toLowerCase().trim() }
+      });
+
+      if (isBlacklisted) {
+        await prisma.emailCampaignLog.create({
+          data: {
+            campaignId,
+            toEmail: recipient.email,
+            status: "SKIPPED",
+            errorType: "BLACKLISTED",
+          }
+        });
+        stats.sent++;
+        results.sent++;
+        continue;
+      }
+
+      const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      let subject = spinContent(campaign.subject || "").trim();
+      subject = subject.replace(/\[Tên\]/g, recipient.name || "Thành viên");
+      subject = subject.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
+      subject = subject.replace(/\[NgauNhien\]/g, randomCode).replace(/\[Random\]/g, randomCode);
+
+      let rawHtml = spinContent(campaign.htmlContent || "").trim();
+      rawHtml = rawHtml.replace(/\[Tên\]/g, recipient.name || "bạn");
+      rawHtml = rawHtml.replace(/\[MãHV\]/g, recipient.userId?.toString() || "");
+      rawHtml = rawHtml.replace(/\[NgauNhien\]/g, randomCode).replace(/\[Random\]/g, randomCode);
+
+      if (!rawHtml.includes('<p>') && !rawHtml.includes('<br')) {
+        rawHtml = rawHtml.replace(/\n/g, '<br/>');
+      }
+
+      if (config.enableRandomMessageFooter) {
+        const footer = await getRandomMessageFooter();
+        rawHtml = injectFooter(rawHtml, footer);
+      }
+
+      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'}/api/unsubscribe?email=${encodeURIComponent(recipient.email)}`;
+
+      const finalHtml = `
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
+          <div style="background-color: #000000; padding: 30px; text-align: center;">
+            <a href="https://giautoandien.io.vn" style="text-decoration: none;">
+              <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MBC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
+            </a>
+            <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">NGÂN HÀNG PHƯỚC BÁU</div>
+          </div>
+          <div style="padding: 40px 30px; background-color: #ffffff;">
+            <div style="font-size: 16px; color: #333333;">
+              ${rawHtml}
+            </div>
+          </div>
+          <div style="padding: 30px; background-color: #f9f9f9; border-top: 1px solid #eeeeee; text-align: center;">
+            <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
+              Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MBC</b>.<br>
+              Nếu không muốn nhận những email này, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">Hủy đăng ký tại đây</a>.
+            </p>
+          </div>
+        </div>
+      `;
+
+      if (sender.provider === 'brevo') {
+        await sendViaBrevo(sender, recipient.email, subject, finalHtml);
+      } else {
+        await sendGmailFromSender(sender as any, recipient.email, subject, finalHtml);
+      }
+
+      await prisma.emailCampaignLog.create({
+        data: {
+          campaignId,
+          senderId: sender.id,
+          toEmail: recipient.email,
+          status: "SENT",
+        }
+      });
+
+      await incrementSenderSentCount(sender.id);
+      await upsertSenderLogEntry(sender.id, 'sentCount', 1);
+      stats.sent++;
+      stats.success++;
+      stats.emailsInBatch++;
+      results.sent++;
+
+      if (sender.provider === 'brevo') {
+        const min = config.brevoInterEmailDelayMin ?? 0.5;
+        const max = config.brevoInterEmailDelayMax ?? 1.5;
+        const delay = +(min + Math.random() * (max - min)).toFixed(1);
+        await new Promise(resolve => setTimeout(resolve, delay * 1000));
+        continue;
+      }
+
+      const batchStatus = await checkBatchStatus(stats.emailsInBatch);
+
+      if (batchStatus.shouldPause) {
+        console.log(`[EmailCampaign] Đã gửi ${stats.emailsInBatch} emails. Bắt đầu pause ${batchStatus.pauseDuration} phút.`);
+
+        stats.emailsInBatch = 0;
+
+        await updateSenderCooldown(sender.id, batchStatus.pauseDuration);
+        await upsertSenderLogEntry(sender.id, 'cooldownCount', 1);
+        await upsertSenderLogEntry(sender.id, 'cooldownMinutes', batchStatus.pauseDuration);
+
+        if (config.enableTelegramAlert) {
+          await sendEmailCampaignNotification({
+            event: 'PAUSE',
+            campaignTitle: campaign.title,
+            total: allRecipients.length,
+            sent: stats.sent,
+            success: stats.success,
+            failed: stats.failed,
+            pauseMinutes: batchStatus.pauseDuration,
+            resumeTime: new Date(Date.now() + batchStatus.pauseDuration * 60 * 1000)
+              .toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+          });
+        }
+
+        const currentSentCount = await prisma.emailCampaignLog.count({
+          where: { campaignId, status: { in: ['SENT', 'SKIPPED'] } }
+        });
+        const currentFailedCount = await prisma.emailCampaignLog.count({
+          where: { campaignId, status: 'FAILED' }
+        });
+
+        await prisma.emailCampaign.update({
+          where: { id: campaignId },
+          data: {
+            sentCount: currentSentCount,
+            failedCount: currentFailedCount,
+            status: "RUNNING",
+            startedAt: campaign.startedAt || new Date(),
+          }
+        });
+
+        return {
+          success: true,
+          sentInBatch: results.sent,
+          needsCooldown: true,
+          pauseMinutes: batchStatus.pauseDuration,
+          finished: false,
+          stats: { totalSent: stats.sent, totalSuccess: stats.success, totalFailed: stats.failed }
+        };
+      } else {
+        const delay = randomBetween(config.interEmailDelayMin, config.interEmailDelayMax);
+        await new Promise(resolve => setTimeout(resolve, delay * 1000));
+      }
+
+    } catch (error: any) {
+      console.error(`Gửi email thất bại tới ${recipient.email}:`, error);
+      results.failed++;
+      stats.failed++;
+
+      await prisma.emailCampaignLog.create({
+        data: {
+          campaignId,
+          senderId: sender.id,
+          toEmail: recipient.email,
+          status: "FAILED",
+          errorCode: error.message,
+        }
+      });
+      await upsertSenderLogEntry(sender.id, 'failedCount', 1);
+      await incrementSenderSentCount(sender.id);
+    }
+  }
+
+  const remainingAfterBatch = unsentRecipients.length - recipientsBatch.length;
+  const isCompleted = remainingAfterBatch <= 0;
+
+  const finalSentCount = await prisma.emailCampaignLog.count({
+    where: { campaignId, status: { in: ['SENT', 'SKIPPED'] } }
+  });
+  const finalFailedCount = await prisma.emailCampaignLog.count({
+    where: { campaignId, status: 'FAILED' }
+  });
+
+  await prisma.emailCampaign.update({
+    where: { id: campaignId },
+    data: {
+      sentCount: finalSentCount,
+      failedCount: finalFailedCount,
+      status: isCompleted ? "COMPLETED" : "RUNNING",
+      startedAt: campaign.startedAt || new Date(),
+      completedAt: isCompleted ? new Date() : null,
+    }
+  });
+
+  if (isCompleted) {
+    campaignStats.delete(campaignId);
+    recipientsCache.delete(campaignId);
+
+    let sheetUrl: string | undefined;
+    if (campaign.notificationType !== "VERIFY_TEST") {
+      const { exportCampaignToSheet } = await import("./email-campaign-export");
+      const exportResult = await exportCampaignToSheet(campaignId, campaign.title);
+      sheetUrl = exportResult?.sheetUrl || undefined;
+      if (exportResult?.sheetUrl) {
+        console.log(`[EmailCampaign] 📊 Sheet kết quả: ${exportResult.sheetUrl}`);
+      }
+    }
+
+    if (config.enableTelegramAlert) {
+      await sendEmailCampaignNotification({
+        event: 'COMPLETE',
+        campaignTitle: campaign.title,
+        total: allRecipients.length,
+        sent: allRecipients.length,
+        success: stats.success,
+        failed: stats.failed,
+        sheetUrl,
+      });
+    }
+  }
+
+  return {
+    success: true,
+    sentInBatch: results.sent,
+    failedInBatch: results.failed,
+    finished: isCompleted,
+    stats: { totalSent: stats.sent, totalSuccess: stats.success, totalFailed: stats.failed }
+  };
+}
+
+async function upsertSenderLogEntry(senderId: number, field: 'sentCount' | 'failedCount' | 'cooldownCount' | 'cooldownMinutes', value: number) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  await prisma.emailSenderLog.upsert({
+    where: { senderId_date: { senderId, date: today } },
+    update: { [field]: { increment: value } },
+    create: { senderId, date: today, sentCount: 0, failedCount: 0, bounceCount: 0, cooldownCount: 0, cooldownMinutes: 0, [field]: value }
+  })
+}
+
+/**
+ * Xử lý 1 chiến dịch cho tới khi hoàn thành hoặc hết ngân sách thời gian —
+ * dùng bởi cron job nền để tiếp tục gửi ngay cả khi admin đã đóng tab.
+ * Không sleep chờ cooldown (khác với vòng lặp phía client) — nếu gặp
+ * needsCooldown thì dừng lại ngay, để lượt cron kế tiếp (15 phút sau) tự
+ * tiếp tục khi cooldown trong DB đã hết hạn.
+ */
+export async function runCampaignQueueUntilBudget(
+  campaignId: number,
+  maxDurationMs: number,
+  batchSize: number = 20
+): Promise<{ finished: boolean; batchesRun: number; lastResult: CampaignBatchResult | null }> {
+  const deadline = Date.now() + maxDurationMs;
+  let batchesRun = 0;
+  let lastResult: CampaignBatchResult | null = null;
+
+  while (Date.now() < deadline) {
+    const result = await processCampaignBatch(campaignId, batchSize);
+    lastResult = result;
+    batchesRun++;
+
+    if (result.finished) return { finished: true, batchesRun, lastResult };
+    if (result.needsCooldown) return { finished: false, batchesRun, lastResult };
+    if (!result.success) return { finished: false, batchesRun, lastResult };
+  }
+
+  return { finished: false, batchesRun, lastResult };
+}
+
 export async function processBounceEmails(scanDays: number = 3) {
   console.log('\n[BOUNCE-SCAN] ============================================');
   console.log(`[BOUNCE-SCAN] BẮT ĐẦU QUÉT BOUNCE - ${scanDays} NGÀY - TẤT CẢ VỆ TINH`);
