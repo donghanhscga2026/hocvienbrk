@@ -64,13 +64,27 @@ export async function POST(request: NextRequest) {
 
     if (course.type !== 'LIB' && course.type !== 'SYS') {
       const brkWallet = await prisma.brkWallet.findUnique({ where: { userId: userIdNum } })
-      const mbvBalance = Number(brkWallet?.mbvBalance || 0)
-      if (mbvBalance > 0 && effectivePhiCoc > 0) {
-        voucherDeducted = Math.min(mbvBalance, effectivePhiCoc)
-        effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
-        voucherApplied = voucherDeducted > 0
-        const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
-        await debitMbvWallet(userIdNum, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${course.id}`, userIdNum)
+
+      // Chống trừ kép: kiểm tra đã từng trừ ví MBV cho khóa này chưa (theo
+      // refId) trước khi trừ — cùng cơ chế đã áp dụng ở app/actions/course-actions.ts
+      // (enrollInCourseAction). Thiếu bước này từng gây trừ MBV 2 lần cho 1
+      // user khi endpoint này (kích hoạt tự động lúc đăng ký) chạy trước, sau
+      // đó user tự bấm kích hoạt thủ công qua course-actions.ts.
+      const existingMbvTx = brkWallet?.id
+        ? await prisma.brkTransaction.findFirst({ where: { walletId: brkWallet.id, refId: `course_${course.id}` } })
+        : null
+
+      if (existingMbvTx) {
+        effectivePhiCoc = Math.max(0, effectivePhiCoc - Math.abs(Number(existingMbvTx.amount)))
+      } else {
+        const mbvBalance = Number(brkWallet?.mbvBalance || 0)
+        if (mbvBalance > 0 && effectivePhiCoc > 0) {
+          voucherDeducted = Math.min(mbvBalance, effectivePhiCoc)
+          effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
+          voucherApplied = voucherDeducted > 0
+          const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
+          await debitMbvWallet(userIdNum, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${course.id}`, userIdNum)
+        }
       }
     }
 

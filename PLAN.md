@@ -2056,6 +2056,30 @@ Sửa lỗi font chữ hiển thị không chính xác khi gõ tiếng Việt c�
 - ⏳ Còn lại: **Phase 3** — cập nhật dữ liệu DB (SiteProfile, Post, PostComment, PostCategory, Survey, Course mo_ta/mo_ta_ngan, AssistantGuide, EmailSender) theo quy trình dry-run → user duyệt → execute
 
 
+---
+
+## ✅ Khắc phục lỗi hiển thị dội ngược học phí gốc khi trừ ví MBV/VNĐ (2026-08-10)
+
+### Mục tiêu
+Sửa lỗi dội ngược học phí về giá gốc khi học viên đã từng bị trừ ví MBV hoặc ví VNĐ nhưng Enrollment vẫn đang ở trạng thái `PENDING` (chưa thanh toán nốt phần còn thiếu).
+
+### Các file đã sửa & Thao tác dữ liệu
+#### `app/actions/course-actions.ts`
+- Vấn đề: Khi `mbvTx` hoặc `cashTx` tồn tại, code cũ lấy `effectivePhiCoc = Number(existing.phi_coc)` từ DB (nơi chứa giá gốc `phi_coc`), làm triệt tiêu hiệu lực của khoản ví đã trừ trước đó.
+- Fix: Sửa logic tính toán `effectivePhiCoc = Math.max(0, course.phi_coc - deducted)` với `deducted` là tổng các giao dịch trừ ví MBV và VNĐ đã ghi nhận.
+
+#### `scripts/_fix_pending_enrollments.ts`
+- Thực thi cập nhật lại giá trị `phi_coc` chuẩn cho các tài khoản đang `PENDING` bị ảnh hưởng:
+  - User **#607 (Hoàng Loan 5*)**: `phi_coc` 655.054đ ➔ **263.026đ** (Đã áp dụng 386.386 MBV + 5.642đ ví VNĐ).
+  - User **#769 (Phạm Thanh Thuỷ 5*)**: `phi_coc` 655.054đ ➔ **268.668đ** (Đã áp dụng 386.386 MBV).
+  - User **#794**, **#1029**, **#1180**: Làm tròn chuẩn số nguyên VNĐ.
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` — Exit code 0
+- ✅ Kiểm tra dữ liệu DB đã cập nhật chính xác cho User #607, #769 và các user liên quan.
+
+
+
 
 
 
