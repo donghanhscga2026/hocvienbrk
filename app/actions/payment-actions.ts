@@ -275,6 +275,7 @@ export async function getPendingPayments() {
           select: {
             id: true,
             status: true,
+            phi_coc: true,
             referrerId: true,
             updatedAt: true,
             activatedAt: true,
@@ -338,6 +339,7 @@ export async function getAllPayments() {
           select: {
             id: true,
             status: true,
+            phi_coc: true,
             referrerId: true,
             updatedAt: true,
             activatedAt: true,

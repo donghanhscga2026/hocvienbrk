@@ -2074,9 +2074,15 @@ Sửa lỗi dội ngược học phí về giá gốc khi học viên đã từn
   - User **#769 (Phạm Thanh Thuỷ 5*)**: `phi_coc` 655.054đ ➔ **268.668đ** (Đã áp dụng 386.386 MBV).
   - User **#794**, **#1029**, **#1180**: Làm tròn chuẩn số nguyên VNĐ.
 
+#### `app/actions/payment-actions.ts` & `app/tools/payments/page.tsx`
+- Vấn đề: Màn hình quản lý thanh toán `/tools/payments` và Modal xem QR Chuyển khoản lấy cứng `payment.amount` cũ (được tạo ở thời điểm đầu bằng học phí gốc `course.phi_coc` 655.054đ) mà không ưu tiên lấy theo `enrollment.phi_coc` đã được khấu trừ ví MBV/VNĐ.
+- Fix:
+  - Thêm `phi_coc: true` vào `select.enrollment` ở server action `getPendingPayments` và `getAllPayments`.
+  - Cập nhật hiển thị số tiền trên thẻ thanh toán và mã QR tự động tính theo `enrollment.phi_coc` (263.026đ), hiển thị đúng dòng **"💳 Đã trừ ví (MBV/VNĐ): -392.028đ"** và tạo mã QR Chuyển Khoản đúng với số tiền 263.026đ.
+
 ### Trạng thái
 - ✅ `npx tsc --noEmit` — Exit code 0
-- ✅ Kiểm tra dữ liệu DB đã cập nhật chính xác cho User #607, #769 và các user liên quan.
+- ✅ Kiểm tra dữ liệu DB & giao diện Admin `/tools/payments` đã hiển thị chuẩn xác cho User #607, #769 và toàn bộ hệ thống.
 
 
 

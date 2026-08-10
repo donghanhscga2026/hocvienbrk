@@ -24,6 +24,7 @@ interface PaymentData {
   enrollment: {
     id: number
     status: string
+    phi_coc?: number
     referrerId: number | null
     updatedAt: Date
     activatedAt: Date | null
@@ -609,23 +610,29 @@ export default function PaymentsPage() {
                       <span className="text-[8px] text-orange-600 font-bold uppercase block">Khóa học</span>
                       <p className="font-bold text-[13px] text-orange-700 break-words">{payment.enrollment.course.name_lop}</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-orange-100/50">
-                      <div>
-                        <span className="text-[8px] text-gray-400 font-bold uppercase block">Giá cọc</span>
-                        <span className="font-bold text-gray-800 text-[11px]">{payment.enrollment.course.phi_coc.toLocaleString()}đ</span>
-                      </div>
-                      {payment.amount > 0 && (
-                        <div>
-                          <span className="text-[8px] text-gray-400 font-bold uppercase block">Nhận được</span>
-                          <span className="font-black text-green-700 text-[11px]">{payment.amount.toLocaleString()}đ</span>
-                        </div>
-                      )}
-                    </div>
-                    {payment.enrollment.course.phi_coc > payment.amount && payment.amount > 0 && (
-                      <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-green-700">
-                        💳 Đã trừ ví (MBV/VNĐ): <b>{(payment.enrollment.course.phi_coc - payment.amount).toLocaleString()}đ</b>
-                      </div>
-                    )}
+                    {(() => {
+                      const finalAmountNeedPay = payment.enrollment.phi_coc !== undefined && payment.enrollment.phi_coc !== null ? payment.enrollment.phi_coc : payment.amount
+                      const totalDeducted = Math.max(0, payment.enrollment.course.phi_coc - finalAmountNeedPay)
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-orange-100/50">
+                            <div>
+                              <span className="text-[8px] text-gray-400 font-bold uppercase block">Giá gốc</span>
+                              <span className="font-bold text-gray-800 text-[11px]">{payment.enrollment.course.phi_coc.toLocaleString()}đ</span>
+                            </div>
+                            <div>
+                              <span className="text-[8px] text-gray-400 font-bold uppercase block">Cần chuyển khoản</span>
+                              <span className="font-black text-red-600 text-[11px]">{finalAmountNeedPay.toLocaleString()}đ</span>
+                            </div>
+                          </div>
+                          {totalDeducted > 0 && (
+                            <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-green-700">
+                              💳 Đã trừ ví (MBV/VNĐ): <b>-{totalDeducted.toLocaleString()}đ</b>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                     {(payment.bankName || payment.accountNumber) && (
                       <div className="pt-1.5 border-t border-orange-100/50 text-[10px] text-slate-600">
                         🏦 <span className="font-medium">{payment.bankName}</span>
@@ -812,8 +819,8 @@ export default function PaymentsPage() {
         const bankId = resolveBankBin(bankAcc.bankName)
         const cleanPhone = p.enrollment.user.phone ? p.enrollment.user.phone.replace(/\D/g, '').slice(-6) : ''
         const standardContent = `SDT ${cleanPhone} HV ${p.enrollment.user.id} COC ${p.enrollment.course.id_khoa}`.toUpperCase()
-        const effectiveAmount = p.amount || p.enrollment.course.phi_coc || 0
-        const mbvDeducted = Math.max(0, (p.enrollment.course.phi_coc || 0) - (p.amount || 0))
+        const effectiveAmount = p.enrollment.phi_coc !== undefined && p.enrollment.phi_coc !== null ? p.enrollment.phi_coc : (p.amount || p.enrollment.course.phi_coc || 0)
+        const mbvDeducted = Math.max(0, (p.enrollment.course.phi_coc || 0) - effectiveAmount)
         const qrUrl = `https://img.vietqr.io/image/${bankId}-${bankAcc.accountNumber}-qr_only.png?amount=${effectiveAmount}&addInfo=${encodeURIComponent(standardContent)}&accountName=${encodeURIComponent(bankAcc.accountHolder)}`
 
         return (
