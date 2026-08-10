@@ -323,7 +323,19 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
   return { success: true }
 }
 
-export async function processGracePeriodExpirations(now: Date = new Date(), onSystem?: number, applicationId?: number) {
+/**
+ * [FIX] Vòng lặp xử lý từng thành viên hết hạn grace period vốn không có
+ * try/catch riêng từng người và không có giới hạn thời gian — 1 thành viên
+ * lỗi (hoặc đơn giản là cộng dồn độ trễ tuần tự của nhiều thành viên trước
+ * đó) khiến TOÀN BỘ batch bị Vercel cắt ngang giữa chừng (maxDuration) mà
+ * không trả về gì, và lượt cron kế tiếp lại chạy lại từ đầu y hệt — kẹt vô
+ * hạn (xem cycle 897 của mbtca-orchestrator, kẹt >40 tiếng). maxDurationMs
+ * để trống (mặc định) giữ nguyên hành vi cũ — chạy tới khi xong toàn bộ,
+ * dùng cho các nơi gọi không qua route cron có giới hạn thời gian (vd.
+ * rebuild-service.ts). Chỉ truyền khi gọi từ 1 route cron có maxDuration.
+ */
+export async function processGracePeriodExpirations(now: Date = new Date(), onSystem?: number, applicationId?: number, maxDurationMs?: number) {
+  const loopStartedAt = Date.now()
   const promoConfig = await prisma.systemConfig.findUnique({ where: { key: 'brk_promotion_logic' } })
   const isOptionB = promoConfig?.value === 'B'
   const targetApplication = applicationId != null
@@ -343,8 +355,14 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
   if (expiredGrace.length === 0) return { processed: 0 }
 
   let count = 0
+  const errors: Array<{ userId: number; onSystem: number; error: string }> = []
 
   for (const member of expiredGrace) {
+    if (maxDurationMs != null && Date.now() - loopStartedAt > maxDurationMs) {
+      console.warn(`[processGracePeriodExpirations] Dừng sớm do gần hết ngân sách thời gian (đã xử lý ${count}/${expiredGrace.length}). Lượt chạy tiếp theo sẽ tiếp tục phần còn lại.`)
+      break
+    }
+    try {
     if (member.gracePeriodEnd && member.gracePeriodEnd <= now) {
       // Look up SystemTree per-member to handle multi-system correctly
       const memberSystemTree = await prisma.systemTree.findUnique({ where: { onSystem: member.onSystem } })
@@ -615,9 +633,13 @@ export async function processGracePeriodExpirations(now: Date = new Date(), onSy
 
       count++
     }
+    } catch (error: any) {
+      console.error(`[processGracePeriodExpirations] Lỗi xử lý thành viên userId=${member.userId} onSystem=${member.onSystem}, bỏ qua để không chặn các thành viên còn lại:`, error)
+      errors.push({ userId: member.userId, onSystem: member.onSystem, error: error?.message || String(error) })
+    }
   }
 
-  return { processed: count }
+  return { processed: count, total: expiredGrace.length, ...(errors.length > 0 ? { errors } : {}) }
 }
 
 export async function revertMemberActivation(

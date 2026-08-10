@@ -11,6 +11,11 @@ import { MB_TCA_SYSTEM_ID, requireMbtcaApplication } from './business-plan-servi
 const HOUR_MS = 60 * 60 * 1000
 const ORCHESTRATOR_DELAY_MS = 5 * 60 * 1000
 const MAX_CATCHUP_CYCLES = 12
+// [FIX] Giới hạn thời gian cho riêng phase OFFICIAL_CONFIRMATION (xử lý grace
+// period tuần tự từng thành viên) — route cron có maxDuration=300s, cần chừa
+// chỗ cho các phase khác + các cycle catch-up khác trong cùng 1 lượt gọi.
+// Xem processGracePeriodExpirations() trong activation-service.ts.
+const OFFICIAL_CONFIRMATION_BUDGET_MS = 200_000
 
 type PhaseCode = 'OFFICIAL_CONFIRMATION' | 'REVENUE_SHARE' | 'LEVEL_PROMOTION' | 'TEAM_COMMISSION'
 type MbtcaApplication = Awaited<ReturnType<typeof requireMbtcaApplication>>
@@ -112,7 +117,7 @@ async function processCycle(application: MbtcaApplication, cycleNumber: number) 
   })
   try {
     await runPhase(run.id, 'OFFICIAL_CONFIRMATION', async () => {
-      const result = await processMbtcaOfficialCron(scheduledAt)
+      const result = await processMbtcaOfficialCron(scheduledAt, OFFICIAL_CONFIRMATION_BUDGET_MS)
       await verifyOfficialPhase(application.id, scheduledAt)
       return result
     })

@@ -49,12 +49,13 @@ export async function activateMbtcaMember(
   )
 }
 
-export async function processMbtcaOfficialCron(runTime: Date = new Date()) {
+export async function processMbtcaOfficialCron(runTime: Date = new Date(), maxDurationMs?: number) {
   const application = await requireMbtcaApplication(runTime)
   const result = await processGracePeriodExpirations(
     runTime,
     MB_TCA_SYSTEM_ID,
     application.id,
+    maxDurationMs,
   )
   return { applicationId: application.id, applicationCode: application.applicationCode, ...result }
 }
