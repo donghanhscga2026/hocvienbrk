@@ -726,7 +726,7 @@ export async function getAdminCoursesAction() {
         const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
         const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
         const where = isAdmin ? {} : { teacherId: userId }
-        const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: true } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
+        const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
         return { success: true, courses, isAdmin, userId }
     } catch (error: any) { return { success: false, error: error.message } }
 }

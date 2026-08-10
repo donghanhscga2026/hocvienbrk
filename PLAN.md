@@ -2080,9 +2080,20 @@ Sửa lỗi dội ngược học phí về giá gốc khi học viên đã từn
   - Thêm `phi_coc: true` vào `select.enrollment` ở server action `getPendingPayments` và `getAllPayments`.
   - Cập nhật hiển thị số tiền trên thẻ thanh toán và mã QR tự động tính theo `enrollment.phi_coc` (263.026đ), hiển thị đúng dòng **"💳 Đã trừ ví (MBV/VNĐ): -392.028đ"** và tạo mã QR Chuyển Khoản đúng với số tiền 263.026đ.
 
+---
+
+## ✅ Đồng bộ cách đếm số lượng học viên trong Quản lý khóa học (2026-08-10)
+
+### Mục tiêu
+Đồng bộ số lượng học viên hiển thị giữa Trang chủ và Trang quản lý khóa học (`/tools/courses`): chỉ đếm các học viên **đã được duyệt chính thức** (`status: 'ACTIVE'`), bỏ qua các lượt đăng ký chờ duyệt/hủy.
+
+### Các file đã sửa
+#### `app/actions/admin-actions.ts`
+- Fix: Sửa `getAdminCoursesAction` đổi `_count: { select: { lessons: true, enrollments: true } }` thành `_count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }`.
+
 ### Trạng thái
 - ✅ `npx tsc --noEmit` — Exit code 0
-- ✅ Kiểm tra dữ liệu DB & giao diện Admin `/tools/payments` đã hiển thị chuẩn xác cho User #607, #769 và toàn bộ hệ thống.
+- ✅ Đã đồng bộ 100% cách đếm học viên chỉ tính thành viên ACTIVE trên toàn bộ hệ thống.
 
 
 
