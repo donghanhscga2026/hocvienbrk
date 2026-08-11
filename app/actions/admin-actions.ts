@@ -629,7 +629,9 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
 
         if (isTeacher) {
             const enrollFilter: any = { course: { teacherId: userId } }
-            if (courseId) enrollFilter.courseId = courseId
+            // Cùng lý do như nhánh admin bên dưới: chỉ tính thành viên ACTIVE
+            // khi xem theo 1 khóa học cụ thể, không tính cả PENDING.
+            if (courseId) { enrollFilter.courseId = courseId; enrollFilter.status = 'ACTIVE' }
             where.enrollments = { some: enrollFilter }
 
             scopeWhere.enrollments = { some: { course: { teacherId: userId } } }
@@ -637,7 +639,12 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
 
         if (isAdmin) {
             if (courseId) {
-                where.enrollments = { some: { courseId } }
+                // Chỉ tính thành viên đã ACTIVE (đã được phê duyệt/kích hoạt) —
+                // trước đây thiếu filter status nên đếm cả PENDING (chưa thanh
+                // toán/chưa duyệt), khiến số liệu hiện trong modal "Xem thành
+                // viên" lệch cao hơn badge "X TV" ở danh sách khoá học (nơi đã
+                // lọc đúng, xem getAdminCoursesAction).
+                where.enrollments = { some: { courseId, status: 'ACTIVE' } }
             } else if (role === 'COURSE_86_DAYS') {
                 where.enrollments = { some: { courseId: 1, status: 'ACTIVE' } }
             } else if (role === 'UNVERIFIED') {
@@ -705,6 +712,54 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
 
         const totalPages = Math.ceil(total / limit)
         return { success: true, students, total, page, totalPages, roleCounts }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Xuất danh sách thành viên ACTIVE của 1 khóa học ra Google Sheet (chỉ ID +
+ * họ tên) — dùng cho modal "Xem thành viên" ở trang quản lý khóa học.
+ */
+export async function exportCourseMembersAction(courseId: number, courseName: string) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+        const isAdmin = session.user.role === Role.ADMIN
+        const isTeacher = session.user.role === Role.TEACHER
+        if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
+
+        const userId = parseInt(session.user.id)
+        const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
+        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
+        if (isTeacher && course.teacherId !== userId) return { success: false, error: "Không có quyền xuất danh sách khóa học này" }
+
+        const enrollments = await prisma.enrollment.findMany({
+            where: { courseId, status: 'ACTIVE' },
+            select: { user: { select: { id: true, name: true } } },
+            orderBy: { user: { id: 'asc' } }
+        })
+
+        if (enrollments.length === 0) return { success: false, error: "Chưa có thành viên nào" }
+
+        const headers = ["STT", "ID", "Họ tên"]
+        const rows = enrollments.map((e, index) => [
+            (index + 1).toString(),
+            e.user.id.toString(),
+            e.user.name || "Chưa có tên",
+        ])
+
+        const safeTitle = courseName.replace(/[<>:"/\\|?*]/g, "").substring(0, 90)
+        const dateStr = new Date().toLocaleDateString("vi-VN").replace(/\//g, "-")
+        const fileName = `ThanhVien_${safeTitle}_${dateStr}`
+
+        const csvHeader = headers.join(",")
+        const csvRows = rows.map(r => r.map(v => (v.includes(",") || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v)).join(","))
+        const csvContent = [csvHeader, ...csvRows].join("\n")
+
+        const { tryCreateSheet } = await import("@/lib/email-campaign-export")
+        const fullSheetTitle = `[Thành viên] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`
+        const { sheetUrl, error } = await tryCreateSheet(rows, headers, fullSheetTitle)
+
+        return { success: true, sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 

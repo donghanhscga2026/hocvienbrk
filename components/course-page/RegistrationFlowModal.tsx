@@ -203,8 +203,11 @@ export default function RegistrationFlowModal({
             borderRadius: '16px',
             width: '100%',
             maxWidth: '500px',
+            maxHeight: '92vh',
             boxShadow: '0 18px 50px rgba(0,0,0,.5)',
             overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -213,52 +216,54 @@ export default function RegistrationFlowModal({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '24px 28px',
+            padding: '14px 16px',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
+            flexShrink: 0,
           }}>
             <div>
-              <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '22px', fontWeight: 700, color: '#F8F1E6', margin: 0 }}>
+              <h3 style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '17px', fontWeight: 700, color: '#F8F1E6', margin: 0, lineHeight: 1.2 }}>
                 Xác nhận đăng ký khóa học
               </h3>
-              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#A8A39C', margin: '4px 0 0' }}>
+              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#A8A39C', margin: '2px 0 0' }}>
                 {course.name_lop || course.name_khoa}
               </p>
             </div>
             <button
               onClick={onClose}
               style={{
-                width: '32px', height: '32px', borderRadius: '8px',
+                width: '28px', height: '28px', borderRadius: '8px',
                 border: '1px solid rgba(255,255,255,0.1)',
                 background: 'transparent', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#A8A39C',
+                flexShrink: 0,
               }}
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
 
-          <div style={{ padding: '28px' }}>
+          <div style={{ padding: '14px 16px', overflowY: 'auto' }}>
             {loadingVoucher ? (
-              <div style={{ padding: '40px', textAlign: 'center' }}>
-                <Loader2 size={32} color="#C86B3D" className="animate-spin mx-auto mb-2" />
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#A8A39C' }}>Đang tải số dư ví MBV...</p>
+              <div style={{ padding: '28px', textAlign: 'center' }}>
+                <Loader2 size={28} color="#C86B3D" className="animate-spin mx-auto mb-2" />
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#A8A39C' }}>Đang tải số dư ví MBV...</p>
               </div>
             ) : (
               <>
                 {/* Course fee summary */}
                 <div style={{
                   background: '#171823',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  marginBottom: '24px',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '12px',
                   border: '1px solid rgba(255,255,255,0.06)',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}>
-                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '15px', color: '#C8C3BA' }}>Phí cọc cam kết:</span>
-                  <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '26px', fontWeight: 700, color: '#F8F1E6' }}>
+                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#C8C3BA' }}>Phí cọc cam kết:</span>
+                  <span style={{ fontFamily: 'Cormorant Garamond, Georgia, serif', fontSize: '20px', fontWeight: 700, color: '#F8F1E6' }}>
                     {(course.phi_coc || 0).toLocaleString('vi-VN')} VND
                   </span>
                 </div>
@@ -268,11 +273,11 @@ export default function RegistrationFlowModal({
                   <div style={{
                     background: 'rgba(200, 107, 61, 0.04)',
                     border: '1px solid rgba(200, 107, 61, 0.15)',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    marginBottom: '28px',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    marginBottom: '14px',
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <input
                         type="checkbox"
                         id="useVoucherCheckbox"
@@ -287,13 +292,13 @@ export default function RegistrationFlowModal({
                           }
                         }}
                         disabled={voucherBalance === 0}
-                        style={{ width: '18px', height: '18px', cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed' }}
+                        style={{ width: '16px', height: '16px', cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed' }}
                       />
                       <label
                         htmlFor="useVoucherCheckbox"
                         style={{
                           fontFamily: 'Inter, sans-serif',
-                          fontSize: '14px',
+                          fontSize: '13px',
                           fontWeight: 600,
                           color: voucherBalance > 0 ? '#F8F1E6' : '#A8A39C',
                           cursor: voucherBalance > 0 ? 'pointer' : 'not-allowed',
@@ -303,17 +308,17 @@ export default function RegistrationFlowModal({
                       </label>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#C8C3BA', marginBottom: useVoucher ? '18px' : '0' }}>
-                      <Coins size={14} color="#C86B3D" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#C8C3BA', marginBottom: useVoucher ? '10px' : '0' }}>
+                      <Coins size={12} color="#C86B3D" />
                       <span>Số dư ví MBV khả dụng: <strong>{voucherBalance.toLocaleString('vi-VN')} VND</strong></span>
                     </div>
 
                     {useVoucher && (
-                      <div style={{ borderTop: '1px solid rgba(200, 107, 61, 0.1)', paddingTop: '16px' }}>
-                        <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#A8A39C', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div style={{ borderTop: '1px solid rgba(200, 107, 61, 0.1)', paddingTop: '10px' }}>
+                        <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#A8A39C', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           Nhập số tiền muốn trừ từ ví MBV:
                         </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <input
                             type="number"
                             value={voucherAmountToUse || ''}
@@ -328,33 +333,33 @@ export default function RegistrationFlowModal({
                               border: '1px solid rgba(255,255,255,0.08)',
                               borderRadius: '8px',
                               color: '#F8F1E6',
-                              padding: '10px 14px',
-                              fontSize: '14px',
+                              padding: '8px 12px',
+                              fontSize: '13px',
                               fontWeight: 700,
                               fontFamily: 'Inter, sans-serif',
                               outline: 'none',
                             }}
                           />
-                          <span style={{ fontSize: '14px', color: '#C8C3BA', fontWeight: 600 }}>VND</span>
+                          <span style={{ fontSize: '13px', color: '#C8C3BA', fontWeight: 600 }}>VND</span>
                         </div>
                       </div>
                     )}
 
                     {/* VNĐ wallet select box */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(200, 107, 61, 0.1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(200, 107, 61, 0.1)' }}>
                       <input
                         type="checkbox"
                         id="useVndWalletCheckbox"
                         checked={useVndWallet}
                         onChange={(e) => setUseVndWallet(e.target.checked)}
                         disabled={vndBalance === 0}
-                        style={{ width: '18px', height: '18px', cursor: vndBalance > 0 ? 'pointer' : 'not-allowed' }}
+                        style={{ width: '16px', height: '16px', cursor: vndBalance > 0 ? 'pointer' : 'not-allowed' }}
                       />
                       <label
                         htmlFor="useVndWalletCheckbox"
                         style={{
                           fontFamily: 'Inter, sans-serif',
-                          fontSize: '14px',
+                          fontSize: '13px',
                           fontWeight: 600,
                           color: vndBalance > 0 ? '#F8F1E6' : '#A8A39C',
                           cursor: vndBalance > 0 ? 'pointer' : 'not-allowed',
@@ -364,15 +369,15 @@ export default function RegistrationFlowModal({
                       </label>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#C8C3BA' }}>
-                      <Coins size={14} color="#C86B3D" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#C8C3BA', marginTop: '6px' }}>
+                      <Coins size={12} color="#C86B3D" />
                       <span>Số dư ví VNĐ khả dụng: <strong>{vndBalance.toLocaleString('vi-VN')} VND</strong></span>
                     </div>
                   </div>
                 )}
 
                 {/* Final calculation preview */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px', fontSize: '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px', fontSize: '13px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: '#A8A39C' }}>
                     <span>Học phí cọc gốc:</span>
                     <span>{(course.phi_coc || 0).toLocaleString('vi-VN')} VND</span>
@@ -389,8 +394,8 @@ export default function RegistrationFlowModal({
                       <span>-{finalPaidWithVnd.toLocaleString('vi-VN')} VND</span>
                     </div>
                   )}
-                  <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 700 }}>
+                  <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 700 }}>
                     <span style={{ color: '#F8F1E6' }}>Thanh toán thực tế cần chuyển:</span>
                     <span style={{ color: '#C86B3D' }}>
                       {Math.max(0, (course.phi_coc || 0) - (useVoucher ? voucherAmountToUse : 0) - finalPaidWithVnd).toLocaleString('vi-VN')} VND
@@ -407,9 +412,9 @@ export default function RegistrationFlowModal({
                     background: 'var(--accent, #C86B3D)',
                     color: '#FFF7ED',
                     fontFamily: 'Inter, sans-serif',
-                    fontSize: '16px',
+                    fontSize: '14px',
                     fontWeight: 700,
-                    padding: '16px 28px',
+                    padding: '12px 20px',
                     borderRadius: '8px',
                     border: 'none',
                     cursor: 'pointer',
@@ -418,7 +423,7 @@ export default function RegistrationFlowModal({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '10px',
+                    gap: '8px',
                   }}
                   onMouseEnter={e => {
                     if (!enrolling) e.currentTarget.style.background = 'var(--accent-hover, #D97949)'
@@ -429,7 +434,7 @@ export default function RegistrationFlowModal({
                 >
                   {enrolling ? (
                     <>
-                      <Loader2 size={18} className="animate-spin" />
+                      <Loader2 size={16} className="animate-spin" />
                       Đang xử lý đăng ký...
                     </>
                   ) : (

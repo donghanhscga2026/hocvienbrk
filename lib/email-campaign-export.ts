@@ -104,12 +104,13 @@ export async function exportCampaignToSheet(campaignId: number, campaignTitle: s
   const csvContent = [csvHeader, ...csvRows].join("\n");
 
   // Thử tạo Google Sheet với từng sender, fallback sang main token
-  const { sheetUrl, error } = await tryCreateSheet(rows, headers, safeTitle);
+  const fullSheetTitle = `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`;
+  const { sheetUrl, error } = await tryCreateSheet(rows, headers, fullSheetTitle);
 
   return { sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error };
 }
 
-async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: string): Promise<{ sheetUrl?: string; error?: string }> {
+export async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: string): Promise<{ sheetUrl?: string; error?: string }> {
   // Thử Service Account trước — không expire, không cần re-auth
   const saAuth = await getServiceAccountAuth();
   if (saAuth) {
@@ -173,9 +174,9 @@ async function tryCreateSheet(rows: string[][], headers: string[], safeTitle: st
   return { error: errors.join(" | ") };
 }
 
-async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers: string[], safeTitle: string): Promise<string> {
+async function doCreateSheet(sheets: any, drive: any, rows: string[][], headers: string[], fullTitle: string): Promise<string> {
   const folderId = process.env.GOOGLE_SHEETS_FOLDER_ID;
-  const title = `[Email Campaign] ${safeTitle} - ${new Date().toLocaleDateString("vi-VN")}`;
+  const title = fullTitle;
 
   // Thử Sheets API trước (có thể hoạt động với quyền Editor hiện tại)
   try {

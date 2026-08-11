@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getStudentsAction } from '@/app/actions/admin-actions'
-import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
+import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getStudentsAction, exportCourseMembersAction } from '@/app/actions/admin-actions'
+import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
@@ -48,6 +48,9 @@ function CoursesTab() {
     const [viewStudents, setViewStudents] = useState<{ courseId: number; courseName: string } | null>(null)
     const [studentsList, setStudentsList] = useState<any[]>([])
     const [studentsLoading, setStudentsLoading] = useState(false)
+    const [studentsPage, setStudentsPage] = useState(0)
+    const [exportingStudents, setExportingStudents] = useState(false)
+    const STUDENTS_PER_PAGE = 60
 
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ACTIVE')
@@ -206,6 +209,7 @@ function CoursesTab() {
         setViewStudents({ courseId, courseName })
         setStudentsLoading(true)
         setStudentsList([])
+        setStudentsPage(0)
         try {
             const res = await getStudentsAction(undefined, undefined, 0, 9999, 'id', 'asc', courseId)
             if (res.success) {
@@ -213,6 +217,31 @@ function CoursesTab() {
             }
         } catch {}
         setStudentsLoading(false)
+    }
+
+    const handleExportStudents = async () => {
+        if (!viewStudents) return
+        setExportingStudents(true)
+        try {
+            const res = await exportCourseMembersAction(viewStudents.courseId, viewStudents.courseName)
+            if (res.success && res.sheetUrl) {
+                window.open(res.sheetUrl, '_blank')
+            } else if (res.success && res.csvContent) {
+                const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `${res.fileName || 'thanh-vien'}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+                alert('Không tạo được Google Sheet, đã tải file CSV thay thế.')
+            } else {
+                alert(res.error || 'Lỗi xuất danh sách')
+            }
+        } catch {
+            alert('Lỗi xuất danh sách')
+        }
+        setExportingStudents(false)
     }
 
     const handleBulkOptionsApply = async () => {
@@ -517,13 +546,17 @@ function CoursesTab() {
                 </div>
             )}
 
-            {viewStudents && (
+            {viewStudents && (() => {
+                const totalStudentPages = Math.max(1, Math.ceil(studentsList.length / STUDENTS_PER_PAGE))
+                const safePage = Math.min(studentsPage, totalStudentPages - 1)
+                const pagedStudents = studentsList.slice(safePage * STUDENTS_PER_PAGE, (safePage + 1) * STUDENTS_PER_PAGE)
+                return (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
                     onClick={() => setViewStudents(null)}
                 >
                     <div
-                        className="bg-white w-full max-w-lg max-h-[70vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                        className="bg-white w-[95vw] h-[85vh] max-w-[1600px] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                         onClick={e => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white shrink-0">
@@ -540,9 +573,9 @@ function CoursesTab() {
                             ) : studentsList.length === 0 ? (
                                 <div className="p-8 text-center text-gray-400 text-sm">Không có thành viên nào</div>
                             ) : (
-                                <div className="divide-y divide-gray-100">
-                                    {studentsList.map((s: any) => (
-                                        <div key={s.id} className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                                    {pagedStudents.map((s: any) => (
+                                        <div key={s.id} className="flex items-center gap-3 px-6 py-3 hover:bg-gray-50 border-b border-gray-100">
                                             <span className="text-xs font-bold font-mono text-purple-600 bg-purple-50 px-2 py-0.5 rounded shrink-0">
                                                 #{s.id}
                                             </span>
@@ -554,20 +587,52 @@ function CoursesTab() {
                                 </div>
                             )}
                         </div>
-                        <div className="px-6 py-3 bg-slate-50 border-t shrink-0 flex items-center justify-between">
-                            <span className="text-xs text-gray-500 font-medium">
-                                {studentsList.length} thành viên
+                        <div className="px-6 py-3 bg-slate-50 border-t shrink-0 flex items-center justify-between gap-3 flex-wrap">
+                            <span className="text-xs text-gray-500 font-medium shrink-0">
+                                {studentsList.length} thành viên{totalStudentPages > 1 ? ` — Trang ${safePage + 1}/${totalStudentPages}` : ''}
                             </span>
-                            <button
-                                onClick={() => setViewStudents(null)}
-                                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors"
-                            >
-                                Đóng
-                            </button>
+
+                            {totalStudentPages > 1 && (
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setStudentsPage(p => Math.max(0, p - 1))}
+                                        disabled={safePage === 0}
+                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="text-xs text-slate-500 font-medium px-2">{safePage + 1} / {totalStudentPages}</span>
+                                    <button
+                                        onClick={() => setStudentsPage(p => Math.min(totalStudentPages - 1, p + 1))}
+                                        disabled={safePage >= totalStudentPages - 1}
+                                        className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-2 ml-auto">
+                                <button
+                                    onClick={handleExportStudents}
+                                    disabled={exportingStudents || studentsList.length === 0}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {exportingStudents ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                                    Xuất Google Sheet
+                                </button>
+                                <button
+                                    onClick={() => setViewStudents(null)}
+                                    className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            )}
+                )
+            })()}
 
             {showBulkOptions && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
