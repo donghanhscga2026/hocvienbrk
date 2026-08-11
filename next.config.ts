@@ -71,6 +71,21 @@ const nextConfig: NextConfig = {
   // Tắt source map production để giảm bundle
   productionBrowserSourceMaps: false,
 
+  // Redirect link cũ sang mã khóa học mới sau khi đổi id_khoa, để quảng
+  // cáo/ảnh QR/bookmark cũ đã phát ra không bị 404 (link cũ trỏ tới id_khoa
+  // cũ của khóa #22, "Quà tặng Lv1", đổi mã ngày 2026-08-11 — xem trao đổi
+  // trong phiên làm việc). permanent:true (308) giữ nguyên query string như
+  // ?ref=... của link affiliate.
+  async redirects() {
+    return [
+      {
+        source: "/khoa-hoc/XD_HETHONG_UP1000",
+        destination: "/khoa-hoc/QUA_LV1",
+        permanent: true,
+      },
+    ];
+  },
+
   // Headers bảo mật cơ bản
   async headers() {
     return [
