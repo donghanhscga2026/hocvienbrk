@@ -87,42 +87,39 @@ export async function enrollInCourseAction(
             effectivePhiCoc = 0
             isLibAllowed = true
         } else if (course.allowMbvDeduction && course.voucherConfig === 'WALLET' && (useVoucher || useVndWallet)) {
-            // Chống trừ kép: kiểm tra đã từng trừ ví cho khóa này chưa (theo wallet của user)
-            const [mbvTx, cashTx] = brkWallet?.id
+            // Tính tổng đã trừ ví MBV / VNĐ từ trước cho khóa này (có thể đã trừ nhiều lần / từng phần)
+            const [mbvTxAgg, cashTxAgg] = brkWallet?.id
                 ? await Promise.all([
-                    prisma.brkTransaction.findFirst({ where: { walletId: brkWallet.id, refId: `course_${courseId}` } }),
-                    prisma.brkTransaction.findFirst({ where: { walletId: brkWallet.id, refId: `course_cash_${courseId}` } })
+                    prisma.brkTransaction.aggregate({ where: { walletId: brkWallet.id, refId: `course_${courseId}` }, _sum: { amount: true } }),
+                    prisma.brkTransaction.aggregate({ where: { walletId: brkWallet.id, refId: `course_cash_${courseId}` }, _sum: { amount: true } })
                 ])
                 : [null, null]
 
-            // Đã từng trừ ví cho khóa này → tuyệt đối không trừ lại (chống trừ kép)
-            if (mbvTx || cashTx) {
-                // Không trừ lại ví, tính lại số tiền cọc chuẩn dựa trên học phí gốc trừ đi các khoản đã trừ ví trước đó
-                const deducted = Math.floor(Math.abs(Number(mbvTx?.amount) || 0) + Math.abs(Number(cashTx?.amount) || 0))
-                effectivePhiCoc = Math.max(0, course.phi_coc - deducted)
-            } else {
-                // 1. Trừ MBV theo số tiền user chọn (chỉ khi chưa từng trừ MBV cho khóa này)
-                if (useVoucher && voucherAmountToUse > 0 && !mbvTx) {
-                    const mbvBalance = Number(brkWallet?.mbvBalance || 0)
-                    const actualDeduct = Math.floor(Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc))
-                    if (actualDeduct > 0) {
-                        voucherDeducted = actualDeduct
-                        effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
-                        voucherApplied = true
-                        const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
-                        await debitMbvWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
-                    }
-                }
+            const alreadyDeductedMbv = Math.floor(Math.abs(Number(mbvTxAgg?._sum.amount) || 0))
+            const alreadyDeductedCash = Math.floor(Math.abs(Number(cashTxAgg?._sum.amount) || 0))
+            effectivePhiCoc = Math.max(0, course.phi_coc - alreadyDeductedMbv - alreadyDeductedCash)
 
-                // 2. Trừ tiếp ví VNĐ nếu user chọn và còn thiếu học phí (chỉ khi chưa từng trừ VNĐ cho khóa này)
-                if (useVndWallet && effectivePhiCoc > 0 && !cashTx) {
-                    const vndBalance = Number(brkWallet?.balance || 0)
-                    cashDeducted = Math.floor(Math.min(vndBalance, effectivePhiCoc))
-                    if (cashDeducted > 0) {
-                        effectivePhiCoc = Math.max(0, effectivePhiCoc - cashDeducted)
-                        const { debitBrkCashBalance } = await import('@/lib/brk/wallet-service')
-                        await debitBrkCashBalance(userId, cashDeducted, `Thanh toán khóa học ${course.id_khoa} (ví VNĐ)`, `course_cash_${courseId}`, userId)
-                    }
+            // 1. Trừ tiếp MBV nếu user chọn dùng ví và vẫn còn thiếu học phí (chống trừ kép: chỉ trừ đúng phần còn thiếu)
+            if (useVoucher && voucherAmountToUse > 0 && effectivePhiCoc > 0) {
+                const mbvBalance = Number(brkWallet?.mbvBalance || 0)
+                const actualDeduct = Math.floor(Math.min(mbvBalance, voucherAmountToUse, effectivePhiCoc))
+                if (actualDeduct > 0) {
+                    voucherDeducted = actualDeduct
+                    effectivePhiCoc = Math.max(0, effectivePhiCoc - voucherDeducted)
+                    voucherApplied = true
+                    const { debitMbvWallet } = await import('@/lib/brk/wallet-service')
+                    await debitMbvWallet(userId, voucherDeducted, `Thanh toán khóa học ${course.id_khoa}`, `course_${courseId}`, userId)
+                }
+            }
+
+            // 2. Trừ tiếp ví VNĐ nếu user chọn và vẫn còn thiếu học phí
+            if (useVndWallet && effectivePhiCoc > 0) {
+                const vndBalance = Number(brkWallet?.balance || 0)
+                cashDeducted = Math.floor(Math.min(vndBalance, effectivePhiCoc))
+                if (cashDeducted > 0) {
+                    effectivePhiCoc = Math.max(0, effectivePhiCoc - cashDeducted)
+                    const { debitBrkCashBalance } = await import('@/lib/brk/wallet-service')
+                    await debitBrkCashBalance(userId, cashDeducted, `Thanh toán khóa học ${course.id_khoa} (ví VNĐ)`, `course_cash_${courseId}`, userId)
                 }
             }
         }
