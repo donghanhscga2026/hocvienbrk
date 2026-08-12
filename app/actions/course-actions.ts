@@ -9,6 +9,7 @@ import { cookies, headers } from "next/headers"
 import { createPaymentQR } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
+import { toTitleCase } from "@/lib/utils/text-format"
 
 /**
  * Đăng ký khóa học mới
@@ -900,8 +901,8 @@ export async function createCourseAction(formData: FormData) {
         const pin = parseInt(formData.get('pin') as string) || 0
         const courseData: Record<string, unknown> = {
             id_khoa: id_khoa.toUpperCase(),
-            name_lop,
-            name_khoa: formData.get('name_khoa') as string || null,
+            name_lop: toTitleCase(name_lop),
+            name_khoa: formData.get('name_khoa') ? toTitleCase(formData.get('name_khoa') as string) : null,
             category: categoryName,
             categoryId,
             type: (formData.get('type') as string) || 'NORMAL',

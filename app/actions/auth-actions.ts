@@ -12,6 +12,7 @@ import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { cookies } from "next/headers"
 import { auth } from "@/auth"
 import { normalizePhone, getAllPhoneVariants } from "@/lib/phone-utils"
+import { toTitleCase } from "@/lib/utils/text-format"
 
 const registerSchema = z.object({
     name: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
@@ -111,7 +112,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         const user = await prisma.user.create({
             data: {
                 id: newId,
-                name,
+                name: toTitleCase(name),
                 email: normalizedEmail,
                 phone: fullPhone,
                 password: hashedPassword,
@@ -259,7 +260,7 @@ export async function completeProfileAction(data: { name: string, phone: string,
         await prisma.user.update({
             where: { id: userId },
             data: {
-                name: name.trim(),
+                name: toTitleCase(name),
                 phone: fullPhone,
                 emailVerified: new Date(), // Đã qua Google nên email đã được xác minh
                 ...(password ? { password: hashedPassword, passwordChanged: true } : {}),

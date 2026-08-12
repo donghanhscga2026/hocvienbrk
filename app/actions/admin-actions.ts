@@ -2,9 +2,10 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { Role, Prisma } from "@prisma/client"
+import { Role, Prisma, EnrollmentMemberRole } from "@prisma/client"
 import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
 import { revalidatePath } from "next/cache"
+import { toTitleCase } from "@/lib/utils/text-format"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -715,36 +716,158 @@ export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'C
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
+// Helper dùng chung: kiểm tra quyền xem/sửa thành viên 1 khóa học (admin hoặc GV chủ nhiệm)
+async function checkCourseMemberAccess(courseId: number) {
+    const session = await auth()
+    if (!session?.user?.id) return { error: "Unauthorized" as const }
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+    if (!isAdmin && !isTeacher) return { error: "Unauthorized" as const }
+
+    const userId = parseInt(session.user.id)
+    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
+    if (!course) return { error: "Không tìm thấy khóa học" as const }
+    if (isTeacher && course.teacherId !== userId) return { error: "Không có quyền truy cập khóa học này" as const }
+
+    return { error: null }
+}
+
+const TEAM_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+type CourseMemberLabels = { teams?: Record<string, string>; groups?: Record<string, string> }
+
+function teamLabel(team: number, labels?: CourseMemberLabels) {
+    const custom = labels?.teams?.[String(team)]
+    if (custom) return custom
+    return team >= 1 && team <= 26 ? `Team ${TEAM_LETTERS[team - 1]}` : `Team ${team}`
+}
+
+function groupLabel(team: number, group: number, labels?: CourseMemberLabels) {
+    const custom = labels?.groups?.[`${team}:${group}`]
+    return custom || `Group ${group}`
+}
+
 /**
- * Xuất danh sách thành viên ACTIVE của 1 khóa học ra Google Sheet (chỉ ID +
- * họ tên) — dùng cho modal "Xem thành viên" ở trang quản lý khóa học.
+ * Lấy danh sách thành viên ACTIVE của 1 khóa học kèm vai trò (PS/TV) + Team/Group,
+ * cùng tên Team/Group tùy chỉnh đã lưu — dùng cho modal "Xem thành viên".
+ */
+export async function getCourseMembersAction(courseId: number) {
+    try {
+        const access = await checkCourseMemberAccess(courseId)
+        if (access.error) return { success: false, error: access.error }
+
+        const [members, course] = await Promise.all([
+            prisma.enrollment.findMany({
+                where: { courseId, status: 'ACTIVE' },
+                select: {
+                    id: true,
+                    memberRole: true,
+                    team: true,
+                    group: true,
+                    activatedAt: true,
+                    createdAt: true,
+                    user: { select: { id: true, name: true } }
+                },
+                orderBy: [{ activatedAt: 'asc' }, { createdAt: 'asc' }]
+            }),
+            prisma.course.findUnique({ where: { id: courseId }, select: { memberLabels: true } })
+        ])
+
+        return { success: true, members, labels: (course?.memberLabels as CourseMemberLabels) || {} }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Đổi tên hiển thị tùy chỉnh cho 1 Team hoặc 1 Group của khóa học (lưu vào
+ * Course.memberLabels, áp dụng cho các lần xem/xuất sau).
+ */
+export async function updateCourseMemberLabelAction(
+    courseId: number,
+    kind: 'team' | 'group',
+    team: number,
+    group: number | null,
+    name: string
+) {
+    try {
+        const access = await checkCourseMemberAccess(courseId)
+        if (access.error) return { success: false, error: access.error }
+
+        const trimmed = name.trim().slice(0, 60)
+        if (!trimmed) return { success: false, error: "Tên không được để trống" }
+
+        const course = await prisma.course.findUnique({ where: { id: courseId }, select: { memberLabels: true } })
+        const current = ((course?.memberLabels as CourseMemberLabels) || {})
+        const next: CourseMemberLabels = { teams: { ...current.teams }, groups: { ...current.groups } }
+
+        if (kind === 'team') {
+            next.teams![String(team)] = trimmed
+        } else {
+            if (group === null) return { success: false, error: "Thiếu số Group" }
+            next.groups![`${team}:${group}`] = trimmed
+        }
+
+        await prisma.course.update({ where: { id: courseId }, data: { memberLabels: next as Prisma.InputJsonValue } })
+
+        return { success: true, labels: next }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Cập nhật hàng loạt vai trò (PS/TV) + Team/Group cho các thành viên của 1 khóa học.
+ */
+export async function updateCourseMemberAssignmentsAction(
+    courseId: number,
+    updates: { enrollmentId: number; memberRole: EnrollmentMemberRole; team: number; group: number }[]
+) {
+    try {
+        const access = await checkCourseMemberAccess(courseId)
+        if (access.error) return { success: false, error: access.error }
+
+        if (!updates || updates.length === 0) return { success: false, error: "Không có thay đổi để lưu" }
+
+        const ops = updates.map(u => prisma.enrollment.updateMany({
+            where: { id: u.enrollmentId, courseId },
+            data: {
+                memberRole: u.memberRole === 'PS' ? 'PS' : 'TV',
+                team: Math.max(1, Math.round(u.team) || 1),
+                group: Math.max(1, Math.round(u.group) || 1),
+            }
+        }))
+
+        await prisma.$transaction(ops)
+
+        return { success: true }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Xuất danh sách thành viên ACTIVE của 1 khóa học ra Google Sheet (ID, họ tên,
+ * vai trò, Team, Group) — dùng cho modal "Xem thành viên" ở trang quản lý khóa học.
  */
 export async function exportCourseMembersAction(courseId: number, courseName: string) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-        const isAdmin = session.user.role === Role.ADMIN
-        const isTeacher = session.user.role === Role.TEACHER
-        if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
+        const access = await checkCourseMemberAccess(courseId)
+        if (access.error) return { success: false, error: access.error }
 
-        const userId = parseInt(session.user.id)
-        const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
-        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
-        if (isTeacher && course.teacherId !== userId) return { success: false, error: "Không có quyền xuất danh sách khóa học này" }
-
-        const enrollments = await prisma.enrollment.findMany({
-            where: { courseId, status: 'ACTIVE' },
-            select: { user: { select: { id: true, name: true } } },
-            orderBy: { user: { id: 'asc' } }
-        })
+        const [enrollments, course] = await Promise.all([
+            prisma.enrollment.findMany({
+                where: { courseId, status: 'ACTIVE' },
+                select: { memberRole: true, team: true, group: true, user: { select: { id: true, name: true } } },
+                orderBy: [{ team: 'asc' }, { memberRole: 'asc' }, { group: 'asc' }, { activatedAt: 'asc' }]
+            }),
+            prisma.course.findUnique({ where: { id: courseId }, select: { memberLabels: true } })
+        ])
 
         if (enrollments.length === 0) return { success: false, error: "Chưa có thành viên nào" }
 
-        const headers = ["STT", "ID", "Họ tên"]
+        const labels = (course?.memberLabels as CourseMemberLabels) || {}
+        const headers = ["STT", "ID", "Họ tên", "Vai trò", "Team", "Group"]
         const rows = enrollments.map((e, index) => [
             (index + 1).toString(),
             e.user.id.toString(),
             e.user.name || "Chưa có tên",
+            e.memberRole === 'PS' ? "Phụng sự (PS)" : "Thành viên (TV)",
+            teamLabel(e.team, labels),
+            e.memberRole === 'PS' ? "" : groupLabel(e.team, e.group, labels),
         ])
 
         const safeTitle = courseName.replace(/[<>:"/\\|?*]/g, "").substring(0, 90)
@@ -1298,8 +1421,8 @@ export async function updateCourseAction(courseId: number, data: {
         // Build Prisma-safe data: only scalar columns, no FK fields
         const courseData: Record<string, any> = {
             id_khoa: data.id_khoa,
-            name_lop: data.name_lop,
-            name_khoa: data.name_khoa ?? null,
+            name_lop: data.name_lop ? toTitleCase(data.name_lop) : data.name_lop,
+            name_khoa: data.name_khoa ? toTitleCase(data.name_khoa) : null,
             date_join: data.date_join ?? null,
             status: data.status,
             mo_ta_ngan: data.mo_ta_ngan ?? null,

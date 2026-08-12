@@ -369,6 +369,7 @@ model Course {
   allowMbvDeduction           Boolean                 @default(true)
   requiresReferralActivation  Boolean                 @default(false)
   referralActivationThreshold Int                     @default(0)
+  memberLabels                Json                    @default("{}")
   courseCategory              CourseCategory?         @relation(fields: [categoryId], references: [id])
   teacherBankAccount          UserBankAccount?        @relation("CourseTeacherBank", fields: [teacherBankAccountId], references: [id])
   teacher                     User?                   @relation(fields: [teacherId], references: [id])
@@ -433,6 +434,9 @@ model Enrollment {
   referrerId     Int?
   activatedAt    DateTime?
   studyMode      EnrollmentMode   @default(ACTIVE)
+  memberRole     EnrollmentMemberRole @default(TV)
+  team           Int              @default(1)
+  group          Int              @default(1)
   course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   referrer       User?            @relation("EnrollmentReferrer", fields: [referrerId], references: [id])
   user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
@@ -1734,6 +1738,11 @@ enum EnrollmentMode {
   AUDITOR
   FREE
   COMPANION
+}
+
+enum EnrollmentMemberRole {
+  TV
+  PS
 }
 
 enum Role {

@@ -22,6 +22,14 @@ const nextConfig: NextConfig = {
     // trước đây chỉ xảy ra do NAT64/DNS64 trong 1 môi trường dev cụ thể, KHÔNG
     // tái hiện trên hạ tầng Vercel thật (đã test cả postimg.cc lẫn Supabase,
     // tải bình thường). Xem CURRENT_STATE.md mục Giai đoạn 3.
+    // (2026-08-12) Vấn đề NAT64/DNS64 tái hiện lại trên máy dev: DNS trả thêm
+    // địa chỉ IPv6 tiền tố 64:ff9b::/96 (NAT64) cho một số domain ảnh
+    // (i.postimg.cc, i.imgur.com, i.ibb.co...), bị Next.js coi là "private ip"
+    // và chặn — dù domain đã nằm trong remotePatterns bên dưới. Bật
+    // dangerouslyAllowLocalIP chỉ ở dev để bỏ qua đúng bước kiểm tra IP này
+    // (domain vẫn phải khớp remotePatterns nên không mở rộng rủi ro); production
+    // (Vercel) giữ nguyên vì không gặp lỗi này.
+    dangerouslyAllowLocalIP: process.env.NODE_ENV !== 'production',
     unoptimized: false,
     // Các mức quality được phép
     qualities: [50, 60, 70, 75, 80, 85, 90],

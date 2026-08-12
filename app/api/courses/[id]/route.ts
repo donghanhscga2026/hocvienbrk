@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { auth } from '@/auth';
 import { Role } from '@prisma/client';
+import { toTitleCase } from '@/lib/utils/text-format';
 
 // ✅ GET - TEACHER chỉ thấy course có teacherId = userId
 export async function GET(
@@ -108,6 +109,9 @@ export async function PUT(
     delete body.id
     delete body.createdAt
     delete body.updatedAt
+
+    if (body.name_lop) body.name_lop = toTitleCase(body.name_lop)
+    if ('name_khoa' in body) body.name_khoa = body.name_khoa ? toTitleCase(body.name_khoa) : null
 
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },

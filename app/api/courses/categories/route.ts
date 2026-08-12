@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
+import { toTitleCase } from '@/lib/utils/text-format'
 
 export async function GET() {
     try {
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
         const maxOrder = await prisma.courseCategory.aggregate({ _max: { order: true } })
         const category = await prisma.courseCategory.create({
             data: {
-                name: name.trim(),
+                name: toTitleCase(name),
                 slug,
                 color: color || '#6366f1',
                 icon: icon || null,
@@ -78,7 +79,7 @@ export async function PUT(request: Request) {
         }
 
         const data: any = {}
-        if (name?.trim()) data.name = name.trim()
+        if (name?.trim()) data.name = toTitleCase(name)
         if (slug?.trim()) data.slug = slug
         if (color) data.color = color
         if (icon !== undefined) data.icon = icon

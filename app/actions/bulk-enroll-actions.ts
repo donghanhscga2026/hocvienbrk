@@ -8,6 +8,7 @@ import { addUserToClosure } from '@/lib/closure-helpers'
 import { trackAffiliateConversion } from '@/lib/affiliate/tracking'
 import { normalizePhone } from '@/lib/phone-utils'
 import { isTestAccount } from '@/lib/test-account'
+import { toTitleCase } from '@/lib/utils/text-format'
 
 const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"
 
@@ -123,7 +124,7 @@ export async function previewBulkEnrollAction(spreadsheetUrl: string, courseId: 
 
         for (let i = 1; i < rows.length; i++) {
             const cols = rows[i]
-            const name = (cols[nameIdx] || '').trim()
+            const name = toTitleCase((cols[nameIdx] || '').trim())
             const email = (cols[emailIdx] || '').trim().toLowerCase()
             const phone = normalizePhone(cols[phoneIdx] || '') || ''
             const rawReferrer = (cols[referrerIdx] || '').trim()
@@ -286,7 +287,7 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         await tx.user.create({
                             data: {
                                 id: row.userId,
-                                name: row.name,
+                                name: toTitleCase(row.name),
                                 email: row.email,
                                 phone: row.phone,
                                 role: 'STUDENT' as Role,

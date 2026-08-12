@@ -3,6 +3,7 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+import { toTitleCase } from "@/lib/utils/text-format"
 
 /**
  * POST /api/courses - Tạo khóa học mới (ADMIN + TEACHER)
@@ -40,8 +41,8 @@ export async function POST(request: NextRequest) {
 
         const courseData: any = {
             id_khoa: body.id_khoa.toUpperCase(),
-            name_lop: body.name_lop,
-            name_khoa: body.name_khoa || null,
+            name_lop: toTitleCase(body.name_lop),
+            name_khoa: body.name_khoa ? toTitleCase(body.name_khoa) : null,
             category: categoryName,
             categoryId,
             type: body.type || 'NORMAL',

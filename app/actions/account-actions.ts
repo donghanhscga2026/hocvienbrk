@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { saveBase64Image } from "@/lib/image-utils"
 import { normalizePhone } from "@/lib/phone-utils"
 import { isTestAccount } from "@/lib/test-account"
+import { toTitleCase } from "@/lib/utils/text-format"
 
 export async function getUserWithAccounts() {
     const session = await auth()
@@ -54,7 +55,7 @@ export async function updateUserProfile(data: {
         const user = await prisma.user.update({
             where: { id: userId },
             data: {
-                name: data.name,
+                name: data.name ? toTitleCase(data.name) : data.name,
                 phone: normalizedPhone,
                 image: finalImageUrl,
             }
