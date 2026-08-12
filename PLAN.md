@@ -2084,18 +2084,20 @@ Sửa lỗi dội ngược học phí về giá gốc khi học viên đã từn
 
 ---
 
-## ✅ Fix lỗi Prisma Foreign Key Constraint cho `saveVideoProgressAction` (2026-08-12)
+---
+
+## ✅ Khắc phục lỗi Connection Pool Timeout (`P2024`) (2026-08-12)
 
 ### Mục tiêu
-Khắc phục lỗi `P2003 Foreign key constraint violated` trên `LessonProgress_lessonId_fkey` khi client lưu tiến độ xem video với `lessonId` không còn tồn tại trong DB.
+Khắc phục lỗi `Timed out fetching a new connection from the connection pool` (`P2024`) khi ứng dụng chạy các truy vấn song song `Promise.all`.
 
 ### Các file đã sửa
-#### `app/actions/course-actions.ts`
-- Fix: Thêm bước xác minh sự tồn tại đồng thời của `lessonId` và `enrollmentId` bằng `Promise.all` trước khi gọi `prisma.lessonProgress.upsert`. Trả về thông báo lỗi êm dịu nếu dữ liệu không hợp lệ thay vì gây ném ngoại lệ server.
+#### `.env`
+- Fix: Nâng `connection_limit` từ `1` lên `10` và đặt `pool_timeout=30` trong `DATABASE_URL` và `DIRECT_URL`.
 
 ### Trạng thái
 - ✅ `npx tsc --noEmit` — Exit code 0
-- ✅ Đã ngăn chặn triệt để lỗi crash server do FK violation.
+- ✅ Đã giải quyết tình trạng nghẽn connection pool cho các truy vấn song song.
 
 
 
