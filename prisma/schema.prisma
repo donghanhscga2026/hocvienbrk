@@ -480,7 +480,8 @@ model LessonComment {
   lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   user      User     @relation("UserToLessonComment", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([lessonId])
+  @@index([lessonId, createdAt])
+  @@index([lessonId, userId])
   @@index([userId])
 }
 

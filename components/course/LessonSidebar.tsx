@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { cn } from "@/lib/utils"
 import { CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw } from "lucide-react"
 
@@ -44,7 +44,7 @@ function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<st
     return p?.status === 'COMPLETED' && (p?.totalScore ?? 0) >= 5
 }
 
-export default function LessonSidebar({
+function LessonSidebar({
     lessons, currentLessonId, onLessonSelect, progress, startedAt, resetAt, onResetStartDate, courseType
 }: LessonSidebarProps) {
     const [showDatePicker, setShowDatePicker] = useState(false)
@@ -191,3 +191,5 @@ export default function LessonSidebar({
         </div>
     )
 }
+
+export default memo(LessonSidebar)

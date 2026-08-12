@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma"
 import { Role, Prisma, EnrollmentMode } from "@prisma/client"
 import type { Enrollment } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import { cookies, headers } from "next/headers"
 import { createPaymentQR } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
@@ -573,85 +574,17 @@ export async function confirmStartDateAction(courseId: number, date: string | Da
 }
 
 /**
- * Lưu tiến độ video (Hỗ trợ đa video/playlist)
- */
-export async function saveVideoProgressAction({ enrollmentId, lessonId, maxTime, duration, lastIndex, playlistScores }: { enrollmentId: number; lessonId: string; maxTime: number; duration: number; lastIndex?: number; playlistScores?: Record<number, { maxTime: number; duration: number }> }) {
-    try {
-        const session = await auth()
-        if (!session?.user?.id) return { success: false }
-
-        // [PLAYLIST LOGIC] Nếu có playlistScores, tính vidScore dựa trên tổng thể
-        let vidScore = 0
-        if (playlistScores) {
-            let totalMax = 0
-            let totalDur = 0
-            Object.values(playlistScores).forEach((p: any) => {
-                totalMax += p.maxTime || 0
-                totalDur += p.duration || 0
-            })
-            const percent = totalDur > 0 ? totalMax / totalDur : 0
-            vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
-        } else {
-            // Logic cũ cho 1 video
-            const percent = duration > 0 ? maxTime / duration : 0
-            vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
-        }
-
-        const [lessonExists, enrollmentExists] = await Promise.all([
-            prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true } }),
-            prisma.enrollment.findUnique({ where: { id: enrollmentId }, select: { id: true } })
-        ])
-        if (!lessonExists || !enrollmentExists) {
-            return { success: false, message: "Bài học hoặc thông tin đăng ký không tồn tại." }
-        }
-
-        const existing = await prisma.lessonProgress.findUnique({
-            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-            select: { scores: true, status: true }
-        })
-
-        const existingScores = existing?.status === 'RESET' ? {} : (existing?.scores as Record<string, unknown> ?? {})
-
-        const updatedScores = {
-            ...existingScores,
-            video: vidScore,
-            lastVideoIndex: lastIndex ?? existingScores.lastVideoIndex ?? 0,
-            playlist: playlistScores ?? existingScores.playlist ?? null
-        }
-
-        await prisma.lessonProgress.upsert({
-            where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-            create: {
-                enrollmentId, lessonId, maxTime, duration,
-                scores: updatedScores as Prisma.JsonObject,
-                status: "IN_PROGRESS"
-            },
-            update: {
-                maxTime, duration,
-                scores: updatedScores as Prisma.JsonObject,
-                ...(existing?.status === 'RESET' ? { status: 'IN_PROGRESS' } : {})
-            }
-        })
-
-        return { success: true, vidScore }
-    } catch (error) {
-        console.error("Save Video Progress Error:", error)
-        return { success: false }
-    }
-}
-
-/**
  * Nộp bài ghi nhận và tính điểm
  */
 export async function submitAssignmentAction({
     enrollmentId, lessonId, reflection, links, supports,
     isUpdate = false, lessonOrder, startedAt,
-    existingVideoScore, existingTimingScore,
+    currentMaxTime, currentDuration, existingTimingScore,
     clientTimeZone = 'Asia/Ho_Chi_Minh' // Mặc định là giờ VN nếu không có
 }: {
     enrollmentId: number, lessonId: string, reflection: string, links: string[], supports: boolean[],
     isUpdate?: boolean, lessonOrder?: number, startedAt?: any,
-    existingVideoScore?: number, existingTimingScore?: number,
+    currentMaxTime?: number, currentDuration?: number, existingTimingScore?: number,
     clientTimeZone?: string
 }) {
     const logId = `[SUBMIT-${lessonId}]`
@@ -696,48 +629,27 @@ export async function submitAssignmentAction({
             }
         }
 
-        // 2. Lấy thông tin bài học
-        const lesson = await prisma.lesson.findUnique({
-            where: { id: lessonId },
-            select: { videoUrl: true }
-        })
+        // 2. Lấy thông tin bài học + enrollment MỘT LẦN — dùng lại cho chấm điểm và thông báo Telegram bên dưới
+        const [lesson, enrollmentInfo] = await Promise.all([
+            prisma.lesson.findUnique({ where: { id: lessonId }, select: { videoUrl: true, title: true } }),
+            prisma.enrollment.findUnique({
+                where: { id: enrollmentId },
+                select: { user: { select: { name: true, id: true } }, course: { select: { name_lop: true } } }
+            })
+        ])
         if (!lesson) return { success: false, message: "Không tìm thấy bài học." }
 
         // 3. Tính toán các đầu điểm
         const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
         const isYouTube = /youtu\.be\/|youtube\.com\/|v=|live\//.test(rawUrl)
 
-        let videoScore = 0
-        if (rawUrl === "" || rawUrl.toLowerCase() === "null" || !isYouTube) {
-            videoScore = 2 // Không dùng video Youtube -> Auto +2
-        } else {
-            // Lấy dữ liệu mới nhất
-            const currentProg = await prisma.lessonProgress.findUnique({
-                where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-                select: { scores: true, maxTime: true, duration: true }
-            })
-            const scoresJson = (currentProg?.scores as any) || {}
-
-            // ƯU TIÊN 1: Tính từ Playlist detail nếu có
-            if (scoresJson.playlist) {
-                let totalMax = 0
-                let totalDur = 0
-                Object.values(scoresJson.playlist).forEach((p: any) => {
-                    totalMax += p.maxTime || 0
-                    totalDur += p.duration || 0
-                })
-                const percent = totalDur > 0 ? totalMax / totalDur : 0
-                videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
-            }
-            // ƯU TIÊN 2: Nếu mất playlist detail nhưng có maxTime/duration tổng ở ngoài (trường hợp bị ghi đè)
-            else if (currentProg?.duration && currentProg.duration > 0) {
-                const percent = currentProg.maxTime / currentProg.duration
-                videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
-            }
-            // ƯU TIÊN 3: Dùng điểm gửi từ client
-            else {
-                videoScore = existingVideoScore ?? 0
-            }
+        // [PERF] Điểm video được tính trực tiếp từ vị trí phát video ngay lúc bấm
+        // "Ghi nhận kết quả" (client gửi kèm currentMaxTime/currentDuration) —
+        // không còn đọc lại LessonProgress đã lưu từ trước.
+        let videoScore = 2 // Không dùng video YouTube -> Auto +2
+        if (rawUrl !== "" && rawUrl.toLowerCase() !== "null" && isYouTube) {
+            const percent = currentDuration && currentDuration > 0 ? (currentMaxTime ?? 0) / currentDuration : 0
+            videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
         }
 
         const reflectionScore = reflection.trim().length >= 50 ? 2 : reflection.trim().length > 0 ? 1 : 0
@@ -764,56 +676,38 @@ export async function submitAssignmentAction({
             }
         })
 
-        // Gửi thông báo Hoàn thành bài tập qua Telegram (Group LESSON)
+        // [PERF] Thông báo Telegram + ghi log hoạt động không cần chặn response
+        // trả về cho client (client đã tự cập nhật UI optimistic) — chạy SAU khi
+        // response đã gửi đi bằng after() của Next.js, thay vì await trực tiếp.
         console.log(`🔍 Kiểm tra trạng thái bài học: ${updatedProgress.status}, Điểm: ${totalScore}`);
         if (updatedProgress.status === 'COMPLETED') {
-            try {
-                const { sendTelegram } = await import("@/lib/notifications")
-                const enrollment = await prisma.enrollment.findUnique({
-                    where: { id: enrollmentId },
-                    include: {
-                        user: { select: { name: true, id: true } },
-                        course: { select: { name_lop: true } }
-                    }
-                })
-                const lesson = await prisma.lesson.findUnique({
-                    where: { id: lessonId },
-                    select: { title: true }
-                })
+            after(async () => {
+                try {
+                    const { sendTelegram } = await import("@/lib/notifications")
 
-                const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
-                    `👤 Thành viên: <b>${enrollment?.user?.name}</b> (#${enrollment?.user?.id})\n` +
-                    `🎓 Khóa học: ${enrollment?.course?.name_lop}\n` +
-                    `📖 Bài học: <b>${lesson?.title}</b>\n` +
-                    `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
-                    `📅 Thời gian: ${now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
+                    const msgAdmin = `📚 <b>HOÀN THÀNH BÀI HỌC</b>\n\n` +
+                        `👤 Thành viên: <b>${enrollmentInfo?.user?.name}</b> (#${enrollmentInfo?.user?.id})\n` +
+                        `🎓 Khóa học: ${enrollmentInfo?.course?.name_lop}\n` +
+                        `📖 Bài học: <b>${lesson.title}</b>\n` +
+                        `🏆 Điểm số: <b>${totalScore}đ</b>\n` +
+                        `📅 Thời gian: ${now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`;
 
-                console.log(`📡 Đang gửi thông báo Telegram LESSON đến ChatID: ${process.env.TELEGRAM_CHAT_ID_LESSON}`);
-                await sendTelegram(msgAdmin, 'LESSON');
-                console.log(`✅ Đã gửi thông báo Telegram LESSON thành công!`);
+                    console.log(`📡 Đang gửi thông báo Telegram LESSON đến ChatID: ${process.env.TELEGRAM_CHAT_ID_LESSON}`);
+                    await sendTelegram(msgAdmin, 'LESSON');
+                    console.log(`✅ Đã gửi thông báo Telegram LESSON thành công!`);
 
-                const { logActivity } = await import('@/lib/activity-logger')
-                if (enrollment?.user?.id) await logActivity({
-                    userId: enrollment.user.id,
-                    action: 'LESSON_COMPLETE',
-                    detail: `Hoàn thành bài: ${lesson?.title} (${totalScore}đ)`,
-                    metadata: { enrollmentId, lessonTitle: lesson?.title, score: totalScore, courseName: enrollment?.course?.name_lop || null, studentName: enrollment?.user?.name || null }
-                })
-            } catch (teleError: any) {
-                console.error(`❌ Lỗi khi gửi thông báo Telegram LESSON:`, teleError.message);
-            }
-        }
-
-        // 5. Revalidate
-        try {
-            const enrollment = await prisma.enrollment.findUnique({
-                where: { id: enrollmentId },
-                select: { course: { select: { id_khoa: true } } }
+                    const { logActivity } = await import('@/lib/activity-logger')
+                    if (enrollmentInfo?.user?.id) await logActivity({
+                        userId: enrollmentInfo.user.id,
+                        action: 'LESSON_COMPLETE',
+                        detail: `Hoàn thành bài: ${lesson.title} (${totalScore}đ)`,
+                        metadata: { enrollmentId, lessonTitle: lesson.title, score: totalScore, courseName: enrollmentInfo?.course?.name_lop || null, studentName: enrollmentInfo?.user?.name || null }
+                    })
+                } catch (teleError: any) {
+                    console.error(`❌ Lỗi khi gửi thông báo Telegram LESSON:`, teleError.message);
+                }
             })
-            if (enrollment?.course?.id_khoa) {
-                revalidatePath(`/courses/${enrollment.course.id_khoa}/learn`, 'page')
-            }
-        } catch (e) { }
+        }
 
         return { success: true, totalScore }
     } catch (error: any) {

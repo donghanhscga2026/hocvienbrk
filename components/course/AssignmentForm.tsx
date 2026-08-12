@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Loader2, Info, X, Send } from "lucide-react"
 import { saveAssignmentDraftAction } from '@/app/actions/course-actions'
@@ -90,7 +90,7 @@ function SectionHead({ num, label, max, current }: { num: number; label: string;
     )
 }
 
-export default function AssignmentForm({
+function AssignmentForm({
     lessonId,
     lessonOrder,
     startedAt,
@@ -389,3 +389,5 @@ export default function AssignmentForm({
         </div>
     )
 }
+
+export default memo(AssignmentForm)

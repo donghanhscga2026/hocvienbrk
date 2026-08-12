@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import {
@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils"
 
 import LessonSidebar from "./LessonSidebar"
-import VideoPlayer from "./VideoPlayer"
+import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
 import ChatSection from "./ChatSection"
 // [OPTIMIZE] StartDateModal kéo theo react-day-picker + CSS riêng, nhưng chỉ
@@ -19,7 +19,6 @@ import ChatSection from "./ChatSection"
 const StartDateModal = dynamic(() => import("./StartDateModal"), { ssr: false })
 import {
     confirmStartDateAction,
-    saveVideoProgressAction,
     submitAssignmentAction,
     updateLastLessonAction
 } from "@/app/actions/course-actions"
@@ -64,8 +63,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const [currentFormData, setCurrentFormData] = useState<{ reflection: string; links: string[]; supports: boolean[] } | null>(null)
     const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'loading' | 'success' | 'error' } | null>(null)
     const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
-    const lastSavedPercentRef = useRef<number>(-1)
-    const videoProgressRef = useRef<{ maxTime: number; duration: number } | null>(null)
+    const videoPlayerRef = useRef<VideoPlayerHandle>(null)
     const prevMobileTabRef = useRef(mobileTab)
     const [showCommentReminder, setShowCommentReminder] = useState(false)
     const [showDailyChallengeReminder, setShowDailyChallengeReminder] = useState(false)
@@ -126,25 +124,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         handleTabChange()
     }, [mobileTab])
 
-    const handleLessonSelect = async (lessonId: string, skipCommentCheck = false) => {
+    const handleLessonSelect = useCallback(async (lessonId: string, skipCommentCheck = false) => {
         if (isSubmittingRef.current) return
-
-        if (assignmentFormRef.current) {
-            await assignmentFormRef.current().catch(() => { })
-        }
-
-        if (currentLessonId && videoProgressRef.current) {
-            await saveVideoProgressAction({
-                enrollmentId: enrollment.id,
-                lessonId: currentLessonId,
-                maxTime: videoProgressRef.current.maxTime,
-                duration: videoProgressRef.current.duration
-            }).catch(() => { })
-        }
 
         const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
 
-        // isDailyChallenge check — mandatory assignment before switching
+        // isDailyChallenge check — mandatory assignment before switching (đồng bộ, không cần chờ mạng)
         if (course.type !== 'LIB' && course.type !== 'SYS' && currentLessonData?.isDailyChallenge && currentLessonId && currentLessonId !== lessonId) {
             const currentProg = progressMap[currentLessonId]
             if (!currentProg || currentProg.status !== 'COMPLETED') {
@@ -154,14 +139,19 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             }
         }
 
-        // Comment reminder (all course types except LIB)
-        if (course.type !== 'LIB' && !skipCommentCheck && currentLessonId && currentLessonId !== lessonId) {
-            const hasComment = await hasUserCommentedOnLesson(currentLessonId)
-            if (!hasComment) {
-                setPendingLessonId(lessonId)
-                setShowCommentReminder(true)
-                return
-            }
+        const needsCommentCheck = course.type !== 'LIB' && !skipCommentCheck && !!currentLessonId && currentLessonId !== lessonId
+
+        // [PERF] Lưu draft bài tập + kiểm tra bình luận là 2 việc độc lập — chạy
+        // song song thay vì tuần tự để UI không phải đợi tổng thời gian của cả 2.
+        const [, hasComment] = await Promise.all([
+            assignmentFormRef.current ? assignmentFormRef.current().catch(() => { }) : Promise.resolve(),
+            needsCommentCheck ? hasUserCommentedOnLesson(currentLessonId!) : Promise.resolve(true)
+        ])
+
+        if (needsCommentCheck && !hasComment) {
+            setPendingLessonId(lessonId)
+            setShowCommentReminder(true)
+            return
         }
 
         setCurrentLessonId(lessonId)
@@ -169,22 +159,15 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         setMobileTab('content')
         setShowContentModal(false)
         updateLastLessonAction(enrollment.id, lessonId).catch(() => { })
-    }
+    }, [course, currentLessonId, progressMap, enrollment.id])
 
-    const handleVideoProgress = useCallback(async (maxTime: number, duration: number) => {
+    const handleVideoProgress = useCallback((maxTime: number, duration: number) => {
         if (!currentLessonId || duration === 0) return
         const pct = Math.min(100, Math.round((maxTime / duration) * 100))
         setVideoPercent(pct)
-        videoProgressRef.current = { maxTime, duration }
+    }, [currentLessonId])
 
-        const threshold = Math.floor(pct / 10) * 10
-        if ((threshold > lastSavedPercentRef.current || pct === 100) && threshold <= 100) {
-            lastSavedPercentRef.current = threshold
-            saveVideoProgressAction({ enrollmentId: enrollment.id, lessonId: currentLessonId, maxTime, duration }).catch(() => { })
-        }
-    }, [currentLessonId, enrollment.id])
-
-    const handleSubmitAssignment = async (data: any, isUpdate: boolean = false) => {
+    const handleSubmitAssignment = useCallback(async (data: any, isUpdate: boolean = false) => {
         if (isSubmittingRef.current) return
 
         isSubmittingRef.current = true
@@ -193,6 +176,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         try {
             const currentProg = progressMap[currentLessonId!]
             const currentLessonData = course.lessons.find((l: any) => l.id === currentLessonId)
+
+            // Đọc vị trí phát video NGAY LÚC bấm "Ghi nhận kết quả" — điểm video
+            // được tính trực tiếp từ đây, không cần lưu tiến độ liên tục nữa.
+            const liveProgress = videoPlayerRef.current?.getLiveProgress()
 
             const result = await submitAssignmentAction({
                 enrollmentId: enrollment.id,
@@ -203,7 +190,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 isUpdate,
                 lessonOrder: currentLessonData?.order,
                 startedAt: enrollment.startedAt,
-                existingVideoScore: currentProg?.scores?.video,
+                currentMaxTime: liveProgress?.maxTime,
+                currentDuration: liveProgress?.duration,
                 existingTimingScore: currentProg?.scores?.timing
             })
 
@@ -236,7 +224,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             isSubmittingRef.current = false
             setStatusMsg(null)
         }
-    }
+    }, [progressMap, course, currentLessonId, enrollment.id, enrollment.startedAt, notify, handleLessonSelect])
 
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
@@ -246,8 +234,24 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     )
 
     const completedCount = Object.values(progressMap).filter((p: any) => p.status === 'COMPLETED').length
-    const startedAt = enrollment.startedAt ? new Date(enrollment.startedAt) : null
+    // [PERF] Memo hóa để LessonSidebar (React.memo) không render lại mỗi khi
+    // component cha đổi state không liên quan (ví dụ videoPercent mỗi ~5s).
+    const startedAt = useMemo(() => enrollment.startedAt ? new Date(enrollment.startedAt) : null, [enrollment.startedAt])
     const isAuditor = enrollment.studyMode === 'AUDITOR'
+
+    const handleResetStartDate = useCallback(async (d: Date) => {
+        await confirmStartDateAction(course.id, d)
+        window.location.reload()
+    }, [course.id])
+
+    const handleDraftSaved = useCallback((draftData: any) => {
+        setProgressMap(prev => ({
+            ...prev,
+            [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
+        }))
+    }, [currentLessonId])
+
+    const assignmentInitialData = useMemo(() => ({ ...currentProgress, enrollmentId: enrollment.id }), [currentProgress, enrollment.id])
 
     // [HYDRATION SAFEGUARD] Trả về giao diện trống tối giản trên server
     if (!isMounted) {
@@ -302,10 +306,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         startedAt={startedAt}
                         resetAt={enrollment.resetAt}
                         courseType={course.type}
-                        onResetStartDate={async (d: Date) => {
-                            await confirmStartDateAction(course.id, d)
-                            window.location.reload()
-                        }}
+                        onResetStartDate={handleResetStartDate}
                     />
                 )}
 
@@ -314,8 +315,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black'}>
                             <VideoPlayer
                                 key={currentLessonId}
-                                enrollmentId={enrollment.id}
-                                lessonId={currentLessonId!}
+                                ref={videoPlayerRef}
                                 videoUrl={currentLesson?.videoUrl || null}
                                 lessonContent={currentLesson?.content || null}
                                 initialMaxTime={currentProgress?.maxTime || 0}
@@ -364,7 +364,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             progress={progressMap}
                                             startedAt={startedAt}
                                             courseType={course.type}
-                                            onResetStartDate={async (d: Date) => { await confirmStartDateAction(course.id, d); window.location.reload(); }}
+                                            onResetStartDate={handleResetStartDate}
                                         />
                                     </div>
                                 )}
@@ -394,15 +394,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             videoPercent={videoPercent}
                                             videoUrl={currentLesson?.videoUrl || null}
                                             onSubmit={handleSubmitAssignment}
-                                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
+                                            initialData={assignmentInitialData}
                                             onSaveDraft={assignmentFormRef}
                                             onFormDataChange={setCurrentFormData}
-                                            onDraftSaved={(draftData) => {
-                                                setProgressMap(prev => ({
-                                                    ...prev,
-                                                    [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
-                                                }))
-                                            }}
+                                            onDraftSaved={handleDraftSaved}
                                         />
                                     </div>
                                 )}
@@ -438,15 +433,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             videoPercent={videoPercent}
                             videoUrl={currentLesson?.videoUrl || null}
                             onSubmit={handleSubmitAssignment}
-                            initialData={{ ...currentProgress, enrollmentId: enrollment.id }}
+                            initialData={assignmentInitialData}
                             onSaveDraft={assignmentFormRef}
                             onFormDataChange={setCurrentFormData}
-                            onDraftSaved={(draftData) => {
-                                setProgressMap(prev => ({
-                                    ...prev,
-                                    [currentLessonId!]: { ...prev[currentLessonId!], assignment: { ...prev[currentLessonId!]?.assignment, ...draftData } }
-                                }))
-                            }}
+                            onDraftSaved={handleDraftSaved}
                         />
                     </div>
                 )}

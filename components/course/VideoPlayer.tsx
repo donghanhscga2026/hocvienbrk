@@ -1,17 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import {
     RotateCcw, CheckCircle, List, ChevronLeft, ChevronRight,
     Play, CheckCircle2, X, FileText, Clock, Loader2, PlayCircle, SkipBack, SkipForward, Maximize2
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
-import { saveVideoProgressAction } from '@/app/actions/course-actions'
 import { detectVideoSource, isYouTube, VideoSource } from '@/lib/video-sources'
 
+export interface VideoPlayerHandle {
+    /** Đọc vị trí phát video HIỆN TẠI (live), dùng để tính điểm ngay lúc bấm "Ghi nhận kết quả" */
+    getLiveProgress: () => { maxTime: number; duration: number }
+}
+
 interface VideoPlayerProps {
-    enrollmentId: number
-    lessonId: string
     videoUrl: string | null
     lessonContent: string | null
     initialMaxTime: number
@@ -106,9 +108,7 @@ function PlayOverlay({ thumbnailUrl, onClick }: { thumbnailUrl?: string; onClick
     )
 }
 
-export default function VideoPlayer({
-    enrollmentId,
-    lessonId,
+const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function VideoPlayer({
     videoUrl,
     lessonContent,
     initialMaxTime,
@@ -119,7 +119,7 @@ export default function VideoPlayer({
     serverPlaylist,
     courseType,
     lessonType,
-}: VideoPlayerProps) {
+}, ref) {
     const playlist = useMemo(() => buildPlaylist(videoUrl, serverPlaylist, lessonType, lessonContent), [videoUrl, serverPlaylist, lessonType, lessonContent])
     const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
     const [showPlaylist, setShowPlaylist] = useState(false)
@@ -178,25 +178,42 @@ export default function VideoPlayer({
         return { maxTime: totalMaxTime, duration: totalDuration }
     }, [playlist, initialMaxTime])
 
-    const saveProgress = useCallback(async (index: number, maxTime: number, duration: number) => {
+    // [PERF] Không còn ghi tiến độ video xuống DB liên tục — chỉ cập nhật state
+    // cục bộ để hiển thị % xem trực tiếp. Điểm video được tính từ vị trí phát
+    // LIVE tại đúng thời điểm bấm "Ghi nhận kết quả" (xem getLiveProgress).
+    const saveProgress = useCallback((index: number, maxTime: number, duration: number) => {
         const nextGranular = { ...granularProgress, [index]: { maxTime, duration } }
         setGranularProgress(nextGranular)
-        setTimeout(() => {
-            const aggregate = calculateAggregateProgress(nextGranular)
-            onProgress(aggregate.maxTime, aggregate.duration)
-            if (aggregate.duration > 0) {
-                onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
+        const aggregate = calculateAggregateProgress(nextGranular)
+        onProgress(aggregate.maxTime, aggregate.duration)
+        if (aggregate.duration > 0) {
+            onPercentChange(Math.min(100, Math.round((aggregate.maxTime / aggregate.duration) * 100)))
+        }
+    }, [granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
+
+    const getLiveProgress = useCallback(() => {
+        let liveMaxTime = granularProgress[currentIndex]?.maxTime ?? 0
+        let liveDuration = granularProgress[currentIndex]?.duration ?? (currentItem?.type === 'doc' ? 30 : 0)
+
+        if (currentItem?.type === 'video') {
+            const source = currentItem.source || detectVideoSource(currentItem.url)
+            if (source.platform === 'youtube' && playerRef.current?.getCurrentTime) {
+                liveMaxTime = playerRef.current.getCurrentTime() ?? liveMaxTime
+                liveDuration = playerRef.current.getDuration?.() ?? liveDuration
+            } else if (source.platform === 'mp4' && htmlVideoRef.current) {
+                liveMaxTime = htmlVideoRef.current.currentTime ?? liveMaxTime
+                liveDuration = htmlVideoRef.current.duration || liveDuration
             }
-            saveVideoProgressAction({
-                enrollmentId,
-                lessonId,
-                maxTime: aggregate.maxTime,
-                duration: aggregate.duration,
-                lastIndex: index,
-                playlistScores: nextGranular,
-            }).catch(() => { })
-        }, 0)
-    }, [enrollmentId, lessonId, granularProgress, calculateAggregateProgress, onProgress, onPercentChange])
+        } else if (currentItem?.type === 'doc') {
+            liveMaxTime = docTimer
+            liveDuration = 30
+        }
+
+        const merged = { ...granularProgress, [currentIndex]: { maxTime: liveMaxTime, duration: liveDuration } }
+        return calculateAggregateProgress(merged)
+    }, [currentIndex, currentItem, granularProgress, docTimer, calculateAggregateProgress])
+
+    useImperativeHandle(ref, () => ({ getLiveProgress }), [getLiveProgress])
 
     const trackYouTubeProgress = useCallback(() => {
         const currentTime = playerRef.current?.getCurrentTime?.() ?? 0
@@ -552,4 +569,8 @@ export default function VideoPlayer({
             </div>
         </div>
     )
-}
+})
+
+VideoPlayer.displayName = 'VideoPlayer'
+
+export default VideoPlayer

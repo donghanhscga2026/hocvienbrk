@@ -2,7 +2,6 @@
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
 
 export async function getCommentsByLesson(lessonId: string) {
     // [OPTIMIZE] Trước đây không giới hạn số dòng — bài học càng nhiều bình luận
@@ -158,8 +157,6 @@ export async function createComment(lessonId: string, content: string) {
                 })
             }
         }
-
-        revalidatePath('/')
 
         return {
             success: true,

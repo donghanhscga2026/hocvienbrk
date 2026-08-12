@@ -43,10 +43,11 @@ export default async function CourseLearnPage({
 
   const userId = Number(session.user.id)
 
-  // Lấy course trước (để kiểm tra tồn tại)
+  // Lấy course trước (để kiểm tra tồn tại) — lấy đủ field ngay từ đây để
+  // enrollment bên dưới không phải fetch lại cùng 1 dòng course lần nữa.
   const course = await prisma.course.findUnique({
     where: { id_khoa: id },
-    select: { id: true, type: true },
+    select: { id: true, type: true, id_khoa: true, name_lop: true },
   })
 
   if (!course) redirect(`/courses/${id}`)
@@ -64,59 +65,56 @@ export default async function CourseLearnPage({
     if (!hasAccess) redirect(`/courses/${id}?error=lib_access_denied`)
   }
 
-  // Lấy enrollment bằng courseId (giữ nguyên query gốc)
-  const enrollment = await prisma.enrollment.findUnique({
-    where: {
-      userId_courseId: {
-        userId,
-        courseId: course.id,
+  // [PERF] enrollment và lessons độc lập với nhau (chỉ cần course.id) — chạy
+  // song song thay vì lồng lessons vào trong course để tránh fetch lại
+  // id/id_khoa/name_lop của course lần thứ 2.
+  const [enrollment, lessons] = await Promise.all([
+    prisma.enrollment.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId: course.id,
+        },
       },
-    },
-    select: {
-      id: true,
-      status: true,
-      studyMode: true,
-      startedAt: true,
-      resetAt: true,
-      lastLessonId: true,
+      select: {
+        id: true,
+        status: true,
+        studyMode: true,
+        startedAt: true,
+        resetAt: true,
+        lastLessonId: true,
 
-      course: {
-        select: {
-          id: true,
-          id_khoa: true,
-          name_lop: true,
-              lessons: {
-             select: {
-               id: true,
-               title: true,
-               order: true,
-               type: true, // [FIX] Cần field type để check TEXT type
-               videoUrl: true,
-               content: true,
-               isDailyChallenge: true,
-             },
-            orderBy: { order: "asc" },
+        lessonProgress: {
+          where: {
+            status: { not: "RESET" },
+          },
+          select: {
+            lessonId: true,
+            status: true,
+            totalScore: true,
+            maxTime: true,
+            duration: true,
+            submittedAt: true,
+            assignment: true,
+            scores: true,
           },
         },
       },
-
-      lessonProgress: {
-        where: {
-          status: { not: "RESET" },
-        },
-        select: {
-          lessonId: true,
-          status: true,
-          totalScore: true,
-          maxTime: true,
-          duration: true,
-          submittedAt: true,
-          assignment: true,
-          scores: true,
-        },
+    }),
+    prisma.lesson.findMany({
+      where: { courseId: course.id },
+      select: {
+        id: true,
+        title: true,
+        order: true,
+        type: true, // [FIX] Cần field type để check TEXT type
+        videoUrl: true,
+        content: true,
+        isDailyChallenge: true,
       },
-    },
-  })
+      orderBy: { order: "asc" },
+    }),
+  ])
 
   if (!enrollment || enrollment.status !== "ACTIVE") {
     redirect(`/khoa-hoc/${id}`)
@@ -125,7 +123,7 @@ export default async function CourseLearnPage({
   return (
     <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
       <CoursePlayer
-        course={{ ...enrollment.course, type: course.type }}
+        course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, lessons }}
         enrollment={enrollment}
         session={session}
       />

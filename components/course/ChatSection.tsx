@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useOptimistic, useTransition } from 'react'
+import { useState, useEffect, useRef, useMemo, useOptimistic, useTransition, memo } from 'react'
 import { getCommentsByLesson, createComment } from '@/app/actions/comment-actions'
 import { Send, LogIn, Loader2, MessageCircle } from 'lucide-react'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
@@ -66,7 +66,7 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
     )
 }
 
-export default function ChatSection({ lessonId, session }: ChatSectionProps) {
+function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [isPending, startTransition] = useTransition()
@@ -259,3 +259,5 @@ export default function ChatSection({ lessonId, session }: ChatSectionProps) {
         </div>
     )
 }
+
+export default memo(ChatSection)
