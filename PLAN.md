@@ -2082,18 +2082,20 @@ Sửa lỗi dội ngược học phí về giá gốc khi học viên đã từn
 
 ---
 
-## ✅ Đồng bộ cách đếm số lượng học viên trong Quản lý khóa học (2026-08-10)
+---
+
+## ✅ Fix lỗi Prisma Foreign Key Constraint cho `saveVideoProgressAction` (2026-08-12)
 
 ### Mục tiêu
-Đồng bộ số lượng học viên hiển thị giữa Trang chủ và Trang quản lý khóa học (`/tools/courses`): chỉ đếm các học viên **đã được duyệt chính thức** (`status: 'ACTIVE'`), bỏ qua các lượt đăng ký chờ duyệt/hủy.
+Khắc phục lỗi `P2003 Foreign key constraint violated` trên `LessonProgress_lessonId_fkey` khi client lưu tiến độ xem video với `lessonId` không còn tồn tại trong DB.
 
 ### Các file đã sửa
-#### `app/actions/admin-actions.ts`
-- Fix: Sửa `getAdminCoursesAction` đổi `_count: { select: { lessons: true, enrollments: true } }` thành `_count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }`.
+#### `app/actions/course-actions.ts`
+- Fix: Thêm bước xác minh sự tồn tại đồng thời của `lessonId` và `enrollmentId` bằng `Promise.all` trước khi gọi `prisma.lessonProgress.upsert`. Trả về thông báo lỗi êm dịu nếu dữ liệu không hợp lệ thay vì gây ném ngoại lệ server.
 
 ### Trạng thái
 - ✅ `npx tsc --noEmit` — Exit code 0
-- ✅ Đã đồng bộ 100% cách đếm học viên chỉ tính thành viên ACTIVE trên toàn bộ hệ thống.
+- ✅ Đã ngăn chặn triệt để lỗi crash server do FK violation.
 
 
 

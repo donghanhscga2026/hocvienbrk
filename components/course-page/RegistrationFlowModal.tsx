@@ -415,6 +415,21 @@ export default function RegistrationFlowModal({
                   </div>
                 </div>
 
+                {/* Error message */}
+                {enrollError && (
+                  <div style={{
+                    background: 'rgba(248,113,113,0.08)',
+                    border: '1px solid rgba(248,113,113,0.25)',
+                    borderRadius: '9px',
+                    padding: '9px 11px',
+                    marginBottom: '10px',
+                  }}>
+                    <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#F87171', margin: 0, lineHeight: 1.5 }}>
+                      ⚠️ {enrollError}
+                    </p>
+                  </div>
+                )}
+
                 {/* Confirm button */}
                 <button
                   onClick={doEnroll}

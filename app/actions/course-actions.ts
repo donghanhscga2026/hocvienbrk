@@ -597,6 +597,14 @@ export async function saveVideoProgressAction({ enrollmentId, lessonId, maxTime,
             vidScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
         }
 
+        const [lessonExists, enrollmentExists] = await Promise.all([
+            prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true } }),
+            prisma.enrollment.findUnique({ where: { id: enrollmentId }, select: { id: true } })
+        ])
+        if (!lessonExists || !enrollmentExists) {
+            return { success: false, message: "Bài học hoặc thông tin đăng ký không tồn tại." }
+        }
+
         const existing = await prisma.lessonProgress.findUnique({
             where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
             select: { scores: true, status: true }
