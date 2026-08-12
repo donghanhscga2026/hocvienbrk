@@ -2,8 +2,9 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { Share2, BookOpen, Clock, Users } from 'lucide-react'
+import { Share2, BookOpen, Clock, Users, ListChecks } from 'lucide-react'
 import { HeroSectionContent } from '@/lib/course-page/types'
+import MemberRosterModal from '@/components/course/MemberRosterModal'
 
 interface HeroSectionProps {
   id: string
@@ -48,6 +49,11 @@ export default function HeroSection({
     : isEnrolled
     ? 'Chia sẻ link để nhận 100% hoa hồng khi đã kích hoạt.'
     : 'Chia sẻ link để nhận 50% hoa hồng khi chưa kích hoạt.'
+
+  const [showRoster, setShowRoster] = React.useState(false)
+  const isAdminUser = session?.user?.role === 'ADMIN'
+  const isTeacherOwner = session?.user?.role === 'TEACHER' && course?.teacherId != null && Number(session?.user?.id) === course.teacherId
+  const canViewRoster = isAdminUser || isTeacherOwner || isEnrolled
 
   const handleShareClick = () => {
     if (onAction) onAction('open_share')
@@ -117,6 +123,16 @@ export default function HeroSection({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Users size={16} color="var(--accent)" />
             <span>{activeStudentCount || 0} thành viên</span>
+            {canViewRoster && (
+              <button
+                type="button"
+                onClick={() => setShowRoster(true)}
+                title="Xem danh sách thành viên & tiến độ nộp bài"
+                style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
+              >
+                <ListChecks size={16} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -234,6 +250,14 @@ export default function HeroSection({
           </div>
         )}
       </div>
+
+      {showRoster && course?.id && (
+        <MemberRosterModal
+          courseId={course.id}
+          courseName={course.name_lop || content.title}
+          onClose={() => setShowRoster(false)}
+        />
+      )}
     </header>
   )
 }

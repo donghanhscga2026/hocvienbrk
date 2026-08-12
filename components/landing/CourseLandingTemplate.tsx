@@ -3,15 +3,16 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { 
-    ChevronDown, ChevronUp, Star, BookOpen, Users, Clock, 
-    Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2
+import {
+    ChevronDown, ChevronUp, Star, BookOpen, Users, Clock,
+    Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2, ListChecks
 } from 'lucide-react'
 import { enrollInCourseAction, checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { useRouter } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
+import MemberRosterModal from '@/components/course/MemberRosterModal'
 
 interface CourseLesson {
     id: string
@@ -41,6 +42,7 @@ interface CourseLandingTemplateProps {
         feeType?: string
         category?: string | null
         courseCategory?: { name: string } | null
+        teacherId?: number | null
     }
     lessons: CourseLesson[]
     testimonials: CourseTestimonial[]
@@ -79,12 +81,16 @@ export default function CourseLandingTemplate({
     const [localEnrollment, setLocalEnrollment] = useState<any>(null)
     const [hasActivated, setHasActivated] = useState(false)
     const [showActivatedToast, setShowActivatedToast] = useState(false)
+    const [showRoster, setShowRoster] = useState(false)
 
     const feeLabel = feeTypeLabels[course.feeType || ''] || 'Phí'
     const effectiveEnrollment = localEnrollment || enrollment
     const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
     const isPending = effectiveEnrollment?.status === 'PENDING'
     const effectivePhiCoc = course.phi_coc
+    const isAdminUser = session?.user?.role === 'ADMIN'
+    const isTeacherOwner = session?.user?.role === 'TEACHER' && course?.teacherId != null && Number(session?.user?.id) === course.teacherId
+    const canViewRoster = isAdminUser || isTeacherOwner || isEnrolled
     const canShare = !!session
     const shareInfo = !canShare
         ? 'Đăng nhập để chia sẻ và nhận hoa hồng affiliate.'
@@ -282,6 +288,16 @@ export default function CourseLandingTemplate({
                                     <div className="flex items-center gap-2">
                                         <Users className="w-4 h-4" />
                                         <span>{activeStudentCount} thành viên</span>
+                                        {canViewRoster && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRoster(true)}
+                                                title="Xem danh sách thành viên & tiến độ nộp bài"
+                                                className="text-brk-primary hover:text-brk-primary/70 transition-colors"
+                                            >
+                                                <ListChecks className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 {(course.courseCategory?.name || course.category) && (
@@ -458,6 +474,14 @@ export default function CourseLandingTemplate({
                     <span className="font-bold">Kích hoạt thành công! Bạn có thể vào học ngay.</span>
                     <button onClick={() => setShowActivatedToast(false)} className="ml-2 opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
                 </div>
+            )}
+
+            {showRoster && (
+                <MemberRosterModal
+                    courseId={course.id}
+                    courseName={course.name_lop}
+                    onClose={() => setShowRoster(false)}
+                />
             )}
         </div>
     )

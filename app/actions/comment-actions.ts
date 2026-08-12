@@ -61,6 +61,8 @@ export async function getCommentsByLesson(lessonId: string) {
 }
 
 export async function hasUserCommentedOnLesson(lessonId: string) {
+    const __t0 = Date.now() // [PERF-TEST] tạm đo, sẽ xoá sau khi có số liệu
+    console.log(`[PERF-TEST] COMMENT_CHECK_START t=${__t0}`)
     const session = await auth()
     if (!session?.user?.id) return false
 
@@ -70,6 +72,7 @@ export async function hasUserCommentedOnLesson(lessonId: string) {
         where: { lessonId, userId }
     })
 
+    console.log(`[PERF-TEST] COMMENT_CHECK_END t=${Date.now()} (+${Date.now() - __t0}ms)`)
     return !!comment
 }
 

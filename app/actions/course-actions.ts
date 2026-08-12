@@ -588,6 +588,8 @@ export async function submitAssignmentAction({
     clientTimeZone?: string
 }) {
     const logId = `[SUBMIT-${lessonId}]`
+    const __t0 = Date.now() // [PERF-TEST] tạm đo, sẽ xoá sau khi có số liệu
+    console.log(`[PERF-TEST] SUBMIT_START t=${__t0}`)
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false, message: "Phiên đăng nhập hết hạn." }
@@ -682,6 +684,8 @@ export async function submitAssignmentAction({
         console.log(`🔍 Kiểm tra trạng thái bài học: ${updatedProgress.status}, Điểm: ${totalScore}`);
         if (updatedProgress.status === 'COMPLETED') {
             after(async () => {
+                const __tAfterStart = Date.now()
+                console.log(`[PERF-TEST] AFTER_CALLBACK_START t=${__tAfterStart} (+${__tAfterStart - __t0}ms since SUBMIT_START)`)
                 try {
                     const { sendTelegram } = await import("@/lib/notifications")
 
@@ -706,9 +710,11 @@ export async function submitAssignmentAction({
                 } catch (teleError: any) {
                     console.error(`❌ Lỗi khi gửi thông báo Telegram LESSON:`, teleError.message);
                 }
+                console.log(`[PERF-TEST] AFTER_CALLBACK_DONE t=${Date.now()} (+${Date.now() - __t0}ms since SUBMIT_START)`)
             })
         }
 
+        console.log(`[PERF-TEST] SUBMIT_RETURN t=${Date.now()} (+${Date.now() - __t0}ms since SUBMIT_START)`)
         return { success: true, totalScore }
     } catch (error: any) {
         console.error(`${logId} ERROR:`, error)
@@ -724,6 +730,8 @@ export async function saveAssignmentDraftAction({
 }: {
     enrollmentId: number, lessonId: string, reflection: string, links: string[], supports: boolean[]
 }) {
+    const __t0 = Date.now() // [PERF-TEST] tạm đo, sẽ xoá sau khi có số liệu
+    console.log(`[PERF-TEST] DRAFT_SAVE_START t=${__t0}`)
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false }
@@ -741,6 +749,7 @@ export async function saveAssignmentDraftAction({
                 assignment: { reflection, links: validLinks, supports } as any
             }
         })
+        console.log(`[PERF-TEST] DRAFT_SAVE_END t=${Date.now()} (+${Date.now() - __t0}ms)`)
         return { success: true }
     } catch (error) {
         return { success: false }

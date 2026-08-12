@@ -746,6 +746,124 @@ function groupLabel(team: number, group: number, labels?: CourseMemberLabels) {
     return custom || `Group ${group}`
 }
 
+type DayStatus = 'missing' | 'late' | 'onTime'
+
+/**
+ * Quyền xem "bảng nộp bài" của 1 khóa học:
+ * - ADMIN hoặc TEACHER sở hữu khóa: xem đầy đủ, kể cả SĐT.
+ * - Học viên đang ACTIVE trong khóa: xem được nhưng KHÔNG thấy SĐT.
+ */
+async function checkCourseRosterAccess(courseId: number) {
+    const session = await auth()
+    if (!session?.user?.id) return { error: "Unauthorized" as const }
+
+    const userId = parseInt(session.user.id)
+    const isAdmin = session.user.role === Role.ADMIN
+    const isTeacher = session.user.role === Role.TEACHER
+
+    const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
+    if (!course) return { error: "Không tìm thấy khóa học" as const }
+
+    if (isAdmin || (isTeacher && course.teacherId === userId)) {
+        return { error: null, canViewPhone: true }
+    }
+
+    const enrollment = await prisma.enrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: { status: true }
+    })
+    if (enrollment?.status === 'ACTIVE') {
+        return { error: null, canViewPhone: false }
+    }
+
+    return { error: "Bạn không có quyền xem danh sách thành viên khóa học này" as const }
+}
+
+/**
+ * Truy vấn dữ liệu roster dùng chung: danh sách bài học (theo `order` = ngày),
+ * thành viên ACTIVE + trạng thái nộp bài từng ngày (missing/late/onTime).
+ */
+async function buildCourseRoster(courseId: number) {
+    const [course, lessons, enrollments] = await Promise.all([
+        prisma.course.findUnique({ where: { id: courseId }, select: { id: true, name_lop: true, id_khoa: true, memberLabels: true } }),
+        prisma.lesson.findMany({ where: { courseId }, orderBy: { order: 'asc' }, select: { id: true, order: true, title: true } }),
+        prisma.enrollment.findMany({
+            where: { courseId, status: 'ACTIVE' },
+            select: {
+                id: true,
+                memberRole: true,
+                team: true,
+                group: true,
+                activatedAt: true,
+                createdAt: true,
+                user: { select: { id: true, name: true, phone: true } },
+                lessonProgress: { select: { lessonId: true, submittedAt: true, scores: true } }
+            },
+            orderBy: [{ activatedAt: 'asc' }, { createdAt: 'asc' }]
+        })
+    ])
+
+    const members = enrollments.map(e => {
+        const progressByLesson = new Map(e.lessonProgress.map(p => [p.lessonId, p]))
+        const days = lessons.map(l => {
+            const p = progressByLesson.get(l.id)
+            let status: DayStatus = 'missing'
+            if (p?.submittedAt) {
+                const timing = (p.scores as any)?.timing
+                status = timing === -1 ? 'late' : 'onTime'
+            }
+            return { order: l.order, status }
+        })
+        return {
+            id: e.id,
+            memberRole: e.memberRole,
+            team: e.team,
+            group: e.group,
+            user: e.user,
+            days,
+        }
+    })
+
+    // Team asc -> PS trước TV -> Group asc -> id asc
+    members.sort((a, b) => {
+        if (a.team !== b.team) return a.team - b.team
+        if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
+        if (a.group !== b.group) return a.group - b.group
+        return a.id - b.id
+    })
+
+    return { course, lessons, members }
+}
+
+/**
+ * Bảng nộp bài + thành viên của 1 khóa học, dùng cho cả trang quản trị lẫn
+ * trang khóa học công khai (icon "học viên"). Học viên ACTIVE của khóa được
+ * xem nhưng không thấy SĐT; chỉ ADMIN/giáo viên sở hữu khóa mới thấy SĐT.
+ */
+export async function getCourseMemberRosterAction(courseId: number) {
+    try {
+        const access = await checkCourseRosterAccess(courseId)
+        if (access.error) return { success: false, error: access.error }
+
+        const { course, lessons, members } = await buildCourseRoster(courseId)
+        if (!course) return { success: false, error: "Không tìm thấy khóa học" }
+
+        const sanitizedMembers = members.map(m => ({
+            ...m,
+            user: access.canViewPhone ? m.user : { id: m.user.id, name: m.user.name, phone: null }
+        }))
+
+        return {
+            success: true,
+            canViewPhone: !!access.canViewPhone,
+            course: { id: course.id, name_lop: course.name_lop, id_khoa: course.id_khoa },
+            lessons,
+            labels: (course.memberLabels as CourseMemberLabels) || {},
+            members: sanitizedMembers,
+        }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
 /**
  * Lấy danh sách thành viên ACTIVE của 1 khóa học kèm vai trò (PS/TV) + Team/Group,
  * cùng tên Team/Group tùy chỉnh đã lưu — dùng cho modal "Xem thành viên".

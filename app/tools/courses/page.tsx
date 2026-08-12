@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getCourseMembersAction, updateCourseMemberAssignmentsAction, updateCourseMemberLabelAction, exportCourseMembersAction } from '@/app/actions/admin-actions'
+import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getCourseMembersAction, getCourseMemberRosterAction, updateCourseMemberAssignmentsAction, updateCourseMemberLabelAction, exportCourseMembersAction } from '@/app/actions/admin-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Minus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette, AlertTriangle, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
+import MemberDayChips, { DayStatus } from '@/components/course/MemberDayChips'
 
 export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
@@ -49,12 +50,19 @@ function groupLabel(team: number, group: number, labels?: CourseMemberLabels) {
     return labels?.groups?.[`${team}:${group}`] || `Group ${group}`
 }
 
-function MemberCard({ member, dirty, effective, onChange, ssMode }: {
+function localPhone(phone: string | null | undefined) {
+    if (!phone) return null
+    return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
+}
+
+function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days }: {
     member: any
     dirty: boolean
     effective: { memberRole: 'TV' | 'PS'; team: number; group: number }
     onChange: (patch: Partial<{ memberRole: 'TV' | 'PS'; team: number; group: number }>) => void
     ssMode: boolean
+    phone?: string | null
+    days?: { order: number; status: DayStatus }[]
 }) {
     const isPS = effective.memberRole === 'PS'
     return (
@@ -101,6 +109,10 @@ function MemberCard({ member, dirty, effective, onChange, ssMode }: {
             <div className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
                 {member.user.name || 'Chưa có tên'}
             </div>
+            {phone && (
+                <div className="text-[10px] text-gray-500 font-mono truncate">{localPhone(phone)}</div>
+            )}
+            {days && days.length > 0 && <MemberDayChips days={days} />}
         </div>
     )
 }
@@ -160,6 +172,7 @@ function CoursesTab() {
     const [viewStudents, setViewStudents] = useState<{ courseId: number; courseName: string } | null>(null)
     const [members, setMembers] = useState<any[]>([])
     const [memberLabels, setMemberLabels] = useState<CourseMemberLabels>({})
+    const [roster, setRoster] = useState<Record<number, { phone: string | null; days: { order: number; status: DayStatus }[] }>>({})
     const [studentsLoading, setStudentsLoading] = useState(false)
     const [exportingStudents, setExportingStudents] = useState(false)
     const [editedMembers, setEditedMembers] = useState<Record<number, { memberRole: 'TV' | 'PS'; team: number; group: number }>>({})
@@ -347,12 +360,24 @@ function CoursesTab() {
     const loadMembers = async (courseId: number) => {
         setStudentsLoading(true)
         try {
-            const res = await getCourseMembersAction(courseId)
+            const [res, rosterRes] = await Promise.all([
+                getCourseMembersAction(courseId),
+                getCourseMemberRosterAction(courseId),
+            ])
             if (res.success) {
                 setMembers(res.members || [])
                 setMemberLabels((res.labels as CourseMemberLabels) || {})
             } else {
                 alert(res.error || 'Có lỗi xảy ra khi tải danh sách thành viên')
+            }
+            if (rosterRes.success) {
+                const map: Record<number, { phone: string | null; days: { order: number; status: DayStatus }[] }> = {}
+                for (const m of (rosterRes.members as any[]) || []) {
+                    map[m.id] = { phone: m.user?.phone ?? null, days: m.days || [] }
+                }
+                setRoster(map)
+            } else {
+                setRoster({})
             }
         } catch {}
         setStudentsLoading(false)
@@ -362,6 +387,7 @@ function CoursesTab() {
         setViewStudents({ courseId, courseName })
         setMembers([])
         setMemberLabels({})
+        setRoster({})
         setEditedMembers({})
         setSsMode(false)
         await loadMembers(courseId)
@@ -757,6 +783,8 @@ function CoursesTab() {
                             dirty={!!editedMembers[m.id]}
                             onChange={(patch) => handleMemberChange(m.id, base, patch)}
                             ssMode={ssMode}
+                            phone={roster[m.id]?.phone}
+                            days={roster[m.id]?.days}
                         />
                     )
                 }
