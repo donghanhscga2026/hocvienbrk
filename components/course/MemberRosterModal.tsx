@@ -27,33 +27,56 @@ type RosterMember = {
     days: { order: number; status: DayStatus }[]
 }
 
+type DisplayToggles = { role: boolean; code: boolean; phone: boolean }
+
 function localPhone(phone: string | null) {
     if (!phone) return null
     return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
 }
 
-function MemberRow({ member, canViewPhone }: { member: RosterMember; canViewPhone: boolean }) {
+function MemberRow({ member, display }: { member: RosterMember; display: DisplayToggles }) {
     const isPS = member.memberRole === 'PS'
     return (
         <div className={`rounded-xl border p-2 space-y-1 ${isPS ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white'}`}>
-            <div className="flex items-center gap-1">
-                <span className={`px-1 py-0.5 rounded text-[9px] font-black shrink-0 ${isPS ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {member.memberRole}
-                </span>
-                <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-50 px-1 py-0.5 rounded shrink-0">
-                    #{member.user.id}
-                </span>
+            {/* Dòng 1: TV | Mã | SĐT */}
+            <div className="flex items-center gap-1 flex-wrap">
+                {display.role && (
+                    <span className={`px-1 py-0.5 rounded text-[9px] font-black shrink-0 ${isPS ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                        {member.memberRole}
+                    </span>
+                )}
+                {display.code && (
+                    <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-50 px-1 py-0.5 rounded shrink-0">
+                        #{member.user.id}
+                    </span>
+                )}
+                {display.phone && member.user.phone && (
+                    <span className="text-[10px] font-mono text-gray-500 shrink-0">
+                        {localPhone(member.user.phone)}
+                    </span>
+                )}
             </div>
+            {/* Dòng 2: Họ tên */}
             <div className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
                 {member.user.name || 'Chưa có tên'}
             </div>
-            {canViewPhone && (
-                <div className="text-[10px] text-gray-500 font-mono truncate">
-                    {localPhone(member.user.phone) || '—'}
-                </div>
-            )}
+            {/* Dòng 3: Kết quả nộp bài từng ngày */}
             <MemberDayChips days={member.days} />
         </div>
+    )
+}
+
+function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+    return (
+        <label className="flex items-center gap-1 cursor-pointer select-none shrink-0">
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={e => onChange(e.target.checked)}
+                className="rounded border-gray-300 accent-violet-600 cursor-pointer w-3.5 h-3.5"
+            />
+            <span className="text-[10px] font-bold text-gray-500">{label}</span>
+        </label>
     )
 }
 
@@ -67,6 +90,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
     const [members, setMembers] = useState<RosterMember[]>([])
     const [labels, setLabels] = useState<CourseMemberLabels>({})
     const [canViewPhone, setCanViewPhone] = useState(false)
+    const [display, setDisplay] = useState<DisplayToggles>({ role: true, code: true, phone: true })
 
     useEffect(() => {
         let cancelled = false
@@ -84,6 +108,8 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
         })
         return () => { cancelled = true }
     }, [courseId])
+
+    const effectiveDisplay: DisplayToggles = { ...display, phone: display.phone && canViewPhone }
 
     const groupedByTeam = (() => {
         const map = new Map<number, { ps: RosterMember[]; groups: Map<number, RosterMember[]> }>()
@@ -147,7 +173,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                                     </div>
                                     {ps.length > 0 && (
                                         <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                                            {ps.map(m => <MemberRow key={m.id} member={m} canViewPhone={canViewPhone} />)}
+                                            {ps.map(m => <MemberRow key={m.id} member={m} display={effectiveDisplay} />)}
                                         </div>
                                     )}
                                     {groups.map(([groupNum, groupMembers]) => (
@@ -156,7 +182,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                                                 {groupLabel(team, groupNum, labels)}
                                             </div>
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                                                {groupMembers.map(m => <MemberRow key={m.id} member={m} canViewPhone={canViewPhone} />)}
+                                                {groupMembers.map(m => <MemberRow key={m.id} member={m} display={effectiveDisplay} />)}
                                             </div>
                                         </div>
                                     ))}
@@ -167,7 +193,15 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                 </div>
 
                 <div className="px-6 py-3 bg-slate-50 border-t shrink-0 flex items-center justify-between gap-3 flex-wrap">
-                    <span className="text-xs text-gray-500 font-medium">{members.length} thành viên</span>
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-xs text-gray-500 font-medium shrink-0">{members.length} thành viên</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Hiển thị:</span>
+                        <ToggleCheckbox checked={display.role} onChange={v => setDisplay(d => ({ ...d, role: v }))} label="Vai trò" />
+                        <ToggleCheckbox checked={display.code} onChange={v => setDisplay(d => ({ ...d, code: v }))} label="Mã" />
+                        {canViewPhone && (
+                            <ToggleCheckbox checked={display.phone} onChange={v => setDisplay(d => ({ ...d, phone: v }))} label="SĐT" />
+                        )}
+                    </div>
                     <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500">
                         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500/60" /> Đúng hạn</span>
                         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-500/60" /> Nộp muộn</span>

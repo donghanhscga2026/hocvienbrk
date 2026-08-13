@@ -55,7 +55,9 @@ function localPhone(phone: string | null | undefined) {
     return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
 }
 
-function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days }: {
+type CardDisplayToggles = { role: boolean; code: boolean; phone: boolean }
+
+function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days, display }: {
     member: any
     dirty: boolean
     effective: { memberRole: 'TV' | 'PS'; team: number; group: number }
@@ -63,22 +65,31 @@ function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days }:
     ssMode: boolean
     phone?: string | null
     days?: { order: number; status: DayStatus }[]
+    display: CardDisplayToggles
 }) {
     const isPS = effective.memberRole === 'PS'
     return (
         <div className={`rounded-xl border p-2 space-y-1 transition-all ${dirty ? 'border-yellow-400 ring-2 ring-yellow-200 bg-yellow-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
-            <div className="flex items-center gap-0.5">
-                <button
-                    type="button"
-                    onClick={() => onChange({ memberRole: isPS ? 'TV' : 'PS' })}
-                    className={`px-1 py-0.5 rounded text-[9px] font-black shrink-0 transition-colors ${isPS ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}
-                    title={isPS ? 'Phụng sự — bấm để đổi thành Thành viên' : 'Thành viên — bấm để đổi thành Phụng sự'}
-                >
-                    {effective.memberRole}
-                </button>
-                <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-50 px-1 py-0.5 rounded shrink-0">
-                    #{member.user.id}
-                </span>
+            {/* Dòng 1: TV | Mã | SĐT | T | G (Team/Group chỉ hiện khi bật chế độ SS) */}
+            <div className="flex items-center gap-0.5 flex-wrap">
+                {display.role && (
+                    <button
+                        type="button"
+                        onClick={() => onChange({ memberRole: isPS ? 'TV' : 'PS' })}
+                        className={`px-1 py-0.5 rounded text-[9px] font-black shrink-0 transition-colors ${isPS ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+                        title={isPS ? 'Phụng sự — bấm để đổi thành Thành viên' : 'Thành viên — bấm để đổi thành Phụng sự'}
+                    >
+                        {effective.memberRole}
+                    </button>
+                )}
+                {display.code && (
+                    <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-50 px-1 py-0.5 rounded shrink-0">
+                        #{member.user.id}
+                    </span>
+                )}
+                {display.phone && phone && (
+                    <span className="text-[9px] font-mono text-gray-500 shrink-0">{localPhone(phone)}</span>
+                )}
                 {ssMode && (
                     <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden shrink-0">
                         <button type="button" onClick={() => onChange({ team: Math.max(1, effective.team - 1) })}
@@ -106,14 +117,27 @@ function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days }:
                     </div>
                 )}
             </div>
+            {/* Dòng 2: Họ tên */}
             <div className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
                 {member.user.name || 'Chưa có tên'}
             </div>
-            {phone && (
-                <div className="text-[10px] text-gray-500 font-mono truncate">{localPhone(phone)}</div>
-            )}
+            {/* Dòng 3: Kết quả nộp bài từng ngày */}
             {days && days.length > 0 && <MemberDayChips days={days} />}
         </div>
+    )
+}
+
+function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+    return (
+        <label className="flex items-center gap-1 cursor-pointer select-none shrink-0">
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={e => onChange(e.target.checked)}
+                className="rounded border-gray-300 accent-violet-600 cursor-pointer w-3.5 h-3.5"
+            />
+            <span className="text-[10px] font-bold text-gray-500">{label}</span>
+        </label>
     )
 }
 
@@ -178,6 +202,7 @@ function CoursesTab() {
     const [editedMembers, setEditedMembers] = useState<Record<number, { memberRole: 'TV' | 'PS'; team: number; group: number }>>({})
     const [savingAssignments, setSavingAssignments] = useState(false)
     const [ssMode, setSsMode] = useState(false)
+    const [cardDisplay, setCardDisplay] = useState<CardDisplayToggles>({ role: true, code: true, phone: true })
 
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ACTIVE')
@@ -785,6 +810,7 @@ function CoursesTab() {
                             ssMode={ssMode}
                             phone={roster[m.id]?.phone}
                             days={roster[m.id]?.days}
+                            display={cardDisplay}
                         />
                     )
                 }
@@ -873,6 +899,10 @@ function CoursesTab() {
                                     />
                                     <span className="text-xs font-bold text-gray-500" title="Sắp xếp Team / Group">SS</span>
                                 </label>
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0 ml-2">Hiển thị:</span>
+                                <ToggleCheckbox checked={cardDisplay.role} onChange={v => setCardDisplay(d => ({ ...d, role: v }))} label="Vai trò" />
+                                <ToggleCheckbox checked={cardDisplay.code} onChange={v => setCardDisplay(d => ({ ...d, code: v }))} label="Mã" />
+                                <ToggleCheckbox checked={cardDisplay.phone} onChange={v => setCardDisplay(d => ({ ...d, phone: v }))} label="SĐT" />
                             </div>
 
                             <div className="flex items-center gap-2 ml-auto">
