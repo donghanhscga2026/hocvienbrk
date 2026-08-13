@@ -1,9 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, X, Users } from 'lucide-react'
+import { Loader2, X, Users, ImageDown } from 'lucide-react'
 import { getCourseMemberRosterAction } from '@/app/actions/admin-actions'
 import MemberDayChips, { DayStatus } from './MemberDayChips'
+import MemberDetailPanel from './MemberDetailPanel'
+import { downloadRosterAsImage } from '@/lib/course/export-roster-image'
+
+const RECENT_DAYS = 7
 
 const TEAM_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 type CourseMemberLabels = { teams?: Record<string, string>; groups?: Record<string, string> }
@@ -25,6 +29,7 @@ type RosterMember = {
     group: number
     user: { id: number; name: string | null; phone: string | null }
     days: { order: number; status: DayStatus }[]
+    completionPercent: number | null
 }
 
 type DisplayToggles = { role: boolean; code: boolean; phone: boolean }
@@ -34,8 +39,9 @@ function localPhone(phone: string | null) {
     return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
 }
 
-function MemberRow({ member, display }: { member: RosterMember; display: DisplayToggles }) {
+function MemberRow({ member, display, onSelect }: { member: RosterMember; display: DisplayToggles; onSelect: () => void }) {
     const isPS = member.memberRole === 'PS'
+    const recentDays = member.days.slice(-RECENT_DAYS)
     return (
         <div className={`rounded-xl border p-2 space-y-1 ${isPS ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white'}`}>
             {/* Dòng 1: TV | Mã | SĐT */}
@@ -56,12 +62,22 @@ function MemberRow({ member, display }: { member: RosterMember; display: Display
                     </span>
                 )}
             </div>
-            {/* Dòng 2: Họ tên */}
-            <div className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
-                {member.user.name || 'Chưa có tên'}
-            </div>
-            {/* Dòng 3: Kết quả nộp bài từng ngày */}
-            <MemberDayChips days={member.days} />
+            {/* Dòng 2: Họ tên + % hoàn thành — bấm để xem chi tiết đủ số ngày */}
+            <button
+                type="button"
+                onClick={onSelect}
+                className="w-full flex items-center justify-between gap-1 text-left hover:underline decoration-dashed underline-offset-2"
+                title="Xem chi tiết toàn bộ tiến độ"
+            >
+                <span className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
+                    {member.user.name || 'Chưa có tên'}
+                </span>
+                <span className="text-[10px] font-black text-violet-600 shrink-0">
+                    {member.completionPercent === null ? '—' : `${member.completionPercent}%`}
+                </span>
+            </button>
+            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất */}
+            <MemberDayChips days={recentDays} />
         </div>
     )
 }
@@ -89,8 +105,11 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
     const [error, setError] = useState<string | null>(null)
     const [members, setMembers] = useState<RosterMember[]>([])
     const [labels, setLabels] = useState<CourseMemberLabels>({})
+    const [dayOrders, setDayOrders] = useState<number[]>([])
     const [canViewPhone, setCanViewPhone] = useState(false)
     const [display, setDisplay] = useState<DisplayToggles>({ role: true, code: true, phone: true })
+    const [exportingImage, setExportingImage] = useState(false)
+    const [selectedMember, setSelectedMember] = useState<RosterMember | null>(null)
 
     useEffect(() => {
         let cancelled = false
@@ -100,6 +119,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
             if (res.success) {
                 setMembers((res.members as any[]) || [])
                 setLabels((res.labels as CourseMemberLabels) || {})
+                setDayOrders(((res.lessons as any[]) || []).map(l => l.order))
                 setCanViewPhone(!!res.canViewPhone)
             } else {
                 setError(res.error || 'Có lỗi xảy ra khi tải danh sách thành viên')
@@ -110,6 +130,31 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
     }, [courseId])
 
     const effectiveDisplay: DisplayToggles = { ...display, phone: display.phone && canViewPhone }
+
+    const handleExportImage = () => {
+        if (members.length === 0) return
+        setExportingImage(true)
+        try {
+            const sorted = [...members].sort((a, b) => {
+                if (a.team !== b.team) return a.team - b.team
+                if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
+                if (a.group !== b.group) return a.group - b.group
+                return a.id - b.id
+            })
+            const rows = sorted.map((m, idx) => ({
+                stt: idx + 1,
+                name: m.user.name || '',
+                code: m.user.id,
+                teamText: teamLabel(m.team, labels),
+                groupText: m.memberRole === 'PS' ? '—' : groupLabel(m.team, m.group, labels),
+                isPS: m.memberRole === 'PS',
+                days: m.days || [],
+            }))
+            downloadRosterAsImage(courseName, rows, dayOrders)
+        } finally {
+            setExportingImage(false)
+        }
+    }
 
     const groupedByTeam = (() => {
         const map = new Map<number, { ps: RosterMember[]; groups: Map<number, RosterMember[]> }>()
@@ -133,6 +178,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
     })()
 
     return (
+        <>
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
             onClick={onClose}
@@ -173,7 +219,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                                     </div>
                                     {ps.length > 0 && (
                                         <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                                            {ps.map(m => <MemberRow key={m.id} member={m} display={effectiveDisplay} />)}
+                                            {ps.map(m => <MemberRow key={m.id} member={m} display={effectiveDisplay} onSelect={() => setSelectedMember(m)} />)}
                                         </div>
                                     )}
                                     {groups.map(([groupNum, groupMembers]) => (
@@ -182,7 +228,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                                                 {groupLabel(team, groupNum, labels)}
                                             </div>
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                                                {groupMembers.map(m => <MemberRow key={m.id} member={m} display={effectiveDisplay} />)}
+                                                {groupMembers.map(m => <MemberRow key={m.id} member={m} display={effectiveDisplay} onSelect={() => setSelectedMember(m)} />)}
                                             </div>
                                         </div>
                                     ))}
@@ -202,13 +248,41 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                             <ToggleCheckbox checked={display.phone} onChange={v => setDisplay(d => ({ ...d, phone: v }))} label="SĐT" />
                         )}
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500">
-                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500/60" /> Đúng hạn</span>
-                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-500/60" /> Nộp muộn</span>
-                        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/60" /> Chưa nộp</span>
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500">
+                            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500/60" /> Đúng hạn</span>
+                            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-500/60" /> Nộp muộn</span>
+                            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/60" /> Chưa nộp</span>
+                        </div>
+                        <button
+                            onClick={handleExportImage}
+                            disabled={exportingImage || members.length === 0}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Xuất bảng tổng hợp nộp bài ra file ảnh PNG"
+                        >
+                            {exportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageDown className="w-3.5 h-3.5" />}
+                            Xuất ảnh
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+
+        {selectedMember && (
+            <MemberDetailPanel
+                member={{
+                    name: selectedMember.user.name,
+                    code: selectedMember.user.id,
+                    memberRole: selectedMember.memberRole,
+                    teamText: teamLabel(selectedMember.team, labels),
+                    groupText: groupLabel(selectedMember.team, selectedMember.group, labels),
+                    phone: canViewPhone ? selectedMember.user.phone : null,
+                    completionPercent: selectedMember.completionPercent,
+                    days: selectedMember.days,
+                }}
+                onClose={() => setSelectedMember(null)}
+            />
+        )}
+        </>
     )
 }

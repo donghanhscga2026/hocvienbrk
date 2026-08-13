@@ -2,11 +2,15 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getCourseMembersAction, getCourseMemberRosterAction, updateCourseMemberAssignmentsAction, updateCourseMemberLabelAction, exportCourseMembersAction } from '@/app/actions/admin-actions'
-import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Minus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette, AlertTriangle, FileSpreadsheet } from 'lucide-react'
+import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Minus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette, AlertTriangle, FileSpreadsheet, ImageDown } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
 import MemberDayChips, { DayStatus } from '@/components/course/MemberDayChips'
+import MemberDetailPanel from '@/components/course/MemberDetailPanel'
+import { downloadRosterAsImage } from '@/lib/course/export-roster-image'
+
+const RECENT_DAYS = 7
 
 export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
@@ -57,7 +61,7 @@ function localPhone(phone: string | null | undefined) {
 
 type CardDisplayToggles = { role: boolean; code: boolean; phone: boolean }
 
-function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days, display }: {
+function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days, completionPercent, display, onSelect }: {
     member: any
     dirty: boolean
     effective: { memberRole: 'TV' | 'PS'; team: number; group: number }
@@ -65,7 +69,9 @@ function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days, d
     ssMode: boolean
     phone?: string | null
     days?: { order: number; status: DayStatus }[]
+    completionPercent?: number | null
     display: CardDisplayToggles
+    onSelect: () => void
 }) {
     const isPS = effective.memberRole === 'PS'
     return (
@@ -117,12 +123,22 @@ function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days, d
                     </div>
                 )}
             </div>
-            {/* Dòng 2: Họ tên */}
-            <div className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
-                {member.user.name || 'Chưa có tên'}
-            </div>
-            {/* Dòng 3: Kết quả nộp bài từng ngày */}
-            {days && days.length > 0 && <MemberDayChips days={days} />}
+            {/* Dòng 2: Họ tên + % hoàn thành — bấm để xem chi tiết đủ số ngày */}
+            <button
+                type="button"
+                onClick={onSelect}
+                className="w-full flex items-center justify-between gap-1 text-left hover:underline decoration-dashed underline-offset-2"
+                title="Xem chi tiết toàn bộ tiến độ"
+            >
+                <span className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
+                    {member.user.name || 'Chưa có tên'}
+                </span>
+                <span className="text-[10px] font-black text-violet-600 shrink-0">
+                    {completionPercent == null ? '—' : `${completionPercent}%`}
+                </span>
+            </button>
+            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất */}
+            {days && days.length > 0 && <MemberDayChips days={days.slice(-RECENT_DAYS)} />}
         </div>
     )
 }
@@ -196,9 +212,12 @@ function CoursesTab() {
     const [viewStudents, setViewStudents] = useState<{ courseId: number; courseName: string } | null>(null)
     const [members, setMembers] = useState<any[]>([])
     const [memberLabels, setMemberLabels] = useState<CourseMemberLabels>({})
-    const [roster, setRoster] = useState<Record<number, { phone: string | null; days: { order: number; status: DayStatus }[] }>>({})
+    const [roster, setRoster] = useState<Record<number, { phone: string | null; days: { order: number; status: DayStatus }[]; completionPercent: number | null }>>({})
+    const [dayOrders, setDayOrders] = useState<number[]>([])
+    const [selectedMember, setSelectedMember] = useState<any | null>(null)
     const [studentsLoading, setStudentsLoading] = useState(false)
     const [exportingStudents, setExportingStudents] = useState(false)
+    const [exportingImage, setExportingImage] = useState(false)
     const [editedMembers, setEditedMembers] = useState<Record<number, { memberRole: 'TV' | 'PS'; team: number; group: number }>>({})
     const [savingAssignments, setSavingAssignments] = useState(false)
     const [ssMode, setSsMode] = useState(false)
@@ -396,13 +415,15 @@ function CoursesTab() {
                 alert(res.error || 'Có lỗi xảy ra khi tải danh sách thành viên')
             }
             if (rosterRes.success) {
-                const map: Record<number, { phone: string | null; days: { order: number; status: DayStatus }[] }> = {}
+                const map: Record<number, { phone: string | null; days: { order: number; status: DayStatus }[]; completionPercent: number | null }> = {}
                 for (const m of (rosterRes.members as any[]) || []) {
-                    map[m.id] = { phone: m.user?.phone ?? null, days: m.days || [] }
+                    map[m.id] = { phone: m.user?.phone ?? null, days: m.days || [], completionPercent: m.completionPercent ?? null }
                 }
                 setRoster(map)
+                setDayOrders(((rosterRes.lessons as any[]) || []).map(l => l.order))
             } else {
                 setRoster({})
+                setDayOrders([])
             }
         } catch {}
         setStudentsLoading(false)
@@ -413,9 +434,36 @@ function CoursesTab() {
         setMembers([])
         setMemberLabels({})
         setRoster({})
+        setDayOrders([])
         setEditedMembers({})
         setSsMode(false)
+        setSelectedMember(null)
         await loadMembers(courseId)
+    }
+
+    const handleExportImage = () => {
+        if (!viewStudents || members.length === 0) return
+        setExportingImage(true)
+        try {
+            const sorted = [...members].sort((a, b) => {
+                if (a.team !== b.team) return a.team - b.team
+                if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
+                if (a.group !== b.group) return a.group - b.group
+                return a.id - b.id
+            })
+            const rows = sorted.map((m, idx) => ({
+                stt: idx + 1,
+                name: m.user.name || '',
+                code: m.user.id,
+                teamText: teamLabel(m.team, memberLabels),
+                groupText: m.memberRole === 'PS' ? '—' : groupLabel(m.team, m.group, memberLabels),
+                isPS: m.memberRole === 'PS',
+                days: roster[m.id]?.days || [],
+            }))
+            downloadRosterAsImage(viewStudents.courseName, rows, dayOrders)
+        } finally {
+            setExportingImage(false)
+        }
     }
 
     const handleSaveLabel = async (kind: 'team' | 'group', team: number, group: number | null, name: string) => {
@@ -810,11 +858,14 @@ function CoursesTab() {
                             ssMode={ssMode}
                             phone={roster[m.id]?.phone}
                             days={roster[m.id]?.days}
+                            completionPercent={roster[m.id]?.completionPercent}
                             display={cardDisplay}
+                            onSelect={() => setSelectedMember(m)}
                         />
                     )
                 }
                 return (
+                <>
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
                     onClick={() => setViewStudents(null)}
@@ -917,6 +968,15 @@ function CoursesTab() {
                                     </button>
                                 )}
                                 <button
+                                    onClick={handleExportImage}
+                                    disabled={exportingImage || members.length === 0}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Xuất bảng tổng hợp nộp bài ra file ảnh PNG"
+                                >
+                                    {exportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageDown className="w-3.5 h-3.5" />}
+                                    Xuất ảnh
+                                </button>
+                                <button
                                     onClick={handleExportStudents}
                                     disabled={exportingStudents || members.length === 0}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -928,6 +988,27 @@ function CoursesTab() {
                         </div>
                     </div>
                 </div>
+
+                {selectedMember && (
+                    <MemberDetailPanel
+                        member={{
+                            name: selectedMember.user.name,
+                            code: selectedMember.user.id,
+                            memberRole: (editedMembers[selectedMember.id]?.memberRole ?? selectedMember.memberRole),
+                            teamText: teamLabel(editedMembers[selectedMember.id]?.team ?? selectedMember.team, memberLabels),
+                            groupText: groupLabel(
+                                editedMembers[selectedMember.id]?.team ?? selectedMember.team,
+                                editedMembers[selectedMember.id]?.group ?? selectedMember.group,
+                                memberLabels
+                            ),
+                            phone: roster[selectedMember.id]?.phone,
+                            completionPercent: roster[selectedMember.id]?.completionPercent ?? null,
+                            days: roster[selectedMember.id]?.days || [],
+                        }}
+                        onClose={() => setSelectedMember(null)}
+                    />
+                )}
+                </>
                 )
             })()}
 
