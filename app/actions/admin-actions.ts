@@ -819,15 +819,17 @@ async function buildCourseRoster(courseId: number) {
             return { order: l.order, status }
         })
 
-        // % hoàn thành tính đến hết ngày hôm qua, theo mốc bắt đầu học riêng của
-        // từng thành viên (giống cách tính hạn nộp trong submitAssignmentAction).
+        // % nộp ĐÚNG HẠN tính đến hết ngày hôm qua (không tính nộp muộn), theo mốc
+        // bắt đầu học riêng của từng thành viên (giống cách tính hạn nộp trong
+        // submitAssignmentAction). Nộp muộn vẫn hiện màu tím ở lưới ngày, chỉ
+        // không được cộng vào % này.
         const base = e.startedAt || e.activatedAt || e.createdAt
         const baseMid = new Date(base)
         baseMid.setHours(0, 0, 0, 0)
         const dayIndexToday = Math.floor((todayMid.getTime() - baseMid.getTime()) / 86400000) + 1
         const elapsedDays = Math.max(0, Math.min(lessons.length, dayIndexToday - 1))
-        const submittedElapsed = days.filter(d => d.order <= elapsedDays && d.status !== 'missing').length
-        const completionPercent = elapsedDays > 0 ? Math.round((submittedElapsed / elapsedDays) * 100) : null
+        const onTimeElapsed = days.filter(d => d.order <= elapsedDays && d.status === 'onTime').length
+        const completionPercent = elapsedDays > 0 ? Math.round((onTimeElapsed / elapsedDays) * 100) : null
 
         return {
             id: e.id,

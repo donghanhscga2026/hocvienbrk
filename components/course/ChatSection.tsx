@@ -218,19 +218,29 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
 
             <div className="shrink-0 border-t border-zinc-800 bg-zinc-900/80 p-3 backdrop-blur-md">
                 {session?.user ? (
-                    <form onSubmit={handleSendComment} className="relative flex items-center">
-                        <input
-                            type="text"
+                    <form onSubmit={handleSendComment} className="relative flex items-end gap-2">
+                        <textarea
                             value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Nhập nội dung tương tác..."
-                            className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-12 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all"
+                            onChange={(e) => {
+                                setNewComment(e.target.value)
+                                // Auto-resize
+                                e.target.style.height = 'auto'
+                                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                            }}
+                            onKeyDown={(e) => {
+                                // Enter thuần = xuống dòng (không submit)
+                                // Không có action nào submit khi nhấn Enter
+                            }}
+                            placeholder="Nhập nội dung tương tác... (Enter để xuống dòng, bấm nút ➤ để gửi)"
+                            rows={1}
+                            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed"
+                            style={{ minHeight: '42px', maxHeight: '120px' }}
                             disabled={isPending}
                         />
                         <button
                             type="submit"
                             disabled={!newComment.trim() || isPending}
-                            className="absolute right-1.5 w-8 h-8 rounded-xl bg-yellow-400 text-black flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 transition-all active:scale-90"
+                            className="shrink-0 w-9 h-9 rounded-xl bg-yellow-400 text-black flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 transition-all active:scale-90 mb-0.5"
                         >
                             {isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

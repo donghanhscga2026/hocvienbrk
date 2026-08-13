@@ -68,6 +68,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const [showCommentReminder, setShowCommentReminder] = useState(false)
     const [showDailyChallengeReminder, setShowDailyChallengeReminder] = useState(false)
     const [pendingLessonId, setPendingLessonId] = useState<string | null>(null)
+    const [videoHidden, setVideoHidden] = useState(false)
+    // [HOVER-HIDE] Desktop: hover vào khung bình luận sẽ tạm thu gọn video (không unmount)
+    // để nhường chỗ cho khung chat, rời chuột ra thì video hiện lại. Chỉ ảnh hưởng hiển
+    // thị (CSS), không đụng tới trạng thái mount của VideoPlayer — nút Ẩn/Hiện vẫn hoạt
+    // động độc lập như cũ (unmount thật khi bấm).
+    const [chatHovered, setChatHovered] = useState(false)
 
     // [HYDRATION FIX] Đảm bảo component đã mount trên client mới thực hiện các tính toán logic và render giao diện chính
     useEffect(() => {
@@ -312,40 +318,64 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
                 <main className="flex-1 flex flex-col min-h-0 overflow-hidden items-center bg-zinc-950">
                     <div className={isMobile ? 'shrink-0 w-full' : 'p-5 pb-0 shrink-0 w-full max-w-5xl'}>
-                        <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black'}>
-                            <VideoPlayer
-                                key={currentLessonId}
-                                ref={videoPlayerRef}
-                                videoUrl={currentLesson?.videoUrl || null}
-                                lessonContent={currentLesson?.content || null}
-                                initialMaxTime={currentProgress?.maxTime || 0}
-                                playlistData={currentProgress?.scores?.playlist}
-                                lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
-                                onProgress={handleVideoProgress}
-                                onPercentChange={setVideoPercent}
-                                courseType={course.type}
-                                lessonType={currentLesson?.type}
-                                serverPlaylist={
-                                    currentLesson?.type === 'TEXT'
-                                        ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }]
-                                        : undefined
-                                }
-                            />
+                        <div
+                            className={isMobile ? '' : 'grid transition-[grid-template-rows] duration-300 ease-in-out'}
+                            style={!isMobile ? { gridTemplateRows: chatHovered ? '0fr' : '1fr' } : undefined}
+                        >
+                            <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black min-h-0'}>
+                                {!videoHidden && (
+                                    <VideoPlayer
+                                        key={currentLessonId}
+                                        ref={videoPlayerRef}
+                                        videoUrl={currentLesson?.videoUrl || null}
+                                        lessonContent={currentLesson?.content || null}
+                                        initialMaxTime={currentProgress?.maxTime || 0}
+                                        playlistData={currentProgress?.scores?.playlist}
+                                        lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
+                                        onProgress={handleVideoProgress}
+                                        onPercentChange={setVideoPercent}
+                                        courseType={course.type}
+                                        lessonType={currentLesson?.type}
+                                        serverPlaylist={
+                                            currentLesson?.type === 'TEXT'
+                                                ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }]
+                                                : undefined
+                                        }
+                                    />
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     {!isMobile && (
                         <div className="p-5 flex-1 flex flex-col gap-4 min-h-0 overflow-hidden w-full max-w-5xl">
-                            <div className="shrink-0">
-                                <h2 className="text-lg font-bold text-white">{currentLesson?.title}</h2>
+                            <div className="shrink-0 flex flex-col gap-1">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-lg font-bold text-white truncate">{currentLesson?.title}</h2>
+                                    <button
+                                        onClick={() => setVideoHidden(v => !v)}
+                                        className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                                        style={videoHidden
+                                            ? { backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316', borderColor: 'rgba(249,115,22,0.4)' }
+                                            : { backgroundColor: 'rgba(255,255,255,0.05)', color: '#a1a1aa', borderColor: 'rgba(255,255,255,0.1)' }
+                                        }
+                                        title={videoHidden ? 'Hiện khung video' : 'Ẩn khung video'}
+                                    >
+                                        {videoHidden ? '▶ Hiện video' : '⊟ Ẩn video'}
+                                    </button>
+                                </div>
                                 {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
                                 {currentLesson?.type === 'ALL' ? (
-                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
+                                    <div className="text-zinc-400 text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
                                 ) : currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
-                                    <div className="text-zinc-400 mt-1 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
+                                    <div className="text-zinc-400 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
                                 )}
                             </div>
-                            <div className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden">
+                            <div
+                                className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden"
+                                onMouseEnter={() => setChatHovered(true)}
+                                onMouseLeave={() => setChatHovered(false)}
+                            >
                                 <ChatSection lessonId={currentLessonId!} session={session} />
                             </div>
                         </div>

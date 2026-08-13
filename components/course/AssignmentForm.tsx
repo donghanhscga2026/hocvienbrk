@@ -51,7 +51,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
                         <p className="text-brk-muted mt-1">Xem &gt;50% <span className="text-brk-accent">(+1đ)</span>, Xem hết <span className="text-brk-accent">(+2đ)</span>.</p>
                     </div>
                     <div>
-                        <p className="font-bold text-brk-accent">2. Bài học Tâm đắc Ngộ (Max 2đ)</p>
+                        <p className="font-bold text-brk-accent">2. Bài tập/Bài học theo yêu cầu (Max 2đ)</p>
                         <p className="text-brk-muted mt-1">Có chia sẻ <span className="text-brk-accent">(+1đ)</span>, Sâu sắc (dài hơn 50 ký tự) <span className="text-brk-accent">(+1đ)</span>.</p>
                     </div>
                     <div>
@@ -111,7 +111,13 @@ function AssignmentForm({
             : ["", "", ""]
     )
     const [supports, setSupports] = useState<boolean[]>(initialData?.assignment?.supports || [false, false])
-    
+    // [EXPAND] Ô "Bồi Nhân": hover (desktop) hoặc đang edit (mọi thiết bị) thì mở
+    // rộng thành overlay 90vh để soạn thảo dễ hơn, rời chuột + mất focus thì thu lại.
+    const [reflectionHovering, setReflectionHovering] = useState(false)
+    const [reflectionFocused, setReflectionFocused] = useState(false)
+    const reflectionExpanded = reflectionHovering || reflectionFocused
+    const reflectionTextareaRef = useRef<HTMLTextAreaElement>(null)
+
     // Refs
     const isDirtyRef = useRef(false)
     const initialRenderRef = useRef(true)
@@ -123,11 +129,11 @@ function AssignmentForm({
 
     const saveDraft = useCallback(async () => {
         if (isCompleted) return
-        
+
         const hasData = reflection.trim() || links.some(l => l.trim()) || supports.some(s => s)
         if (hasData) {
             const draftData = { reflection, links, supports }
-            
+
             try {
                 await saveAssignmentDraftAction({
                     enrollmentId: initialData?.enrollmentId,
@@ -215,7 +221,7 @@ function AssignmentForm({
             if (isNowOnTime) return 1
             return existingScores.timing ?? -1
         }
-        
+
         return isNowOnTime ? 1 : -1
     }, [deadline, isCompleted, existingScores.timing])
 
@@ -235,14 +241,14 @@ function AssignmentForm({
         try {
             // Lấy múi giờ hiện tại của thiết bị thành viên
             const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
-            
-            const result = await onSubmit({ 
-                reflection, 
-                links, 
+
+            const result = await onSubmit({
+                reflection,
+                links,
                 supports,
                 clientTimeZone // Gửi kèm múi giờ về server
             }, isUpdate)
-            
+
             if (result?.success) {
                 isDirtyRef.current = false
                 if (onFormDataChange && !isUpdate) {
@@ -312,14 +318,39 @@ function AssignmentForm({
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
-                    <SectionHead num={2} label="Bồi Nhân = Bài học Tâm đắc Ngộ (2đ)" max={2} current={refScore} />
-                    <textarea
-                        value={reflection}
-                        onChange={e => setReflection(e.target.value)}
-                        placeholder="Điều bạn tâm đắc ngộ được từ bài học hôm nay..."
-                        rows={3}
-                        className="w-full text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300"
-                    />
+                    <SectionHead num={2} label="Bồi Nhân = Bài tập/Bài học theo yêu cầu (2đ)" max={2} current={refScore} />
+                    {reflectionExpanded && (
+                        <div
+                            className="fixed inset-0 z-40 bg-black/50"
+                            onClick={() => {
+                                reflectionTextareaRef.current?.blur()
+                                setReflectionHovering(false)
+                                setReflectionFocused(false)
+                            }}
+                        />
+                    )}
+                    <div
+                        onMouseEnter={() => setReflectionHovering(true)}
+                        onMouseLeave={() => setReflectionHovering(false)}
+                        className={reflectionExpanded
+                            ? 'fixed left-1/2 top-[5vh] -translate-x-1/2 z-50 w-[92vw] max-w-2xl h-[90vh]'
+                            : ''
+                        }
+                    >
+                        <textarea
+                            ref={reflectionTextareaRef}
+                            value={reflection}
+                            onChange={e => setReflection(e.target.value)}
+                            onFocus={() => setReflectionFocused(true)}
+                            onBlur={() => setReflectionFocused(false)}
+                            placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
+                            rows={3}
+                            className={reflectionExpanded
+                                ? 'w-full h-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
+                                : 'w-full bg-white text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
+                            }
+                        />
+                    </div>
                     <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>
                 </div>
 

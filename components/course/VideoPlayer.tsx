@@ -156,6 +156,22 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
 
     useEffect(() => { setIsMounted(true) }, [])
 
+    // [FIX] YouTube IFrame API ném DOMException TimeoutError ("The operation was
+    // aborted due to timeout") từ script nội bộ của youtube.com khi iframe bị gỡ
+    // (chuyển bài học, bấm "Ẩn video"...) ngay giữa lúc đang handshake postMessage
+    // để xác nhận player "ready". Đây là lỗi vô hại, không có API chính thức để hủy
+    // handshake đó, nên ta nuốt riêng lỗi này để tránh log nhiễu / vỡ overlay dev.
+    useEffect(() => {
+        const swallowYouTubeTimeout = (e: PromiseRejectionEvent) => {
+            const reason = e.reason
+            if (reason instanceof DOMException && reason.name === 'TimeoutError') {
+                e.preventDefault()
+            }
+        }
+        window.addEventListener('unhandledrejection', swallowYouTubeTimeout)
+        return () => window.removeEventListener('unhandledrejection', swallowYouTubeTimeout)
+    }, [])
+
     useEffect(() => {
         const handleEsc = (e: KeyboardEvent) => {
             if (e.key === 'Escape') setIsFullscreen(false)
@@ -314,9 +330,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         const source = currentItem.source || detectVideoSource(currentItem.url)
 
         let cleanup: (() => void) | undefined
+        // [FIX] Cờ hủy: nếu effect này đã cleanup (đổi bài / unmount) trước khi
+        // script YouTube API kịp tải xong và gọi onYouTubeIframeAPIReady, không
+        // được khởi tạo player nữa — tránh tạo player "mồ côi" trên container đã
+        // gỡ, một trong các nguyên nhân gây race condition dẫn tới TimeoutError.
+        let cancelled = false
 
         if (source.platform === 'youtube') {
             const doInit = () => {
+                if (cancelled) return
                 if (cleanup) cleanup()
                 cleanup = initYouTubePlayer(currentItem)
             }
@@ -339,12 +361,17 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         }
 
         return () => {
+            cancelled = true
             if (saveIntervalRef.current) {
                 clearInterval(saveIntervalRef.current)
                 saveIntervalRef.current = null
             }
             if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-                playerRef.current.destroy()
+                try {
+                    playerRef.current.destroy()
+                } catch {
+                    // destroy() có thể ném lỗi nếu player chưa kịp "ready" — bỏ qua.
+                }
             }
             playerRef.current = null
             if (cleanup) cleanup()

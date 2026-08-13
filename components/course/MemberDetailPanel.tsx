@@ -55,7 +55,7 @@ export default function MemberDetailPanel({ member, onClose }: {
                         <div className="text-2xl font-black text-violet-700">
                             {member.completionPercent === null ? '—' : `${member.completionPercent}%`}
                         </div>
-                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Hoàn thành tính đến hết hôm qua</div>
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Đúng hạn tính đến hết hôm qua</div>
                     </div>
                     <div className="h-8 w-px bg-violet-200" />
                     <div>
