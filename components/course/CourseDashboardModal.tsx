@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useState } from 'react'
 import { Loader2, X, LayoutDashboard, Users, Rss } from 'lucide-react'
 import { getCourseMemberRosterAction } from '@/app/actions/admin-actions'
 import MemberRosterPanel, { RosterMember, CourseMemberLabels } from './MemberRosterPanel'
@@ -16,12 +16,31 @@ const TABS: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { key: 'feed', label: 'Nhật ký hoạt động', icon: Rss },
 ]
 
-export default function CourseDashboardModal({ courseId, courseName, onClose }: {
+export type MembersTabContext = {
+    courseId: number
+    courseName: string
+    members: RosterMember[]
+    labels: CourseMemberLabels
+    canViewPhone: boolean
+    dayOrders: number[]
+    reload: () => void
+}
+
+/**
+ * Khung Dashboard dùng chung cho mọi nơi cần mở "xem thành viên + thống kê"
+ * của 1 khóa học (trang khóa học công khai, trang quản trị...). Tab "Thành
+ * viên" mặc định là bảng đọc-only (MemberRosterPanel); nơi gọi cần thêm
+ * quyền chỉnh sửa (như trang quản trị) truyền `renderMembersTab` để thay
+ * bằng nội dung riêng, dùng chung đúng 1 lần fetch roster + khung modal.
+ */
+export default function CourseDashboardModal({ courseId, courseName, onClose, renderMembersTab }: {
     courseId: number
     courseName: string
     onClose: () => void
+    renderMembersTab?: (ctx: MembersTabContext) => ReactNode
 }) {
     const [tab, setTab] = useState<Tab>('overview')
+    const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['overview']))
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [members, setMembers] = useState<RosterMember[]>([])
@@ -29,23 +48,31 @@ export default function CourseDashboardModal({ courseId, courseName, onClose }: 
     const [lessons, setLessons] = useState<Lesson[]>([])
     const [canViewPhone, setCanViewPhone] = useState(false)
 
-    useEffect(() => {
-        let cancelled = false
+    const load = useCallback(() => {
         setLoading(true)
-        getCourseMemberRosterAction(courseId).then(res => {
-            if (cancelled) return
+        return getCourseMemberRosterAction(courseId).then(res => {
             if (res.success) {
                 setMembers((res.members as any[]) || [])
                 setLabels((res.labels as CourseMemberLabels) || {})
                 setLessons((res.lessons as any[]) || [])
                 setCanViewPhone(!!res.canViewPhone)
+                setError(null)
             } else {
                 setError(res.error || 'Có lỗi xảy ra khi tải dữ liệu khóa học')
             }
             setLoading(false)
         })
-        return () => { cancelled = true }
     }, [courseId])
+
+    useEffect(() => { load() }, [load])
+
+    // Giữ nguyên các tab đã mở trong DOM (chỉ ẩn/hiện bằng display) thay vì
+    // unmount khi chuyển tab — tránh mất trạng thái đang chỉnh dở (ví dụ chế
+    // độ SS + các thay đổi Team/Group chưa lưu ở tab Thành viên).
+    const selectTab = (t: Tab) => {
+        setTab(t)
+        setVisitedTabs(prev => (prev.has(t) ? prev : new Set(prev).add(t)))
+    }
 
     const dayOrders = lessons.map(l => l.order)
 
@@ -74,7 +101,7 @@ export default function CourseDashboardModal({ courseId, courseName, onClose }: 
                             <button
                                 key={t.key}
                                 type="button"
-                                onClick={() => setTab(t.key)}
+                                onClick={() => selectTab(t.key)}
                                 className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg transition-colors ${tab === t.key ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-600'}`}
                             >
                                 <Icon className="w-3.5 h-3.5" />
@@ -90,12 +117,26 @@ export default function CourseDashboardModal({ courseId, courseName, onClose }: 
                     </div>
                 ) : error ? (
                     <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">{error}</div>
-                ) : tab === 'overview' ? (
-                    <CourseStatsTab members={members} lessons={lessons} />
-                ) : tab === 'members' ? (
-                    <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} dayOrders={dayOrders} />
                 ) : (
-                    <CourseActivityFeedTab courseId={courseId} />
+                    <>
+                        {visitedTabs.has('overview') && (
+                            <div style={{ display: tab === 'overview' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
+                                <CourseStatsTab members={members} lessons={lessons} />
+                            </div>
+                        )}
+                        {visitedTabs.has('members') && (
+                            <div style={{ display: tab === 'members' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
+                                {renderMembersTab
+                                    ? renderMembersTab({ courseId, courseName, members, labels, canViewPhone, dayOrders, reload: load })
+                                    : <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} dayOrders={dayOrders} />}
+                            </div>
+                        )}
+                        {visitedTabs.has('feed') && (
+                            <div style={{ display: tab === 'feed' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
+                                <CourseActivityFeedTab courseId={courseId} />
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

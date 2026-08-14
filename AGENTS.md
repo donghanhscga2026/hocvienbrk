@@ -143,6 +143,46 @@
   - Text branding in hoa đặc biệt do user yêu cầu rõ ràng
 - Nếu cần nhấn mạnh → dùng **Markdown bold** (`**...**`) hoặc CSS, KHÔNG dùng viết hoa toàn bộ.
 
+### 13. XÁC MINH CONVENTION DỮ LIỆU TRƯỚC KHI TÍNH TOÁN GIỜ/NGÀY
+> Trước khi viết bất kỳ công thức tính giờ/ngày/deadline nào, bắt buộc phải xác định rõ **giá trị đầu vào đang ở dạng nào** bằng cách đọc code lưu giá trị đó.
+
+**Bắt buộc hỏi:** "Giá trị này được lưu bởi code nào? `new Date(string)`, `new Date()`, hay cách khác?"
+
+| Cách lưu | Ý nghĩa thực | Cần quy đổi thêm? |
+|---|---|---|
+| `new Date("2026-08-12")` | UTC midnight — nhãn ngày thuần, không phải thời điểm vật lý | ❌ Không — đã đúng, dùng thẳng |
+| `new Date()` | Thời điểm UTC thực tại | ✅ Cần quy đổi nếu muốn giờ địa phương |
+
+**Cấm tuyệt đối:** Áp dụng công thức quy đổi múi giờ lên giá trị đã được quy đổi rồi (cộng offset 2 lần) — dù logic từng bước trông đúng khi đọc riêng lẻ.
+
+**Nguồn gốc quy tắc:** Sự cố 2026-08-14 — công thức mới tính deadline lệch -7 tiếng vì quy đổi `Enrollment.startedAt` (vốn đã là UTC midnight nhãn ngày VN) thêm 1 lần nữa, khiến 4 học viên bị trừ điểm oan dù nộp đúng hạn.
+
+### 14. VERIFY 2 CHIỀU KHI SỬA CÔNG THỨC ĐIỂM/HẠN
+> Khi sửa công thức tính deadline, timingScore, hoặc bất kỳ hàm nào ảnh hưởng điểm số — phải kiểm chứng **cả 2 chiều trái ngược nhau**, không chỉ 1 chiều.
+
+**Bắt buộc kiểm tra đủ 2 case:**
+- ✅ Người nộp **trễ thật** → phải bị trừ điểm (`timingScore = -1`)
+- ✅ Người nộp **đúng hạn thật** (kể cả sát 23:59) → **không bị trừ oan** (`timingScore = 1`)
+
+**Quy trình verify bắt buộc:**
+1. Lấy ít nhất 1 case "đúng hạn" thật từ DB (nộp trước 23:59 VN cùng ngày deadline)
+2. Lấy ít nhất 1 case "trễ hạn" thật từ DB (nộp sau 23:59 VN)
+3. Chạy cả 2 qua công thức mới → kiểm tra output khớp với thực tế đã biết
+4. Nếu không có data thật → tạo mock timestamp sát 23:58 và 00:01 hôm sau rồi assert
+
+**Cấm:** Chỉ verify 1 chiều rồi kết luận công thức đúng. Lỗi kiểu này luôn vô hình khi chỉ test 1 phía.
+
+### 15. KHÔNG VIẾT LẠI CÔNG THỨC ĐÃ XÁC MINH MÀ KHÔNG CÓ TEST TƯƠNG ĐƯƠNG
+> Nếu công thức cũ đã được xác minh đúng qua dữ liệu thật, khi viết lại công thức mới phải chứng minh kết quả khớp với **cùng bộ data đó** trước khi thay thế — không chỉ suy luận tay rồi tin ngay.
+
+**Quy trình bắt buộc khi thay thế công thức đã hoạt động:**
+1. Ghi lại bộ data mẫu cụ thể mà công thức cũ đã cho kết quả đúng (input + expected output)
+2. Chạy công thức mới qua **cùng bộ data đó**
+3. So sánh output — phải khớp 100% mới được thay thế
+4. Nếu không có bộ data mẫu → lấy từ DB thật trước khi viết lại
+
+**Lý do:** Mục tiêu sửa (ví dụ: lấy startedAt từ DB thay vì tin client) và công thức tính là 2 thứ độc lập. Sửa đúng mục tiêu không đảm bảo công thức mới viết kèm theo là đúng.
+
 ---
 
 ## 🟡 QUY TRÌNH LÀM VIỆC (MANDATORY)

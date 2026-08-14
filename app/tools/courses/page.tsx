@@ -1,16 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction, getCourseMembersAction, getCourseMemberRosterAction, updateCourseMemberAssignmentsAction, updateCourseMemberLabelAction, exportCourseMembersAction } from '@/app/actions/admin-actions'
-import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Minus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette, AlertTriangle, FileSpreadsheet, ImageDown } from 'lucide-react'
+import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
+import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
-import MemberDayChips, { DayStatus } from '@/components/course/MemberDayChips'
-import MemberDetailPanel from '@/components/course/MemberDetailPanel'
-import { downloadRosterAsImage } from '@/lib/course/export-roster-image'
-
-const RECENT_DAYS = 7
+import CourseDashboardModal from '@/components/course/CourseDashboardModal'
+import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
 
 export default function ToolsCoursesPage() {
     const [activeTab, setActiveTab] = useState<'courses' | 'categories'>('courses')
@@ -41,165 +38,6 @@ export default function ToolsCoursesPage() {
     )
 }
 
-const TEAM_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-type CourseMemberLabels = { teams?: Record<string, string>; groups?: Record<string, string> }
-
-function teamLabel(team: number, labels?: CourseMemberLabels) {
-    const custom = labels?.teams?.[String(team)]
-    if (custom) return custom
-    return team >= 1 && team <= 26 ? `Team ${TEAM_LETTERS[team - 1]}` : `Team ${team}`
-}
-
-function groupLabel(team: number, group: number, labels?: CourseMemberLabels) {
-    return labels?.groups?.[`${team}:${group}`] || `Group ${group}`
-}
-
-function localPhone(phone: string | null | undefined) {
-    if (!phone) return null
-    return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
-}
-
-type CardDisplayToggles = { role: boolean; code: boolean; phone: boolean }
-
-function MemberCard({ member, dirty, effective, onChange, ssMode, phone, days, completionPercent, display, onSelect }: {
-    member: any
-    dirty: boolean
-    effective: { memberRole: 'TV' | 'PS'; team: number; group: number }
-    onChange: (patch: Partial<{ memberRole: 'TV' | 'PS'; team: number; group: number }>) => void
-    ssMode: boolean
-    phone?: string | null
-    days?: { order: number; status: DayStatus }[]
-    completionPercent?: number | null
-    display: CardDisplayToggles
-    onSelect: () => void
-}) {
-    const isPS = effective.memberRole === 'PS'
-    return (
-        <div className={`rounded-xl border p-2 space-y-1 transition-all ${dirty ? 'border-yellow-400 ring-2 ring-yellow-200 bg-yellow-50' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
-            {/* Dòng 1: TV | Mã | SĐT | T | G (Team/Group chỉ hiện khi bật chế độ SS) */}
-            <div className="flex items-center gap-0.5 flex-wrap">
-                {display.role && (
-                    <button
-                        type="button"
-                        onClick={() => onChange({ memberRole: isPS ? 'TV' : 'PS' })}
-                        className={`px-1 py-0.5 rounded text-[9px] font-black shrink-0 transition-colors ${isPS ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}
-                        title={isPS ? 'Phụng sự — bấm để đổi thành Thành viên' : 'Thành viên — bấm để đổi thành Phụng sự'}
-                    >
-                        {effective.memberRole}
-                    </button>
-                )}
-                {display.code && (
-                    <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-50 px-1 py-0.5 rounded shrink-0">
-                        #{member.user.id}
-                    </span>
-                )}
-                {display.phone && phone && (
-                    <span className="text-[9px] font-mono text-gray-500 shrink-0">{localPhone(phone)}</span>
-                )}
-                {ssMode && (
-                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden shrink-0">
-                        <button type="button" onClick={() => onChange({ team: Math.max(1, effective.team - 1) })}
-                            className="w-3 h-4 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100">
-                            <Minus className="w-2 h-2" />
-                        </button>
-                        <span className="text-[8px] font-black text-gray-600 px-0.5 min-w-[14px] text-center">T{effective.team}</span>
-                        <button type="button" onClick={() => onChange({ team: effective.team + 1 })}
-                            className="w-3 h-4 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100">
-                            <Plus className="w-2 h-2" />
-                        </button>
-                    </div>
-                )}
-                {ssMode && !isPS && (
-                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded overflow-hidden shrink-0">
-                        <button type="button" onClick={() => onChange({ group: Math.max(1, effective.group - 1) })}
-                            className="w-3 h-4 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100">
-                            <Minus className="w-2 h-2" />
-                        </button>
-                        <span className="text-[8px] font-black text-gray-600 px-0.5 min-w-[14px] text-center">G{effective.group}</span>
-                        <button type="button" onClick={() => onChange({ group: effective.group + 1 })}
-                            className="w-3 h-4 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100">
-                            <Plus className="w-2 h-2" />
-                        </button>
-                    </div>
-                )}
-            </div>
-            {/* Dòng 2: Họ tên + % hoàn thành — bấm để xem chi tiết đủ số ngày */}
-            <button
-                type="button"
-                onClick={onSelect}
-                className="w-full flex items-center justify-between gap-1 text-left hover:underline decoration-dashed underline-offset-2"
-                title="Xem chi tiết toàn bộ tiến độ"
-            >
-                <span className="text-xs font-bold text-gray-700 truncate" title={member.user.name || 'Chưa có tên'}>
-                    {member.user.name || 'Chưa có tên'}
-                </span>
-                <span className="text-[10px] font-black text-violet-600 shrink-0">
-                    {completionPercent == null ? '—' : `${completionPercent}%`}
-                </span>
-            </button>
-            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất */}
-            {days && days.length > 0 && <MemberDayChips days={days.slice(-RECENT_DAYS)} />}
-        </div>
-    )
-}
-
-function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-    return (
-        <label className="flex items-center gap-1 cursor-pointer select-none shrink-0">
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={e => onChange(e.target.checked)}
-                className="rounded border-gray-300 accent-violet-600 cursor-pointer w-3.5 h-3.5"
-            />
-            <span className="text-[10px] font-bold text-gray-500">{label}</span>
-        </label>
-    )
-}
-
-function EditableLabel({ value, onSave, className, inputClassName }: {
-    value: string
-    onSave: (name: string) => void
-    className?: string
-    inputClassName?: string
-}) {
-    const [editing, setEditing] = useState(false)
-    const [draft, setDraft] = useState(value)
-
-    if (editing) {
-        return (
-            <input
-                autoFocus
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onFocus={e => e.currentTarget.select()}
-                onBlur={() => {
-                    setEditing(false)
-                    const trimmed = draft.trim()
-                    if (trimmed && trimmed !== value) onSave(trimmed)
-                    else setDraft(value)
-                }}
-                onKeyDown={e => {
-                    if (e.key === 'Enter') e.currentTarget.blur()
-                    if (e.key === 'Escape') { setDraft(value); setEditing(false) }
-                }}
-                className={inputClassName || 'bg-white border border-violet-300 rounded px-1 py-0.5 text-xs font-black text-violet-700 outline-none'}
-                style={{ width: `${Math.max(draft.length + 1, 5)}ch` }}
-            />
-        )
-    }
-    return (
-        <button
-            type="button"
-            onClick={() => { setDraft(value); setEditing(true) }}
-            className={className || 'hover:underline decoration-dashed underline-offset-2'}
-            title="Bấm để đổi tên"
-        >
-            {value}
-        </button>
-    )
-}
-
 function CoursesTab() {
     const [courses, setCourses] = useState<any[]>([])
     const [coursePages, setCoursePages] = useState<any[]>([])
@@ -210,18 +48,6 @@ function CoursesTab() {
     const [batchLoading, setBatchLoading] = useState(false)
 
     const [viewStudents, setViewStudents] = useState<{ courseId: number; courseName: string } | null>(null)
-    const [members, setMembers] = useState<any[]>([])
-    const [memberLabels, setMemberLabels] = useState<CourseMemberLabels>({})
-    const [roster, setRoster] = useState<Record<number, { phone: string | null; days: { order: number; status: DayStatus }[]; completionPercent: number | null }>>({})
-    const [dayOrders, setDayOrders] = useState<number[]>([])
-    const [selectedMember, setSelectedMember] = useState<any | null>(null)
-    const [studentsLoading, setStudentsLoading] = useState(false)
-    const [exportingStudents, setExportingStudents] = useState(false)
-    const [exportingImage, setExportingImage] = useState(false)
-    const [editedMembers, setEditedMembers] = useState<Record<number, { memberRole: 'TV' | 'PS'; team: number; group: number }>>({})
-    const [savingAssignments, setSavingAssignments] = useState(false)
-    const [ssMode, setSsMode] = useState(false)
-    const [cardDisplay, setCardDisplay] = useState<CardDisplayToggles>({ role: true, code: true, phone: true })
 
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ACTIVE')
@@ -338,31 +164,6 @@ function CoursesTab() {
         })
     }, [courses, search, filterStatus, filterCategory, filterTeacher])
 
-    const hasCustomAssignment = useMemo(() => {
-        return members.some((m: any) => m.memberRole === 'PS' || m.team !== 1 || m.group !== 1)
-    }, [members])
-
-    const groupedByTeam = useMemo(() => {
-        const map = new Map<number, { ps: any[]; groups: Map<number, any[]> }>()
-        members.forEach((m: any) => {
-            if (!map.has(m.team)) map.set(m.team, { ps: [], groups: new Map() })
-            const bucket = map.get(m.team)!
-            if (m.memberRole === 'PS') {
-                bucket.ps.push(m)
-            } else {
-                if (!bucket.groups.has(m.group)) bucket.groups.set(m.group, [])
-                bucket.groups.get(m.group)!.push(m)
-            }
-        })
-        return Array.from(map.entries())
-            .sort((a, b) => a[0] - b[0])
-            .map(([team, bucket]) => ({
-                team,
-                ps: bucket.ps,
-                groups: Array.from(bucket.groups.entries()).sort((a, b) => a[0] - b[0])
-            }))
-    }, [members])
-
     const toggleSelect = (id: number) => {
         setSelectedIds(prev => {
             const next = new Set(prev)
@@ -401,143 +202,8 @@ function CoursesTab() {
         }
     }
 
-    const loadMembers = async (courseId: number) => {
-        setStudentsLoading(true)
-        try {
-            const [res, rosterRes] = await Promise.all([
-                getCourseMembersAction(courseId),
-                getCourseMemberRosterAction(courseId),
-            ])
-            if (res.success) {
-                setMembers(res.members || [])
-                setMemberLabels((res.labels as CourseMemberLabels) || {})
-            } else {
-                alert(res.error || 'Có lỗi xảy ra khi tải danh sách thành viên')
-            }
-            if (rosterRes.success) {
-                const map: Record<number, { phone: string | null; days: { order: number; status: DayStatus }[]; completionPercent: number | null }> = {}
-                for (const m of (rosterRes.members as any[]) || []) {
-                    map[m.id] = { phone: m.user?.phone ?? null, days: m.days || [], completionPercent: m.completionPercent ?? null }
-                }
-                setRoster(map)
-                setDayOrders(((rosterRes.lessons as any[]) || []).map(l => l.order))
-            } else {
-                setRoster({})
-                setDayOrders([])
-            }
-        } catch {}
-        setStudentsLoading(false)
-    }
-
-    const handleViewStudents = async (courseId: number, courseName: string) => {
+    const handleViewStudents = (courseId: number, courseName: string) => {
         setViewStudents({ courseId, courseName })
-        setMembers([])
-        setMemberLabels({})
-        setRoster({})
-        setDayOrders([])
-        setEditedMembers({})
-        setSsMode(false)
-        setSelectedMember(null)
-        await loadMembers(courseId)
-    }
-
-    const handleExportImage = () => {
-        if (!viewStudents || members.length === 0) return
-        setExportingImage(true)
-        try {
-            const sorted = [...members].sort((a, b) => {
-                if (a.team !== b.team) return a.team - b.team
-                if (a.memberRole !== b.memberRole) return a.memberRole === 'PS' ? -1 : 1
-                if (a.group !== b.group) return a.group - b.group
-                return a.id - b.id
-            })
-            const rows = sorted.map((m, idx) => ({
-                stt: idx + 1,
-                name: m.user.name || '',
-                code: m.user.id,
-                teamText: teamLabel(m.team, memberLabels),
-                groupText: m.memberRole === 'PS' ? '—' : groupLabel(m.team, m.group, memberLabels),
-                isPS: m.memberRole === 'PS',
-                days: roster[m.id]?.days || [],
-            }))
-            downloadRosterAsImage(viewStudents.courseName, rows, dayOrders)
-        } finally {
-            setExportingImage(false)
-        }
-    }
-
-    const handleSaveLabel = async (kind: 'team' | 'group', team: number, group: number | null, name: string) => {
-        if (!viewStudents) return
-        const prevLabels = memberLabels
-        setMemberLabels(prev => {
-            const next: CourseMemberLabels = { teams: { ...prev.teams }, groups: { ...prev.groups } }
-            if (kind === 'team') next.teams![String(team)] = name
-            else next.groups![`${team}:${group}`] = name
-            return next
-        })
-        const res = await updateCourseMemberLabelAction(viewStudents.courseId, kind, team, group, name)
-        if (!res.success) {
-            setMemberLabels(prevLabels)
-            alert(res.error || 'Có lỗi xảy ra khi đổi tên')
-        }
-    }
-
-    const handleMemberChange = (enrollmentId: number, base: { memberRole: 'TV' | 'PS'; team: number; group: number }, patch: Partial<{ memberRole: 'TV' | 'PS'; team: number; group: number }>) => {
-        setEditedMembers(prev => {
-            const current = prev[enrollmentId] ?? base
-            const next = { ...current, ...patch }
-            const rest = { ...prev }
-            if (next.memberRole === base.memberRole && next.team === base.team && next.group === base.group) {
-                delete rest[enrollmentId]
-            } else {
-                rest[enrollmentId] = next
-            }
-            return rest
-        })
-    }
-
-    const handleSaveAssignments = async () => {
-        if (!viewStudents) return
-        const updates = Object.entries(editedMembers).map(([enrollmentId, v]) => ({ enrollmentId: Number(enrollmentId), ...v }))
-        if (updates.length === 0) return
-        setSavingAssignments(true)
-        try {
-            const res = await updateCourseMemberAssignmentsAction(viewStudents.courseId, updates)
-            if (res.success) {
-                setEditedMembers({})
-                await loadMembers(viewStudents.courseId)
-            } else {
-                alert(res.error || 'Có lỗi xảy ra khi cập nhật')
-            }
-        } catch {
-            alert('Có lỗi xảy ra khi cập nhật')
-        }
-        setSavingAssignments(false)
-    }
-
-    const handleExportStudents = async () => {
-        if (!viewStudents) return
-        setExportingStudents(true)
-        try {
-            const res = await exportCourseMembersAction(viewStudents.courseId, viewStudents.courseName)
-            if (res.success && res.sheetUrl) {
-                window.open(res.sheetUrl, '_blank')
-            } else if (res.success && res.csvContent) {
-                const blob = new Blob([res.csvContent], { type: 'text/csv;charset=utf-8;' })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `${res.fileName || 'thanh-vien'}.csv`
-                a.click()
-                URL.revokeObjectURL(url)
-                alert('Không tạo được Google Sheet, đã tải file CSV thay thế.')
-            } else {
-                alert(res.error || 'Lỗi xuất danh sách')
-            }
-        } catch {
-            alert('Lỗi xuất danh sách')
-        }
-        setExportingStudents(false)
     }
 
     const handleBulkOptionsApply = async () => {
@@ -842,176 +508,23 @@ function CoursesTab() {
                 </div>
             )}
 
-            {viewStudents && (() => {
-                const pendingCount = Object.keys(editedMembers).length
-                const cardGridClass = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2"
-                const renderCard = (m: any) => {
-                    const base = { memberRole: m.memberRole, team: m.team, group: m.group }
-                    const effective = editedMembers[m.id] ?? base
-                    return (
-                        <MemberCard
-                            key={m.id}
-                            member={m}
-                            effective={effective}
-                            dirty={!!editedMembers[m.id]}
-                            onChange={(patch) => handleMemberChange(m.id, base, patch)}
-                            ssMode={ssMode}
-                            phone={roster[m.id]?.phone}
-                            days={roster[m.id]?.days}
-                            completionPercent={roster[m.id]?.completionPercent}
-                            display={cardDisplay}
-                            onSelect={() => setSelectedMember(m)}
+            {viewStudents && (
+                <CourseDashboardModal
+                    courseId={viewStudents.courseId}
+                    courseName={viewStudents.courseName}
+                    onClose={() => setViewStudents(null)}
+                    renderMembersTab={(ctx) => (
+                        <AdminMemberRosterTab
+                            courseId={ctx.courseId}
+                            courseName={ctx.courseName}
+                            members={ctx.members}
+                            labels={ctx.labels}
+                            dayOrders={ctx.dayOrders}
+                            reload={ctx.reload}
                         />
-                    )
-                }
-                return (
-                <>
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
-                    onClick={() => setViewStudents(null)}
-                >
-                    <div
-                        className="bg-white w-[95vw] h-[85vh] max-w-[1600px] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white shrink-0">
-                            <h2 className="font-bold text-sm">Thành viên — {viewStudents!.courseName}</h2>
-                            <button onClick={() => setViewStudents(null)} className="p-1 rounded-lg hover:bg-white/20">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                            {studentsLoading ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-                                </div>
-                            ) : members.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 text-sm">Không có thành viên nào</div>
-                            ) : !hasCustomAssignment ? (
-                                <div className={`${cardGridClass} p-4`}>
-                                    {members.map(renderCard)}
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-gray-100">
-                                    {groupedByTeam.map(({ team, ps, groups }) => (
-                                        <div key={team}>
-                                            <div className="bg-violet-50 border-y border-violet-100 px-4 py-2 flex items-center gap-2 flex-wrap">
-                                                <EditableLabel
-                                                    value={teamLabel(team, memberLabels)}
-                                                    onSave={(name) => handleSaveLabel('team', team, null, name)}
-                                                    className="text-xs font-black text-violet-700 shrink-0 hover:underline decoration-dashed underline-offset-2"
-                                                />
-                                                {ps.length > 0 ? (
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[10px] font-bold text-violet-500 shrink-0">Phụng sự:</span>
-                                                        {ps.map(renderCard)}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-[10px] text-amber-600 font-bold flex items-center gap-1">
-                                                        <AlertTriangle className="w-3 h-3" /> Chưa có phụng sự
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {groups.map(([groupNum, groupMembers]) => (
-                                                <div key={groupNum} className="px-4 py-3">
-                                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-1 pb-1.5 flex items-center gap-1.5">
-                                                        <EditableLabel
-                                                            value={groupLabel(team, groupNum, memberLabels)}
-                                                            onSave={(name) => handleSaveLabel('group', team, groupNum, name)}
-                                                            className="hover:underline decoration-dashed underline-offset-2"
-                                                        />
-                                                        {groupMembers.length < 3 && (
-                                                            <span className="text-amber-600 font-bold normal-case flex items-center gap-0.5">
-                                                                <AlertTriangle className="w-3 h-3" /> {groupMembers.length}/3
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className={cardGridClass}>
-                                                        {groupMembers.map(renderCard)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div className="px-6 py-3 bg-slate-50 border-t shrink-0 flex items-center justify-between gap-3 flex-wrap">
-                            <div className="flex items-center gap-3 flex-wrap">
-                                <span className="text-xs text-gray-500 font-medium shrink-0">
-                                    {members.length} thành viên{pendingCount > 0 ? ` — ${pendingCount} đang chỉnh chưa lưu` : ''}
-                                </span>
-                                <label className="flex items-center gap-1.5 cursor-pointer select-none shrink-0">
-                                    <input
-                                        type="checkbox"
-                                        checked={ssMode}
-                                        onChange={e => setSsMode(e.target.checked)}
-                                        className="rounded border-gray-300 accent-yellow-500 cursor-pointer"
-                                    />
-                                    <span className="text-xs font-bold text-gray-500" title="Sắp xếp Team / Group">SS</span>
-                                </label>
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0 ml-2">Hiển thị:</span>
-                                <ToggleCheckbox checked={cardDisplay.role} onChange={v => setCardDisplay(d => ({ ...d, role: v }))} label="Vai trò" />
-                                <ToggleCheckbox checked={cardDisplay.code} onChange={v => setCardDisplay(d => ({ ...d, code: v }))} label="Mã" />
-                                <ToggleCheckbox checked={cardDisplay.phone} onChange={v => setCardDisplay(d => ({ ...d, phone: v }))} label="SĐT" />
-                            </div>
-
-                            <div className="flex items-center gap-2 ml-auto">
-                                {ssMode && (
-                                    <button
-                                        onClick={handleSaveAssignments}
-                                        disabled={savingAssignments || pendingCount === 0}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-black text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {savingAssignments ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                                        Cập nhật{pendingCount > 0 ? ` (${pendingCount})` : ''}
-                                    </button>
-                                )}
-                                <button
-                                    onClick={handleExportImage}
-                                    disabled={exportingImage || members.length === 0}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Xuất bảng tổng hợp nộp bài ra file ảnh PNG"
-                                >
-                                    {exportingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageDown className="w-3.5 h-3.5" />}
-                                    Xuất ảnh
-                                </button>
-                                <button
-                                    onClick={handleExportStudents}
-                                    disabled={exportingStudents || members.length === 0}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {exportingStudents ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                                    Xuất Google Sheet
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {selectedMember && (
-                    <MemberDetailPanel
-                        member={{
-                            enrollmentId: selectedMember.id,
-                            name: selectedMember.user.name,
-                            code: selectedMember.user.id,
-                            memberRole: (editedMembers[selectedMember.id]?.memberRole ?? selectedMember.memberRole),
-                            teamText: teamLabel(editedMembers[selectedMember.id]?.team ?? selectedMember.team, memberLabels),
-                            groupText: groupLabel(
-                                editedMembers[selectedMember.id]?.team ?? selectedMember.team,
-                                editedMembers[selectedMember.id]?.group ?? selectedMember.group,
-                                memberLabels
-                            ),
-                            phone: roster[selectedMember.id]?.phone,
-                            completionPercent: roster[selectedMember.id]?.completionPercent ?? null,
-                            days: roster[selectedMember.id]?.days || [],
-                        }}
-                        onClose={() => setSelectedMember(null)}
-                    />
-                )}
-                </>
-                )
-            })()}
+                    )}
+                />
+            )}
 
             {showBulkOptions && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
