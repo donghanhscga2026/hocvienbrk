@@ -12,7 +12,7 @@ import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { useRouter } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
-import MemberRosterModal from '@/components/course/MemberRosterModal'
+import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 
 interface CourseLesson {
     id: string
@@ -480,7 +480,7 @@ export default function CourseLandingTemplate({
             )}
 
             {showRoster && (
-                <MemberRosterModal
+                <CourseDashboardModal
                     courseId={course.id}
                     courseName={course.name_lop}
                     onClose={() => setShowRoster(false)}

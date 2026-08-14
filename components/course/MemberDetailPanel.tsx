@@ -97,7 +97,7 @@ function HistoryEntry({ day, highlighted }: { day: HistoryDay; highlighted: bool
             ) : (
                 <>
                     <div className="flex items-center gap-3 text-[11px] text-gray-500 flex-wrap">
-                        <span>Nộp lúc: <span className="font-semibold text-gray-700">{formatDateTime(day.submittedAt)}</span></span>
+                        <span>Nộp lúc: <span className="font-semibold text-gray-700">{formatDateTime(day.submittedAt) || '—'}</span></span>
                         <span>Tổng điểm: <span className="font-semibold text-gray-700">{day.totalScore ?? '—'}/10</span></span>
                     </div>
                     {day.scores && (

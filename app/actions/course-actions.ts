@@ -613,13 +613,15 @@ export async function submitAssignmentAction({
 
                 const isCurrentlyOnTime = nowLocal.getTime() <= deadlineLocal.getTime();
 
-                if (isUpdate) {
-                    timingScore = isCurrentlyOnTime ? 1 : (existingTimingScore ?? -1);
-                } else {
-                    timingScore = isCurrentlyOnTime ? 1 : -1;
-                }
-
-                if (isUpdate && !isCurrentlyOnTime) {
+                if (isCurrentlyOnTime) {
+                    timingScore = 1;
+                } else if (isUpdate) {
+                    // Cập nhật sau hạn: chỉ giữ "đúng hạn" nếu bài GỐC đã từng đạt
+                    // hoàn thành (>=5đ, status COMPLETED) trước hạn — khi đó chặn
+                    // luôn không cho sửa nữa (như cũ). Nếu bài gốc CHƯA đạt (mới
+                    // ghi nhận tạm/chưa hoàn thiện) mà giờ mới hoàn thiện sau hạn,
+                    // tính là nộp muộn — không cho phép ghi nhận trước rồi hoàn
+                    // thiện sau để "giữ" điểm đúng hạn.
                     const existingStatus = await prisma.lessonProgress.findUnique({
                         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
                         select: { status: true }
@@ -627,6 +629,9 @@ export async function submitAssignmentAction({
                     if (existingStatus?.status === 'COMPLETED') {
                         return { success: false, message: "Bài học đã hết hạn cập nhật." }
                     }
+                    timingScore = -1;
+                } else {
+                    timingScore = -1;
                 }
             }
         }

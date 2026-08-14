@@ -811,7 +811,11 @@ async function buildCourseRoster(courseId: number) {
                 activatedAt: true,
                 createdAt: true,
                 user: { select: { id: true, name: true, phone: true } },
-                lessonProgress: { select: { lessonId: true, submittedAt: true, scores: true } }
+                // status: loại RESET vì đó là bài của lộ trình CŨ trước khi
+                // thành viên "Đặt lại lộ trình" (confirmStartDateAction) — vẫn
+                // còn submittedAt/scores trong DB nhưng không thuộc chu kỳ hiện
+                // tại nữa, không được tính là đã nộp.
+                lessonProgress: { select: { lessonId: true, submittedAt: true, scores: true, status: true } }
             },
             orderBy: [{ activatedAt: 'asc' }, { createdAt: 'asc' }]
         })
@@ -820,13 +824,19 @@ async function buildCourseRoster(courseId: number) {
     const todayMid = toVnMidnight(new Date())
 
     const members = enrollments.map(e => {
-        const progressByLesson = new Map(e.lessonProgress.map(p => [p.lessonId, p]))
+        const progressByLesson = new Map(
+            e.lessonProgress.filter(p => p.status !== 'RESET').map(p => [p.lessonId, p])
+        )
         const days = lessons.map(l => {
             const p = progressByLesson.get(l.id)
             let status: DayStatus = 'missing'
             if (p?.submittedAt) {
                 const timing = (p.scores as any)?.timing
                 status = timing === -1 ? 'late' : 'onTime'
+            } else if (p?.status === 'COMPLETED') {
+                // Một số khóa (type NORMAL) tự đánh dấu hoàn thành khi bình luận,
+                // không đi qua submitAssignmentAction nên không có submittedAt.
+                status = 'onTime'
             }
             return { order: l.order, status }
         })
@@ -922,7 +932,7 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
         const [progress, comments] = await Promise.all([
             prisma.lessonProgress.findMany({
                 where: { enrollmentId },
-                select: { lessonId: true, submittedAt: true, totalScore: true, scores: true, assignment: true, maxTime: true, duration: true }
+                select: { lessonId: true, submittedAt: true, totalScore: true, scores: true, assignment: true, maxTime: true, duration: true, status: true }
             }),
             prisma.lessonComment.findMany({
                 where: { userId: enrollment.userId, lessonId: { in: lessonIds } },
@@ -931,7 +941,11 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
             })
         ])
 
-        const progressByLesson = new Map(progress.map(p => [p.lessonId, p]))
+        // Loại bỏ tiến độ của lộ trình CŨ trước khi "Đặt lại lộ trình" — status
+        // RESET vẫn còn submittedAt/scores trong DB nhưng không thuộc chu kỳ
+        // hiện tại. Bình luận vẫn giữ nguyên vì là tương tác độc lập với việc
+        // nộp bài, không bị ảnh hưởng bởi reset.
+        const progressByLesson = new Map(progress.filter(p => p.status !== 'RESET').map(p => [p.lessonId, p]))
         const commentsByLesson = new Map<string, typeof comments>()
         for (const c of comments) {
             if (!commentsByLesson.has(c.lessonId)) commentsByLesson.set(c.lessonId, [])
@@ -944,6 +958,8 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
             if (p?.submittedAt) {
                 const timing = (p.scores as any)?.timing
                 status = timing === -1 ? 'late' : 'onTime'
+            } else if (p?.status === 'COMPLETED') {
+                status = 'onTime'
             }
             const watchPercent = p && p.duration > 0 ? Math.round(Math.min(1, p.maxTime / p.duration) * 100) : null
             // Ngày lịch của "Ngày N" = ngày bắt đầu học riêng của thành viên + (N-1)
@@ -965,6 +981,80 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
         })
 
         return { success: true, days }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Nhật ký hoạt động của cả khóa học (dạng bản tin/timeline) — gộp bình luận
+ * trong bài học và nội dung bài tập đã nộp của TẤT CẢ thành viên, sắp mới
+ * nhất lên đầu. Dùng cho tab "Nhật ký hoạt động" trong dashboard khóa học.
+ * Cùng điều kiện truy cập với getCourseMemberRosterAction.
+ */
+export async function getCourseActivityFeedAction(courseId: number, limit: number = 40) {
+    try {
+        const access = await checkCourseRosterAccess(courseId)
+        if (access.error) return { success: false, error: access.error }
+
+        const take = Math.min(100, Math.max(1, limit))
+
+        const [comments, submissions] = await Promise.all([
+            prisma.lessonComment.findMany({
+                where: { lesson: { courseId } },
+                orderBy: { createdAt: 'desc' },
+                take,
+                select: {
+                    id: true,
+                    content: true,
+                    createdAt: true,
+                    user: { select: { id: true, name: true, image: true } },
+                    lesson: { select: { title: true, order: true } },
+                }
+            }),
+            prisma.lessonProgress.findMany({
+                where: { lesson: { courseId }, submittedAt: { not: null }, status: { not: 'RESET' } },
+                orderBy: { submittedAt: 'desc' },
+                take,
+                select: {
+                    id: true,
+                    submittedAt: true,
+                    totalScore: true,
+                    assignment: true,
+                    enrollment: { select: { user: { select: { id: true, name: true, image: true } } } },
+                    lesson: { select: { title: true, order: true } },
+                }
+            })
+        ])
+
+        const feed = [
+            ...comments.map(c => ({
+                type: 'comment' as const,
+                id: `c-${c.id}`,
+                userId: c.user.id,
+                userName: c.user.name,
+                userImage: c.user.image,
+                lessonOrder: c.lesson.order,
+                lessonTitle: c.lesson.title,
+                createdAt: c.createdAt,
+                content: c.content,
+                totalScore: null as number | null,
+            })),
+            ...submissions.map(s => ({
+                type: 'submission' as const,
+                id: `s-${s.id}`,
+                userId: s.enrollment.user.id,
+                userName: s.enrollment.user.name,
+                userImage: s.enrollment.user.image,
+                lessonOrder: s.lesson.order,
+                lessonTitle: s.lesson.title,
+                createdAt: s.submittedAt as Date,
+                content: (s.assignment as any)?.reflection || '',
+                totalScore: s.totalScore,
+            })),
+        ]
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+            .slice(0, take)
+
+        return { success: true, feed }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 

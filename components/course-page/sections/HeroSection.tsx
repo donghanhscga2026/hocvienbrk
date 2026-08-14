@@ -4,7 +4,7 @@ import React from 'react'
 import Image from 'next/image'
 import { Share2, BookOpen, Clock, Users, ListChecks } from 'lucide-react'
 import { HeroSectionContent } from '@/lib/course-page/types'
-import MemberRosterModal from '@/components/course/MemberRosterModal'
+import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 
 interface HeroSectionProps {
   id: string
@@ -255,7 +255,7 @@ export default function HeroSection({
       </div>
 
       {showRoster && course?.id && (
-        <MemberRosterModal
+        <CourseDashboardModal
           courseId={course.id}
           courseName={course.name_lop || content.title}
           onClose={() => setShowRoster(false)}
