@@ -578,14 +578,12 @@ export async function confirmStartDateAction(courseId: number, date: string | Da
  */
 export async function submitAssignmentAction({
     enrollmentId, lessonId, reflection, links, supports,
-    isUpdate = false, lessonOrder, startedAt,
-    currentMaxTime, currentDuration, existingTimingScore,
-    clientTimeZone = 'Asia/Ho_Chi_Minh' // Mặc định là giờ VN nếu không có
+    isUpdate = false, lessonOrder,
+    currentMaxTime, currentDuration,
 }: {
     enrollmentId: number, lessonId: string, reflection: string, links: string[], supports: boolean[],
-    isUpdate?: boolean, lessonOrder?: number, startedAt?: any,
-    currentMaxTime?: number, currentDuration?: number, existingTimingScore?: number,
-    clientTimeZone?: string
+    isUpdate?: boolean, lessonOrder?: number,
+    currentMaxTime?: number, currentDuration?: number,
 }) {
     const logId = `[SUBMIT-${lessonId}]`
     const __t0 = Date.now() // [PERF-TEST] tạm đo, sẽ xoá sau khi có số liệu
@@ -597,31 +595,58 @@ export async function submitAssignmentAction({
         const now = new Date()
         let timingScore = 0
 
-        // 1. Tính timingScore dựa trên múi giờ địa phương của thành viên
-        if (startedAt && lessonOrder) {
-            const startDate = new Date(startedAt)
-            if (!isNaN(startDate.getTime())) {
-                // Lấy thời điểm hiện tại theo múi giờ thành viên
-                const nowStr = new Date().toLocaleString('en-US', { timeZone: clientTimeZone });
-                const nowLocal = new Date(nowStr);
+        // 1. Lấy startedAt trực tiếp từ DB — không tin giá trị từ client
+        //    để tránh lỗi sai lệch khi client gửi startedAt cũ (trước khi reset)
+        //    hoặc bị giả mạo.
+        if (lessonOrder) {
+            const enrollmentForTiming = await prisma.enrollment.findUnique({
+                where: { id: enrollmentId },
+                select: { startedAt: true }
+            })
+            const startDate = enrollmentForTiming?.startedAt
 
-                // Tạo Deadline theo múi giờ thành viên
-                const deadlineStr = new Date(startDate).toLocaleString('en-US', { timeZone: clientTimeZone });
-                const deadlineLocal = new Date(deadlineStr);
-                deadlineLocal.setDate(deadlineLocal.getDate() + (lessonOrder - 1));
-                deadlineLocal.setHours(23, 59, 59, 999);
+            if (startDate) {
+                // Tính deadline hoàn toàn bằng UTC thuần:
+                //   deadline = startedAt (UTC midnight của ngày VN đã chọn)
+                //              + (lessonOrder - 1) ngày
+                //              + 16 giờ 59 phút 59 giây 999ms
+                //   = 23:59:59.999 giờ Việt Nam (UTC+7)
+                //
+                // Ví dụ: startedAt = 2026-08-12T00:00:00Z (= 12/08 07:00 VN)
+                //   Nhưng ngày học viên chọn là 12/08 VN, nên ta lấy
+                //   "ngày VN" từ startedAt bằng cách cộng offset +7h trước.
+                //
+                // Cách đúng: xác định "ngày VN" của startedAt, rồi tính
+                // 23:59:59.999 VN = 16:59:59.999 UTC của ngày đó.
 
-                const isCurrentlyOnTime = nowLocal.getTime() <= deadlineLocal.getTime();
+                // Lấy timestamp UTC của startedAt
+                const startUTC = startDate.getTime()
+
+                // Xác định "ngày VN" (UTC+7): floor về UTC midnight của ngày VN
+                // Offset VN = +7*60*60*1000 ms
+                const VN_OFFSET_MS = 7 * 60 * 60 * 1000
+                // Số ms kể từ UTC epoch đến đầu ngày VN chứa startedAt
+                const startDayVN_UTC = Math.floor((startUTC + VN_OFFSET_MS) / 86400000) * 86400000 - VN_OFFSET_MS
+
+                // Deadline = đầu ngày VN của startDate + (lessonOrder-1) ngày + 23:59:59.999 VN
+                // 23:59:59.999 VN = 16:59:59.999 UTC
+                const deadlineUTC = startDayVN_UTC
+                    + (lessonOrder - 1) * 86400000  // cộng (N-1) ngày
+                    + 16 * 3600000                  // 16 giờ UTC = 23:00 VN
+                    + 59 * 60000                    // 59 phút
+                    + 59 * 1000                     // 59 giây
+                    + 999                           // 999ms
+
+                const isCurrentlyOnTime = now.getTime() <= deadlineUTC
+
+                console.log(`${logId} TIMING: startDate=${startDate.toISOString()} lessonOrder=${lessonOrder} deadlineUTC=${new Date(deadlineUTC).toISOString()} nowUTC=${now.toISOString()} onTime=${isCurrentlyOnTime}`)
 
                 if (isCurrentlyOnTime) {
-                    timingScore = 1;
+                    timingScore = 1
                 } else if (isUpdate) {
                     // Cập nhật sau hạn: chỉ giữ "đúng hạn" nếu bài GỐC đã từng đạt
                     // hoàn thành (>=5đ, status COMPLETED) trước hạn — khi đó chặn
-                    // luôn không cho sửa nữa (như cũ). Nếu bài gốc CHƯA đạt (mới
-                    // ghi nhận tạm/chưa hoàn thiện) mà giờ mới hoàn thiện sau hạn,
-                    // tính là nộp muộn — không cho phép ghi nhận trước rồi hoàn
-                    // thiện sau để "giữ" điểm đúng hạn.
+                    // luôn không cho sửa nữa (như cũ).
                     const existingStatus = await prisma.lessonProgress.findUnique({
                         where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
                         select: { status: true }
@@ -629,9 +654,9 @@ export async function submitAssignmentAction({
                     if (existingStatus?.status === 'COMPLETED') {
                         return { success: false, message: "Bài học đã hết hạn cập nhật." }
                     }
-                    timingScore = -1;
+                    timingScore = -1
                 } else {
-                    timingScore = -1;
+                    timingScore = -1
                 }
             }
         }

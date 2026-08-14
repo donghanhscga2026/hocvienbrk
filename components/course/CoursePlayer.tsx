@@ -195,10 +195,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 supports: data.supports,
                 isUpdate,
                 lessonOrder: currentLessonData?.order,
-                startedAt: enrollment.startedAt,
                 currentMaxTime: liveProgress?.maxTime,
                 currentDuration: liveProgress?.duration,
-                existingTimingScore: currentProg?.scores?.timing
             })
 
             if (!(result as any)?.success) {

@@ -239,14 +239,10 @@ function AssignmentForm({
         const isUpdate = isCompleted
         setLoading(true)
         try {
-            // Lấy múi giờ hiện tại của thiết bị thành viên
-            const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
-
             const result = await onSubmit({
                 reflection,
                 links,
                 supports,
-                clientTimeZone // Gửi kèm múi giờ về server
             }, isUpdate)
 
             if (result?.success) {
