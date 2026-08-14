@@ -607,35 +607,31 @@ export async function submitAssignmentAction({
 
             if (startDate) {
                 // Tính deadline hoàn toàn bằng UTC thuần:
-                //   deadline = startedAt (UTC midnight của ngày VN đã chọn)
-                //              + (lessonOrder - 1) ngày
-                //              + 16 giờ 59 phút 59 giây 999ms
-                //   = 23:59:59.999 giờ Việt Nam (UTC+7)
+                //   deadline = startedAt + (lessonOrder - 1) ngày + 16:59:59.999
+                //   = 23:59:59.999 giờ Việt Nam (UTC+7) của ngày tương ứng.
                 //
-                // Ví dụ: startedAt = 2026-08-12T00:00:00Z (= 12/08 07:00 VN)
-                //   Nhưng ngày học viên chọn là 12/08 VN, nên ta lấy
-                //   "ngày VN" từ startedAt bằng cách cộng offset +7h trước.
+                // startedAt luôn được lưu là UTC midnight (00:00:00.000Z) của
+                // NGÀY VN mà học viên chọn (confirmStartDateAction dùng
+                // `new Date("YYYY-MM-DD")`, ví dụ "2026-08-12" -> lưu thành
+                // 2026-08-12T00:00:00.000Z) — bản thân giá trị này đã là một
+                // "nhãn ngày VN", KHÔNG phải một thời điểm UTC cần quy đổi thêm.
+                // Vì vậy chỉ cần cộng thẳng (lessonOrder-1) ngày rồi cộng
+                // 16:59:59.999 UTC (= 23:59:59.999 VN) là ra đúng hạn nộp.
                 //
-                // Cách đúng: xác định "ngày VN" của startedAt, rồi tính
-                // 23:59:59.999 VN = 16:59:59.999 UTC của ngày đó.
-
-                // Lấy timestamp UTC của startedAt
+                // (Bug cũ: có thêm 1 bước "quy đổi ngày VN" bằng
+                // Math.floor((startUTC+7h)/1day)*1day-7h trước khi cộng
+                // 16:59:59 — làm cộng dồn offset +7h hai lần, khiến hạn nộp
+                // bị tính sớm hơn 7 tiếng, tức 16:59:59 VN thay vì 23:59:59 VN.
+                // Phát hiện ngày 2026-08-14 khi nhiều học viên nộp bài đúng
+                // ngày nhưng sau 17h VN vẫn bị tính nộp muộn.)
                 const startUTC = startDate.getTime()
 
-                // Xác định "ngày VN" (UTC+7): floor về UTC midnight của ngày VN
-                // Offset VN = +7*60*60*1000 ms
-                const VN_OFFSET_MS = 7 * 60 * 60 * 1000
-                // Số ms kể từ UTC epoch đến đầu ngày VN chứa startedAt
-                const startDayVN_UTC = Math.floor((startUTC + VN_OFFSET_MS) / 86400000) * 86400000 - VN_OFFSET_MS
-
-                // Deadline = đầu ngày VN của startDate + (lessonOrder-1) ngày + 23:59:59.999 VN
-                // 23:59:59.999 VN = 16:59:59.999 UTC
-                const deadlineUTC = startDayVN_UTC
+                const deadlineUTC = startUTC
                     + (lessonOrder - 1) * 86400000  // cộng (N-1) ngày
-                    + 16 * 3600000                  // 16 giờ UTC = 23:00 VN
-                    + 59 * 60000                    // 59 phút
-                    + 59 * 1000                     // 59 giây
-                    + 999                           // 999ms
+                    + 16 * 3600000                  // 16:59:59.999 UTC
+                    + 59 * 60000                    // = 23:59:59.999 VN
+                    + 59 * 1000
+                    + 999
 
                 const isCurrentlyOnTime = now.getTime() <= deadlineUTC
 
