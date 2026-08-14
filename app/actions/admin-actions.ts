@@ -6,6 +6,7 @@ import { Role, Prisma, EnrollmentMemberRole } from "@prisma/client"
 import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
 import { revalidatePath } from "next/cache"
 import { toTitleCase } from "@/lib/utils/text-format"
+import { computeLessonDeadlineUTC } from "@/lib/course/deadline"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -762,6 +763,25 @@ function toVnMidnight(date: Date | string) {
 }
 
 /**
+ * Trạng thái nộp bài của 1 ngày: CHỈ tính "Đúng hạn"/"Muộn" khi bài đã thực
+ * sự HOÀN THÀNH (status COMPLETED, ≥5đ) — bài mới nộp tạm/chưa đạt điểm thì
+ * không được tính "đúng hạn" dù nộp trong ngày. Ngày đó trôi qua rồi mà vẫn
+ * chưa hoàn thành thì CHẮC CHẮN chuyển sang "Muộn", kể cả khi thành viên
+ * không bao giờ động lại vào bài nộp nữa (không cần đợi họ bấm cập nhật).
+ */
+function computeDayStatus(
+    p: { status: string; scores: unknown } | undefined,
+    deadlineUTC: number,
+    nowUTC: number
+): DayStatus {
+    if (p?.status === 'COMPLETED') {
+        const timing = (p.scores as any)?.timing
+        return timing === -1 ? 'late' : 'onTime'
+    }
+    return nowUTC > deadlineUTC ? 'late' : 'missing'
+}
+
+/**
  * Quyền xem "bảng nộp bài" của 1 khóa học:
  * - ADMIN hoặc TEACHER sở hữu khóa: xem đầy đủ, kể cả SĐT.
  * - Học viên đang ACTIVE trong khóa: xem được nhưng KHÔNG thấy SĐT.
@@ -822,22 +842,18 @@ async function buildCourseRoster(courseId: number) {
     ])
 
     const todayMid = toVnMidnight(new Date())
+    const nowUTC = Date.now()
 
     const members = enrollments.map(e => {
         const progressByLesson = new Map(
             e.lessonProgress.filter(p => p.status !== 'RESET').map(p => [p.lessonId, p])
         )
+        const base = e.startedAt || e.activatedAt || e.createdAt
+
         const days = lessons.map(l => {
             const p = progressByLesson.get(l.id)
-            let status: DayStatus = 'missing'
-            if (p?.submittedAt) {
-                const timing = (p.scores as any)?.timing
-                status = timing === -1 ? 'late' : 'onTime'
-            } else if (p?.status === 'COMPLETED') {
-                // Một số khóa (type NORMAL) tự đánh dấu hoàn thành khi bình luận,
-                // không đi qua submitAssignmentAction nên không có submittedAt.
-                status = 'onTime'
-            }
+            const deadlineUTC = computeLessonDeadlineUTC(base, l.order)
+            const status = computeDayStatus(p, deadlineUTC, nowUTC)
             return { order: l.order, status }
         })
 
@@ -845,7 +861,6 @@ async function buildCourseRoster(courseId: number) {
         // bắt đầu học riêng của từng thành viên (giống cách tính hạn nộp trong
         // submitAssignmentAction). Nộp muộn vẫn hiện màu tím ở lưới ngày, chỉ
         // không được cộng vào % này.
-        const base = e.startedAt || e.activatedAt || e.createdAt
         const baseMid = toVnMidnight(base)
         const dayIndexToday = Math.floor((todayMid.getTime() - baseMid.getTime()) / 86400000) + 1
         const elapsedDays = Math.max(0, Math.min(lessons.length, dayIndexToday - 1))
@@ -920,7 +935,9 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
         const access = await checkCourseRosterAccess(enrollment.courseId)
         if (access.error) return { success: false, error: access.error }
 
-        const baseMid = toVnMidnight(enrollment.startedAt || enrollment.activatedAt || enrollment.createdAt)
+        const base = enrollment.startedAt || enrollment.activatedAt || enrollment.createdAt
+        const baseMid = toVnMidnight(base)
+        const nowUTC = Date.now()
 
         const lessons = await prisma.lesson.findMany({
             where: { courseId: enrollment.courseId },
@@ -954,13 +971,8 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
 
         const days = lessons.map(l => {
             const p = progressByLesson.get(l.id)
-            let status: DayStatus = 'missing'
-            if (p?.submittedAt) {
-                const timing = (p.scores as any)?.timing
-                status = timing === -1 ? 'late' : 'onTime'
-            } else if (p?.status === 'COMPLETED') {
-                status = 'onTime'
-            }
+            const deadlineUTC = computeLessonDeadlineUTC(base, l.order)
+            const status = computeDayStatus(p, deadlineUTC, nowUTC)
             const watchPercent = p && p.duration > 0 ? Math.round(Math.min(1, p.maxTime / p.duration) * 100) : null
             // Ngày lịch của "Ngày N" = ngày bắt đầu học riêng của thành viên + (N-1)
             // ngày, đúng theo mốc hạn nộp mà submitAssignmentAction dùng.

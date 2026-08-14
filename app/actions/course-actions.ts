@@ -11,6 +11,7 @@ import { createPaymentQR } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { toTitleCase } from "@/lib/utils/text-format"
+import { computeLessonDeadlineUTC } from "@/lib/course/deadline"
 
 /**
  * Đăng ký khóa học mới
@@ -606,32 +607,11 @@ export async function submitAssignmentAction({
             const startDate = enrollmentForTiming?.startedAt
 
             if (startDate) {
-                // Tính deadline hoàn toàn bằng UTC thuần:
-                //   deadline = startedAt + (lessonOrder - 1) ngày + 16:59:59.999
-                //   = 23:59:59.999 giờ Việt Nam (UTC+7) của ngày tương ứng.
-                //
-                // startedAt luôn được lưu là UTC midnight (00:00:00.000Z) của
-                // NGÀY VN mà học viên chọn (confirmStartDateAction dùng
-                // `new Date("YYYY-MM-DD")`, ví dụ "2026-08-12" -> lưu thành
-                // 2026-08-12T00:00:00.000Z) — bản thân giá trị này đã là một
-                // "nhãn ngày VN", KHÔNG phải một thời điểm UTC cần quy đổi thêm.
-                // Vì vậy chỉ cần cộng thẳng (lessonOrder-1) ngày rồi cộng
-                // 16:59:59.999 UTC (= 23:59:59.999 VN) là ra đúng hạn nộp.
-                //
-                // (Bug cũ: có thêm 1 bước "quy đổi ngày VN" bằng
-                // Math.floor((startUTC+7h)/1day)*1day-7h trước khi cộng
-                // 16:59:59 — làm cộng dồn offset +7h hai lần, khiến hạn nộp
-                // bị tính sớm hơn 7 tiếng, tức 16:59:59 VN thay vì 23:59:59 VN.
-                // Phát hiện ngày 2026-08-14 khi nhiều học viên nộp bài đúng
-                // ngày nhưng sau 17h VN vẫn bị tính nộp muộn.)
-                const startUTC = startDate.getTime()
-
-                const deadlineUTC = startUTC
-                    + (lessonOrder - 1) * 86400000  // cộng (N-1) ngày
-                    + 16 * 3600000                  // 16:59:59.999 UTC
-                    + 59 * 60000                    // = 23:59:59.999 VN
-                    + 59 * 1000
-                    + 999
+                // Công thức tính hạn dùng CHUNG với phần đọc/hiển thị trạng thái
+                // đúng hạn (xem lib/course/deadline.ts) — không viết lại công
+                // thức ở đây nữa để tránh lệch nhau (đã từng gây lỗi lệch múi
+                // giờ 7 tiếng do có 2 nơi tính khác công thức).
+                const deadlineUTC = computeLessonDeadlineUTC(startDate, lessonOrder)
 
                 const isCurrentlyOnTime = now.getTime() <= deadlineUTC
 
