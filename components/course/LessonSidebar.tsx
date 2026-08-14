@@ -1,9 +1,8 @@
-
 'use client'
 
-import { useState, memo } from 'react'
+import { useState, memo, useMemo } from 'react'
 import { cn } from "@/lib/utils"
-import { CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw } from "lucide-react"
+import { CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw, AlertTriangle, X } from "lucide-react"
 
 interface Lesson {
     id: string
@@ -28,11 +27,16 @@ function formatDateVN(date: Date | null) {
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-// Chuyển Date → string cho input (yyyy-MM-dd)
 function toInputValue(date: Date | null): string {
     if (!date) return ''
-    const d = new Date(date)
-    return d.toISOString().slice(0, 10)
+    return new Date(date).toISOString().slice(0, 10)
+}
+
+// Ngày hôm nay theo VN (UTC+7) định dạng yyyy-MM-dd
+function todayVN(): string {
+    const now = new Date()
+    const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+    return vnNow.toISOString().slice(0, 10)
 }
 
 function isLessonUnlocked(lesson: Lesson, lessons: Lesson[], progress: Record<string, any>, courseType?: string) {
@@ -50,28 +54,28 @@ function LessonSidebar({
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dateInput, setDateInput] = useState(toInputValue(startedAt))
     const [saving, setSaving] = useState(false)
-    
-    // Lọc progress chỉ hiển thị các bài học không bị reset (lộ trình hiện tại)
+    const [showWarning, setShowWarning] = useState(false)
+
     const filteredProgress = Object.entries(progress).reduce((acc, [lessonId, p]: [string, any]) => {
-        // Chỉ hiển thị progress không có status RESET
-        if (p.status !== 'RESET') {
-            acc[lessonId] = p
-        }
+        if (p.status !== 'RESET') acc[lessonId] = p
         return acc
     }, {} as Record<string, any>)
 
-    const handleReset = async () => {
-        if (!dateInput) return
-        
-        // Hiển thị cảnh báo trước khi reset
-        const confirmReset = window.confirm(
-            "⚠️ Cảnh báo: Dữ liệu học tập cũ sẽ không được tính vào lộ trình mới.\n\n" +
-            "Bạn sẽ bắt đầu lại từ bài 1. Tiến trình cũ vẫn lưu trong hệ thống để admin xem lại.\n\n" +
-            "Nhấn OK để xác nhận đổi ngày bắt đầu mới."
-        )
-        
-        if (!confirmReset) return
-        
+    const completedLessons = useMemo(() =>
+        lessons.filter(l => filteredProgress[l.id]?.status === 'COMPLETED'),
+        [lessons, filteredProgress]
+    )
+
+    const today = todayVN()
+    const isPastDate = dateInput < today
+
+    const handleOpenWarning = () => {
+        if (!dateInput || isPastDate) return
+        setShowWarning(true)
+    }
+
+    const handleConfirmReset = async () => {
+        setShowWarning(false)
         setSaving(true)
         try {
             await onResetStartDate(new Date(dateInput))
@@ -106,23 +110,29 @@ function LessonSidebar({
 
                 {showDatePicker && (
                     <div className="bg-zinc-800 rounded-lg p-3 space-y-2 border border-zinc-700">
-                        <p className="text-[10px] text-zinc-400">Chọn ngày mới (dd/mm/yyyy):</p>
+                        <p className="text-[10px] text-zinc-400">Chọn ngày mới (từ hôm nay trở đi):</p>
                         <input
                             type="date"
                             value={dateInput}
+                            min={today}
                             onChange={e => setDateInput(e.target.value)}
                             className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
+                        {isPastDate && dateInput && (
+                            <p className="text-[10px] text-red-400 font-semibold flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" /> Không được chọn ngày trong quá khứ
+                            </p>
+                        )}
                         <div className="flex gap-2">
                             <button
-                                onClick={handleReset}
-                                disabled={!dateInput || saving}
-                                className="flex-1 text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-1.5 disabled:opacity-50 transition-colors"
+                                onClick={handleOpenWarning}
+                                disabled={!dateInput || saving || isPastDate}
+                                className="flex-1 text-xs font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg py-1.5 disabled:opacity-40 transition-colors"
                             >
-                                {saving ? 'Đang lưu...' : 'Xác nhận'}
+                                {saving ? 'Đang lưu...' : 'Đặt lại lộ trình'}
                             </button>
                             <button
-                                onClick={() => setShowDatePicker(false)}
+                                onClick={() => { setShowDatePicker(false); setShowWarning(false) }}
                                 className="flex-1 text-xs text-zinc-400 hover:text-white border border-zinc-600 rounded-lg py-1.5 transition-colors"
                             >
                                 Hủy
@@ -188,6 +198,96 @@ function LessonSidebar({
                     )
                 })}
             </div>
+
+            {/* ── Modal cảnh báo reset ── */}
+            {showWarning && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="bg-zinc-900 border-2 border-red-500/60 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+                        {/* Header đỏ */}
+                        <div className="bg-red-600 px-5 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-white shrink-0" />
+                                <span className="text-white font-black text-base">Cảnh báo — Đặt lại lộ trình</span>
+                            </div>
+                            <button onClick={() => setShowWarning(false)} className="text-white/70 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Nội dung */}
+                        <div className="p-5 space-y-4">
+                            <p className="text-white text-sm leading-relaxed">
+                                Bạn đang đặt lại ngày bắt đầu lộ trình về{' '}
+                                <span className="font-black text-orange-400">
+                                    {new Date(dateInput + 'T00:00:00').toLocaleDateString('vi-VN')}
+                                </span>.
+                            </p>
+
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-2">
+                                <p className="text-red-400 font-bold text-sm flex items-center gap-1.5">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    Hành động này có nghĩa là:
+                                </p>
+                                <ul className="text-red-300 text-xs space-y-1.5 ml-1">
+                                    <li className="flex gap-2">
+                                        <span className="shrink-0 mt-0.5">•</span>
+                                        <span>Toàn bộ tiến trình và điểm số hiện tại <strong className="text-red-200">sẽ bị hủy</strong>, không được tính vào lộ trình mới</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="shrink-0 mt-0.5">•</span>
+                                        <span>Bạn <strong className="text-red-200">phải làm lại tất cả bài học từ Bài 1</strong> theo đúng thứ tự từ đầu</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="shrink-0 mt-0.5">•</span>
+                                        <span>Deadline các bài sẽ tính lại từ ngày mới — <strong className="text-red-200">không thể hoàn tác</strong></span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {completedLessons.length > 0 && (
+                                <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3">
+                                    <p className="text-zinc-300 text-xs font-semibold mb-2">
+                                        🗑 {completedLessons.length} bài đã hoàn thành sẽ bị reset:
+                                    </p>
+                                    <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
+                                        {completedLessons.map(l => (
+                                            <div key={l.id} className="flex items-center gap-2 text-xs text-zinc-400">
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/50 shrink-0" />
+                                                <span className="truncate">{l.title}</span>
+                                                <span className="shrink-0 text-zinc-600 ml-auto">({filteredProgress[l.id]?.totalScore}/10đ)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {completedLessons.length === 0 && (
+                                <p className="text-zinc-500 text-xs text-center italic">Chưa có bài nào hoàn thành trong lộ trình hiện tại.</p>
+                            )}
+
+                            <p className="text-zinc-600 text-[10px] text-center">
+                                Dữ liệu cũ vẫn được lưu trong hệ thống để admin kiểm tra khi cần.
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="px-5 pb-5 flex gap-3">
+                            <button
+                                onClick={() => setShowWarning(false)}
+                                className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm transition-colors"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                onClick={handleConfirmReset}
+                                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-sm transition-all active:scale-95"
+                            >
+                                Tôi hiểu, xác nhận đặt lại
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

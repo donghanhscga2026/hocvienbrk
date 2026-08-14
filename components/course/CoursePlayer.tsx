@@ -539,17 +539,27 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
     const [showDatePicker, setShowDatePicker] = useState(false)
     const [dateInput, setDateInput] = useState(startedAt ? new Date(startedAt).toISOString().slice(0, 10) : '')
     const [saving, setSaving] = useState(false)
+    const [showWarning, setShowWarning] = useState(false)
 
-    // Lọc progress chỉ hiển thị các bài học không bị reset
     const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => {
-        if (p.status !== 'RESET') acc[id] = p;
+        if (p.status !== 'RESET') acc[id] = p
         return acc
     }, {})
 
-    const handleReset = async () => {
-        if (!dateInput) return
-        const confirmReset = window.confirm("⚠️ Cảnh báo: Dữ liệu học tập cũ sẽ không được tính vào lộ trình mới.\n\nNhấn OK để xác nhận đổi ngày bắt đầu mới.")
-        if (!confirmReset) return
+    // Ngày hôm nay VN (UTC+7)
+    const today = (() => {
+        const now = new Date()
+        const vnNow = new Date(now.getTime() + 7 * 60 * 60 * 1000)
+        return vnNow.toISOString().slice(0, 10)
+    })()
+
+    const isPastDate = dateInput < today
+
+    const completedLessons = lessons.filter((l: any) => filteredProgress[l.id]?.status === 'COMPLETED')
+    const completedCount = completedLessons.length
+
+    const handleConfirmReset = async () => {
+        setShowWarning(false)
         setSaving(true)
         try {
             await onResetStartDate(new Date(dateInput))
@@ -558,8 +568,6 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
             setSaving(false)
         }
     }
-
-    const completedCount = lessons.filter((l: any) => filteredProgress[l.id]?.status === 'COMPLETED').length
 
     return (
         <div className="flex flex-col h-full w-full bg-zinc-900 overflow-hidden">
@@ -585,26 +593,32 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
 
                 {showDatePicker && (
                     <div className="bg-zinc-800 rounded-xl p-3 space-y-2.5 border border-zinc-700 shadow-xl">
-                        <p className="text-[10px] text-zinc-400 font-medium">Chọn ngày mới cho lộ trình:</p>
+                        <p className="text-[10px] text-zinc-400 font-medium">Chọn ngày mới (từ hôm nay trở đi):</p>
                         <input
                             type="date"
                             value={dateInput}
+                            min={today}
                             onChange={e => setDateInput(e.target.value)}
                             className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
+                        {isPastDate && dateInput && (
+                            <p className="text-[10px] text-red-400 font-semibold flex items-center gap-1">
+                                ⚠ Không được chọn ngày trong quá khứ
+                            </p>
+                        )}
                         <div className="flex gap-2">
                             <button
-                                onClick={handleReset}
-                                disabled={!dateInput || saving}
-                                className="flex-1 text-xs font-black bg-orange-500 text-white rounded-lg py-2 disabled:opacity-50"
+                                onClick={() => { if (!isPastDate && dateInput) setShowWarning(true) }}
+                                disabled={!dateInput || saving || isPastDate}
+                                className="flex-1 text-xs font-black bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 disabled:opacity-40 transition-colors"
                             >
-                                {saving ? 'Đang lưu...' : 'XÁC NHẬN'}
+                                {saving ? 'Đang lưu...' : 'Đặt lại lộ trình'}
                             </button>
                             <button
-                                onClick={() => setShowDatePicker(false)}
+                                onClick={() => { setShowDatePicker(false); setShowWarning(false) }}
                                 className="flex-1 text-xs font-bold text-zinc-400 border border-zinc-700 rounded-lg py-2"
                             >
-                                HỦY
+                                Hủy
                             </button>
                         </div>
                     </div>
@@ -652,6 +666,74 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                     )
                 })}
             </div>
+
+            {/* ─ Modal cảnh báo reset ─ */}
+            {showWarning && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="bg-zinc-900 border-2 border-red-500/60 rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden">
+                        <div className="bg-red-600 px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-white font-black text-sm">⚠️ Cảnh báo — Đặt lại lộ trình</span>
+                            </div>
+                            <button onClick={() => setShowWarning(false)} className="text-white/70 hover:text-white">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-3">
+                            <p className="text-white text-sm">
+                                Đặt lại về ngày{' '}
+                                <span className="font-black text-orange-400">
+                                    {new Date(dateInput + 'T00:00:00').toLocaleDateString('vi-VN')}
+                                </span>
+                            </p>
+
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 space-y-1.5">
+                                <p className="text-red-400 font-bold text-xs">Hành động này có nghĩa là:</p>
+                                <ul className="text-red-300 text-xs space-y-1 ml-1">
+                                    <li>• Toàn bộ tiến trình và điểm số hiện tại <strong>sẽ bị hủy</strong></li>
+                                    <li>• Bạn <strong>phải làm lại tất cả từ Bài 1</strong></li>
+                                    <li>• Deadline tính lại từ ngày mới — <strong>không thể hoàn tác</strong></li>
+                                </ul>
+                            </div>
+
+                            {completedLessons.length > 0 && (
+                                <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3">
+                                    <p className="text-zinc-300 text-xs font-semibold mb-1.5">
+                                        🗑 {completedLessons.length} bài sẽ bị reset:
+                                    </p>
+                                    <div className="flex flex-col gap-1 max-h-24 overflow-y-auto">
+                                        {completedLessons.map((l: any) => (
+                                            <div key={l.id} className="flex items-center gap-1.5 text-xs text-zinc-400">
+                                                <CheckCircle2 className="w-3 h-3 text-emerald-500/50 shrink-0" />
+                                                <span className="truncate">{l.title}</span>
+                                                <span className="shrink-0 text-zinc-600 ml-auto">({filteredProgress[l.id]?.totalScore}/10đ)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-4 pb-4 flex gap-2">
+                            <button
+                                onClick={() => setShowWarning(false)}
+                                className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-xs transition-colors"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                onClick={handleConfirmReset}
+                                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition-all active:scale-95"
+                            >
+                                Tôi hiểu, xác nhận
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
+
+
