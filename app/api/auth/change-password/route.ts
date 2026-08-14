@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { sendPasswordChangedNotification } from "@/lib/notifications"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { validatePasswordStrength } from "@/lib/password-policy"
 
 export async function POST(request: Request) {
     try {
@@ -20,8 +21,13 @@ export async function POST(request: Request) {
 
         const { newPassword } = await request.json()
 
-        if (!newPassword || newPassword.length < 6) {
-            return NextResponse.json({ error: "Mật khẩu phải có ít nhất 6 ký tự" }, { status: 400 })
+        if (!newPassword) {
+            return NextResponse.json({ error: "Vui lòng nhập mật khẩu mới" }, { status: 400 })
+        }
+
+        const passwordError = validatePasswordStrength(newPassword)
+        if (passwordError) {
+            return NextResponse.json({ error: passwordError }, { status: 400 })
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 12)

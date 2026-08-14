@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
+import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy"
 // import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"  // DISABLED: Google Auth
 // import { useEmailPrefill } from "@/hooks/useEmailPrefill"  // DISABLED: Google Auth
 
@@ -201,8 +202,9 @@ function LoginForm() {
             return
         }
 
-        if (data.newPassword.length < 6) {
-            setError("Mật khẩu mới phải có ít nhất 6 ký tự.")
+        const passwordError = validatePasswordStrength(data.newPassword)
+        if (passwordError) {
+            setError(passwordError)
             setIsLoading(false)
             return
         }
@@ -257,8 +259,8 @@ function LoginForm() {
                         <div className="flex items-center gap-3 p-4 bg-brk-primary-25 border border-brk-primary/30 rounded-xl">
                             <AlertTriangle className="h-6 w-6 text-brk-primary shrink-0" />
                             <p className="text-sm text-brk-primary">
-                                Mật khẩu <code className="bg-brk-primary/20 px-2 py-0.5 rounded">Brk#3773</code> là mật khẩu mặc định. 
-                                Để bảo vệ tài khoản, vui lòng đổi ngay.
+                                Bạn đang dùng mật khẩu mặc định do hệ thống cấp.
+                                Để bảo vệ tài khoản, vui lòng đổi sang mật khẩu cá nhân ngay.
                             </p>
                         </div>
 
@@ -276,7 +278,7 @@ function LoginForm() {
                                     <input
                                         {...register("newPassword", { 
                                             required: "Vui lòng nhập mật khẩu mới",
-                                            minLength: { value: 6, message: "Tối thiểu 6 ký tự" }
+                                            validate: (value: string) => validatePasswordStrength(value) ?? true
                                         })}
                                         type={showNewPassword ? "text" : "password"}
                                         className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
@@ -290,7 +292,11 @@ function LoginForm() {
                                         {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                     </button>
                                 </div>
-                                {errors.newPassword && <p className="mt-1 text-xs text-brk-accent">{errors.newPassword.message}</p>}
+                                {errors.newPassword ? (
+                                    <p className="mt-1 text-xs text-brk-accent">{errors.newPassword.message}</p>
+                                ) : (
+                                    <p className="mt-1 text-xs text-brk-muted">{PASSWORD_POLICY_MESSAGE}</p>
+                                )}
                             </div>
 
                             <div>

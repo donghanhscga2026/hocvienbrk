@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAllPhoneVariants } from "@/lib/phone-utils";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 type IdentifierType = 'student_id' | 'email' | 'phone' | 'unknown';
 type ErrorType = 'NOT_FOUND' | 'INVALID_PASSWORD' | 'NO_PASSWORD' | 'UNKNOWN';
@@ -18,6 +19,13 @@ export async function POST(request: NextRequest) {
     const { identifier, password } = await request.json();
     if (!identifier) {
       return NextResponse.json({ error: "Missing identifier" }, { status: 400 });
+    }
+
+    // Chặn dò quét identifier hàng loạt (endpoint này không yêu cầu đăng nhập)
+    const ip = getClientIp(request);
+    const byIp = checkRateLimit(`report-failed-login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 });
+    if (!byIp.allowed) {
+      return NextResponse.json({ error: "Bạn thử quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 });
     }
 
     const identifierType = detectIdentifierType(identifier);
@@ -129,7 +137,6 @@ export async function POST(request: NextRequest) {
       identifierType,
       errorType,
       userFound: !!user,
-      userInfo,
     });
   } catch (error: any) {
     console.error("❌ [ReportFailedLogin] Error:", error);

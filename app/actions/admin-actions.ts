@@ -749,6 +749,19 @@ function groupLabel(team: number, group: number, labels?: CourseMemberLabels) {
 type DayStatus = 'missing' | 'late' | 'onTime'
 
 /**
+ * Quy về 00:00 giờ Việt Nam (Asia/Ho_Chi_Minh) của 1 thời điểm — dùng để tính
+ * số ngày đã trôi qua / ngày lịch của "Ngày N", khớp đúng múi giờ mà
+ * submitAssignmentAction dùng khi tính hạn nộp (clientTimeZone mặc định VN).
+ * Không dùng giờ local của server vì server production có thể chạy ở UTC.
+ */
+function toVnMidnight(date: Date | string) {
+    const vnStr = new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })
+    const vn = new Date(vnStr)
+    vn.setHours(0, 0, 0, 0)
+    return vn
+}
+
+/**
  * Quyền xem "bảng nộp bài" của 1 khóa học:
  * - ADMIN hoặc TEACHER sở hữu khóa: xem đầy đủ, kể cả SĐT.
  * - Học viên đang ACTIVE trong khóa: xem được nhưng KHÔNG thấy SĐT.
@@ -804,8 +817,7 @@ async function buildCourseRoster(courseId: number) {
         })
     ])
 
-    const todayMid = new Date()
-    todayMid.setHours(0, 0, 0, 0)
+    const todayMid = toVnMidnight(new Date())
 
     const members = enrollments.map(e => {
         const progressByLesson = new Map(e.lessonProgress.map(p => [p.lessonId, p]))
@@ -824,8 +836,7 @@ async function buildCourseRoster(courseId: number) {
         // submitAssignmentAction). Nộp muộn vẫn hiện màu tím ở lưới ngày, chỉ
         // không được cộng vào % này.
         const base = e.startedAt || e.activatedAt || e.createdAt
-        const baseMid = new Date(base)
-        baseMid.setHours(0, 0, 0, 0)
+        const baseMid = toVnMidnight(base)
         const dayIndexToday = Math.floor((todayMid.getTime() - baseMid.getTime()) / 86400000) + 1
         const elapsedDays = Math.max(0, Math.min(lessons.length, dayIndexToday - 1))
         const onTimeElapsed = days.filter(d => d.order <= elapsedDays && d.status === 'onTime').length
@@ -879,6 +890,81 @@ export async function getCourseMemberRosterAction(courseId: number) {
             labels: (course.memberLabels as CourseMemberLabels) || {},
             members: sanitizedMembers,
         }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Lịch sử làm bài đầy đủ của 1 thành viên (thời gian nộp, nội dung bài tập,
+ * điểm số từng ngày) — tải riêng khi mở chi tiết 1 người trong bảng nộp bài,
+ * cùng điều kiện truy cập với getCourseMemberRosterAction (ADMIN/giáo viên
+ * sở hữu khóa, hoặc học viên ACTIVE của chính khóa đó).
+ */
+export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
+    try {
+        const enrollment = await prisma.enrollment.findUnique({
+            where: { id: enrollmentId },
+            select: { courseId: true, userId: true, startedAt: true, activatedAt: true, createdAt: true }
+        })
+        if (!enrollment) return { success: false, error: "Không tìm thấy thành viên" }
+
+        const access = await checkCourseRosterAccess(enrollment.courseId)
+        if (access.error) return { success: false, error: access.error }
+
+        const baseMid = toVnMidnight(enrollment.startedAt || enrollment.activatedAt || enrollment.createdAt)
+
+        const lessons = await prisma.lesson.findMany({
+            where: { courseId: enrollment.courseId },
+            orderBy: { order: 'asc' },
+            select: { id: true, order: true, title: true }
+        })
+        const lessonIds = lessons.map(l => l.id)
+
+        const [progress, comments] = await Promise.all([
+            prisma.lessonProgress.findMany({
+                where: { enrollmentId },
+                select: { lessonId: true, submittedAt: true, totalScore: true, scores: true, assignment: true, maxTime: true, duration: true }
+            }),
+            prisma.lessonComment.findMany({
+                where: { userId: enrollment.userId, lessonId: { in: lessonIds } },
+                orderBy: { createdAt: 'asc' },
+                select: { id: true, lessonId: true, content: true, createdAt: true }
+            })
+        ])
+
+        const progressByLesson = new Map(progress.map(p => [p.lessonId, p]))
+        const commentsByLesson = new Map<string, typeof comments>()
+        for (const c of comments) {
+            if (!commentsByLesson.has(c.lessonId)) commentsByLesson.set(c.lessonId, [])
+            commentsByLesson.get(c.lessonId)!.push(c)
+        }
+
+        const days = lessons.map(l => {
+            const p = progressByLesson.get(l.id)
+            let status: DayStatus = 'missing'
+            if (p?.submittedAt) {
+                const timing = (p.scores as any)?.timing
+                status = timing === -1 ? 'late' : 'onTime'
+            }
+            const watchPercent = p && p.duration > 0 ? Math.round(Math.min(1, p.maxTime / p.duration) * 100) : null
+            // Ngày lịch của "Ngày N" = ngày bắt đầu học riêng của thành viên + (N-1)
+            // ngày, đúng theo mốc hạn nộp mà submitAssignmentAction dùng.
+            const dayDate = new Date(baseMid)
+            dayDate.setDate(dayDate.getDate() + (l.order - 1))
+            return {
+                order: l.order,
+                lessonTitle: l.title,
+                dayDate,
+                status,
+                submittedAt: p?.submittedAt ?? null,
+                totalScore: p?.totalScore ?? null,
+                scores: (p?.scores as any) ?? null,
+                assignment: (p?.assignment as any) ?? null,
+                watchPercent,
+                comments: (commentsByLesson.get(l.id) || []).map(c => ({ id: c.id, content: c.content, createdAt: c.createdAt })),
+            }
+        })
+
+        return { success: true, days }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 

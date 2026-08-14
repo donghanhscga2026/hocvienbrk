@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { validatePasswordStrength } from "@/lib/password-policy"
 
 export async function POST(request: Request) {
     try {
@@ -10,8 +11,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
         }
 
-        if (newPassword.length < 6) {
-            return NextResponse.json({ error: "Mật khẩu phải có ít nhất 6 ký tự" }, { status: 400 })
+        const passwordError = validatePasswordStrength(newPassword)
+        if (passwordError) {
+            return NextResponse.json({ error: passwordError }, { status: 400 })
         }
 
         const normalizedEmail = email.toLowerCase().trim()

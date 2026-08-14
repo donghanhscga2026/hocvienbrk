@@ -13,18 +13,17 @@ import { cookies } from "next/headers"
 import { auth } from "@/auth"
 import { normalizePhone, getAllPhoneVariants } from "@/lib/phone-utils"
 import { toTitleCase } from "@/lib/utils/text-format"
+import { validatePasswordStrength } from "@/lib/password-policy"
 
 const registerSchema = z.object({
     name: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
     email: z.string().email("Địa chỉ email không hợp lệ"),
     countryCode: z.string(),
     phone: z.string().min(9, "Số điện thoại phải có ít nhất 9 số").max(15, "Số điện thoại tối đa 15 số"),
-    password: z.string()
-        .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
-        .regex(/[A-Z]/, "Mật khẩu phải chứa ít nhất một chữ hoa")
-        .regex(/[a-z]/, "Mật khẩu phải chứa ít nhất một chữ thường")
-        .regex(/[0-9]/, "Mật khẩu phải chứa ít nhất một chữ số")
-        .regex(/[!@#$%^&*(),.?":{}|<>]/, "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"),
+    password: z.string().superRefine((value, ctx) => {
+        const error = validatePasswordStrength(value)
+        if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error })
+    }),
     referrerId: z.string().optional(),
 })
 

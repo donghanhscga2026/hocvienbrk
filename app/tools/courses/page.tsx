@@ -992,6 +992,7 @@ function CoursesTab() {
                 {selectedMember && (
                     <MemberDetailPanel
                         member={{
+                            enrollmentId: selectedMember.id,
                             name: selectedMember.user.name,
                             code: selectedMember.user.id,
                             memberRole: (editedMembers[selectedMember.id]?.memberRole ?? selectedMember.memberRole),

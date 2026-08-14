@@ -271,6 +271,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
         {selectedMember && (
             <MemberDetailPanel
                 member={{
+                    enrollmentId: selectedMember.id,
                     name: selectedMember.user.name,
                     code: selectedMember.user.id,
                     memberRole: selectedMember.memberRole,

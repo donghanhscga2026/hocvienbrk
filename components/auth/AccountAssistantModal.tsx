@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import { registerUser } from '@/app/actions/auth-actions'
 import { parsePhoneNumber } from 'libphonenumber-js'
+import { validatePasswordStrength } from '@/lib/password-policy'
 import { Loader2, Eye, EyeOff, X, CheckCircle2, PlayCircle, ArrowLeft } from 'lucide-react'
 import AgentAvatar from './AgentAvatar'
 import GuideVideoPopup from './GuideVideoPopup'
@@ -29,6 +30,7 @@ interface StepData {
 
 interface WizardData {
   studentId: string
+  contactQuery: string
   email: string
   phone: string
   name: string
@@ -111,6 +113,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   }, [])
   const [data, setData] = useState<WizardData>({
     studentId: '',
+    contactQuery: '',
     email: '',
     phone: '',
     name: '',
@@ -142,7 +145,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       setData(prev => ({ ...prev, originalUrl: window.location.href }))
       const saved = localStorage.getItem('assistant_user_contact')
       if (saved) {
-        setData(prev => ({ ...prev, email: saved }))
+        setData(prev => ({ ...prev, contactQuery: saved }))
       }
     }
   }, [])
@@ -345,7 +348,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
   // ─── CHECK: Search by email/phone ───
   const handleCheckUser = async () => {
-    const query = data.email.trim()
+    const query = data.contactQuery.trim()
     if (!query) { setError('Vui lòng nhập số điện thoại hoặc email'); return }
     setIsLoading(true); setError(null)
     try {
@@ -385,11 +388,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   // ─── REGISTER: Submit password → go to confirm ───
   const handleRegisterPassword = () => {
     if (!registerPassword) { setError('Vui lòng nhập mật khẩu'); return }
-    if (registerPassword.length < 8) { setError('Mật khẩu phải có ít nhất 8 ký tự'); return }
-    if (!/[A-Z]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 chữ hoa (A-Z)'); return }
-    if (!/[a-z]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 chữ thường (a-z)'); return }
-    if (!/[0-9]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 chữ số (0-9)'); return }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(registerPassword)) { setError('Mật khẩu cần ít nhất 1 ký tự đặc biệt (!@#$...)'); return }
+    const passwordError = validatePasswordStrength(registerPassword)
+    if (passwordError) { setError(passwordError); return }
     goToStep('register_confirm')
   }
 
@@ -484,7 +484,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   const handleResetPassword = async () => {
     if (!otp || otp.length !== 6) { setError('Vui lòng nhập mã OTP 6 số'); return }
     if (!newPassword) { setError('Vui lòng nhập mật khẩu mới'); return }
-    if (newPassword.length < 6) { setError('Mật khẩu phải có ít nhất 6 ký tự'); return }
+    const passwordError = validatePasswordStrength(newPassword)
+    if (passwordError) { setError(passwordError); return }
     if (newPassword !== confirmNewPassword) { setError('Mật khẩu mới không khớp xác nhận'); return }
     setIsLoading(true); setError(null)
     try {
@@ -560,8 +561,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         return (
           <input
             type="text"
-            value={data.email}
-            onChange={e => updateField('email', e.target.value)}
+            value={data.contactQuery}
+            onChange={e => updateField('contactQuery', e.target.value)}
             placeholder="Số điện thoại hoặc email"
             autoFocus
             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"

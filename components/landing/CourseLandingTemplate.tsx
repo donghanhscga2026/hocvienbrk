@@ -285,20 +285,23 @@ export default function CourseLandingTemplate({
                                         <Clock className="w-4 h-4" />
                                         <span>{totalHours} giờ</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Users className="w-4 h-4" />
-                                        <span>{activeStudentCount} thành viên</span>
-                                        {canViewRoster && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowRoster(true)}
-                                                title="Xem danh sách thành viên & tiến độ nộp bài"
-                                                className="text-brk-primary hover:text-brk-primary/70 transition-colors"
-                                            >
-                                                <ListChecks className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
+                                    {canViewRoster ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRoster(true)}
+                                            title="Xem danh sách thành viên & tiến độ nộp bài"
+                                            className="flex items-center gap-2 text-brk-primary hover:text-brk-primary/70 transition-colors underline decoration-dashed underline-offset-4"
+                                        >
+                                            <Users className="w-4 h-4" />
+                                            <span>{activeStudentCount} thành viên</span>
+                                            <ListChecks className="w-4 h-4" />
+                                        </button>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-4 h-4" />
+                                            <span>{activeStudentCount} thành viên</span>
+                                        </div>
+                                    )}
                                 </div>
                                 {(course.courseCategory?.name || course.category) && (
                                     <div className="flex items-center justify-center gap-2 mt-3">

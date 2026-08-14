@@ -120,20 +120,23 @@ export default function HeroSection({
             <Clock size={16} color="var(--accent)" />
             <span>{totalHours || 0} giờ học</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={16} color="var(--accent)" />
-            <span>{activeStudentCount || 0} thành viên</span>
-            {canViewRoster && (
-              <button
-                type="button"
-                onClick={() => setShowRoster(true)}
-                title="Xem danh sách thành viên & tiến độ nộp bài"
-                style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '2px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
-              >
-                <ListChecks size={16} />
-              </button>
-            )}
-          </div>
+          {canViewRoster ? (
+            <button
+              type="button"
+              onClick={() => setShowRoster(true)}
+              title="Xem danh sách thành viên & tiến độ nộp bài"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dashed', textUnderlineOffset: '4px' }}
+            >
+              <Users size={16} color="var(--accent)" />
+              <span>{activeStudentCount || 0} thành viên</span>
+              <ListChecks size={16} />
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={16} color="var(--accent)" />
+              <span>{activeStudentCount || 0} thành viên</span>
+            </div>
+          )}
         </div>
 
         {/* Content stats from DB */}
