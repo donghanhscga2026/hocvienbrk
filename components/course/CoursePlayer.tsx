@@ -440,7 +440,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     <button
                                         key={tab.id}
                                         onClick={() => setMobileTab(tab.id as MobileTab)}
-                                        className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] ${mobileTab === tab.id ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'text-zinc-500'}`}
+                                        className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold ${mobileTab === tab.id ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'text-white/80'}`}
                                     >
                                         <tab.icon className="w-5 h-5" />
                                         {tab.label}
@@ -645,22 +645,22 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                             key={lesson.id}
                             onClick={() => unlocked && onLessonSelect(lesson.id)}
                             className={cn(
-                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b transition-all active:bg-brk-background',
+                                'w-full flex items-center gap-3 px-4 py-4 text-left border-b transition-all',
                                 'border-brk-outline/50',
-                                isActive && 'bg-brk-background border-l-4 border-l-brk-accent',
+                                isActive ? 'bg-white border-l-4 border-l-orange-500' : 'active:bg-white/5',
                                 !unlocked && 'opacity-40 grayscale'
                             )}
                         >
                             <div className="shrink-0">
-                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className="w-5 h-5 text-brk-accent" /> : isActive ? <PlayCircle className="w-5 h-5 text-brk-accent animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-brk-muted" /> : <div className="w-4 h-4 rounded-full border border-brk-outline flex items-center justify-center text-[8px] text-brk-muted">{lesson.order}</div>}
+                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className={cn('w-5 h-5', isActive ? 'text-emerald-600' : 'text-emerald-500')} /> : isActive ? <PlayCircle className="w-5 h-5 text-orange-500 animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-zinc-500" /> : <div className="w-4 h-4 rounded-full border border-zinc-600 flex items-center justify-center text-[8px] text-zinc-400">{lesson.order}</div>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={cn('text-sm leading-snug', isActive ? 'text-brk-on-primary font-black' : 'text-brk-muted font-medium')}>{lesson.title}
+                                <p className={cn('text-sm leading-snug', isActive ? 'text-black font-black' : 'text-white font-medium')}>{lesson.title}
                                     {lesson.isDailyChallenge && (
                                         <span className="ml-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full align-middle">📝 Bài tập</span>
                                     )}
                                 </p>
-                                {prog?.totalScore !== undefined && <p className={cn('text-[10px] mt-1 font-bold', prog.totalScore >= 5 ? 'text-brk-accent' : 'text-brk-accent')}>{prog.totalScore >= 5 ? '✓' : '✗'} Kết quả: {prog.totalScore}/10đ</p>}
+                                {prog?.totalScore !== undefined && <p className={cn('text-[10px] mt-1 font-bold', isActive ? 'text-blue-950' : 'text-orange-400')}>{prog.totalScore >= 5 ? '✓' : '✗'} Kết quả: {prog.totalScore}/10đ</p>}
                             </div>
                         </button>
                     )

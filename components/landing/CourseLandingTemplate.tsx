@@ -98,15 +98,18 @@ export default function CourseLandingTemplate({
             ? 'Chia sẻ link để nhận 100% hoa hồng khi đã kích hoạt.'
             : ''
 
-    // Polling: tự động kiểm tra trạng thái ghi danh sau thanh toán
+    // Polling nền: tự động kiểm tra trạng thái ghi danh sau thanh toán.
+    // Chỉ chạy khi modal đăng ký ĐANG ĐÓNG — nếu đang mở thì để chính
+    // RegistrationFlowModal tự polling và chuyển sang bước "thankyou",
+    // tránh việc polling ở đây tự đóng mất modal (kể cả bước thankyou
+    // có link nhóm Zalo cần khách bấm vào trước khi đóng).
     useEffect(() => {
-        if (!course?.id || hasActivated || isEnrolled) return
+        if (!course?.id || hasActivated || isEnrolled || showRegistration) return
         const interval = setInterval(async () => {
             try {
                 const res = await checkEnrollmentStatusAction(course.id)
                 if (res.status === 'ACTIVE' && !hasActivated) {
                     setHasActivated(true)
-                    setShowRegistration(false)
                     setShowActivatedToast(true)
                     setLocalEnrollment((prev: any) => prev ? { ...prev, status: 'ACTIVE' } : { status: 'ACTIVE' })
                     router.refresh()
@@ -115,7 +118,7 @@ export default function CourseLandingTemplate({
         }, 10_000)
         const timeout = setTimeout(() => clearInterval(interval), 20 * 60 * 1000)
         return () => { clearInterval(interval); clearTimeout(timeout) }
-    }, [course?.id, hasActivated, isEnrolled])
+    }, [course?.id, hasActivated, isEnrolled, showRegistration])
     
     const displayLessons = showAllLessons ? lessons : lessons.slice(0, 3)
     const hasMoreLessons = lessons.length > 3
