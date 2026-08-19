@@ -166,16 +166,34 @@ export async function previewBulkEnrollAction(spreadsheetUrl: string, courseId: 
                     })
                     existingCount++
                 } else if (emailMatch || phoneMatch) {
-                    // Same user but phone or email changed
-                    previewRows.push({
-                        rowIndex: i + 1, name, email, phone, referrerId,
-                        status: 'EXISTING',
-                        userId: existingUser.id,
-                        conflictDetail: emailMatch
-                            ? `SĐT khác (cũ: ${existingUser.phone}, mới: ${phone})`
-                            : `Email khác (cũ: ${existingUser.email}, mới: ${email})`
-                    })
-                    existingCount++
+                    // Same user nhưng phone/email khác với sheet — kiểm tra xem giá
+                    // trị mới có đang thuộc về MỘT user khác không, nếu có thì việc
+                    // update sẽ vỡ unique constraint (đã từng xảy ra và làm hỏng cả
+                    // transaction ghi danh) → đánh dấu CONFLICT thay vì EXISTING.
+                    const newValueField = emailMatch ? 'phone' : 'email'
+                    const newValueOwner = emailMatch
+                        ? await prisma.user.findFirst({ where: { phone: { contains: phone }, NOT: { id: existingUser.id } } })
+                        : await prisma.user.findFirst({ where: { email, NOT: { id: existingUser.id } } })
+
+                    if (newValueOwner) {
+                        previewRows.push({
+                            rowIndex: i + 1, name, email, phone, referrerId,
+                            status: 'CONFLICT',
+                            userId: existingUser.id,
+                            conflictDetail: `${newValueField === 'phone' ? 'SĐT' : 'Email'} mới đã thuộc về user #${newValueOwner.id} — không thể cập nhật`
+                        })
+                        conflictCount++
+                    } else {
+                        previewRows.push({
+                            rowIndex: i + 1, name, email, phone, referrerId,
+                            status: 'EXISTING',
+                            userId: existingUser.id,
+                            conflictDetail: emailMatch
+                                ? `SĐT khác (cũ: ${existingUser.phone}, mới: ${phone})`
+                                : `Email khác (cũ: ${existingUser.email}, mới: ${email})`
+                        })
+                        existingCount++
+                    }
                 } else {
                     // Both email and phone belong to different users
                     const phoneUser = await prisma.user.findFirst({
@@ -279,10 +297,21 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
             }
         }
 
-        // Transaction chỉ cho CRUD thiết yếu
-        await prisma.$transaction(async (tx) => {
-            for (const row of filteredRows) {
-                try {
+        // [FIX] Mỗi dòng chạy trong transaction RIÊNG thay vì gộp cả lô vào 1
+        // transaction Postgres duy nhất. Trước đây khi 1 dòng lỗi (vd unique
+        // constraint trên phone), Postgres đánh dấu transaction ở trạng thái
+        // aborted — mọi câu lệnh sau đó trong CÙNG transaction đều lập tức lỗi
+        // 25P02 dù có try/catch riêng từng dòng, kéo theo toàn bộ lô còn lại
+        // thất bại và cuối cùng cả transaction bị rollback (không ai được ghi
+        // danh dù log báo "đang xử lý" hàng trăm dòng).
+        for (const row of filteredRows) {
+            try {
+                if (isTestAccount(row.userId)) {
+                    errors.push(`Dòng #${row.rowIndex}: Tài khoản test không được phép tham gia khóa học`)
+                    continue
+                }
+
+                await prisma.$transaction(async (tx) => {
                     if (row.status === 'NEW' && row.userId) {
                         await tx.user.create({
                             data: {
@@ -299,28 +328,38 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         const updates: any = {}
                         const mods = summary.modifiedUsers.filter(m => m.userId === row.userId)
                         for (const m of mods) updates[m.field] = m.newValue
+
+                        // Guard: không update email/phone nếu giá trị mới đã thuộc
+                        // về MỘT user khác — tránh vỡ unique constraint giữa chừng
+                        // (dữ liệu có thể đã đổi khác so với lúc Xem trước).
+                        if (updates.email) {
+                            const owner = await tx.user.findFirst({ where: { email: updates.email, NOT: { id: row.userId } } })
+                            if (owner) { delete updates.email; errors.push(`Dòng #${row.rowIndex}: Bỏ qua cập nhật email vì đã thuộc user #${owner.id}`) }
+                        }
+                        if (updates.phone) {
+                            const owner = await tx.user.findFirst({ where: { phone: updates.phone, NOT: { id: row.userId } } })
+                            if (owner) { delete updates.phone; errors.push(`Dòng #${row.rowIndex}: Bỏ qua cập nhật SĐT vì đã thuộc user #${owner.id}`) }
+                        }
+
                         if (Object.keys(updates).length > 0) {
                             await tx.user.update({ where: { id: row.userId }, data: updates })
                         }
                     }
 
-                    if (isTestAccount(row.userId)) {
-                        errors.push(`Dòng #${row.rowIndex}: Tài khoản test không được phép tham gia khóa học`)
-                        continue
-                    }
                     if (row.userId) {
                         await tx.enrollment.upsert({
                             where: { userId_courseId: { userId: row.userId, courseId } },
                             update: { status: 'ACTIVE', startedAt: new Date() },
                             create: { userId: row.userId, courseId, status: 'ACTIVE', startedAt: new Date() }
                         })
-                        summary.createdEnrollments.push({ userId: row.userId, courseId })
                     }
-                } catch (err: any) {
-                    errors.push(`Dòng #${row.rowIndex}: ${err.message}`)
-                }
+                })
+
+                if (row.userId) summary.createdEnrollments.push({ userId: row.userId, courseId })
+            } catch (err: any) {
+                errors.push(`Dòng #${row.rowIndex}: ${err.message}`)
             }
-        }, { timeout: 60000 })
+        }
 
         // Closure + affiliate tracking sau transaction
         // [OPTIMIZE] Chạy song song theo lô thay vì tuần tự từng dòng — import
