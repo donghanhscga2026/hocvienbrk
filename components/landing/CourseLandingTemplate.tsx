@@ -114,25 +114,25 @@ export default function CourseLandingTemplate({
                     setLocalEnrollment((prev: any) => prev ? { ...prev, status: 'ACTIVE' } : { status: 'ACTIVE' })
                     router.refresh()
                 }
-            } catch {}
+            } catch { }
         }, 10_000)
         const timeout = setTimeout(() => clearInterval(interval), 20 * 60 * 1000)
         return () => { clearInterval(interval); clearTimeout(timeout) }
     }, [course?.id, hasActivated, isEnrolled, showRegistration])
-    
+
     const displayLessons = showAllLessons ? lessons : lessons.slice(0, 3)
     const hasMoreLessons = lessons.length > 3
-    
+
     const handleEnroll = async () => {
         if (!session) {
             router.push(`/register?redirect=khoa-hoc/${course.id_khoa}`)
             return
         }
-        
+
         // Luôn mở Modal Đăng Ký (RegistrationFlowModal) để người dùng có thể chọn Voucher trước khi thanh toán
         setShowRegistration(true)
     }
-    
+
     const handleCopyShareLink = async () => {
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
         const link = `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}${userId ? `?ref=${userId}` : ''}`
@@ -144,16 +144,16 @@ export default function CourseLandingTemplate({
             // fallback
         }
     }
-    
+
     const getCTAButton = () => {
         if (isEnrolled) {
             return (
                 <button
                     onClick={() => router.push(`/courses/${course.id_khoa}/learn`)}
-                    className="w-full bg-brk-primary text-brk-on-primary py-4 rounded-2xl font-black text-lg uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brk-primary/20"
+                    className="flex-1 bg-brk-primary text-brk-on-primary py-4 rounded-2xl font-black text-sm uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brk-primary/20"
                 >
                     <Play className="w-6 h-6" />
-                    Vào học ngay
+                    Vào học tiếp
                 </button>
             )
         }
@@ -162,20 +162,20 @@ export default function CourseLandingTemplate({
             return (
                 <button
                     onClick={() => setShowRegistration(true)}
-                    className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-lg uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20"
+                    className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-500/20"
                 >
                     <Clock className="w-6 h-6 animate-pulse" />
                     Chờ thanh toán
                 </button>
             )
         }
-        
+
         if (effectivePhiCoc === 0) {
             return (
                 <button
                     onClick={handleEnroll}
                     disabled={loading}
-                    className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black text-lg uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brk-accent/20 disabled:opacity-50"
+                    className="w-full bg-brk-accent text-brk-on-primary py-4 rounded-2xl font-black text-sm uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brk-accent/20 disabled:opacity-50"
                 >
                     {loading ? (
                         <span className="animate-spin">⟳</span>
@@ -188,12 +188,12 @@ export default function CourseLandingTemplate({
                 </button>
             )
         }
-        
+
         return (
             <button
                 onClick={handleEnroll}
                 disabled={loading}
-                className="w-full bg-brk-primary text-brk-on-primary py-4 rounded-2xl font-black text-lg uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brk-primary/20 disabled:opacity-50"
+                className="w-full bg-brk-primary text-brk-on-primary py-4 rounded-2xl font-black text-sm uppercase tracking-wide hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-xl shadow-brk-primary/20 disabled:opacity-50"
             >
                 {loading ? (
                     <span className="animate-spin">⟳</span>
@@ -206,11 +206,11 @@ export default function CourseLandingTemplate({
             </button>
         )
     }
-    
+
     return (
         <div className="min-h-screen bg-brk-background">
             <MainHeader title="" />
-            
+
             {/* CTA Section */}
             <section className="py-8 pt-20">
                 <div className="container mx-auto px-4">
@@ -228,33 +228,36 @@ export default function CourseLandingTemplate({
                                     />
                                 </div>
                             )}
-                            
+
                             <div className="mb-4">
                                 <h1 className="text-2xl md:text-3xl font-black text-brk-on-surface mb-1">
                                     {course.name_lop}
                                 </h1>
-                                {course.name_khoa && (
+                                {/* Tên khóa học + Phí/Giá tiền chỉ hiện khi CHƯA kích hoạt — học viên đã kích hoạt không cần xem lại giá */}
+                                {!isEnrolled && course.name_khoa && (
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>
                                 )}
-                                <div className="mt-2 flex flex-wrap items-center gap-3">
-                                    <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
-                                        {feeLabel}
-                                    </span>
-                                    <p className="text-lg font-black text-brk-primary">
-                                        {effectivePhiCoc.toLocaleString('vi-VN')}đ
-                                    </p>
-                                </div>
+                                {!isEnrolled && (
+                                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                                        <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
+                                            {feeLabel}
+                                        </span>
+                                        <p className="text-lg font-black text-brk-primary">
+                                            {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                        </p>
+                                    </div>
+                                )}
                             </div>
-                            
+
                             {isEnrolled && (
                                 <div className="mb-4 p-3 bg-brk-primary/10 rounded-xl border border-brk-primary/30">
                                     <p className="text-brk-primary text-sm font-medium flex items-center gap-2">
                                         <span className="w-2 h-2 bg-brk-primary rounded-full animate-pulse" />
-                                        Bạn đã kích hoạt khóa học này
+                                        Bạn đã kích hoạt món quà này
                                     </p>
                                 </div>
                             )}
-                            
+
                             {isPending && (
                                 <div className="mb-4 p-3 bg-brk-primary/10 rounded-xl border border-brk-primary/30">
                                     <p className="text-brk-primary text-sm font-medium flex items-center gap-2">
@@ -263,19 +266,38 @@ export default function CourseLandingTemplate({
                                     </p>
                                 </div>
                             )}
-                            
-                            {getCTAButton()}
-                            <div className="mt-4 space-y-3">
-                                <button
-                                    onClick={handleCopyShareLink}
-                                    disabled={!canShare}
-                                    className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wide transition-all flex items-center justify-center gap-2 ${canShare ? 'bg-white border-2 border-brk-primary text-brk-primary hover:bg-brk-primary/5 shadow-sm shadow-brk-primary/10' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
-                                >
-                                    <Link2 className="w-4 h-4" />
-                                    {copied ? '✓ Đã sao chép' : 'Chia sẻ link giới thiệu'}
-                                </button>
-                                {shareInfo && <p className="text-center text-xs text-brk-muted">{shareInfo}</p>}
-                            </div>
+
+                            {isEnrolled ? (
+                                <>
+                                    <div className="flex gap-3">
+                                        {getCTAButton()}
+                                        <button
+                                            onClick={handleCopyShareLink}
+                                            disabled={!canShare}
+                                            className={`flex-1 py-4 rounded-2xl font-black text-sm uppercase tracking-wide transition-all flex items-center justify-center gap-2 ${canShare ? 'bg-white border-2 border-brk-primary text-brk-primary hover:bg-brk-primary/5 shadow-sm shadow-brk-primary/10' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                                        >
+                                            <Link2 className="w-4 h-4" />
+                                            {copied ? '✓ Đã sao chép' : 'Chia sẻ'}
+                                        </button>
+                                    </div>
+                                    {shareInfo && <p className="mt-3 text-center text-xs text-brk-muted">{shareInfo}</p>}
+                                </>
+                            ) : (
+                                <>
+                                    {getCTAButton()}
+                                    <div className="mt-4 space-y-3">
+                                        <button
+                                            onClick={handleCopyShareLink}
+                                            disabled={!canShare}
+                                            className={`w-full py-3 rounded-2xl font-black text-sm uppercase tracking-wide transition-all flex items-center justify-center gap-2 ${canShare ? 'bg-white border-2 border-brk-primary text-brk-primary hover:bg-brk-primary/5 shadow-sm shadow-brk-primary/10' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                                        >
+                                            <Link2 className="w-4 h-4" />
+                                            {copied ? '✓ Đã sao chép' : 'Chia sẻ'}
+                                        </button>
+                                        {shareInfo && <p className="text-center text-xs text-brk-muted">{shareInfo}</p>}
+                                    </div>
+                                </>
+                            )}
 
                             {/* Stats */}
                             <div className="mt-6 pt-6 border-t border-brk-outline">
@@ -318,7 +340,7 @@ export default function CourseLandingTemplate({
                     </div>
                 </div>
             </section>
-            
+
             {/* Overview Section */}
             <section className="py-16">
                 <div className="container mx-auto px-4">
@@ -326,14 +348,14 @@ export default function CourseLandingTemplate({
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                             Giới thiệu khóa học
                         </h2>
-                        <div 
+                        <div
                             className="text-brk-on-surface leading-relaxed whitespace-pre-line text-justify"
                             dangerouslySetInnerHTML={{ __html: course.mo_ta_ngan || 'Khóa học đang được cập nhật...' }}
                         />
                     </div>
                 </div>
             </section>
-            
+
             {/* Curriculum Section */}
             {lessons.length > 0 && (
                 <section className="py-16 bg-brk-surface">
@@ -345,10 +367,10 @@ export default function CourseLandingTemplate({
                             <p className="text-brk-muted mb-6">
                                 {lessons.length} bài học • {totalHours} giờ
                             </p>
-                            
+
                             <div className="space-y-3">
                                 {displayLessons.map((lesson, index) => (
-                                    <div 
+                                    <div
                                         key={lesson.id}
                                         className="flex items-center gap-4 p-4 bg-brk-background rounded-xl border border-brk-outline"
                                     >
@@ -363,7 +385,7 @@ export default function CourseLandingTemplate({
                                     </div>
                                 ))}
                             </div>
-                            
+
                             {hasMoreLessons && (
                                 <button
                                     onClick={() => setShowAllLessons(!showAllLessons)}
@@ -386,7 +408,7 @@ export default function CourseLandingTemplate({
                     </div>
                 </section>
             )}
-            
+
             {/* Testimonials Section */}
             <section className="py-16">
                 <div className="container mx-auto px-4">
@@ -394,11 +416,11 @@ export default function CourseLandingTemplate({
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                             Thành viên nói gì về khóa học
                         </h2>
-                        
+
                         {testimonials.length > 0 ? (
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {testimonials.slice(0, 3).map((testimonial) => (
-                                    <div 
+                                    <div
                                         key={testimonial.id}
                                         className="bg-brk-surface rounded-2xl p-6 border border-brk-outline"
                                     >
@@ -452,8 +474,8 @@ export default function CourseLandingTemplate({
                     </div>
                 </div>
             </section>
-            
-            
+
+
             {/* Footer */}
             <footer className="py-8 text-center text-brk-muted text-sm">
                 <p>© 2026 Cộng đồng MBC. All rights reserved.</p>
