@@ -266,7 +266,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
 
     const handleUpdateLesson = async (data: any) => {
         const res = await updateLessonAction(data.id, {
-            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content
+            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content, isDailyChallenge: data.isDailyChallenge
         })
         if (res.success) {
             setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })

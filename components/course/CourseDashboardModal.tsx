@@ -121,7 +121,7 @@ export default function CourseDashboardModal({ courseId, courseName, onClose, re
                     <>
                         {visitedTabs.has('overview') && (
                             <div style={{ display: tab === 'overview' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
-                                <CourseStatsTab members={members} lessons={lessons} />
+                                <CourseStatsTab members={members} lessons={lessons} labels={labels} />
                             </div>
                         )}
                         {visitedTabs.has('members') && (

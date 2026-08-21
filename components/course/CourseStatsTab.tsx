@@ -2,9 +2,13 @@
 
 import type { ReactNode } from 'react'
 import { Users, TrendingUp, BookOpen } from 'lucide-react'
-import { RosterMember } from './MemberRosterPanel'
+import { RosterMember, CourseMemberLabels, teamLabel, groupLabel } from './MemberRosterPanel'
 
 type Lesson = { id: string; order: number; title: string }
+
+// Nhóm mang tên đúng chuỗi này bị loại khỏi mọi tính toán tỷ lệ hoàn thành
+// (thành viên tạm dừng học có lý do riêng, không tính là "chưa hoàn thành").
+const EXCLUDED_GROUP_NAME = 'Tạm dừng/có lý do'
 
 function StatCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
     return (
@@ -20,11 +24,48 @@ function StatCard({ icon, label, value }: { icon: ReactNode; label: string; valu
     )
 }
 
-export default function CourseStatsTab({ members, lessons }: { members: RosterMember[]; lessons: Lesson[] }) {
+function average(values: number[]): number | null {
+    return values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null
+}
+
+export default function CourseStatsTab({ members, lessons, labels }: {
+    members: RosterMember[]
+    lessons: Lesson[]
+    labels: CourseMemberLabels
+}) {
     const totalMembers = members.length
 
-    const percents = members.map(m => m.completionPercent).filter((p): p is number => p !== null)
-    const avgPercent = percents.length > 0 ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length) : null
+    const teamsWithPS = new Set(members.filter(m => m.memberRole === 'PS').map(m => m.team))
+
+    // Thành viên KHÔNG được tính vào tỷ lệ hoàn thành (theo Team lẫn cả lớp)
+    // nếu: (a) thuộc 1 Team chưa có Phụng sự, hoặc (b) thuộc Group tên đúng
+    // "Tạm dừng/có lý do".
+    const isCounted = (m: RosterMember) => {
+        if (!teamsWithPS.has(m.team)) return false
+        if (m.memberRole === 'PS') return true
+        return groupLabel(m.team, m.group, labels) !== EXCLUDED_GROUP_NAME
+    }
+
+    const countedMembers = members.filter(isCounted)
+    const avgPercent = average(countedMembers.map(m => m.completionPercent).filter((p): p is number => p !== null))
+
+    const teamStats = (() => {
+        const map = new Map<number, RosterMember[]>()
+        members.forEach(m => {
+            if (!map.has(m.team)) map.set(m.team, [])
+            map.get(m.team)!.push(m)
+        })
+        return Array.from(map.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([team, teamMembers]) => {
+                const hasPS = teamsWithPS.has(team)
+                const counted = teamMembers.filter(isCounted)
+                const percent = hasPS
+                    ? average(counted.map(m => m.completionPercent).filter((p): p is number => p !== null))
+                    : null
+                return { team, memberCount: teamMembers.length, countedCount: counted.length, hasPS, percent }
+            })
+    })()
 
     const dayStats = lessons.map(l => {
         let onTime = 0, late = 0, missing = 0
@@ -44,6 +85,30 @@ export default function CourseStatsTab({ members, lessons }: { members: RosterMe
                 <StatCard icon={<TrendingUp className="w-5 h-5" />} label="% đúng hạn trung bình" value={avgPercent === null ? '—' : `${avgPercent}%`} />
                 <StatCard icon={<BookOpen className="w-5 h-5" />} label="Số ngày bài học" value={String(lessons.length)} />
             </div>
+
+            {teamStats.length > 0 && (
+                <div>
+                    <div className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Tỷ lệ hoàn thành theo Team</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {teamStats.map(t => (
+                            <div key={t.team} className="bg-white border border-gray-100 rounded-xl p-4">
+                                <div className="text-xs font-black text-violet-700 truncate">{teamLabel(t.team, labels)}</div>
+                                {t.hasPS ? (
+                                    <>
+                                        <div className="text-2xl font-black text-gray-800 mt-1">{t.percent === null ? '—' : `${t.percent}%`}</div>
+                                        <div className="text-[10px] font-bold text-gray-400 mt-0.5">{t.countedCount}/{t.memberCount} thành viên được tính</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="text-2xl font-black text-gray-300 mt-1">—</div>
+                                        <div className="text-[10px] font-bold text-amber-600 mt-0.5">Chưa có phụng sự — không tính</div>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div>
                 <div className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">Tình hình nộp bài theo từng ngày</div>
