@@ -476,13 +476,17 @@ model LessonComment {
   lessonId  String
   userId    Int
   content   String
+  parentId  Int?
   createdAt DateTime @default(now())
-  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  user      User     @relation("UserToLessonComment", fields: [userId], references: [id], onDelete: Cascade)
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user      User           @relation("UserToLessonComment", fields: [userId], references: [id], onDelete: Cascade)
+  parent    LessonComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   LessonComment[] @relation("CommentReplies")
 
   @@index([lessonId, createdAt])
   @@index([lessonId, userId])
   @@index([userId])
+  @@index([parentId])
 }
 
 model Message {

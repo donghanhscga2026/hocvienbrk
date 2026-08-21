@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, memo, useMemo } from 'react'
+import { useState, memo, useMemo, useRef, useEffect } from 'react'
 import { cn } from "@/lib/utils"
-import { CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw, AlertTriangle, X } from "lucide-react"
+import { CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw, AlertTriangle, X, ArrowUpDown } from "lucide-react"
 
 interface Lesson {
     id: string
@@ -55,6 +55,9 @@ function LessonSidebar({
     const [dateInput, setDateInput] = useState(toInputValue(startedAt))
     const [saving, setSaving] = useState(false)
     const [showWarning, setShowWarning] = useState(false)
+    const [sortDesc, setSortDesc] = useState(true)
+    const listContainerRef = useRef<HTMLDivElement>(null)
+    const hasAutoScrolledRef = useRef(false)
 
     const filteredProgress = Object.entries(progress).reduce((acc, [lessonId, p]: [string, any]) => {
         if (p.status !== 'RESET') acc[lessonId] = p
@@ -65,6 +68,18 @@ function LessonSidebar({
         lessons.filter(l => filteredProgress[l.id]?.status === 'COMPLETED'),
         [lessons, filteredProgress]
     )
+
+    const displayLessons = useMemo(() => sortDesc ? [...lessons].reverse() : lessons, [lessons, sortDesc])
+
+    // Tự động cuộn tới bài học hiện tại khi vừa vào trang
+    useEffect(() => {
+        if (hasAutoScrolledRef.current || !currentLessonId) return
+        const el = listContainerRef.current?.querySelector(`[data-lesson-id="${CSS.escape(currentLessonId)}"]`)
+        if (el) {
+            el.scrollIntoView({ block: 'center', behavior: 'auto' })
+            hasAutoScrolledRef.current = true
+        }
+    }, [currentLessonId])
 
     const today = todayVN()
     const isPastDate = dateInput < today
@@ -93,7 +108,7 @@ function LessonSidebar({
                     <div className="flex items-center gap-2 text-zinc-300">
                         <CalendarDays className="w-4 h-4 text-orange-400 shrink-0" />
                         <div>
-                            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Ngày bắt đầu lộ trình</p>
+                            <p className="text-[10px] text-zinc-400 uppercase tracking-wide">Ngày bắt đầu lộ trình</p>
                             <p className="text-sm font-semibold text-white leading-tight">
                                 {startedAt ? formatDateVN(startedAt) : '-- / -- / ----'}
                             </p>
@@ -110,7 +125,7 @@ function LessonSidebar({
 
                 {showDatePicker && (
                     <div className="bg-zinc-800 rounded-lg p-3 space-y-2 border border-zinc-700">
-                        <p className="text-[10px] text-zinc-400">Chọn ngày mới (từ hôm nay trở đi):</p>
+                        <p className="text-[10px] text-zinc-300">Chọn ngày mới (từ hôm nay trở đi):</p>
                         <input
                             type="date"
                             value={dateInput}
@@ -133,7 +148,7 @@ function LessonSidebar({
                             </button>
                             <button
                                 onClick={() => { setShowDatePicker(false); setShowWarning(false) }}
-                                className="flex-1 text-xs text-zinc-400 hover:text-white border border-zinc-600 rounded-lg py-1.5 transition-colors"
+                                className="flex-1 text-xs text-zinc-200 hover:text-white border border-zinc-600 rounded-lg py-1.5 transition-colors"
                             >
                                 Hủy
                             </button>
@@ -143,13 +158,21 @@ function LessonSidebar({
             </div>
 
             {/* ── Tiêu đề danh sách ── */}
-            <div className="px-4 py-2 border-b border-zinc-800">
-                <h2 className="font-bold text-sm text-zinc-400 uppercase tracking-wide">Nội dung khóa học</h2>
+            <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-2">
+                <h2 className="font-bold text-sm text-zinc-200 uppercase tracking-wide">Nội dung khóa học</h2>
+                <button
+                    onClick={() => setSortDesc(v => !v)}
+                    title={sortDesc ? 'Đang sắp xếp: Cuối → Đầu' : 'Đang sắp xếp: Đầu → Cuối'}
+                    className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-full px-2 py-1 transition-colors"
+                >
+                    <ArrowUpDown className="w-3 h-3" />
+                    {sortDesc ? 'Cuối → Đầu' : 'Đầu → Cuối'}
+                </button>
             </div>
 
             {/* ── Danh sách bài ── */}
-            <div className="flex-1 overflow-y-auto">
-                {lessons.map((lesson) => {
+            <div ref={listContainerRef} className="flex-1 overflow-y-auto">
+                {displayLessons.map((lesson) => {
                     const prog = filteredProgress[lesson.id]
                     const isCompleted = prog?.status === 'COMPLETED'
                     const isActive = currentLessonId === lesson.id
@@ -158,6 +181,7 @@ function LessonSidebar({
                     return (
                         <button
                             key={lesson.id}
+                            data-lesson-id={lesson.id}
                             onClick={() => unlocked && onLessonSelect(lesson.id)}
                             disabled={!unlocked}
                             title={!unlocked ? 'Hoàn thành bài trước ≥5đ để mở khóa' : undefined}
@@ -174,15 +198,15 @@ function LessonSidebar({
                                 ) : isActive ? (
                                     <PlayCircle className="w-5 h-5 text-orange-400" />
                                 ) : !unlocked ? (
-                                    <Lock className="w-4 h-4 text-zinc-600" />
+                                    <Lock className="w-4 h-4 text-zinc-400" />
                                 ) : (
-                                    <div className="w-5 h-5 rounded-full border-2 border-zinc-700 flex items-center justify-center text-[10px] text-zinc-500">
+                                    <div className="w-5 h-5 rounded-full border-2 border-zinc-600 flex items-center justify-center text-[10px] text-zinc-200">
                                         {lesson.order}
                                     </div>
                                 )}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={cn("text-sm font-medium line-clamp-2", isActive ? "text-white" : "text-zinc-400")}>
+                                <p className={cn("text-sm font-medium line-clamp-2", isActive ? "text-white" : "text-zinc-100")}>
                                     {lesson.title}
                                     {lesson.isDailyChallenge && (
                                         <span className="ml-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full align-middle">📝 Bài tập</span>
@@ -251,10 +275,10 @@ function LessonSidebar({
                                     </p>
                                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
                                         {completedLessons.map(l => (
-                                            <div key={l.id} className="flex items-center gap-2 text-xs text-zinc-400">
+                                            <div key={l.id} className="flex items-center gap-2 text-xs text-zinc-300">
                                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/50 shrink-0" />
                                                 <span className="truncate">{l.title}</span>
-                                                <span className="shrink-0 text-zinc-600 ml-auto">({filteredProgress[l.id]?.totalScore}/10đ)</span>
+                                                <span className="shrink-0 text-zinc-400 ml-auto">({filteredProgress[l.id]?.totalScore}/10đ)</span>
                                             </div>
                                         ))}
                                     </div>
@@ -262,10 +286,10 @@ function LessonSidebar({
                             )}
 
                             {completedLessons.length === 0 && (
-                                <p className="text-zinc-500 text-xs text-center italic">Chưa có bài nào hoàn thành trong lộ trình hiện tại.</p>
+                                <p className="text-zinc-400 text-xs text-center italic">Chưa có bài nào hoàn thành trong lộ trình hiện tại.</p>
                             )}
 
-                            <p className="text-zinc-600 text-[10px] text-center">
+                            <p className="text-zinc-400 text-[10px] text-center">
                                 Dữ liệu cũ vẫn được lưu trong hệ thống để admin kiểm tra khi cần.
                             </p>
                         </div>

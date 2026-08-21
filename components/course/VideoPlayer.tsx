@@ -147,8 +147,8 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         return (
             <div className="w-full h-full flex items-center justify-center bg-zinc-900">
                 <div className="text-center p-8">
-                    <FileText className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                    <p className="text-zinc-400 font-bold">Chưa có nội dung bài học</p>
+                    <FileText className="w-16 h-16 text-zinc-500 mx-auto mb-4" />
+                    <p className="text-zinc-300 font-bold">Chưa có nội dung bài học</p>
                 </div>
             </div>
         )
@@ -476,7 +476,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
 
         return (
             <div className="w-full h-full flex items-center justify-center bg-zinc-900">
-                <p className="text-zinc-500 text-sm">Không hỗ trợ định dạng video này</p>
+                <p className="text-zinc-300 text-sm">Không hỗ trợ định dạng video này</p>
             </div>
         )
     }
@@ -518,7 +518,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                             <h3 className="text-white font-black text-base flex items-center gap-3">
                                 <List className="w-5 h-5 text-orange-400" /> DANH SÁCH HỌC ({playlist.length})
                             </h3>
-                            <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"><X className="w-5 h-5" /></button>
+                            <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-300 hover:text-white transition-all"><X className="w-5 h-5" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[66vh] custom-scrollbar">
                             {playlist.map((item, idx) => {
@@ -536,7 +536,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                                         <div className="flex-1 text-left min-w-0">
                                             <p className={`text-xs font-bold truncate ${isCurrent ? 'text-orange-300' : 'text-zinc-200'}`}>
                                                 {item.title}
-                                                {platformLabel && <span className="text-[8px] text-zinc-500 ml-1">({platformLabel})</span>}
+                                                {platformLabel && <span className="text-[8px] text-zinc-400 ml-1">({platformLabel})</span>}
                                             </p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className="flex-1 h-1 bg-zinc-700 rounded-full overflow-hidden"><div className="h-full transition-all duration-1000 bg-orange-500" style={{ width: `${pct}%` }} /></div>

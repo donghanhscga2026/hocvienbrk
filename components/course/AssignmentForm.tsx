@@ -117,6 +117,11 @@ function AssignmentForm({
     const [reflectionFocused, setReflectionFocused] = useState(false)
     const reflectionExpanded = reflectionHovering || reflectionFocused
     const reflectionTextareaRef = useRef<HTMLTextAreaElement>(null)
+    const closeReflectionExpand = useCallback(() => {
+        reflectionTextareaRef.current?.blur()
+        setReflectionHovering(false)
+        setReflectionFocused(false)
+    }, [])
 
     // Refs
     const isDirtyRef = useRef(false)
@@ -315,24 +320,35 @@ function AssignmentForm({
 
                 <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={2} label="Bồi Nhân = Bài tập/Bài học theo yêu cầu (2đ)" max={2} current={refScore} />
+                    <style jsx>{`
+                        .reflection-expand-box { height: 90vh; top: 5vh; }
+                        @supports (height: 100dvh) {
+                            .reflection-expand-box { height: 85dvh; top: 7.5dvh; }
+                        }
+                    `}</style>
                     {reflectionExpanded && (
                         <div
                             className="fixed inset-0 z-40 bg-black/50"
-                            onClick={() => {
-                                reflectionTextareaRef.current?.blur()
-                                setReflectionHovering(false)
-                                setReflectionFocused(false)
-                            }}
+                            onClick={closeReflectionExpand}
                         />
                     )}
                     <div
                         onMouseEnter={() => setReflectionHovering(true)}
                         onMouseLeave={() => setReflectionHovering(false)}
                         className={reflectionExpanded
-                            ? 'fixed left-1/2 top-[5vh] -translate-x-1/2 z-50 w-[92vw] max-w-2xl h-[90vh]'
+                            ? 'reflection-expand-box fixed left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-2xl'
                             : ''
                         }
                     >
+                        {reflectionExpanded && (
+                            <button
+                                type="button"
+                                onClick={closeReflectionExpand}
+                                className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" /> ĐÓNG
+                            </button>
+                        )}
                         <textarea
                             ref={reflectionTextareaRef}
                             value={reflection}
@@ -342,7 +358,7 @@ function AssignmentForm({
                             placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
                             rows={3}
                             className={reflectionExpanded
-                                ? 'w-full h-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
+                                ? 'w-full h-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
                                 : 'w-full bg-white text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
                             }
                         />

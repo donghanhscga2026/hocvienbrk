@@ -55,7 +55,8 @@ export async function getCommentsByLesson(lessonId: string) {
             createdAt: comment.createdAt,
             userId: comment.userId,
             userName: comment.user.name,
-            userAvatar: avatar
+            userAvatar: avatar,
+            parentId: comment.parentId
         }
     })
 }
@@ -76,7 +77,7 @@ export async function hasUserCommentedOnLesson(lessonId: string) {
     return !!comment
 }
 
-export async function createComment(lessonId: string, content: string) {
+export async function createComment(lessonId: string, content: string, parentId?: number | null) {
     const session = await auth()
     if (!session?.user?.id) {
         return { success: false, message: "Vui lòng đăng nhập để bình luận" }
@@ -85,11 +86,18 @@ export async function createComment(lessonId: string, content: string) {
     const userId = parseInt(session.user.id as string)
 
     try {
+        // Chỉ cho reply vào bình luận CÙNG bài học, tránh gắn nhầm parentId lệch lesson
+        if (parentId) {
+            const parent = await prisma.lessonComment.findUnique({ where: { id: parentId }, select: { lessonId: true } })
+            if (!parent || parent.lessonId !== lessonId) parentId = null
+        }
+
         const comment = await prisma.lessonComment.create({
             data: {
                 lessonId,
                 userId,
-                content: content.trim()
+                content: content.trim(),
+                parentId: parentId || null
             },
             include: {
                 user: {
@@ -169,7 +177,8 @@ export async function createComment(lessonId: string, content: string) {
                 createdAt: comment.createdAt,
                 userId: comment.userId,
                 userName: comment.user.name,
-                userAvatar: avatar
+                userAvatar: avatar,
+                parentId: comment.parentId
             }
         }
     } catch (error) {

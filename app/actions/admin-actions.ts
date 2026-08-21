@@ -1210,6 +1210,124 @@ export async function exportCourseMembersAction(courseId: number, courseName: st
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
+// ==========================================
+// XUẤT DANH SÁCH EMAIL TOÀN HỆ THỐNG (Email Marketing)
+// ==========================================
+
+type UserEmailExportFilters = {
+    courseId?: number | null
+    onSystem?: number | null
+    registeredFrom?: string | null
+    registeredTo?: string | null
+}
+
+function buildUserEmailExportWhere(filters: UserEmailExportFilters): Prisma.UserWhereInput {
+    const where: Prisma.UserWhereInput = {}
+
+    if (filters.courseId) {
+        where.enrollments = { some: { courseId: filters.courseId, status: 'ACTIVE' } }
+    }
+    if (filters.onSystem) {
+        where.systems = { some: { onSystem: filters.onSystem } }
+    }
+    if (filters.registeredFrom || filters.registeredTo) {
+        where.createdAt = {
+            ...(filters.registeredFrom ? { gte: new Date(`${filters.registeredFrom}T00:00:00`) } : {}),
+            ...(filters.registeredTo ? { lte: new Date(`${filters.registeredTo}T23:59:59`) } : {}),
+        }
+    }
+
+    return where
+}
+
+/**
+ * Lấy danh sách khóa học + hệ thống BRK để đổ vào bộ lọc của tính năng xuất
+ * danh sách email (tab "Xuất Email" ở /tools/email-mkt).
+ */
+export async function getEmailExportFilterOptionsAction() {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) return { success: false, error: "Unauthorized" }
+
+        const [courses, systems] = await Promise.all([
+            prisma.course.findMany({ select: { id: true, name_lop: true }, orderBy: { id: 'desc' } }),
+            prisma.systemTree.findMany({ select: { onSystem: true, nameSystem: true }, orderBy: { onSystem: 'asc' } }),
+        ])
+
+        return { success: true, courses, systems }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Đếm nhanh số tài khoản khớp bộ lọc (dùng để hiện số lượng xem trước trước khi xuất).
+ */
+export async function previewUserEmailExportAction(filters: UserEmailExportFilters) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) return { success: false, error: "Unauthorized" }
+
+        const total = await prisma.user.count({ where: buildUserEmailExportWhere(filters) })
+        return { success: true, total }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
+/**
+ * Xuất danh sách email tài khoản đã đăng ký (ID, họ tên, email, ngày đăng ký)
+ * ra Google Sheet/CSV, có thể lọc theo khóa học, hệ thống, khoảng thời gian đăng ký.
+ */
+/**
+ * Tách "Họ tên" tiếng Việt thành FIRSTNAME/LASTNAME để khớp template CRM
+ * (VD Brevo): FIRSTNAME = từ cuối (tên gọi hàng ngày, dùng để cá nhân hóa
+ * kiểu "Xin chào Vân"), LASTNAME = phần còn lại (họ + tên đệm).
+ */
+function splitNameForExport(name: string | null | undefined) {
+    const trimmed = (name || "").trim()
+    if (!trimmed) return { firstName: "", lastName: "" }
+    const parts = trimmed.split(/\s+/)
+    if (parts.length === 1) return { firstName: parts[0], lastName: "" }
+    return { firstName: parts[parts.length - 1], lastName: parts.slice(0, -1).join(" ") }
+}
+
+export async function exportUserEmailsAction(filters: UserEmailExportFilters) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) return { success: false, error: "Unauthorized" }
+
+        const users = await prisma.user.findMany({
+            where: buildUserEmailExportWhere(filters),
+            select: { id: true, name: true, email: true, phone: true },
+            orderBy: { id: 'asc' }
+        })
+
+        if (users.length === 0) return { success: false, error: "Không có tài khoản nào khớp bộ lọc" }
+
+        const headers = ["CONTACT ID", "EMAIL", "FIRSTNAME", "LASTNAME", "SMS"]
+        const rows = users.map((u) => {
+            const { firstName, lastName } = splitNameForExport(u.name)
+            return [
+                u.id.toString(),
+                u.email,
+                firstName,
+                lastName,
+                u.phone || "",
+            ]
+        })
+
+        const dateStr = new Date().toLocaleDateString("vi-VN").replace(/\//g, "-")
+        const fileName = `DanhSachEmail_${dateStr}`
+
+        const csvHeader = headers.join(",")
+        const csvRows = rows.map(r => r.map(v => (v.includes(",") || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v)).join(","))
+        const csvContent = [csvHeader, ...csvRows].join("\n")
+
+        const { tryCreateSheet } = await import("@/lib/email-campaign-export")
+        const fullSheetTitle = `[Danh sách Email] ${new Date().toLocaleDateString("vi-VN")}`
+        const { sheetUrl, error } = await tryCreateSheet(rows, headers, fullSheetTitle)
+
+        return { success: true, sheetUrl, csvContent, fileName, totalRows: rows.length, sheetError: error }
+    } catch (error: any) { return { success: false, error: error.message } }
+}
+
 export async function changeUserIdAction(prevState: any, formData: FormData) {
     try {
         await checkAdmin()
