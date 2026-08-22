@@ -9,6 +9,7 @@ import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
 import AffiliateTracker from "@/components/AffiliateTracker";
 import AccountAssistantTrigger from "@/components/auth/AccountAssistantTrigger";
 import { getSession } from "@/lib/get-session";
+import { getAttentionHighlightSettings } from "@/app/actions/attention-highlight-actions";
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -77,6 +78,7 @@ export default async function RootLayout({
 }>) {
   const siteThemeId = await getSiteTheme()
   const session = await getSession()
+  const attentionHighlight = await getAttentionHighlightSettings()
 
   const INITIAL_SCRIPT = `
 (function(){
@@ -105,7 +107,7 @@ export default async function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }}
         />
-        <Providers session={session}>
+        <Providers session={session} attentionHighlight={attentionHighlight}>
           {children}
           <AffiliateTracker />
           <AccountAssistantTrigger />

@@ -8,6 +8,9 @@ import {
     Loader2, CheckCircle2, PlayCircle, Lock, CalendarDays, RefreshCw, ArrowUpDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAttentionCycle } from "@/hooks/useAttentionCycle"
+import { AttentionHighlight } from "@/components/ui/attention-highlight"
+import { useAttentionHighlightSettings } from "@/app/contexts/AttentionHighlightContext"
 
 import LessonSidebar from "./LessonSidebar"
 import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
@@ -256,6 +259,26 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const assignmentInitialData = useMemo(() => ({ ...currentProgress, enrollmentId: enrollment.id }), [currentProgress, enrollment.id])
 
+    // Chu trình lóe sáng + tooltip tự động (giống MainHeader) cho nút Thoát ra
+    // và 3 tab dưới cùng trên mobile — chỉ nhấp nháy các tab CHƯA được chọn.
+    // Nội dung tooltip + tốc độ/thời gian đọc từ AttentionHighlightContext (DB,
+    // chỉnh trong /tools/settings/attention-tooltip).
+    const { config: attnConfig, getItem: getAttnItem } = useAttentionHighlightSettings()
+    const backAttn = getAttnItem('courseplayer.back', 'Thoát ra khỏi bài học')
+    const listTabAttn = getAttnItem('courseplayer.tab.list', 'Danh sách toàn bộ bài học')
+    const contentTabAttn = getAttnItem('courseplayer.tab.content', 'Xem video & tương tác')
+    const recordTabAttn = getAttnItem('courseplayer.tab.record', 'Nộp bài & xem điểm')
+
+    const cycleOptions = { idleDelayMs: attnConfig.idleDelayMs, cycleIntervalMs: attnConfig.cycleIntervalMs }
+    const { getStatus: getBackAttention } = useAttentionCycle([
+        { id: 'back', tooltip: backAttn.tooltip, visible: backAttn.enabled }
+    ], cycleOptions)
+    const { getStatus: getMobileTabAttention } = useAttentionCycle([
+        { id: 'list', tooltip: listTabAttn.tooltip, visible: mobileTab !== 'list' && listTabAttn.enabled },
+        { id: 'content', tooltip: contentTabAttn.tooltip, visible: mobileTab !== 'content' && contentTabAttn.enabled },
+        { id: 'record', tooltip: recordTabAttn.tooltip, visible: mobileTab !== 'record' && course.type !== 'LIB' && recordTabAttn.enabled },
+    ], cycleOptions)
+
     // [HYDRATION SAFEGUARD] Trả về giao diện trống tối giản trên server
     if (!isMounted) {
         return <div className="h-screen w-full bg-black flex items-center justify-center text-zinc-700 font-mono text-xs">Đang tải ứng dụng...</div>
@@ -270,14 +293,16 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             )}
             {/* Header */}
             <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-3 px-4 bg-zinc-900 z-50 fixed top-0 left-0 right-0">
-                <button
-                    onClick={() => router.back()}
-                    aria-label="Quay lại"
-                    className="shrink-0 flex items-center gap-1.5 pl-2.5 pr-3.5 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all"
-                >
-                    <ArrowLeft className="w-5 h-5" strokeWidth={2.75} />
-                    <span className="text-xs font-black tracking-wide">QUAY RA</span>
-                </button>
+                <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
+                    <button
+                        onClick={() => router.back()}
+                        aria-label="Quay ra"
+                        className="shrink-0 flex items-center gap-1.5 pl-2.5 pr-3.5 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all"
+                    >
+                        <ArrowLeft className="w-5 h-5" strokeWidth={2.75} />
+                        <span className="text-xs font-black tracking-wide">THOÁT RA</span>
+                    </button>
+                </AttentionHighlight>
 
                 {statusMsg && (
                     <div className={`absolute left-1/2 -translate-x-1/2 top-16 px-4 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 transition-all duration-300 z-[100] ${statusMsg.type === 'loading' ? 'bg-brk-accent text-brk-on-surface' :
@@ -357,7 +382,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 {currentLesson?.type === 'ALL' ? (
                                     <div className="text-zinc-300 text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
                                 ) : currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
-                                    <div className="text-zinc-300 text-sm leading-relaxed line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
+                                    <div className="text-zinc-300 text-sm leading-relaxed text-justify line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
                                 )}
                             </div>
                             <div
@@ -422,22 +447,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 )}
                             </div>
 
-                            <style jsx>{`
-                                @keyframes tabAttention {
-                                    0%, 100% { background-color: rgba(56,189,248,0.08); box-shadow: none; }
-                                    50% { background-color: rgba(56,189,248,0.55); box-shadow: 0 0 24px 4px rgba(56,189,248,0.75) inset, 0 0 16px rgba(56,189,248,0.5); }
-                                }
-                                @keyframes tabAttentionText {
-                                    0%, 100% { color: rgba(186,230,253,0.85); }
-                                    50% { color: #ffffff; }
-                                }
-                                @keyframes tabAttentionIcon {
-                                    0%, 100% { transform: scale(1); }
-                                    50% { transform: scale(1.25); }
-                                }
-                                .tab-attention { animation: tabAttention 0.9s ease-in-out infinite, tabAttentionText 0.9s ease-in-out infinite; }
-                                .tab-attention-icon { animation: tabAttentionIcon 0.9s ease-in-out infinite; }
-                            `}</style>
                             <nav className="h-14 bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-50">
                                 {[
                                     { id: 'list', icon: ListVideo, label: 'Danh sách' },
@@ -446,14 +455,15 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 ].map(tab => {
                                     const isActive = mobileTab === tab.id
                                     return (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setMobileTab(tab.id as MobileTab)}
-                                            className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${isActive ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'tab-attention'}`}
-                                        >
-                                            <tab.icon className={`w-5 h-5 ${!isActive ? 'tab-attention-icon' : ''}`} />
-                                            {tab.label}
-                                        </button>
+                                        <AttentionHighlight key={tab.id} {...getMobileTabAttention(tab.id)} tooltipPosition="top" className="flex-1 h-full">
+                                            <button
+                                                onClick={() => setMobileTab(tab.id as MobileTab)}
+                                                className={`w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${isActive ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'text-white/90'}`}
+                                            >
+                                                <tab.icon className="w-5 h-5" />
+                                                {tab.label}
+                                            </button>
+                                        </AttentionHighlight>
                                     )
                                 })}
                             </nav>
@@ -490,7 +500,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         </div>
                         {/* [FIX] Ẩn content trong modal khi là TEXT (đã hiển thị trong Player) */}
                         {currentLesson?.type !== 'TEXT' && (
-                            <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson?.content || '') }} />
+                            <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed text-justify [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson?.content || '') }} />
                         )}
                     </div>
                 </div>

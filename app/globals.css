@@ -99,3 +99,51 @@ body {
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* attention-blink — dùng cho AttentionHighlight (components/ui/attention-highlight.tsx)
+   khi 1 đối tượng đang được chu trình lóe sáng chọn: nền + glow chớp lên chớp
+   xuống liên tục. Màu nền (--attn-bg-color), màu chữ (--attn-text-color) và
+   tốc độ chớp (animation-duration) đều được set INLINE per-instance từ cấu
+   hình lưu trong DB (xem /tools/settings/attention-tooltip) — không hardcode
+   ở đây, chỉ định nghĩa CƠ CHẾ hoạt ảnh, còn giá trị thật lấy từ biến CSS. */
+@keyframes attention-blink {
+  0%, 100% {
+    background-color: color-mix(in srgb, var(--attn-bg-color, #4EB09B) 35%, transparent);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--attn-bg-color, #4EB09B) 35%, transparent);
+  }
+  50% {
+    background-color: var(--attn-bg-color, #4EB09B);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--attn-bg-color, #4EB09B) 85%, transparent);
+  }
+}
+.animate-attention-blink {
+  animation-name: attention-blink;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  /* animation-duration: set inline per-instance (style.animationDuration) */
+}
+/* Ép màu chữ/icon bên trong đối tượng đang lóe sáng sang màu đã cấu hình —
+   luôn tương phản rõ trên nền --attn-bg-color bất kể theme sáng/tối. */
+.attention-highlight-active * {
+  color: var(--attn-text-color, #111827) !important;
+}
+
+/* Bong bóng tooltip — luôn ƯU TIÊN hiện 1 dòng, chiều rộng khớp sát theo độ
+   dài text thật. Chỉ khi text dài hơn ngưỡng % chiều ngang màn hình (khác
+   nhau điện thoại/máy tính, lấy từ DB qua biến CSS --attn-tooltip-max-vw /
+   --attn-tooltip-max-vw-desktop) thì mới bị giới hạn lại = đúng ngưỡng đó và
+   xuống dòng.
+   [FIX] Chỉ dùng `max-width` (không set width) khiến trình duyệt tính
+   shrink-to-fit theo kiểu "min-content" khi kết hợp với break-words — co lại
+   kiểu mỗi dòng 1 từ dù còn dư chỗ. Phải khai báo rõ `width: max-content` (độ
+   rộng nếu hiện trọn 1 dòng) rồi mới để `max-width` cắt bớt khi cần, để trình
+   duyệt luôn ưu tiên xài hết chỗ được cấp trước khi thật sự phải xuống dòng. */
+.attention-tooltip-bubble {
+  width: max-content;
+  max-width: var(--attn-tooltip-max-vw, 60vw);
+}
+@media (min-width: 640px) {
+  .attention-tooltip-bubble {
+    max-width: var(--attn-tooltip-max-vw-desktop, 20vw);
+  }
+}

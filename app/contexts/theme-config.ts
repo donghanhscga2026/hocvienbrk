@@ -230,6 +230,7 @@ export function generateThemeCSS(colors: ThemeColors, isDark: boolean): string {
       --color-on-surface: ${colors.onSurface};
       --color-muted: ${colors.muted};
       --color-accent: ${colors.accent};
+      --color-on-accent: ${getContrastColor(colors.accent)};
       --color-outline: ${colors.outline};
     }
 

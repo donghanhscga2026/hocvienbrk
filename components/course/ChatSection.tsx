@@ -58,7 +58,7 @@ const CommentItem = ({ comment, isReply, onReply }: { comment: Comment; isReply?
                         </span>
                         {comment.sending && <span className="text-[9px] text-yellow-500 italic">Đang gửi...</span>}
                     </div>
-                    <p className="text-[13px] italic text-zinc-200 mt-0.5 break-words leading-relaxed">
+                    <p className="text-[13px] italic text-zinc-200 mt-0.5 break-words leading-relaxed text-justify">
                         {comment.content}
                     </p>
                     {onReply && !comment.sending && (
@@ -82,9 +82,21 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [newComment, setNewComment] = useState('')
     const [error, setError] = useState('')
     const [replyingTo, setReplyingTo] = useState<{ id: number | string; userName: string | null } | null>(null)
+    // [EXPAND] Ô nhập bình luận: hover (desktop) hoặc đang gõ (mọi thiết bị) thì
+    // mở rộng thành overlay lớn để soạn thảo dễ hơn — cùng cơ chế với ô "Bồi
+    // Nhân" trong AssignmentForm (mục 2 của Ghi nhận).
+    const [commentHovering, setCommentHovering] = useState(false)
+    const [commentFocused, setCommentFocused] = useState(false)
+    const commentExpanded = commentHovering || commentFocused
     const commentsEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const { openAssistant } = useAccountAssistant()
+
+    const closeCommentExpand = () => {
+        textareaRef.current?.blur()
+        setCommentHovering(false)
+        setCommentFocused(false)
+    }
 
     // Optimistic UI: Hiển thị ngay lập tức khi nhấn gửi
     const [optimisticComments, addOptimisticComment] = useOptimistic(
@@ -129,6 +141,8 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
         setNewComment('')
         setError('')
         setReplyingTo(null)
+        // Gửi = gửi rồi tự thu gọn lại (khác với Đóng — chỉ thu gọn, không gửi)
+        closeCommentExpand()
 
         // 1. Tạo bản tin nhắn tạm thời (Optimistic)
         const tempId = Date.now().toString()
@@ -265,10 +279,21 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                 <div ref={commentsEndRef} className="h-4" />
             </div>
 
-            <div className="shrink-0 border-t border-zinc-800 bg-zinc-900/80 p-3 backdrop-blur-md">
+            {/* [FIX] KHÔNG dùng backdrop-blur (backdrop-filter) trên div này — theo
+                spec CSS, backdrop-filter/filter/transform tạo containing block MỚI
+                cho con cháu position:fixed, khiến ô mở rộng bên trong (.comment-expand-box)
+                tính "top" theo div này (nằm sát đáy khung chat) thay vì theo viewport
+                thật → hộp mở rộng bị đẩy ra ngoài màn hình, trông như "biến mất". */}
+            <div className="shrink-0 border-t border-zinc-800 bg-zinc-900/90 p-3">
                 {session?.user ? (
                     <>
-                    {replyingTo && (
+                    <style jsx>{`
+                        .comment-expand-box { height: 90vh; top: 5vh; }
+                        @supports (height: 100dvh) {
+                            .comment-expand-box { height: 85dvh; top: 7.5dvh; }
+                        }
+                    `}</style>
+                    {!commentExpanded && replyingTo && (
                         <div className="flex items-center justify-between gap-2 mb-2 pl-3 pr-2 py-1.5 rounded-xl bg-zinc-800/70 border border-zinc-700">
                             <span className="text-[11px] text-zinc-300 truncate">
                                 ↩ Đang trả lời <span className="font-semibold text-yellow-400">{replyingTo.userName || 'Người dùng'}</span>
@@ -282,37 +307,87 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                             </button>
                         </div>
                     )}
-                    <form onSubmit={handleSendComment} className="relative flex items-end gap-2">
-                        <textarea
-                            ref={textareaRef}
-                            value={newComment}
-                            onChange={(e) => {
-                                setNewComment(e.target.value)
-                                // Auto-resize
-                                e.target.style.height = 'auto'
-                                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-                            }}
-                            onKeyDown={(e) => {
-                                // Enter thuần = xuống dòng (không submit)
-                                // Không có action nào submit khi nhấn Enter
-                            }}
-                            placeholder={replyingTo ? `Trả lời ${replyingTo.userName || 'người dùng'}...` : "Nhập nội dung tương tác... (Enter để xuống dòng, bấm nút ➤ để gửi)"}
-                            rows={1}
-                            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed"
-                            style={{ minHeight: '42px', maxHeight: '120px' }}
-                            disabled={isPending}
-                        />
-                        <button
-                            type="submit"
-                            disabled={!newComment.trim() || isPending}
-                            className="shrink-0 w-9 h-9 rounded-xl bg-yellow-400 text-black flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 transition-all active:scale-90 mb-0.5"
+                    {commentExpanded && (
+                        <div className="fixed inset-0 z-40 bg-black/50" onClick={closeCommentExpand} />
+                    )}
+                    <form onSubmit={handleSendComment}>
+                        <div
+                            onMouseEnter={() => setCommentHovering(true)}
+                            onMouseLeave={() => setCommentHovering(false)}
+                            className={commentExpanded
+                                ? 'comment-expand-box fixed left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-2xl flex flex-col'
+                                : 'flex items-end gap-2'
+                            }
                         >
-                            {isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
+                            {commentExpanded && (
+                                <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+                                    <div className="min-w-0 flex-1">
+                                        {replyingTo && (
+                                            <span className="inline-block max-w-full text-xs text-zinc-200 bg-zinc-800 px-3 py-1.5 rounded-lg truncate">
+                                                ↩ Đang trả lời <span className="font-semibold text-yellow-400">{replyingTo.userName || 'Người dùng'}</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {/* Gửi = gửi bình luận rồi tự đóng lại. Đóng = thu gọn lại,
+                                            KHÔNG gửi, nội dung đang gõ vẫn giữ nguyên trong ô. */}
+                                        <button
+                                            type="submit"
+                                            disabled={!newComment.trim() || isPending}
+                                            className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors disabled:opacity-30 disabled:grayscale"
+                                        >
+                                            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Gửi
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={closeCommentExpand}
+                                            className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
+                                        >
+                                            <X className="w-3.5 h-3.5" /> ĐÓNG
+                                        </button>
+                                    </div>
+                                </div>
                             )}
-                        </button>
+                            <textarea
+                                ref={textareaRef}
+                                value={newComment}
+                                onChange={(e) => {
+                                    setNewComment(e.target.value)
+                                    if (!commentExpanded) {
+                                        // Auto-resize (chỉ áp dụng ở trạng thái thu gọn)
+                                        e.target.style.height = 'auto'
+                                        e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                                    }
+                                }}
+                                onFocus={() => setCommentFocused(true)}
+                                onBlur={() => setCommentFocused(false)}
+                                onKeyDown={(e) => {
+                                    // Enter thuần = xuống dòng (không submit)
+                                    // Không có action nào submit khi nhấn Enter
+                                }}
+                                placeholder={replyingTo ? `Trả lời ${replyingTo.userName || 'người dùng'}...` : "Nhập nội dung tương tác... (Enter để xuống dòng, bấm nút ➤ để gửi)"}
+                                rows={commentExpanded ? undefined : 1}
+                                className={commentExpanded
+                                    ? 'flex-1 w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 placeholder:text-gray-300 text-justify leading-relaxed'
+                                    : 'flex-1 w-full block bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed text-justify'
+                                }
+                                style={commentExpanded ? undefined : { minHeight: '42px', maxHeight: '120px' }}
+                                disabled={isPending}
+                            />
+                            {!commentExpanded && (
+                                <button
+                                    type="submit"
+                                    disabled={!newComment.trim() || isPending}
+                                    className="shrink-0 w-9 h-9 rounded-xl bg-yellow-400 text-black flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 transition-all active:scale-90 mb-0.5"
+                                >
+                                    {isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                </button>
+                            )}
+                        </div>
                     </form>
                     </>
                 ) : (

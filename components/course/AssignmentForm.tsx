@@ -358,8 +358,8 @@ function AssignmentForm({
                             placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
                             rows={3}
                             className={reflectionExpanded
-                                ? 'w-full h-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
-                                : 'w-full bg-white text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300'
+                                ? 'w-full h-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
+                                : 'w-full bg-white text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
                             }
                         />
                     </div>

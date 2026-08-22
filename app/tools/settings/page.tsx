@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link"
-import { Palette, Globe, Settings } from "lucide-react"
+import { Palette, Globe, Settings, Sparkles } from "lucide-react"
 import MainHeader from "@/components/layout/MainHeader"
 
 export default function SettingsPage() {
@@ -22,6 +22,21 @@ export default function SettingsPage() {
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Giao diện</h2>
                 <p className="text-sm text-gray-500">Tùy chỉnh theme, màu sắc, phông chữ</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/tools/settings/attention-tooltip"
+            className="block bg-white rounded-2xl border border-gray-100 p-6 hover:border-purple-300 hover:shadow-md transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-indigo-600 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Tooltip lóe sáng</h2>
+                <p className="text-sm text-gray-500">Màu sắc, tốc độ chớp & nội dung tooltip Header/Footer</p>
               </div>
             </div>
           </Link>
