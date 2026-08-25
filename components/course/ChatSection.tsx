@@ -1,14 +1,24 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo, useOptimistic, useTransition, memo } from 'react'
-import { getCommentsByLesson, createComment } from '@/app/actions/comment-actions'
-import { Send, LogIn, Loader2, MessageCircle, X } from 'lucide-react'
+import { getCommentsByLesson, createComment, updateComment } from '@/app/actions/comment-actions'
+import { Send, LogIn, Loader2, MessageCircle, X, Bold, Palette, Type, Smile, Image as ImageIcon } from 'lucide-react'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
+import {
+    formatCommentContent,
+    wrapSelection,
+    insertAtCursor,
+    COLOR_PRESETS,
+    SIZE_PRESETS,
+    EMOJI_PRESETS,
+} from '@/lib/comment-format'
 
 interface Comment {
     id: number | string
     content: string
+    imageUrl?: string | null
     createdAt: Date
+    editedAt?: Date | null
     userId: number
     userName: string | null
     userAvatar: string | null
@@ -21,8 +31,28 @@ interface ChatSectionProps {
     session: any
 }
 
+interface CommentItemProps {
+    comment: Comment
+    isReply?: boolean
+    onReply?: (comment: Comment) => void
+    isOwner?: boolean
+    isEditing?: boolean
+    editValue?: string
+    editImageUrl?: string | null
+    editSaving?: boolean
+    onStartEdit?: (comment: Comment) => void
+    onCancelEdit?: () => void
+    onSaveEdit?: () => void
+    onEditValueChange?: (value: string) => void
+    onRemoveEditImage?: () => void
+}
+
 // Tách component nhỏ để tối ưu re-render
-const CommentItem = ({ comment, isReply, onReply }: { comment: Comment; isReply?: boolean; onReply?: (comment: Comment) => void }) => {
+const CommentItem = ({
+    comment, isReply, onReply,
+    isOwner, isEditing, editValue, editImageUrl, editSaving,
+    onStartEdit, onCancelEdit, onSaveEdit, onEditValueChange, onRemoveEditImage,
+}: CommentItemProps) => {
     const getInitials = (name: string | null) => {
         if (!name) return '?'
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -56,18 +86,85 @@ const CommentItem = ({ comment, isReply, onReply }: { comment: Comment; isReply?
                         <span className="text-[10px] text-zinc-400">
                             {formatTime(comment.createdAt)}
                         </span>
+                        {comment.editedAt && !comment.sending && (
+                            <span className="text-[10px] text-zinc-500 italic">(đã chỉnh sửa)</span>
+                        )}
                         {comment.sending && <span className="text-[9px] text-yellow-500 italic">Đang gửi...</span>}
                     </div>
-                    <p className="text-[13px] italic text-zinc-200 mt-0.5 break-words leading-relaxed text-justify">
-                        {comment.content}
-                    </p>
-                    {onReply && !comment.sending && (
-                        <button
-                            onClick={() => onReply(comment)}
-                            className="mt-1 text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
-                        >
-                            ↩ Trả lời
-                        </button>
+
+                    {isEditing ? (
+                        <div className="mt-1">
+                            <textarea
+                                autoFocus
+                                value={editValue}
+                                onChange={e => onEditValueChange?.(e.target.value)}
+                                rows={2}
+                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2 text-[13px] text-white resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-justify leading-relaxed"
+                            />
+                            {editImageUrl && (
+                                <div className="mt-1.5 flex items-center gap-2">
+                                    <img src={editImageUrl} alt="preview" className="w-10 h-10 rounded object-cover" />
+                                    <button type="button" onClick={onRemoveEditImage} className="text-[11px] font-semibold text-red-400 hover:text-red-300">
+                                        Xoá ảnh
+                                    </button>
+                                </div>
+                            )}
+                            <div className="flex gap-2 mt-1.5">
+                                <button
+                                    type="button"
+                                    onClick={onSaveEdit}
+                                    disabled={editSaving || (!editValue?.trim() && !editImageUrl)}
+                                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-40 transition-colors"
+                                >
+                                    {editSaving ? 'Đang lưu...' : 'Lưu'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onCancelEdit}
+                                    disabled={editSaving}
+                                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+                                >
+                                    Hủy
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            {comment.content && (
+                                <p
+                                    className="text-[13px] text-zinc-200 mt-0.5 break-words leading-relaxed text-justify"
+                                    dangerouslySetInnerHTML={{ __html: formatCommentContent(comment.content) }}
+                                />
+                            )}
+                            {comment.imageUrl && (
+                                <img
+                                    src={comment.imageUrl}
+                                    alt="Hình ảnh đính kèm"
+                                    className="mt-1.5 max-w-[220px] max-h-[220px] rounded-lg border border-zinc-800 object-cover cursor-zoom-in"
+                                    onClick={() => window.open(comment.imageUrl!, '_blank')}
+                                />
+                            )}
+                            {!comment.sending && (
+                                <div className="flex items-center gap-3 mt-1">
+                                    {onReply && (
+                                        <button
+                                            onClick={() => onReply(comment)}
+                                            className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                        >
+                                            ↩ Trả lời
+                                        </button>
+                                    )}
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => onStartEdit?.(comment)}
+                                            className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                        >
+                                            ✎ Sửa
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -88,14 +185,29 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [commentHovering, setCommentHovering] = useState(false)
     const [commentFocused, setCommentFocused] = useState(false)
     const commentExpanded = commentHovering || commentFocused
+
+    // [EDIT] Sửa bình luận của chính mình — chỉ 1 bình luận được sửa cùng lúc.
+    const [editingId, setEditingId] = useState<number | string | null>(null)
+    const [editValue, setEditValue] = useState('')
+    const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
+    const [editSaving, setEditSaving] = useState(false)
+    const currentUserId = session?.user?.id ? parseInt(session.user.id) : null
     const commentsEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const { openAssistant } = useAccountAssistant()
+
+    // [FORMAT] Toolbar định dạng đơn giản — chỉ hiện khi đã mở rộng (đủ chỗ).
+    const [activePopover, setActivePopover] = useState<'color' | 'size' | 'emoji' | null>(null)
+    const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null)
+    const [uploadingImage, setUploadingImage] = useState(false)
+    const [uploadError, setUploadError] = useState('')
 
     const closeCommentExpand = () => {
         textareaRef.current?.blur()
         setCommentHovering(false)
         setCommentFocused(false)
+        setActivePopover(null)
     }
 
     // Optimistic UI: Hiển thị ngay lập tức khi nhấn gửi
@@ -132,13 +244,64 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
         commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [optimisticComments])
 
+    // Áp dụng 1 thao tác định dạng (đậm/màu/cỡ chữ/emoji) vào vùng đang chọn
+    // trong textarea, rồi khôi phục vị trí con trỏ sau khi React render lại.
+    function applyFormat(kind: 'bold' | { color: string } | { size: string } | { emoji: string }) {
+        const ta = textareaRef.current
+        if (!ta) return
+        const start = ta.selectionStart ?? newComment.length
+        const end = ta.selectionEnd ?? newComment.length
+
+        let result
+        if (kind === 'bold') {
+            result = wrapSelection(newComment, start, end, '**', '**', 'chữ đậm')
+        } else if ('color' in kind) {
+            result = wrapSelection(newComment, start, end, `{{c:${kind.color}}}`, '{{/c}}', 'chữ màu')
+        } else if ('size' in kind) {
+            result = wrapSelection(newComment, start, end, `{{s:${kind.size}}}`, '{{/s}}', 'chữ cỡ khác')
+        } else {
+            result = insertAtCursor(newComment, start, end, kind.emoji)
+        }
+
+        setNewComment(result.text)
+        setActivePopover(null)
+        requestAnimationFrame(() => {
+            ta.focus()
+            ta.setSelectionRange(result.cursorStart, result.cursorEnd)
+        })
+    }
+
+    async function handleImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        e.target.value = '' // cho phép chọn lại cùng 1 file lần sau
+        if (!file) return
+
+        setUploadError('')
+        setUploadingImage(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            const res = await fetch('/api/upload/comment', { method: 'POST', body: formData })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Tải ảnh thất bại')
+            setPendingImageUrl(data.url)
+        } catch (err: any) {
+            setUploadError(err.message || 'Tải ảnh thất bại')
+        } finally {
+            setUploadingImage(false)
+        }
+    }
+
     async function handleSendComment(e: React.FormEvent) {
         e.preventDefault()
         const content = newComment.trim()
-        if (!content || !session?.user) return
+        if ((!content && !pendingImageUrl) || !session?.user) return
 
         const parentId = replyingTo?.id
+        const imageUrl = pendingImageUrl
         setNewComment('')
+        setPendingImageUrl(null)
+        setUploadError('')
         setError('')
         setReplyingTo(null)
         // Gửi = gửi rồi tự thu gọn lại (khác với Đóng — chỉ thu gọn, không gửi)
@@ -149,6 +312,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
         const tempComment: Comment = {
             id: tempId,
             content: content,
+            imageUrl,
             createdAt: new Date(),
             userId: parseInt(session.user.id),
             userName: session.user.name || session.user.studentId || 'Bạn',
@@ -162,7 +326,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
             addOptimisticComment(tempComment)
 
             // 3. Gọi server action
-            const result = await createComment(lessonId, content, typeof parentId === 'number' ? parentId : null)
+            const result = await createComment(lessonId, content, typeof parentId === 'number' ? parentId : null, imageUrl)
 
             if (result.success && result.comment) {
                 const newEntry = {
@@ -188,6 +352,43 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
         const threadRootId = (typeof comment.parentId === 'number' ? comment.parentId : comment.id)
         setReplyingTo({ id: threadRootId as number, userName: comment.userName })
         textareaRef.current?.focus()
+    }
+
+    function handleStartEdit(comment: Comment) {
+        setEditingId(comment.id)
+        setEditValue(comment.content)
+        setEditImageUrl(comment.imageUrl || null)
+    }
+
+    function handleCancelEdit() {
+        setEditingId(null)
+        setEditValue('')
+        setEditImageUrl(null)
+    }
+
+    async function handleSaveEdit() {
+        if (editingId == null || typeof editingId !== 'number') return
+        const trimmed = editValue.trim()
+        if (!trimmed && !editImageUrl) return
+
+        setEditSaving(true)
+        try {
+            const result = await updateComment(editingId, trimmed, editImageUrl)
+            if (result.success && result.comment) {
+                setComments(prev => {
+                    const updated = prev.map(c => c.id === editingId
+                        ? { ...c, content: result.comment!.content, imageUrl: result.comment!.imageUrl, editedAt: result.comment!.editedAt ? new Date(result.comment!.editedAt) : c.editedAt }
+                        : c)
+                    commentCache.current.set(lessonId, updated)
+                    return updated
+                })
+                handleCancelEdit()
+            } else {
+                setError(result.message || 'Cập nhật thất bại. Vui lòng thử lại.')
+            }
+        } finally {
+            setEditSaving(false)
+        }
     }
 
     // Tách bình luận gốc (parentId null) và reply, gom reply theo threadRoot để
@@ -263,11 +464,39 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                             </div>
                             {dateComments.map(comment => (
                                 <div key={comment.id}>
-                                    <CommentItem comment={comment} onReply={session?.user ? handleReplyClick : undefined} />
+                                    <CommentItem
+                                        comment={comment}
+                                        onReply={session?.user ? handleReplyClick : undefined}
+                                        isOwner={currentUserId != null && comment.userId === currentUserId}
+                                        isEditing={editingId === comment.id}
+                                        editValue={editValue}
+                                        editImageUrl={editImageUrl}
+                                        editSaving={editSaving}
+                                        onStartEdit={handleStartEdit}
+                                        onCancelEdit={handleCancelEdit}
+                                        onSaveEdit={handleSaveEdit}
+                                        onEditValueChange={setEditValue}
+                                        onRemoveEditImage={() => setEditImageUrl(null)}
+                                    />
                                     {repliesByParent[String(comment.id)]?.length > 0 && (
                                         <div className="ml-11 pl-3 border-l-2 border-zinc-800 -mt-1">
                                             {repliesByParent[String(comment.id)].map(reply => (
-                                                <CommentItem key={reply.id} comment={reply} isReply onReply={session?.user ? handleReplyClick : undefined} />
+                                                <CommentItem
+                                                    key={reply.id}
+                                                    comment={reply}
+                                                    isReply
+                                                    onReply={session?.user ? handleReplyClick : undefined}
+                                                    isOwner={currentUserId != null && reply.userId === currentUserId}
+                                                    isEditing={editingId === reply.id}
+                                                    editValue={editValue}
+                                                    editImageUrl={editImageUrl}
+                                                    editSaving={editSaving}
+                                                    onStartEdit={handleStartEdit}
+                                                    onCancelEdit={handleCancelEdit}
+                                                    onSaveEdit={handleSaveEdit}
+                                                    onEditValueChange={setEditValue}
+                                                    onRemoveEditImage={() => setEditImageUrl(null)}
+                                                />
                                             ))}
                                         </div>
                                     )}
@@ -293,6 +522,13 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                             .comment-expand-box { height: 85dvh; top: 7.5dvh; }
                         }
                     `}</style>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleImageFileChange}
+                    />
                     {!commentExpanded && replyingTo && (
                         <div className="flex items-center justify-between gap-2 mb-2 pl-3 pr-2 py-1.5 rounded-xl bg-zinc-800/70 border border-zinc-700">
                             <span className="text-[11px] text-zinc-300 truncate">
@@ -305,6 +541,21 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                             >
                                 <X className="h-3 w-3" />
                             </button>
+                        </div>
+                    )}
+                    {!commentExpanded && (pendingImageUrl || uploadingImage) && (
+                        <div className="flex items-center gap-2 mb-2 pl-2 pr-2 py-1.5 rounded-xl bg-zinc-800/70 border border-zinc-700">
+                            {uploadingImage ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                            ) : (
+                                <img src={pendingImageUrl!} alt="preview" className="w-8 h-8 rounded object-cover" />
+                            )}
+                            <span className="text-[11px] text-zinc-300 flex-1">{uploadingImage ? 'Đang tải ảnh...' : 'Đã đính kèm ảnh'}</span>
+                            {!uploadingImage && (
+                                <button type="button" onClick={() => setPendingImageUrl(null)} className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            )}
                         </div>
                     )}
                     {commentExpanded && (
@@ -320,6 +571,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                             }
                         >
                             {commentExpanded && (
+                                <>
                                 <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
                                     <div className="min-w-0 flex-1">
                                         {replyingTo && (
@@ -333,7 +585,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                             KHÔNG gửi, nội dung đang gõ vẫn giữ nguyên trong ô. */}
                                         <button
                                             type="submit"
-                                            disabled={!newComment.trim() || isPending}
+                                            disabled={(!newComment.trim() && !pendingImageUrl) || isPending || uploadingImage}
                                             className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors disabled:opacity-30 disabled:grayscale"
                                         >
                                             {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Gửi
@@ -347,6 +599,94 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Toolbar định dạng: đậm / màu / cỡ chữ / emoji / ảnh */}
+                                <div className="relative flex items-center gap-1 mb-2 shrink-0 flex-wrap">
+                                    <button type="button" onClick={() => applyFormat('bold')} title="In đậm" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                        <Bold className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={() => setActivePopover(p => p === 'color' ? null : 'color')} title="Màu chữ" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                        <Palette className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={() => setActivePopover(p => p === 'size' ? null : 'size')} title="Cỡ chữ" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                        <Type className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={() => setActivePopover(p => p === 'emoji' ? null : 'emoji')} title="Emoji" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                        <Smile className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={uploadingImage}
+                                        title="Chèn ảnh"
+                                        className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors disabled:opacity-40"
+                                    >
+                                        {uploadingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                                    </button>
+
+                                    {activePopover === 'color' && (
+                                        <div className="absolute top-full left-0 mt-1 z-10 flex gap-1.5 p-2 bg-white border border-gray-200 rounded-xl shadow-xl">
+                                            {COLOR_PRESETS.map(c => (
+                                                <button
+                                                    key={c.key}
+                                                    type="button"
+                                                    title={c.label}
+                                                    onClick={() => applyFormat({ color: c.key })}
+                                                    className="w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform"
+                                                    style={{ backgroundColor: c.hex }}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    {activePopover === 'size' && (
+                                        <div className="absolute top-full left-9 mt-1 z-10 flex gap-1.5 p-2 bg-white border border-gray-200 rounded-xl shadow-xl">
+                                            {SIZE_PRESETS.map(s => (
+                                                <button
+                                                    key={s.key}
+                                                    type="button"
+                                                    onClick={() => applyFormat({ size: s.key })}
+                                                    className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors"
+                                                >
+                                                    {s.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {activePopover === 'emoji' && (
+                                        <div className="absolute top-full left-16 mt-1 z-10 grid grid-cols-5 gap-1 p-2 bg-white border border-gray-200 rounded-xl shadow-xl w-[190px]">
+                                            {EMOJI_PRESETS.map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    type="button"
+                                                    onClick={() => applyFormat({ emoji })}
+                                                    className="text-lg hover:bg-gray-100 rounded-lg py-0.5 transition-colors"
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {(pendingImageUrl || uploadingImage) && (
+                                    <div className="flex items-center gap-2 mb-2 pl-2 pr-2 py-1.5 rounded-xl bg-gray-100 shrink-0">
+                                        {uploadingImage ? (
+                                            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                                        ) : (
+                                            <img src={pendingImageUrl!} alt="preview" className="w-10 h-10 rounded-lg object-cover" />
+                                        )}
+                                        <span className="text-xs text-gray-600 flex-1">{uploadingImage ? 'Đang tải ảnh...' : 'Đã đính kèm ảnh — sẽ gửi kèm bình luận'}</span>
+                                        {!uploadingImage && (
+                                            <button type="button" onClick={() => setPendingImageUrl(null)} className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition-colors">
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                {uploadError && (
+                                    <p className="text-[11px] text-red-500 mb-2 shrink-0">{uploadError}</p>
+                                )}
+                                </>
                             )}
                             <textarea
                                 ref={textareaRef}
@@ -377,7 +717,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                             {!commentExpanded && (
                                 <button
                                     type="submit"
-                                    disabled={!newComment.trim() || isPending}
+                                    disabled={(!newComment.trim() && !pendingImageUrl) || isPending}
                                     className="shrink-0 w-9 h-9 rounded-xl bg-yellow-400 text-black flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 transition-all active:scale-90 mb-0.5"
                                 >
                                     {isPending ? (

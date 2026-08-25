@@ -52,7 +52,9 @@ export async function getCommentsByLesson(lessonId: string) {
         return {
             id: comment.id,
             content: comment.content,
+            imageUrl: comment.imageUrl,
             createdAt: comment.createdAt,
+            editedAt: comment.editedAt,
             userId: comment.userId,
             userName: comment.user.name,
             userAvatar: avatar,
@@ -77,10 +79,15 @@ export async function hasUserCommentedOnLesson(lessonId: string) {
     return !!comment
 }
 
-export async function createComment(lessonId: string, content: string, parentId?: number | null) {
+export async function createComment(lessonId: string, content: string, parentId?: number | null, imageUrl?: string | null) {
     const session = await auth()
     if (!session?.user?.id) {
         return { success: false, message: "Vui lòng đăng nhập để bình luận" }
+    }
+
+    const trimmedContent = content.trim()
+    if (!trimmedContent && !imageUrl) {
+        return { success: false, message: "Bình luận trống" }
     }
 
     const userId = parseInt(session.user.id as string)
@@ -96,7 +103,8 @@ export async function createComment(lessonId: string, content: string, parentId?
             data: {
                 lessonId,
                 userId,
-                content: content.trim(),
+                content: trimmedContent,
+                imageUrl: imageUrl || null,
                 parentId: parentId || null
             },
             include: {
@@ -174,7 +182,9 @@ export async function createComment(lessonId: string, content: string, parentId?
             comment: {
                 id: comment.id,
                 content: comment.content,
+                imageUrl: comment.imageUrl,
                 createdAt: comment.createdAt,
+                editedAt: comment.editedAt,
                 userId: comment.userId,
                 userName: comment.user.name,
                 userAvatar: avatar,
@@ -184,5 +194,55 @@ export async function createComment(lessonId: string, content: string, parentId?
     } catch (error) {
         console.error("Create comment error:", error)
         return { success: false, message: "Gửi bình luận thất bại" }
+    }
+}
+
+export async function updateComment(commentId: number, content: string, imageUrl?: string | null) {
+    const session = await auth()
+    if (!session?.user?.id) {
+        return { success: false, message: "Vui lòng đăng nhập" }
+    }
+
+    const trimmedContent = content.trim()
+    if (!trimmedContent && !imageUrl) {
+        return { success: false, message: "Bình luận trống" }
+    }
+
+    const userId = parseInt(session.user.id as string)
+
+    try {
+        // Chỉ chủ bình luận mới được sửa — kiểm tra quyền sở hữu trước khi update
+        const existing = await prisma.lessonComment.findUnique({
+            where: { id: commentId },
+            select: { userId: true }
+        })
+        if (!existing) {
+            return { success: false, message: "Bình luận không tồn tại" }
+        }
+        if (existing.userId !== userId) {
+            return { success: false, message: "Bạn chỉ có thể sửa bình luận của chính mình" }
+        }
+
+        const comment = await prisma.lessonComment.update({
+            where: { id: commentId },
+            data: {
+                content: trimmedContent,
+                imageUrl: imageUrl === undefined ? undefined : (imageUrl || null),
+                editedAt: new Date(),
+            }
+        })
+
+        return {
+            success: true,
+            comment: {
+                id: comment.id,
+                content: comment.content,
+                imageUrl: comment.imageUrl,
+                editedAt: comment.editedAt,
+            }
+        }
+    } catch (error) {
+        console.error("Update comment error:", error)
+        return { success: false, message: "Cập nhật bình luận thất bại" }
     }
 }

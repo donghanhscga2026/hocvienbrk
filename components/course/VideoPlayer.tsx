@@ -122,7 +122,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
 }, ref) {
     const playlist = useMemo(() => buildPlaylist(videoUrl, serverPlaylist, lessonType, lessonContent), [videoUrl, serverPlaylist, lessonType, lessonContent])
     const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
-    const [showPlaylist, setShowPlaylist] = useState(false)
+    // Bài học có ≥2 học phần → mở ra là thấy ngay danh sách học phần để chọn,
+    // thay vì tự nhảy thẳng vào học phần đầu tiên khiến học viên không biết
+    // còn học phần khác. Chỉ 1 học phần thì vào thẳng nội dung như cũ.
+    const [showPlaylist, setShowPlaylist] = useState(() => playlist.length >= 2)
     const [isMounted, setIsMounted] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
     const [docTimer, setDocTimer] = useState<number>(0)

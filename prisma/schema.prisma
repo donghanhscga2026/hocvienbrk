@@ -476,8 +476,10 @@ model LessonComment {
   lessonId  String
   userId    Int
   content   String
+  imageUrl  String?
   parentId  Int?
   createdAt DateTime @default(now())
+  editedAt  DateTime?
   lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   user      User           @relation("UserToLessonComment", fields: [userId], references: [id], onDelete: Cascade)
   parent    LessonComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
