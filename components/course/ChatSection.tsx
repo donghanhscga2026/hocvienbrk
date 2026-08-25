@@ -36,22 +36,14 @@ interface CommentItemProps {
     isReply?: boolean
     onReply?: (comment: Comment) => void
     isOwner?: boolean
-    isEditing?: boolean
-    editValue?: string
-    editImageUrl?: string | null
-    editSaving?: boolean
+    isBeingEdited?: boolean
     onStartEdit?: (comment: Comment) => void
-    onCancelEdit?: () => void
-    onSaveEdit?: () => void
-    onEditValueChange?: (value: string) => void
-    onRemoveEditImage?: () => void
 }
 
 // Tách component nhỏ để tối ưu re-render
 const CommentItem = ({
     comment, isReply, onReply,
-    isOwner, isEditing, editValue, editImageUrl, editSaving,
-    onStartEdit, onCancelEdit, onSaveEdit, onEditValueChange, onRemoveEditImage,
+    isOwner, isBeingEdited, onStartEdit,
 }: CommentItemProps) => {
     const getInitials = (name: string | null) => {
         if (!name) return '?'
@@ -92,42 +84,8 @@ const CommentItem = ({
                         {comment.sending && <span className="text-[9px] text-yellow-500 italic">Đang gửi...</span>}
                     </div>
 
-                    {isEditing ? (
-                        <div className="mt-1">
-                            <textarea
-                                autoFocus
-                                value={editValue}
-                                onChange={e => onEditValueChange?.(e.target.value)}
-                                rows={2}
-                                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg p-2 text-[13px] text-white resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-justify leading-relaxed"
-                            />
-                            {editImageUrl && (
-                                <div className="mt-1.5 flex items-center gap-2">
-                                    <img src={editImageUrl} alt="preview" className="w-10 h-10 rounded object-cover" />
-                                    <button type="button" onClick={onRemoveEditImage} className="text-[11px] font-semibold text-red-400 hover:text-red-300">
-                                        Xoá ảnh
-                                    </button>
-                                </div>
-                            )}
-                            <div className="flex gap-2 mt-1.5">
-                                <button
-                                    type="button"
-                                    onClick={onSaveEdit}
-                                    disabled={editSaving || (!editValue?.trim() && !editImageUrl)}
-                                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-40 transition-colors"
-                                >
-                                    {editSaving ? 'Đang lưu...' : 'Lưu'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={onCancelEdit}
-                                    disabled={editSaving}
-                                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
-                                >
-                                    Hủy
-                                </button>
-                            </div>
-                        </div>
+                    {isBeingEdited ? (
+                        <p className="text-[11px] text-yellow-400 italic mt-0.5">✎ Đang sửa ở ô soạn thảo bên dưới...</p>
                     ) : (
                         <>
                             {comment.content && (
@@ -186,11 +144,10 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [commentFocused, setCommentFocused] = useState(false)
     const commentExpanded = commentHovering || commentFocused
 
-    // [EDIT] Sửa bình luận của chính mình — chỉ 1 bình luận được sửa cùng lúc.
+    // [EDIT] Sửa bình luận của chính mình — dùng LẠI ô soạn thảo mở rộng (cùng
+    // toolbar định dạng/ảnh như lúc viết bình luận mới), chỉ đổi hành vi Gửi
+    // sang gọi updateComment() thay vì createComment() khi editingId != null.
     const [editingId, setEditingId] = useState<number | string | null>(null)
-    const [editValue, setEditValue] = useState('')
-    const [editImageUrl, setEditImageUrl] = useState<string | null>(null)
-    const [editSaving, setEditSaving] = useState(false)
     const currentUserId = session?.user?.id ? parseInt(session.user.id) : null
     const commentsEndRef = useRef<HTMLDivElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -208,6 +165,19 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
         setCommentHovering(false)
         setCommentFocused(false)
         setActivePopover(null)
+    }
+
+    // Nút ĐÓNG / bấm ra ngoài overlay: nếu đang sửa 1 bình luận thì huỷ luôn
+    // thao tác sửa (xoá nội dung đang gõ dở), khác với lúc soạn bình luận MỚI
+    // (đóng chỉ thu gọn, vẫn giữ nháp).
+    const handleCloseComposer = () => {
+        if (editingId != null) {
+            setEditingId(null)
+            setNewComment('')
+            setPendingImageUrl(null)
+            setUploadError('')
+        }
+        closeCommentExpand()
     }
 
     // Optimistic UI: Hiển thị ngay lập tức khi nhấn gửi
@@ -297,6 +267,40 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
         const content = newComment.trim()
         if ((!content && !pendingImageUrl) || !session?.user) return
 
+        // [EDIT] Đang sửa 1 bình luận có sẵn — gọi updateComment() thay vì tạo mới.
+        if (editingId != null) {
+            if (typeof editingId !== 'number') return
+            const targetId = editingId
+            const imageUrl = pendingImageUrl
+            setNewComment('')
+            setPendingImageUrl(null)
+            setUploadError('')
+            setError('')
+            setEditingId(null)
+            closeCommentExpand()
+
+            startTransition(async () => {
+                const result = await updateComment(targetId, content, imageUrl)
+                if (result.success && result.comment) {
+                    setComments(prev => {
+                        const updated = prev.map(c => c.id === targetId
+                            ? {
+                                ...c,
+                                content: result.comment!.content,
+                                imageUrl: result.comment!.imageUrl,
+                                editedAt: result.comment!.editedAt ? new Date(result.comment!.editedAt) : c.editedAt
+                            }
+                            : c)
+                        commentCache.current.set(lessonId, updated)
+                        return updated
+                    })
+                } else {
+                    setError(result.message || 'Cập nhật thất bại. Vui lòng thử lại.')
+                }
+            })
+            return
+        }
+
         const parentId = replyingTo?.id
         const imageUrl = pendingImageUrl
         setNewComment('')
@@ -347,48 +351,32 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
     }
 
     function handleReplyClick(comment: Comment) {
+        // Đang sửa dở 1 bình luận khác thì huỷ luôn thao tác sửa trước khi
+        // chuyển sang trả lời (2 việc dùng chung 1 ô soạn thảo, không thể lẫn).
+        if (editingId != null) {
+            setEditingId(null)
+            setNewComment('')
+            setPendingImageUrl(null)
+        }
         // Luôn quy về gốc thread (không lồng quá 1 cấp) — trả lời 1 reply cũng
         // gắn parentId vào bình luận GỐC của thread đó, chỉ đổi tên hiển thị trong chip.
         const threadRootId = (typeof comment.parentId === 'number' ? comment.parentId : comment.id)
         setReplyingTo({ id: threadRootId as number, userName: comment.userName })
+        setCommentFocused(true)
         textareaRef.current?.focus()
     }
 
+    // Mở LẠI ô soạn thảo mở rộng (giống lúc viết bình luận mới — đầy đủ
+    // toolbar định dạng/ảnh), nạp sẵn nội dung + ảnh của bình luận đang sửa.
     function handleStartEdit(comment: Comment) {
+        setReplyingTo(null)
+        setUploadError('')
+        setError('')
         setEditingId(comment.id)
-        setEditValue(comment.content)
-        setEditImageUrl(comment.imageUrl || null)
-    }
-
-    function handleCancelEdit() {
-        setEditingId(null)
-        setEditValue('')
-        setEditImageUrl(null)
-    }
-
-    async function handleSaveEdit() {
-        if (editingId == null || typeof editingId !== 'number') return
-        const trimmed = editValue.trim()
-        if (!trimmed && !editImageUrl) return
-
-        setEditSaving(true)
-        try {
-            const result = await updateComment(editingId, trimmed, editImageUrl)
-            if (result.success && result.comment) {
-                setComments(prev => {
-                    const updated = prev.map(c => c.id === editingId
-                        ? { ...c, content: result.comment!.content, imageUrl: result.comment!.imageUrl, editedAt: result.comment!.editedAt ? new Date(result.comment!.editedAt) : c.editedAt }
-                        : c)
-                    commentCache.current.set(lessonId, updated)
-                    return updated
-                })
-                handleCancelEdit()
-            } else {
-                setError(result.message || 'Cập nhật thất bại. Vui lòng thử lại.')
-            }
-        } finally {
-            setEditSaving(false)
-        }
+        setNewComment(comment.content)
+        setPendingImageUrl(comment.imageUrl || null)
+        setCommentFocused(true)
+        requestAnimationFrame(() => textareaRef.current?.focus())
     }
 
     // Tách bình luận gốc (parentId null) và reply, gom reply theo threadRoot để
@@ -468,15 +456,8 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                         comment={comment}
                                         onReply={session?.user ? handleReplyClick : undefined}
                                         isOwner={currentUserId != null && comment.userId === currentUserId}
-                                        isEditing={editingId === comment.id}
-                                        editValue={editValue}
-                                        editImageUrl={editImageUrl}
-                                        editSaving={editSaving}
+                                        isBeingEdited={editingId === comment.id}
                                         onStartEdit={handleStartEdit}
-                                        onCancelEdit={handleCancelEdit}
-                                        onSaveEdit={handleSaveEdit}
-                                        onEditValueChange={setEditValue}
-                                        onRemoveEditImage={() => setEditImageUrl(null)}
                                     />
                                     {repliesByParent[String(comment.id)]?.length > 0 && (
                                         <div className="ml-11 pl-3 border-l-2 border-zinc-800 -mt-1">
@@ -487,15 +468,8 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                                     isReply
                                                     onReply={session?.user ? handleReplyClick : undefined}
                                                     isOwner={currentUserId != null && reply.userId === currentUserId}
-                                                    isEditing={editingId === reply.id}
-                                                    editValue={editValue}
-                                                    editImageUrl={editImageUrl}
-                                                    editSaving={editSaving}
+                                                    isBeingEdited={editingId === reply.id}
                                                     onStartEdit={handleStartEdit}
-                                                    onCancelEdit={handleCancelEdit}
-                                                    onSaveEdit={handleSaveEdit}
-                                                    onEditValueChange={setEditValue}
-                                                    onRemoveEditImage={() => setEditImageUrl(null)}
                                                 />
                                             ))}
                                         </div>
@@ -559,7 +533,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                         </div>
                     )}
                     {commentExpanded && (
-                        <div className="fixed inset-0 z-40 bg-black/50" onClick={closeCommentExpand} />
+                        <div className="fixed inset-0 z-40 bg-black/50" onClick={handleCloseComposer} />
                     )}
                     <form onSubmit={handleSendComment}>
                         <div
@@ -574,25 +548,30 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 <>
                                 <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
                                     <div className="min-w-0 flex-1">
-                                        {replyingTo && (
+                                        {editingId != null ? (
+                                            <span className="inline-block max-w-full text-xs text-zinc-200 bg-zinc-800 px-3 py-1.5 rounded-lg truncate">
+                                                ✎ Đang sửa bình luận
+                                            </span>
+                                        ) : replyingTo && (
                                             <span className="inline-block max-w-full text-xs text-zinc-200 bg-zinc-800 px-3 py-1.5 rounded-lg truncate">
                                                 ↩ Đang trả lời <span className="font-semibold text-yellow-400">{replyingTo.userName || 'Người dùng'}</span>
                                             </span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        {/* Gửi = gửi bình luận rồi tự đóng lại. Đóng = thu gọn lại,
-                                            KHÔNG gửi, nội dung đang gõ vẫn giữ nguyên trong ô. */}
+                                        {/* Gửi/Lưu = gửi rồi tự đóng lại. Đóng = thu gọn lại; nếu
+                                            đang sửa thì Đóng = huỷ sửa, nếu đang soạn mới thì Đóng
+                                            chỉ thu gọn, nội dung đang gõ vẫn giữ nguyên trong ô. */}
                                         <button
                                             type="submit"
                                             disabled={(!newComment.trim() && !pendingImageUrl) || isPending || uploadingImage}
                                             className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors disabled:opacity-30 disabled:grayscale"
                                         >
-                                            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Gửi
+                                            {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} {editingId != null ? 'Lưu' : 'Gửi'}
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={closeCommentExpand}
+                                            onClick={handleCloseComposer}
                                             className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
                                         >
                                             <X className="w-3.5 h-3.5" /> ĐÓNG
@@ -705,7 +684,13 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                     // Enter thuần = xuống dòng (không submit)
                                     // Không có action nào submit khi nhấn Enter
                                 }}
-                                placeholder={replyingTo ? `Trả lời ${replyingTo.userName || 'người dùng'}...` : "Nhập nội dung tương tác... (Enter để xuống dòng, bấm nút ➤ để gửi)"}
+                                placeholder={
+                                    editingId != null
+                                        ? "Chỉnh sửa bình luận..."
+                                        : replyingTo
+                                            ? `Trả lời ${replyingTo.userName || 'người dùng'}...`
+                                            : "Nhập nội dung tương tác... (Enter để xuống dòng, bấm nút ➤ để gửi)"
+                                }
                                 rows={commentExpanded ? undefined : 1}
                                 className={commentExpanded
                                     ? 'flex-1 w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 placeholder:text-gray-300 text-justify leading-relaxed'
