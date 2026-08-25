@@ -147,6 +147,7 @@ export default function MemberDetailPanel({ member, onClose }: {
         phone?: string | null
         completionPercent: number | null
         days: { order: number; status: DayStatus }[]
+        todayOrder?: number
     }
     onClose: () => void
 }) {
@@ -244,7 +245,7 @@ export default function MemberDetailPanel({ member, onClose }: {
 
                 <div className="flex-1 overflow-y-auto p-6" ref={listRef}>
                     {tab === 'overview' ? (
-                        <MemberDayMatrix days={member.days} columns={10} onSelectDay={goToDayHistory} />
+                        <MemberDayMatrix days={member.days} columns={10} onSelectDay={goToDayHistory} todayOrder={member.todayOrder} />
                     ) : historyLoading ? (
                         <div className="flex items-center justify-center py-12">
                             <Loader2 className="w-6 h-6 animate-spin text-violet-500" />

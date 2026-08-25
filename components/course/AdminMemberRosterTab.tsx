@@ -9,7 +9,7 @@ import {
 } from '@/app/actions/admin-actions'
 import MemberDayChips from './MemberDayChips'
 import MemberDetailPanel from './MemberDetailPanel'
-import { teamLabel, groupLabel, CourseMemberLabels, RosterMember } from './MemberRosterPanel'
+import { teamLabel, groupLabel, CourseMemberLabels, RosterMember, formatStartDate, recentDayWindow } from './MemberRosterPanel'
 import { downloadRosterAsImage } from '@/lib/course/export-roster-image'
 
 function localPhone(phone: string | null | undefined) {
@@ -78,6 +78,9 @@ function MemberCard({ member, dirty, effective, onChange, ssMode, display, onSel
                         </button>
                     </div>
                 )}
+                <span className="text-[9px] font-mono text-gray-400 shrink-0 ml-auto" title="Ngày bắt đầu học">
+                    {formatStartDate(member.startDate)}
+                </span>
             </div>
             {/* Dòng 2: Họ tên + % hoàn thành — bấm để xem chi tiết đủ số ngày */}
             <button
@@ -93,8 +96,11 @@ function MemberCard({ member, dirty, effective, onChange, ssMode, display, onSel
                     {member.completionPercent == null ? '—' : `${member.completionPercent}%`}
                 </span>
             </button>
-            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất */}
-            {member.days?.length > 0 && <MemberDayChips days={member.days.slice(-7)} />}
+            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất tính theo lịch riêng — ô viền
+                nhấp nháy cam/đỏ là bài cần hoàn thành hôm nay của người này */}
+            {member.days?.length > 0 && (
+                <MemberDayChips days={recentDayWindow(member.days, member.todayOrder)} todayOrder={member.todayOrder} />
+            )}
         </div>
     )
 }
@@ -423,6 +429,7 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                         phone: selectedMember.user.phone,
                         completionPercent: selectedMember.completionPercent,
                         days: selectedMember.days,
+                        todayOrder: selectedMember.todayOrder,
                     }}
                     onClose={() => setSelectedMember(null)}
                 />

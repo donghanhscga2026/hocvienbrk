@@ -14,10 +14,11 @@ const STATUS_LABEL: Record<DayStatus, string> = {
     missing: 'Chưa nộp',
 }
 
-export default function MemberDayMatrix({ days, columns = 10, onSelectDay }: {
+export default function MemberDayMatrix({ days, columns = 10, onSelectDay, todayOrder }: {
     days: { order: number; status: DayStatus }[]
     columns?: number
     onSelectDay?: (order: number) => void
+    todayOrder?: number
 }) {
     if (!days || days.length === 0) return null
     return (
@@ -25,17 +26,20 @@ export default function MemberDayMatrix({ days, columns = 10, onSelectDay }: {
             className="grid gap-1.5"
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         >
-            {days.map(d => (
-                <button
-                    key={d.order}
-                    type="button"
-                    onClick={onSelectDay ? () => onSelectDay(d.order) : undefined}
-                    title={`Ngày ${d.order}: ${STATUS_LABEL[d.status]}`}
-                    className={`aspect-square rounded-md flex items-center justify-center text-[11px] font-black ${STATUS_STYLE[d.status]} ${onSelectDay ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-default'}`}
-                >
-                    {d.order}
-                </button>
-            ))}
+            {days.map(d => {
+                const isToday = d.order === todayOrder
+                return (
+                    <button
+                        key={d.order}
+                        type="button"
+                        onClick={onSelectDay ? () => onSelectDay(d.order) : undefined}
+                        title={`Ngày ${d.order}: ${STATUS_LABEL[d.status]}${isToday ? ' (bài hôm nay)' : ''}`}
+                        className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-black ${STATUS_STYLE[d.status]} ${onSelectDay ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-default'} ${isToday ? 'today-ring-pulse' : ''}`}
+                    >
+                        {d.order}
+                    </button>
+                )
+            })}
         </div>
     )
 }

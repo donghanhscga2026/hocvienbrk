@@ -14,19 +14,25 @@ const STATUS_LABEL: Record<DayStatus, string> = {
     missing: 'Chưa nộp',
 }
 
-export default function MemberDayChips({ days }: { days: { order: number; status: DayStatus }[] }) {
+export default function MemberDayChips({ days, todayOrder }: {
+    days: { order: number; status: DayStatus }[]
+    todayOrder?: number
+}) {
     if (!days || days.length === 0) return null
     return (
         <div className="flex flex-wrap gap-1">
-            {days.map(d => (
-                <span
-                    key={d.order}
-                    title={`Ngày ${d.order}: ${STATUS_LABEL[d.status]}`}
-                    className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black shrink-0 ${STATUS_STYLE[d.status]}`}
-                >
-                    {d.order}
-                </span>
-            ))}
+            {days.map(d => {
+                const isToday = d.order === todayOrder
+                return (
+                    <span
+                        key={d.order}
+                        title={`Ngày ${d.order}: ${STATUS_LABEL[d.status]}${isToday ? ' (bài hôm nay)' : ''}`}
+                        className={`inline-flex items-center justify-center w-4 h-4 rounded text-[8px] font-black shrink-0 ${STATUS_STYLE[d.status]} ${isToday ? 'today-ring-pulse' : ''}`}
+                    >
+                        {d.order}
+                    </span>
+                )
+            })}
         </div>
     )
 }

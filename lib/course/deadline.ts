@@ -20,3 +20,24 @@ export function computeLessonDeadlineUTC(startedAt: Date | string, lessonOrder: 
         + 59 * 1000
         + 999
 }
+
+/** Quy 1 thời điểm về 00:00 giờ Việt Nam (Asia/Ho_Chi_Minh), trả về timestamp UTC. */
+export function toVnMidnightUTC(date: Date | string): number {
+    const vnStr = new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })
+    const vn = new Date(vnStr)
+    vn.setHours(0, 0, 0, 0)
+    return vn.getTime()
+}
+
+/**
+ * "Hôm nay là Ngày mấy" của 1 thành viên — mỗi người bắt đầu 1 ngày khác
+ * nhau (Enrollment.startedAt) nên cùng 1 ngày lịch, người bắt đầu sớm đã ở
+ * bài xa hơn người mới vào. Ngày 1 = đúng ngày startedAt. Không giới hạn theo
+ * số bài học hiện có của khóa — nơi gọi tự quyết định cách xử lý khi giá trị
+ * trả về vượt quá số bài học đang publish (ví dụ: không tô sáng ô nào).
+ */
+export function computeCurrentDayOrder(startedAt: Date | string, now: Date | string = new Date()): number {
+    const startMid = toVnMidnightUTC(startedAt)
+    const nowMid = toVnMidnightUTC(now)
+    return Math.floor((nowMid - startMid) / 86400000) + 1
+}

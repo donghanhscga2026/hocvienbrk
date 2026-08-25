@@ -6,7 +6,7 @@ import { Role, Prisma, EnrollmentMemberRole } from "@prisma/client"
 import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
 import { revalidatePath } from "next/cache"
 import { toTitleCase } from "@/lib/utils/text-format"
-import { computeLessonDeadlineUTC } from "@/lib/course/deadline"
+import { computeLessonDeadlineUTC, toVnMidnightUTC, computeCurrentDayOrder } from "@/lib/course/deadline"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -750,19 +750,6 @@ function groupLabel(team: number, group: number, labels?: CourseMemberLabels) {
 type DayStatus = 'missing' | 'late' | 'onTime'
 
 /**
- * Quy về 00:00 giờ Việt Nam (Asia/Ho_Chi_Minh) của 1 thời điểm — dùng để tính
- * số ngày đã trôi qua / ngày lịch của "Ngày N", khớp đúng múi giờ mà
- * submitAssignmentAction dùng khi tính hạn nộp (clientTimeZone mặc định VN).
- * Không dùng giờ local của server vì server production có thể chạy ở UTC.
- */
-function toVnMidnight(date: Date | string) {
-    const vnStr = new Date(date).toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })
-    const vn = new Date(vnStr)
-    vn.setHours(0, 0, 0, 0)
-    return vn
-}
-
-/**
  * Trạng thái nộp bài của 1 ngày: CHỈ tính "Đúng hạn"/"Muộn" khi bài đã thực
  * sự HOÀN THÀNH (status COMPLETED, ≥5đ) — bài mới nộp tạm/chưa đạt điểm thì
  * không được tính "đúng hạn" dù nộp trong ngày. Ngày đó trôi qua rồi mà vẫn
@@ -841,7 +828,6 @@ async function buildCourseRoster(courseId: number) {
         })
     ])
 
-    const todayMid = toVnMidnight(new Date())
     const nowUTC = Date.now()
 
     const members = enrollments.map(e => {
@@ -857,12 +843,17 @@ async function buildCourseRoster(courseId: number) {
             return { order: l.order, status }
         })
 
+        // "Hôm nay là Ngày mấy" theo lịch riêng của thành viên — mỗi người bắt
+        // đầu 1 ngày khác nhau nên cùng 1 ngày lịch, bài cần hoàn thành hôm nay
+        // của mỗi người sẽ khác nhau. Dùng để: (a) cắt cửa sổ hiển thị ở thẻ rút
+        // gọn theo đúng lịch cá nhân thay vì cắt cứng theo cuối danh sách bài
+        // học chung, (b) tô sáng ô "bài hôm nay" ở giao diện.
+        const dayIndexToday = computeCurrentDayOrder(base)
+
         // % nộp ĐÚNG HẠN tính đến hết ngày hôm qua (không tính nộp muộn), theo mốc
         // bắt đầu học riêng của từng thành viên (giống cách tính hạn nộp trong
         // submitAssignmentAction). Nộp muộn vẫn hiện màu tím ở lưới ngày, chỉ
         // không được cộng vào % này.
-        const baseMid = toVnMidnight(base)
-        const dayIndexToday = Math.floor((todayMid.getTime() - baseMid.getTime()) / 86400000) + 1
         const elapsedDays = Math.max(0, Math.min(lessons.length, dayIndexToday - 1))
         const onTimeElapsed = days.filter(d => d.order <= elapsedDays && d.status === 'onTime').length
         const completionPercent = elapsedDays > 0 ? Math.round((onTimeElapsed / elapsedDays) * 100) : null
@@ -875,6 +866,8 @@ async function buildCourseRoster(courseId: number) {
             user: e.user,
             days,
             completionPercent,
+            todayOrder: dayIndexToday,
+            startDate: base,
         }
     })
 
@@ -936,7 +929,7 @@ export async function getMemberSubmissionHistoryAction(enrollmentId: number) {
         if (access.error) return { success: false, error: access.error }
 
         const base = enrollment.startedAt || enrollment.activatedAt || enrollment.createdAt
-        const baseMid = toVnMidnight(base)
+        const baseMid = toVnMidnightUTC(base)
         const nowUTC = Date.now()
 
         const lessons = await prisma.lesson.findMany({

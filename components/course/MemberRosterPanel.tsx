@@ -29,6 +29,8 @@ export type RosterMember = {
     user: { id: number; name: string | null; phone: string | null }
     days: { order: number; status: DayStatus }[]
     completionPercent: number | null
+    todayOrder: number
+    startDate: string | Date
 }
 
 type DisplayToggles = { role: boolean; code: boolean; phone: boolean }
@@ -38,12 +40,28 @@ function localPhone(phone: string | null) {
     return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
 }
 
+export function formatStartDate(date: string | Date) {
+    return new Date(date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })
+}
+
+/**
+ * Cắt cửa sổ hiển thị RECENT_DAYS ngày kết thúc đúng tại "hôm nay" CỦA RIÊNG
+ * thành viên đó (todayOrder) — không cắt cứng theo cuối danh sách bài học
+ * chung của khóa, vì mỗi người bắt đầu 1 ngày khác nhau nên "bài cần làm hôm
+ * nay" của mỗi người là khác nhau (xem lib/course/deadline.ts).
+ */
+export function recentDayWindow(days: { order: number; status: DayStatus }[], todayOrder: number) {
+    const windowEnd = Math.min(days.length, Math.max(1, todayOrder))
+    const windowStart = Math.max(1, windowEnd - RECENT_DAYS + 1)
+    return days.filter(d => d.order >= windowStart && d.order <= windowEnd)
+}
+
 function MemberRow({ member, display, onSelect }: { member: RosterMember; display: DisplayToggles; onSelect: () => void }) {
     const isPS = member.memberRole === 'PS'
-    const recentDays = member.days.slice(-RECENT_DAYS)
+    const recentDays = recentDayWindow(member.days, member.todayOrder)
     return (
         <div className={`rounded-xl border p-2 space-y-1 ${isPS ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-white'}`}>
-            {/* Dòng 1: TV | Mã | SĐT */}
+            {/* Dòng 1: TV | Mã | SĐT ... ngày bắt đầu (căn phải) */}
             <div className="flex items-center gap-1 flex-wrap">
                 {display.role && (
                     <span className={`px-1 py-0.5 rounded text-[9px] font-black shrink-0 ${isPS ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
@@ -60,6 +78,9 @@ function MemberRow({ member, display, onSelect }: { member: RosterMember; displa
                         {localPhone(member.user.phone)}
                     </span>
                 )}
+                <span className="text-[9px] font-mono text-gray-400 shrink-0 ml-auto" title="Ngày bắt đầu học">
+                    {formatStartDate(member.startDate)}
+                </span>
             </div>
             {/* Dòng 2: Họ tên + % hoàn thành — bấm để xem chi tiết đủ số ngày */}
             <button
@@ -75,8 +96,9 @@ function MemberRow({ member, display, onSelect }: { member: RosterMember; displa
                     {member.completionPercent === null ? '—' : `${member.completionPercent}%`}
                 </span>
             </button>
-            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất */}
-            <MemberDayChips days={recentDays} />
+            {/* Dòng 3: Kết quả nộp bài 7 ngày gần nhất tính theo lịch riêng — ô viền
+                nhấp nháy cam/đỏ là bài cần hoàn thành hôm nay của người này */}
+            <MemberDayChips days={recentDays} todayOrder={member.todayOrder} />
         </div>
     )
 }
@@ -232,6 +254,7 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
                         phone: canViewPhone ? selectedMember.user.phone : null,
                         completionPercent: selectedMember.completionPercent,
                         days: selectedMember.days,
+                        todayOrder: selectedMember.todayOrder,
                     }}
                     onClose={() => setSelectedMember(null)}
                 />

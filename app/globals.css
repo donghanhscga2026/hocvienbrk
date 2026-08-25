@@ -147,3 +147,17 @@ body {
     max-width: var(--attn-tooltip-max-vw-desktop, 20vw);
   }
 }
+
+/* Viền nhấp nháy đổi màu cam <-> đỏ đánh dấu ô "bài tập ngày hôm nay" của
+   riêng từng thành viên trong lưới/dãy ngày (MemberDayChips, MemberDayMatrix) */
+@keyframes today-ring-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px #f97316, 0 0 6px 1px rgba(249, 115, 22, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 2px #ef4444, 0 0 6px 1px rgba(239, 68, 68, 0.6);
+  }
+}
+.today-ring-pulse {
+  animation: today-ring-pulse 1.2s ease-in-out infinite;
+}
