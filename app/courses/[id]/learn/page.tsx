@@ -47,7 +47,7 @@ export default async function CourseLearnPage({
   // enrollment bên dưới không phải fetch lại cùng 1 dòng course lần nữa.
   const course = await prisma.course.findUnique({
     where: { id_khoa: id },
-    select: { id: true, type: true, id_khoa: true, name_lop: true },
+    select: { id: true, type: true, id_khoa: true, name_lop: true, teacherId: true },
   })
 
   if (!course) redirect(`/courses/${id}`)
@@ -110,6 +110,7 @@ export default async function CourseLearnPage({
         type: true, // [FIX] Cần field type để check TEXT type
         videoUrl: true,
         content: true,
+        imageUrl: true,
         isDailyChallenge: true,
       },
       orderBy: { order: "asc" },
@@ -123,7 +124,7 @@ export default async function CourseLearnPage({
   return (
     <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
       <CoursePlayer
-        course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, lessons }}
+        course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, teacherId: course.teacherId, lessons }}
         enrollment={enrollment}
         session={session}
       />

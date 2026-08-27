@@ -137,12 +137,12 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [newComment, setNewComment] = useState('')
     const [error, setError] = useState('')
     const [replyingTo, setReplyingTo] = useState<{ id: number | string; userName: string | null } | null>(null)
-    // [EXPAND] Ô nhập bình luận: hover (desktop) hoặc đang gõ (mọi thiết bị) thì
-    // mở rộng thành overlay lớn để soạn thảo dễ hơn — cùng cơ chế với ô "Bồi
-    // Nhân" trong AssignmentForm (mục 2 của Ghi nhận).
-    const [commentHovering, setCommentHovering] = useState(false)
+    // [EXPAND] Ô nhập bình luận: chỉ mở rộng thành overlay lớn khi người dùng
+    // BẤM/CHẠM vào ô để nhập liệu (focus) — không tự bật khi chỉ rê chuột
+    // ngang qua khu vực này. Cùng cơ chế với ô "Bồi Nhân" trong AssignmentForm
+    // (mục 2 của Ghi nhận).
     const [commentFocused, setCommentFocused] = useState(false)
-    const commentExpanded = commentHovering || commentFocused
+    const commentExpanded = commentFocused
 
     // [EDIT] Sửa bình luận của chính mình — dùng LẠI ô soạn thảo mở rộng (cùng
     // toolbar định dạng/ảnh như lúc viết bình luận mới), chỉ đổi hành vi Gửi
@@ -162,7 +162,6 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
 
     const closeCommentExpand = () => {
         textareaRef.current?.blur()
-        setCommentHovering(false)
         setCommentFocused(false)
         setActivePopover(null)
     }
@@ -537,8 +536,6 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                     )}
                     <form onSubmit={handleSendComment}>
                         <div
-                            onMouseEnter={() => setCommentHovering(true)}
-                            onMouseLeave={() => setCommentHovering(false)}
                             className={commentExpanded
                                 ? 'comment-expand-box fixed left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-2xl flex flex-col'
                                 : 'flex items-end gap-2'

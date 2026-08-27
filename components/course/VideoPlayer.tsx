@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { detectVideoSource, isYouTube, VideoSource } from '@/lib/video-sources'
+import LessonContentBox from './LessonContentBox'
 
 export interface VideoPlayerHandle {
     /** Đọc vị trí phát video HIỆN TẠI (live), dùng để tính điểm ngay lúc bấm "Ghi nhận kết quả" */
@@ -24,6 +25,9 @@ interface VideoPlayerProps {
     serverPlaylist?: PlaylistItem[]
     courseType?: string
     lessonType?: string
+    contentImageUrl?: string | null
+    canEditContent?: boolean
+    onSaveContent?: (content: string, imageUrl: string | null) => Promise<{ success: boolean; message?: string }>
 }
 
 type PlaylistItem = {
@@ -34,14 +38,6 @@ type PlaylistItem = {
     content?: string
 }
 
-function makeLinksClickable(text: string): string {
-    if (!text) return ''
-    const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
-    return text.replace(urlRegex, (match) => {
-        return `<a href="${match}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:700">${match}</a>`
-    })
-}
-
 function trimDocUrl(url: string) {
     if (!url.includes('docs.google.com')) return url
     if (url.includes('/pub')) return url
@@ -49,7 +45,7 @@ function trimDocUrl(url: string) {
     return `${cleanUrl}/preview`
 }
 
-function buildPlaylist(videoUrl: string | null, serverPlaylist: PlaylistItem[] | undefined, lessonType: string | undefined, lessonContent: string | null): PlaylistItem[] {
+function buildPlaylist(videoUrl: string | null, serverPlaylist: PlaylistItem[] | undefined, lessonType: string | undefined, lessonContent: string | null, canEditContent?: boolean): PlaylistItem[] {
     let base: PlaylistItem[] = []
     if (serverPlaylist && serverPlaylist.length > 0) {
         base = serverPlaylist.map(item => ({
@@ -71,9 +67,11 @@ function buildPlaylist(videoUrl: string | null, serverPlaylist: PlaylistItem[] |
             return { type: 'video' as const, title: `Phần ${index + 1}`, url, source: detectVideoSource(url) }
         })
     }
-    if (lessonType === 'ALL' && lessonContent) {
+    // [EDIT] Cho phép ADMIN/giáo viên thêm nội dung text lần đầu cho bài ALL
+    // (bình thường chỉ chèn mục text khi đã có lessonContent).
+    if (lessonType === 'ALL' && (lessonContent || canEditContent)) {
         return [
-            { type: 'text' as const, title: 'Nội dung bài học', url: '', content: lessonContent },
+            { type: 'text' as const, title: 'Nội dung bài học', url: '', content: lessonContent || '' },
             ...base,
         ]
     }
@@ -119,8 +117,11 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     serverPlaylist,
     courseType,
     lessonType,
+    contentImageUrl,
+    canEditContent,
+    onSaveContent,
 }, ref) {
-    const playlist = useMemo(() => buildPlaylist(videoUrl, serverPlaylist, lessonType, lessonContent), [videoUrl, serverPlaylist, lessonType, lessonContent])
+    const playlist = useMemo(() => buildPlaylist(videoUrl, serverPlaylist, lessonType, lessonContent, canEditContent), [videoUrl, serverPlaylist, lessonType, lessonContent, canEditContent])
     const [currentIndex, setCurrentVideoIndex] = useState(lastVideoIndex < playlist.length ? lastVideoIndex : 0)
     // Bài học có ≥2 học phần → mở ra là thấy ngay danh sách học phần để chọn,
     // thay vì tự nhảy thẳng vào học phần đầu tiên khiến học viên không biết
@@ -354,10 +355,10 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                     document.head.appendChild(tag)
                 }
                 const originalCallback = (window as any).onYouTubeIframeAPIReady
-                ;(window as any).onYouTubeIframeAPIReady = () => {
-                    if (originalCallback) originalCallback()
-                    doInit()
-                }
+                    ; (window as any).onYouTubeIframeAPIReady = () => {
+                        if (originalCallback) originalCallback()
+                        doInit()
+                    }
             }
         } else if (source.platform === 'mp4') {
             cleanup = initMp4Player()
@@ -487,9 +488,13 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
     const renderNonVideo = () => {
         if (currentItem?.type === 'text') {
             return (
-                <div className="absolute inset-0 bg-white overflow-y-auto p-6">
-                    <div className="text-gray-900 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: makeLinksClickable((currentItem.content || lessonContent || '').replace(/\n/g, '<br>')) }} />
-                </div>
+                <LessonContentBox
+                    variant="framed"
+                    content={currentItem.content || lessonContent || ''}
+                    imageUrl={contentImageUrl}
+                    canEdit={!!canEditContent}
+                    onSave={onSaveContent || (async () => ({ success: false, message: 'Không thể lưu' }))}
+                />
             )
         }
         return (
@@ -519,7 +524,7 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                     <div className="absolute inset-0 bg-zinc-900 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
                         <div className="flex items-center justify-between p-5 border-b border-zinc-700 shrink-0">
                             <h3 className="text-white font-black text-base flex items-center gap-3">
-                                <List className="w-5 h-5 text-orange-400" /> DANH SÁCH HỌC ({playlist.length})
+                                <List className="w-5 h-5 text-orange-400" /> Danh sách học ({playlist.length})
                             </h3>
                             <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-300 hover:text-white transition-all"><X className="w-5 h-5" /></button>
                         </div>
@@ -578,12 +583,12 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
                         ) : (
                             <span className="text-[8px] sm:text-[9px] text-zinc-400 font-bold uppercase tracking-widest">
                                 {currentItem?.source?.platform === 'youtube' ? 'YouTube' :
-                                 currentItem?.source?.platform === 'mp4' ? 'MP4' :
-                                 currentItem?.source?.platform === 'vimeo' ? 'Vimeo' :
-                                 currentItem?.source?.platform === 'dailymotion' ? 'Dailymotion' :
-                                 currentItem?.source?.platform === 'tiktok' ? 'TikTok' :
-                                 currentItem?.source?.platform === 'facebook' ? 'Facebook' :
-                                 currentItem?.source?.platform === 'drive' ? 'Google Drive' : 'Video'}
+                                    currentItem?.source?.platform === 'mp4' ? 'MP4' :
+                                        currentItem?.source?.platform === 'vimeo' ? 'Vimeo' :
+                                            currentItem?.source?.platform === 'dailymotion' ? 'Dailymotion' :
+                                                currentItem?.source?.platform === 'tiktok' ? 'TikTok' :
+                                                    currentItem?.source?.platform === 'facebook' ? 'Facebook' :
+                                                        currentItem?.source?.platform === 'drive' ? 'Google Drive' : 'Video'}
                             </span>
                         )}
                     </div>

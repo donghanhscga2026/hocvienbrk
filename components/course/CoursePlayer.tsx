@@ -16,6 +16,7 @@ import LessonSidebar from "./LessonSidebar"
 import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
 import ChatSection from "./ChatSection"
+import LessonContentBox from "./LessonContentBox"
 // [OPTIMIZE] StartDateModal kéo theo react-day-picker + CSS riêng, nhưng chỉ
 // hiện với học viên CHƯA chọn ngày bắt đầu học (thiểu số) — dynamic-import để
 // không tải thư viện này cho mọi học viên vào trang học.
@@ -26,15 +27,7 @@ import {
     updateLastLessonAction
 } from "@/app/actions/course-actions"
 import { hasUserCommentedOnLesson } from "@/app/actions/comment-actions"
-
-// Chuyển URL thành link clickable
-const makeLinksClickable = (text: string): string => {
-    if (!text) return ''
-    const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
-    return text.replace(urlRegex, (match) => {
-        return `<a href="${match}" target="_blank" rel="noopener noreferrer" class="text-orange-400 hover:underline font-bold">${match}</a>`
-    })
-}
+import { updateLessonAction } from "@/app/actions/admin-actions"
 
 interface CoursePlayerProps {
     course: any
@@ -236,6 +229,22 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     const currentLesson = course.lessons.find((l: any) => l.id === currentLessonId)
     const currentProgress = progressMap[currentLessonId]
 
+    // [EDIT] ADMIN hoặc TEACHER của chính khóa học này được sửa nội dung bài
+    // học ngay tại giao diện học — kiểm tra lại y hệt phía server trong
+    // updateLessonAction (course.teacherId === userId), đây chỉ là gate hiển thị UI.
+    const currentUserId = session?.user?.id ? parseInt(session.user.id) : null
+    const canEditLessonContent = session?.user?.role === 'ADMIN' || (currentUserId != null && course.teacherId === currentUserId)
+
+    const handleSaveLessonContent = useCallback(async (content: string, imageUrl: string | null) => {
+        if (!currentLessonId) return { success: false, message: 'Không tìm thấy bài học' }
+        const result = await updateLessonAction(currentLessonId, { content, imageUrl })
+        if (result.success) {
+            router.refresh()
+            return { success: true }
+        }
+        return { success: false, message: result.error || 'Lưu thất bại' }
+    }, [currentLessonId, router])
+
     const initialPercent = !currentLesson?.videoUrl ? 100 : (
         currentProgress?.duration ? (currentProgress.maxTime / currentProgress.duration) * 100 : 0
     )
@@ -355,6 +364,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                                 ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }]
                                                 : undefined
                                         }
+                                        contentImageUrl={currentLesson?.imageUrl || null}
+                                        canEditContent={canEditLessonContent}
+                                        onSaveContent={handleSaveLessonContent}
                                     />
                                 )}
                             </div>
@@ -381,8 +393,17 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
                                 {currentLesson?.type === 'ALL' ? (
                                     <div className="text-zinc-300 text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
-                                ) : currentLesson?.content && currentLesson?.type !== 'TEXT' && !currentLesson.content.includes('docs.google.com') && currentLesson?.videoUrl && (
-                                    <div className="text-zinc-300 text-sm leading-relaxed text-justify line-clamp-2 hover:line-clamp-none transition-all [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson.content) }} />
+                                ) : currentLesson?.type !== 'TEXT' && currentLesson?.videoUrl
+                                    && !(currentLesson?.content || '').includes('docs.google.com')
+                                    && (currentLesson?.content || canEditLessonContent) && (
+                                    <LessonContentBox
+                                        key={currentLessonId}
+                                        variant="inline"
+                                        content={currentLesson?.content || null}
+                                        imageUrl={currentLesson?.imageUrl || null}
+                                        canEdit={canEditLessonContent}
+                                        onSave={handleSaveLessonContent}
+                                    />
                                 )}
                             </div>
                             <div
@@ -500,7 +521,16 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         </div>
                         {/* [FIX] Ẩn content trong modal khi là TEXT (đã hiển thị trong Player) */}
                         {currentLesson?.type !== 'TEXT' && (
-                            <div className="overflow-y-auto p-5 text-zinc-300 text-sm leading-relaxed text-justify [&_a]:text-orange-400 [&_a]:hover:underline [&_a]:font-bold" dangerouslySetInnerHTML={{ __html: makeLinksClickable(currentLesson?.content || '') }} />
+                            <div className="overflow-y-auto p-4">
+                                <LessonContentBox
+                                    key={currentLessonId}
+                                    variant="inline"
+                                    content={currentLesson?.content || null}
+                                    imageUrl={currentLesson?.imageUrl || null}
+                                    canEdit={canEditLessonContent}
+                                    onSave={handleSaveLessonContent}
+                                />
+                            </div>
                         )}
                     </div>
                 </div>

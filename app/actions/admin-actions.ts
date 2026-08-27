@@ -1930,6 +1930,7 @@ export async function updateCourseAction(courseId: number, data: {
 export async function updateLessonAction(lessonId: string, data: {
     title?: string,
     content?: string | null,
+    imageUrl?: string | null,
     videoUrl?: string | null,
     order?: number,
     type?: any,

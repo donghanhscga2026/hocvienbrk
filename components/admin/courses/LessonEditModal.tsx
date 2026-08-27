@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, X, Save, Trash2 } from 'lucide-react'
+import { Loader2, X, Save, Trash2, Upload } from 'lucide-react'
 
-export function LessonEditModal({ lesson, onClose, onSave, onDelete }: { 
-    lesson: any, 
-    onClose: () => void, 
+export function LessonEditModal({ lesson, onClose, onSave, onDelete }: {
+    lesson: any,
+    onClose: () => void,
     onSave: (data: any) => Promise<void>,
     onDelete?: (id: string) => Promise<void>
 }) {
@@ -14,14 +14,35 @@ export function LessonEditModal({ lesson, onClose, onSave, onDelete }: {
     const [order, setOrder] = useState(lesson.order || 0)
     const [lessonType, setLessonType] = useState(lesson.type || 'VIDEO')
     const [content, setContent] = useState(lesson.content || '')
+    const [imageUrl, setImageUrl] = useState(lesson.imageUrl || '')
+    const [uploadingImage, setUploadingImage] = useState(false)
     const [isDailyChallenge, setIsDailyChallenge] = useState(lesson.isDailyChallenge || false)
     const [saving, setSaving] = useState(false)
     const [deleting, setDeleting] = useState(false)
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (!file) return
+
+        setUploadingImage(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            const res = await fetch('/api/upload/lesson', { method: 'POST', body: formData })
+            const data = await res.json()
+            if (data.url) {
+                setImageUrl(data.url)
+            }
+        } finally {
+            setUploadingImage(false)
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
-        await onSave({ id: lesson.id, title, videoUrl, order, type: lessonType, content, isDailyChallenge })
+        await onSave({ id: lesson.id, title, videoUrl, order, type: lessonType, content, imageUrl: imageUrl || null, isDailyChallenge })
         setSaving(false)
         onClose()
     }
@@ -61,10 +82,43 @@ export function LessonEditModal({ lesson, onClose, onSave, onDelete }: {
                             <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" placeholder={lessonType === 'VIDEO' ? "https://youtube.com, vimeo.com, fb.com, .mp4..." : "https://docs.google.com/..."} />
                         </div>
                     )}
-                    {lessonType === 'TEXT' && (
+                    {lessonType !== 'DOCS' && (
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nội dung văn bản</label>
-                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Nhập nội dung bài học..." />
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">
+                                {lessonType === 'TEXT' ? 'Nội dung văn bản' : 'Nội dung / mô tả bài học (hiện dưới video)'}
+                            </label>
+                            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={lessonType === 'TEXT' ? 10 : 4} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm outline-none resize-y" placeholder="Nhập nội dung bài học..." />
+                        </div>
+                    )}
+                    {lessonType !== 'DOCS' && (
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Hình ảnh đính kèm</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={imageUrl}
+                                    onChange={(e) => setImageUrl(e.target.value)}
+                                    className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                    placeholder="https://... hoặc /uploads/lessons/..."
+                                />
+                                <label className="flex items-center gap-2 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl cursor-pointer hover:bg-blue-100 transition-all text-sm font-bold whitespace-nowrap">
+                                    <Upload className="w-4 h-4" />
+                                    {uploadingImage ? 'Đang tải...' : 'Upload'}
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp,image/gif"
+                                        onChange={handleImageUpload}
+                                        className="hidden"
+                                        disabled={uploadingImage}
+                                    />
+                                </label>
+                            </div>
+                            {imageUrl && (
+                                <div className="mt-2 bg-gray-50 rounded-2xl p-4 flex flex-col items-center gap-2">
+                                    <img src={imageUrl} alt="Preview" className="max-w-full max-h-64 object-contain rounded-xl" />
+                                    <button type="button" onClick={() => setImageUrl('')} className="text-[11px] font-bold text-red-500 hover:text-red-600">Xóa ảnh</button>
+                                </div>
+                            )}
                         </div>
                     )}
                     <div className="space-y-1.5">

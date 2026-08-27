@@ -111,15 +111,14 @@ function AssignmentForm({
             : ["", "", ""]
     )
     const [supports, setSupports] = useState<boolean[]>(initialData?.assignment?.supports || [false, false])
-    // [EXPAND] Ô "Bồi Nhân": hover (desktop) hoặc đang edit (mọi thiết bị) thì mở
-    // rộng thành overlay 90vh để soạn thảo dễ hơn, rời chuột + mất focus thì thu lại.
-    const [reflectionHovering, setReflectionHovering] = useState(false)
+    // [EXPAND] Ô "Bồi Nhân": chỉ mở rộng thành overlay 90vh khi BẤM/CHẠM vào ô
+    // để nhập liệu (focus) — không tự bật khi chỉ rê chuột ngang qua, mất focus
+    // thì thu lại.
     const [reflectionFocused, setReflectionFocused] = useState(false)
-    const reflectionExpanded = reflectionHovering || reflectionFocused
+    const reflectionExpanded = reflectionFocused
     const reflectionTextareaRef = useRef<HTMLTextAreaElement>(null)
     const closeReflectionExpand = useCallback(() => {
         reflectionTextareaRef.current?.blur()
-        setReflectionHovering(false)
         setReflectionFocused(false)
     }, [])
 
@@ -333,8 +332,6 @@ function AssignmentForm({
                         />
                     )}
                     <div
-                        onMouseEnter={() => setReflectionHovering(true)}
-                        onMouseLeave={() => setReflectionHovering(false)}
                         className={reflectionExpanded
                             ? 'reflection-expand-box fixed left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-2xl'
                             : ''

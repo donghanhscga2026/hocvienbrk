@@ -63,6 +63,39 @@ export function formatCommentContent(raw: string): string {
     return html
 }
 
+/**
+ * Định dạng cho nội dung bài học (Lesson.content) — cùng cú pháp
+ * đậm/màu/cỡ chữ như ô bình luận, NHƯNG KHÔNG escape HTML trước (khác
+ * formatCommentContent): field này do admin/giáo viên biên soạn (không phải
+ * học viên tự nhập), và nội dung cũ đã tồn tại có thể chứa HTML thô được
+ * render trực tiếp từ trước tới giờ — escape sẽ làm hỏng các bài học cũ.
+ * Giữ nguyên hành vi tự động biến URL trần thành link như trước đây.
+ */
+export function formatLessonContent(raw: string): string {
+    let html = raw || ''
+
+    html = html.replace(/\n/g, '<br/>')
+
+    html = html.replace(/\{\{c:([a-z]+)\}\}([\s\S]*?)\{\{\/c\}\}/g, (match, key, inner) => {
+        const hex = COLOR_MAP[key]
+        return hex ? `<span style="color:${hex}">${inner}</span>` : match
+    })
+
+    html = html.replace(/\{\{s:([a-z]+)\}\}([\s\S]*?)\{\{\/s\}\}/g, (match, key, inner) => {
+        const cls = SIZE_MAP[key]
+        return cls ? `<span class="${cls}">${inner}</span>` : match
+    })
+
+    html = html.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
+
+    const urlRegex = /(\b(https?:\/\/)[^\s<]+)/gi
+    html = html.replace(urlRegex, (match) => {
+        return `<a href="${match}" target="_blank" rel="noopener noreferrer" style="color:#ea580c;font-weight:700">${match}</a>`
+    })
+
+    return html
+}
+
 /** Bọc / chèn cú pháp định dạng quanh vùng đang chọn trong textarea (dùng cho toolbar). */
 export function wrapSelection(
     value: string,
