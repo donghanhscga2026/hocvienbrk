@@ -328,6 +328,7 @@ function AssignmentForm({
                     {reflectionExpanded && (
                         <div
                             className="fixed inset-0 z-40 bg-black/50"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={closeReflectionExpand}
                         />
                     )}
@@ -340,6 +341,7 @@ function AssignmentForm({
                         {reflectionExpanded && (
                             <button
                                 type="button"
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={closeReflectionExpand}
                                 className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
                             >

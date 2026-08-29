@@ -532,7 +532,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                         </div>
                     )}
                     {commentExpanded && (
-                        <div className="fixed inset-0 z-40 bg-black/50" onClick={handleCloseComposer} />
+                        <div className="fixed inset-0 z-40 bg-black/50" onMouseDown={(e) => e.preventDefault()} onClick={handleCloseComposer} />
                     )}
                     <form onSubmit={handleSendComment}>
                         <div
@@ -561,6 +561,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                             chỉ thu gọn, nội dung đang gõ vẫn giữ nguyên trong ô. */}
                                         <button
                                             type="submit"
+                                            onMouseDown={(e) => e.preventDefault()}
                                             disabled={(!newComment.trim() && !pendingImageUrl) || isPending || uploadingImage}
                                             className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors disabled:opacity-30 disabled:grayscale"
                                         >
@@ -568,6 +569,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                         </button>
                                         <button
                                             type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
                                             onClick={handleCloseComposer}
                                             className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
                                         >
@@ -578,20 +580,21 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
 
                                 {/* Toolbar định dạng: đậm / màu / cỡ chữ / emoji / ảnh */}
                                 <div className="relative flex items-center gap-1 mb-2 shrink-0 flex-wrap">
-                                    <button type="button" onClick={() => applyFormat('bold')} title="In đậm" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('bold')} title="In đậm" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
                                         <Bold className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setActivePopover(p => p === 'color' ? null : 'color')} title="Màu chữ" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePopover(p => p === 'color' ? null : 'color')} title="Màu chữ" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
                                         <Palette className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setActivePopover(p => p === 'size' ? null : 'size')} title="Cỡ chữ" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePopover(p => p === 'size' ? null : 'size')} title="Cỡ chữ" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
                                         <Type className="w-4 h-4" />
                                     </button>
-                                    <button type="button" onClick={() => setActivePopover(p => p === 'emoji' ? null : 'emoji')} title="Emoji" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
+                                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setActivePopover(p => p === 'emoji' ? null : 'emoji')} title="Emoji" className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-colors">
                                         <Smile className="w-4 h-4" />
                                     </button>
                                     <button
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={uploadingImage}
                                         title="Chèn ảnh"
@@ -606,6 +609,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                                 <button
                                                     key={c.key}
                                                     type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
                                                     title={c.label}
                                                     onClick={() => applyFormat({ color: c.key })}
                                                     className="w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform"
@@ -620,6 +624,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                                 <button
                                                     key={s.key}
                                                     type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
                                                     onClick={() => applyFormat({ size: s.key })}
                                                     className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold transition-colors"
                                                 >
@@ -634,6 +639,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                                 <button
                                                     key={emoji}
                                                     type="button"
+                                                    onMouseDown={(e) => e.preventDefault()}
                                                     onClick={() => applyFormat({ emoji })}
                                                     className="text-lg hover:bg-gray-100 rounded-lg py-0.5 transition-colors"
                                                 >
@@ -653,7 +659,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                         )}
                                         <span className="text-xs text-gray-600 flex-1">{uploadingImage ? 'Đang tải ảnh...' : 'Đã đính kèm ảnh — sẽ gửi kèm bình luận'}</span>
                                         {!uploadingImage && (
-                                            <button type="button" onClick={() => setPendingImageUrl(null)} className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition-colors">
+                                            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setPendingImageUrl(null)} className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition-colors">
                                                 <X className="h-3.5 w-3.5" />
                                             </button>
                                         )}
