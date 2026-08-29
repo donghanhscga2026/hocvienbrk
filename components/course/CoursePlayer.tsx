@@ -48,7 +48,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     const [currentLessonId, setCurrentLessonId] = useState<string>(course.lessons[0]?.id)
     const [videoPercent, setVideoPercent] = useState(0)
-    const [mobileTab, setMobileTab] = useState<MobileTab>('content')
+    // [FIX] Mặc định mở tab "Danh sách" trước — học viên thấy toàn bộ lộ
+    // trình ngay khi vào trang, thay vì nhảy thẳng vào "Nội dung" của bài học
+    // gần nhất. Chọn 1 bài trong danh sách vẫn tự chuyển sang tab "Nội dung"
+    // như cũ (xem handleLessonSelect).
+    const [mobileTab, setMobileTab] = useState<MobileTab>('list')
     const [progressMap, setProgressMap] = useState<Record<string, any>>(() =>
         filteredLessonProgress.reduce((acc: any, p: any) => {
             acc[p.lessonId] = p
@@ -288,9 +292,15 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         { id: 'record', tooltip: recordTabAttn.tooltip, visible: mobileTab !== 'record' && course.type !== 'LIB' && recordTabAttn.enabled },
     ], cycleOptions)
 
-    // [HYDRATION SAFEGUARD] Trả về giao diện trống tối giản trên server
+    // [HYDRATION SAFEGUARD] Trả về giao diện trống tối giản trên server.
+    // [FIX] Dùng cả h-dvh (thắng h-screen nhờ thứ tự utility của Tailwind) để
+    // khớp chiều cao thật với layout chính thức bên dưới (page.tsx cũng dùng
+    // h-screen h-dvh) — trước đây khung loading dùng riêng h-screen (100vh
+    // tĩnh) nên trên mobile (Safari/Chrome ẩn/hiện thanh địa chỉ) xảy ra lệch
+    // chiều cao ngay lúc chuyển từ khung loading sang layout thật, gây cảm
+    // giác trang "nhảy" và bị cuộn dở khi vừa tải xong.
     if (!isMounted) {
-        return <div className="h-screen w-full bg-black flex items-center justify-center text-zinc-700 font-mono text-xs">Đang tải ứng dụng...</div>
+        return <div className="h-screen h-dvh w-full bg-black flex items-center justify-center text-zinc-700 font-mono text-xs">Đang tải ứng dụng...</div>
     }
 
     return (
@@ -596,8 +606,6 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
     const [saving, setSaving] = useState(false)
     const [showWarning, setShowWarning] = useState(false)
     const [sortDesc, setSortDesc] = useState(true)
-    const listContainerRef = useRef<HTMLDivElement>(null)
-    const hasAutoScrolledRef = useRef(false)
 
     const filteredProgress = Object.entries(progress).reduce((acc: any, [id, p]: [string, any]) => {
         if (p.status !== 'RESET') acc[id] = p
@@ -606,15 +614,11 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
 
     const displayLessons = useMemo(() => sortDesc ? [...lessons].reverse() : lessons, [lessons, sortDesc])
 
-    // Tự động cuộn tới bài học hiện tại khi vừa vào trang
-    useEffect(() => {
-        if (hasAutoScrolledRef.current || !currentLessonId) return
-        const el = listContainerRef.current?.querySelector(`[data-lesson-id="${CSS.escape(currentLessonId)}"]`)
-        if (el) {
-            el.scrollIntoView({ block: 'center', behavior: 'auto' })
-            hasAutoScrolledRef.current = true
-        }
-    }, [currentLessonId])
+    // [FIX] Trước đây tự cuộn tới bài học hiện tại ngay khi vào tab "Danh
+    // sách" — với khóa học nhiều bài, bài hiện tại thường nằm giữa/cuối danh
+    // sách nên vừa mở tab là bị nhảy xuống giữa trang, che mất phần đầu
+    // (Ngày bắt đầu / nút sắp xếp), học viên phải tự cuộn lên mới thấy đủ.
+    // Bỏ hẳn auto-scroll — tab "Danh sách" luôn hiện từ đầu danh sách.
 
     // Ngày hôm nay VN (UTC+7)
     const today = (() => {
@@ -714,7 +718,7 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
             </div>
 
             {/* ─ Danh sách cuộn ─ */}
-            <div ref={listContainerRef} className="flex-1 overflow-y-auto overscroll-contain">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
                 {displayLessons.map((lesson: any) => {
                     const prog = filteredProgress[lesson.id]
                     const isActive = currentLessonId === lesson.id
