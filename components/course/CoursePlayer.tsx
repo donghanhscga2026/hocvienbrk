@@ -340,38 +340,43 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 )}
 
                 <main className="flex-1 flex flex-col min-h-0 overflow-hidden items-center bg-zinc-950">
-                    <div className={isMobile ? 'shrink-0 w-full' : 'p-5 pb-0 shrink-0 w-full max-w-5xl'}>
-                        <div
-                            className={isMobile ? '' : 'grid transition-[grid-template-rows] duration-300 ease-in-out'}
-                            style={!isMobile ? { gridTemplateRows: chatHovered ? '0fr' : '1fr' } : undefined}
-                        >
-                            <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black min-h-0'}>
-                                {!videoHidden && (
-                                    <VideoPlayer
-                                        key={currentLessonId}
-                                        ref={videoPlayerRef}
-                                        videoUrl={currentLesson?.videoUrl || null}
-                                        lessonContent={currentLesson?.content || null}
-                                        initialMaxTime={currentProgress?.maxTime || 0}
-                                        playlistData={currentProgress?.scores?.playlist}
-                                        lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
-                                        onProgress={handleVideoProgress}
-                                        onPercentChange={setVideoPercent}
-                                        courseType={course.type}
-                                        lessonType={currentLesson?.type}
-                                        serverPlaylist={
-                                            currentLesson?.type === 'TEXT'
-                                                ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }]
-                                                : undefined
-                                        }
-                                        contentImageUrl={currentLesson?.imageUrl || null}
-                                        canEditContent={canEditLessonContent}
-                                        onSaveContent={handleSaveLessonContent}
-                                    />
-                                )}
+                    {/* [FIX] Trên mobile, khung video/nội dung chỉ hiện ở tab "Nội dung" —
+                        trước đây hiện cố định phía trên cả 3 tab, chiếm chỗ và lẫn cả vào
+                        tab "Danh sách" bài học. Desktop không có khái niệm tab nên luôn hiện. */}
+                    {(!isMobile || mobileTab === 'content') && (
+                        <div className={isMobile ? 'shrink-0 w-full' : 'p-5 pb-0 shrink-0 w-full max-w-5xl'}>
+                            <div
+                                className={isMobile ? '' : 'grid transition-[grid-template-rows] duration-300 ease-in-out'}
+                                style={!isMobile ? { gridTemplateRows: chatHovered ? '0fr' : '1fr' } : undefined}
+                            >
+                                <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black min-h-0'}>
+                                    {!videoHidden && (
+                                        <VideoPlayer
+                                            key={currentLessonId}
+                                            ref={videoPlayerRef}
+                                            videoUrl={currentLesson?.videoUrl || null}
+                                            lessonContent={currentLesson?.content || null}
+                                            initialMaxTime={currentProgress?.maxTime || 0}
+                                            playlistData={currentProgress?.scores?.playlist}
+                                            lastVideoIndex={currentProgress?.scores?.lastVideoIndex}
+                                            onProgress={handleVideoProgress}
+                                            onPercentChange={setVideoPercent}
+                                            courseType={course.type}
+                                            lessonType={currentLesson?.type}
+                                            serverPlaylist={
+                                                currentLesson?.type === 'TEXT'
+                                                    ? [{ type: 'text', title: currentLesson.title, url: '', content: currentLesson.content || '' }]
+                                                    : undefined
+                                            }
+                                            contentImageUrl={currentLesson?.imageUrl || null}
+                                            canEditContent={canEditLessonContent}
+                                            onSaveContent={handleSaveLessonContent}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {!isMobile && (
                         <div className="p-5 flex-1 flex flex-col gap-4 min-h-0 overflow-hidden w-full max-w-5xl">
