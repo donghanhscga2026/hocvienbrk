@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
-import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction } from '@/app/actions/admin-actions'
-import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText } from 'lucide-react'
+import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction } from '@/app/actions/admin-actions'
+import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText, KeyRound } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
 import BulkEnrollModal from '@/components/admin/students/BulkEnrollModal'
@@ -90,11 +90,52 @@ function ResendVerifyBtn({ studentId }: { studentId: number }) {
   )
 }
 
+function ResetPasswordBtn({ studentId, studentName }: { studentId: number; studentName: string }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [msg, setMsg] = useState('')
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm(`Gửi link đặt lại mật khẩu đến email của "${studentName}"?`)) return
+    setStatus('loading')
+    setMsg('')
+    const res = await adminResetStudentPasswordAction(studentId)
+    if (res.success) {
+      setStatus('success')
+      setMsg(res.message || 'Đã gửi!')
+    } else {
+      setStatus('error')
+      setMsg(res.error || 'Lỗi')
+    }
+    setTimeout(() => setStatus('idle'), 4000)
+  }
+
+  if (status === 'loading') {
+    return (
+      <span className="p-1.5">
+        <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+      </span>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-orange-50 transition-all"
+      title={status === 'success' ? msg : status === 'error' ? msg : 'Gửi link đặt lại mật khẩu'}
+    >
+      <KeyRound className={`w-4 h-4 ${status === 'success' ? 'text-green-500' : status === 'error' ? 'text-red-500' : 'text-orange-400 hover:text-orange-600'}`} />
+    </button>
+  )
+}
+
 export default function ToolsStudentsPage() {
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'ADMIN'
   const isTeacher = session?.user?.role === 'TEACHER'
   const isRoot = session?.user?.id === '0'
+  const isSuperAdmin = session?.user?.id === '0' || session?.user?.id === '3773'
 
   const [students, setStudents] = useState<StudentData[]>([])
   const [loading, setLoading] = useState(true)
@@ -420,14 +461,21 @@ export default function ToolsStudentsPage() {
                       </div>
                     </div>
                   </Link>
-                  {isRoot && (
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActivityLogTarget({ id: student.id, name: student.name || 'Chưa có tên' }) }}
-                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-blue-50 transition-all"
-                      title="Xem lịch sử hoạt động"
-                    >
-                      <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
-                    </button>
+                  {(isRoot || isSuperAdmin) && (
+                    <div className="absolute top-3 right-3 flex items-center gap-0.5">
+                      {isRoot && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActivityLogTarget({ id: student.id, name: student.name || 'Chưa có tên' }) }}
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-blue-50 transition-all"
+                          title="Xem lịch sử hoạt động"
+                        >
+                          <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
+                        </button>
+                      )}
+                      {isSuperAdmin && (
+                        <ResetPasswordBtn studentId={student.id} studentName={student.name || 'Chưa có tên'} />
+                      )}
+                    </div>
                   )}
                 </div>
               )

@@ -2118,6 +2118,64 @@ export async function resendVerificationAction(studentId: number) {
     }
 }
 
+// Chỉ admin root (id=0) hoặc admin đặc biệt (id=3773) được reset mật khẩu tài khoản bất kỳ
+function isSuperAdminId(userId: number): boolean {
+    return userId === 0 || userId === 3773
+}
+
+export async function adminResetStudentPasswordAction(studentId: number) {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) return { success: false, error: "Chưa đăng nhập" }
+
+        const adminId = parseInt(session.user.id)
+        if (!isSuperAdminId(adminId)) {
+            return { success: false, error: "Không có quyền thực hiện thao tác này" }
+        }
+
+        const student = await prisma.user.findUnique({
+            where: { id: studentId },
+            select: { id: true, name: true, email: true },
+        })
+        if (!student) return { success: false, error: "Không tìm thấy thành viên" }
+
+        const crypto = await import("crypto")
+        const token = crypto.randomBytes(32).toString("hex")
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+        await prisma.passwordReset.deleteMany({ where: { userId: student.id } })
+        await prisma.passwordReset.create({ data: { userId: student.id, token, expiresAt } })
+
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://giautoandien.io.vn"
+        const resetUrl = `${baseUrl}/reset-password/${token}`
+
+        const { sendPasswordResetLinkEmail, sendTelegram } = await import("@/lib/notifications")
+        const result = await sendPasswordResetLinkEmail(student.email, student.name || "Thành viên", resetUrl, student.id)
+
+        if (!result.success) {
+            return { success: false, error: `Gửi email thất bại: ${result.message}` }
+        }
+
+        await sendTelegram(
+            `🔐 <b>ADMIN KHỞI TẠO RESET MẬT KHẨU</b>\n👤 Thành viên: <b>${student.name || 'N/A'}</b> (#${student.id})\n📧 Email: ${student.email}\n👮 Admin thực hiện: #${adminId}\n\n✅ Đã gửi link đặt lại mật khẩu, hiệu lực 24h.`,
+            'CHANGE'
+        )
+
+        const { logActivity } = await import("@/lib/activity-logger")
+        await logActivity({
+            userId: student.id,
+            action: 'PASSWORD_RESET',
+            detail: `Admin #${adminId} đã gửi link đặt lại mật khẩu`,
+            metadata: { triggeredByAdminId: adminId, email: student.email },
+        })
+
+        const maskedEmail = student.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
+        return { success: true, message: `Đã gửi link đặt lại mật khẩu đến ${maskedEmail}` }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
 export async function resendAllVerificationAction() {
     try {
         const session = await auth()

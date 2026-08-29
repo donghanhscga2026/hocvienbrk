@@ -64,6 +64,13 @@ function buildPlaylist(videoUrl: string | null, serverPlaylist: PlaylistItem[] |
                 return { type: 'doc' as const, title: docMatch[1], url: docMatch[2].trim() }
             }
             const url = item.trim()
+            // [FIX] Bài học loại DOCS lưu link thẳng (không cần bọc "(tiêu đề)")
+            // — trước đây rơi vào nhánh video mặc định (platform "unknown"),
+            // vừa bỏ lỡ trimDocUrl() (chuyển /edit → /preview để nhúng được),
+            // vừa bị ép theo khung tỉ lệ video 16:9 quá thấp để đọc tài liệu.
+            if (lessonType === 'DOCS') {
+                return { type: 'doc' as const, title: `Phần ${index + 1}`, url }
+            }
             return { type: 'video' as const, title: `Phần ${index + 1}`, url, source: detectVideoSource(url) }
         })
     }
@@ -516,7 +523,15 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         )}>
             <div className={cn(
                 "relative bg-black overflow-hidden shadow-2xl transition-all",
-                isFullscreen ? "fixed inset-0 z-[9999] flex flex-col" : "w-full aspect-video"
+                isFullscreen
+                    ? "fixed inset-0 z-[9999] flex flex-col"
+                    // [FIX] Nội dung text/docs không phải video — ép theo tỉ lệ 16:9 của
+                    // video khiến khung quá thấp, học viên phải cuộn kép mới đọc hết
+                    // trang (đặc biệt trên mobile). Dùng chiều cao theo % màn hình thay
+                    // vì tỉ lệ khung hình để có nhiều chỗ đọc hơn hẳn.
+                    : currentItem?.type === 'video'
+                        ? "w-full aspect-video"
+                        : "w-full h-[60vh] min-h-[320px] max-h-[720px]"
             )}>
                 {currentItem?.type === 'video' ? renderVideo() : renderNonVideo()}
 

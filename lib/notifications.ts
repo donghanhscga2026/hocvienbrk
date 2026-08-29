@@ -532,6 +532,42 @@ export async function sendPasswordChangedNotification(user: { id: number; name: 
   await sendTelegram(msg, 'CHANGE');
 }
 
+export async function sendPasswordResetLinkEmail(to: string, studentName: string, resetUrl: string, userId?: number) {
+  const subject = '[Cộng đồng MBC] Đặt lại mật khẩu tài khoản của bạn';
+  const htmlBody = `
+<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden;">
+    <div style="background: linear-gradient(90deg, #f97316, #ea580c); padding: 32px 30px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 24px;">Đặt lại mật khẩu</h1>
+    </div>
+    <div style="padding: 30px;">
+      <p style="color: #1f2937; font-size: 16px;">Xin chào <b>${studentName}</b>,</p>
+      <p style="color: #4b5563; line-height: 1.6;">Quản trị viên đã khởi tạo yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Nhấn nút bên dưới để tự đặt mật khẩu mới:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetUrl}" style="background: #f97316; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">Đặt lại mật khẩu</a>
+      </div>
+      <p style="color: #ef4444; font-size: 13px;"><b>Lưu ý:</b> Link này có hiệu lực trong 24 giờ và chỉ dùng được 1 lần.</p>
+      <p style="color: #9ca3af; font-size: 12px;">Nếu bạn không yêu cầu việc này, vui lòng liên hệ Admin để được hỗ trợ.</p>
+    </div>
+  </div>
+</div>`;
+
+  const result = await sendGmail(to, subject, htmlBody);
+
+  const { logEmail } = await import('@/lib/email-logger');
+  await logEmail({
+    userId,
+    email: to,
+    type: 'admin_password_reset_link',
+    provider: result.provider || 'unknown',
+    status: result.success ? 'sent' : 'failed',
+    messageId: result.emailId,
+    error: result.success ? undefined : result.message,
+  });
+
+  return result;
+}
+
 interface GoalConfig {
   videoPerDay?: number;
   days?: number;
