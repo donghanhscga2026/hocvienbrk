@@ -3,64 +3,78 @@
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 
-export async function getCommentsByLesson(lessonId: string) {
-    // [OPTIMIZE] Trước đây không giới hạn số dòng — bài học càng nhiều bình luận
-    // càng tải chậm. Lấy 200 bình luận MỚI NHẤT (desc + take) rồi đảo lại thành
-    // thứ tự cũ->mới để giữ nguyên cách hiển thị hiện tại.
-    const commentsDesc = await prisma.lessonComment.findMany({
-        where: { lessonId },
-        include: {
-            user: {
-                select: {
-                    id: true,
-                    name: true,
-                    image: true,
-                    accounts: {
-                        select: {
-                            provider: true,
-                            providerAccountId: true,
-                        }
-                    }
-                }
-            }
-        },
-        orderBy: {
-            createdAt: 'desc'
-        },
-        take: 200
+const COMMENT_USER_SELECT = {
+    id: true,
+    name: true,
+    image: true,
+    accounts: {
+        select: {
+            provider: true,
+            providerAccountId: true,
+        }
+    }
+} as const
+
+// Ưu tiên avatar: user.image > ảnh Google > ảnh Facebook > null
+function resolveAvatar(user: { image: string | null; accounts: { provider: string; providerAccountId: string }[] }): string | null {
+    if (user.image) return user.image
+    const googleAccount = user.accounts.find(a => a.provider === 'google')
+    if (googleAccount) return `https://www.googleapis.com/plus/v1/people/${googleAccount.providerAccountId}?picture`
+    const facebookAccount = user.accounts.find(a => a.provider === 'facebook')
+    if (facebookAccount) return `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture?type=large`
+    return null
+}
+
+function mapComment(comment: any) {
+    return {
+        id: comment.id,
+        content: comment.content,
+        imageUrl: comment.imageUrl,
+        createdAt: comment.createdAt,
+        editedAt: comment.editedAt,
+        userId: comment.userId,
+        userName: comment.user.name,
+        userAvatar: resolveAvatar(comment.user),
+        parentId: comment.parentId
+    }
+}
+
+/**
+ * [PAGINATE] Chỉ tải `limit` bình luận GỐC (thread cấp cao nhất) MỚI NHẤT mỗi
+ * lần, kèm TOÀN BỘ reply của riêng các thread đó (không cắt reply giữa
+ * chừng). `offset` = số thread gốc đã tải trước đó (để tải tiếp các thread
+ * CŨ HƠN — dùng cho nút "Xem thêm bình luận khác". Sắp xếp mặc định MỚI NHẤT
+ * TRƯỚC (client hiển thị y nguyên thứ tự này). Trả kèm `totalTopLevel`/
+ * `loadedTopLevel` để client tính số còn lại.
+ */
+export async function getCommentsByLesson(lessonId: string, options?: { limit?: number; offset?: number }) {
+    const limit = options?.limit ?? 20
+    const offset = options?.offset ?? 0
+
+    const totalTopLevel = await prisma.lessonComment.count({
+        where: { lessonId, parentId: null }
     })
-    const comments = commentsDesc.reverse()
 
-    return comments.map((comment: any) => {
-        // Get avatar priority: user.image > Google image > Facebook image > null
-        let avatar = comment.user.image
-        
-        if (!avatar) {
-            const googleAccount = comment.user.accounts.find((a: any) => a.provider === 'google')
-            if (googleAccount) {
-                avatar = `https://www.googleapis.com/plus/v1/people/${googleAccount.providerAccountId}?picture`
-            }
-        }
-
-        if (!avatar) {
-            const facebookAccount = comment.user.accounts.find((a: any) => a.provider === 'facebook')
-            if (facebookAccount) {
-                avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture?type=large`
-            }
-        }
-
-        return {
-            id: comment.id,
-            content: comment.content,
-            imageUrl: comment.imageUrl,
-            createdAt: comment.createdAt,
-            editedAt: comment.editedAt,
-            userId: comment.userId,
-            userName: comment.user.name,
-            userAvatar: avatar,
-            parentId: comment.parentId
-        }
+    const topLevel = await prisma.lessonComment.findMany({
+        where: { lessonId, parentId: null },
+        include: { user: { select: COMMENT_USER_SELECT } },
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit,
     })
+
+    const topLevelIds = topLevel.map(c => c.id)
+    const replies = topLevelIds.length > 0 ? await prisma.lessonComment.findMany({
+        where: { parentId: { in: topLevelIds } },
+        include: { user: { select: COMMENT_USER_SELECT } },
+        orderBy: { createdAt: 'asc' },
+    }) : []
+
+    return {
+        comments: [...topLevel, ...replies].map(mapComment),
+        totalTopLevel,
+        loadedTopLevel: offset + topLevel.length,
+    }
 }
 
 export async function hasUserCommentedOnLesson(lessonId: string) {
@@ -107,38 +121,8 @@ export async function createComment(lessonId: string, content: string, parentId?
                 imageUrl: imageUrl || null,
                 parentId: parentId || null
             },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        image: true,
-                        accounts: {
-                            select: {
-                                provider: true,
-                                providerAccountId: true,
-                            }
-                        }
-                    }
-                }
-            }
+            include: { user: { select: COMMENT_USER_SELECT } }
         })
-
-        // Get avatar with same priority logic
-        let avatar = comment.user.image
-        if (!avatar) {
-            const googleAccount = comment.user.accounts.find((a: any) => a.provider === 'google')
-            if (googleAccount) {
-                avatar = `https://www.googleapis.com/plus/v1/people/${googleAccount.providerAccountId}?picture`
-            }
-        }
-        
-        if (!avatar) {
-            const facebookAccount = comment.user.accounts.find((a: any) => a.provider === 'facebook')
-            if (facebookAccount) {
-                avatar = `https://graph.facebook.com/${facebookAccount.providerAccountId}/picture?type=large`
-            }
-        }
 
         // Auto-complete lesson for NORMAL course type
         const lesson = await prisma.lesson.findUnique({
@@ -179,17 +163,7 @@ export async function createComment(lessonId: string, content: string, parentId?
 
         return {
             success: true,
-            comment: {
-                id: comment.id,
-                content: comment.content,
-                imageUrl: comment.imageUrl,
-                createdAt: comment.createdAt,
-                editedAt: comment.editedAt,
-                userId: comment.userId,
-                userName: comment.user.name,
-                userAvatar: avatar,
-                parentId: comment.parentId
-            }
+            comment: mapComment(comment)
         }
     } catch (error) {
         console.error("Create comment error:", error)

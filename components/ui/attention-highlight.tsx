@@ -96,7 +96,7 @@ export function AttentionHighlight({ isActive, tooltip, tooltipPosition = 'botto
             {isActive && tooltip && (
                 <div
                     ref={tooltipRef}
-                    className={`attention-tooltip-bubble absolute ${bubblePosClass} backdrop-blur-sm leading-tight font-black px-2 py-1 rounded-md shadow-lg border whitespace-normal break-words text-center z-50 animate-in fade-in zoom-in-95 duration-200 ${isBottom ? 'top-full mt-1.5' : 'bottom-full mb-1.5'}`}
+                    className={`attention-tooltip-bubble absolute ${bubblePosClass} backdrop-blur-sm leading-tight font-black px-2 py-1 rounded-md shadow-lg border whitespace-normal break-words text-center z-[60] animate-in fade-in zoom-in-95 duration-200 ${isBottom ? 'top-full mt-1.5' : 'bottom-full mb-1.5'}`}
                     style={{
                         ['--attn-tooltip-max-vw' as any]: `${config.tooltipMaxWidthVwMobile}vw`,
                         ['--attn-tooltip-max-vw-desktop' as any]: `${config.tooltipMaxWidthVwDesktop}vw`,

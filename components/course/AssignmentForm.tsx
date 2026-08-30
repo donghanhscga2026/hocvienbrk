@@ -111,9 +111,8 @@ function AssignmentForm({
             : ["", "", ""]
     )
     const [supports, setSupports] = useState<boolean[]>(initialData?.assignment?.supports || [false, false])
-    // [EXPAND] Ô "Bồi Nhân": chỉ mở rộng thành overlay 90vh khi BẤM/CHẠM vào ô
-    // để nhập liệu (focus) — không tự bật khi chỉ rê chuột ngang qua, mất focus
-    // thì thu lại.
+    // [EXPAND] Ô "Bồi Nhân": chỉ mở rộng khi BẤM/CHẠM vào ô để nhập liệu
+    // (focus) — không tự bật khi chỉ rê chuột ngang qua, mất focus thì thu lại.
     const [reflectionFocused, setReflectionFocused] = useState(false)
     const reflectionExpanded = reflectionFocused
     const reflectionTextareaRef = useRef<HTMLTextAreaElement>(null)
@@ -317,14 +316,8 @@ function AssignmentForm({
                     </p>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="relative bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={2} label="Bồi Nhân = Bài tập/Bài học theo yêu cầu (2đ)" max={2} current={refScore} />
-                    <style jsx>{`
-                        .reflection-expand-box { height: 90vh; top: 5vh; }
-                        @supports (height: 100dvh) {
-                            .reflection-expand-box { height: 85dvh; top: 7.5dvh; }
-                        }
-                    `}</style>
                     {reflectionExpanded && (
                         <div
                             className="fixed inset-0 z-40 bg-black/50"
@@ -332,9 +325,14 @@ function AssignmentForm({
                             onClick={closeReflectionExpand}
                         />
                     )}
+                    {/* [FIX] Neo theo chính khung mục 2 này (position:relative ở trên) thay
+                        vì position:fixed canh giữa màn hình như trước — ô mở rộng giờ bắt
+                        đầu ngay tại vị trí mục 2, không che phần nội dung/đề bài phía trên.
+                        Giới hạn chiều cao (max-h-[50vh], không còn 85-90vh) để trên mobile
+                        không bị bàn phím ảo che mất khi gõ. */}
                     <div
                         className={reflectionExpanded
-                            ? 'reflection-expand-box fixed left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-2xl'
+                            ? 'absolute inset-x-0 top-0 z-50 max-h-[50vh] overflow-y-auto'
                             : ''
                         }
                     >
@@ -357,9 +355,10 @@ function AssignmentForm({
                             placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
                             rows={3}
                             className={reflectionExpanded
-                                ? 'w-full h-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
+                                ? 'w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
                                 : 'w-full bg-white text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
                             }
+                            style={reflectionExpanded ? { minHeight: '160px' } : undefined}
                         />
                     </div>
                     <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>

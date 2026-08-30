@@ -23,11 +23,12 @@ export default function MemberDayChips({ days, todayOrder }: {
         <div className="flex flex-wrap gap-1">
             {days.map(d => {
                 const isToday = d.order === todayOrder
+                const todayClass = isToday ? (d.status === 'missing' ? 'today-ring-pulse' : 'today-ring-pulse-done') : ''
                 return (
                     <span
                         key={d.order}
                         title={`Ngày ${d.order}: ${STATUS_LABEL[d.status]}${isToday ? ' (bài hôm nay)' : ''}`}
-                        className={`inline-flex items-center justify-center w-4 h-4 rounded text-[8px] font-black shrink-0 ${STATUS_STYLE[d.status]} ${isToday ? 'today-ring-pulse' : ''}`}
+                        className={`inline-flex items-center justify-center w-4 h-4 rounded text-[8px] font-black shrink-0 ${STATUS_STYLE[d.status]} ${todayClass}`}
                     >
                         {d.order}
                     </span>

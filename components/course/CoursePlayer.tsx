@@ -311,7 +311,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 </div>
             )}
             {/* Header */}
-            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-3 px-4 bg-zinc-900 z-50 fixed top-0 left-0 right-0">
+            {/* [FIX] z-[60] (thay vì z-50 trước đây) — cao hơn mọi overlay NỘI DUNG
+                trong trang (danh sách học phần, ô soạn thảo mở rộng, các modal nhỏ...
+                đều đang z-50), để tooltip lóe sáng của nút trên header/nav không còn
+                bị các overlay đó đè lên. Vẫn thấp hơn các modal xác nhận thật sự
+                (z-[100] trở lên) — những modal đó vẫn cần che cả header khi hiện. */}
+            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-3 px-4 bg-zinc-900 z-[60] fixed top-0 left-0 right-0">
                 <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
                     <button
                         onClick={() => router.back()}
@@ -349,7 +354,14 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     />
                 )}
 
-                <main className="flex-1 flex flex-col min-h-0 overflow-hidden items-center bg-zinc-950">
+                {/* [FIX] overflow-y-auto (thay vì overflow-hidden trước đây) — bình
+                    thường layout luôn vừa khít nên không có gì để cuộn, nhưng khi
+                    khung video cao hơn (panel "Danh sách học phần" hiện ra, đẩy nội
+                    dung bên dưới xuống) thì overflow-hidden sẽ ép các khối flex-1 bên
+                    dưới (mô tả/Tương tác) co lại thay vì thực sự "đẩy xuống" — nhìn
+                    như panel đè phủ lên chứ không đẩy nội dung xuống đúng nghĩa. Cho
+                    phép cuộn thì phần bị đẩy xuống vẫn xem được bằng cách cuộn main. */}
+                <main className="flex-1 flex flex-col min-h-0 overflow-y-auto items-center bg-zinc-950">
                     {/* [FIX] Trên mobile, khung video/nội dung chỉ hiện ở tab "Nội dung" —
                         trước đây hiện cố định phía trên cả 3 tab, chiếm chỗ và lẫn cả vào
                         tab "Danh sách" bài học. Desktop không có khái niệm tab nên luôn hiện. */}
@@ -389,7 +401,13 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     )}
 
                     {!isMobile && (
-                        <div className="p-5 flex-1 flex flex-col gap-4 min-h-0 overflow-hidden w-full max-w-5xl">
+                        // [FIX] min-h-[300px] (thay vì min-h-0) — trước đây "min-h-0" cho
+                        // phép khối này (mô tả + Tương tác) co lại tới gần bằng 0 khi khung
+                        // video phía trên cao hơn (panel học phần hiện ra), tạo cảm giác
+                        // panel "đè phủ lên" thay vì đẩy nội dung xuống. Có sàn tối thiểu +
+                        // main đã overflow-y-auto ở trên nên phần vượt quá sẽ cuộn được
+                        // thay vì bị ép biến mất.
+                        <div className="p-5 flex-1 flex flex-col gap-4 min-h-[300px] w-full max-w-5xl">
                             <div className="shrink-0 flex flex-col gap-1">
                                 <div className="flex items-center justify-between gap-3">
                                     <h2 className="text-lg font-bold text-white truncate">{currentLesson?.title}</h2>
@@ -449,7 +467,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     </div>
                                 )}
                                 {mobileTab === 'content' && (
-                                    <div className="flex-1 flex flex-col min-h-0">
+                                    // [FIX] min-h-[220px] (thay vì min-h-0) — cùng lý do như bản
+                                    // desktop: tránh bị ép co gần bằng 0 khi khung video phía trên
+                                    // cao hơn lúc panel học phần hiện ra.
+                                    <div className="flex-1 flex flex-col min-h-[220px]">
                                         <div className="px-4 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
                                             <p className="text-base font-bold text-white leading-tight">{currentLesson?.title}</p>
                                             {currentLesson?.type !== 'TEXT' && currentLesson?.type !== 'ALL' && (
@@ -483,7 +504,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 )}
                             </div>
 
-                            <nav className="h-14 bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-50">
+                            <nav className="h-14 bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-[60]">
                                 {[
                                     { id: 'list', icon: ListVideo, label: 'Danh sách' },
                                     { id: 'content', icon: FileText, label: 'Nội dung' },

@@ -28,13 +28,14 @@ export default function MemberDayMatrix({ days, columns = 10, onSelectDay, today
         >
             {days.map(d => {
                 const isToday = d.order === todayOrder
+                const todayClass = isToday ? (d.status === 'missing' ? 'today-ring-pulse' : 'today-ring-pulse-done') : ''
                 return (
                     <button
                         key={d.order}
                         type="button"
                         onClick={onSelectDay ? () => onSelectDay(d.order) : undefined}
                         title={`Ngày ${d.order}: ${STATUS_LABEL[d.status]}${isToday ? ' (bài hôm nay)' : ''}`}
-                        className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-black ${STATUS_STYLE[d.status]} ${onSelectDay ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-default'} ${isToday ? 'today-ring-pulse' : ''}`}
+                        className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-black ${STATUS_STYLE[d.status]} ${onSelectDay ? 'cursor-pointer hover:ring-2 hover:ring-violet-400' : 'cursor-default'} ${todayClass}`}
                     >
                         {d.order}
                     </button>

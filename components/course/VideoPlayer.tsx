@@ -516,6 +516,36 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         )
     }
 
+    // Nội dung dùng chung của panel "Danh sách học phần" — khung bọc ngoài
+    // khác nhau tuỳ chế độ toàn màn hình hay không (xem chỗ gọi).
+    const renderPlaylistPanelBody = () => (
+        <>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 shrink-0">
+                <h3 className="text-gray-900 font-black text-xs flex items-center gap-1.5 min-w-0">
+                    <List className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                    <span className="truncate">Có {playlist.length} học phần trong bài này</span>
+                </h3>
+                <button onClick={() => setShowPlaylist(false)} className="shrink-0 p-1.5 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition-all"><X className="w-3.5 h-3.5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
+                {playlist.map((item, idx) => {
+                    const isCurrent = idx === currentIndex
+                    const isVideo = item.type === 'video'
+                    return (
+                        <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false) }} className={`w-full flex items-center gap-2 py-1.5 px-2 rounded-lg transition-all border ${isCurrent ? 'bg-orange-50 border-orange-400' : 'bg-white border-transparent hover:bg-gray-50'}`}>
+                            <div className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                {isVideo ? <Play className="w-2.5 h-2.5 fill-current" /> : <FileText className="w-2.5 h-2.5" />}
+                            </div>
+                            <p className={`flex-1 text-left text-xs font-bold truncate ${isCurrent ? 'text-orange-600' : 'text-gray-700'}`}>
+                                {item.title}
+                            </p>
+                        </button>
+                    )
+                })}
+            </div>
+        </>
+    )
+
     return (
         <div className={cn(
             "flex flex-col bg-zinc-950 transition-all duration-300",
@@ -523,57 +553,37 @@ const VideoPlayer = forwardRef<VideoPlayerHandle, VideoPlayerProps>(function Vid
         )}>
             <div className={cn(
                 "relative bg-black overflow-hidden shadow-2xl transition-all",
-                isFullscreen
-                    ? "fixed inset-0 z-[9999] flex flex-col"
-                    // [FIX] Nội dung text/docs không phải video — ép theo tỉ lệ 16:9 của
-                    // video khiến khung quá thấp, học viên phải cuộn kép mới đọc hết
-                    // trang (đặc biệt trên mobile). Dùng chiều cao theo % màn hình thay
-                    // vì tỉ lệ khung hình để có nhiều chỗ đọc hơn hẳn.
-                    : currentItem?.type === 'video'
-                        ? "w-full aspect-video"
-                        : "w-full h-[60vh] min-h-[320px] max-h-[720px]"
+                // [REVERT] Khung hiển thị phải giữ ĐÚNG 1 kích thước/tỉ lệ (aspect-video)
+                // cho MỌI loại nội dung (video/text/docs) — không đổi kích thước theo
+                // loại, để không xô lệch bố cục các phần khác đã canh sẵn xung quanh.
+                // Nội dung text/docs dài hơn khung thì tự cuộn BÊN TRONG khung đó
+                // (đã có overflow-y-auto/iframe riêng), không phải mở rộng khung ra.
+                isFullscreen ? "fixed inset-0 z-[9999] flex flex-col" : "w-full aspect-video"
             )}>
                 {currentItem?.type === 'video' ? renderVideo() : renderNonVideo()}
 
-                {showPlaylist && (
-                    <div className="absolute inset-0 bg-zinc-900 z-50 flex flex-col animate-in slide-in-from-bottom duration-300">
-                        <div className="flex items-center justify-between p-5 border-b border-zinc-700 shrink-0">
-                            <h3 className="text-white font-black text-base flex items-center gap-3">
-                                <List className="w-5 h-5 text-orange-400" /> Danh sách học ({playlist.length})
-                            </h3>
-                            <button onClick={() => setShowPlaylist(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-300 hover:text-white transition-all"><X className="w-5 h-5" /></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[66vh] custom-scrollbar">
-                            {playlist.map((item, idx) => {
-                                const isCurrent = idx === currentIndex
-                                const prog = granularProgress[idx] || { maxTime: 0, duration: item.type === 'doc' ? 30 : 0 }
-                                const pct = prog.duration > 0 ? Math.round((prog.maxTime / prog.duration) * 100) : 0
-                                const source = item.source || (item.url ? detectVideoSource(item.url) : null)
-                                const isVideo = item.type === 'video'
-                                const platformLabel = source ? source.platform.toUpperCase() : ''
-                                return (
-                                    <button key={idx} onClick={() => { setCurrentVideoIndex(idx); setShowPlaylist(false) }} className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all border ${isCurrent ? 'bg-orange-500/20 border-orange-400 shadow-lg' : 'bg-zinc-800 border-zinc-700 hover:bg-zinc-700'}`}>
-                                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${isCurrent ? 'bg-orange-500 text-white' : 'bg-zinc-700 text-zinc-300'}`}>
-                                            {isVideo ? <Play className="w-3 h-3 fill-current" /> : <FileText className="w-3 h-3" />}
-                                        </div>
-                                        <div className="flex-1 text-left min-w-0">
-                                            <p className={`text-xs font-bold truncate ${isCurrent ? 'text-orange-300' : 'text-zinc-200'}`}>
-                                                {item.title}
-                                                {platformLabel && <span className="text-[8px] text-zinc-400 ml-1">({platformLabel})</span>}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <div className="flex-1 h-1 bg-zinc-700 rounded-full overflow-hidden"><div className="h-full transition-all duration-1000 bg-orange-500" style={{ width: `${pct}%` }} /></div>
-                                                <span className="text-[9px] text-zinc-400 font-bold">{pct}%</span>
-                                            </div>
-                                        </div>
-                                        {pct >= 95 && <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />}
-                                    </button>
-                                )
-                            })}
-                        </div>
+                {/* Toàn màn hình thì khung video CHÍNH LÀ toàn bộ viewport (fixed
+                    inset-0) — không có khái niệm "dưới khung" nữa nên vẫn phải hiện
+                    đè lên trên như cũ. Chỉ khi KHÔNG toàn màn hình mới tách hẳn panel
+                    ra ngoài, xuống dưới khung (xem khối bên dưới). */}
+                {isFullscreen && showPlaylist && (
+                    <div className="absolute inset-x-0 top-0 z-50 max-h-[70vh] flex flex-col bg-white text-gray-900 rounded-b-2xl shadow-2xl animate-in slide-in-from-top duration-300">
+                        {renderPlaylistPanelBody()}
                     </div>
                 )}
             </div>
+
+            {!isFullscreen && showPlaylist && (
+                // [FIX] Nằm NGAY DƯỚI khung video, ở luồng bố cục bình thường (không
+                // "absolute" đè lên trên) — không che nội dung/video đang hiển thị bên
+                // trong khung nữa. Tự co giãn theo số lượng học phần, tối đa 70% chiều
+                // cao giao diện hiển thị (max-h-[70vh] tính tới đáy, không phải theo
+                // khung video), vượt quá thì tự cuộn bên trong. Nền/màu chữ đảo ngược
+                // so với giao diện chính để nổi bật rõ đây là 1 lớp chọn lựa tạm thời.
+                <div className="max-h-[70vh] flex flex-col bg-white text-gray-900 shadow-lg animate-in slide-in-from-top duration-300 z-40">
+                    {renderPlaylistPanelBody()}
+                </div>
+            )}
 
             <div className="bg-zinc-900 border-t border-zinc-700 px-4 py-2.5 flex items-center justify-between gap-2 sm:gap-4">
                 <div className="flex items-center gap-2 shrink-0">
