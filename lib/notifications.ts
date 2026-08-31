@@ -379,6 +379,9 @@ function getVerificationTemplate1(name: string, verifyUrl: string, emailId: stri
     <div style="margin: 20px 0;">
       <a href="${verifyUrl}" style="background: #4f46e5; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Kích Hoạt Tài Khoản</a>
     </div>
+    <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 16px; margin: 20px 0; text-align: left;">
+      <p style="color: #92400e; font-size: 13px; margin: 0;">🎁 Tài khoản của bạn đang có sẵn <b>386.386 MBV</b>. Xác minh email ngay để bảo toàn phần quà này và không bị thu hồi.</p>
+    </div>
     <p style="font-size: 11px; color: #d1d5db; margin-top: 20px;">ID: ${emailId}</p>
   </div>
 </div>`;
@@ -403,6 +406,9 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
         <p style="color: #6b7280; font-size: 14px; margin-bottom: 15px;">Hoặc click vào link:</p>
         <a href="${verifyUrl}" style="background: #4f46e5; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(79,70,229,0.3);">Xác Nhận Ngay</a>
       </div>
+      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 16px; margin: 20px 0;">
+        <p style="color: #92400e; font-size: 13px; margin: 0;">🎁 Tài khoản của bạn đang có sẵn <b>386.386 MBV</b>. Xác minh email ngay để bảo toàn phần quà này và không bị thu hồi.</p>
+      </div>
       <p style="color: #6b7280; font-size: 13px; font-style: italic;">"${quote}"</p>
       <p style="color: #9ca3af; font-size: 11px; margin-top: 20px; text-align: center;">ID: ${emailId}</p>
     </div>
@@ -423,6 +429,9 @@ function getVerificationTemplate3(name: string, verifyUrl: string, emailId: stri
   <p style="color: #4b5563; line-height: 1.6;">Hoặc nhấn nút bên dưới để kích hoạt:</p>
   <div style="margin: 28px 0;">
     <a href="${verifyUrl}" style="background: #111827; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 500; display: inline-block;">Kích hoạt</a>
+  </div>
+  <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
+    <p style="color: #92400e; font-size: 13px; margin: 0;">🎁 Tài khoản của bạn đang có sẵn <b>386.386 MBV</b>. Xác minh email ngay để bảo toàn phần quà này và không bị thu hồi.</p>
   </div>
   <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
   <p style="color: #9ca3af; font-size: 11px;">Email ID: ${emailId}</p>
