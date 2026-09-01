@@ -147,28 +147,30 @@ const CommentItem = ({
                                 />
                             )}
                             {!comment.sending && (
-                                <div className="flex items-center gap-3 mt-1">
-                                    {onReply && (
-                                        <button
-                                            onClick={() => onReply(comment)}
-                                            className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
-                                        >
-                                            ↩ Trả lời
-                                        </button>
-                                    )}
-                                    {isOwner && (
-                                        <button
-                                            onClick={() => onStartEdit?.(comment)}
-                                            className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
-                                        >
-                                            ✎ Sửa
-                                        </button>
-                                    )}
+                                <div className="flex items-center justify-between gap-3 mt-1">
+                                    <div className="flex items-center gap-3">
+                                        {onReply && (
+                                            <button
+                                                onClick={() => onReply(comment)}
+                                                className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                            >
+                                                ↩ Trả lời
+                                            </button>
+                                        )}
+                                        {isOwner && (
+                                            <button
+                                                onClick={() => onStartEdit?.(comment)}
+                                                className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                            >
+                                                ✎ Sửa
+                                            </button>
+                                        )}
+                                    </div>
                                     {isTruncated && (
                                         <button
                                             type="button"
                                             onClick={isContentExpanded ? collapseContent : expandContent}
-                                            className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                            className="text-[11px] font-bold text-yellow-400 hover:text-yellow-300 transition-colors"
                                         >
                                             {isContentExpanded ? '(thu gọn)' : '(xem thêm)'}
                                         </button>
@@ -799,7 +801,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 rows={commentExpanded ? undefined : 1}
                                 className={commentExpanded
                                     ? 'flex-1 w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 placeholder:text-gray-300 text-justify leading-relaxed'
-                                    : 'flex-1 w-full block bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed text-justify'
+                                    : 'flex-1 w-full block bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-4 py-2.5 text-base text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed text-justify'
                                 }
                                 style={commentExpanded ? { minHeight: '160px' } : { minHeight: '42px', maxHeight: '120px' }}
                                 disabled={isPending}
