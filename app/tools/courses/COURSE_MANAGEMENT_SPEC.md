@@ -1,9 +1,12 @@
 # TÀI LIỆU KỸ THUẬT & CHANGE LOG
 ## Quản lý Khóa học (Teacher Permission System)
 **Ngày tạo:** 2026-04-30  
-**Phiên bản hiện tại:** 2.2.1  
-**Trạng thái:** Hoàn thành 100% (đã thêm combo category, tăng chiều cao textarea, upload ảnh bìa, nested playlist trong 1 bài học, content thành Phần 1 trong playlist)  
+**Cập nhật gần nhất:** 2026-09-01  
+**Phiên bản hiện tại:** 3.0.0  
+**Trạng thái:** Hoàn thành 100% chức năng gốc + đã tối ưu hóa kiến trúc (gộp permission/category logic, gộp form create/edit, đổi tên route tránh nhầm lẫn, lọc mặc định theo GV, bổ sung validate server) — xem [Mục 11](#11-cập-nhật-2026-09-01--tối-ưu-hóa-kiến-trúc)  
 **Người phụ trách:** AI Agent + Admin
+
+> ⚠️ **LƯU Ý**: Số liệu "21 trường" trong các mục 1, 4, 5 bên dưới là snapshot lịch sử tại thời điểm 2026-04-30 và **không còn chính xác** — Course hiện có nhiều trường hơn (feeType, voucherConfig, teacherBankAccountId, requiresReferralActivation, referralActivationThreshold, acceptedVouchers/voucherAwards...). Xem Mục 11.3 để biết danh sách trường hiện tại.
 
 ---
 ## 📋 MỤC LỤC
@@ -14,6 +17,7 @@
  5. [Danh sách trường Course (21 trường)](#danh-sách-trường-course)
  6. [Kiểm tra hoàn thành](#kiểm-tra-hoàn-thành)
  7. [Phiên bản hiện tại](#phiên-bản-hiện-tại)
+ 8. [Cập nhật 2026-09-01 — Tối ưu hóa kiến trúc](#11-cập-nhật-2026-09-01--tối-ưu-hóa-kiến-trúc)
 
 ---
 ## 1. TỔNG QUAN
@@ -44,8 +48,13 @@ ADMIN xem/sửa tất cả. Bổ sung đầy đủ 21 trường của bảng Cou
 | 1 | `app/actions/admin-actions.ts` | Sửa | getAdminCoursesAction → getCoursesAction (hỗ trợ TEACHER) | ✅ Xong (1.3.1) | `plan_temp/admin-actions_backup_20260430_v2.txt` |
 | 2 | `app/actions/course-actions.ts` | Sửa + Thêm | Thêm create/delete/getTeachers | ✅ Xong (1.1.0) | `plan_temp/course-actions_backup_20260430.txt` |
 | 3 | `app/tools/courses/page.tsx` | Sửa | Danh sách + phân quyền + nút + | ✅ Xong (1.0.2) | `plan_temp/courses-page_backup_20260430.txt` |
-| 4 | `app/tools/courses/new/page.tsx` | Sửa | Form tạo khóa học (21 trường + combo category + upload ảnh + textarea cải tiến) | ✅ Xong (2.0.0) | `plan_temp/new-page_backup_20260501.txt` |
-| 5 | `app/tools/courses/[id]/page.tsx` | Sửa | Form sửa (21 trường + combo category + upload ảnh + textarea cải tiến) | ✅ Xong (2.0.0) | `plan_temp/courses-id-page_backup_20260501_v2.txt` |
+| 4 | `app/tools/courses/new/page.tsx` | Sửa | Form dùng chung tạo MỚI + SỬA (qua `?id=`), 21+ trường + combo category + upload ảnh + textarea cải tiến | ✅ Xong (3.0.0) | `plan_temp/new-page_backup_20260501.txt` |
+| 5 | ~~`app/tools/courses/[id]/page.tsx`~~ | **Đã xoá (3.0.0)** | Trùng lặp ~90% với `new/page.tsx` — gộp về 1 file, link "Sửa" ở `page.tsx` nay trỏ `/tools/courses/new?id={id}` | ✅ Xong (3.0.0) | git history |
+| 11 | `app/tools/courses/pages/[id]/page.tsx` (trước: `app/tools/courses/[id]/edit/page.tsx`) | Đổi tên route | Sửa **CoursePage** (trang landing `/khoa-hoc/[slug]`) — id ở đây là `CoursePage.id` (UUID), khác hẳn `Course.id` (Int) dùng ở `/tools/courses/[id]/...`. Đổi tên để tránh nhầm 2 khái niệm | ✅ Xong (3.0.0) | git history |
+| 12 | `lib/course/permissions.ts` | Mới | `getCourseAuthContext`, `canManageCourse`, `requireCourseAccessAction`, `requireCourseAccessApi` — 1 nguồn kiểm tra quyền TEACHER/ADMIN dùng chung cho mọi action/API route thay vì lặp lại | ✅ Xong (3.0.0) | (File mới) |
+| 13 | `lib/course/category.ts` | Mới | `resolveCourseCategoryName(categoryId)` — 1 nguồn tính cột `category` (string) từ `categoryId` | ✅ Xong (3.0.0) | (File mới) |
+| 14 | `lib/course/pin-limit.ts` | Mới | `canPinAnotherCourse()` — kiểm tra giới hạn tối đa 3 khóa ghim, dùng chung mọi nơi tạo/sửa Course | ✅ Xong (3.0.0) | (File mới) |
+| 15 | `lib/course/errors.ts` | Mới | `formatCourseSaveError()` — bắt lỗi Prisma P2002 (trùng `id_khoa`) trả message thân thiện thay vì lỗi Prisma thô | ✅ Xong (3.0.0) | (File mới) |
 | 6 | `app/api/courses/route.ts` | Mới | POST tạo khóa học (21 trường) | ✅ Xong (1.3.0) | `plan_temp/courses-route_backup_20260430.txt` |
 | 7 | `app/api/courses/[id]/route.ts` | Sửa | GET/PUT/DELETE + check teacherId | ✅ Xong (1.2.2) | `plan_temp/courses-id-route_backup_20260430.txt` |
 | 8 | `components/course/VideoPlayer.tsx` | Sửa | Hiển thị TEXT trong Player, nested playlist, link clickable | ✅ Xong (2.2.0) | `plan_temp/VideoPlayer_backup_20260501_2000_before-plan.txt` |
@@ -59,6 +68,18 @@ ADMIN xem/sửa tất cả. Bổ sung đầy đủ 21 trường của bảng Cou
 ---
 ## 3. LỊCH SỬ THAY ĐỔI (CHANGE LOG)
 > ⚠️ **QUY TẮC VÀNG**: Mỗi lần sửa code PHẢI cập nhật section này ngay lập tức!
+
+### 🆕 PHIÊN 2026-09-01 - Tối ưu hóa kiến trúc (7 hạng mục)
+> Xem chi tiết đầy đủ ở **Mục 11** cuối file. Tóm tắt nhanh:
+> 1. Gộp toàn bộ logic phân quyền TEACHER/ADMIN vào `lib/course/permissions.ts` — đồng thời vá 2 lỗ hổng: `createCourseAction` trước đây không hề kiểm tra role (STUDENT cũng gọi được), và `updateCourseAction` (server action) cho phép TEACHER tự đổi `teacherId` của khóa học sang người khác.
+> 2. Gộp `new/page.tsx` + `[id]/page.tsx` (trùng lặp ~90%) thành 1 form dùng chung; xóa `[id]/page.tsx`.
+> 3. Đổi route `[id]/edit` → `pages/[id]` vì `[id]` ở đó thực ra là `CoursePage.id` (UUID), không phải `Course.id` (Int) như các route khác cùng cấp.
+> 4. Gộp logic tính `category` (string) từ `categoryId` vào `lib/course/category.ts`, dùng chung 4 nơi thay vì code lặp lại rời rạc (trước đây `PUT /api/courses/[id]` còn thiếu bước này, dữ liệu bị lệch).
+> 5. **ADMIN mặc định chỉ thấy khóa học của chính mình** khi vào `/tools/courses` (giống TEACHER), chủ động đổi sang "Tất cả GV" hoặc chọn GV khác qua dropdown. Đồng thời chuyển việc lọc theo GV sang server-side (trước đây tải hết rồi lọc client).
+> 6. Bổ sung check giới hạn 3 khóa ghim còn thiếu ở `POST /api/courses`; chuẩn hóa thông báo lỗi trùng `id_khoa` (bắt Prisma P2002) thay vì để lộ message Prisma thô.
+> 7. Cập nhật lại chính tài liệu này cho khớp code hiện tại.
+>
+> **Phiên bản**: 3.0.0 (Major — đổi route, xóa file, đổi hành vi mặc định của trang danh sách)
 
 ### 🆕 PHIÊN 2026-05-01 20:00 - Nested Playlist & TEXT Display Fix
 
@@ -1023,3 +1044,77 @@ Dựa trên `schema.prisma:328-363`, loại bỏ các trường tự động (id
 - [x] **NEW**: Fix teacherId bị mất khi TEACHER sửa course (2.1.0)
 - [x] **NEW**: Hiển thị Tên khóa học (name_khoa) trong danh sách (2.1.0)
 - [x] **NEW**: Fix AddLessonModal không hoạt động - chuyển ra top-level (2.1.0)
+
+---
+
+## 11. CẬP NHẬT 2026-09-01 — TỐI ƯU HÓA KIẾN TRÚC
+
+**Bối cảnh**: Sau khi tính năng đã hoàn thiện về mặt chức năng (bản 2.1.0), rà soát lại phát hiện code bị trùng lặp nhiều nơi (logic phân quyền, logic tính category, 2 form gần như giống hệt nhau), route đặt tên gây nhầm lẫn, thiếu vài validate server, và trang danh sách của ADMIN load toàn bộ dữ liệu thay vì theo phạm vi hợp lý. Phiên này dọn lại 7 hạng mục đó, **không đổi UI/tính năng nhìn thấy được** trừ mục 5 (hành vi mặc định của trang danh sách) và mục 2 (layout trang sửa đổi từ 1-trang-dài sang tab).
+
+### 11.1 Gộp logic phân quyền (`lib/course/permissions.ts`)
+Trước đây có 3-4 bản sao của cùng 1 logic "ADMIN được tất cả, TEACHER chỉ được course của mình", rải ở `course-actions.ts`, `admin-actions.ts`, và từng API route trong `app/api/courses/`. Rủi ro: sửa rule ở 1 nơi mà quên nơi khác (đã từng xảy ra — xem fix 2.1.0 "Fix teacherId bị mất khi TEACHER sửa course").
+
+Tạo `getCourseAuthContext()`, `canManageCourse()`, `requireCourseAccessAction()` (cho server actions), `requireCourseAccessApi()` (cho API routes). Áp dụng cho: `createCourseAction`, `deleteCourseAction`, `getTeachersAction`, `updateCourseAction`, `updateLessonAction`, `deleteLessonAction`, `POST/GET /api/courses`, `GET/PUT/DELETE /api/courses/[id]`, `POST /api/courses/[id]/lessons`, `POST /api/courses/[id]/lessons/import`.
+
+Nhân tiện vá 2 lỗ hổng phát hiện được khi rà soát:
+- `createCourseAction` (server action) trước đây **không kiểm tra role** — bất kỳ user đã đăng nhập nào (kể cả STUDENT) đều có thể tạo khóa học và tự gán mình làm `teacherId`. Nay bắt buộc `isAdmin || isTeacher`.
+- `updateCourseAction` (server action, khác với API route `PUT /api/courses/[id]` đã có sẵn check này) trước đây cho phép **TEACHER tự đổi `teacherId`** của khóa học mình đang sở hữu sang bất kỳ user nào khác. Nay chỉ ADMIN mới đổi được GV phụ trách, khớp với hành vi của API route.
+- `POST /api/courses/[id]/lessons/import` trước đây **chỉ ADMIN** mới import CSV được dù TEACHER vẫn thêm được từng bài lẻ qua `AddLessonModal` — nay đồng nhất: ADMIN hoặc TEACHER sở hữu khóa học đều import được.
+
+### 11.2 Gộp form tạo/sửa khóa học
+`app/tools/courses/new/page.tsx` và `app/tools/courses/[id]/page.tsx` trùng nhau ~90% (4 section + quản lý bài giảng). File `new/page.tsx` vốn đã hỗ trợ sẵn chế độ sửa qua query `?id=` nhưng không được dùng — link "Sửa" ở danh sách trỏ tới `[id]/page.tsx`. Đã:
+- Vá 1 bug ở nhánh sửa của `new/page.tsx`: thiếu gửi `requiresReferralActivation`/`referralActivationThreshold` khi lưu (khiến 2 trường này bị mất nếu sửa qua route đó).
+- Port cảnh báo "GV chưa cấu hình tài khoản ngân hàng" từ `[id]/page.tsx` sang cho đủ tính năng.
+- Xóa `app/tools/courses/[id]/page.tsx`, đổi link "Sửa" ở `page.tsx` và ở `[id]/lib-access/page.tsx` sang `/tools/courses/new?id={id}`.
+
+**Đổi UI đáng chú ý**: `[id]/page.tsx` cũ hiển thị form + danh sách bài giảng trên **1 trang cuộn dài liên tục**; `new/page.tsx` dùng **layout tab** (Thông tin / Bài giảng). Người dùng sẽ thấy giao diện sửa khóa học đổi sang dạng tab.
+
+### 11.3 Đổi tên route CoursePage (landing page)
+`app/tools/courses/[id]/edit/` đổi thành `app/tools/courses/pages/[id]/`. Lý do: route này sửa `CoursePage` (trang landing marketing tại `/khoa-hoc/[slug]`), và tham số `[id]` ở đây là `CoursePage.id` (UUID) — hoàn toàn khác `Course.id` (Int) dùng ở `/tools/courses/[id]` và `/tools/courses/[id]/lib-access`. Cùng tên tham số `[id]` nhưng 2 ý nghĩa khác nhau ở 2 route cùng cấp là nguồn gây nhầm lẫn khi đọc/sửa code. Cập nhật 2 nơi có link tới route cũ: `app/tools/courses/page.tsx` và `app/tools/pages/CoursesTab.tsx`.
+
+> 📌 Phát hiện thêm (chưa xử lý, ngoài phạm vi 7 hạng mục): `app/tools/pages/CoursesTab.tsx` là một tool **riêng** (`/tools/pages`) cũng quản lý CoursePage (list/xóa/toggle template), trùng chức năng với tab "Template động" đã có sẵn trong `app/tools/courses/page.tsx`. Và route `/tools/courses/[id]/lib-access` hiện **không có link nào trỏ tới** trong toàn bộ UI (chỉ truy cập được nếu gõ thẳng URL) — nên cân nhắc thêm link hoặc bỏ hẳn nếu không còn dùng.
+
+### 11.4 Chuẩn hóa tính `category` từ `categoryId`
+Course lưu category ở 2 dạng: quan hệ `categoryId → CourseCategory` và cột `category` (string, denormalized, dùng làm fallback hiển thị cho dữ liệu cũ chưa gán `categoryId`). Logic "tra `CourseCategory` rồi gán chuỗi tên vào `category`" từng lặp lại độc lập ở 4 nơi — và **`PUT /api/courses/[id]` trước đây thiếu hẳn bước này**, khiến cột `category` bị lệch (không đồng bộ) nếu course được sửa qua route đó. Gộp vào `resolveCourseCategoryName(categoryId)` trong `lib/course/category.ts`, dùng chung ở `createCourseAction`, `POST /api/courses`, `updateCourseAction`, `bulkUpdateCoursesOptionsAction`, `PUT /api/courses/[id]`.
+
+> Không migrate/xóa cột `category` string khỏi schema trong đợt này — đó là thay đổi DB rủi ro cao (đang được dùng làm fallback hiển thị ở nhiều nơi: `app/page.tsx`, `components/landing/CourseLandingTemplate.tsx`, `app/page/[slug]/page.tsx`...), cần bàn riêng nếu muốn làm.
+
+### 11.5 ADMIN mặc định chỉ xem khóa học của mình
+`getAdminCoursesAction()` nhận thêm tham số tùy chọn `{ teacherId?: number | 'ALL' | 'SELF' }`. **Không truyền tham số** giữ nguyên hành vi cũ (ADMIN xem tất cả) — để không phá vỡ nơi gọi khác đang cần đủ danh sách khóa học (`app/tools/students/page.tsx` dùng để lọc học viên theo khóa). Trang `/tools/courses` chủ động truyền `teacherId: 'SELF'` làm mặc định (kể cả khi đăng nhập là ADMIN), người dùng đổi sang "Tất cả GV" hoặc chọn 1 GV cụ thể qua dropdown thì mới tải lại theo phạm vi đó.
+
+Đồng thời chuyển việc lọc theo GV từ **client-side** (tải hết rồi filter trong `useMemo`) sang **server-side** (query Prisma `where: { teacherId }` theo đúng phạm vi đang chọn) — giảm dữ liệu phải tải khi hệ thống có nhiều khóa học từ nhiều GV. Dropdown danh sách GV và dropdown danh mục trong modal "Tùy chỉnh hàng loạt" được tách ra tải riêng (`getTeachersAction()`, `/api/courses/categories`) thay vì suy ra từ tập khóa học đang hiển thị — để không bị thiếu lựa chọn khi tập đó chỉ là 1 phần (vd chỉ khóa học của bản thân).
+
+### 11.6 Bổ sung validate server còn thiếu
+- `POST /api/courses` trước đây không kiểm tra giới hạn 3 khóa ghim (trong khi `createCourseAction` và `updateCourseAction` đã có) — bổ sung, dùng chung `canPinAnotherCourse()` (`lib/course/pin-limit.ts`).
+- Lỗi trùng `id_khoa` (Prisma P2002) trước đây để lộ message Prisma thô ra response (`error.message`) ở một số nơi, hoặc chỉ được chặn bằng pre-check `findUnique` riêng (vẫn còn race condition giữa 2 request tạo cùng lúc). Thêm `formatCourseSaveError()` (`lib/course/errors.ts`) bắt `error.code === 'P2002'` và trả về thông báo thân thiện, dùng như lớp bảo vệ cuối cùng ở tất cả các nơi tạo/sửa Course.
+
+### 11.7 Danh sách trường Course hiện tại (thay thế Mục 5 đã lỗi thời)
+Ngoài 21 trường liệt kê ở Mục 5 (vẫn đúng), Course hiện có thêm:
+
+| Trường | Kiểu | Ghi chú |
+|--------|------|---------|
+| `feeType` | FeeType enum | MIEN_PHI / PHI_TUY_TINH / PHI_CAM_KET / PHI_DONG_HANH / PHI_TOI_THIEU |
+| `voucherConfig` | String | NONE / WALLET / SPECIAL |
+| `allowMbvDeduction` | Boolean | Cho phép trừ MBV khi thanh toán |
+| `requiresReferralActivation` | Boolean | Yêu cầu kích hoạt referral |
+| `referralActivationThreshold` | Int | Số TV kích hoạt cần thiết |
+| `teacherBankAccountId` | Int? | Tài khoản ngân hàng nhận tiền (quan hệ `UserBankAccount`) |
+| `vipExempt` | Boolean | Miễn trừ VIP |
+| `memberLabels` | Json | Nhãn thành viên tùy biến |
+| `acceptedVouchers` | quan hệ | `CourseAcceptedVoucher[]` — voucher được áp dụng cho khóa |
+| `voucherAwards` | quan hệ | `CourseVoucherAward[]` — voucher thưởng khi kích hoạt |
+
+`LessonType` enum cũng có thêm giá trị `ALL` (ngoài `VIDEO`/`DOCS`/`TEXT`) chưa được liệt kê ở phần trước.
+
+### 11.8 Kiểm tra hoàn thành
+- [x] Permission logic gộp về `lib/course/permissions.ts`, áp dụng ở mọi action/API route liên quan course & lesson
+- [x] Vá lỗ hổng: `createCourseAction` không check role, TEACHER tự đổi được `teacherId`, import lesson chỉ ADMIN dùng được
+- [x] Xóa `app/tools/courses/[id]/page.tsx`, gộp về `new/page.tsx`, cập nhật link "Sửa"
+- [x] Đổi route `[id]/edit` → `pages/[id]`, cập nhật mọi link liên quan
+- [x] Category resolve gộp về `lib/course/category.ts`, áp dụng cả ở `PUT /api/courses/[id]` (trước đây thiếu)
+- [x] ADMIN mặc định xem khóa học của mình ở `/tools/courses`, lọc theo GV chuyển sang server-side
+- [x] Bổ sung pin-limit check ở `POST /api/courses`, chuẩn hóa lỗi trùng `id_khoa`
+- [x] `npx tsc --noEmit` sạch sau toàn bộ thay đổi
+- [ ] Chưa xử lý: trùng lặp giữa `/tools/pages` (CoursesTab) và tab "Template động" trong `/tools/courses`; route `lib-access` không có link nào trỏ tới trong UI; cột `category` string vẫn còn (không migrate)
+
+**Phiên bản**: 3.0.0

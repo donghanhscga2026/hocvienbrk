@@ -141,7 +141,7 @@ export default function CoursesTab() {
                           <Eye className="w-3.5 h-3.5" />
                         </a>
                         <Link
-                          href={`/tools/courses/${page.id}/edit`}
+                          href={`/tools/courses/pages/${page.id}`}
                           className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all"
                         >
                           <Edit className="w-3.5 h-3.5" />

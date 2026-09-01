@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { getAdminCoursesAction, bulkToggleCourseStatusAction, bulkUpdateCoursesOptionsAction } from '@/app/actions/admin-actions'
+import { getTeachersAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
@@ -52,7 +53,11 @@ function CoursesTab() {
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('ACTIVE')
     const [filterCategory, setFilterCategory] = useState('ALL')
-    const [filterTeacher, setFilterTeacher] = useState('ALL')
+    // ✅ Mặc định luôn xem khoá học CỦA CHÍNH MÌNH — kể cả ADMIN. Muốn xem toàn bộ
+    // hoặc của GV khác thì chủ động đổi ở dropdown (chỉ ADMIN mới đổi được).
+    const [filterTeacher, setFilterTeacher] = useState('SELF')
+    const [teacherOptions, setTeacherOptions] = useState<{ id: number; name: string }[]>([])
+    const [allCategories, setAllCategories] = useState<{ id: number; name: string }[]>([])
 
     const [showBulkOptions, setShowBulkOptions] = useState(false)
     const [bulkOptionsLoading, setBulkOptionsLoading] = useState(false)
@@ -68,36 +73,45 @@ function CoursesTab() {
     }
     const [bulkOpts, setBulkOpts] = useState(defaultBulkOpts)
 
-    useEffect(() => {
-        const fetchCourses = async () => {
-            setLoading(true)
-            const res = await getAdminCoursesAction()
-            if (res.success) {
-                setCourses(res.courses || [])
-                setIsAdmin(res.isAdmin || false)
-                setCurrentUserId(res.userId || null)
-                if (!res.isAdmin && res.userId) {
-                    setFilterTeacher(String(res.userId))
-                }
-            }
-            const pages = await getCoursePages()
-            setCoursePages(pages)
-            setLoading(false)
+    // ✅ Tải danh sách khoá học theo đúng phạm vi đang chọn (server-side filter) —
+    // thay vì tải hết rồi lọc ở client, giúp ADMIN mặc định chỉ tải khoá học của
+    // chính mình, đỡ tốn băng thông/DB cho hệ thống nhiều khoá học.
+    const fetchCourses = async (teacherFilter: string) => {
+        setLoading(true)
+        const teacherId = teacherFilter === 'ALL' || teacherFilter === 'SELF' ? teacherFilter : parseInt(teacherFilter)
+        const res = await getAdminCoursesAction({ teacherId })
+        if (res.success) {
+            setCourses(res.courses || [])
+            setIsAdmin(res.isAdmin || false)
+            setCurrentUserId(res.userId || null)
         }
-        fetchCourses()
-    }, [])
+        setLoading(false)
+    }
 
     useEffect(() => {
+        fetchCourses(filterTeacher)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filterTeacher])
+
+    useEffect(() => {
+        getCoursePages().then(setCoursePages)
         fetch('/api/vouchers').then(r => r.json()).then(data => setAllVouchers(data.vouchers || [])).catch(() => {})
+        // ✅ Danh sách GV cho dropdown lọc — tải riêng, độc lập với phạm vi khoá học
+        // đang xem, để ADMIN luôn chọn được bất kỳ GV nào (kể cả khi đang chỉ xem
+        // khoá học của chính mình).
+        getTeachersAction().then(res => {
+            if (res.success) {
+                setTeacherOptions((res.teachers || []).map((t: any) => ({ id: t.id, name: t.name || t.email || `#${t.id}` })))
+            }
+        })
+        // ✅ Danh mục cho modal "Tùy chỉnh hàng loạt" — tải riêng từ API danh mục,
+        // không phụ thuộc vào các khoá học đang được tải (có thể chỉ là tập con).
+        fetch('/api/courses/categories').then(r => r.json()).then(data => {
+            setAllCategories((data.categories || []).map((c: any) => ({ id: c.id, name: c.name })))
+        }).catch(() => {})
     }, [])
 
-    const categoryOptions = useMemo(() => {
-        const map = new Map<number, string>()
-        courses.forEach((c: any) => {
-            if (c.courseCategory) map.set(c.courseCategory.id, c.courseCategory.name)
-        })
-        return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
-    }, [courses])
+    const categoryOptions = allCategories
 
     const handleToggleTemplate = async (slug: string, page: any, currentVal: boolean) => {
         if (page) {
@@ -135,15 +149,9 @@ function CoursesTab() {
         return Array.from(cats).sort()
     }, [courses])
 
-    const teachers = useMemo(() => {
-        const unique = new Map<number, string>()
-        courses.forEach((c: any) => {
-            if (c.teacher) unique.set(c.teacher.id, c.teacher.name || c.teacher.email || `Teacher #${c.teacher.id}`)
-        })
-        return Array.from(unique.entries()).map(([id, name]) => ({ id, name }))
-    }, [courses])
-
     const filteredCourses = useMemo(() => {
+        // ✅ Lọc theo GV đã do server thực hiện (fetchCourses) — ở đây chỉ còn lọc
+        // theo tìm kiếm/trạng thái/danh mục trong tập đã tải.
         return courses.filter((course: any) => {
             if (search.trim()) {
                 const q = search.toLowerCase()
@@ -156,13 +164,9 @@ function CoursesTab() {
             if (filterStatus === 'HIDDEN' && course.status) return false
             const catName = course.courseCategory?.name || course.category || 'Khác'
             if (filterCategory !== 'ALL' && catName !== filterCategory) return false
-            if (filterTeacher !== 'ALL') {
-                const tid = parseInt(filterTeacher)
-                if (course.teacherId !== tid) return false
-            }
             return true
         })
-    }, [courses, search, filterStatus, filterCategory, filterTeacher])
+    }, [courses, search, filterStatus, filterCategory])
 
     const toggleSelect = (id: number) => {
         setSelectedIds(prev => {
@@ -189,8 +193,7 @@ function CoursesTab() {
         try {
             const res = await bulkToggleCourseStatusAction(Array.from(selectedIds), newStatus)
             if (res.success) {
-                const refreshed = await getAdminCoursesAction()
-                if (refreshed.success) setCourses(refreshed.courses || [])
+                await fetchCourses(filterTeacher)
                 setSelectedIds(new Set())
             } else {
                 alert(res.error || 'Có lỗi xảy ra')
@@ -224,8 +227,7 @@ function CoursesTab() {
         try {
             const res = await bulkUpdateCoursesOptionsAction(Array.from(selectedIds), opts)
             if (res.success) {
-                const refreshed = await getAdminCoursesAction()
-                if (refreshed.success) setCourses(refreshed.courses || [])
+                await fetchCourses(filterTeacher)
                 const pages = await getCoursePages()
                 setCoursePages(pages)
                 setShowBulkOptions(false)
@@ -276,24 +278,23 @@ function CoursesTab() {
                         <option value="ALL">Tất cả danh mục</option>
                         {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
-                    {teachers.length > 0 && (
-                        isAdmin ? (
-                            <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}
-                                className="text-xs bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 font-medium outline-none focus:ring-2 focus:ring-yellow-200">
-                                <option value="ALL">Tất cả GV</option>
-                                {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            </select>
-                        ) : (
-                            <select disabled value={filterTeacher}
-                                className="text-xs bg-gray-100 border border-gray-200 rounded-lg px-2 py-1.5 font-medium outline-none text-gray-500 cursor-not-allowed">
-                                {teachers.filter(t => t.id === currentUserId).map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                            </select>
-                        )
+                    {isAdmin ? (
+                        <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}
+                            className="text-xs bg-gray-50 border border-gray-100 rounded-lg px-2 py-1.5 font-medium outline-none focus:ring-2 focus:ring-yellow-200">
+                            <option value="SELF">Khóa học của tôi</option>
+                            <option value="ALL">Tất cả GV</option>
+                            {teacherOptions.filter(t => t.id !== currentUserId).map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    ) : (
+                        <select disabled value="SELF"
+                            className="text-xs bg-gray-100 border border-gray-200 rounded-lg px-2 py-1.5 font-medium outline-none text-gray-500 cursor-not-allowed">
+                            <option value="SELF">{teacherOptions.find(t => t.id === currentUserId)?.name || 'Khóa học của tôi'}</option>
+                        </select>
                     )}
-                    {search || filterStatus !== 'ACTIVE' || filterCategory !== 'ALL' || (isAdmin && filterTeacher !== 'ALL') ? (
-                        <button onClick={() => { setSearch(''); setFilterStatus('ACTIVE'); setFilterCategory('ALL'); if (isAdmin) setFilterTeacher('ALL') }}
+                    {search || filterStatus !== 'ACTIVE' || filterCategory !== 'ALL' || (isAdmin && filterTeacher !== 'SELF') ? (
+                        <button onClick={() => { setSearch(''); setFilterStatus('ACTIVE'); setFilterCategory('ALL'); if (isAdmin) setFilterTeacher('SELF') }}
                             className="text-xs text-gray-400 hover:text-gray-600 font-bold px-2 py-1">
                             Xóa lọc
                         </button>
@@ -476,7 +477,7 @@ function CoursesTab() {
                                                                 </button>
                                                                 {isTemplateApplied && page && (
                                                                     <Link
-                                                                        href={`/tools/courses/${page.id}/edit`}
+                                                                        href={`/tools/courses/pages/${page.id}`}
                                                                         className="inline-flex items-center justify-center w-5 h-5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full transition-all ml-1"
                                                                         title="Thiết lập giao diện Template"
                                                                     >
@@ -490,7 +491,7 @@ function CoursesTab() {
 
                                                 <div className="flex items-center gap-2 ml-auto">
                                                     <Link
-                                                        href={`/tools/courses/${course.id}`}
+                                                        href={`/tools/courses/new?id=${course.id}`}
                                                         className="inline-flex items-center justify-center gap-1 px-3 py-1 bg-black text-yellow-400 rounded-lg hover:bg-zinc-800 active:scale-95 transition-all text-xs font-black shadow-sm"
                                                         title="Sửa cấu hình khóa học"
                                                     >

@@ -263,6 +263,8 @@ function CreateCourseContent() {
                 feeType,
                 voucherConfig,
                 allowMbvDeduction,
+                requiresReferralActivation,
+                referralActivationThreshold,
                 acceptedVoucherIds,
                 awardVoucherIds,
                 noidung_stk: noidungStk || null,
@@ -653,6 +655,12 @@ function CreateCourseContent() {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                    )}
+                    {teacherBankAccounts.length === 0 && teacherId && (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl text-xs text-yellow-700 font-bold">
+                            ⚠️ Giáo viên này chưa cấu hình tài khoản ngân hàng nào trên hệ thống.
+                            Vui lòng cấu hình tài khoản ngân hàng cho giáo viên này tại mục quản lý User hoặc Bank Accounts trước.
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-4">

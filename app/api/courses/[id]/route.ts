@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { auth } from '@/auth';
-import { Role } from '@prisma/client';
 import { toTitleCase } from '@/lib/utils/text-format';
+import { requireCourseAccessApi } from '@/lib/course/permissions';
+import { resolveCourseCategoryName } from '@/lib/course/category';
 
 // ✅ GET - TEACHER chỉ thấy course có teacherId = userId
 export async function GET(
@@ -10,14 +10,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const isAdmin = session.user.role === Role.ADMIN;
-    const userId = parseInt(session.user.id);
-
     const { id } = await params;
     const course = await prisma.course.findUnique({
       where: { id: parseInt(id) },
@@ -40,9 +32,8 @@ export async function GET(
     }
 
     // ✅ TEACHER chỉ được xem course có teacherId = userId
-    if (!isAdmin && course.teacherId !== userId) {
-      return NextResponse.json({ error: 'Forbidden: You can only view your own courses' }, { status: 403 });
-    }
+    const { denied } = await requireCourseAccessApi(course.teacherId);
+    if (denied) return denied;
 
     return NextResponse.json(course);
   } catch (error: any) {
@@ -56,14 +47,6 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const isAdmin = session.user.role === Role.ADMIN;
-    const userId = parseInt(session.user.id);
-
     const { id } = await params;
     const body = await req.json();
 
@@ -78,16 +61,9 @@ export async function PUT(
     }
 
     // ✅ TEACHER chỉ được sửa course có teacherId = userId
-    if (!isAdmin && course.teacherId !== userId) {
-      return NextResponse.json({ error: 'Forbidden: You can only edit your own courses' }, { status: 403 });
-    }
-
-    // ✅ Sửa lỗi 2026-05-01: TEACHER sửa khóa học bị mất teacherId  
-    // Lỗi cũ: if (!isAdmin && body.teacherId != null) - khi teacherId=null thì không xóa được
-    // Sửa: Luôn xóa teacherId cho TEACHER để bảo vệ dữ liệu
-    if (!isAdmin) {
-      delete body.teacherId;  // TEACHER không được thay đổi teacherId
-    }
+    const { denied, ctx } = await requireCourseAccessApi(course.teacherId);
+    if (denied) return denied;
+    const isAdmin = ctx!.isAdmin;
 
     // Extract non-scalar fields BEFORE any deletions
     const acceptedVoucherIds = body.acceptedVoucherIds
@@ -96,10 +72,8 @@ export async function PUT(
     const rawTeacherId = body.teacherId ?? null
     const bankAccountId = body.teacherBankAccountId ?? null
 
-    // TEACHER không được thay đổi teacherId — nhưng KHÔNG disconnect, giữ nguyên
-    if (!isAdmin) {
-      delete body.teacherId
-    }
+    // ✅ TEACHER không được thay đổi teacherId (chỉ ADMIN mới được đổi GV phụ trách)
+    delete body.teacherId
 
     delete body.acceptedVoucherIds
     delete body.awardVoucherIds
@@ -112,6 +86,10 @@ export async function PUT(
 
     if (body.name_lop) body.name_lop = toTitleCase(body.name_lop)
     if ('name_khoa' in body) body.name_khoa = body.name_khoa ? toTitleCase(body.name_khoa) : null
+
+    // ✅ Đồng bộ cột category (string, denormalized) theo categoryId — dùng
+    // chung 1 nguồn tính toán với server actions để tránh lệch dữ liệu
+    body.category = await resolveCourseCategoryName(categoryId)
 
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },
@@ -165,14 +143,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const isAdmin = session.user.role === Role.ADMIN;
-    const userId = parseInt(session.user.id);
-
     const { id } = await params;
 
     // ✅ Check course tồn tại + quyền xóa
@@ -186,9 +156,8 @@ export async function DELETE(
     }
 
     // ✅ TEACHER chỉ được xóa course có teacherId = userId
-    if (!isAdmin && course.teacherId !== userId) {
-      return NextResponse.json({ error: 'Forbidden: You can only delete your own courses' }, { status: 403 });
-    }
+    const { denied } = await requireCourseAccessApi(course.teacherId);
+    if (denied) return denied;
 
     await prisma.course.delete({
       where: { id: parseInt(id) }
