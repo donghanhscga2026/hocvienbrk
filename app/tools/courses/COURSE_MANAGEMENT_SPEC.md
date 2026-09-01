@@ -2,7 +2,7 @@
 ## Quản lý Khóa học (Teacher Permission System)
 **Ngày tạo:** 2026-04-30  
 **Cập nhật gần nhất:** 2026-09-01  
-**Phiên bản hiện tại:** 3.0.0  
+**Phiên bản hiện tại:** 3.0.1  
 **Trạng thái:** Hoàn thành 100% chức năng gốc + đã tối ưu hóa kiến trúc (gộp permission/category logic, gộp form create/edit, đổi tên route tránh nhầm lẫn, lọc mặc định theo GV, bổ sung validate server) — xem [Mục 11](#11-cập-nhật-2026-09-01--tối-ưu-hóa-kiến-trúc)  
 **Người phụ trách:** AI Agent + Admin
 
@@ -1072,7 +1072,9 @@ Nhân tiện vá 2 lỗ hổng phát hiện được khi rà soát:
 ### 11.3 Đổi tên route CoursePage (landing page)
 `app/tools/courses/[id]/edit/` đổi thành `app/tools/courses/pages/[id]/`. Lý do: route này sửa `CoursePage` (trang landing marketing tại `/khoa-hoc/[slug]`), và tham số `[id]` ở đây là `CoursePage.id` (UUID) — hoàn toàn khác `Course.id` (Int) dùng ở `/tools/courses/[id]` và `/tools/courses/[id]/lib-access`. Cùng tên tham số `[id]` nhưng 2 ý nghĩa khác nhau ở 2 route cùng cấp là nguồn gây nhầm lẫn khi đọc/sửa code. Cập nhật 2 nơi có link tới route cũ: `app/tools/courses/page.tsx` và `app/tools/pages/CoursesTab.tsx`.
 
-> 📌 Phát hiện thêm (chưa xử lý, ngoài phạm vi 7 hạng mục): `app/tools/pages/CoursesTab.tsx` là một tool **riêng** (`/tools/pages`) cũng quản lý CoursePage (list/xóa/toggle template), trùng chức năng với tab "Template động" đã có sẵn trong `app/tools/courses/page.tsx`. Và route `/tools/courses/[id]/lib-access` hiện **không có link nào trỏ tới** trong toàn bộ UI (chỉ truy cập được nếu gõ thẳng URL) — nên cân nhắc thêm link hoặc bỏ hẳn nếu không còn dùng.
+> 📌 **Cập nhật 2026-09-01 (sau khi rà lại)**: 2 điểm dưới đây đã được xử lý.
+> - `app/tools/pages/CoursesTab.tsx`: kiểm tra kỹ thì `app/tools/pages/page.tsx` **không hề import/render** component này (chỉ có 3 tab `my-site`/`landings`/`site-profiles`) — đây là **dead code**, chưa từng hiển thị trên UI thật, không phải trùng lặp tính năng đang sống song song. Đã xoá file.
+> - `/tools/courses/[id]/lib-access`: đã thêm link "Quản lý Whitelist Email" ngay trong form sửa khóa học (`new/page.tsx`), hiện ra khi đang sửa 1 khóa có `type = LIB`.
 
 ### 11.4 Chuẩn hóa tính `category` từ `categoryId`
 Course lưu category ở 2 dạng: quan hệ `categoryId → CourseCategory` và cột `category` (string, denormalized, dùng làm fallback hiển thị cho dữ liệu cũ chưa gán `categoryId`). Logic "tra `CourseCategory` rồi gán chuỗi tên vào `category`" từng lặp lại độc lập ở 4 nơi — và **`PUT /api/courses/[id]` trước đây thiếu hẳn bước này**, khiến cột `category` bị lệch (không đồng bộ) nếu course được sửa qua route đó. Gộp vào `resolveCourseCategoryName(categoryId)` trong `lib/course/category.ts`, dùng chung ở `createCourseAction`, `POST /api/courses`, `updateCourseAction`, `bulkUpdateCoursesOptionsAction`, `PUT /api/courses/[id]`.
@@ -1115,6 +1117,8 @@ Ngoài 21 trường liệt kê ở Mục 5 (vẫn đúng), Course hiện có th�
 - [x] ADMIN mặc định xem khóa học của mình ở `/tools/courses`, lọc theo GV chuyển sang server-side
 - [x] Bổ sung pin-limit check ở `POST /api/courses`, chuẩn hóa lỗi trùng `id_khoa`
 - [x] `npx tsc --noEmit` sạch sau toàn bộ thay đổi
-- [ ] Chưa xử lý: trùng lặp giữa `/tools/pages` (CoursesTab) và tab "Template động" trong `/tools/courses`; route `lib-access` không có link nào trỏ tới trong UI; cột `category` string vẫn còn (không migrate)
+- [x] Xoá `app/tools/pages/CoursesTab.tsx` (dead code, không được `page.tsx` nào import/render)
+- [x] Thêm link "Quản lý Whitelist Email" tới `/tools/courses/[id]/lib-access` trong form sửa khóa học (hiện khi `type = LIB`)
+- [ ] Chưa xử lý: cột `category` string vẫn còn (không migrate) — rủi ro cao, cần bàn riêng nếu muốn bỏ
 
-**Phiên bản**: 3.0.0
+**Phiên bản**: 3.0.1
