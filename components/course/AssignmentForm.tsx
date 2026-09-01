@@ -316,50 +316,51 @@ function AssignmentForm({
                     </p>
                 </div>
 
-                <div className="relative bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
                     <SectionHead num={2} label="Bồi Nhân = Bài tập/Bài học theo yêu cầu (2đ)" max={2} current={refScore} />
-                    {reflectionExpanded && (
-                        <div
-                            className="fixed inset-0 z-40 bg-black/50"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={closeReflectionExpand}
-                        />
-                    )}
-                    {/* [FIX] Neo theo chính khung mục 2 này (position:relative ở trên) thay
-                        vì position:fixed canh giữa màn hình như trước — ô mở rộng giờ bắt
-                        đầu ngay tại vị trí mục 2, không che phần nội dung/đề bài phía trên.
-                        Giới hạn chiều cao (max-h-[50vh], không còn 85-90vh) để trên mobile
-                        không bị bàn phím ảo che mất khi gõ. */}
-                    <div
-                        className={reflectionExpanded
-                            ? 'absolute inset-x-0 top-0 z-50 max-h-[50vh] overflow-y-auto'
-                            : ''
-                        }
-                    >
+                    {/* [FIX] "relative" giờ chỉ bọc riêng khối bên dưới tiêu đề (không
+                        còn ôm chung với SectionHead ở trên) — top:0 của ô mở rộng vì vậy
+                        rơi đúng ngay dưới tiêu đề mục 2, không còn che mất chữ tiêu đề
+                        như trước. Chiều cao ô mở rộng tăng gấp đôi (max-h-[100vh]). */}
+                    <div className="relative">
                         {reflectionExpanded && (
-                            <button
-                                type="button"
+                            <div
+                                className="fixed inset-0 z-40 bg-black/50"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={closeReflectionExpand}
-                                className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
-                            >
-                                <X className="w-3.5 h-3.5" /> ĐÓNG
-                            </button>
+                            />
                         )}
-                        <textarea
-                            ref={reflectionTextareaRef}
-                            value={reflection}
-                            onChange={e => setReflection(e.target.value)}
-                            onFocus={() => setReflectionFocused(true)}
-                            onBlur={() => setReflectionFocused(false)}
-                            placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
-                            rows={3}
+                        <div
                             className={reflectionExpanded
-                                ? 'w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
-                                : 'w-full bg-white text-sm text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
+                                ? 'absolute inset-x-0 top-0 z-50 max-h-[100vh] overflow-y-auto'
+                                : ''
                             }
-                            style={reflectionExpanded ? { minHeight: '160px' } : undefined}
-                        />
+                        >
+                            {reflectionExpanded && (
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={closeReflectionExpand}
+                                    className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
+                                >
+                                    <X className="w-3.5 h-3.5" /> ĐÓNG
+                                </button>
+                            )}
+                            <textarea
+                                ref={reflectionTextareaRef}
+                                value={reflection}
+                                onChange={e => setReflection(e.target.value)}
+                                onFocus={() => setReflectionFocused(true)}
+                                onBlur={() => setReflectionFocused(false)}
+                                placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
+                                rows={3}
+                                className={reflectionExpanded
+                                    ? 'w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
+                                    : 'w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
+                                }
+                                style={reflectionExpanded ? { minHeight: '320px' } : undefined}
+                            />
+                        </div>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>
                 </div>
