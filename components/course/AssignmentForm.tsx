@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Loader2, Info, X, Send } from "lucide-react"
 import { saveAssignmentDraftAction } from '@/app/actions/course-actions'
+import { computeLessonDeadlineUTC } from '@/lib/course/deadline'
 
 interface AssignmentFormProps {
     lessonId: string
@@ -20,14 +21,9 @@ interface AssignmentFormProps {
 
 function formatDate(date: Date | null) {
     if (!date) return '--/--/----'
-    return new Date(date).toLocaleDateString('vi-VN')
-}
-
-function calcDeadline(startedAt: Date | null, order: number) {
-    if (!startedAt) return null
-    const d = new Date(startedAt)
-    d.setDate(d.getDate() + (order - 1))
-    return d
+    // [FIX] Ép timeZone Asia/Ho_Chi_Minh khi hiển thị — trước đây dùng giờ local
+    // của trình duyệt, có thể lệch ngày hiển thị với người dùng ở múi giờ khác VN.
+    return new Date(date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
 }
 
 // ─── Popup Quy tắc ─────────────────────────────────────────────────────────
@@ -125,7 +121,15 @@ function AssignmentForm({
     const isDirtyRef = useRef(false)
     const initialRenderRef = useRef(true)
 
-    const deadline = calcDeadline(startedAt, lessonOrder)
+    // [FIX] Dùng CHUNG công thức computeLessonDeadlineUTC với server
+    // (submitAssignmentAction) thay vì tự tính lại bằng Date.setDate/setHours
+    // (vốn chạy theo giờ LOCAL của trình duyệt) — tránh client và server tính
+    // ra 2 hạn nộp khác nhau khi máy/trình duyệt người dùng không ở múi giờ VN.
+    const deadlineMs = useMemo(
+        () => startedAt ? computeLessonDeadlineUTC(startedAt, lessonOrder) : null,
+        [startedAt, lessonOrder]
+    )
+    const deadline = deadlineMs != null ? new Date(deadlineMs) : null
     const isCompleted = initialData?.status === 'COMPLETED'
     const existingTotalScore = initialData?.totalScore ?? 0
     const existingScores = initialData?.scores ?? {}
@@ -212,13 +216,11 @@ function AssignmentForm({
     const supportScore = useMemo(() => supports.filter(Boolean).length, [supports])
 
     const currentTimingScore = useMemo(() => {
-        if (!deadline) return 0
-        const dl = new Date(deadline)
-        dl.setHours(23, 59, 59, 999)
-        const isNowOnTime = new Date().getTime() <= dl.getTime()
+        if (deadlineMs == null) return 0
+        const isNowOnTime = Date.now() <= deadlineMs
 
         if (isCompleted) {
-            // Nếu đã xong: 
+            // Nếu đã xong:
             // - Nếu bây giờ vẫn trong hạn -> auto +1 (để gỡ điểm trễ)
             // - Nếu bây giờ quá hạn -> giữ nguyên điểm cũ (bảo vệ điểm đúng hạn)
             if (isNowOnTime) return 1
@@ -226,7 +228,7 @@ function AssignmentForm({
         }
 
         return isNowOnTime ? 1 : -1
-    }, [deadline, isCompleted, existingScores.timing])
+    }, [deadlineMs, isCompleted, existingScores.timing])
 
     const total = Math.max(0, vidScore + refScore + pracScore + supportScore + currentTimingScore)
 
@@ -237,12 +239,7 @@ function AssignmentForm({
     // "&& !isCompleted" khiến điều kiện chặn "isCompleted && isOverdue" không
     // bao giờ đúng (2 vế loại trừ nhau) — form vẫn cho sửa dù server luôn từ
     // chối bài đã COMPLETED mà quá hạn (course-actions.ts, submitAssignmentAction).
-    const isPastDeadline = useMemo(() => {
-        if (!deadline) return false
-        const dl = new Date(deadline)
-        dl.setHours(23, 59, 59, 999)
-        return new Date().getTime() > dl.getTime()
-    }, [deadline])
+    const isPastDeadline = useMemo(() => deadlineMs != null && Date.now() > deadlineMs, [deadlineMs])
     const isOverdue = isPastDeadline
 
     const handleSubmit = async () => {
