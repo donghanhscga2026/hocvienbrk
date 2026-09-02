@@ -375,7 +375,7 @@ function CreateCourseContent() {
                         <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
                     </h2>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
                             <input 
@@ -411,55 +411,95 @@ function CreateCourseContent() {
                         />
                     </div>
                     
-                        <div className="grid grid-cols-3 gap-4 mt-4">
-                             <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
-                             <select 
-                                  value={categoryId ?? ''} 
-                                  onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-                                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                              >
-                                  <option value="">Khác</option>
-                                  {categories.map((cat: any) => (
-                                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                  ))}
-                              </select>
-                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
-                            <select 
-                                value={type} 
-                                onChange={(e) => setType(e.target.value)}
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
+                            <select
+                                value={categoryId ?? ''}
+                                onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                             >
-                                <option value="NORMAL">Bình thường</option>
-                                <option value="CHALLENGE">Thử thách</option>
-                                <option value="LIB">Tài liệu (LIB)</option>
-                                <option value="SYS">Hệ thống (SYS)</option>
+                                <option value="">Khác</option>
+                                {categories.map((cat: any) => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
                             </select>
-                            {isEditMode && type === 'LIB' && (
-                                <Link
-                                    href={`/tools/courses/${courseId}/lib-access`}
-                                    className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-bold text-purple-600 hover:text-purple-700 hover:underline"
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
+                                <select
+                                    value={type}
+                                    onChange={(e) => setType(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                 >
-                                    <Mail className="w-3 h-3" /> Quản lý Whitelist Email
-                                </Link>
+                                    <option value="NORMAL">Bình thường</option>
+                                    <option value="CHALLENGE">Thử thách</option>
+                                    <option value="LIB">Tài liệu (LIB)</option>
+                                    <option value="SYS">Hệ thống (SYS)</option>
+                                </select>
+                                {isEditMode && type === 'LIB' && (
+                                    <Link
+                                        href={`/tools/courses/${courseId}/lib-access`}
+                                        className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-bold text-purple-600 hover:text-purple-700 hover:underline"
+                                    >
+                                        <Mail className="w-3 h-3" /> Quản lý Whitelist Email
+                                    </Link>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
+                                <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={status}
+                                            onChange={(e) => setStatus(e.target.checked)}
+                                            className="w-5 h-5 rounded"
+                                        />
+                                        <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
+                                <input
+                                    type="number"
+                                    value={pin}
+                                    onChange={(e) => setPin(parseInt(e.target.value) || 0)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
+                                <input
+                                    type="date"
+                                    value={dateJoin}
+                                    onChange={(e) => setDateJoin(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                />
+                            </div>
+                            {(isAdmin || isTeacher) && (
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
+                                    <select
+                                        value={teacherId}
+                                        onChange={(e) => setTeacherId(e.target.value)}
+                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                    >
+                                        <option value="">Tự động (session)</option>
+                                        {teachers.map((t: any) => (
+                                            <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             )}
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
-                            <div className="flex items-center gap-3 h-full px-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={status} 
-                                        onChange={(e) => setStatus(e.target.checked)} 
-                                        className="w-5 h-5 rounded" 
-                                    />
-                                    <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
-                                </label>
-                        </div>
-                        <div className="space-y-4">
+
+                        <div className="space-y-4 mt-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>
                                 <div className="mt-2">
@@ -539,44 +579,6 @@ function CreateCourseContent() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
-                            <input 
-                                type="number" 
-                                value={pin} 
-                                onChange={(e) => setPin(parseInt(e.target.value) || 0)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
-                            <input 
-                                type="date" 
-                                value={dateJoin} 
-                                onChange={(e) => setDateJoin(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            />
-                        </div>
-                        {(isAdmin || isTeacher) && (
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
-                                <select 
-                                    value={teacherId} 
-                                    onChange={(e) => setTeacherId(e.target.value)}
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                                >
-                                    <option value="">Tự động (session)</option>
-                                    {teachers.map((t: any) => (
-                                        <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-                    </div>
                 </div>
                 
                 {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
@@ -671,7 +673,7 @@ function CreateCourseContent() {
                             Vui lòng cấu hình tài khoản ngân hàng cho giáo viên này tại mục quản lý User hoặc Bank Accounts trước.
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
                             <input 
@@ -715,7 +717,7 @@ function CreateCourseContent() {
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số lượng thành viên kích hoạt cần thiết</label>
                             <input type="number" value={referralActivationThreshold} onChange={(e) => setReferralActivationThreshold(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" min={0} />
@@ -860,7 +862,7 @@ function CreateCourseContent() {
                     onClose={() => setSelectedLesson(null)}
                     onSave={async (data: any) => {
                         const res = await updateLessonAction(data.id, {
-                            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content, isDailyChallenge: data.isDailyChallenge
+                            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content, imageUrl: data.imageUrl, isDailyChallenge: data.isDailyChallenge
                         })
                         if (res.success) {
                             setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
