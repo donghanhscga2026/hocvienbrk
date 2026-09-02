@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail } from 'lucide-react'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -30,6 +30,11 @@ function CreateCourseContent() {
     
     const [activeTab, setActiveTab] = useState<'info' | 'lessons'>('info')
     const [lessons, setLessons] = useState<any[]>([])
+    // ✅ Sắp xếp danh sách bài giảng theo thứ tự — mặc định giảm dần (bài mới/thứ tự lớn nhất lên đầu)
+    const [lessonSortDir, setLessonSortDir] = useState<'asc' | 'desc'>('desc')
+    const sortedLessons = useMemo(() => {
+        return [...lessons].sort((a, b) => lessonSortDir === 'asc' ? a.order - b.order : b.order - a.order)
+    }, [lessons, lessonSortDir])
     const [showImport, setShowImport] = useState(false)
     const [selectedLesson, setSelectedLesson] = useState<any>(null)
     const [showAddLesson, setShowAddLesson] = useState(false)
@@ -796,18 +801,26 @@ function CreateCourseContent() {
 
                 {isEditMode && activeTab === 'lessons' && (
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap justify-between items-center gap-2">
                             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
                                 <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({lessons.length})
                             </h2>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setLessonSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                title={lessonSortDir === 'desc' ? 'Đang sắp xếp: Mới nhất lên đầu (bấm để đổi)' : 'Đang sắp xếp: Cũ nhất lên đầu (bấm để đổi)'}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-black uppercase rounded-xl hover:bg-gray-200 transition-all"
+                            >
+                                {lessonSortDir === 'desc' ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />}
+                                {lessonSortDir === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
+                            </button>
                             <button
                                 onClick={() => setShowImport(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl hover:bg-green-700 transition-all"
                             >
                                 <Upload className="w-4 h-4" /> Import
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setShowAddLesson(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700 transition-all"
                             >
@@ -816,7 +829,7 @@ function CreateCourseContent() {
                         </div>
                     </div>
                         <div className="space-y-3">
-                            {lessons.map((lesson: any) => (
+                            {sortedLessons.map((lesson: any) => (
                                 <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex items-center justify-between group">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black font-mono">
