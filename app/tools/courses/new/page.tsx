@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail } from 'lucide-react'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -30,6 +30,11 @@ function CreateCourseContent() {
     
     const [activeTab, setActiveTab] = useState<'info' | 'lessons'>('info')
     const [lessons, setLessons] = useState<any[]>([])
+    // ✅ Sắp xếp danh sách bài giảng theo thứ tự — mặc định giảm dần (bài mới/thứ tự lớn nhất lên đầu)
+    const [lessonSortDir, setLessonSortDir] = useState<'asc' | 'desc'>('desc')
+    const sortedLessons = useMemo(() => {
+        return [...lessons].sort((a, b) => lessonSortDir === 'asc' ? a.order - b.order : b.order - a.order)
+    }, [lessons, lessonSortDir])
     const [showImport, setShowImport] = useState(false)
     const [selectedLesson, setSelectedLesson] = useState<any>(null)
     const [showAddLesson, setShowAddLesson] = useState(false)
@@ -375,7 +380,7 @@ function CreateCourseContent() {
                         <BookOpen className="w-5 h-5 text-blue-500" /> Thông tin cơ bản *
                     </h2>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Tên lớp học *</label>
                             <input 
@@ -411,55 +416,95 @@ function CreateCourseContent() {
                         />
                     </div>
                     
-                        <div className="grid grid-cols-3 gap-4 mt-4">
-                             <div className="space-y-1.5">
-                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
-                             <select 
-                                  value={categoryId ?? ''} 
-                                  onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
-                                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                              >
-                                  <option value="">Khác</option>
-                                  {categories.map((cat: any) => (
-                                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                  ))}
-                              </select>
-                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
-                            <select 
-                                value={type} 
-                                onChange={(e) => setType(e.target.value)}
+                        <div className="space-y-1.5 mt-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Danh mục</label>
+                            <select
+                                value={categoryId ?? ''}
+                                onChange={(e) => setCategoryId(e.target.value ? parseInt(e.target.value) : null)}
                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                             >
-                                <option value="NORMAL">Bình thường</option>
-                                <option value="CHALLENGE">Thử thách</option>
-                                <option value="LIB">Tài liệu (LIB)</option>
-                                <option value="SYS">Hệ thống (SYS)</option>
+                                <option value="">Khác</option>
+                                {categories.map((cat: any) => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
                             </select>
-                            {isEditMode && type === 'LIB' && (
-                                <Link
-                                    href={`/tools/courses/${courseId}/lib-access`}
-                                    className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-bold text-purple-600 hover:text-purple-700 hover:underline"
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Loại khóa học</label>
+                                <select
+                                    value={type}
+                                    onChange={(e) => setType(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
                                 >
-                                    <Mail className="w-3 h-3" /> Quản lý Whitelist Email
-                                </Link>
+                                    <option value="NORMAL">Bình thường</option>
+                                    <option value="CHALLENGE">Thử thách</option>
+                                    <option value="LIB">Tài liệu (LIB)</option>
+                                    <option value="SYS">Hệ thống (SYS)</option>
+                                </select>
+                                {isEditMode && type === 'LIB' && (
+                                    <Link
+                                        href={`/tools/courses/${courseId}/lib-access`}
+                                        className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-bold text-purple-600 hover:text-purple-700 hover:underline"
+                                    >
+                                        <Mail className="w-3 h-3" /> Quản lý Whitelist Email
+                                    </Link>
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
+                                <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={status}
+                                            onChange={(e) => setStatus(e.target.checked)}
+                                            className="w-5 h-5 rounded"
+                                        />
+                                        <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
+                                <input
+                                    type="number"
+                                    value={pin}
+                                    onChange={(e) => setPin(parseInt(e.target.value) || 0)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
+                                <input
+                                    type="date"
+                                    value={dateJoin}
+                                    onChange={(e) => setDateJoin(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                />
+                            </div>
+                            {(isAdmin || isTeacher) && (
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
+                                    <select
+                                        value={teacherId}
+                                        onChange={(e) => setTeacherId(e.target.value)}
+                                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
+                                    >
+                                        <option value="">Tự động (session)</option>
+                                        {teachers.map((t: any) => (
+                                            <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             )}
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
-                            <div className="flex items-center gap-3 h-full px-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={status} 
-                                        onChange={(e) => setStatus(e.target.checked)} 
-                                        className="w-5 h-5 rounded" 
-                                    />
-                                    <span className="text-sm font-bold">{status ? 'Hiển thị' : 'Ẩn'}</span>
-                                </label>
-                        </div>
-                        <div className="space-y-4">
+
+                        <div className="space-y-4 mt-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Voucher áp dụng cho khóa này</label>
                                 <div className="mt-2">
@@ -539,44 +584,6 @@ function CreateCourseContent() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ghim (0=không)</label>
-                            <input 
-                                type="number" 
-                                value={pin} 
-                                onChange={(e) => setPin(parseInt(e.target.value) || 0)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Ngày khai giảng</label>
-                            <input 
-                                type="date" 
-                                value={dateJoin} 
-                                onChange={(e) => setDateJoin(e.target.value)} 
-                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" 
-                            />
-                        </div>
-                        {(isAdmin || isTeacher) && (
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Giáo viên</label>
-                                <select 
-                                    value={teacherId} 
-                                    onChange={(e) => setTeacherId(e.target.value)}
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none"
-                                >
-                                    <option value="">Tự động (session)</option>
-                                    {teachers.map((t: any) => (
-                                        <option key={t.id} value={t.id}>[#{t.id}] {t.name || t.email}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-                    </div>
                 </div>
                 
                 {/* SECTION 2: MÔ TẢ & HÌNH ẢNH */}
@@ -671,7 +678,7 @@ function CreateCourseContent() {
                             Vui lòng cấu hình tài khoản ngân hàng cho giáo viên này tại mục quản lý User hoặc Bank Accounts trước.
                         </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Học phí (VND)</label>
                             <input 
@@ -715,7 +722,7 @@ function CreateCourseContent() {
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Số lượng thành viên kích hoạt cần thiết</label>
                             <input type="number" value={referralActivationThreshold} onChange={(e) => setReferralActivationThreshold(parseInt(e.target.value) || 0)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none" min={0} />
@@ -794,18 +801,26 @@ function CreateCourseContent() {
 
                 {isEditMode && activeTab === 'lessons' && (
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap justify-between items-center gap-2">
                             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2 px-2 uppercase tracking-tight">
                                 <List className="w-5 h-5 text-indigo-500" /> Bài giảng ({lessons.length})
                             </h2>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setLessonSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                title={lessonSortDir === 'desc' ? 'Đang sắp xếp: Mới nhất lên đầu (bấm để đổi)' : 'Đang sắp xếp: Cũ nhất lên đầu (bấm để đổi)'}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-black uppercase rounded-xl hover:bg-gray-200 transition-all"
+                            >
+                                {lessonSortDir === 'desc' ? <ArrowDown className="w-4 h-4" /> : <ArrowUp className="w-4 h-4" />}
+                                {lessonSortDir === 'desc' ? 'Mới nhất' : 'Cũ nhất'}
+                            </button>
                             <button
                                 onClick={() => setShowImport(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase rounded-xl hover:bg-green-700 transition-all"
                             >
                                 <Upload className="w-4 h-4" /> Import
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setShowAddLesson(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-black uppercase rounded-xl hover:bg-blue-700 transition-all"
                             >
@@ -814,7 +829,7 @@ function CreateCourseContent() {
                         </div>
                     </div>
                         <div className="space-y-3">
-                            {lessons.map((lesson: any) => (
+                            {sortedLessons.map((lesson: any) => (
                                 <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex items-center justify-between group">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black font-mono">
@@ -860,7 +875,7 @@ function CreateCourseContent() {
                     onClose={() => setSelectedLesson(null)}
                     onSave={async (data: any) => {
                         const res = await updateLessonAction(data.id, {
-                            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content, isDailyChallenge: data.isDailyChallenge
+                            title: data.title, videoUrl: data.videoUrl, order: data.order, type: data.type, content: data.content, imageUrl: data.imageUrl, isDailyChallenge: data.isDailyChallenge
                         })
                         if (res.success) {
                             setMessage({ type: 'success', text: 'Đã cập nhật bài học thành công!' })
