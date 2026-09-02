@@ -52,7 +52,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
                     </div>
                     <div>
                         <p className="font-bold text-brk-accent">2. Bài tập/Bài học theo yêu cầu (Max 2đ)</p>
-                        <p className="text-brk-muted mt-1">Có chia sẻ <span className="text-brk-accent">(+1đ)</span>, Sâu sắc (dài hơn 50 ký tự) <span className="text-brk-accent">(+1đ)</span>.</p>
+                        <p className="text-brk-muted mt-1">Có chia sẻ <span className="text-brk-accent">(+1đ)</span>, Sâu sắc (≥ 86 ký tự) <span className="text-brk-accent">(+1đ)</span>.</p>
                     </div>
                     <div>
                         <p className="font-bold text-brk-accent">3. Thực hành nộp link video (Max 3đ)</p>
@@ -230,7 +230,20 @@ function AssignmentForm({
 
     const total = Math.max(0, vidScore + refScore + pracScore + supportScore + currentTimingScore)
 
-    const isOverdue = currentTimingScore === -1 && !isCompleted // Chỉ coi là trễ nếu chưa xong bài và hết hạn
+    // [FIX] "Trễ hạn" để KHOÁ sửa bài phải là "hiện tại đã quá deadline" thuần
+    // tuý — KHÔNG được suy ra từ currentTimingScore, vì với bài đã hoàn thành
+    // currentTimingScore cố tình giữ nguyên điểm cũ (bảo vệ điểm đúng hạn) nên
+    // vẫn ra 1 dù thực tế đã quá hạn từ lâu. Trước đây isOverdue còn ép thêm
+    // "&& !isCompleted" khiến điều kiện chặn "isCompleted && isOverdue" không
+    // bao giờ đúng (2 vế loại trừ nhau) — form vẫn cho sửa dù server luôn từ
+    // chối bài đã COMPLETED mà quá hạn (course-actions.ts, submitAssignmentAction).
+    const isPastDeadline = useMemo(() => {
+        if (!deadline) return false
+        const dl = new Date(deadline)
+        dl.setHours(23, 59, 59, 999)
+        return new Date().getTime() > dl.getTime()
+    }, [deadline])
+    const isOverdue = isPastDeadline
 
     const handleSubmit = async () => {
         if (!startedAt) { alert("Bạn chưa xác nhận ngày bắt đầu lộ trình!"); return }

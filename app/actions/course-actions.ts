@@ -664,7 +664,7 @@ export async function submitAssignmentAction({
             videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
         }
 
-        const reflectionScore = reflection.trim().length >= 50 ? 2 : reflection.trim().length > 0 ? 1 : 0
+        const reflectionScore = reflection.trim().length >= 86 ? 2 : reflection.trim().length > 0 ? 1 : 0
         const linkScore = Math.min(links.filter(l => l && l.trim() !== "").length, 3)
         const supportScore = supports.filter(s => s === true).length
 
