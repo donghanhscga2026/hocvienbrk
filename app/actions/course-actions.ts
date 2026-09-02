@@ -11,7 +11,7 @@ import { createPaymentQR } from "@/lib/vietqr"
 import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { toTitleCase } from "@/lib/utils/text-format"
-import { computeLessonDeadlineUTC } from "@/lib/course/deadline"
+import { computeLessonDeadlineUTC, toVnMidnightUTC } from "@/lib/course/deadline"
 import { getCourseAuthContext, requireCourseAccessAction } from "@/lib/course/permissions"
 import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
@@ -542,8 +542,14 @@ export async function confirmStartDateAction(courseId: number, date: string | Da
         const session = await auth()
         if (!session?.user?.id) return { success: false, message: "Unauthorized" }
 
-        const startDate = new Date(date)
-        if (isNaN(startDate.getTime())) return { success: false, message: "Ngày bắt đầu không hợp lệ." }
+        const rawDate = new Date(date)
+        if (isNaN(rawDate.getTime())) return { success: false, message: "Ngày bắt đầu không hợp lệ." }
+        // [FIX] Chuẩn hoá về đúng UTC-midnight của NGÀY VN — bắt buộc vì client
+        // (StartDateModal) gửi lên nửa đêm theo GIỜ TRÌNH DUYỆT của người dùng,
+        // không phải giờ VN. Nếu lưu thẳng giá trị client gửi, computeLessonDeadlineUTC
+        // (vốn giả định startedAt luôn là 00:00:00.000Z của ngày VN) sẽ tính sai hạn
+        // nộp bài cho bất kỳ ai có múi giờ máy/trình duyệt khác UTC+7.
+        const startDate = new Date(toVnMidnightUTC(rawDate))
 
         const userId = Number(session.user.id)
         const now = new Date()
@@ -664,7 +670,7 @@ export async function submitAssignmentAction({
             videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
         }
 
-        const reflectionScore = reflection.trim().length >= 50 ? 2 : reflection.trim().length > 0 ? 1 : 0
+        const reflectionScore = reflection.trim().length >= 86 ? 2 : reflection.trim().length > 0 ? 1 : 0
         const linkScore = Math.min(links.filter(l => l && l.trim() !== "").length, 3)
         const supportScore = supports.filter(s => s === true).length
 
@@ -725,7 +731,15 @@ export async function submitAssignmentAction({
         }
 
         console.log(`[PERF-TEST] SUBMIT_RETURN t=${Date.now()} (+${Date.now() - __t0}ms since SUBMIT_START)`)
-        return { success: true, totalScore }
+        // [FIX] Trả thêm "scores" breakdown — client (CoursePlayer) cần ghi lại
+        // đúng giá trị này vào progressMap cục bộ, nếu không lần "Cập nhật" kế
+        // tiếp (chưa reload trang) sẽ đọc existingScores.timing CŨ (của lần nộp
+        // trước) để tính điểm "bảo vệ đúng hạn" cho AssignmentForm.
+        return {
+            success: true,
+            totalScore,
+            scores: { video: videoScore, reflection: reflectionScore, link: linkScore, support: supportScore, timing: timingScore }
+        }
     } catch (error: any) {
         console.error(`${logId} ERROR:`, error)
         return { success: false, message: "Lỗi hệ thống khi lưu kết quả." }

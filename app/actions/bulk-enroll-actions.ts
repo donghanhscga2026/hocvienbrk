@@ -9,6 +9,7 @@ import { trackAffiliateConversion } from '@/lib/affiliate/tracking'
 import { normalizePhone } from '@/lib/phone-utils'
 import { isTestAccount } from '@/lib/test-account'
 import { toTitleCase } from '@/lib/utils/text-format'
+import { toVnMidnightUTC } from '@/lib/course/deadline'
 
 const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"
 
@@ -347,10 +348,15 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                     }
 
                     if (row.userId) {
+                        // [FIX] startedAt phải là UTC-midnight của ngày VN (giả định bắt
+                        // buộc của computeLessonDeadlineUTC, dùng tính hạn nộp bài) — new
+                        // Date() thô mang theo cả giờ/phút/giây hiện tại nên làm lệch hạn
+                        // nộp của mọi bài học trong suốt khoá học.
+                        const enrollStartedAt = new Date(toVnMidnightUTC(new Date()))
                         await tx.enrollment.upsert({
                             where: { userId_courseId: { userId: row.userId, courseId } },
-                            update: { status: 'ACTIVE', startedAt: new Date() },
-                            create: { userId: row.userId, courseId, status: 'ACTIVE', startedAt: new Date() }
+                            update: { status: 'ACTIVE', startedAt: enrollStartedAt },
+                            create: { userId: row.userId, courseId, status: 'ACTIVE', startedAt: enrollStartedAt }
                         })
                     }
                 })

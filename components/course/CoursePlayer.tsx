@@ -60,7 +60,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         }, {})
     )
     const [showContentModal, setShowContentModal] = useState(false)
-    const [currentFormData, setCurrentFormData] = useState<{ reflection: string; links: string[]; supports: boolean[] } | null>(null)
     const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'loading' | 'success' | 'error' } | null>(null)
     const assignmentFormRef = useRef<(() => Promise<void>) | undefined>(undefined)
     const videoPlayerRef = useRef<VideoPlayerHandle>(null)
@@ -97,14 +96,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
         if (type !== 'loading') {
             setTimeout(() => setStatusMsg(null), duration)
         }
-    }, [])
-
-    const checkIsOnTime = useCallback((startedAt: Date | null, lessonOrder: number): boolean => {
-        if (!startedAt) return false
-        const deadline = new Date(startedAt)
-        deadline.setDate(deadline.getDate() + (lessonOrder - 1))
-        deadline.setHours(23, 59, 59, 999)
-        return new Date() <= deadline
     }, [])
 
     const [isMobile, setIsMobile] = useState(false)
@@ -211,7 +202,11 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 ...(progressMap[currentLessonId!] || {}),
                 assignment: { reflection: data.reflection, links: data.links, supports: data.supports },
                 status: res.totalScore >= 5 ? 'COMPLETED' : 'IN_PROGRESS',
-                totalScore: res.totalScore
+                totalScore: res.totalScore,
+                // [FIX] Đồng bộ luôn breakdown điểm mới nhất — thiếu dòng này khiến
+                // AssignmentForm đọc existingScores.timing CŨ (lần nộp trước) khi
+                // "Cập nhật" nhiều lần liên tiếp mà chưa tải lại trang.
+                scores: res.scores ?? progressMap[currentLessonId!]?.scores
             }
             setProgressMap(prev => ({ ...prev, [currentLessonId!]: updatedProgress }))
 
@@ -497,7 +492,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             onSubmit={handleSubmitAssignment}
                                             initialData={assignmentInitialData}
                                             onSaveDraft={assignmentFormRef}
-                                            onFormDataChange={setCurrentFormData}
                                             onDraftSaved={handleDraftSaved}
                                         />
                                     </div>
@@ -540,7 +534,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                             onSubmit={handleSubmitAssignment}
                             initialData={assignmentInitialData}
                             onSaveDraft={assignmentFormRef}
-                            onFormDataChange={setCurrentFormData}
                             onDraftSaved={handleDraftSaved}
                         />
                     </div>
