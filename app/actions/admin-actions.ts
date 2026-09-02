@@ -7,6 +7,10 @@ import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
 import { revalidatePath } from "next/cache"
 import { toTitleCase } from "@/lib/utils/text-format"
 import { computeLessonDeadlineUTC, toVnMidnightUTC, computeCurrentDayOrder } from "@/lib/course/deadline"
+import { requireCourseAccessAction } from "@/lib/course/permissions"
+import { resolveCourseCategoryName } from "@/lib/course/category"
+import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
+import { formatCourseSaveError } from "@/lib/course/errors"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -1334,11 +1338,30 @@ export async function changeUserIdAction(prevState: any, formData: FormData) {
     } catch (e) { return { message: "Error: Lỗi hệ thống." } }
 }
 
-export async function getAdminCoursesAction() {
+/**
+ * Lấy danh sách khóa học cho trang quản trị.
+ * - Không truyền `options`: giữ hành vi mặc định cũ (ADMIN xem tất cả, TEACHER
+ *   chỉ xem của mình) — dùng ở những nơi cần đủ danh sách để lọc (vd trang Học viên).
+ * - Truyền `options.teacherId`: cho phép trang Quản lý khóa học chủ động chọn
+ *   phạm vi xem — 'SELF' (mặc định, kể cả ADMIN), 'ALL' (ADMIN xem hết), hoặc id
+ *   một GV cụ thể (chỉ ADMIN mới đổi được, TEACHER luôn bị ép về chính mình).
+ */
+export async function getAdminCoursesAction(options?: { teacherId?: number | 'ALL' | 'SELF' }) {
     try {
         const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
         const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
-        const where = isAdmin ? {} : { teacherId: userId }
+
+        let where: Record<string, any>
+        if (!options) {
+            where = isAdmin ? {} : { teacherId: userId }
+        } else if (options.teacherId === 'ALL') {
+            where = isAdmin ? {} : { teacherId: userId }
+        } else if (options.teacherId === undefined || options.teacherId === 'SELF') {
+            where = { teacherId: userId }
+        } else {
+            where = { teacherId: isAdmin ? options.teacherId : userId }
+        }
+
         const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
         return { success: true, courses, isAdmin, userId }
     } catch (error: any) { return { success: false, error: error.message } }
@@ -1384,12 +1407,7 @@ export async function bulkUpdateCoursesOptionsAction(
         if (options.requiresReferralActivation !== undefined) courseData.requiresReferralActivation = options.requiresReferralActivation
         if (options.categoryId !== undefined) {
             courseData.categoryId = options.categoryId
-            if (options.categoryId) {
-                const cat = await prisma.courseCategory.findUnique({ where: { id: options.categoryId } })
-                if (cat) courseData.category = cat.name
-            } else {
-                courseData.category = 'Khác'
-            }
+            courseData.category = await resolveCourseCategoryName(options.categoryId)
         }
 
         if (Object.keys(courseData).length > 0) {
@@ -1805,12 +1823,6 @@ export async function updateCourseAction(courseId: number, data: {
     requiresReferralActivation?: boolean,
     referralActivationThreshold?: number
 }) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
     try {
         // ✅ Check course tồn tại + quyền sửa (TEACHER chỉ sửa course của mình)
         const course = await prisma.course.findUnique({
@@ -1820,35 +1832,22 @@ export async function updateCourseAction(courseId: number, data: {
 
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
 
-        // ✅ Quyền sửa: ADMIN hoặc chính TEACHER sở hữu khóa học
-        const isTeacherOwner = session.user.role === Role.TEACHER && course.teacherId === userId
-        if (!isAdmin && !isTeacherOwner) {
-            return { success: false, error: "Bạn không có quyền sửa khóa học này" }
-        }
+        const { denied, ctx } = await requireCourseAccessAction(course.teacherId)
+        if (denied) return denied
+        const isAdmin = ctx!.isAdmin
 
         // ✅ Auto-resolve category name from categoryId
         if (data.categoryId !== undefined) {
-            if (data.categoryId) {
-                const cat = await prisma.courseCategory.findUnique({ where: { id: data.categoryId } })
-                if (cat) data.category = cat.name
-            } else {
-                data.category = 'Khác'
-            }
+            data.category = await resolveCourseCategoryName(data.categoryId)
         }
 
         // ✅ Only allow a maximum of 3 pinned courses across the catalog
         const isCurrentlyPinned = course.pin != null && course.pin > 0
         if (data.pin !== undefined && data.pin > 0 && !isCurrentlyPinned) {
-            const pinnedCount = await prisma.course.count({
-                where: {
-                    pin: { gt: 0 },
-                    id: { not: courseId }
-                }
-            })
-            if (pinnedCount >= 3) {
+            if (!(await canPinAnotherCourse(courseId))) {
                 return {
                     success: false,
-                    error: 'Chỉ được ghim tối đa 3 khóa học. Vui lòng bỏ ghim một khóa trước khi ghim khóa khác.'
+                    error: PIN_LIMIT_ERROR
                 }
             }
         }
@@ -1886,9 +1885,12 @@ export async function updateCourseAction(courseId: number, data: {
         courseData.courseCategory = categoryId
             ? { connect: { id: categoryId } }
             : { disconnect: true }
-        courseData.teacher = teacherIdVal
-            ? { connect: { id: teacherIdVal } }
-            : { disconnect: true }
+        // ✅ Chỉ ADMIN được đổi giáo viên phụ trách; TEACHER giữ nguyên chủ sở hữu
+        if (isAdmin) {
+            courseData.teacher = teacherIdVal
+                ? { connect: { id: teacherIdVal } }
+                : { disconnect: true }
+        }
         courseData.teacherBankAccount = bankAccountId
             ? { connect: { id: bankAccountId } }
             : { disconnect: true }
@@ -1923,7 +1925,7 @@ export async function updateCourseAction(courseId: number, data: {
         return { success: true, course: updatedCourse }
     } catch (error: any) {
         console.error("Update Course Error:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: formatCourseSaveError(error, data.id_khoa) }
     }
 }
 
@@ -1936,12 +1938,6 @@ export async function updateLessonAction(lessonId: string, data: {
     type?: any,
     isDailyChallenge?: boolean
 }) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
     try {
         const lesson = await prisma.lesson.findUnique({
             where: { id: lessonId },
@@ -1951,9 +1947,8 @@ export async function updateLessonAction(lessonId: string, data: {
         if (!lesson) return { success: false, error: "Không tìm thấy bài học" }
 
         // ✅ TEACHER chỉ được sửa bài học của khóa học mình dạy
-        if (!isAdmin && lesson.course.teacherId !== userId) {
-            return { success: false, error: "Bạn không có quyền sửa bài học này" }
-        }
+        const { denied } = await requireCourseAccessAction(lesson.course.teacherId)
+        if (denied) return denied
 
         const updatedLesson = await prisma.lesson.update({
             where: { id: lessonId },
@@ -1977,12 +1972,6 @@ export async function updateLessonAction(lessonId: string, data: {
 }
 
 export async function deleteLessonAction(lessonId: string) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
     try {
         const lesson = await prisma.lesson.findUnique({
             where: { id: lessonId },
@@ -1992,9 +1981,8 @@ export async function deleteLessonAction(lessonId: string) {
         if (!lesson) return { success: false, error: "Không tìm thấy bài học" }
 
         // ✅ TEACHER chỉ được xóa bài học của khóa học mình dạy
-        if (!isAdmin && lesson.course.teacherId !== userId) {
-            return { success: false, error: "Bạn không có quyền xóa bài học này" }
-        }
+        const { denied } = await requireCourseAccessAction(lesson.course.teacherId)
+        if (denied) return denied
 
         await prisma.lesson.delete({
             where: { id: lessonId }

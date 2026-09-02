@@ -106,7 +106,7 @@ export default function LibAccessPage({ params }: { params: Promise<{ id: string
             <MainHeader title="WHITELIST EMAIL" toolSlug="courses" />
             
             <div className="max-w-4xl mx-auto space-y-8 p-4 pb-32">
-                <Link href={`/tools/courses/${id}`} className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
+                <Link href={`/tools/courses/new?id=${id}`} className="inline-flex items-center gap-2 text-xs font-black text-gray-400 uppercase hover:text-purple-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" /> Quay lại cấu hình
                 </Link>
 

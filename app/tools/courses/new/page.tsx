@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus } from 'lucide-react'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
@@ -263,6 +263,8 @@ function CreateCourseContent() {
                 feeType,
                 voucherConfig,
                 allowMbvDeduction,
+                requiresReferralActivation,
+                referralActivationThreshold,
                 acceptedVoucherIds,
                 awardVoucherIds,
                 noidung_stk: noidungStk || null,
@@ -435,6 +437,14 @@ function CreateCourseContent() {
                                 <option value="LIB">Tài liệu (LIB)</option>
                                 <option value="SYS">Hệ thống (SYS)</option>
                             </select>
+                            {isEditMode && type === 'LIB' && (
+                                <Link
+                                    href={`/tools/courses/${courseId}/lib-access`}
+                                    className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-bold text-purple-600 hover:text-purple-700 hover:underline"
+                                >
+                                    <Mail className="w-3 h-3" /> Quản lý Whitelist Email
+                                </Link>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Trạng thái</label>
@@ -653,6 +663,12 @@ function CreateCourseContent() {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+                    )}
+                    {teacherBankAccounts.length === 0 && teacherId && (
+                        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-2xl text-xs text-yellow-700 font-bold">
+                            ⚠️ Giáo viên này chưa cấu hình tài khoản ngân hàng nào trên hệ thống.
+                            Vui lòng cấu hình tài khoản ngân hàng cho giáo viên này tại mục quản lý User hoặc Bank Accounts trước.
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-4">

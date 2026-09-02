@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
-import { auth } from '@/auth'
+import { requireCourseAccessApi } from '@/lib/course/permissions'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-        }
-
-        const isAdmin = session.user.role === 'ADMIN'
-        const userId = parseInt(session.user.id)
         const courseId = parseInt((await params).id)
 
         // ✅ Check course exists + permission
@@ -25,9 +18,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }
 
         // ✅ TEACHER only can add lesson to own course
-        if (!isAdmin && course.teacherId !== userId) {
-            return NextResponse.json({ error: "Bạn không có quyền" }, { status: 403 })
-        }
+        const { denied } = await requireCourseAccessApi(course.teacherId)
+        if (denied) return denied
 
         const body = await request.json()
         const { title, videoUrl, order, type, content, isDailyChallenge } = body

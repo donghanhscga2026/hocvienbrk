@@ -12,6 +12,10 @@ import { resolveBankBin } from "@/lib/bank-bin"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
 import { toTitleCase } from "@/lib/utils/text-format"
 import { computeLessonDeadlineUTC } from "@/lib/course/deadline"
+import { getCourseAuthContext, requireCourseAccessAction } from "@/lib/course/permissions"
+import { resolveCourseCategoryName } from "@/lib/course/category"
+import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
+import { formatCourseSaveError } from "@/lib/course/errors"
 
 /**
  * Đăng ký khóa học mới
@@ -780,11 +784,11 @@ export async function updateLastLessonAction(enrollmentId: number, lessonId: str
 // CREATE COURSE - Tạo khóa học mới (ADMIN + TEACHER)
 // ==========================================
 export async function createCourseAction(formData: FormData) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
+    const ctx = await getCourseAuthContext()
+    if (!ctx) return { success: false, error: "Unauthorized" }
+    if (!ctx.isAdmin && !ctx.isTeacher) return { success: false, error: "Bạn không có quyền tạo khóa học" }
 
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
+    const { isAdmin, userId } = ctx
 
     // ✅ Validate required fields
     const id_khoa = formData.get('id_khoa') as string
@@ -809,11 +813,7 @@ export async function createCourseAction(formData: FormData) {
         // ✅ Parse all 21 fields từ FormData
         const categoryIdStr = formData.get('categoryId') as string
         const categoryId = categoryIdStr ? parseInt(categoryIdStr) : null
-        let categoryName = 'Khác'
-        if (categoryId) {
-            const cat = await prisma.courseCategory.findUnique({ where: { id: categoryId } })
-            if (cat) categoryName = cat.name
-        }
+        const categoryName = await resolveCourseCategoryName(categoryId)
 
         const pin = parseInt(formData.get('pin') as string) || 0
         const courseData: Record<string, unknown> = {
@@ -842,13 +842,8 @@ export async function createCourseAction(formData: FormData) {
         }
  
         // ✅ Enforce a maximum of 3 pinned courses on course creation
-        if (pin > 0) {
-            const pinnedCount = await prisma.course.count({
-               where: { pin: { gt: 0 } }
-            })
-            if (pinnedCount >= 3) {
-               return { success: false, error: 'Chỉ được ghim tối đa 3 khóa học. Vui lòng bỏ ghim một khóa trước khi ghim khóa khác.' }
-            }
+        if (pin > 0 && !(await canPinAnotherCourse())) {
+            return { success: false, error: PIN_LIMIT_ERROR }
         }
 
             // ✅ Gán teacherId nếu có
@@ -928,7 +923,7 @@ export async function createCourseAction(formData: FormData) {
 
         return { success: true, course: newCourse, message: 'Đã tạo khóa học thành công!' }
     } catch (error: any) {
-        return { success: false, error: error.message || 'Lỗi khi tạo khóa học' }
+        return { success: false, error: formatCourseSaveError(error, id_khoa) }
     }
 }
 
@@ -936,12 +931,6 @@ export async function createCourseAction(formData: FormData) {
 // DELETE COURSE - Xóa khóa học (Check quyền)
 // ==========================================
 export async function deleteCourseAction(courseId: number) {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const userId = parseInt(session.user.id)
-
     try {
         // ✅ Check course tồn tại + quyền xóa
         const course = await prisma.course.findUnique({
@@ -951,10 +940,8 @@ export async function deleteCourseAction(courseId: number) {
 
         if (!course) return { success: false, error: "Không tìm thấy khóa học" }
 
-        // ✅ TEACHER chỉ được xóa course của mình
-        if (!isAdmin && course.teacherId !== userId) {
-            return { success: false, error: "Bạn không có quyền xóa khóa học này" }
-        }
+        const { denied } = await requireCourseAccessAction(course.teacherId)
+        if (denied) return denied
 
         // ✅ Xóa course (cascade xóa lessons, enrollments...)
         await prisma.course.delete({ where: { id: courseId } })
@@ -970,13 +957,9 @@ export async function deleteCourseAction(courseId: number) {
 // GET TEACHERS - Lấy danh sách TEACHER (cho ADMIN chọn)
 // ==========================================
 export async function getTeachersAction() {
-    const session = await auth()
-    if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-
-    const isAdmin = session.user.role === Role.ADMIN
-    const isTeacher = session.user.role === Role.TEACHER
-
-    if (!isAdmin && !isTeacher) return { success: false, error: "Unauthorized" }
+    const ctx = await getCourseAuthContext()
+    if (!ctx) return { success: false, error: "Unauthorized" }
+    if (!ctx.isAdmin && !ctx.isTeacher) return { success: false, error: "Unauthorized" }
 
     try {
         const teachers = await prisma.user.findMany({

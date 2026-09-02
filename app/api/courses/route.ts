@@ -1,42 +1,44 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
-import { Role } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { toTitleCase } from "@/lib/utils/text-format"
+import { getCourseAuthContext } from "@/lib/course/permissions"
+import { resolveCourseCategoryName } from "@/lib/course/category"
+import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
+import { formatCourseSaveError } from "@/lib/course/errors"
 
 /**
  * POST /api/courses - Tạo khóa học mới (ADMIN + TEACHER)
  */
 export async function POST(request: NextRequest) {
+    let body: any
     try {
-        const session = await auth()
-        if (!session?.user?.id) {
+        const ctx = await getCourseAuthContext()
+        if (!ctx) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
-
-        const userRole = session.user.role as Role
-        if (userRole !== Role.ADMIN && userRole !== Role.TEACHER) {
+        if (!ctx.isAdmin && !ctx.isTeacher) {
             return NextResponse.json({ error: "Forbidden: Cần quyền ADMIN hoặc TEACHER" }, { status: 403 })
         }
 
-        const body = await request.json()
-        
+        body = await request.json()
+
         // Validate required fields
         if (!body.id_khoa || !body.name_lop) {
             return NextResponse.json({ error: "Thiếu trường bắt buộc: id_khoa, name_lop" }, { status: 400 })
         }
 
         // TEACHER chỉ được tạo course với teacherId = chính mình
-        const teacherIdValue: number | undefined = userRole === Role.TEACHER 
-            ? Number(session.user.id) 
+        const teacherIdValue: number | undefined = ctx.isTeacher
+            ? ctx.userId
             : (body.teacherId ? Number(body.teacherId) : undefined)
 
-        let categoryName = body.category || 'Khác'
         const categoryId = body.categoryId ? Number(body.categoryId) : null
-        if (categoryId) {
-            const cat = await prisma.courseCategory.findUnique({ where: { id: categoryId } })
-            if (cat) categoryName = cat.name
+        const categoryName = await resolveCourseCategoryName(categoryId)
+
+        const pin = Number(body.pin) || 0
+        if (pin > 0 && !(await canPinAnotherCourse())) {
+            return NextResponse.json({ error: PIN_LIMIT_ERROR }, { status: 409 })
         }
 
         const courseData: any = {
@@ -47,7 +49,7 @@ export async function POST(request: NextRequest) {
             categoryId,
             type: body.type || 'NORMAL',
             status: body.status !== undefined ? body.status : true,
-            pin: Number(body.pin) || 0,
+            pin,
             date_join: body.date_join || null,
             mo_ta_ngan: body.mo_ta_ngan || null,
             mo_ta_dai: body.mo_ta_dai || null,
@@ -99,7 +101,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, course })
     } catch (error: any) {
         console.error('POST /api/courses error:', error)
-        return NextResponse.json({ error: error.message || "Lỗi tạo khóa học" }, { status: 500 })
+        const status = error?.code === 'P2002' ? 409 : 500
+        return NextResponse.json({ error: formatCourseSaveError(error, body?.id_khoa) }, { status })
     }
 }
 
@@ -108,29 +111,19 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
     try {
-        const session = await auth()
-        if (!session?.user?.id) {
+        const ctx = await getCourseAuthContext()
+        if (!ctx) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
-
-        const userRole = session.user.role as Role
-        const userId = Number(session.user.id)
-
-        let courses
-        if (userRole === Role.ADMIN) {
-            courses = await prisma.course.findMany({
-                orderBy: { id: 'desc' },
-                include: { teacher: { select: { id: true, name: true, email: true } } }
-            })
-        } else if (userRole === Role.TEACHER) {
-            courses = await prisma.course.findMany({
-                where: { teacherId: userId },
-                orderBy: { id: 'desc' },
-                include: { teacher: { select: { id: true, name: true, email: true } } }
-            })
-        } else {
+        if (!ctx.isAdmin && !ctx.isTeacher) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
+
+        const courses = await prisma.course.findMany({
+            where: ctx.isAdmin ? {} : { teacherId: ctx.userId },
+            orderBy: { id: 'desc' },
+            include: { teacher: { select: { id: true, name: true, email: true } } }
+        })
 
         return NextResponse.json({ courses })
     } catch (error: any) {
