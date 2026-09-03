@@ -649,13 +649,36 @@ export async function submitAssignmentAction({
 
         // 2. Lấy thông tin bài học + enrollment MỘT LẦN — dùng lại cho chấm điểm và thông báo Telegram bên dưới
         const [lesson, enrollmentInfo] = await Promise.all([
-            prisma.lesson.findUnique({ where: { id: lessonId }, select: { videoUrl: true, title: true } }),
+            prisma.lesson.findUnique({ where: { id: lessonId }, select: { videoUrl: true, title: true, order: true, courseId: true } }),
             prisma.enrollment.findUnique({
                 where: { id: enrollmentId },
-                select: { user: { select: { name: true, id: true } }, course: { select: { name_lop: true } } }
+                select: { user: { select: { name: true, id: true } }, course: { select: { name_lop: true, type: true } } }
             })
         ])
         if (!lesson) return { success: false, message: "Không tìm thấy bài học." }
+
+        // [FIX] Chặn nộp bài cho bài học CHƯA MỞ KHOÁ theo đúng thứ tự — trước
+        // đây điều kiện này (isLessonUnlocked) chỉ được kiểm tra ở LessonSidebar.tsx
+        // để disable nút bấm, không hề được xác minh lại ở server. Ai gọi thẳng
+        // action này (bỏ qua UI) vẫn được chấm điểm bình thường cho bài chưa tới
+        // lượt. Chỉ áp dụng cho khoá học loại CHALLENGE — khớp với logic mở khoá
+        // hiện có (LIB/NORMAL/SYS luôn mở, không giới hạn thứ tự).
+        if (enrollmentInfo?.course?.type === 'CHALLENGE' && lesson.order > 1) {
+            const prevLesson = await prisma.lesson.findUnique({
+                where: { courseId_order: { courseId: lesson.courseId, order: lesson.order - 1 } },
+                select: { id: true }
+            })
+            if (prevLesson) {
+                const prevProgress = await prisma.lessonProgress.findUnique({
+                    where: { enrollmentId_lessonId: { enrollmentId, lessonId: prevLesson.id } },
+                    select: { status: true, totalScore: true }
+                })
+                const prevUnlocked = prevProgress?.status === 'COMPLETED' && (prevProgress?.totalScore ?? 0) >= 5
+                if (!prevUnlocked) {
+                    return { success: false, message: "Bạn cần hoàn thành bài học trước đó (≥5đ) mới được nộp bài này." }
+                }
+            }
+        }
 
         // 3. Tính toán các đầu điểm
         const rawUrl = lesson.videoUrl ? String(lesson.videoUrl).trim() : ""
