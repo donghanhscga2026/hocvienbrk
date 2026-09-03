@@ -160,17 +160,11 @@ export default function CourseStatsTab({ members, lessons, labels }: {
                                                     </div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                                         {d.missingMembers.map(m => (
-                                                            <div key={m.id} className="flex items-center gap-2 bg-white border border-red-100 rounded-lg px-2.5 py-1.5">
-                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${m.memberRole === 'PS' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                                    {m.memberRole}
-                                                                </span>
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="text-xs font-bold text-gray-800 truncate">{m.user.name || `#${m.user.id}`}</div>
-                                                                    <div className="text-[10px] text-gray-400 truncate">
-                                                                        {teamLabel(m.team, labels)} · {groupLabel(m.team, m.group, labels)}
-                                                                        {m.user.phone && ` · ${localPhone(m.user.phone)}`}
-                                                                    </div>
-                                                                </div>
+                                                            <div key={m.id} className="flex items-center justify-between gap-2 bg-white border border-red-100 rounded-lg px-2.5 py-1.5">
+                                                                <span className="text-xs font-bold text-gray-800 truncate">{m.user.name || `#${m.user.id}`}</span>
+                                                                {m.user.phone && (
+                                                                    <span className="text-[11px] font-bold text-gray-500 shrink-0">{localPhone(m.user.phone)}</span>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
