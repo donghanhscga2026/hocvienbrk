@@ -2,12 +2,13 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { validatePasswordStrength } from "@/lib/password-policy"
+import { resolveUserForPasswordReset } from "@/lib/password-reset-lookup"
 
 export async function POST(request: Request) {
     try {
-        const { email, otp, newPassword } = await request.json()
+        const { email, studentId, otp, newPassword } = await request.json()
 
-        if (!email || !otp || !newPassword) {
+        if ((!email && !studentId) || !otp || !newPassword) {
             return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
         }
 
@@ -16,12 +17,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: passwordError }, { status: 400 })
         }
 
-        const normalizedEmail = email.toLowerCase().trim()
-        const user = await prisma.user.findFirst({
-            where: {
-                email: { equals: normalizedEmail, mode: 'insensitive' }
-            }
-        })
+        const user = await resolveUserForPasswordReset({ studentId, email })
         if (!user) {
             return NextResponse.json({ error: "Không tìm thấy tài khoản" }, { status: 404 })
         }

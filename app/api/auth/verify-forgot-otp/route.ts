@@ -1,29 +1,25 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { resolveUserForPasswordReset, rateLimitKeyFor } from "@/lib/password-reset-lookup"
 
 export async function POST(request: Request) {
     try {
-        const { email, otp } = await request.json()
+        const { email, studentId, otp } = await request.json()
 
-        if (!email || !otp) {
-            return NextResponse.json({ error: "Thiếu thông tin email hoặc mã OTP" }, { status: 400 })
+        if ((!email && !studentId) || !otp) {
+            return NextResponse.json({ error: "Thiếu thông tin tài khoản hoặc mã OTP" }, { status: 400 })
         }
 
         // OTP chỉ có 6 số — bắt buộc giới hạn số lần thử để chống dò brute-force
         const ip = getClientIp(request)
-        const byEmail = checkRateLimit(`verify-forgot-otp:email:${email}`, { max: 8, windowMs: 15 * 60 * 1000 })
+        const byIdentifier = checkRateLimit(`verify-forgot-otp:${rateLimitKeyFor({ studentId, email })}`, { max: 8, windowMs: 15 * 60 * 1000 })
         const byIp = checkRateLimit(`verify-forgot-otp:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 })
-        if (!byEmail.allowed || !byIp.allowed) {
+        if (!byIdentifier.allowed || !byIp.allowed) {
             return NextResponse.json({ error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút." }, { status: 429 })
         }
 
-        const normalizedEmail = email.toLowerCase().trim()
-        const user = await prisma.user.findFirst({
-            where: {
-                email: { equals: normalizedEmail, mode: 'insensitive' }
-            }
-        })
+        const user = await resolveUserForPasswordReset({ studentId, email })
         if (!user) {
             return NextResponse.json({ error: "Không tìm thấy tài khoản" }, { status: 404 })
         }

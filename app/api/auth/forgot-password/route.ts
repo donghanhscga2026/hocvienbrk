@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { sendGmail } from "@/lib/notifications"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
+import { resolveUserForPasswordReset, rateLimitKeyFor } from "@/lib/password-reset-lookup"
 
 function generateOTP(): string {
     return Math.floor(100000 + Math.random() * 900000).toString()
@@ -9,29 +10,24 @@ function generateOTP(): string {
 
 export async function POST(request: Request) {
     try {
-        const { email } = await request.json()
+        const { email, studentId } = await request.json()
 
-        if (!email) {
-            return NextResponse.json({ error: "Email là bắt buộc" }, { status: 400 })
+        if (!email && !studentId) {
+            return NextResponse.json({ error: "Thiếu thông tin tài khoản" }, { status: 400 })
         }
 
         // Chặn spam gửi OTP hàng loạt (tốn quota email + có thể dùng để enumerate tài khoản)
         const ip = getClientIp(request)
-        const byEmail = checkRateLimit(`forgot-password:email:${email.toLowerCase().trim()}`, { max: 3, windowMs: 15 * 60 * 1000 })
+        const byIdentifier = checkRateLimit(`forgot-password:${rateLimitKeyFor({ studentId, email })}`, { max: 3, windowMs: 15 * 60 * 1000 })
         const byIp = checkRateLimit(`forgot-password:ip:${ip}`, { max: 10, windowMs: 60 * 60 * 1000 })
-        if (!byEmail.allowed || !byIp.allowed) {
+        if (!byIdentifier.allowed || !byIp.allowed) {
             return NextResponse.json({ error: "Bạn yêu cầu quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
         }
 
-        const normalizedEmail = email.toLowerCase().trim()
-        const user = await prisma.user.findFirst({
-            where: {
-                email: { equals: normalizedEmail, mode: 'insensitive' }
-            }
-        })
+        const user = await resolveUserForPasswordReset({ studentId, email })
 
         if (!user) {
-            return NextResponse.json({ error: "Không tìm thấy tài khoản với email này" }, { status: 404 })
+            return NextResponse.json({ error: studentId ? "Không tìm thấy tài khoản" : "Không tìm thấy tài khoản với email này" }, { status: 404 })
         }
 
         const otp = generateOTP()
@@ -61,12 +57,12 @@ export async function POST(request: Request) {
             </div>
         `
 
-        const result = await sendGmail(email, "Mã xác minh đặt lại mật khẩu - Cộng đồng MBC", htmlBody)
+        const result = await sendGmail(user.email, "Mã xác minh đặt lại mật khẩu - Cộng đồng MBC", htmlBody)
 
         // Gửi thông báo Telegram về trạng thái gửi OTP quên mật khẩu
         try {
             const { sendOtpStatusNotification } = await import("@/lib/notifications")
-            await sendOtpStatusNotification(email, user.name || "Thành viên", otp, result.success, result.success ? undefined : result.message, user.id)
+            await sendOtpStatusNotification(user.email, user.name || "Thành viên", otp, result.success, result.success ? undefined : result.message, user.id)
         } catch (e) {
             console.error("Failed to send forgot-password OTP status notification:", e)
         }
@@ -76,7 +72,7 @@ export async function POST(request: Request) {
             const { logEmail } = await import("@/lib/email-logger")
             await logEmail({
                 userId: user.id,
-                email: email,
+                email: user.email,
                 type: 'forgot_password',
                 provider: result.provider || 'unknown',
                 status: result.success ? 'sent' : 'failed',
@@ -87,10 +83,10 @@ export async function POST(request: Request) {
             console.error("Failed to log forgot-password email:", e)
         }
 
-        return NextResponse.json({ 
-            success: true, 
+        return NextResponse.json({
+            success: true,
             message: "Mã xác minh đã được gửi đến email của bạn",
-            email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
+            email: user.email.replace(/(.{2})(.*)(@.*)/, '$1***$3')
         })
     } catch (error: any) {
         console.error("Forgot password error:", error)
