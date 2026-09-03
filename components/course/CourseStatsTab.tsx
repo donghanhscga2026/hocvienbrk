@@ -1,8 +1,8 @@
 'use client'
 
-import type { ReactNode } from 'react'
-import { Users, TrendingUp, BookOpen } from 'lucide-react'
-import { RosterMember, CourseMemberLabels, teamLabel, groupLabel } from './MemberRosterPanel'
+import { useState, type ReactNode } from 'react'
+import { Users, TrendingUp, BookOpen, ChevronDown, UserX } from 'lucide-react'
+import { RosterMember, CourseMemberLabels, teamLabel, groupLabel, localPhone } from './MemberRosterPanel'
 
 type Lesson = { id: string; order: number; title: string }
 
@@ -33,6 +33,7 @@ export default function CourseStatsTab({ members, lessons, labels }: {
     lessons: Lesson[]
     labels: CourseMemberLabels
 }) {
+    const [expandedDay, setExpandedDay] = useState<number | null>(null)
     const totalMembers = members.length
 
     const teamsWithPS = new Set(members.filter(m => m.memberRole === 'PS').map(m => m.team))
@@ -68,14 +69,15 @@ export default function CourseStatsTab({ members, lessons, labels }: {
     })()
 
     const dayStats = lessons.map(l => {
-        let onTime = 0, late = 0, missing = 0
+        let onTime = 0, late = 0
+        const missingMembers: RosterMember[] = []
         members.forEach(m => {
             const d = m.days.find(x => x.order === l.order)
             if (d?.status === 'onTime') onTime++
             else if (d?.status === 'late') late++
-            else missing++
+            else missingMembers.push(m)
         })
-        return { order: l.order, title: l.title, onTime, late, missing }
+        return { order: l.order, title: l.title, onTime, late, missing: missingMembers.length, missingMembers }
     })
 
     return (
@@ -121,22 +123,61 @@ export default function CourseStatsTab({ members, lessons, labels }: {
                             const onTimePct = (d.onTime / total) * 100
                             const latePct = (d.late / total) * 100
                             const missingPct = (d.missing / total) * 100
+                            const isExpanded = expandedDay === d.order
                             return (
-                                <div key={d.order} className="bg-white border border-gray-100 rounded-xl p-3">
-                                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                                        <span className="text-xs font-bold text-gray-700 truncate">Ngày {d.order} — {d.title}</span>
-                                        <span className="text-[10px] font-bold text-gray-400 shrink-0">{d.onTime + d.late}/{totalMembers} đã nộp</span>
-                                    </div>
-                                    <div className="flex w-full h-3 rounded-full overflow-hidden bg-gray-100">
-                                        {onTimePct > 0 && <div className="bg-emerald-500" style={{ width: `${onTimePct}%` }} />}
-                                        {latePct > 0 && <div className="bg-purple-500" style={{ width: `${latePct}%` }} />}
-                                        {missingPct > 0 && <div className="bg-red-300" style={{ width: `${missingPct}%` }} />}
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-1.5 text-[10px] font-bold text-gray-500">
-                                        <span className="text-emerald-600">Đúng hạn: {d.onTime}</span>
-                                        <span className="text-purple-600">Muộn: {d.late}</span>
-                                        <span className="text-red-500">Chưa nộp: {d.missing}</span>
-                                    </div>
+                                <div key={d.order} className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setExpandedDay(isExpanded ? null : d.order)}
+                                        className="w-full text-left p-3 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                            <span className="text-xs font-bold text-gray-700 truncate">Ngày {d.order} — {d.title}</span>
+                                            <span className="flex items-center gap-1.5 shrink-0">
+                                                <span className="text-[10px] font-bold text-gray-400">{d.onTime + d.late}/{totalMembers} đã nộp</span>
+                                                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                            </span>
+                                        </div>
+                                        <div className="flex w-full h-3 rounded-full overflow-hidden bg-gray-100">
+                                            {onTimePct > 0 && <div className="bg-emerald-500" style={{ width: `${onTimePct}%` }} />}
+                                            {latePct > 0 && <div className="bg-purple-500" style={{ width: `${latePct}%` }} />}
+                                            {missingPct > 0 && <div className="bg-red-300" style={{ width: `${missingPct}%` }} />}
+                                        </div>
+                                        <div className="flex items-center gap-3 mt-1.5 text-[10px] font-bold text-gray-500">
+                                            <span className="text-emerald-600">Đúng hạn: {d.onTime}</span>
+                                            <span className="text-purple-600">Muộn: {d.late}</span>
+                                            <span className="text-red-500">Chưa nộp: {d.missing}</span>
+                                        </div>
+                                    </button>
+                                    {isExpanded && (
+                                        <div className="border-t border-gray-100 bg-red-50/40 p-3">
+                                            {d.missingMembers.length === 0 ? (
+                                                <p className="text-[11px] text-gray-400 italic text-center py-2">Mọi người đã nộp bài ngày này 🎉</p>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-red-600 uppercase tracking-wider mb-2">
+                                                        <UserX className="w-3.5 h-3.5" /> Chưa nộp ({d.missingMembers.length})
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                        {d.missingMembers.map(m => (
+                                                            <div key={m.id} className="flex items-center gap-2 bg-white border border-red-100 rounded-lg px-2.5 py-1.5">
+                                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ${m.memberRole === 'PS' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                                    {m.memberRole}
+                                                                </span>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="text-xs font-bold text-gray-800 truncate">{m.user.name || `#${m.user.id}`}</div>
+                                                                    <div className="text-[10px] text-gray-400 truncate">
+                                                                        {teamLabel(m.team, labels)} · {groupLabel(m.team, m.group, labels)}
+                                                                        {m.user.phone && ` · ${localPhone(m.user.phone)}`}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })}
