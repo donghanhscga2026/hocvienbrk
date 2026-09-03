@@ -35,7 +35,7 @@ export type RosterMember = {
 
 type DisplayToggles = { role: boolean; code: boolean; phone: boolean }
 
-function localPhone(phone: string | null) {
+export function localPhone(phone: string | null) {
     if (!phone) return null
     return phone.startsWith('+84') ? '0' + phone.slice(3) : phone
 }
