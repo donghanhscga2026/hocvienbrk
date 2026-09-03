@@ -402,6 +402,13 @@ export async function confirmBulkEnrollAction(rows: PreviewRow[], courseId: numb
                         where: { id: row.userId },
                         data: { emailVerified: new Date() }
                     })
+
+                    // Import CSV bỏ qua luồng xác minh OTP thường (nơi quà tặng đăng ký
+                    // 386.386 MBV + điểm thưởng cho người giới thiệu vốn được cấp) —
+                    // gọi thẳng onEmailVerified ở đây để không bỏ sót cả 2 phần thưởng đó.
+                    const { onEmailVerified } = await import('@/lib/affiliate/points-manager')
+                    await onEmailVerified(row.userId)
+
                     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
                     let refLink = ''
                     if (row.referrerId) {
