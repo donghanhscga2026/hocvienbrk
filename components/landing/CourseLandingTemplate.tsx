@@ -8,8 +8,8 @@ import {
     Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2, ListChecks
 } from 'lucide-react'
 import { enrollInCourseAction, checkEnrollmentStatusAction } from '@/app/actions/course-actions'
-import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { useRouter } from 'next/navigation'
+import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import MainHeader from '@/components/layout/MainHeader'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
@@ -74,6 +74,7 @@ export default function CourseLandingTemplate({
     activeStudentCount
 }: CourseLandingTemplateProps) {
     const router = useRouter()
+    const { openAssistant } = useAccountAssistant()
     const [loading, setLoading] = useState(false)
     const [showAllLessons, setShowAllLessons] = useState(false)
     const [copied, setCopied] = useState(false)
@@ -125,7 +126,10 @@ export default function CourseLandingTemplate({
 
     const handleEnroll = async () => {
         if (!session) {
-            router.push(`/register?redirect=khoa-hoc/${course.id_khoa}`)
+            // Mở Modal Trợ lý tài khoản thay vì điều hướng sang /register để tránh
+            // 2 giao diện đăng ký khác nhau cùng lúc. Modal tự lưu URL hiện tại
+            // (originalUrl) nên đăng ký/đăng nhập xong sẽ quay lại đúng trang này.
+            openAssistant()
             return
         }
 

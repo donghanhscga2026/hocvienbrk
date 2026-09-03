@@ -2,11 +2,11 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { surveyQuestions } from '@/lib/survey-data'
 import { saveSurveyResultAction } from '@/app/actions/survey-actions'
 import { getActiveSurvey, getCoursesForBuilder } from '@/app/actions/roadmap-actions'
 import { notify } from '@/lib/notifications-client'
+import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import { Target, CheckCircle2, ChevronRight, Loader2, ArrowLeft, Play, Send, Sparkles, BookOpen } from 'lucide-react'
 
 function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => void }) {
@@ -29,7 +29,7 @@ function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => 
 }
 
 export default function Zero2HeroSurvey({ session, survey, onComplete }: { session?: any, survey?: any | null, onComplete?: () => void }) {
-    const router = useRouter()
+    const { openAssistant } = useAccountAssistant()
     
     // States
     const [flow, setFlow] = useState<any>(null)
@@ -328,14 +328,14 @@ export default function Zero2HeroSurvey({ session, survey, onComplete }: { sessi
                             Kết quả đã được lưu tạm! Hãy Đăng nhập/đăng ký tài khoản để lưu chính thức kết quả cá nhân bạn.
                         </p>
                         <div className="flex gap-2 sm:gap-3 justify-between max-w-md mx-auto">
-                            <button 
-                                onClick={() => router.push('/login')}
+                            <button
+                                onClick={openAssistant}
                                 className="flex-1 bg-brk-accent text-brk-on-primary px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wide hover:brightness-110 transition-all active:scale-95"
                             >
                                 Đăng nhập
                             </button>
-                            <button 
-                                onClick={() => router.push('/register')}
+                            <button
+                                onClick={openAssistant}
                                 className="flex-1 bg-brk-background text-brk-muted px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wide hover:bg-brk-surface transition-all active:scale-95 border border-brk-outline"
                             >
                                 Đăng ký

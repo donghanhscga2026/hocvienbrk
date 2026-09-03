@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 import { registerUser } from '@/app/actions/auth-actions'
 import { parsePhoneNumber } from 'libphonenumber-js'
-import { validatePasswordStrength } from '@/lib/password-policy'
+import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from '@/lib/password-policy'
 import { Loader2, Eye, EyeOff, X, CheckCircle2, PlayCircle, ArrowLeft } from 'lucide-react'
 import AgentAvatar from './AgentAvatar'
 import GuideVideoPopup from './GuideVideoPopup'
@@ -136,6 +136,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   const [showRegisterPassword, setShowRegisterPassword] = useState(false)
   const [registeredUserId, setRegisteredUserId] = useState<number | null>(null)
   const [guideVideo, setGuideVideo] = useState<{ url: string; title: string | null } | null>(null)
+  const [passwordFailCount, setPasswordFailCount] = useState(0)
+  const [showForgotPasswordHint, setShowForgotPasswordHint] = useState(false)
 
   const currentStep = steps.find(s => s.stepKey === step)
 
@@ -233,9 +235,33 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     }
   }, [step])
 
+  // Vào lại bước nhập mật khẩu từ đầu (sau khi tìm tài khoản khác) → reset đếm số lần sai
+  useEffect(() => {
+    if (step === 'login_password') {
+      setPasswordFailCount(0)
+      setShowForgotPasswordHint(false)
+    }
+  }, [step])
+
   const updateField = useCallback(<K extends keyof WizardData>(key: K, value: WizardData[K]) => {
     setData(prev => ({ ...prev, [key]: value }))
   }, [])
+
+  // Điều hướng sau đăng nhập/đăng ký bằng router (client-side), thay vì
+  // window.location.href gây full page reload — nhanh hơn, giữ trạng thái SPA.
+  // router.refresh() để các Server Component phụ thuộc session lấy lại cookie mới.
+  // Trước đây full reload "vô tình" dọn luôn Modal khỏi cây component — giờ điều
+  // hướng mềm thì phải tự đóng Modal, nếu không nó vẫn hiển thị dù đã xong việc.
+  const navigateAfterAuth = useCallback((url: string) => {
+    let path = url
+    try {
+      const parsed = new URL(url, window.location.origin)
+      path = parsed.pathname + parsed.search + parsed.hash
+    } catch {}
+    onClose()
+    router.push(path)
+    router.refresh()
+  }, [router, onClose])
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -249,9 +275,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         case 'action:check_student_id': handleCheckStudentId(); break
         case 'action:submit_login': handleLogin(); break
         case 'action:check_user': handleCheckUser(); break
-        case 'action:register_name': handleRegisterName(); break
-        case 'action:register_email': handleRegisterEmail(); break
-        case 'action:register_phone': handleRegisterPhone(); break
+        case 'action:register_info': handleRegisterInfo(); break
         case 'action:register_password': handleRegisterPassword(); break
         case 'action:register_confirm': handleRegisterConfirm(); break
         case 'action:verify_register_otp': handleVerifyRegisterOtp(); break
@@ -292,8 +316,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       const callbackUrl = data.originalUrl || '/'
       const result = await signIn('credentials', { identifier: data.studentId.trim(), password, redirect: false, callbackUrl })
       if (result?.error) {
-        let errorMsg = 'Đăng nhập thất bại. Vui lòng thử lại.'
-        let canRetryOrForgot = false
+        let errorType: string | null = null
 
         try {
           const errRes = await fetch('/api/auth/report-failed-login', {
@@ -301,47 +324,37 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             body: JSON.stringify({ identifier: data.studentId.trim(), password })
           })
           const errData = await errRes.json()
-          if (errData.errorType === 'INVALID_PASSWORD') {
-            errorMsg = 'Mật khẩu không chính xác.'
-            canRetryOrForgot = true
-          } else if (errData.errorType === 'NO_PASSWORD') {
-            errorMsg = 'Tài khoản này chưa thiết lập mật khẩu.'
-            canRetryOrForgot = true
-          }
+          errorType = errData.errorType
         } catch {}
 
-        /*
-        // OLD - Shared Account #2689 Fallback START
-        // Giữ lại code cũ fallback vào tài khoản chung để dùng khi cần
-        try { await fetch('/api/auth/report-failed-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: data.studentId.trim() }) }) } catch {}
-        const specialResult = await signIn('credentials', { identifier: '2689', password: 'Brk#2689', redirect: false })
-        if (specialResult?.ok) {
-          setError('Hãy kết bạn zalo với số điện thoại +84 876 473 257 để được hỗ trợ thêm!')
-          setTimeout(() => window.location.href = callbackUrl, 5000); return
+        if (errorType === 'INVALID_PASSWORD') {
+          const attempt = passwordFailCount + 1
+          setPasswordFailCount(attempt)
+          if (attempt === 1) {
+            // Sai lần đầu: chỉ nhắc kiểm tra lại, chưa vội gợi ý quên mật khẩu
+            setError('Mật khẩu không chính xác. Vui lòng kiểm tra lại mật khẩu đã lưu và nhập lại.')
+          } else {
+            // Sai từ lần 2: gợi ý đăng nhập bằng OTP thay vì đoán tiếp mật khẩu + làm nút đó nhấp nháy
+            setError('Mật khẩu không chính xác. Nếu bạn không chắc mật khẩu của mình, hãy bấm nút bên dưới để đăng nhập bằng mã OTP thay vì mật khẩu.')
+            setShowForgotPasswordHint(true)
+          }
+        } else if (errorType === 'NO_PASSWORD') {
+          // Tài khoản chưa có mật khẩu nào — thử lại vô ích, hướng dẫn thẳng luôn
+          setError('Tài khoản này chưa thiết lập mật khẩu. Hãy bấm nút bên dưới để đăng nhập bằng mã OTP.')
+          setShowForgotPasswordHint(true)
+        } else {
+          setError('Đăng nhập thất bại. Vui lòng thử lại.')
         }
-        setError('Mật khẩu không chính xác. Vui lòng thử lại.'); return
-        // OLD - Shared Account #2689 Fallback END
-        */
 
-        setError(errorMsg)
         setIsLoading(false)
-
-        if (canRetryOrForgot && data.email) {
-          // Thêm nút "Quên mật khẩu?" sau 1s để user có thể đặt lại qua OTP
-          setTimeout(() => {
-            if (confirm('Bạn có muốn đặt lại mật khẩu qua email không?')) {
-              handleSendOtp()
-            }
-          }, 500)
-        }
         return
       }
       const updatedSession = await update()
       const isUnverified = (updatedSession?.user as any)?.isUnverified
       if (isUnverified) {
         setSuccess('Đăng nhập thành công! Email của bạn chưa được xác minh.')
-        setTimeout(() => window.location.href = callbackUrl, 2000)
-      } else window.location.href = callbackUrl
+        setTimeout(() => navigateAfterAuth(callbackUrl), 2000)
+      } else navigateAfterAuth(callbackUrl)
     } catch { setError('Đã xảy ra lỗi không mong muốn.')
     } finally { setIsLoading(false) }
   }
@@ -358,30 +371,23 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       if (json.found) {
         updateField('studentId', json.id.toString()); updateField('email', json.email); updateField('phone', json.phone)
         goToStep('login_password')
-      } else goToStep('register_name')
+      } else goToStep('register_info')
     } catch { setError('Có lỗi xảy ra. Vui lòng thử lại.')
     } finally { setIsLoading(false) }
   }
 
-  // ─── REGISTER: Submit name ───
-  const handleRegisterName = () => {
+  // ─── REGISTER: Submit thông tin cơ bản (tên + email + SĐT) cùng lúc ───
+  // Gộp 3 bước cũ (register_name → register_email → register_phone) thành 1 bước
+  // duy nhất để giảm phễu đăng ký — mỗi bước rời rạc trước đây làm tăng tỷ lệ rớt.
+  const handleRegisterInfo = () => {
     if (!data.name.trim()) { setError('Vui lòng nhập họ tên của bạn'); return }
-    goToStep('register_email')
-  }
-
-  // ─── REGISTER: Submit email ───
-  const handleRegisterEmail = () => {
     const email = data.email.trim()
     if (!email) { setError('Vui lòng nhập địa chỉ email'); return }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Email không hợp lệ.'); return }
-    goToStep('register_phone')
-  }
-
-  // ─── REGISTER: Submit phone → go to password step ───
-  const handleRegisterPhone = () => {
+    if (!validateEmail(email)) { setError('Email không hợp lệ.'); return }
     const phoneRaw = data.phone.replace(/\s/g, '')
     if (!phoneRaw) { setError('Vui lòng nhập số điện thoại'); return }
     if (phoneRaw.length < 7) { setError('Số điện thoại không hợp lệ'); return }
+    updateField('email', email)
     goToStep('register_password')
   }
 
@@ -419,10 +425,10 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     const signInResult = await signIn('credentials', { identifier: registeredUserId.toString(), password: registerPassword, redirect: false })
     if (signInResult?.ok) {
       setSuccess(message)
-      setTimeout(() => window.location.href = data.originalUrl || '/', 1500)
+      setTimeout(() => navigateAfterAuth(data.originalUrl || '/'), 1500)
     } else {
       setError('Đăng nhập tự động thất bại.')
-      setTimeout(() => window.location.href = '/login', 2000)
+      setTimeout(() => navigateAfterAuth('/login'), 2000)
     }
   }
 
@@ -458,10 +464,17 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   const handleSendOtp = async () => {
     setIsLoading(true); setError(null)
     try {
-      const res = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: data.email }) })
+      // Gửi theo studentId (luôn đúng, không bao giờ bị che) thay vì data.email —
+      // vì khi tìm tài khoản qua SĐT/email (bước "check"), data.email chỉ là
+      // bản email đã che trả về từ /api/auth/check-user (vd. "ngu***@gmail.com"),
+      // dùng để tra cứu sẽ luôn báo "không tìm thấy tài khoản".
+      const res = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: data.studentId }) })
       const json = await res.json()
-      if (res.ok) { setSuccess('Mã OTP đã được gửi đến email của bạn'); goToStep('forgot_otp') }
-      else setError(json.error || 'Không thể gửi mã OTP')
+      if (res.ok) {
+        if (json.email) updateField('email', json.email)
+        setSuccess('Mã OTP đã được gửi đến email của bạn')
+        goToStep('forgot_otp')
+      } else setError(json.error || 'Không thể gửi mã OTP')
     } catch { setError('Có lỗi xảy ra khi gửi mã OTP')
     } finally { setIsLoading(false) }
   }
@@ -471,7 +484,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     if (!otp || otp.length !== 6) { setError('Vui lòng nhập mã OTP 6 số'); return }
     setIsLoading(true); setError(null)
     try {
-      const res = await fetch('/api/auth/verify-forgot-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: data.email, otp }) })
+      const res = await fetch('/api/auth/verify-forgot-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: data.studentId, otp }) })
       const json = await res.json()
       if (res.ok) {
         goToStep('forgot_new_password')
@@ -489,13 +502,13 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     if (newPassword !== confirmNewPassword) { setError('Mật khẩu mới không khớp xác nhận'); return }
     setIsLoading(true); setError(null)
     try {
-      const res = await fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: data.email, otp, newPassword }) })
+      const res = await fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: data.studentId, otp, newPassword }) })
       const json = await res.json()
       if (res.ok) {
         setSuccess('Đặt lại mật khẩu thành công! Đang đăng nhập...')
         const signInResult = await signIn('credentials', { identifier: data.studentId, password: newPassword, redirect: false })
-        if (signInResult?.ok) setTimeout(() => window.location.href = data.originalUrl || '/', 1500)
-        else setTimeout(() => window.location.href = '/login', 2000)
+        if (signInResult?.ok) setTimeout(() => navigateAfterAuth(data.originalUrl || '/'), 1500)
+        else setTimeout(() => navigateAfterAuth('/login'), 2000)
       } else setError(json.error || 'Không thể đặt lại mật khẩu')
     } catch { setError('Có lỗi xảy ra khi đặt lại mật khẩu')
     } finally { setIsLoading(false) }
@@ -523,6 +536,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             value={data.studentId}
             onChange={e => updateField('studentId', e.target.value.replace(/\D/g, ''))}
             placeholder="Nhập mã thành viên"
+            autoComplete="username"
             autoFocus
             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
           />
@@ -548,6 +562,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••"
+                autoComplete="current-password"
                 autoFocus
                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
               />
@@ -564,6 +579,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             value={data.contactQuery}
             onChange={e => updateField('contactQuery', e.target.value)}
             placeholder="Số điện thoại hoặc email"
+            autoComplete="username"
             autoFocus
             className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
           />
@@ -579,15 +595,42 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             <p className="text-xs text-brk-muted mt-3">Đang chuyển đến trang đăng nhập...</p>
           </div>
         )
-      case 'register_name':
+      case 'register_info':
         return (
           <>
             <input
               type="text"
               value={data.name}
               onChange={e => updateField('name', e.target.value)}
-              placeholder="Nguyễn Văn A"
+              placeholder="Họ và tên"
+              autoComplete="name"
               autoFocus
+              className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+            />
+            <input
+              type="email"
+              value={data.email}
+              onChange={e => updateField('email', e.target.value)}
+              placeholder="vi-du@gmail.com"
+              autoComplete="email"
+              onBlur={e => {
+                const trimmed = e.target.value.trim()
+                updateField('email', trimmed)
+                if (trimmed && !validateEmail(trimmed)) setError('Email không hợp lệ.')
+                else clearError()
+              }}
+              className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+            />
+            <div className="flex items-center gap-2 -mb-1.5">
+              <label className="block text-sm font-medium text-brk-on-surface">Mã quốc gia:</label>
+              <span className="text-sm font-bold text-brk-primary">{data.countryCode}</span>
+            </div>
+            <input
+              type="tel"
+              value={data.phone}
+              onChange={e => onPhoneChange(e.target.value)}
+              placeholder={data.countryCode === '+84' ? '912345678' : 'Số điện thoại'}
+              autoComplete="tel-national"
               className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
             />
             <div>
@@ -606,40 +649,6 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             </div>
           </>
         )
-      case 'register_email':
-        return (
-          <input
-            type="email"
-            value={data.email}
-            onChange={e => updateField('email', e.target.value)}
-            placeholder="vi-du@gmail.com"
-            autoFocus
-            onBlur={e => {
-              const trimmed = e.target.value.trim()
-              updateField('email', trimmed)
-              if (trimmed && !validateEmail(trimmed)) setError('Email không hợp lệ.')
-              else clearError()
-            }}
-            className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
-          />
-        )
-      case 'register_phone':
-        return (
-          <>
-            <div className="flex items-center gap-2 mb-1.5">
-              <label className="block text-sm font-medium text-brk-on-surface">Mã quốc gia:</label>
-              <span className="text-sm font-bold text-brk-primary">{data.countryCode}</span>
-            </div>
-            <input
-              type="tel"
-              value={data.phone}
-              onChange={e => onPhoneChange(e.target.value)}
-              placeholder={data.countryCode === '+84' ? '912345678' : 'Số điện thoại'}
-              autoFocus
-              className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
-            />
-          </>
-        )
       case 'register_password':
         return (
           <>
@@ -648,7 +657,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
                 type={showRegisterPassword ? 'text' : 'password'}
                 value={registerPassword}
                 onChange={e => setRegisterPassword(e.target.value)}
-                placeholder="Ít nhất 8 ký tự, chữ hoa, số, ký tự đặc biệt"
+                placeholder="Mật khẩu"
+                autoComplete="new-password"
                 autoFocus
                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
               />
@@ -657,7 +667,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
               </button>
             </div>
             <p className="text-[10px] text-brk-accent italic text-center">
-              Cần đáp ứng: ≥ 8 ký tự, chữ Hoa, chữ thường, số và ký tự đặc biệt (VD: Mbc$9319)
+              {PASSWORD_POLICY_MESSAGE}
             </p>
           </>
         )
@@ -691,6 +701,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
               value={otp}
               onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="000000"
+              autoComplete="one-time-code"
+              inputMode="numeric"
               autoFocus
               className="w-full text-center text-2xl font-mono tracking-[0.5em] rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
             />
@@ -748,6 +760,8 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
               value={otp}
               onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
               placeholder="000000"
+              autoComplete="one-time-code"
+              inputMode="numeric"
               autoFocus
               className="w-full text-center text-2xl font-mono tracking-[0.5em] rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
             />
@@ -757,12 +771,13 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
         return (
           <>
             <div className="relative">
-              <input type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nhập mật khẩu mới" autoFocus className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary" />
+              <input type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nhập mật khẩu mới" autoComplete="new-password" autoFocus className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 pr-10 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary" />
               <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-brk-muted hover:text-brk-on-surface">
                 {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
-            <input type={showNewPassword ? 'text' : 'password'} value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Nhập lại mật khẩu mới" className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary" />
+            <p className="text-[10px] text-brk-accent italic text-center">{PASSWORD_POLICY_MESSAGE}</p>
+            <input type={showNewPassword ? 'text' : 'password'} value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Nhập lại mật khẩu mới" autoComplete="new-password" className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary" />
           </>
         )
       default:
@@ -876,12 +891,19 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
                 )
               }
 
+              const isForgotPasswordBtn = opt.action === 'action:send_otp'
+              const highlight = isForgotPasswordBtn && showForgotPasswordHint
+
               return (
                 <button
                   key={opt.action}
                   onClick={() => handleAction(opt.action)}
                   disabled={isLoadingBtn}
-                  className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-sm text-brk-muted hover:text-brk-on-surface hover:border-brk-primary transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className={`w-full rounded-xl border px-4 py-3 text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    highlight
+                      ? 'border-brk-primary bg-brk-primary/10 text-brk-primary font-bold animate-pulse ring-2 ring-brk-primary shadow-lg shadow-brk-primary/30'
+                      : 'border-brk-outline bg-brk-background/5 text-brk-muted hover:text-brk-on-surface hover:border-brk-primary'
+                  }`}
                 >
                   {isLoadingBtn ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   {opt.label}

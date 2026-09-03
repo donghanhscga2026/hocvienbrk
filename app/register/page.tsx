@@ -8,6 +8,7 @@ import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2, MessageCircle } from "
 import { signIn } from "next-auth/react"
 import { registerUser } from "../actions/auth-actions"
 import { COUNTRY_CODES } from "@/lib/country-codes"
+import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy"
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 import { useEmailPrefill } from "@/hooks/useEmailPrefill"
 
@@ -565,6 +566,7 @@ function RegisterForm() {
                                 <input
                                     {...register("name", { required: "Vui lòng nhập họ tên" })}
                                     type="text"
+                                    autoComplete="name"
                                     placeholder="Nguyễn Văn A"
                                     className="block w-full rounded-md border border-brk-outline px-3 py-2 shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary text-sm"
                                 />
@@ -687,6 +689,7 @@ function RegisterForm() {
                                         }
                                     })}
                                     type="tel"
+                                    autoComplete="tel-national"
                                     placeholder={countryCode === "+84" ? "912..." : "SĐT"}
                                     className="block w-full rounded-md border border-brk-outline px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary"
                                 />
@@ -707,20 +710,10 @@ function RegisterForm() {
                                 <input
                                     {...register("password", {
                                         required: "Vui lòng nhập mật khẩu",
-                                        minLength: { value: 8, message: "Mật khẩu phải có ít nhất 8 ký tự" },
-                                        validate: (value) => {
-                                            const hasUpperCase = /[A-Z]/.test(value);
-                                            const hasLowerCase = /[a-z]/.test(value);
-                                            const hasNumber = /[0-9]/.test(value);
-                                            const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(value);
-                                            
-                                            if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
-                                                return "Mật khẩu cần: 1 chữ Hoa, 1 chữ thường, 1 số và 1 ký tự đặc biệt";
-                                            }
-                                            return true;
-                                        }
+                                        validate: (value) => validatePasswordStrength(value) ?? true
                                     })}
                                     type={showPassword ? "text" : "password"}
+                                    autoComplete="new-password"
                                     placeholder="******"
                                     className="mt-1 block w-full rounded-md border border-brk-outline px-3 py-2 pr-10 shadow-sm focus:border-brk-primary focus:outline-none focus:ring-brk-primary text-sm"
                                 />
@@ -733,7 +726,7 @@ function RegisterForm() {
                                 </button>
                             </div>
                             <p className="mt-1 text-[10px] text-brk-accent italic">
-                                Để bảo mật tốt hơn, cần đáp ứng: ≥ 8 ký tự, đủ chữ Hoa, chữ thường, số và ký tự đặc biệt (VD: Brk$9319)
+                                {PASSWORD_POLICY_MESSAGE}
                             </p>
                             {errors.password && (
                                 <p className="mt-1 text-xs text-brk-accent font-medium">{errors.password.message}</p>
