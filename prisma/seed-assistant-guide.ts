@@ -5,11 +5,11 @@ const prisma = new PrismaClient()
 const guides = [
   {
     pagePath: '/',
-    title: 'Chào mừng đến với MBC',
-    script: 'Chào mừng bạn đến với Cộng đồng MBC - Ngân hàng Phước Báu. Tôi là trợ lý ảo của bạn. Tại đây, bạn có thể khám phá các khóa học, theo dõi lộ trình phát triển bản thân và kết nối với cộng đồng. Hãy bắt đầu hành trình của bạn ngay hôm nay!',
-    textContent: `Chào mừng bạn đến với Cộng đồng MBC!
+    title: 'Chào mừng đến với MFC',
+    script: 'Chào mừng bạn đến với Cộng đồng MFC - Dòng chảy Phước Báu. Tôi là trợ lý ảo của bạn. Tại đây, bạn có thể khám phá các khóa học, theo dõi lộ trình phát triển bản thân và kết nối với cộng đồng. Hãy bắt đầu hành trình của bạn ngay hôm nay!',
+    textContent: `Chào mừng bạn đến với Cộng đồng MFC!
 
-MBC - Ngân hàng Phước Báu là nền tảng đào tạo trực tuyến, nơi bạn có thể:
+MFC - Dòng chảy Phước Báu là nền tảng đào tạo trực tuyến, nơi bạn có thể:
 • Khám phá các khóa học đa dạng về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính - Kinh doanh - Đầu tư và Công nghệ AI
 • Theo dõi lộ trình phát triển cá nhân
 • Kết nối với cộng đồng thành viên

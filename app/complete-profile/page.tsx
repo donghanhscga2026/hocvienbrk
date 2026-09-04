@@ -142,7 +142,7 @@ function CompleteProfileContent() {
                         Hoàn tất hồ sơ
                     </h2>
                     <p className="text-sm text-brk-muted">
-                        Vui lòng bổ sung thông tin để bắt đầu trải nghiệm Cộng đồng MBC
+                        Vui lòng bổ sung thông tin để bắt đầu trải nghiệm Cộng đồng MFC
                     </p>
                 </div>
 
@@ -343,7 +343,7 @@ function CompleteProfileContent() {
                 </form>
 
                 <p className="text-center text-xs text-brk-muted mt-6 italic">
-                    Bằng cách nhấn hoàn tất, bạn đồng ý với điều khoản sử dụng của Cộng đồng MBC.
+                    Bằng cách nhấn hoàn tất, bạn đồng ý với điều khoản sử dụng của Cộng đồng MFC.
                 </p>
             </div>
         </div>

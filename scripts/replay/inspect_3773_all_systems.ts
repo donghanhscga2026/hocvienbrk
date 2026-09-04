@@ -29,9 +29,9 @@ async function main() {
     totalPoints: Number(sys1.totalPoints)
   } : "Không tồn tại")
 
-  // 4. System 4 (MB - Ngân hàng phước báu)
+  // 4. System 4 (MB - Dòng chảy phước báu)
   const sys4 = await prisma.system.findUnique({ where: { userId_onSystem: { userId, onSystem: 4 } } })
-  console.log("\nSystem #4 (MB - Ngân hàng phước báu):", sys4 ? {
+  console.log("\nSystem #4 (MB - Dòng chảy phước báu):", sys4 ? {
     autoId: sys4.autoId,
     level: sys4.level,
     totalPoints: Number(sys4.totalPoints)

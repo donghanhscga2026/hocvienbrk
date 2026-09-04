@@ -47,8 +47,8 @@ export default function MessageCard({
     
     // Xác định tiêu đề hiển thị theo yêu cầu mới
     // Dòng 1 = title field, Dòng 2 = subtitle field, Dòng 3 = greeting động
-    const displayLine1 = isDefault ? 'MBC' : (profile.title || 'MBC')
-    const displayLine2 = isDefault ? 'NGÂN HÀNG PHƯỚC BÁU' : (profile.subtitle || '')
+    const displayLine1 = isDefault ? 'MFC' : (profile.title || 'MFC')
+    const displayLine2 = isDefault ? 'DÒNG CHẢY PHƯỚC BÁU' : (profile.subtitle || '')
     const subtitle = profile.subtitle || 'Mến chào bạn hữu đường xa!' // Giữ để dùng cho fallback
     const messageContent = messageContentProp ?? profile.messageContent ?? 'Học hôm nay, thành công ngày mai'
     const messageDetail = profile.messageDetail || 'Tri thức thực chiến giúp bạn phát triển bản thân và sự nghiệp.'
@@ -261,7 +261,7 @@ export default function MessageCard({
                                 {messageDetail}
                             </div>
                             <p className="text-brk-muted text-[11px] text-center pt-2 italic tracking-widest">
-                                💡 {isDefault ? 'CỘNG ĐỒNG MBC - NGÂN HÀNG PHƯỚC BÁU' : displayLine1?.toUpperCase()}
+                                💡 {isDefault ? 'CỘNG ĐỒNG MFC - DÒNG CHẢY PHƯỚC BÁU' : displayLine1?.toUpperCase()}
                             </p>
                         </div>
 

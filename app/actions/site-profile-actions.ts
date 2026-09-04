@@ -118,7 +118,7 @@ export async function getMySiteProfile(userId: number) {
 }
 
 /**
- * Lấy MBC default profile
+ * Lấy MFC default profile
  * [OPTIMIZE] Đây là dữ liệu nền cho trang chủ — trang được xem nhiều nhất hệ
  * thống — nhưng gần như không đổi giữa các lượt truy cập. Cache 10 phút, làm
  * mới ngay khi admin lưu profile (xem revalidateTag('site-profile') trong

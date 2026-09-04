@@ -92,7 +92,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                             <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
                                 <Image
                                     src="/logobrk-50px.png"
-                                    alt="MBC Logo"
+                                    alt="MFC Logo"
                                     width={120}
                                     height={40}
                                     priority
@@ -180,7 +180,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                                 <button
                                     onClick={openMbw}
                                     className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
-                                    title="Ví MBW — Ngân hàng Phước Báu"
+                                    title="Ví MBW — Dòng chảy Phước Báu"
                                 >
                                     <Wallet className="w-6 h-6 text-brk-primary" />
                                 </button>
@@ -198,7 +198,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                 <ShareModal
                     isOpen={showShare}
                     onClose={() => setShowShare(false)}
-                    course={{ id_khoa: '', name_lop: 'Trang cá nhân - Cộng đồng MBC' }}
+                    course={{ id_khoa: '', name_lop: 'Trang cá nhân - Cộng đồng MFC' }}
                     affiliateCode={userId}
                     profileSlug={isHomePage ? null : (hasCustomHome ? homeSlug : null)}
                     shareType="header"

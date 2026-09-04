@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
     // (domain vẫn phải khớp remotePatterns nên không mở rộng rủi ro); production
     // (Vercel) giữ nguyên vì không gặp lỗi này.
     dangerouslyAllowLocalIP: process.env.NODE_ENV !== 'production',
-    unoptimized: false,
+    unoptimized: true,
     // Các mức quality được phép
     qualities: [50, 60, 70, 75, 80, 85, 90],
 

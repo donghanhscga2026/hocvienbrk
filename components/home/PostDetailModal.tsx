@@ -52,7 +52,7 @@ export default function PostDetailModal({ postId, onClose }: PostDetailModalProp
                 <div className="bg-black p-5 text-white flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center text-black font-black">
-                            MBC
+                            MFC
                         </div>
                         <div>
                             <h3 className="font-black text-xs uppercase tracking-widest text-yellow-400">Bảng tin cộng đồng</h3>

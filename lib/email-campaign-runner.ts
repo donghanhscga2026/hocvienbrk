@@ -235,7 +235,7 @@ export async function sendGmailFromSender(
   });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-  const fromName = 'Cộng đồng MBC';
+  const fromName = 'Cộng đồng MFC';
 
   const encodeHeader = (str: string) => { 
     if (!str) return ""; 
@@ -348,7 +348,7 @@ export async function sendViaBrevo(
     subject,
     htmlContent: html,
     sender: {
-      name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Cộng đồng MBC',
+      name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Cộng đồng MFC',
       email: sender.email || process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com',
     },
     tags: [],
@@ -1003,9 +1003,9 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
           <div style="background-color: #000000; padding: 30px; text-align: center;">
             <a href="https://giautoandien.io.vn" style="text-decoration: none;">
-              <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MBC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
+              <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MFC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
             </a>
-            <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">NGÂN HÀNG PHƯỚC BÁU</div>
+            <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">DÒNG CHẢY PHƯỚC BÁU</div>
           </div>
           <div style="padding: 40px 30px; background-color: #ffffff;">
             <div style="font-size: 16px; color: #333333;">
@@ -1014,7 +1014,7 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
           </div>
           <div style="padding: 30px; background-color: #f9f9f9; border-top: 1px solid #eeeeee; text-align: center;">
             <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
-              Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MBC</b>.<br>
+              Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MFC</b>.<br>
               Nếu không muốn nhận những email này, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">Hủy đăng ký tại đây</a>.
             </p>
           </div>

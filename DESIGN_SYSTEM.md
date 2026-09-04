@@ -1,4 +1,4 @@
-# HỆ THỐNG THIẾT KẾ (DESIGN SYSTEM) - CỘNG ĐỒNG MBC
+# HỆ THỐNG THIẾT KẾ (DESIGN SYSTEM) - CỘNG ĐỒNG MFC
 
 Tài liệu này lưu trữ các thông số kỹ thuật về giao diện (UI) của dự án. Mọi thay đổi trong code sẽ được cập nhật đồng bộ vào đây.
 
@@ -24,8 +24,8 @@ Tài liệu này lưu trữ các thông số kỹ thuật về giao diện (UI) 
 
 | Thành phần | Font & Kích thước | Màu sắc | Hiệu ứng & Vị trí |
 | :--- | :--- | :--- | :--- |
-| **Tiêu đề chính** | `text-3xl/5xl/6xl`, `font-black` | `white` (Opacity 90%) | "CỘNG ĐỒNG MBC" - Dòng trên, VIẾT HOA. |
-| **Tiêu đề phụ** | `text-2xl/4xl/5xl`, `font-black` | `yellow-400` (Glow) | "NGÂN HÀNG PHƯỚC BÁU" - Dòng dưới, VIẾT HOA. |
+| **Tiêu đề chính** | `text-3xl/5xl/6xl`, `font-black` | `white` (Opacity 90%) | "CỘNG ĐỒNG MFC" - Dòng trên, VIẾT HOA. |
+| **Tiêu đề phụ** | `text-2xl/4xl/5xl`, `font-black` | `yellow-400` (Glow) | "DÒNG CHẢY PHƯỚC BÁU" - Dòng dưới, VIẾT HOA. |
 | **Hiệu ứng Glow** | N/A | Vàng Lóe Sáng | Hiệu ứng 3D huyền bí, lóe sáng liên tục. |
 | **Khoảng cách** | `gap-6` | N/A | Khoảng cách giữa 2 dòng tiêu đề. |
 

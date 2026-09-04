@@ -954,7 +954,7 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-brk-outline/10">
-          <p className="text-[10px] text-brk-muted text-center">MBC - Ngân hàng Phước Báu</p>
+          <p className="text-[10px] text-brk-muted text-center">MFC - Dòng chảy Phước Báu</p>
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import { Dictionary } from './types';
 
 export const vi: Dictionary = {
   common: {
-    appName: 'Cộng đồng MBC',
+    appName: 'Cộng đồng MFC',
     save: 'Lưu',
     cancel: 'Hủy',
     apply: 'Áp dụng',

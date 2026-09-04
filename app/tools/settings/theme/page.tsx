@@ -424,7 +424,7 @@ export default function ThemeSettingsPage() {
               >
                 B
               </div>
-              <span className="font-bold" style={{ color: colors.onSurface }}>Cộng đồng MBC</span>
+              <span className="font-bold" style={{ color: colors.onSurface }}>Cộng đồng MFC</span>
               <nav className="ml-auto flex gap-4 text-sm" style={{ color: colors.primary }}>
                 Trang chủ
               </nav>

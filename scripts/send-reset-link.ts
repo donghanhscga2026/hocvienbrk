@@ -71,7 +71,7 @@ async function run() {
 
     const htmlBody = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #f97316;">CỘNG ĐỒNG MBC - KHÔI PHỤC MẬT KHẨU</h2>
+            <h2 style="color: #f97316;">CỘNG ĐỒNG MFC - KHÔI PHỤC MẬT KHẨU</h2>
             <p>Xin chào <b>${user.name}</b>,</p>
             <p>Theo yêu cầu của bạn, đây là liên kết để đặt lại mật khẩu cho tài khoản học viên của bạn. Vui lòng bấm vào nút bên dưới để tiến hành đổi mật khẩu mới:</p>
             
@@ -87,7 +87,7 @@ async function run() {
         </div>
     `
 
-    const result = await sendGmail(user.email, "Liên kết khôi phục mật khẩu - Cộng đồng MBC", htmlBody)
+    const result = await sendGmail(user.email, "Liên kết khôi phục mật khẩu - Cộng đồng MFC", htmlBody)
     
     if (result.success) {
         console.log(`✅ Email sent successfully to ${user.email}`)

@@ -6,11 +6,11 @@ async function seedMessages() {
   console.log('📁 Seeding Messages...')
 
   const messages = [
-    { content: 'Học hôm nay, thành công ngày mai', detail: 'MBC mang đến những tri thức thực chiến giúp bạn phát triển bản thân và xây dựng sự nghiệp.' },
+    { content: 'Học hôm nay, thành công ngày mai', detail: 'MFC mang đến những tri thức thực chiến giúp bạn phát triển bản thân và xây dựng sự nghiệp.' },
     { content: 'Đầu tư vào tri thức là đầu tư sinh lợi nhất', detail: 'Mỗi ngày học một điều mới là mỗi ngày bạn đang xây dựng tương lai vững chắc.' },
     { content: 'Thành công không phải đích đến, mà là hành trình', detail: 'Hãy tận hưởng từng bước đi trên con đường phát triển bản thân.' },
-    { content: 'Tri thức là sức mạnh - Nâng tầm năng lực thực chiến', detail: 'MBC đồng hành cùng bạn trên con đường chinh phục tri thức và kiến tạo giá trị.' },
-    { content: 'Kết nối - Chia sẻ - Phát triển', detail: 'Cùng nhau học tập, cùng nhau lớn mạnh trong cộng đồng MBC.' },
+    { content: 'Tri thức là sức mạnh - Nâng tầm năng lực thực chiến', detail: 'MFC đồng hành cùng bạn trên con đường chinh phục tri thức và kiến tạo giá trị.' },
+    { content: 'Kết nối - Chia sẻ - Phát triển', detail: 'Cùng nhau học tập, cùng nhau lớn mạnh trong cộng đồng MFC.' },
   ]
 
   for (const msg of messages) {
@@ -24,7 +24,7 @@ async function seedPostCategories() {
   console.log('📁 Seeding PostCategories...')
 
   const categories = [
-    { name: 'Thông báo', slug: 'thong-bao', description: 'Thông báo từ Cộng đồng MBC', order: 1 },
+    { name: 'Thông báo', slug: 'thong-bao', description: 'Thông báo từ Cộng đồng MFC', order: 1 },
     { name: 'Chia sẻ', slug: 'chia-se', description: 'Bài viết chia sẻ từ cộng đồng', order: 2 },
   ]
 
@@ -49,10 +49,10 @@ async function seedPosts() {
 
   const posts = [
     {
-      title: 'Chào mừng bạn đến với Cộng đồng MBC',
-      content: `Chào mừng bạn đến với Cộng đồng MBC - Ngân hàng Phước Báu!
+      title: 'Chào mừng bạn đến với Cộng đồng MFC',
+      content: `Chào mừng bạn đến với Cộng đồng MFC - Dòng chảy Phước Báu!
 
-Đây là nơi chúng ta cùng nhau học tập, chia sẻ và phát triển. MBC cam kết mang đến những giá trị thực chiến nhất giúp bạn nâng tầm năng lực và kiến tạo thành công.
+Đây là nơi chúng ta cùng nhau học tập, chia sẻ và phát triển. MFC cam kết mang đến những giá trị thực chiến nhất giúp bạn nâng tầm năng lực và kiến tạo thành công.
 
 Hãy bắt đầu hành trình của bạn ngay hôm nay!`,
       published: true,
@@ -62,7 +62,7 @@ Hãy bắt đầu hành trình của bạn ngay hôm nay!`,
     },
     {
       title: 'Hướng dẫn sử dụng các công cụ học tập',
-      content: `Cộng đồng MBC cung cấp đầy đủ các công cụ hỗ trợ học tập:
+      content: `Cộng đồng MFC cung cấp đầy đủ các công cụ hỗ trợ học tập:
 
 1. 📹 YouTube Tools - Quản lý video học tập
 2. 📧 Email MKT - Tiếp thị qua email
@@ -76,8 +76,8 @@ Hãy khám phá tất cả công cụ tại mục "Công cụ" trên thanh đi�
       categoryId: category?.id || null,
     },
     {
-      title: 'Cộng đồng MBC - Kết nối và phát triển',
-      content: `Cộng đồng MBC là nơi hội tụ những người cùng chí hướng, cùng nhau học tập và phát triển.
+      title: 'Cộng đồng MFC - Kết nối và phát triển',
+      content: `Cộng đồng MFC là nơi hội tụ những người cùng chí hướng, cùng nhau học tập và phát triển.
 
 Tại đây, bạn có thể:
 • 🤝 Kết nối với các thành viên khác
@@ -140,7 +140,7 @@ async function seedSurvey() {
         id: 'q1',
         type: 'questionNode',
         position: { x: 400, y: 50 },
-        data: { label: 'Bạn muốn học để làm gì?', type: 'CHOICE', description: 'Xác định hướng đi chính của bạn tại Cộng đồng MBC.' },
+        data: { label: 'Bạn muốn học để làm gì?', type: 'CHOICE', description: 'Xác định hướng đi chính của bạn tại Cộng đồng MFC.' },
       },
       {
         id: 'opt_q1_branding',
@@ -214,7 +214,7 @@ async function seedSurvey() {
 
   await prisma.survey.create({
     data: {
-      name: 'Khảo sát định hướng MBC',
+      name: 'Khảo sát định hướng MFC',
       description: 'Bài khảo sát giúp xác định lộ trình học tập phù hợp với bạn',
       flow: JSON.parse(JSON.stringify(flow)),
       isActive: true,

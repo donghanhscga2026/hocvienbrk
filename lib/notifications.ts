@@ -18,13 +18,13 @@ import { sendTransactionalEmail } from "@/lib/brevo";
 
 // Random subject lines cho verification email (7 biến thể)
 const verificationSubjects = [
-  '[Cộng đồng MBC] Xác minh tài khoản của bạn',
-  '[Cộng đồng MBC] Kích hoạt tài khoản ngay',
-  '[Cộng đồng MBC] Hoàn tất đăng ký - Xác nhận email của bạn',
-  '[Cộng đồng MBC] Verify your account để bắt đầu học',
-  'Xác nhận đăng ký thành công - Cộng đồng MBC',
-  '[Cộng đồng MBC] Chào mừng! Xác minh email để tiếp tục',
-  'Kích hoạt tài khoản Cộng đồng MBC của bạn',
+  '[Cộng đồng MFC] Xác minh tài khoản của bạn',
+  '[Cộng đồng MFC] Kích hoạt tài khoản ngay',
+  '[Cộng đồng MFC] Hoàn tất đăng ký - Xác nhận email của bạn',
+  '[Cộng đồng MFC] Verify your account để bắt đầu học',
+  'Xác nhận đăng ký thành công - Cộng đồng MFC',
+  '[Cộng đồng MFC] Chào mừng! Xác minh email để tiếp tục',
+  'Kích hoạt tài khoản Cộng đồng MFC của bạn',
 ];
 
 // Random greeting styles
@@ -76,7 +76,7 @@ export async function sendTelegram(
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIdMap = {
     REGISTER: process.env.TELEGRAM_CHAT_ID_REGISTER || process.env.TELEGRAM_CHAT_ID,
-    ACTIVATE: process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID_MBC_LOG || process.env.TELEGRAM_CHAT_ID,
+    ACTIVATE: process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID_MFC_LOG || process.env.TELEGRAM_CHAT_ID,
     LESSON: process.env.TELEGRAM_CHAT_ID_LESSON || process.env.TELEGRAM_CHAT_ID,
     TOOL_CLICK: process.env.TELEGRAM_CHAT_ID_AFFILIATE || process.env.TELEGRAM_CHAT_ID,
     FAILED_LOGIN: process.env.TELEGRAM_CHAT_ID_FAILED_LOGIN || process.env.TELEGRAM_CHAT_ID,
@@ -238,7 +238,7 @@ async function sendViaResend(to: string, subject: string, htmlBody: string): Pro
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Cộng đồng MBC <onboarding@resend.dev>',
+        from: 'Cộng đồng MFC <onboarding@resend.dev>',
         to: to,
         subject: subject,
         html: htmlBody,
@@ -328,7 +328,7 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
-    const fromName = 'Cộng đồng MBC';
+    const fromName = 'Cộng đồng MFC';
     const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
     const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
     const messageParts = [
@@ -398,7 +398,7 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
     </div>
     <div style="padding: 30px;">
       <p style="color: #1f2937; font-size: 16px;">${greeting} <span style="font-weight: 600;">${name}</span></p>
-      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Cộng đồng MBC. Nhập mã này để xác nhận:</p>
+      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Cộng đồng MFC. Nhập mã này để xác nhận:</p>
       <div style="background: #f9fafb; border: 2px dashed #4f46e5; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0;">
         <h1 style="color: #4f46e5; font-size: 40px; margin: 0; letter-spacing: 10px;">${code}</h1>
       </div>
@@ -475,8 +475,8 @@ function getRandomVerificationTemplate(name: string, token: string): { subject: 
  */
 
 export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
-  const subject = `[Cộng đồng MBC] Chào mừng bạn gia nhập cộng đồng - Mã học tập của bạn là #${studentId}`;
-  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Cộng đồng MBC,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
+  const subject = `[Cộng đồng MFC] Chào mừng bạn gia nhập cộng đồng - Mã học tập của bạn là #${studentId}`;
+  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Cộng đồng MFC,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
@@ -524,7 +524,7 @@ export async function sendVerificationEmail(to: string, studentName: string, tok
 }
 
 export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, _customContent: string | null) {
-  const subject = `[Cộng đồng MBC] Kích hoạt thành công khóa học: ${courseName}`;
+  const subject = `[Cộng đồng MFC] Kích hoạt thành công khóa học: ${courseName}`;
   const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
@@ -542,7 +542,7 @@ export async function sendPasswordChangedNotification(user: { id: number; name: 
 }
 
 export async function sendPasswordResetLinkEmail(to: string, studentName: string, resetUrl: string, userId?: number) {
-  const subject = '[Cộng đồng MBC] Đặt lại mật khẩu tài khoản của bạn';
+  const subject = '[Cộng đồng MFC] Đặt lại mật khẩu tài khoản của bạn';
   const htmlBody = `
 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden;">

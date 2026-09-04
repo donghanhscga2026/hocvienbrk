@@ -89,7 +89,7 @@ INSERT INTO "SiteProfile" (
     'brk',
     true,
     true,
-    'NGÂN HÀNG PHƯỚC BÁU',
+    'DÒNG CHẢY PHƯỚC BÁU',
     'Tri thức là sức mạnh',
     0.3,
     true,
@@ -97,9 +97,9 @@ INSERT INTO "SiteProfile" (
     'Bảng tin cộng đồng',
     'Khóa học nổi bật',
     'Tất cả khóa học',
-    'BRK - Ngân hàng Phước Báu',
+    'BRK - Dòng chảy Phước Báu',
     'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
-    '© 2026 Ngân hàng Phước Báu. Mọi quyền được bảo lưu.'
+    '© 2026 Dòng chảy Phước Báu. Mọi quyền được bảo lưu.'
 ) ON CONFLICT ("slug") DO NOTHING;
 
 -- ============================================

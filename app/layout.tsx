@@ -24,29 +24,29 @@ const beVietnamPro = Be_Vietnam_Pro({
 
 export const metadata: Metadata = {
   title: {
-    default: "MBC - Ngân hàng Phước Báu",
-    template: "%s | MBC - Ngân hàng Phước Báu",
+    default: "MFC - Dòng chảy Phước Báu",
+    template: "%s | MFC - Dòng chảy Phước Báu",
   },
   description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
   openGraph: {
-    title: "MBC - Ngân hàng Phước Báu",
+    title: "MFC - Dòng chảy Phước Báu",
     description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
     type: "website",
     locale: "vi_VN",
     url: "https://giautoandien.io.vn",
-    siteName: "MBC - Ngân hàng Phước Báu",
+    siteName: "MFC - Dòng chảy Phước Báu",
     images: [
       {
         url: "https://giautoandien.io.vn/og-image.png",
         width: 1200,
         height: 630,
-        alt: "MBC - Ngân hàng Phước Báu",
+        alt: "MFC - Dòng chảy Phước Báu",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "MBC - Ngân hàng Phước Báu",
+    title: "MFC - Dòng chảy Phước Báu",
     description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
     images: ["https://giautoandien.io.vn/og-image.png"],
   },

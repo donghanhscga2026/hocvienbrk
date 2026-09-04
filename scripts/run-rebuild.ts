@@ -14,7 +14,7 @@ async function main() {
   })
   await prisma.systemTree.update({
     where: { onSystem: 4 },
-    data: { nameSystem: 'MB - Ngân hàng phước báu', graceDays: 1 }
+    data: { nameSystem: 'MB - Dòng chảy phước báu', graceDays: 1 }
   })
   console.log('Config done')
 

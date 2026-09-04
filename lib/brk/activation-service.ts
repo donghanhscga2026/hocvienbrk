@@ -308,7 +308,7 @@ export async function cancelBrkMemberWithinGrace(userId: number, onSystem: numbe
       userId,
       fee,
       'RETURN_FEE',
-      `Hoàn 100% phí tham gia MBC (hủy trong thời gian cân nhắc)`,
+      `Hoàn 100% phí tham gia MFC (hủy trong thời gian cân nhắc)`,
       `cancel_grace_sys_${onSystem}`
     )
     // BRKD refund equal to self BRKD

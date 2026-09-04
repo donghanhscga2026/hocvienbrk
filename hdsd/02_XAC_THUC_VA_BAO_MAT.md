@@ -1,5 +1,5 @@
 # 02. XÁC THỰC VÀ BẢO MẬT
-> **Mục đích**: Tài liệu này mô tả chi tiết các phương thức xác thực, luồng bảo vệ người dùng, cơ chế cấp phát định danh (ID) và các chính sách an toàn thông tin của dự án Cộng đồng MBC.
+> **Mục đích**: Tài liệu này mô tả chi tiết các phương thức xác thực, luồng bảo vệ người dùng, cơ chế cấp phát định danh (ID) và các chính sách an toàn thông tin của dự án Cộng đồng MFC.
 
 ---
 

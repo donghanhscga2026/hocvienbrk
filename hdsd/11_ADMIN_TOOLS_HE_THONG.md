@@ -15,8 +15,8 @@ Dự án hỗ trợ quản lý dữ liệu từ nhiều nguồn khác nhau (vd: 
 - **TCA Sync Engine**: 
   - Tích hợp với Chrome Extension để trích xuất dữ liệu từ Portal TCA.
   - Sử dụng bảng `TCASyncHistory` để ghi lại nhật ký từng lần đồng bộ, giúp đối soát dữ liệu cũ và mới (`beforeData` vs `afterData`).
-  - Tự động ánh xạ (Map) ID TCA sang ID Thành viên trên hệ thống Cộng đồng MBC.
-- **System Closure**: Mỗi hệ thống có một cây phả hệ riêng biệt (vd: `systemId=1` cho TCA) được lưu trữ độc lập để không làm ảnh hưởng đến cây nhân mạch gốc của Cộng đồng MBC.
+  - Tự động ánh xạ (Map) ID TCA sang ID Thành viên trên hệ thống Cộng đồng MFC.
+- **System Closure**: Mỗi hệ thống có một cây phả hệ riêng biệt (vd: `systemId=1` cho TCA) được lưu trữ độc lập để không làm ảnh hưởng đến cây nhân mạch gốc của Cộng đồng MFC.
 
 ### 3. Công cụ YouTube (YouTube Tools)
 Hệ thống tích hợp trực tiếp với **YouTube Data API v3**:
@@ -33,7 +33,7 @@ Hệ thống tích hợp trực tiếp với **YouTube Data API v3**:
 - **Dọn dẹp dữ liệu**: Sử dụng tính năng "Xóa hàng loạt" cho các tài khoản ảo hoặc tài khoản đã hết hạn tham gia mà không gửi minh chứng thanh toán.
 
 ### 2. Đồng bộ dữ liệu TCA
-1. Cài đặt Chrome Extension của Cộng đồng MBC.
+1. Cài đặt Chrome Extension của Cộng đồng MFC.
 2. Đăng nhập vào Portal TCA của bạn.
 3. Nhấn nút **"Đồng bộ về Cộng đồng"**. Dữ liệu về doanh số, cấp bậc và đội nhóm sẽ được cập nhật tự động lên hệ thống `giautoandien.io.vn`.
 4. Xem nhật ký đồng bộ tại mục **Tools** -> **TCA Sync** để kiểm tra các thay đổi mới nhất.
@@ -53,4 +53,4 @@ Hệ thống tích hợp trực tiếp với **YouTube Data API v3**:
 - **Tại sao đồng bộ TCA báo lỗi "Unauthorized"?**
   - Có thể phiên đăng nhập của bạn trên Portal TCA đã hết hạn hoặc Token của Extension cần được làm mới. Hãy đăng nhập lại Portal TCA và thử lại.
 - **Tính năng "Cây phả hệ TCA" khác gì với "Nhân mạch"?**
-  - Cây Nhân mạch dựa trên quan hệ giới thiệu trực tiếp của Cộng đồng MBC. Cây TCA dựa trên sơ đồ tổ chức thực tế của bạn tại công ty TCA. Hai cây này có thể khác nhau tùy vào cách bạn sắp xếp đội nhóm.
+  - Cây Nhân mạch dựa trên quan hệ giới thiệu trực tiếp của Cộng đồng MFC. Cây TCA dựa trên sơ đồ tổ chức thực tế của bạn tại công ty TCA. Hai cây này có thể khác nhau tùy vào cách bạn sắp xếp đội nhóm.

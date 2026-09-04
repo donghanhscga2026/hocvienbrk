@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     return new NextResponse(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1>Đã hủy đăng ký thành công</h1>
-        <p>Bạn sẽ không nhận được các email thông báo từ Cộng đồng MBC nữa.</p>
+        <p>Bạn sẽ không nhận được các email thông báo từ Cộng đồng MFC nữa.</p>
         <a href="/">Quay lại trang chủ</a>
       </div>
     `, { headers: { "Content-Type": "text/html; charset=utf-8" } });

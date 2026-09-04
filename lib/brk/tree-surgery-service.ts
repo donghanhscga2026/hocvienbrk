@@ -238,10 +238,10 @@ export async function previewMove(
   newReferrerUserId: number
 ): Promise<PreviewResult> {
   const sourceSys = await getSystemRecord(sourceUserId)
-  if (!sourceSys) throw new Error('Source user not found in MBC system')
+  if (!sourceSys) throw new Error('Source user not found in MFC system')
 
   const refSys = await getSystemRecord(newReferrerUserId)
-  if (!refSys) throw new Error('New referrer not found in MBC system')
+  if (!refSys) throw new Error('New referrer not found in MFC system')
 
   const descAutoIds = await getDescendantAutoIds(sourceSys.autoId)
   const descSystems = descAutoIds.length > 0
@@ -318,7 +318,7 @@ export async function moveBrkMember(
   if (sourceSys.status !== 'ACTIVE') { result.warnings.push(`Source user status is ${sourceSys.status}, not ACTIVE`); return result }
 
   const refSys = await getSystemRecord(newReferrerUserId)
-  if (!refSys) { result.warnings.push('New referrer not found in MBC system'); return result }
+  if (!refSys) { result.warnings.push('New referrer not found in MFC system'); return result }
   if (refSys.status !== 'ACTIVE') { result.warnings.push(`New referrer status is ${refSys.status}, not ACTIVE`); return result }
 
   if (sourceUserId === newReferrerUserId) { result.warnings.push('Cannot move user under themselves'); return result }

@@ -7,7 +7,7 @@ import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 
-const DEFAULT_OG_TITLE = 'MBC - Ngân hàng Phước Báu'
+const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
 const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
 
