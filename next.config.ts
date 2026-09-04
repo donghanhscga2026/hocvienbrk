@@ -30,7 +30,12 @@ const nextConfig: NextConfig = {
     // (domain vẫn phải khớp remotePatterns nên không mở rộng rủi ro); production
     // (Vercel) giữ nguyên vì không gặp lỗi này.
     dangerouslyAllowLocalIP: process.env.NODE_ENV !== 'production',
-    unoptimized: true,
+    // Ảnh dán link ngoài (postimg.cc, imgur, ibb.co...) giờ được tự động tải
+    // về, nén và lưu vào Supabase Storage khi lưu khoá học/bài viết (xem
+    // resolveImageUrl() trong lib/image-utils.ts) — next/image không còn
+    // phải fetch trực tiếp các host ngoài không ổn định gây timeout, nên có
+    // thể bật lại Image Optimization (WebP/AVIF/resize theo viewport).
+    unoptimized: false,
     // Các mức quality được phép
     qualities: [50, 60, 70, 75, 80, 85, 90],
 
