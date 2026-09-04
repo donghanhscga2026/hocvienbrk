@@ -520,7 +520,6 @@ function CoursesTab() {
                             courseName={ctx.courseName}
                             members={ctx.members}
                             labels={ctx.labels}
-                            dayOrders={ctx.dayOrders}
                             reload={ctx.reload}
                         />
                     )}

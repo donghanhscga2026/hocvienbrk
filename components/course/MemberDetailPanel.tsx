@@ -152,7 +152,10 @@ export default function MemberDetailPanel({ member, onClose }: {
     onClose: () => void
 }) {
     const isPS = member.memberRole === 'PS'
-    const completedCount = member.days.filter(d => d.status !== 'missing').length
+    // Chỉ tính trong phạm vi ngày đã tới hạn của riêng người này — tránh mẫu số
+    // là tổng số ngày của cả khoá trong khi họ mới học được vài ngày.
+    const reachedDayCount = member.todayOrder != null ? Math.min(member.days.length, member.todayOrder) : member.days.length
+    const completedCount = member.days.filter(d => d.order <= reachedDayCount && d.status !== 'missing').length
 
     const [tab, setTab] = useState<'overview' | 'history'>('overview')
     const [historyLoading, setHistoryLoading] = useState(false)
@@ -221,7 +224,7 @@ export default function MemberDetailPanel({ member, onClose }: {
                     </div>
                     <div className="h-8 w-px bg-violet-200" />
                     <div>
-                        <div className="text-2xl font-black text-gray-700">{completedCount}/{member.days.length}</div>
+                        <div className="text-2xl font-black text-gray-700">{completedCount}/{reachedDayCount}</div>
                         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số ngày đã nộp</div>
                     </div>
                 </div>
