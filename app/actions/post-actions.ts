@@ -43,11 +43,11 @@ export async function createPostAction(data: { title: string, content: string, i
     }
 
     try {
-        const { saveBase64Image } = await import("@/lib/image-utils")
-        let finalImageUrl = data.image;
-        if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
-            finalImageUrl = await saveBase64Image(finalImageUrl, 'posts');
-        }
+        const { resolveImageUrl } = await import("@/lib/image-utils")
+        // Ảnh bài viết có thể là base64 (upload file) hoặc link dán tay
+        // (postimg.cc, imgur...) -> đều được đưa về Supabase Storage để
+        // next/image không phải fetch trực tiếp host ngoài không ổn định.
+        const finalImageUrl = await resolveImageUrl(data.image ?? null, 'posts');
 
         const post = await prisma.post.create({
             data: {

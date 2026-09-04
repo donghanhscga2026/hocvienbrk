@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import { supabase } from './supabase';
+import { isBlockedHost } from './security/url-safety';
 
 /**
  * Lưu 1 file (Buffer) lên Supabase Storage (ưu tiên) — chỉ dự phòng ghi ổ đĩa
@@ -121,6 +123,84 @@ export async function saveBase64Image(base64Data: string, subDir: string = 'avat
 
     } catch (error: any) {
         console.error('❌ [ImageUtils] LỖI XỬ LÝ ẢNH:', error.message);
-        return base64Data; 
+        return base64Data;
+    }
+}
+
+const EXTERNAL_IMAGE_FETCH_TIMEOUT_MS = 8000;
+const EXTERNAL_IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8MB
+const EXTERNAL_IMAGE_MAX_DIMENSION = 1600;
+
+function isAlreadyStoredUrl(url: string): boolean {
+    if (url.startsWith('/uploads/') || url.startsWith('data:')) return true;
+    try {
+        return new URL(url).hostname.endsWith('.supabase.co');
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Với link ảnh do người dùng dán tay (postimg.cc, imgur, ibb.co...), tải ảnh
+ * về, nén/resize qua sharp rồi đẩy lên Supabase Storage, trả về link Supabase
+ * thay cho link ngoài. Mục đích: next/image không còn phải fetch trực tiếp
+ * các host ngoài không ổn định lúc render (nguồn gốc lỗi "upstream image
+ * response timed out"). Nếu tải/nén thất bại (mạng lỗi, không phải ảnh, quá
+ * lớn...) thì trả lại nguyên url gốc để không chặn việc lưu dữ liệu — trang
+ * quản trị vẫn lưu được, chỉ là ảnh đó sẽ còn phụ thuộc host ngoài như cũ.
+ */
+export async function resolveImageUrl(
+    url: string | null | undefined,
+    subDir: string
+): Promise<string | null> {
+    if (!url) return null;
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith('data:image')) {
+        return saveBase64Image(trimmed, subDir);
+    }
+
+    if (isAlreadyStoredUrl(trimmed)) return trimmed;
+
+    let parsed: URL;
+    try {
+        parsed = new URL(trimmed);
+    } catch {
+        return trimmed; // Không phải URL hợp lệ — giữ nguyên, form tự validate
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return trimmed;
+    if (isBlockedHost(parsed.hostname)) return trimmed;
+
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), EXTERNAL_IMAGE_FETCH_TIMEOUT_MS);
+        let response: Response;
+        try {
+            response = await fetch(trimmed, { signal: controller.signal });
+        } finally {
+            clearTimeout(timeout);
+        }
+
+        if (!response.ok) return trimmed;
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/')) return trimmed;
+
+        const arrayBuffer = await response.arrayBuffer();
+        if (arrayBuffer.byteLength > EXTERNAL_IMAGE_MAX_BYTES) return trimmed;
+
+        const optimized = await sharp(Buffer.from(arrayBuffer))
+            .resize({ width: EXTERNAL_IMAGE_MAX_DIMENSION, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+        const filename = `img_${Date.now()}_${Math.random().toString(36).substring(7)}.webp`;
+        const storedUrl = await saveUploadedFile(optimized, filename, subDir, 'image/webp');
+        console.log(`✅ [resolveImageUrl] Đã migrate "${trimmed}" -> "${storedUrl}"`);
+        return storedUrl;
+    } catch (error: any) {
+        console.warn(`⚠️ [resolveImageUrl] Không thể tải/nén "${trimmed}": ${error.message}`);
+        return trimmed;
     }
 }

@@ -196,7 +196,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                     title={course.name_lop}
                 >
                     <Image
-                        src={course.link_anh_bia || 'https://i.postimg.cc/PJPkm7vB/1.jpg'}
+                        src={course.link_anh_bia || '/og-image.png'}
                         alt={course.name_lop}
                         fill
                         priority={priority} // Ưu tiên load các card đầu tiên
