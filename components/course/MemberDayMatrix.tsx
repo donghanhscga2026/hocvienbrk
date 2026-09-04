@@ -20,13 +20,16 @@ export default function MemberDayMatrix({ days, columns = 10, onSelectDay, today
     onSelectDay?: (order: number) => void
     todayOrder?: number
 }) {
-    if (!days || days.length === 0) return null
+    // Chỉ hiển thị đến đúng "hôm nay" của riêng thành viên này — các ngày sau
+    // đó chưa tới hạn nên không có ý nghĩa gì để hiện (tránh nhầm là "chưa nộp").
+    const visibleDays = todayOrder != null ? days.filter(d => d.order <= todayOrder) : days
+    if (!visibleDays || visibleDays.length === 0) return null
     return (
         <div
             className="grid gap-1.5"
             style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         >
-            {days.map(d => {
+            {visibleDays.map(d => {
                 const isToday = d.order === todayOrder
                 const todayClass = isToday ? (d.status === 'missing' ? 'today-ring-pulse' : 'today-ring-pulse-done') : ''
                 return (

@@ -22,7 +22,6 @@ export type MembersTabContext = {
     members: RosterMember[]
     labels: CourseMemberLabels
     canViewPhone: boolean
-    dayOrders: number[]
     reload: () => void
 }
 
@@ -73,8 +72,6 @@ export default function CourseDashboardModal({ courseId, courseName, onClose, re
         setTab(t)
         setVisitedTabs(prev => (prev.has(t) ? prev : new Set(prev).add(t)))
     }
-
-    const dayOrders = lessons.map(l => l.order)
 
     return (
         <div
@@ -127,8 +124,8 @@ export default function CourseDashboardModal({ courseId, courseName, onClose, re
                         {visitedTabs.has('members') && (
                             <div style={{ display: tab === 'members' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
                                 {renderMembersTab
-                                    ? renderMembersTab({ courseId, courseName, members, labels, canViewPhone, dayOrders, reload: load })
-                                    : <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} dayOrders={dayOrders} />}
+                                    ? renderMembersTab({ courseId, courseName, members, labels, canViewPhone, reload: load })
+                                    : <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} />}
                             </div>
                         )}
                         {visitedTabs.has('feed') && (

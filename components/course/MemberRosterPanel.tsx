@@ -117,12 +117,11 @@ function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChan
     )
 }
 
-export default function MemberRosterPanel({ members, labels, canViewPhone, courseName, dayOrders }: {
+export default function MemberRosterPanel({ members, labels, canViewPhone, courseName }: {
     members: RosterMember[]
     labels: CourseMemberLabels
     canViewPhone: boolean
     courseName: string
-    dayOrders: number[]
 }) {
     const [display, setDisplay] = useState<DisplayToggles>({ role: true, code: true, phone: true })
     const [exportingImage, setExportingImage] = useState(false)
@@ -147,9 +146,10 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
                 teamText: teamLabel(m.team, labels),
                 groupText: m.memberRole === 'PS' ? '—' : groupLabel(m.team, m.group, labels),
                 isPS: m.memberRole === 'PS',
+                startDate: m.startDate,
                 days: m.days || [],
             }))
-            downloadRosterAsImage(courseName, rows, dayOrders)
+            downloadRosterAsImage(courseName, rows)
         } finally {
             setExportingImage(false)
         }

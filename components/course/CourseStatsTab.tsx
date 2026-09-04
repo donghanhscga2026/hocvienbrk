@@ -69,15 +69,19 @@ export default function CourseStatsTab({ members, lessons, labels }: {
     })()
 
     const dayStats = lessons.map(l => {
-        let onTime = 0, late = 0
+        let onTime = 0, late = 0, reachedCount = 0
         const missingMembers: RosterMember[] = []
         members.forEach(m => {
+            // Ngày này chưa tới hạn với riêng người này (họ bắt đầu muộn hơn cả
+            // lớp) — bỏ qua hoàn toàn, không tính là "chưa nộp".
+            if (l.order > m.todayOrder) return
+            reachedCount++
             const d = m.days.find(x => x.order === l.order)
             if (d?.status === 'onTime') onTime++
             else if (d?.status === 'late') late++
             else missingMembers.push(m)
         })
-        return { order: l.order, title: l.title, onTime, late, missing: missingMembers.length, missingMembers }
+        return { order: l.order, title: l.title, onTime, late, missing: missingMembers.length, missingMembers, reachedCount }
     })
 
     return (
@@ -119,10 +123,11 @@ export default function CourseStatsTab({ members, lessons, labels }: {
                 ) : (
                     <div className="space-y-2.5">
                         {dayStats.map(d => {
-                            const total = Math.max(1, totalMembers)
+                            const total = Math.max(1, d.reachedCount)
                             const onTimePct = (d.onTime / total) * 100
                             const latePct = (d.late / total) * 100
                             const missingPct = (d.missing / total) * 100
+                            const notReached = totalMembers - d.reachedCount
                             const isExpanded = expandedDay === d.order
                             return (
                                 <div key={d.order} className="bg-white border border-gray-100 rounded-xl overflow-hidden">
@@ -134,7 +139,10 @@ export default function CourseStatsTab({ members, lessons, labels }: {
                                         <div className="flex items-center justify-between gap-2 mb-1.5">
                                             <span className="text-xs font-bold text-gray-700 truncate">Ngày {d.order} — {d.title}</span>
                                             <span className="flex items-center gap-1.5 shrink-0">
-                                                <span className="text-[10px] font-bold text-gray-400">{d.onTime + d.late}/{totalMembers} đã nộp</span>
+                                                <span className="text-[10px] font-bold text-gray-400">
+                                                    {d.onTime + d.late}/{d.reachedCount} đã nộp
+                                                    {notReached > 0 && <span className="text-gray-300"> · {notReached} chưa tới ngày</span>}
+                                                </span>
                                                 <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                             </span>
                                         </div>
@@ -151,7 +159,9 @@ export default function CourseStatsTab({ members, lessons, labels }: {
                                     </button>
                                     {isExpanded && (
                                         <div className="border-t border-gray-100 bg-red-50/40 p-3">
-                                            {d.missingMembers.length === 0 ? (
+                                            {d.reachedCount === 0 ? (
+                                                <p className="text-[11px] text-gray-400 italic text-center py-2">Chưa có ai tới ngày này</p>
+                                            ) : d.missingMembers.length === 0 ? (
                                                 <p className="text-[11px] text-gray-400 italic text-center py-2">Mọi người đã nộp bài ngày này 🎉</p>
                                             ) : (
                                                 <>

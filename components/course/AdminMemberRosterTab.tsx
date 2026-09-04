@@ -161,12 +161,11 @@ function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChan
     )
 }
 
-export default function AdminMemberRosterTab({ courseId, courseName, members, labels, dayOrders, reload }: {
+export default function AdminMemberRosterTab({ courseId, courseName, members, labels, reload }: {
     courseId: number
     courseName: string
     members: RosterMember[]
     labels: CourseMemberLabels
-    dayOrders: number[]
     reload: () => void
 }) {
     const [editedMembers, setEditedMembers] = useState<Record<number, EditPatch>>({})
@@ -281,9 +280,10 @@ export default function AdminMemberRosterTab({ courseId, courseName, members, la
                 teamText: teamLabel(m.team, labels),
                 groupText: m.memberRole === 'PS' ? '—' : groupLabel(m.team, m.group, labels),
                 isPS: m.memberRole === 'PS',
+                startDate: m.startDate,
                 days: m.days || [],
             }))
-            downloadRosterAsImage(courseName, rows, dayOrders)
+            downloadRosterAsImage(courseName, rows)
         } finally {
             setExportingImage(false)
         }

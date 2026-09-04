@@ -14,7 +14,6 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
     const [error, setError] = useState<string | null>(null)
     const [members, setMembers] = useState<RosterMember[]>([])
     const [labels, setLabels] = useState<CourseMemberLabels>({})
-    const [dayOrders, setDayOrders] = useState<number[]>([])
     const [canViewPhone, setCanViewPhone] = useState(false)
 
     useEffect(() => {
@@ -25,7 +24,6 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
             if (res.success) {
                 setMembers((res.members as any[]) || [])
                 setLabels((res.labels as CourseMemberLabels) || {})
-                setDayOrders(((res.lessons as any[]) || []).map(l => l.order))
                 setCanViewPhone(!!res.canViewPhone)
             } else {
                 setError(res.error || 'Có lỗi xảy ra khi tải danh sách thành viên')
@@ -60,7 +58,7 @@ export default function MemberRosterModal({ courseId, courseName, onClose }: {
                 ) : error ? (
                     <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">{error}</div>
                 ) : (
-                    <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} dayOrders={dayOrders} />
+                    <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} />
                 )}
             </div>
         </div>

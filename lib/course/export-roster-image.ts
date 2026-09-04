@@ -1,3 +1,5 @@
+import { toVnMidnightUTC } from './deadline'
+
 export type DayStatus = 'missing' | 'late' | 'onTime'
 
 export type RosterExportRow = {
@@ -7,6 +9,9 @@ export type RosterExportRow = {
     teamText: string
     groupText: string
     isPS: boolean
+    /** Ngày bắt đầu học riêng của người này — dùng để quy đổi mỗi cột ngày lịch
+     *  chung của bảng thành "ngày học thứ mấy" của riêng họ. */
+    startDate: string | Date
     days: { order: number; status: DayStatus }[]
 }
 
@@ -16,11 +21,11 @@ const STATUS_COLOR: Record<DayStatus, string> = {
     missing: '#ef4444',
 }
 
-const STATUS_SYMBOL: Record<DayStatus, string> = {
-    onTime: '✓',
-    late: 'M',
-    missing: '✗',
-}
+const DAY_MS = 86400000
+// Mỗi lớp có người bắt đầu cách nhau nhiều ngày thì bảng có thể rất nhiều cột
+// — giới hạn tối đa số cột/ảnh để dễ theo dõi, vượt quá thì tách thành nhiều
+// ảnh (mỗi ảnh 1 khoảng ngày liên tiếp, tính từ ngày bắt đầu sớm nhất lớp).
+const MAX_COLS_PER_IMAGE = 15
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
     ctx.beginPath()
@@ -41,11 +46,31 @@ function slugify(text: string) {
         .replace(/(^-|-$)/g, '') || 'khoa-hoc'
 }
 
-export function downloadRosterAsImage(
+function chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = []
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+    return out
+}
+
+function formatDDMM(mid: number) {
+    return new Date(mid).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+}
+
+/**
+ * Vẽ + tải 1 ảnh cho 1 khoảng tối đa MAX_COLS_PER_IMAGE ngày lịch (cùng 1 trục
+ * ngày cho cả lớp). Ô của mỗi thành viên ghi SỐ THỨ TỰ NGÀY HỌC riêng của họ
+ * (tính từ ngày họ bắt đầu) ứng với cột ngày lịch đó, không phải "Ngày N"
+ * chung của khóa — người bắt đầu muộn hơn sẽ có các ô đầu bảng (trước ngày họ
+ * vào học) hoặc cuối bảng (chưa tới hạn) để trống.
+ */
+function renderChunk(
     courseName: string,
     rows: RosterExportRow[],
-    dayOrders: number[],
-    format: 'png' | 'jpeg' = 'png'
+    dateMids: number[],
+    titleSuffix: string,
+    fileSuffix: string,
+    exportedAt: Date,
+    format: 'png' | 'jpeg'
 ) {
     const measureCanvas = document.createElement('canvas')
     const mctx = measureCanvas.getContext('2d')!
@@ -64,7 +89,7 @@ export function downloadRosterAsImage(
     const teamW = Math.min(140, Math.max(70, ...rows.map(r => mctx.measureText(r.teamText).width + 24)))
     const groupW = Math.min(140, Math.max(70, ...rows.map(r => mctx.measureText(r.groupText).width + 24)))
 
-    const tableW = STT_W + nameW + CODE_W + teamW + groupW + DAY_COL_W * dayOrders.length
+    const tableW = STT_W + nameW + CODE_W + teamW + groupW + DAY_COL_W * dateMids.length
     const width = tableW + PAD * 2
     const height = TITLE_H + HEADER_H + ROW_H * rows.length + LEGEND_H + PAD * 2
 
@@ -83,11 +108,13 @@ export function downloadRosterAsImage(
     ctx.fillStyle = '#1f2937'
     ctx.font = '700 18px Arial, sans-serif'
     ctx.textBaseline = 'middle'
-    ctx.fillText(`Bảng tổng hợp nộp bài — ${courseName}`, PAD, PAD + TITLE_H / 2 - 8)
+    ctx.fillText(`Bảng tổng hợp nộp bài — ${courseName}${titleSuffix}`, PAD, PAD + TITLE_H / 2 - 8)
     ctx.font = '400 11px Arial, sans-serif'
     ctx.fillStyle = '#6b7280'
-    const now = new Date()
-    ctx.fillText(`Xuất lúc ${now.toLocaleString('vi-VN')} • ${rows.length} thành viên`, PAD, PAD + TITLE_H / 2 + 14)
+    ctx.fillText(
+        `${formatDDMM(dateMids[0])} - ${formatDDMM(dateMids[dateMids.length - 1])} • Xuất lúc ${exportedAt.toLocaleString('vi-VN')} • ${rows.length} thành viên • Số trong ô = ngày học thứ mấy của riêng người đó`,
+        PAD, PAD + TITLE_H / 2 + 14
+    )
 
     let y = PAD + TITLE_H
     const cols = [
@@ -96,7 +123,7 @@ export function downloadRosterAsImage(
         { key: 'code', label: 'Mã', w: CODE_W },
         { key: 'team', label: 'Team', w: teamW },
         { key: 'group', label: 'Group', w: groupW },
-        ...dayOrders.map(order => ({ key: `day-${order}`, label: `Ngày ${order}`, w: DAY_COL_W })),
+        ...dateMids.map(mid => ({ key: `d-${mid}`, label: formatDDMM(mid), w: DAY_COL_W })),
     ]
 
     // Header row
@@ -143,15 +170,21 @@ export function downloadRosterAsImage(
         ctx.fillText(row.groupText, x + groupW / 2, y + ROW_H / 2, groupW - 10)
         x += groupW
 
-        for (const d of row.days) {
-            const cx = x + DAY_COL_W / 2
-            const cy = y + ROW_H / 2
-            ctx.fillStyle = STATUS_COLOR[d.status]
-            roundedRect(ctx, x + 6, y + 5, DAY_COL_W - 12, ROW_H - 10, 6)
-            ctx.fill()
-            ctx.fillStyle = '#ffffff'
-            ctx.font = '700 12px Arial, sans-serif'
-            ctx.fillText(STATUS_SYMBOL[d.status], cx, cy)
+        const rowStartMid = toVnMidnightUTC(row.startDate)
+        for (const mid of dateMids) {
+            const order = Math.floor((mid - rowStartMid) / DAY_MS) + 1
+            const d = order >= 1 ? row.days.find(item => item.order === order) : undefined
+            if (d) {
+                const cx = x + DAY_COL_W / 2
+                const cy = y + ROW_H / 2
+                ctx.fillStyle = STATUS_COLOR[d.status]
+                roundedRect(ctx, x + 6, y + 5, DAY_COL_W - 12, ROW_H - 10, 6)
+                ctx.fill()
+                ctx.fillStyle = '#ffffff'
+                ctx.font = '700 11px Arial, sans-serif'
+                ctx.fillText(String(order), cx, cy)
+            }
+            // Ngoài khoảng ngày bắt đầu → hôm nay của người này: để trống.
             x += DAY_COL_W
         }
 
@@ -177,6 +210,9 @@ export function downloadRosterAsImage(
         ctx.fillText(label, lx + 20, ly)
         lx += mctx.measureText(label).width + 50
     }
+    ctx.fillStyle = '#9ca3af'
+    ctx.font = '500 10px Arial, sans-serif'
+    ctx.fillText('Ô trống = chưa bắt đầu học hoặc chưa tới ngày này', lx + 10, ly)
 
     const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png'
     canvas.toBlob(blob => {
@@ -184,8 +220,39 @@ export function downloadRosterAsImage(
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `nop-bai-${slugify(courseName)}-${now.toISOString().slice(0, 10)}.${format === 'jpeg' ? 'jpg' : 'png'}`
+        a.download = `nop-bai-${slugify(courseName)}${fileSuffix}-${exportedAt.toISOString().slice(0, 10)}.${format === 'jpeg' ? 'jpg' : 'png'}`
         a.click()
         URL.revokeObjectURL(url)
     }, mime, format === 'jpeg' ? 0.95 : undefined)
+}
+
+/**
+ * Xuất bảng tổng hợp nộp bài ra ảnh PNG/JPEG. Trục cột là NGÀY LỊCH THẬT dùng
+ * chung cho cả lớp (từ ngày bắt đầu sớm nhất tới hôm nay) — không phải "Ngày
+ * N" tương đối của từng người, vì mỗi thành viên có thể bắt đầu 1 ngày khác
+ * nhau. Nếu khoảng ngày dài hơn MAX_COLS_PER_IMAGE thì tự tách thành nhiều
+ * ảnh (mỗi ảnh 1 khoảng ngày liên tiếp) để bảng không quá rộng khó xem.
+ */
+export function downloadRosterAsImage(
+    courseName: string,
+    rows: RosterExportRow[],
+    format: 'png' | 'jpeg' = 'png'
+) {
+    if (rows.length === 0) return
+
+    const exportedAt = new Date()
+    const startMids = rows.map(r => toVnMidnightUTC(r.startDate))
+    const earliestStartMid = Math.min(...startMids)
+    const todayMid = toVnMidnightUTC(exportedAt)
+    const totalDays = Math.max(1, Math.floor((todayMid - earliestStartMid) / DAY_MS) + 1)
+    const allDateMids = Array.from({ length: totalDays }, (_, i) => earliestStartMid + i * DAY_MS)
+
+    const chunks = chunk(allDateMids, MAX_COLS_PER_IMAGE)
+
+    chunks.forEach((dateMids, i) => {
+        const titleSuffix = chunks.length > 1 ? ` — Phần ${i + 1}/${chunks.length}` : ''
+        const fileSuffix = chunks.length > 1 ? `-phan-${i + 1}` : ''
+        // Giãn nhẹ giữa các lần tải để trình duyệt không chặn tải nhiều file liên tiếp.
+        setTimeout(() => renderChunk(courseName, rows, dateMids, titleSuffix, fileSuffix, exportedAt, format), i * 350)
+    })
 }
