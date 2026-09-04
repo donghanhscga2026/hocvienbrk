@@ -201,7 +201,7 @@ export async function rebuildSystem4Data(method: 'A' | 'B') {
   const graceDays = method === 'A' ? 3 : 1;
   await prisma.systemTree.update({
     where: { onSystem: 4 },
-    data: { nameSystem: 'MB - Ngân hàng phước báu', graceDays }
+    data: { nameSystem: 'MB - Dòng chảy phước báu', graceDays }
   });
 
   await prisma.course.update({

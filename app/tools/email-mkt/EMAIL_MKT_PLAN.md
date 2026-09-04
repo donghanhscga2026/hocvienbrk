@@ -673,7 +673,7 @@ export async function sendGmailFromSender(
   });
 
   const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-  const fromName = 'Cộng đồng MBC';
+  const fromName = 'Cộng đồng MFC';
 
   const encodeHeader = (str: string) => { 
     if (!str) return ""; 
@@ -1288,13 +1288,13 @@ import { google } from 'googleapis';
 
 // Random subject lines cho verification email (7 biến thể)
 const verificationSubjects = [
-  '[Cộng đồng MBC] Xác minh tài khoản của bạn',
-  '[Cộng đồng MBC] Kích hoạt tài khoản ngay',
-  '[Cộng đồng MBC] Hoàn tất đăng ký - Xác nhận email của bạn',
-  '[Cộng đồng MBC] Verify your account để bắt đầu học',
-  'Xác nhận đăng ký thành công - Cộng đồng MBC',
-  '[Cộng đồng MBC] Chào mừng! Xác minh email để tiếp tục',
-  'Kích hoạt tài khoản Cộng đồng MBC của bạn',
+  '[Cộng đồng MFC] Xác minh tài khoản của bạn',
+  '[Cộng đồng MFC] Kích hoạt tài khoản ngay',
+  '[Cộng đồng MFC] Hoàn tất đăng ký - Xác nhận email của bạn',
+  '[Cộng đồng MFC] Verify your account để bắt đầu học',
+  'Xác nhận đăng ký thành công - Cộng đồng MFC',
+  '[Cộng đồng MFC] Chào mừng! Xác minh email để tiếp tục',
+  'Kích hoạt tài khoản Cộng đồng MFC của bạn',
 ];
 
 // Random greeting styles
@@ -1481,7 +1481,7 @@ async function sendViaResend(to: string, subject: string, htmlBody: string): Pro
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Cộng đồng MBC <onboarding@resend.dev>',
+        from: 'Cộng đồng MFC <onboarding@resend.dev>',
         to: to,
         subject: subject,
         html: htmlBody,
@@ -1515,7 +1515,7 @@ async function sendGmail(to: string, subject: string, htmlBody: string, bcc?: st
   try {
     const gmail = getGmailClient();
     const adminEmail = process.env.GMAIL_USER || 'hocvienbrk@gmail.com';
-    const fromName = 'Cộng đồng MBC';
+    const fromName = 'Cộng đồng MFC';
     const encodedFromName = `=?utf-8?B?${Buffer.from(fromName).toString('base64')}?=`;
     const encodedSubject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
     const messageParts = [
@@ -1601,7 +1601,7 @@ function getVerificationTemplate2(name: string, verifyUrl: string, emailId: stri
     </div>
     <div style="padding: 30px;">
       <p style="color: #1f2937; font-size: 16px;">${greeting} <span style="font-weight: 600;">${name}</span></p>
-      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Cộng đồng MBC. Nhập mã này để xác nhận:</p>
+      <p style="color: #4b5563; line-height: 1.6;">Chào mừng bạn tham gia Cộng đồng MFC. Nhập mã này để xác nhận:</p>
       <div style="background: #f9fafb; border: 2px dashed #4f46e5; padding: 20px; border-radius: 12px; text-align: center; margin: 20px 0;">
         <h1 style="color: #4f46e5; font-size: 40px; margin: 0; letter-spacing: 10px;">${code}</h1>
       </div>
@@ -1672,8 +1672,8 @@ function getRandomVerificationTemplate(name: string, token: string): { subject: 
  */
 
 export async function sendWelcomeEmail(to: string, studentName: string, studentId: number) {
-  const subject = `[Cộng đồng MBC] Chào mừng bạn gia nhập cộng đồng - Mã học tập của bạn là #${studentId}`;
-  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Cộng đồng MBC,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
+  const subject = `[Cộng đồng MFC] Chào mừng bạn gia nhập cộng đồng - Mã học tập của bạn là #${studentId}`;
+  const htmlBody = `Chào mừng <b>${studentName}</b> đến với Cộng đồng MFC,<br><br>Mã số học tập của bạn là: <b>#${studentId}</b>`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
 }
@@ -1686,7 +1686,7 @@ export async function sendVerificationEmail(to: string, studentName: string, tok
 }
 
 export async function sendActivationEmail(to: string, studentName: string, studentId: number, courseName: string, _customContent: string | null) {
-  const subject = `[Cộng đồng MBC] Kích hoạt thành công khóa học: ${courseName}`;
+  const subject = `[Cộng đồng MFC] Kích hoạt thành công khóa học: ${courseName}`;
   const htmlBody = `Chào <b>${studentName}</b> (#${studentId}),<br><br>Khóa học <b>${courseName}</b> đã được kích hoạt.`;
   const result = await sendGmail(to, subject, htmlBody);
   return result;
@@ -2676,9 +2676,9 @@ export async function POST(
           <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; border: 1px solid #eeeeee; border-radius: 20px; overflow: hidden;">
             <div style="background-color: #000000; padding: 30px; text-align: center;">
               <a href="https://giautoandien.io.vn" style="text-decoration: none;">
-                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MBC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
+                <img src="https://giautoandien.io.vn/logobrk-50px.png" alt="CỘNG ĐỒNG MFC" style="height: 40px; display: block; margin: 0 auto; color: #FACC15; font-weight: bold; font-size: 20px; border: 0;">
               </a>
-              <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">NGÂN HÀNG PHƯỚC BÁU</div>
+              <div style="color: #FACC15; font-size: 10px; font-weight: bold; margin-top: 5px; letter-spacing: 2px;">DÒNG CHẢY PHƯỚC BÁU</div>
             </div>
             <div style="padding: 40px 30px; background-color: #ffffff;">
               <div style="font-size: 16px; color: #333333;">
@@ -2687,7 +2687,7 @@ export async function POST(
             </div>
             <div style="padding: 30px; background-color: #f9f9f9; border-top: 1px solid #eeeeee; text-align: center;">
               <p style="font-size: 11px; color: #999999; margin: 0; line-height: 1.8;">
-                Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MBC</b>.<br>
+                Bạn nhận được thông báo này vì là thành viên của <b>Cộng đồng MFC</b>.<br>
                 Nếu không muốn nhận những email này, bạn có thể <a href="${unsubscribeUrl}" style="color: #000000; text-decoration: underline;">Hủy đăng ký tại đây</a>.
               </p>
             </div>
@@ -3528,7 +3528,7 @@ export async function GET(req: Request) {
     return new NextResponse(`
       <div style="font-family: sans-serif; text-align: center; padding: 50px;">
         <h1>Đã hủy đăng ký thành công</h1>
-        <p>Bạn sẽ không nhận được các email thông báo từ Cộng đồng MBC nữa.</p>
+        <p>Bạn sẽ không nhận được các email thông báo từ Cộng đồng MFC nữa.</p>
         <a href="/">Quay lại trang chủ</a>
       </div>
     `, { headers: { "Content-Type": "text/html; charset=utf-8" } });

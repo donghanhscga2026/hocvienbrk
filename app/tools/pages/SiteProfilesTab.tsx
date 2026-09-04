@@ -51,7 +51,7 @@ export default function SiteProfilesTab() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-xl font-black uppercase tracking-tight">Site Profiles</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Quản lý trang chủ cho MBC và các Teacher</p>
+          <p className="text-sm text-gray-400 mt-0.5">Quản lý trang chủ cho MFC và các Teacher</p>
         </div>
         <Link href="/tools/site-profiles/new" className="flex items-center gap-2 px-4 py-2 bg-black text-yellow-400 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-gray-800 transition-all">
           <Plus className="w-4 h-4" /> Tạo Profile
@@ -81,13 +81,13 @@ export default function SiteProfilesTab() {
                   <tr key={profile.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
-                        {profile.isDefault && <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-500 rounded text-[10px] font-bold">MBC</span>}
+                        {profile.isDefault && <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-500 rounded text-[10px] font-bold">MFC</span>}
                         <Link href={`/page/${profile.slug}`} className="text-orange-500 hover:underline font-mono text-sm" target="_blank">/page/{profile.slug}</Link>
                       </div>
                     </td>
                     <td className="px-5 py-3"><span className="font-medium text-gray-800">{profile.title || '-'}</span></td>
                     <td className="px-5 py-3">
-                      {profile.user ? <span className="text-gray-800">{profile.user.name}</span> : <span className="text-orange-500 italic">MBC Default</span>}
+                      {profile.user ? <span className="text-gray-800">{profile.user.name}</span> : <span className="text-orange-500 italic">MFC Default</span>}
                     </td>
                     <td className="px-5 py-3 text-center text-gray-500">{profile.viewCount || 0}</td>
                     <td className="px-5 py-3 text-center">

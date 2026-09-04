@@ -60,8 +60,8 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
 
   // Title tùy theo shareType
   const shareTitle = shareType === 'course'
-    ? `Khóa học: ${course.name_lop} - Cộng đồng học tập MBC`
-    : 'Trang chủ - Cộng đồng học tập MBC'
+    ? `Khóa học: ${course.name_lop} - Cộng đồng học tập MFC`
+    : 'Trang chủ - Cộng đồng học tập MFC'
 
   const encodedUrl = encodeURIComponent(shareUrl)
   const encodedTitle = encodeURIComponent(shareTitle)

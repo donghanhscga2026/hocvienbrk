@@ -9,7 +9,7 @@ interface BrkWalletCardProps {
 export default function BrkWalletCard({ balance, totalEarned, totalWithdrawn }: BrkWalletCardProps) {
   return (
     <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-6 border border-amber-200">
-      <h3 className="text-lg font-semibold text-amber-800 mb-4">Ví MBC</h3>
+      <h3 className="text-lg font-semibold text-amber-800 mb-4">Ví MFC</h3>
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-gray-600">Số dư khả dụng</span>

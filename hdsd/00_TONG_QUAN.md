@@ -1,10 +1,10 @@
-# TÀI LIỆU TỔNG QUAN DỰ ÁN CỘNG ĐỒNG MBC
-> **Mục đích**: Tài liệu này cung cấp bức tranh toàn cảnh về kiến trúc hệ thống, công nghệ nền tảng và triết lý thiết kế của dự án Cộng đồng MBC. Đây là cẩm nang khởi đầu dành cho cả lập trình viên (Developers) và quản trị viên (Administrators).
+# TÀI LIỆU TỔNG QUAN DỰ ÁN CỘNG ĐỒNG MFC
+> **Mục đích**: Tài liệu này cung cấp bức tranh toàn cảnh về kiến trúc hệ thống, công nghệ nền tảng và triết lý thiết kế của dự án Cộng đồng MFC. Đây là cẩm nang khởi đầu dành cho cả lập trình viên (Developers) và quản trị viên (Administrators).
 
 ---
 
 ## 1. GIỚI THIỆU CHUNG
-**Cộng đồng MBC** là một nền tảng học trực tuyến kết hợp hệ thống quản trị cộng đồng và tiếp thị liên kết (Affiliate). Hệ thống được thiết kế để không chỉ cung cấp khóa học mà còn quản lý cây phả hệ phức tạp (Genealogy), theo dõi doanh thu và hỗ trợ công cụ Email Marketing.
+**Cộng đồng MFC** là một nền tảng học trực tuyến kết hợp hệ thống quản trị cộng đồng và tiếp thị liên kết (Affiliate). Hệ thống được thiết kế để không chỉ cung cấp khóa học mà còn quản lý cây phả hệ phức tạp (Genealogy), theo dõi doanh thu và hỗ trợ công cụ Email Marketing.
 
 ### 🎯 Các phân hệ chính:
 1. **Hệ thống Học tập (LMS)**: Player học tập, quản lý khóa học/bài học.
@@ -70,7 +70,7 @@ Dự án sử dụng Design System độc quyền `brk-theme` dựa trên biến
 ### Màu sắc chủ đạo:
 - `brk-bg`: Màu nền chính (Sáng/Tối).
 - `brk-surface`: Màu nền của thẻ (Cards, Modals).
-- `brk-accent`: Màu cam chủ đạo (Thương hiệu MBC).
+- `brk-accent`: Màu cam chủ đạo (Thương hiệu MFC).
 - `brk-text`, `brk-text-muted`: Màu chữ chính và phụ.
 
 *Lưu ý cho Dev: Không sử dụng các class màu cứng như `bg-white` hay `text-black` cho các UI tái sử dụng, hãy sử dụng các biến `bg-brk-surface`, `text-brk-text`.*

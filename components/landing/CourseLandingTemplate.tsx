@@ -482,7 +482,7 @@ export default function CourseLandingTemplate({
 
             {/* Footer */}
             <footer className="py-8 text-center text-brk-muted text-sm">
-                <p>© 2026 Cộng đồng MBC. All rights reserved.</p>
+                <p>© 2026 Cộng đồng MFC. All rights reserved.</p>
             </footer>
 
             {showRegistration && (

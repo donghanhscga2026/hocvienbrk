@@ -181,7 +181,7 @@ function MemberDetailsModal({ info, onClose, selectedSystem }: { info: MemberDet
             </div>
             <div className="flex-1 flex flex-col min-w-0 pt-0.5">
               <span className="text-[9px] font-bold uppercase tracking-widest text-yellow-300 mb-1">
-                {isBrk ? 'MB - Ngân hàng phước báu' : 'Hệ thống'}
+                {isBrk ? 'MB - Dòng chảy phước báu' : 'Hệ thống'}
               </span>
               <div className="flex items-center justify-between gap-2 w-full pr-1 sm:pr-2">
                 <div className="flex flex-col min-w-0">

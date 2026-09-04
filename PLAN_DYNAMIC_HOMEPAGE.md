@@ -29,7 +29,7 @@
 
 ### Mục tiêu
 Mỗi Teacher (role `TEACHER`) sẽ có **trang chủ riêng** với URL `domain.com/[slug]`:
-- Giao diện giống MBC nhưng **100% tùy biến từ database**
+- Giao diện giống MFC nhưng **100% tùy biến từ database**
 - Nội dung động: hero, message, survey, roadmap, courses, footer
 - **Full theme customization** cho mỗi Teacher
 - **Affiliate system riêng** cho mỗi Teacher
@@ -72,7 +72,7 @@ giautoandien.io.vn/nhung-dinh-duong
 ┌─────────────────────────────────────────────────────────────┐
 │                      ROUTING LAYER                          │
 ├─────────────────────────────────────────────────────────────┤
-│  /                   → MBC Profile (slug="mbc")             │
+│  /                   → MFC Profile (slug="mbc")             │
 │  /[slug]             → SiteProfile theo slug                │
 │  /admin/profiles     → Admin quản lý profiles              │
 │  /tools/my-site      → Teacher chỉnh sửa profile của mình  │
@@ -83,10 +83,10 @@ giautoandien.io.vn/nhung-dinh-duong
 │                      DATA LAYER                             │
 ├─────────────────────────────────────────────────────────────┤
 │  SiteProfile                                                  │
-│    ├── MBC gốc (slug="mbc", userId=null, isDefault=true)   │
+│    ├── MFC gốc (slug="mbc", userId=null, isDefault=true)   │
 │    └── Teacher (slug=tùy chỉnh, userId=User.id)            │
 │                                                              │
-│  Fallback: Nếu Teacher chưa set config → dùng MBC default  │
+│  Fallback: Nếu Teacher chưa set config → dùng MFC default  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -145,14 +145,14 @@ model SiteProfile {
   // IDENTITY
   // ─────────────────────────────────────────────────────────
   // 2 loại profile:
-  // 1. MBC gốc: userId = null, slug = "mbc", isDefault = true
+  // 1. MFC gốc: userId = null, slug = "mbc", isDefault = true
   // 2. Teacher: userId = User.id, slug = tùy chỉnh
-  userId          Int?      @unique  // null = MBC gốc
+  userId          Int?      @unique  // null = MFC gốc
   user            User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slug            String    @unique
   
   isActive        Boolean   @default(false)
-  isDefault       Boolean   @default(false)  // true = MBC gốc
+  isDefault       Boolean   @default(false)  // true = MFC gốc
   
   // ─────────────────────────────────────────────────────────
   // HERO SECTION
@@ -160,7 +160,7 @@ model SiteProfile {
   heroImage       String?   // Ảnh nền hero
   heroOverlay     Float?    @default(0.3)  // Độ mờ overlay (0-1)
   
-  title           String?   // "NGÂN HÀNG PHƯỚC BÁU" → tùy biến
+  title           String?   // "DÒNG CHẢY PHƯỚC BÁU" → tùy biến
   subtitle        String?   // "Tri thức là sức mạnh"
   
   messageContent  String?
@@ -245,7 +245,7 @@ model AffiliateCampaign {
   // ... existing fields ...
   
   // THÊM MỚI
-  profileId     Int?      @unique  // null = campaign global (MBC)
+  profileId     Int?      @unique  // null = campaign global (MFC)
   profile       SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }
 ```
@@ -324,7 +324,7 @@ export async function getMySiteProfile(userId: number) {
 }
 
 /**
- * Lấy MBC default profile
+ * Lấy MFC default profile
  */
 export async function getDefaultProfile() {
   return prisma.siteProfile.findFirst({
@@ -360,7 +360,7 @@ export async function getCoursesForProfile(profile: any) {
     })
   }
 
-  // MBC gốc → tất cả khóa học
+  // MFC gốc → tất cả khóa học
   return prisma.course.findMany({
     where: { status: true },
     orderBy: [{ pin: 'asc' }, { id: 'asc' }]
@@ -891,7 +891,7 @@ async function main() {
       userId: null,
       isActive: true,
       isDefault: true,
-      title: 'NGÂN HÀNG PHƯỚC BÁU',
+      title: 'DÒNG CHẢY PHƯỚC BÁU',
       subtitle: 'Tri thức là sức mạnh',
       messageContent: defaultMessage?.content || 'Học hôm nay, thành công ngày mai',
       messageDetail: defaultMessage?.detail || 'BRK mang đến những tri thức thực chiến...',
@@ -900,7 +900,7 @@ async function main() {
       showAllCourses: true,
       themeId: defaultTheme?.id,
       affiliateCampaignId: defaultCampaign?.id,
-      metaTitle: 'Học viện BRK - Ngân hàng Phước Báu',
+      metaTitle: 'Học viện BRK - Dòng chảy Phước Báu',
       metaDescription: 'Học viện đào tạo kỹ năng thực chiến hàng đầu Việt Nam',
     }
   })
@@ -992,7 +992,7 @@ plan_temp/
 - [ ] Backup tất cả files
 - [ ] Schema migrated thành công
 - [ ] Prisma client generated
-- [ ] MBC Profile created
+- [ ] MFC Profile created
 - [ ] npm run build không lỗi
 
 ### Testing

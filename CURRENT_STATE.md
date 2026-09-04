@@ -1,6 +1,6 @@
 # CURRENT_STATE.md — Trạng thái công việc (snapshot)
 
-> **Đọc file này CÙNG với `AGENTS.md` trước khi làm bất cứ việc gì.** File này là bản chụp nhanh (snapshot) của một chuỗi công việc bảo mật + hiệu năng đang thực hiện trên dự án **BRK Academy / Cộng đồng MBC**. Mục tiêu: một phiên Codex/AI mới đọc xong file này là biết chính xác: đã sửa gì, sửa ở đâu, vì sao sửa như vậy, cái gì còn dang dở, và phải kiểm tra gì trước khi đụng tiếp vào code.
+> **Đọc file này CÙNG với `AGENTS.md` trước khi làm bất cứ việc gì.** File này là bản chụp nhanh (snapshot) của một chuỗi công việc bảo mật + hiệu năng đang thực hiện trên dự án **BRK Academy / Cộng đồng MFC**. Mục tiêu: một phiên Codex/AI mới đọc xong file này là biết chính xác: đã sửa gì, sửa ở đâu, vì sao sửa như vậy, cái gì còn dang dở, và phải kiểm tra gì trước khi đụng tiếp vào code.
 >
 > **Cập nhật lần cuối:** sau commit `fa6a5d6` (branch `master`, đã push lên GitHub). Trạng thái git lúc ghi file này: sạch (không có thay đổi chưa commit).
 
@@ -35,7 +35,7 @@ Toàn bộ các thay đổi đều tuân theo nguyên tắc trong `AGENTS.md`: �
 - **Deploy:** Vercel, project `hocvienbrk`, domain production `https://giautoandien.io.vn`. **Đã ghim vùng `sin1` (Singapore)** qua `vercel.json` (trước đây không ghim, dùng vùng mặc định).
 - **Middleware:** Next.js 16 dùng `proxy.ts` (không phải `middleware.ts` — 2 file không được tồn tại cùng lúc, sẽ lỗi build). `proxy.ts` chặn mặc định các prefix `/api/admin`, `/api/sync-tca`, `/api/system-tree` nếu không phải role `ADMIN` (lớp phòng thủ thứ 2, ngoài check trong từng route).
 - **Auth:** NextAuth v5, JWT session. Có rate-limit in-memory (per-instance, xem cảnh báo ở mục 6).
-- **Thương hiệu:** Đang trong quá trình đổi tên hiển thị từ "Học Viện BRK" sang **"Cộng đồng MBC"** (xem mục 7 — thay đổi này KHÔNG do phiên làm việc này thực hiện).
+- **Thương hiệu:** Đang trong quá trình đổi tên hiển thị từ "Học Viện BRK" sang **"Cộng đồng MFC"** (xem mục 7 — thay đổi này KHÔNG do phiên làm việc này thực hiện).
 
 ---
 
@@ -168,11 +168,11 @@ Trong lúc làm việc, phát hiện có **một quy trình/công cụ khác** (
 Cụ thể, giữa commit `d87cf57` (Hiệu năng Giai đoạn 1, của phiên này) và `fa6a5d6` (Hiệu năng Giai đoạn 2, của phiên này), có 3 commit lạ đã lên `master`:
 - `2dec748` — "fix: chuyen ALL-CAPS tieng Viet sang Sentence case (AssignmentForm)"
 - `770e2e4` — "cap nhat: AGENTS.md" (thêm **Quy tắc #12**: cấm viết hoa toàn bộ tiếng Việt có dấu — lý do: gây false-positive mojibake trong pre-commit hook)
-- `f1ab712` — "rebrand: Học Viện BRK -> Cộng đồng MBC (code, docs, database)" — đổi tên hiển thị ở **rất nhiều file** (đã xem qua `git show --stat`, phạm vi rộng: actions, components, docs...)
+- `f1ab712` — "rebrand: Học Viện BRK -> Cộng đồng MFC (code, docs, database)" — đổi tên hiển thị ở **rất nhiều file** (đã xem qua `git show --stat`, phạm vi rộng: actions, components, docs...)
 
 **Phiên làm việc này KHÔNG kiểm tra sâu nội dung 3 commit trên** (không phải việc được giao). Lưu ý cho phiên sau:
 - `package.json` field `"name"` **vẫn là `"brk-academy"`**, chưa đổi theo rebrand.
-- Nếu thấy code/UI có chỗ vẫn ghi "BRK"/"Học Viện BRK" xen lẫn "MBC"/"Cộng đồng MBC" — đó là rebrand chưa hoàn tất, không phải lỗi do các fix bảo mật/hiệu năng ở trên.
+- Nếu thấy code/UI có chỗ vẫn ghi "BRK"/"Học Viện BRK" xen lẫn "MFC"/"Cộng đồng MFC" — đó là rebrand chưa hoàn tất, không phải lỗi do các fix bảo mật/hiệu năng ở trên.
 - `AGENTS.md` đã có thêm Quy tắc #12 (không dùng ALL-CAPS tiếng Việt có dấu) — các đoạn code Vietnamese uppercase message cũ (nếu gặp) nên sửa theo quy tắc mới khi động tới.
 
 ---

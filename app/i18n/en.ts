@@ -2,7 +2,7 @@ import { Dictionary } from './types';
 
 export const en: Dictionary = {
   common: {
-    appName: 'MBC Academy',
+    appName: 'MFC Academy',
     save: 'Save',
     cancel: 'Cancel',
     apply: 'Apply',

@@ -1,5 +1,5 @@
 # 01. GIAO DIỆN TRANG CHỦ ĐỘNG
-> **Mục đích**: Tài liệu này đặc tả logic hiển thị, cấu trúc dữ liệu và hướng dẫn sử dụng giao diện Trang chủ (Home Page) của Cộng đồng MBC.
+> **Mục đích**: Tài liệu này đặc tả logic hiển thị, cấu trúc dữ liệu và hướng dẫn sử dụng giao diện Trang chủ (Home Page) của Cộng đồng MFC.
 
 ---
 

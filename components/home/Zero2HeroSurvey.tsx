@@ -16,7 +16,7 @@ function AdviceModal({ videoUrl, onClose }: { videoUrl?: string, onClose: () => 
                 <div className="aspect-video bg-brk-background relative flex items-center justify-center group cursor-pointer" onClick={() => videoUrl && window.open(videoUrl, '_blank')}>
                     <div className="absolute inset-0 bg-gradient-to-t from-brk-surface/50 to-transparent"></div>
                     <Play className="w-16 h-16 text-brk-primary fill-current group-hover:scale-110 transition-transform" />
-                    <p className="absolute bottom-4 left-6 text-brk-on-surface font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình MBC'}</p>
+                    <p className="absolute bottom-4 left-6 text-brk-on-surface font-black uppercase tracking-widest text-xs">{videoUrl ? 'Bấm để xem video tư vấn' : 'Video tư vấn lộ trình MFC'}</p>
                 </div>
                 <div className="p-8 space-y-4">
                     <h3 className="text-2xl font-black text-brk-on-surface uppercase">Cố vấn định hướng</h3>

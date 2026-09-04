@@ -1,4 +1,4 @@
-# Báo cáo đánh giá hiệu năng toàn diện — BRK Academy / Cộng đồng MBC
+# Báo cáo đánh giá hiệu năng toàn diện — BRK Academy / Cộng đồng MFC
 
 > **Ngày:** 2026-08-09 · **Phạm vi:** toàn bộ codebase Next.js 16 + Prisma + PostgreSQL (Supabase) tại thời điểm sau commit `e303996`.
 > **Phương pháp:** audit thủ công có kiểm chứng (đọc trực tiếp file:dòng, không suy đoán), chia 3 hướng độc lập: (1) Backend/Database, (2) Frontend/Bundle/Render, (3) Caching/Middleware/Data-fetching. Các phát hiện trọng yếu đã được kiểm tra chéo lại bằng grep/read trực tiếp trước khi đưa vào báo cáo.

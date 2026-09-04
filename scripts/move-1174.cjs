@@ -2,7 +2,7 @@
  * MOVE-1174.CJS — Di chuyển #1174 về đúng vị trí trong đội #379 (MB TCA system #4)
  *
  * Case: #1174 (Dien thi Thu Hương) có referrer = #379, nhưng do swap trước đó
- * được đưa về dưới #974 (chỗ cũ của #1172). Theo nguyên tắc MBC TCA giai đoạn 2
+ * được đưa về dưới #974 (chỗ cũ của #1172). Theo nguyên tắc MFC TCA giai đoạn 2
  * (FORCED_4WIDE BFS theo referrer), #1174 phải nằm trong cây của #379.
  * #379 đã full 4 slot F1 → BFS từ #379 chọn F1 đầu tiên có <4 con: #1121
  * → #1174 trở thành F2 của #1121 (kề bên #1176).
@@ -154,7 +154,7 @@ async function main() {
       newChain,
       subtree: [sysMember.userId],
       affectedCount: 0,
-      reason: `Đưa #${sysMember.userId} về đúng đội #379 theo nguyên tắc MBC TCA giai đoạn 2 (BFS referrer #379 → #${MOVE.newParentUserId})`,
+      reason: `Đưa #${sysMember.userId} về đúng đội #379 theo nguyên tắc MFC TCA giai đoạn 2 (BFS referrer #379 → #${MOVE.newParentUserId})`,
       adminId,
       metadata: { applicationId, volumeZero: true },
     },

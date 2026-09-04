@@ -465,7 +465,7 @@ export async function revertToPendingAction(enrollmentIds: number[]) {
             } catch (err: any) {
               errors.push({
                 enrollmentId,
-                reason: `Lỗi revert MBC member #${enrollment.userId}: ${err.message}`
+                reason: `Lỗi revert MFC member #${enrollment.userId}: ${err.message}`
               })
               continue
             }
@@ -680,7 +680,7 @@ export async function resetSystemForRebuildAction(systemId?: number, courseId?: 
       success: true,
       memberCount: systems.length,
       deletedRecords,
-      message: `Đã xóa toàn bộ dữ liệu MBC system #${systemId} (${systems.length} thành viên).`
+      message: `Đã xóa toàn bộ dữ liệu MFC system #${systemId} (${systems.length} thành viên).`
     }
   } catch (error: any) {
     console.error('Reset System For Rebuild Error:', error)

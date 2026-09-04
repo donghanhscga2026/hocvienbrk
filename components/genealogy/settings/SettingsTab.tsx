@@ -96,7 +96,7 @@ export default function SettingsTab() {
           )}
 
           {selectedSystem !== 4 && selectedSystem !== null && (
-            <p className="text-[10px] text-slate-400 font-bold">Chỉ hệ thống MBC (#4) hỗ trợ chuyển đổi Promotion Logic</p>
+            <p className="text-[10px] text-slate-400 font-bold">Chỉ hệ thống MFC (#4) hỗ trợ chuyển đổi Promotion Logic</p>
           )}
         </div>
 

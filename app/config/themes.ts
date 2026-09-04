@@ -233,10 +233,10 @@ export const THEME_PRESETS: Theme[] = [
     },
   },
 
-  // 1. MBC Classic
+  // 1. MFC Classic
   {
     id: 'classic',
-    name: 'MBC Classic',
+    name: 'MFC Classic',
     description: 'Giao diện cổ điển với màu vàng chủ đạo',
     isLocked: true,
     colors: {

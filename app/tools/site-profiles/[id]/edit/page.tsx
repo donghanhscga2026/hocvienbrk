@@ -271,7 +271,7 @@ export default function EditSiteProfilePage({ params }: PageProps) {
                   type="text"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  placeholder="NGÂN HÀNG PHƯỚC BÁU"
+                  placeholder="DÒNG CHẢY PHƯỚC BÁU"
                   className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-gray-800"
                 />
               </div>

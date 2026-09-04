@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       await sendTelegramMessage(
         chatId,
         `<b>🎉 KẾT NỐI TÀI KHOẢN THÀNH CÔNG!</b>\n\n` +
-        `✅ Tài khoản Telegram của bạn đã được liên kết thành công với Cộng đồng MBC.\n\n` +
+        `✅ Tài khoản Telegram của bạn đã được liên kết thành công với Cộng đồng MFC.\n\n` +
         `Bạn sẽ nhận được các thông báo học tập quan trọng (lịch học Zoom, thông tin tài khoản, xác nhận thanh toán) trực tiếp tại đây.`
       )
     } else {

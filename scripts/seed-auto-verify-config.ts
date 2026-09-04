@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('🌱 Seeding AutoVerifyConfig...')
 
-  // Khóa #22: NGÂN HÀNG PHƯỚC BÁU BRK1 → Sacombank → BRK System #4
+  // Khóa #22: DÒNG CHẢY PHƯỚC BÁU BRK1 → Sacombank → BRK System #4
   const course22 = await prisma.course.findUnique({ where: { id: 22 } })
   if (!course22) {
     console.log('❌ Course 22 not found')

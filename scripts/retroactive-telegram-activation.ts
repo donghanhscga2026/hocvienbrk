@@ -204,7 +204,7 @@ async function main() {
   }
 
   const token = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID_MBC_LOG || process.env.TELEGRAM_CHAT_ID
+  const chatId = process.env.TELEGRAM_CHAT_ID_ACTIVATE || process.env.TELEGRAM_CHAT_ID_MFC_LOG || process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) {
     console.error('❌ Thiếu TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID env vars')
     await prisma.$disconnect()

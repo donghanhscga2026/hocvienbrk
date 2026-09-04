@@ -1,5 +1,5 @@
 # 05. NHÂN MẠCH (GENEALOGY TREE)
-> **Mục đích**: Tài liệu này đặc tả hệ thống Sơ đồ phả hệ (Genealogy) - linh hồn của dự án Cộng đồng MBC, bao gồm mô hình dữ liệu Closure Table, các chế độ hiển thị và logic xây dựng cây đa cấp.
+> **Mục đích**: Tài liệu này đặc tả hệ thống Sơ đồ phả hệ (Genealogy) - linh hồn của dự án Cộng đồng MFC, bao gồm mô hình dữ liệu Closure Table, các chế độ hiển thị và logic xây dựng cây đa cấp.
 
 ---
 
