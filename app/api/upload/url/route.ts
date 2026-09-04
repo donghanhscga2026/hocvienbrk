@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from '@/lib/api-auth'
-
-// Chặn truy cập vào mạng nội bộ/localhost/metadata endpoint để tránh SSRF
-// khi server tự ý fetch() một URL do người dùng cung cấp.
-function isBlockedHost(hostname: string): boolean {
-    const h = hostname.toLowerCase()
-    if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0') return true
-    if (h === '169.254.169.254') return true // cloud metadata endpoint
-    if (/^10\./.test(h)) return true
-    if (/^192\.168\./.test(h)) return true
-    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true
-    if (/^127\./.test(h)) return true
-    return false
-}
+import { isBlockedHost } from '@/lib/security/url-safety'
 
 export async function POST(req: NextRequest) {
     const denied = await requireAuth()

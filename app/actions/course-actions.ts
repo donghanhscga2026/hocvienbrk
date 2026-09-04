@@ -16,6 +16,7 @@ import { getCourseAuthContext, requireCourseAccessAction } from "@/lib/course/pe
 import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
+import { resolveImageUrl } from "@/lib/image-utils"
 
 /**
  * Đăng ký khóa học mới
@@ -865,7 +866,7 @@ export async function createCourseAction(formData: FormData) {
             date_join: formData.get('date_join') as string || null,
             mo_ta_ngan: formData.get('mo_ta_ngan') as string || null,
             mo_ta_dai: formData.get('mo_ta_dai') as string || null,
-            link_anh_bia: formData.get('link_anh_bia') as string || null,
+            link_anh_bia: await resolveImageUrl(formData.get('link_anh_bia') as string || null, 'courses'),
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
             feeType: (formData.get('feeType') as string) || 'MIEN_PHI',
             requiresReferralActivation: formData.get('requiresReferralActivation') === 'true',

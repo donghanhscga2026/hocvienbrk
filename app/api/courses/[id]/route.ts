@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { toTitleCase } from '@/lib/utils/text-format';
 import { requireCourseAccessApi } from '@/lib/course/permissions';
 import { resolveCourseCategoryName } from '@/lib/course/category';
+import { resolveImageUrl } from '@/lib/image-utils';
 
 // ✅ GET - TEACHER chỉ thấy course có teacherId = userId
 export async function GET(
@@ -90,6 +91,13 @@ export async function PUT(
     // ✅ Đồng bộ cột category (string, denormalized) theo categoryId — dùng
     // chung 1 nguồn tính toán với server actions để tránh lệch dữ liệu
     body.category = await resolveCourseCategoryName(categoryId)
+
+    // Ảnh bìa dán link ngoài (postimg.cc, imgur...) -> tải về, nén, lưu Supabase
+    // Storage để next/image không còn phải fetch trực tiếp host ngoài không ổn
+    // định (nguồn gốc lỗi "upstream image response timed out").
+    if ('link_anh_bia' in body) {
+        body.link_anh_bia = await resolveImageUrl(body.link_anh_bia, 'courses')
+    }
 
     const updatedCourse = await prisma.course.update({
       where: { id: parseInt(id) },

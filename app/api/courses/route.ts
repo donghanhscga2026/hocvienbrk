@@ -6,6 +6,7 @@ import { getCourseAuthContext } from "@/lib/course/permissions"
 import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
+import { resolveImageUrl } from "@/lib/image-utils"
 
 /**
  * POST /api/courses - Tạo khóa học mới (ADMIN + TEACHER)
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
             date_join: body.date_join || null,
             mo_ta_ngan: body.mo_ta_ngan || null,
             mo_ta_dai: body.mo_ta_dai || null,
-            link_anh_bia: body.link_anh_bia || null,
+            link_anh_bia: await resolveImageUrl(body.link_anh_bia, 'courses'),
             phi_coc: Number(body.phi_coc) || 0,
             feeType: body.feeType || 'MIEN_PHI',
             noidung_stk: body.noidung_stk || null,
