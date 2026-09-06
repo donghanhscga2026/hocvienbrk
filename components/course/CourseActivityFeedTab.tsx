@@ -37,7 +37,9 @@ function FeedRow({ item }: { item: FeedItem }) {
     const isComment = item.type === 'comment'
     return (
         <div className="flex gap-3 p-3 bg-white border border-gray-100 rounded-xl">
-            <Avatar src={item.userImage} name={item.userName} />
+            <div className="shrink-0 self-start">
+                <Avatar src={item.userImage} name={item.userName} />
+            </div>
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap text-xs">
                     <span className="font-bold text-gray-800">{item.userName || 'Thành viên'}</span>
@@ -71,7 +73,15 @@ export default function CourseActivityFeedTab({ courseId }: { courseId: number }
         setLoading(true)
         getCourseActivityFeedAction(courseId).then(res => {
             if (cancelled) return
-            if (res.success) setFeed((res.feed as FeedItem[]) || [])
+            if (res.success) {
+                const feedData = (res.feed as FeedItem[]) || []
+                const nowTime = new Date().getTime()
+                const recentFeed = feedData.filter(item => {
+                    const diffDays = (nowTime - new Date(item.createdAt).getTime()) / (1000 * 3600 * 24)
+                    return diffDays <= 3
+                })
+                setFeed(recentFeed)
+            }
             else setError(res.error || 'Có lỗi xảy ra khi tải nhật ký hoạt động')
             setLoading(false)
         })

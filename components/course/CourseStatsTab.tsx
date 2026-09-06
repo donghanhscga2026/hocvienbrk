@@ -34,8 +34,6 @@ export default function CourseStatsTab({ members, lessons, labels }: {
     labels: CourseMemberLabels
 }) {
     const [expandedDay, setExpandedDay] = useState<number | null>(null)
-    const totalMembers = members.length
-
     const teamsWithPS = new Set(members.filter(m => m.memberRole === 'PS').map(m => m.team))
 
     // Thành viên KHÔNG được tính vào tỷ lệ hoàn thành (theo Team lẫn cả lớp)
@@ -48,11 +46,12 @@ export default function CourseStatsTab({ members, lessons, labels }: {
     }
 
     const countedMembers = members.filter(isCounted)
+    const totalMembers = countedMembers.length
     const avgPercent = average(countedMembers.map(m => m.completionPercent).filter((p): p is number => p !== null))
 
     const teamStats = (() => {
         const map = new Map<number, RosterMember[]>()
-        members.forEach(m => {
+        countedMembers.forEach(m => {
             if (!map.has(m.team)) map.set(m.team, [])
             map.get(m.team)!.push(m)
         })
@@ -68,10 +67,10 @@ export default function CourseStatsTab({ members, lessons, labels }: {
             })
     })()
 
-    const dayStats = lessons.map(l => {
+    const dayStats = [...lessons].reverse().map(l => {
         let onTime = 0, late = 0, reachedCount = 0
         const missingMembers: RosterMember[] = []
-        members.forEach(m => {
+        countedMembers.forEach(m => {
             // Ngày này chưa tới hạn với riêng người này (họ bắt đầu muộn hơn cả
             // lớp) — bỏ qua hoàn toàn, không tính là "chưa nộp".
             if (l.order > m.todayOrder) return
