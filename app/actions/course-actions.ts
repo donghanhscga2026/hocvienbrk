@@ -628,17 +628,18 @@ export async function submitAssignmentAction({
 
                 console.log(`${logId} TIMING: startDate=${startDate.toISOString()} lessonOrder=${lessonOrder} deadlineUTC=${new Date(deadlineUTC).toISOString()} nowUTC=${now.toISOString()} onTime=${isCurrentlyOnTime}`)
 
+                let existingProgress = null
+                if (isUpdate) {
+                    existingProgress = await prisma.lessonProgress.findUnique({
+                        where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+                        select: { status: true, scores: true }
+                    })
+                }
+
                 if (isCurrentlyOnTime) {
                     timingScore = 1
                 } else if (isUpdate) {
-                    // Cập nhật sau hạn: chỉ giữ "đúng hạn" nếu bài GỐC đã từng đạt
-                    // hoàn thành (>=5đ, status COMPLETED) trước hạn — khi đó chặn
-                    // luôn không cho sửa nữa (như cũ).
-                    const existingStatus = await prisma.lessonProgress.findUnique({
-                        where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
-                        select: { status: true }
-                    })
-                    if (existingStatus?.status === 'COMPLETED') {
+                    if (existingProgress?.status === 'COMPLETED') {
                         return { success: false, message: "Bài học đã hết hạn cập nhật." }
                     }
                     timingScore = -1
@@ -692,6 +693,17 @@ export async function submitAssignmentAction({
         if (rawUrl !== "" && rawUrl.toLowerCase() !== "null" && isYouTube) {
             const percent = currentDuration && currentDuration > 0 ? (currentMaxTime ?? 0) / currentDuration : 0
             videoScore = percent >= 0.95 ? 2 : percent >= 0.5 ? 1 : 0
+            
+            // [FIX] Khôi phục điểm video cũ nếu đang cập nhật mà client gửi currentMaxTime thấp do load lại trang
+            if (isUpdate) {
+                // Nếu chưa có existingProgress do chưa lấy ở trên (vd: không có lessonOrder), thì lấy tạm
+                const oldScores = await prisma.lessonProgress.findUnique({
+                    where: { enrollmentId_lessonId: { enrollmentId, lessonId } },
+                    select: { scores: true }
+                })
+                const oldVideoScore = (oldScores?.scores as any)?.video ?? 0
+                videoScore = Math.max(videoScore, oldVideoScore)
+            }
         }
 
         const reflectionScore = reflection.trim().length >= 86 ? 2 : reflection.trim().length > 0 ? 1 : 0
