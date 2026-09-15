@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
     // resolveImageUrl() trong lib/image-utils.ts) — next/image không còn
     // phải fetch trực tiếp các host ngoài không ổn định gây timeout, nên có
     // thể bật lại Image Optimization (WebP/AVIF/resize theo viewport).
-    unoptimized: false,
+    unoptimized: true,
     // Các mức quality được phép
     qualities: [50, 60, 70, 75, 80, 85, 90],
 
