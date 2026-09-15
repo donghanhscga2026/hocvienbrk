@@ -227,6 +227,7 @@ export default function CourseLandingTemplate({
                                         alt={course.name_lop}
                                         fill
                                         priority
+                                        unoptimized={course.link_anh_bia?.includes('postimg.cc') ?? false}
                                         sizes="(max-width: 512px) 100vw, 512px"
                                         className="object-contain"
                                     />

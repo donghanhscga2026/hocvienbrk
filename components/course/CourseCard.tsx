@@ -199,6 +199,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         src={course.link_anh_bia || '/og-image.png'}
                         alt={course.name_lop}
                         fill
+                        unoptimized={course.link_anh_bia?.includes('postimg.cc') ?? false}
                         priority={priority} // Ưu tiên load các card đầu tiên
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
