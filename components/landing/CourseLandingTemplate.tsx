@@ -7,7 +7,7 @@ import {
     ChevronDown, ChevronUp, Star, BookOpen, Users, Clock,
     Check, Play, GraduationCap, MessageSquare, ArrowRight, Link2, ListChecks
 } from 'lucide-react'
-import { enrollInCourseAction, checkEnrollmentStatusAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
 import { useRouter } from 'next/navigation'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import MainHeader from '@/components/layout/MainHeader'
@@ -40,6 +40,8 @@ interface CourseLandingTemplateProps {
         link_anh_bia?: string | null
         phi_coc: number
         feeType?: string
+        voucherConfig?: string | null
+        allowMbvDeduction?: boolean | null
         category?: string | null
         courseCategory?: { name: string } | null
         teacherId?: number | null
@@ -54,13 +56,7 @@ interface CourseLandingTemplateProps {
     activeStudentCount: number
 }
 
-const feeTypeLabels: Record<string, string> = {
-    MIEN_PHI: 'Miễn phí',
-    PHI_TUY_TINH: 'Phí tùy tâm',
-    PHI_CAM_KET: 'Phí cam kết',
-    PHI_TOI_THIEU: 'Phí tối thiểu',
-    PHI_DONG_HANH: 'Phí đồng hành'
-}
+
 
 export default function CourseLandingTemplate({
     course,
@@ -83,8 +79,27 @@ export default function CourseLandingTemplate({
     const [hasActivated, setHasActivated] = useState(false)
     const [showActivatedToast, setShowActivatedToast] = useState(false)
     const [showRoster, setShowRoster] = useState(false)
+    const [voucherBalance, setVoucherBalance] = useState<number>(0)
 
-    const feeLabel = feeTypeLabels[course.feeType || ''] || 'Phí'
+    useEffect(() => {
+        if (session && userId != null) {
+            getBrkMbvBalanceAction()
+                .then(bal => setVoucherBalance(bal))
+                .catch(err => console.error("Error fetching MBV balance:", err))
+        }
+    }, [session, userId])
+
+    const feeTypeDisplay = (() => {
+        const ft = course.feeType || 'MIEN_PHI'
+        switch (ft) {
+            case 'PHI_CAM_KET': return { icon: '🤝', color: 'text-brk-primary', label: 'Phí cam kết' }
+            case 'PHI_TUY_TINH': return { icon: '💝', color: 'text-yellow-500', label: 'Phí tùy tâm' }
+            case 'PHI_DONG_HANH': return { icon: '🚀', color: 'text-green-500', label: 'Phí đồng hành' }
+            case 'PHI_TOI_THIEU': return { icon: '✨', color: 'text-orange-500', label: 'Phí tối thiểu' }
+            default: return { icon: '🎁', color: 'text-brk-accent', label: 'Miễn phí' }
+        }
+    })()
+
     const effectiveEnrollment = localEnrollment || enrollment
     const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
     const isPending = effectiveEnrollment?.status === 'PENDING'
@@ -235,21 +250,59 @@ export default function CourseLandingTemplate({
                             )}
 
                             <div className="mb-4">
-                                <h1 className="text-2xl md:text-3xl font-black text-brk-on-surface mb-1">
+                                <h1 className="text-2xl md:text-3xl font-black text-brk-on-surface mb-1 flex items-center gap-3">
+                                    <span className={`text-3xl md:text-4xl drop-shadow-sm select-none shrink-0 ${feeTypeDisplay.color}`}>
+                                        {feeTypeDisplay.icon}
+                                    </span>
                                     {course.name_lop}
                                 </h1>
-                                {/* Tên khóa học + Phí/Giá tiền chỉ hiện khi CHƯA kích hoạt — học viên đã kích hoạt không cần xem lại giá */}
+                                {/* Tên khóa học + Phí/Giá tiền chỉ hiện khi CHƯA kích hoạt - học viên đã kích hoạt không cần xem lại giá */}
                                 {!isEnrolled && course.name_khoa && (
                                     <p className="text-sm text-brk-muted">{course.name_khoa}</p>
                                 )}
                                 {!isEnrolled && (
-                                    <div className="mt-2 flex flex-wrap items-center gap-3">
-                                        <span className="inline-block px-3 py-1 bg-brk-accent text-brk-on-primary text-xs font-bold uppercase rounded-full">
-                                            {feeLabel}
-                                        </span>
-                                        <p className="text-lg font-black text-brk-primary">
-                                            {effectivePhiCoc.toLocaleString('vi-VN')}đ
-                                        </p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        {effectivePhiCoc === 0 ? (
+                                            <span className={`inline-block rounded-full px-3 py-1 text-xs font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
+                                                {feeTypeDisplay.label}
+                                            </span>
+                                        ) : (
+                                            <>
+                                                {course.voucherConfig === 'WALLET' && course.allowMbvDeduction && voucherBalance >= effectivePhiCoc ? (
+                                                    <>
+                                                        <span className="inline-block rounded-full px-3 py-1 text-sm font-black tracking-wider shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200 line-through decoration-red-500 decoration-2">
+                                                            {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                                        </span>
+                                                        <span className="inline-block rounded-full px-3 py-1 text-sm font-black tracking-wider shadow-sm bg-brk-accent text-brk-on-primary animate-pulse">
+                                                            0đ (-{effectivePhiCoc.toLocaleString('vi-VN')} MBV)
+                                                        </span>
+                                                    </>
+                                                ) : course.voucherConfig === 'WALLET' && course.allowMbvDeduction && voucherBalance > 0 ? (
+                                                    <>
+                                                        <span className="relative inline-block rounded-full px-3 py-1 text-sm font-black tracking-wider shadow-sm bg-blue-50 text-blue-600 border border-blue-200 overflow-hidden">
+                                                            {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                                            <span className="absolute left-1 right-0 h-[1.5px] bg-red-400" style={{ top: '50%' }} />
+                                                        </span>
+                                                        <span className="inline-block rounded-full px-3 py-1 text-sm font-black tracking-wider shadow-sm bg-amber-500 text-white">
+                                                            {(effectivePhiCoc - voucherBalance).toLocaleString('vi-VN')}đ (Đã -{voucherBalance.toLocaleString('vi-VN')} MBV)
+                                                        </span>
+                                                    </>
+                                                ) : course.feeType === 'PHI_TUY_TINH' ? (
+                                                    <span className={`inline-block rounded-full px-3 py-1 text-xs font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
+                                                        {feeTypeDisplay.label}
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <span className="inline-block rounded-full px-3 py-1 text-sm font-black tracking-wider shadow-sm bg-red-50 text-red-600 border border-red-200">
+                                                            {effectivePhiCoc.toLocaleString('vi-VN')}đ
+                                                        </span>
+                                                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-black tracking-wider shadow-sm bg-brk-surface border border-brk-primary/30 ${feeTypeDisplay.color}`}>
+                                                            {feeTypeDisplay.label}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
