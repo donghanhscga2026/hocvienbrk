@@ -4,7 +4,7 @@ import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
 import { Role, Prisma, EnrollmentMemberRole } from "@prisma/client"
 import { rebuildSystem4Data } from "@/lib/brk/rebuild-service"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { toTitleCase } from "@/lib/utils/text-format"
 import { computeLessonDeadlineUTC, toVnMidnightUTC, computeCurrentDayOrder } from "@/lib/course/deadline"
 import { requireCourseAccessAction } from "@/lib/course/permissions"
@@ -1378,6 +1378,7 @@ export async function bulkToggleCourseStatusAction(courseIds: number[], newStatu
             data: { status: newStatus }
         })
 
+        revalidateTag('site-profile', { expire: 0 })
         return { success: true }
     } catch (error: any) { return { success: false, error: error.message } }
 }
@@ -1451,6 +1452,7 @@ export async function bulkUpdateCoursesOptionsAction(
             }
         }
 
+        revalidateTag('site-profile', { expire: 0 })
         return { success: true }
     } catch (error: any) {
         return { success: false, error: error.message }
@@ -1922,6 +1924,7 @@ export async function updateCourseAction(courseId: number, data: {
 
         revalidatePath('/tools/courses')
         revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
+        revalidateTag('site-profile', { expire: 0 }) // Clear cache của site-profile (khoá học trên trang chủ)
         return { success: true, course: updatedCourse }
     } catch (error: any) {
         console.error("Update Course Error:", error)

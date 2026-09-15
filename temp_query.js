@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { const c = await prisma.course.findMany({where: {id: {in: [52, 53, 54]}}, select: {id: true, name_lop: true, link_anh_bia: true}}); console.log(JSON.stringify(c, null, 2)); } main().finally(() => prisma.$disconnect());
