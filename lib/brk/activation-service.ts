@@ -63,34 +63,48 @@ export async function activateBrkMember(
   }
 
   const effectiveReferrer = enrollmentReferrerId ?? user.referrerId
-  const refSysId = forcedRefSysId !== undefined ? forcedRefSysId : await resolvePlacement(onSystem, effectiveReferrer)
 
-  const system = await prisma.system.upsert({
-    where: { userId_onSystem: { userId, onSystem } },
-    update: {
-      status: 'ACTIVE',
-      refSysId,
-      activatedAt: now,
-      gracePeriodEnd: graceEnd,
-      expiresAt,
-      level: 0, // Chưa qua grace period → chưa được xét cấp
-      applicationId,
-    },
-    create: {
-      userId,
-      onSystem,
-      refSysId,
-      status: 'ACTIVE',
-      activatedAt: now,
-      gracePeriodEnd: graceEnd,
-      expiresAt,
-      level: 0, // Chưa qua grace period → chưa được xét cấp
-      totalPoints: 0,
-      applicationId,
-    }
+  // Sử dụng Transaction wrapper duy nhất để lấy Transaction Advisory Lock (PostgreSQL).
+  // Đảm bảo không bao giờ có 2 user cùng được xếp vào 1 vị trí (Race condition) trên cùng 1 hệ thống (Sys#4).
+  // Các hàm bên trong vẫn dùng global `prisma` để không phải sửa toàn bộ code BFS.
+  const { refSysId, system } = await prisma.$transaction(async (tx) => {
+    // Khoá tất cả các process khác đang muốn activate vào cùng onSystem. 
+    // Sẽ tự động nhả khoá khi ra khỏi block transaction này.
+    await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${10000 + onSystem})`)
+
+    const calculatedRef = forcedRefSysId !== undefined ? forcedRefSysId : await resolvePlacement(onSystem, effectiveReferrer)
+    
+    const sys = await prisma.system.upsert({
+      where: { userId_onSystem: { userId, onSystem } },
+      update: {
+        status: 'ACTIVE',
+        refSysId: calculatedRef,
+        activatedAt: now,
+        gracePeriodEnd: graceEnd,
+        expiresAt,
+        level: 0, // Chua qua grace period -> chua du?c xt c?p
+        applicationId,
+      },
+      create: {
+        userId,
+        onSystem,
+        refSysId: calculatedRef,
+        status: 'ACTIVE',
+        activatedAt: now,
+        gracePeriodEnd: graceEnd,
+        expiresAt,
+        level: 0, // Chua qua grace period -> chua du?c xt c?p
+        totalPoints: 0,
+        applicationId,
+      }
+    })
+
+    await addUserToSystemClosure(userId, calculatedRef, onSystem)
+
+    return { refSysId: calculatedRef, system: sys }
+  }, {
+    timeout: 30000 // Chờ tối đa 30s để đảm bảo không đứt gãy nếu BFS chậm
   })
-
-  await addUserToSystemClosure(userId, refSysId, onSystem)
 
   await ensureBrkWallet(userId)
 

@@ -1561,7 +1561,7 @@ Audit và fix toàn diện hệ thống MB Dòng chảy Phước Báu (Sys#4, Co
 - ✅ `npx tsc --noEmit` → Exit code: 0 (không lỗi TypeScript).
 - ✅ Git commit: `fix(brk-sys4): 5 critical/high fixes for MB Ngan hang Phuoc Bau Sys#4`.
 - ⏳ Cần test thực tế: kích hoạt member mới trên Sys#4, verify RETURN_FEE refId đúng format.
-- ⚠️ Bug còn lại (chưa fix trong lần này): Race condition 4-wide placement (cần advisory lock DB), hardcode courseId=22 (cần refactor lớn hơn).
+- ⚠️ Bug còn lại: , hardcode courseId=22 (cần refactor lớn hơn).
 
 ---
 
@@ -2104,3 +2104,25 @@ Khắc phục lỗi `Timed out fetching a new connection from the connection poo
 
 
 
+
+## ✅ [Kiến trúc hệ thống] Tự động Kích hoạt Khóa học Linh hoạt (2026-09-16)
+
+### Mục tiêu
+Mở rộng tính năng auto-approve thanh toán khóa học cho tất cả các Teacher mà không vi phạm chính sách bảo mật của Google (tránh audit OAuth2) và có các giải pháp dự phòng linh hoạt.
+
+### Kiến trúc 3 Lớp
+1. **Ưu tiên 1: Email Auto-Forwarding (Triển khai đầu tiên)**
+   - **Mô tả:** Teacher dùng tính năng Auto-Forward của Gmail để đẩy thông báo biến động số dư về Email Admin của hệ thống. 
+   - **Thay đổi cần làm:** Cập nhật lib/auto-verify.ts, bổ sung các Parser Regex cho các ngân hàng phổ biến (MBBank, Vietcombank, Techcombank, ACB...).
+2. **Ưu tiên 2: Tích hợp Cổng Open Banking (Mở rộng)**
+   - **Mô tả:** Dùng SePay.vn / Casso.vn để nhận webhook realtime.
+   - **Thay đổi cần làm:** Thêm pp/api/webhooks/sepay/route.ts, bổ sung cấu hình API vào bảng User Profile.
+3. **Ưu tiên 3: Dự phòng thủ công (Đã có sẵn)**
+   - **Mô tả:** Duyệt tay qua Dashboard Admin/Teacher khi automation lỗi hoặc học viên chuyển sai cú pháp.
+
+### Trạng thái
+- ✅ Đã thống nhất giải pháp kiến trúc với User.
+- ⏳ Chuẩn bị viết các Parser cho các ngân hàng dựa trên dữ liệu db.
+
+
+- ✅ Đã tạo cổng Webhook SePay/Casso tự động nhận diện giao dịch qua accountNumber tại app/api/webhooks/sepay/route.ts

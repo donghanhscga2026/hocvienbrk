@@ -76,6 +76,45 @@ function parseSacombankEmail(htmlContent: string) {
   };
 }
 
+// TODO: Thêm mẫu parse email cho các ngân hàng khác khi có mẫu thực tế từ Teacher
+function parseMBBankEmail(htmlContent: string) {
+  // const text = extractTextFromHtml(htmlContent);
+  // ... Logic tương tự parseSacombankEmail ...
+  return null;
+}
+
+function parseTechcombankEmail(htmlContent: string) {
+  return null;
+}
+
+function parseVietcombankEmail(htmlContent: string) {
+  return null;
+}
+
+function parseAcbEmail(htmlContent: string) {
+  return null;
+}
+
+// Hàm tổng hợp để quyết định dùng parser nào dựa trên tiêu đề hoặc người gửi
+function parseBankEmail(htmlContent: string, fromAddress: string, subject: string) {
+  const fromLower = fromAddress.toLowerCase();
+  
+  if (fromLower.includes('sacombank')) {
+    return parseSacombankEmail(htmlContent);
+  } else if (fromLower.includes('mbbank') || fromLower.includes('tienphong')) {
+    return parseMBBankEmail(htmlContent);
+  } else if (fromLower.includes('techcombank')) {
+    return parseTechcombankEmail(htmlContent);
+  } else if (fromLower.includes('vietcombank')) {
+    return parseVietcombankEmail(htmlContent);
+  } else if (fromLower.includes('acb')) {
+    return parseAcbEmail(htmlContent);
+  }
+
+  // Fallback mặc định thử phân tích theo form Sacombank
+  return parseSacombankEmail(htmlContent);
+}
+
 // Helper wrapper to safely call Gmail API with exponential backoff retry on 429
 async function callGmailWithRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
   try {
@@ -211,23 +250,34 @@ export async function processPaymentEmails() {
     for (const msg of messages) {
       // Nghỉ 200ms giữa các email để giảm tải dồn dập cho API
       await new Promise(resolve => setTimeout(resolve, 200));
-      try {
-        const message = await callGmailWithRetry(() => gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' }));
-        let body = '';
-        const payload = message.data.payload;
-        if (payload?.body?.data) {
-          body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
-        } else if (payload?.parts) {
-          for (const part of payload.parts) {
-            if (part.mimeType === 'text/html' && part.body?.data) {
-              body = Buffer.from(part.body.data, 'base64').toString('utf-8');
-              break;
+        try {
+          const message = await callGmailWithRetry(() => gmail.users.messages.get({ userId: 'me', id: msg.id || '', format: 'full' }));
+          let body = '';
+          const payload = message.data.payload;
+          
+          // Lấy thông tin người gửi và tiêu đề để biết của ngân hàng nào
+          let fromAddress = '';
+          let subject = '';
+          if (payload?.headers) {
+            for (const header of payload.headers) {
+              if (header.name?.toLowerCase() === 'from') fromAddress = header.value || '';
+              if (header.name?.toLowerCase() === 'subject') subject = header.value || '';
             }
           }
-        }
 
-        const parsed = parseSacombankEmail(body);
-        if (!parsed.amount || (!parsed.userId && !parsed.phone)) continue;
+          if (payload?.body?.data) {
+            body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+          } else if (payload?.parts) {
+            for (const part of payload.parts) {
+              if (part.mimeType === 'text/html' && part.body?.data) {
+                body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+                break;
+              }
+            }
+          }
+
+          const parsed = parseBankEmail(body, fromAddress, subject);
+          if (!parsed || !parsed.amount || (!parsed.userId && !parsed.phone)) continue;
 
         for (const enrollment of pendingEnrollments) {
           // Bỏ qua enrollment của tài khoản test hệ thống

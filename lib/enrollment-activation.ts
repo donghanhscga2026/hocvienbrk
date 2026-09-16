@@ -4,7 +4,7 @@ import { processEnrollmentCommission } from '@/lib/affiliate/commission-calculat
 
 export interface ActivationOptions {
   enrollmentId: number
-  method: 'AUTO_EMAIL' | 'MANUAL_UPLOAD' | 'MANUAL_ADMIN'
+  method: 'AUTO_EMAIL' | 'AUTO_SEPAY' | 'MANUAL_UPLOAD' | 'MANUAL_ADMIN'
   note?: string
   customActivatedAt?: Date
   transferData?: {
