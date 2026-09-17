@@ -227,10 +227,25 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
     }
   }, [data.referrerId, data.isRefLocked])
 
-  // Auto-navigate found_account → login_id
+  // Auto-populate referrerId from aff_ref cookie when entering register step (if not locked)
+  useEffect(() => {
+    if (step === 'register_info') {
+      const cookie = document.cookie.split('; ').find(row => row.startsWith('aff_ref='))
+      if (cookie && !data.isRefLocked) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(cookie.split('=')[1]))
+          if (parsed?.r) {
+            setData(prev => ({ ...prev, referrerId: parsed.r }))
+          }
+        } catch {}
+      }
+    }
+  }, [step])
+
+  // Auto-navigate found_account → login_password (not login_id)
   useEffect(() => {
     if (step === 'found_account') {
-      const timer = setTimeout(() => setStep('login_id'), 3000)
+      const timer = setTimeout(() => setStep('login_password'), 3000)
       return () => clearTimeout(timer)
     }
   }, [step])
@@ -245,6 +260,10 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
   const updateField = useCallback(<K extends keyof WizardData>(key: K, value: WizardData[K]) => {
     setData(prev => ({ ...prev, [key]: value }))
+  }, [])
+
+  const unlockRef = useCallback(() => {
+    setData(prev => ({ ...prev, referrerId: '', referrerName: null, isRefLocked: false }))
   }, [])
 
   // Điều hướng sau đăng nhập/đăng ký bằng router (client-side), thay vì
@@ -291,11 +310,19 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
   }, [data, password, otp, newPassword, confirmNewPassword, isLoading, registerPassword, registeredUserId, success])
 
   // ─── LOGIN: Check student ID ───
+  // Tự động phát hiện: nếu input chứa '@' → email; nếu đủ 8-15 số → phone → chuyển sang bước check
   const handleCheckStudentId = async () => {
-    if (!data.studentId.trim()) { setError('Vui lòng nhập mã thành viên'); return }
+    const input = data.studentId.trim()
+    if (!input) { setError('Vui lòng nhập mã thành viên'); return }
     setIsLoading(true); setError(null)
     try {
-      const res = await fetch(`/api/user/${data.studentId.trim()}`)
+      // Nếu nhập email hoặc số điện thoại → chuyển sang bước check thay vì tra cứu student_id
+      if (input.includes('@') || (/^\d+$/.test(input) && input.length >= 8 && input.length <= 15)) {
+        updateField('contactQuery', input)
+        goToStep('check')
+        return
+      }
+      const res = await fetch(`/api/user/${input}`)
       if (!res.ok) { setError('Không tìm thấy mã thành viên này.'); return }
       const json = await res.json()
       if (json.id != null) {
@@ -422,14 +449,32 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
 
   const autoLoginAfterRegister = async (message: string) => {
     if (!registeredUserId) return
-    const signInResult = await signIn('credentials', { identifier: registeredUserId.toString(), password: registerPassword, redirect: false })
-    if (signInResult?.ok) {
-      setSuccess(message)
-      setTimeout(() => navigateAfterAuth(data.originalUrl || '/'), 1500)
-    } else {
-      setError('Đăng nhập tự động thất bại.')
-      setTimeout(() => navigateAfterAuth('/login'), 2000)
+    const trySignIn = async (attempt: number): Promise<boolean> => {
+      try {
+        const signInResult = await signIn('credentials', { identifier: registeredUserId.toString(), password: registerPassword, redirect: false })
+        if (signInResult?.ok) {
+          setSuccess(message)
+          setTimeout(() => navigateAfterAuth(data.originalUrl || '/'), 1500)
+          return true
+        }
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1000))
+          return trySignIn(attempt + 1)
+        }
+        setError('Đăng nhập tự động thất bại. Đang chuyển đến trang đăng nhập.')
+        setTimeout(() => navigateAfterAuth('/login'), 2000)
+        return false
+      } catch {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1000))
+          return trySignIn(attempt + 1)
+        }
+        setError('Đăng nhập tự động thất bại. Đang chuyển đến trang đăng nhập.')
+        setTimeout(() => navigateAfterAuth('/login'), 2000)
+        return false
+      }
     }
+    await trySignIn(1)
   }
 
   const handleVerifyRegisterOtp = async () => {
@@ -441,7 +486,10 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       if (res.ok) {
         setSuccess('Xác minh thành công!')
         goToStep('register_success')
-      } else setError(json.error || 'Mã OTP không chính xác')
+      } else {
+        const remaining = json?.remaining != null ? ` (Còn ${json.remaining} lần thử)` : ''
+        setError((json.error || 'Mã OTP không chính xác') + remaining)
+      }
     } catch { setError('Có lỗi xảy ra khi xác minh OTP')
     } finally { setIsLoading(false) }
   }
@@ -488,7 +536,10 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
       const json = await res.json()
       if (res.ok) {
         goToStep('forgot_new_password')
-      } else setError(json.error || 'Mã OTP không chính xác')
+      } else {
+        const remaining = json?.remaining != null ? ` (Còn ${json.remaining} lần thử)` : ''
+        setError((json.error || 'Mã OTP không chính xác') + remaining)
+      }
     } catch { setError('Có lỗi xảy ra khi xác minh OTP')
     } finally { setIsLoading(false) }
   }
@@ -635,17 +686,23 @@ export default function AccountAssistantModal({ onClose }: { onClose: () => void
             />
             <div>
               <label className="block text-sm font-medium text-brk-on-surface mb-1.5">Mã người giới thiệu</label>
-              {data.isRefLocked ? (
-                <div className="flex items-center gap-2">
-                  <input type="text" value={data.referrerId} disabled className="w-24 rounded-xl border border-brk-accent/40 bg-brk-accent/10 px-4 py-3 text-sm text-brk-accent font-semibold cursor-not-allowed" />
-                  {data.referrerName && <div className="flex-1 px-3 py-3 rounded-xl bg-brk-accent/10 border border-brk-accent/30"><span className="text-xs text-brk-accent font-bold">{data.referrerName}</span></div>}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <input type="text" value={data.referrerId} onChange={e => updateField('referrerId', e.target.value.replace(/\D/g, ''))} placeholder="3773" className="w-24 rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary" />
-                  {data.referrerName && <div className="flex-1 px-3 py-3 rounded-xl bg-brk-accent/10 border border-brk-accent/30"><span className="text-xs text-brk-accent font-bold">{data.referrerName}</span></div>}
-                </div>
-              )}
+                  {data.isRefLocked && data.referrerName && (
+                    <button type="button" onClick={unlockRef} className="text-xs text-brk-muted hover:text-brk-accent underline ml-1" title="Bỏ khóa người giới thiệu">
+                      ✕ Bỏ khóa
+                    </button>
+                  )}
+                  {data.isRefLocked && (
+                    <div className="flex items-center gap-2">
+                      <input type="text" value={data.referrerId} disabled className="w-24 rounded-xl border border-brk-accent/40 bg-brk-accent/10 px-4 py-3 text-sm text-brk-accent font-semibold cursor-not-allowed" />
+                      {data.referrerName && <div className="flex-1 px-3 py-3 rounded-xl bg-brk-accent/10 border border-brk-accent/30"><span className="text-xs text-brk-accent font-bold">{data.referrerName}</span></div>}
+                    </div>
+                  )}
+                  {!data.isRefLocked && (
+                    <div className="flex items-center gap-2">
+                      <input type="text" value={data.referrerId} onChange={e => updateField('referrerId', e.target.value.replace(/\D/g, ''))} placeholder="3773" className="w-24 rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary" />
+                      {data.referrerName && <div className="flex-1 px-3 py-3 rounded-xl bg-brk-accent/10 border border-brk-accent/30"><span className="text-xs text-brk-accent font-bold">{data.referrerName}</span></div>}
+                    </div>
+                  )}
             </div>
           </>
         )

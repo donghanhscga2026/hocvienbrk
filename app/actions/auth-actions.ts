@@ -67,7 +67,7 @@ export async function registerUser(prevState: any, formData: FormData) {
         }
         
         return {
-            message: `Tài khoản đã tồn tại với ${issues.join(' và ')}. Vui lòng kiểm tra lại hoặc đăng nhập.`,
+            message: `Tài khoản đã tồn tại với ${issues.join(' và ')}. Vui lòng kiểm tra lại hoặc đăng nhập. Nếu quên mật khẩu, dùng tính năng Quên tài khoản/Quên mật khẩu.`,
             errors: {},
         }
     }

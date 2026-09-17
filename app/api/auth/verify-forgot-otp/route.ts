@@ -16,7 +16,11 @@ export async function POST(request: Request) {
         const byIdentifier = checkRateLimit(`verify-forgot-otp:${rateLimitKeyFor({ studentId, email })}`, { max: 8, windowMs: 15 * 60 * 1000 })
         const byIp = checkRateLimit(`verify-forgot-otp:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 })
         if (!byIdentifier.allowed || !byIp.allowed) {
-            return NextResponse.json({ error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút." }, { status: 429 })
+            return NextResponse.json({ 
+                error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút.", 
+                remaining: 0, 
+                retryAfterMs: Math.max(0, Math.ceil((byIdentifier.retryAfterMs || 0) / 1000))
+            }, { status: 429 })
         }
 
         const user = await resolveUserForPasswordReset({ studentId, email })

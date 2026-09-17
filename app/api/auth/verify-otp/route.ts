@@ -16,7 +16,11 @@ export async function POST(request: NextRequest) {
     const byEmail = checkRateLimit(`verify-otp:email:${email}`, { max: 8, windowMs: 15 * 60 * 1000 })
     const byIp = checkRateLimit(`verify-otp:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 })
     if (!byEmail.allowed || !byIp.allowed) {
-      return NextResponse.json({ error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút." }, { status: 429 });
+      return NextResponse.json({ 
+        error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút.", 
+        remaining: 0, 
+        retryAfterMs: byEmail.allowed ? 0 : Math.max(0, Math.ceil((byEmail.retryAfterMs || 0) / 1000))
+      }, { status: 429 })
     }
 
     // 1. Tìm token trong DB
