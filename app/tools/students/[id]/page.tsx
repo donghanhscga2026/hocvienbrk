@@ -13,7 +13,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
   if (isNaN(studentId)) redirect("/tools/students")
 
   const session = await auth()
-  if (!session?.user?.id) redirect("/auth/login")
+  if (!session?.user?.id) redirect("/login")
 
   const res = await getStudentDetailAction(studentId)
   if (!res.success || !res.user) redirect("/tools/students")
