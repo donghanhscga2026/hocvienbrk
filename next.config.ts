@@ -1,8 +1,13 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 const nextConfig: NextConfig = {
   // Tăng tốc phản hồi HTTP
   compress: true,
+
+  // Ẩn header X-Powered-By: Next.js (tránh lộ thông tin công nghệ)
+  poweredByHeader: false,
 
   allowedDevOrigins: ["192.168.1.3:3000"],
 
@@ -99,11 +104,11 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Headers bảo mật cơ bản
+  // Headers bảo mật bắt buộc (X-Frame-Options, HSTS, Permissions-Policy, CSP...)
   async headers() {
     return [
       {
-        source: "/(.*)",
+        source: "/:path*",
         headers: [
           {
             key: "X-Frame-Options",
@@ -116,6 +121,31 @@ const nextConfig: NextConfig = {
           {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https:`,
+              "style-src 'self' 'unsafe-inline' https:",
+              "img-src 'self' data: https: blob:",
+              "font-src 'self' data: https:",
+              "connect-src 'self' https: ws: wss:",
+              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.tiktok.com https://www.facebook.com https://drive.google.com https://docs.google.com https://*.supabase.co",
+              "media-src 'self' https: blob:",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'self'",
+            ].join("; "),
           },
         ],
       },

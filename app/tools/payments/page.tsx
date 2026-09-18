@@ -99,7 +99,7 @@ export default function PaymentsPage() {
 
   // Date range
   const [dateMode, setDateMode] = useState<'quick' | 'custom'>('quick')
-  const [quickRange, setQuickRange] = useState<'today' | '3d' | '7d' | '14d' | '30d'>('today')
+  const [quickRange, setQuickRange] = useState<'today' | '3d' | '7d' | '14d' | '30d' | 'all'>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [dateLoading, setDateLoading] = useState(false)
@@ -110,9 +110,11 @@ export default function PaymentsPage() {
     { label: '7 ngày', value: '7d' as const },
     { label: '14 ngày', value: '14d' as const },
     { label: '30 ngày', value: '30d' as const },
+    { label: 'Tất cả', value: 'all' as const },
   ]
 
-  function getDateRange(range: string): { from: string; to: string } {
+  function getDateRange(range: string): { from: string; to: string } | null {
+    if (range === 'all') return null
     const now = new Date()
     const to = now.toISOString()
     let from: Date
@@ -133,8 +135,7 @@ export default function PaymentsPage() {
     let to: string | undefined
     if (dateMode === 'quick') {
       const range = getDateRange(quickRange)
-      from = range.from
-      to = range.to
+      if (range) { from = range.from; to = range.to }
     } else {
       if (customFrom) from = new Date(customFrom).toISOString()
       if (customTo) to = new Date(customTo).toISOString()
@@ -183,8 +184,7 @@ export default function PaymentsPage() {
     let to: string | undefined
     if (dateMode === 'quick') {
       const range = getDateRange(quickRange)
-      from = range.from
-      to = range.to
+      if (range) { from = range.from; to = range.to }
     } else {
       if (customFrom) from = new Date(customFrom).toISOString()
       if (customTo) to = new Date(customTo).toISOString()
