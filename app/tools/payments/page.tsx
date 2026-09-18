@@ -97,6 +97,57 @@ export default function PaymentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [enrollmentDates, setEnrollmentDates] = useState<Record<number, string>>({})
 
+  // Date range
+  const [dateMode, setDateMode] = useState<'quick' | 'custom'>('quick')
+  const [quickRange, setQuickRange] = useState<'today' | '3d' | '7d' | '14d' | '30d'>('today')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [dateLoading, setDateLoading] = useState(false)
+
+  const quickRanges = [
+    { label: 'Hôm nay', value: 'today' as const },
+    { label: '3 ngày', value: '3d' as const },
+    { label: '7 ngày', value: '7d' as const },
+    { label: '14 ngày', value: '14d' as const },
+    { label: '30 ngày', value: '30d' as const },
+  ]
+
+  function getDateRange(range: string): { from: string; to: string } {
+    const now = new Date()
+    const to = now.toISOString()
+    let from: Date
+    switch (range) {
+      case 'today': from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break
+      case '3d': from = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000); break
+      case '7d': from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break
+      case '14d': from = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000); break
+      case '30d': from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break
+      default: from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); break
+    }
+    return { from: from.toISOString(), to }
+  }
+
+  function loadPayments() {
+    setDateLoading(true)
+    let from: string | undefined
+    let to: string | undefined
+    if (dateMode === 'quick') {
+      const range = getDateRange(quickRange)
+      from = range.from
+      to = range.to
+    } else {
+      if (customFrom) from = new Date(customFrom).toISOString()
+      if (customTo) to = new Date(customTo).toISOString()
+    }
+    ;(async () => {
+      const result = await getAllPayments(from, to)
+      if (result.success) {
+        setAllPayments(result.payments as PaymentData[])
+      }
+      setDateLoading(false)
+    })()
+  }
+
   const stats = useMemo(() => ({
     total: allPayments.length,
     pending: allPayments.filter(p => p.status === 'PENDING').length,
@@ -128,7 +179,17 @@ export default function PaymentsPage() {
   async function loadData() {
     setLoading(true)
     setSelectedIds(new Set())
-    const result = await getAllPayments()
+    let from: string | undefined
+    let to: string | undefined
+    if (dateMode === 'quick') {
+      const range = getDateRange(quickRange)
+      from = range.from
+      to = range.to
+    } else {
+      if (customFrom) from = new Date(customFrom).toISOString()
+      if (customTo) to = new Date(customTo).toISOString()
+    }
+    const result = await getAllPayments(from, to)
     if (result.success) {
       setAllPayments(result.payments as PaymentData[])
     }
@@ -354,7 +415,66 @@ export default function PaymentsPage() {
             )}
           </div>
 
-          {/* ROW 2: Quét Gmail + Sort controls */}
+          {/* ROW 2: Date Range Filter */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-gray-500 font-bold shrink-0">📅 Khoảng thời gian:</span>
+            {quickRanges.map(q => (
+              <button
+                key={q.value}
+                onClick={() => { setDateMode('quick'); setQuickRange(q.value); loadPayments() }}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
+                  dateMode === 'quick' && quickRange === q.value
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {q.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setDateMode('custom')}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
+                dateMode === 'custom' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Tùy chỉnh
+            </button>
+            {dateMode === 'custom' && (
+              <>
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={e => setCustomFrom(e.target.value)}
+                  className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 bg-white text-gray-700 outline-none focus:border-indigo-400"
+                />
+                <span className="text-[10px] text-gray-400">→</span>
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={e => setCustomTo(e.target.value)}
+                  className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-gray-200 bg-white text-gray-700 outline-none focus:border-indigo-400"
+                />
+                <button
+                  onClick={loadPayments}
+                  disabled={dateLoading || !customFrom || !customTo}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-all shrink-0"
+                >
+                  {dateLoading ? '...' : 'Tải'}
+                </button>
+              </>
+            )}
+            {(dateMode === 'quick') && (
+              <button
+                onClick={loadPayments}
+                disabled={dateLoading}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-gray-800 text-white hover:bg-gray-900 disabled:opacity-50 transition-all shrink-0"
+              >
+                {dateLoading ? '...' : '🔄 Tải lại'}
+              </button>
+            )}
+          </div>
+
+          {/* ROW 3: Quét Gmail + Sort controls */}
           <div className="flex items-center gap-1.5">
             <button
               disabled={scanning || gmailStatus.penalized}
@@ -392,7 +512,7 @@ export default function PaymentsPage() {
             </div>
           </div>
 
-          {/* ROW 3: Admin — Select all + Bulk actions (only when items selected) */}
+          {/* ROW 4: Admin — Select all + Bulk actions (only when items selected) */}
           {isAdmin && (
             <div className="flex items-center gap-1.5 flex-wrap">
               {payments.length > 0 && (

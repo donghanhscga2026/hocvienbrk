@@ -317,7 +317,7 @@ export async function getPendingPayments() {
   }
 }
 
-export async function getAllPayments() {
+export async function getAllPayments(dateFrom?: string, dateTo?: string) {
   try {
     const session = await auth()
     if (!session?.user?.id) return { success: false, error: "Unauthorized" }
@@ -330,6 +330,12 @@ export async function getAllPayments() {
     const where: any = {}
     if (isTeacher) {
       where.enrollment = { course: { teacherId: userId } }
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {}
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom)
+      if (dateTo) where.createdAt.lte = new Date(dateTo)
     }
 
     const payments = await prisma.payment.findMany({
@@ -372,10 +378,6 @@ export async function getAllPayments() {
         }
       },
       orderBy: { createdAt: 'desc' },
-      // [OPTIMIZE] Chặn tăng trưởng vô hạn khi số lượng giao dịch lớn dần theo
-      // thời gian — vì sắp xếp mới nhất trước, các giao dịch gần đây vẫn hiển thị
-      // đầy đủ; chỉ lịch sử rất cũ mới bị cắt bớt. Nếu cần xem toàn bộ lịch sử,
-      // nên bổ sung phân trang ở UI thay vì tải hết 1 lần.
       take: 1000
     })
 
