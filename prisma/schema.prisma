@@ -440,11 +440,12 @@ model Enrollment {
   group          Int              @default(1)
   course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   referrer       User?            @relation("EnrollmentReferrer", fields: [referrerId], references: [id])
-  user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
-  lessonProgress LessonProgress[]
-  payment        Payment?
+   user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
+   lessonProgress LessonProgress[]
+   payment        Payment?
+   hiddenFromGifts Boolean @default(false)
 
-  @@unique([userId, courseId])
+   @@unique([userId, courseId])
   @@index([userId])
   @@index([courseId])
   @@index([referrerId])

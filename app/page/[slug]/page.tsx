@@ -91,6 +91,7 @@ export default async function PageSlugPage({ params }: PageProps) {
                     courseId: true,
                     status: true,
                     startedAt: true,
+                    hiddenFromGifts: true,
                     payment: { select: { id: true, status: true, proofImage: true, qrCodeUrl: true, transferContent: true, amount: true, bankName: true, accountNumber: true } },
                     course: { select: { _count: { select: { lessons: true } } } },
                     _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
@@ -108,11 +109,14 @@ export default async function PageSlugPage({ params }: PageProps) {
         totalLessons: number
         enrollmentId?: number
         payment?: { id: number; status: string; proofImage?: string | null }
+        hiddenFromGifts: boolean
     }> = {}
 
     enrollments.forEach((e: any) => {
         if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
-            myCourseIds.add(e.courseId)
+            if (!e.hiddenFromGifts) {
+                myCourseIds.add(e.courseId)
+            }
         }
         enrollmentsMap[e.courseId] = {
             status: e.status,
@@ -120,7 +124,8 @@ export default async function PageSlugPage({ params }: PageProps) {
             completedCount: e._count?.lessonProgress || 0,
             totalLessons: e.course?._count?.lessons || 0,
             enrollmentId: e.id,
-            payment: e.payment
+            payment: e.payment,
+            hiddenFromGifts: e.hiddenFromGifts || false
         }
     })
 

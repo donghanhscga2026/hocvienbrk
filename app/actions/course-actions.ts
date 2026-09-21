@@ -1105,3 +1105,29 @@ export async function getBrkVndWalletBalanceAction() {
     }
 }
 
+export async function toggleHiddenFromGifts(enrollmentId: number) {
+  'use server'
+  const session = await auth()
+  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+
+  const userId = parseInt(session.user.id)
+  try {
+    const enrollment = await prisma.enrollment.findUnique({
+      where: { id: enrollmentId, userId },
+      select: { id: true, hiddenFromGifts: true }
+    })
+
+    if (!enrollment) return { success: false, error: 'Enrollment not found' }
+
+    const updated = await prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: { hiddenFromGifts: !enrollment.hiddenFromGifts }
+    })
+
+    revalidatePath('/')
+    return { success: true, hiddenFromGifts: updated.hiddenFromGifts }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+

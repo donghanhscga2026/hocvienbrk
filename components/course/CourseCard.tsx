@@ -7,11 +7,11 @@ import { useRouter } from 'next/navigation'
 import PaymentModal from './PaymentModal'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
-import { enrollInCourseAction, getBrkMbvBalanceAction } from '@/app/actions/course-actions'
+import { enrollInCourseAction, getBrkMbvBalanceAction, toggleHiddenFromGifts } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
-import { Share2, BookOpen, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { Share2, BookOpen, Users, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react'
 
 // Chuyển URL thành link clickable (cho phần mô tả khóa học)
 const makeLinksClickable = (html: string): string => {
@@ -52,6 +52,7 @@ interface CourseCardProps {
         completedCount: number
         totalLessons: number
         enrollmentId?: number
+        hiddenFromGifts?: boolean
         payment?: {
             id: number
             status: string
@@ -75,6 +76,10 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
     const [showToc, setShowToc] = useState(false)
     const [loading, setLoading] = useState(false)
     const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
+    const [hiddenFromGifts, setHiddenFromGifts] = useState(enrollment?.hiddenFromGifts || false)
+    const [toggleLoading, setToggleLoading] = useState(false)
+
+    const isActive = enrollment?.status === 'ACTIVE'
 
     // ✅ Mô tả mở rộng và tự động co lại sau 5 giây không tương tác
     const [descExpanded, setDescExpanded] = useState(false)
@@ -90,6 +95,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
             }, 5000)
         }
     }, [descExpanded])
+
+    const isHiddenEnrollment = isActive && hiddenFromGifts
 
     useEffect(() => {
         if (descExpanded) {
@@ -134,7 +141,6 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         }
     })()
 
-    const isActive = enrollment?.status === 'ACTIVE'
     const isPending = enrollment?.status === 'PENDING'
 
     // Sửa lỗi hydration: Format ngày chỉ ở client side
@@ -178,6 +184,19 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
         }
     }
 
+    const handleToggleHidden = async () => {
+        setToggleLoading(true)
+        try {
+            const enrollmentId = enrollment?.enrollmentId
+            if (!enrollmentId) return
+            const result = await toggleHiddenFromGifts(enrollmentId)
+            if (result.success) {
+                setHiddenFromGifts(result.hiddenFromGifts)
+            }
+        } catch {}
+        finally { setToggleLoading(false) }
+    }
+
     const progressPct = enrollment && enrollment.totalLessons > 0
         ? Math.round((enrollment.completedCount / enrollment.totalLessons) * 100)
         : 0
@@ -200,10 +219,15 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         alt={course.name_lop}
                         fill
                         unoptimized={course.link_anh_bia?.includes('postimg.cc') ?? false}
-                        priority={priority} // Ưu tiên load các card đầu tiên
+                        priority={priority}
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
+                    {isHiddenEnrollment && (
+                        <div className="absolute top-2 right-2 bg-gray-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <EyeOff className="w-3 h-3" /> Đã ẩn
+                        </div>
+                    )}
                 </Link>
 
                 {/* Nội dung - Giữ nguyên 100% */}
@@ -274,6 +298,16 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-brk-background px-2.5 py-0.5 text-[10px] font-black tracking-wider text-brk-on-surface shadow-sm border border-brk-outline">
                             <Users className="w-3 h-3" />
                             {(course.activeStudentCount ?? course._count?.enrollments ?? 0).toLocaleString('vi-VN')} thành viên
+                            {isActive && (
+                                <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleToggleHidden(); }}
+                                    disabled={toggleLoading}
+                                    className="ml-1 hover:opacity-70 transition-opacity"
+                                    title={hiddenFromGifts ? 'Hiện trong Món quà' : 'Ẩn khỏi Món quà'}
+                                >
+                                    {hiddenFromGifts ? <Eye className="w-3 h-3 text-gray-400" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                                </button>
+                            )}
                         </span>
 
                         {/* Chia sẻ */}
@@ -368,7 +402,6 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             )}
                         </button>
                     </div>
-
 
                 </div>
             </div>
