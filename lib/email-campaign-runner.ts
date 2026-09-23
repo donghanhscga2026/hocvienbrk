@@ -5,7 +5,7 @@ import { spinContent } from "@/lib/email-spin";
 import { google } from "googleapis";
 import { getEmailConfig, randomBetween, getEffectiveDailyLimit } from "@/lib/email-config";
 import { sendEmailCampaignNotification } from "@/lib/notifications";
-import { sendTransactionalEmail } from "@/lib/brevo";
+import { sendTransactionalEmail, isBrevoIpBlockedError } from "@/lib/brevo";
 
 export interface Recipient {
   email: string;
@@ -269,6 +269,8 @@ export async function sendGmailFromSender(
   }
 
   const boundary = `----=_Part_${Math.random().toString(36).substring(2)}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
+  const unsubUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(to)}`;
 
   // KHỞI TẠO CẤU TRÚC MULTIPART/RELATED (Dành cho Email có nội dung kèm ảnh nội khối)
   const messageParts = [
@@ -278,6 +280,9 @@ export async function sendGmailFromSender(
     `MIME-Version: 1.0`,
     `Content-Type: multipart/related; boundary="${boundary}"`,
     `Date: ${new Date().toUTCString()}`,
+    `Reply-To: ${sender.email}`,
+    `List-Unsubscribe: <${unsubUrl}>`,
+    `List-Unsubscribe-Post: List-Unsubscribe=One-Click`,
     ``,
     `--${boundary}`,
     `Content-Type: text/html; charset=utf-8`,
@@ -343,13 +348,22 @@ export async function sendViaBrevo(
 
   if (!apiKey) throw new Error('Brevo API key not found')
 
+  const senderEmail = sender.email || process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
+  const unsubUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(to)}`;
+
   const result = await sendTransactionalEmail({
     to: [{ email: to }],
     subject,
     htmlContent: html,
     sender: {
       name: sender.senderName || process.env.BREVO_SENDER_NAME || 'Cộng đồng MFC',
-      email: sender.email || process.env.BREVO_SENDER_EMAIL || 'hocvienbrk@gmail.com',
+      email: senderEmail,
+    },
+    replyTo: { email: senderEmail },
+    headers: {
+      'List-Unsubscribe': `<${unsubUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     },
     tags: [],
     apiKey,
@@ -361,7 +375,7 @@ export async function sendViaBrevo(
 /**
  * Lấy danh sách người nhận dựa trên cấu hình Campaign
  */
-export async function resolveRecipients(campaignId: number): Promise<Recipient[]> {
+async function resolveBaseRecipients(campaignId: number): Promise<Recipient[]> {
   const campaign = await prisma.emailCampaign.findUnique({
     where: { id: campaignId },
   });
@@ -440,6 +454,35 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
   }
 
   return [];
+}
+
+/**
+ * Wrapper công khai: gộp thêm email bổ sung sau (recipientFilter.extraEmails)
+ * vào danh sách gốc. Dùng cho tính năng "bổ sung email cho chiến dịch đã xong".
+ * Email đã có trong danh sách gốc không bị trùng.
+ */
+export async function resolveRecipients(campaignId: number): Promise<Recipient[]> {
+  const base = await resolveBaseRecipients(campaignId);
+  const campaign = await prisma.emailCampaign.findUnique({
+    where: { id: campaignId },
+    select: { recipientFilter: true },
+  });
+  const extra = (campaign?.recipientFilter as any)?.extraEmails;
+  if (!Array.isArray(extra) || extra.length === 0) return base;
+
+  const seen = new Set(base.map(r => r.email.toLowerCase().trim()));
+  const merged = [...base];
+  for (const e of extra) {
+    const rawEmail = typeof e === 'string' ? e : e?.email;
+    if (!rawEmail) continue;
+    const email = String(rawEmail).toLowerCase().trim();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    merged.push(typeof e === 'string'
+      ? { email }
+      : { email, name: e.name || '', userId: e.userId });
+  }
+  return merged;
 }
 
 type EmailSenderRecord = {
@@ -837,6 +880,12 @@ export interface CampaignBatchResult {
 const campaignStats: Map<number, { total: number; sent: number; success: number; failed: number; emailsInBatch: number }> = new Map();
 const recipientsCache: Map<number, Recipient[]> = new Map();
 
+/** Xóa cache người nhận (gọi sau khi bổ sung email để lượt gửi kế tiếp thấy danh sách mới). */
+export function clearCampaignCache(campaignId: number): void {
+  recipientsCache.delete(campaignId);
+  campaignStats.delete(campaignId);
+}
+
 export async function processCampaignBatch(campaignId: number, batchSize: number = 20): Promise<CampaignBatchResult> {
   const config = await getEmailConfig();
 
@@ -1108,6 +1157,14 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
 
     } catch (error: any) {
       console.error(`Gửi email thất bại tới ${recipient.email}:`, error);
+      // Brevo chặn IP chưa whitelist: tắt sender hỏng, KHÔNG tốn quota, gửi lại người này bằng sender khác
+      if (isBrevoIpBlockedError(error)) {
+        console.error(`[Brevo] Sender ${sender.id} bị chặn IP chưa whitelist, tự động tắt.`);
+        await prisma.emailSender.update({ where: { id: sender.id }, data: { isActive: false } });
+        await upsertSenderLogEntry(sender.id, 'failedCount', 1);
+        i--; // thử lại recipient hiện tại với sender khỏe kế tiếp
+        continue;
+      }
       results.failed++;
       stats.failed++;
 

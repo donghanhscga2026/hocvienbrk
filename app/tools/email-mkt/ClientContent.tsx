@@ -106,6 +106,9 @@ function SendersTab() {
   const [brevoEnvVar, setBrevoEnvVar] = useState('')
   const [brevoAdding, setBrevoAdding] = useState(false)
   const [brevoError, setBrevoError] = useState('')
+  const [editingNameId, setEditingNameId] = useState<number | null>(null)
+  const [editingNameValue, setEditingNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/senders/list')
@@ -153,6 +156,27 @@ function SendersTab() {
       }
     } catch (error) { console.error(error) }
     finally { setValidating(false) }
+  }
+
+  const updateSenderName = async (id: number) => {
+    if (!editingNameValue.trim()) return
+    setSavingName(true)
+    try {
+      const res = await fetch(`/api/admin/senders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderName: editingNameValue.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSenders(prev => prev.map(s => s.id === id ? { ...s, senderName: data.sender.senderName } : s))
+        setEditingNameId(null)
+        setEditingNameValue('')
+      } else {
+        alert('Lưu thất bại: ' + await res.text())
+      }
+    } catch { alert('Không thể kết nối server') }
+    finally { setSavingName(false) }
   }
 
   const removeSender = async (id: number) => {
@@ -288,6 +312,27 @@ function SendersTab() {
                 <div>
                   <h3 className="font-bold text-gray-900">{sender.label}</h3>
                   <p className="text-sm text-gray-400">{sender.email}</p>
+                  {editingNameId === sender.id ? (
+                    <div className="flex gap-1.5 mt-1.5">
+                      <input
+                        type="text"
+                        value={editingNameValue}
+                        onChange={e => setEditingNameValue(e.target.value)}
+                        placeholder="Tên người gửi học viên thấy"
+                        className="flex-1 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold min-w-0"
+                      />
+                      <button onClick={() => updateSenderName(sender.id)} disabled={savingName || !editingNameValue.trim()}
+                        className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-2.5 py-1 rounded-lg disabled:opacity-50">Lưu</button>
+                      <button onClick={() => { setEditingNameId(null); setEditingNameValue('') }}
+                        className="text-xs font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded-lg">Hủy</button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Tên người gửi: <span className="font-bold text-gray-700">{sender.senderName || 'Cộng đồng MFC (mặc định)'}</span>
+                      <button onClick={() => { setEditingNameId(sender.id); setEditingNameValue(sender.senderName || '') }}
+                        className="ml-2 text-blue-600 hover:text-blue-800 font-bold">Sửa</button>
+                    </p>
+                  )}
                   <div className="flex gap-1.5 mt-1 flex-wrap">
                     {sender.isMain && (
                       <span className="inline-block bg-black text-yellow-400 text-xs font-bold px-2 py-0.5 rounded">Main</span>

@@ -2,6 +2,37 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  const { id: idStr } = await params;
+  const id = parseInt(idStr);
+
+  if (session?.user?.role !== "ADMIN") {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const { senderName } = await req.json();
+    const name = String(senderName ?? "").trim();
+    if (!name) {
+      return new NextResponse("Tên người gửi không được để trống", { status: 400 });
+    }
+
+    const updated = await prisma.emailSender.update({
+      where: { id },
+      data: { senderName: name },
+    });
+
+    return NextResponse.json({ success: true, sender: updated });
+  } catch (error: any) {
+    console.error("❌ Lỗi khi cập nhật Sender:", error.message);
+    return new NextResponse(error.message, { status: 500 });
+  }
+}
+
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }

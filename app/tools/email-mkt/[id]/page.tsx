@@ -3,7 +3,8 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban, Search, FileSpreadsheet } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, Play, Trash2, RefreshCw, XCircle, Ban, Search, FileSpreadsheet, Eye } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { Button } from '@/components/ui/button'
 
@@ -63,6 +64,8 @@ interface SenderStat {
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const { data: session } = useSession()
+  const isTeacher = session?.user?.role === 'TEACHER'
 
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -76,6 +79,14 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const [bounceResult, setBounceResult] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  const [extraEmails, setExtraEmails] = useState('')
+  const [addingEmails, setAddingEmails] = useState(false)
+  const [addResult, setAddResult] = useState('')
+  const [addSource, setAddSource] = useState('CSV')
+  const [addCourseId, setAddCourseId] = useState('')
+  const [addCourses, setAddCourses] = useState<any[]>([])
+  const [addPreview, setAddPreview] = useState<any[] | null>(null)
+  const [addPreviewLoading, setAddPreviewLoading] = useState(false)
 
   const fetchCampaign = async () => {
     try {
@@ -130,6 +141,14 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     }, 5000)
     return () => clearInterval(interval)
   }, [campaign?.status, sending])
+
+  useEffect(() => {
+    if (addSource !== 'DB_ACTIVE' || addCourses.length > 0) return
+    fetch('/api/courses')
+      .then(res => res.ok ? res.json() : { courses: [] })
+      .then(data => setAddCourses(data.courses || []))
+      .catch(() => {})
+  }, [addSource])
 
   const handleSendBatch = async () => {
     const isResume = (campaign?.sentCount || 0) > 0
@@ -201,6 +220,76 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         await fetchLogs()
       }
     } catch {}
+  }
+
+  const handleRetryFailed = async () => {
+    const failCount = (logSummary?.failed || 0) + (logSummary?.bounced || 0)
+    if (!failCount) return
+    if (!confirm(`Chỉ gửi lại ${failCount} email lỗi, giữ nguyên ${logSummary?.sent || 0} email đã gửi?`)) return
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/retry-failed`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Lỗi không xác định')
+      await fetchCampaign()
+      await fetchLogs()
+      if (data.retried > 0) await handleSendBatch()
+    } catch (err: any) {
+      setSendProgress(`Lỗi gửi lại: ${err.message}`)
+    }
+  }
+
+  const handleAddPreview = async () => {
+    setAddPreviewLoading(true)
+    setAddPreview(null)
+    try {
+      if (addSource === 'CSV' || addSource === 'GOOGLE_SHEET') {
+        const res = await fetch('/api/admin/campaigns/potential-recipients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: addSource, recipientCsvData: extraEmails })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setAddPreview(Array.isArray(data) ? data : [])
+        } else {
+          setAddResult(`Lỗi: ${await res.text() || 'Lỗi phân tích nguồn dữ liệu'}`)
+        }
+      } else {
+        let url = `/api/admin/campaigns/potential-recipients?source=${addSource}`
+        if (addSource === 'DB_ACTIVE' && addCourseId) url += `&courseId=${addCourseId}`
+        const res = await fetch(url)
+        if (res.ok) {
+          const data = await res.json()
+          setAddPreview(Array.isArray(data) ? data : [])
+        }
+      }
+    } catch {}
+    setAddPreviewLoading(false)
+  }
+
+  const handleAddRecipients = async () => {
+    setAddingEmails(true)
+    setAddResult('')
+    try {
+      const res = await fetch(`/api/admin/campaigns/${id}/add-recipients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: addSource, rawText: extraEmails, recipientCsvData: extraEmails, courseId: addCourseId }),
+      })
+      const text = await res.text().catch(() => '')
+      let data: any = {}
+      try { data = JSON.parse(text) } catch {}
+      if (!res.ok) throw new Error(data.error || text || 'Lỗi không xác định')
+      setAddResult(`Đã thêm ${data.added} email mới${data.skipped ? `, bỏ qua ${data.skipped} email đã có` : ''}. Tổng: ${data.totalRecipients}. Bấm "Gửi tiếp" để gửi.`)
+      setExtraEmails('')
+      setAddPreview(null)
+      await fetchCampaign()
+      await fetchLogs()
+    } catch (err: any) {
+      const msg = err.message && err.message !== '{}' ? err.message : 'Lỗi không xác định'
+      setAddResult(`Lỗi: ${msg}`)
+    }
+    setAddingEmails(false)
   }
 
   const handleDelete = async () => {
@@ -411,10 +500,18 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           )}
 
           {(campaign.status === 'COMPLETED' || campaign.status === 'FAILED') && (
-            <Button onClick={handleRestart}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
-              <RefreshCw className="w-4 h-4" /> Gửi lại
-            </Button>
+            <>
+              {((logSummary?.failed || 0) + (logSummary?.bounced || 0)) > 0 && (
+                <Button onClick={handleRetryFailed} disabled={sending}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+                  <RefreshCw className="w-4 h-4" /> Gửi lại {(logSummary?.failed || 0) + (logSummary?.bounced || 0)} email lỗi
+                </Button>
+              )}
+              <Button onClick={handleRestart}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4" /> Gửi lại toàn bộ
+              </Button>
+            </>
           )}
 
           <Button onClick={handleDelete}
@@ -458,6 +555,79 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
             </div>
           )}
         </div>
+
+        {(campaign.status === 'COMPLETED' || campaign.status === 'FAILED' || campaign.status === 'RUNNING') && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+            <h2 className="font-black text-gray-900 uppercase tracking-tight text-sm">Bổ sung email</h2>
+            <p className="text-[11px] text-gray-400">Chọn nguồn giống lúc tạo chiến dịch. Email đã có trong chiến dịch sẽ tự bỏ qua, không gửi trùng.</p>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Nguồn</label>
+              <select value={addSource} onChange={e => { setAddSource(e.target.value); setAddPreview(null); setExtraEmails(''); setAddResult('') }}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
+                {!isTeacher && <option value="DB_ALL">Tất cả thành viên (đã xác thực email)</option>}
+                {!isTeacher && <option value="DB_ALL_INCLUDING_UNVERIFIED">Tất cả thành viên (cả chưa xác thực email)</option>}
+                <option value="DB_ACTIVE">Thành viên đang học trong khóa</option>
+                <option value="CSV">Danh sách tự nhập thủ công (Email/Tên)</option>
+                <option value="GOOGLE_SHEET">Link Google Sheet chứa Email</option>
+              </select>
+            </div>
+
+            {addSource === 'DB_ACTIVE' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Chọn khóa học *</label>
+                <select value={addCourseId} onChange={e => setAddCourseId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
+                  <option value="">-- Chọn khóa --</option>
+                  {addCourses.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.name_lop} ({c.id_khoa})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {addSource === 'CSV' && (
+              <textarea value={extraEmails} onChange={e => setExtraEmails(e.target.value)}
+                rows={4}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none resize-y font-sans font-bold"
+                placeholder={`Mỗi người một dòng:\nnguyenvana@gmail.com, Nguyễn Văn A\ntranthib@gmail.com; Trần Thị B`} />
+            )}
+
+            {addSource === 'GOOGLE_SHEET' && (
+              <input type="url" value={extraEmails} onChange={e => setExtraEmails(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none"
+                placeholder="https://docs.google.com/spreadsheets/d/.../edit" />
+            )}
+
+            <Button onClick={handleAddPreview} disabled={addPreviewLoading}
+              className="w-full bg-gray-100 text-gray-700 font-bold text-sm rounded-xl py-2.5 flex items-center justify-center gap-2">
+              {addPreviewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+              Xem trước người nhận
+            </Button>
+
+            {addPreview && (
+              <div className="bg-gray-50 rounded-xl p-3 max-h-40 overflow-y-auto">
+                <p className="text-xs font-bold text-gray-500 mb-1">Tổng: {addPreview.length} người</p>
+                {addPreview.slice(0, 10).map((u: any, i: number) => (
+                  <div key={i} className="text-xs text-gray-600 truncate">{u.email}{u.name ? ` (${u.name})` : ''}</div>
+                ))}
+                {addPreview.length > 10 && (
+                  <p className="text-xs text-gray-400 mt-1">...và {addPreview.length - 10} người khác</p>
+                )}
+              </div>
+            )}
+
+            <Button onClick={handleAddRecipients}
+              disabled={addingEmails || (addSource === 'CSV' && !extraEmails.trim()) || (addSource === 'GOOGLE_SHEET' && !extraEmails.trim()) || (addSource === 'DB_ACTIVE' && !addCourseId)}
+              className="w-full bg-black text-yellow-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+              {addingEmails ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Thêm email vào chiến dịch
+            </Button>
+            {addResult && (
+              <div className="bg-gray-50 rounded-xl p-3 text-xs font-bold text-gray-600">
+                {addResult}
+              </div>
+            )}
+          </div>
+        )}
 
         {issueLogs.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">

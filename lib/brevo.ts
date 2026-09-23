@@ -239,3 +239,12 @@ export async function createBrevoContact(
 export function validateApiKey(apiKey: string): Promise<BrevoAccountInfo> {
   return brevoFetch<BrevoAccountInfo>('GET', '/account', undefined, apiKey)
 }
+
+/**
+ * Nhận diện lỗi Brevo chặn IP chưa whitelist (security/authorised_ips).
+ * Gặp ở cả POST /smtp/email và GET /account khi account bật "Authorised IPs".
+ */
+export function isBrevoIpBlockedError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error ?? '')
+  return /unrecognised IP address|authorised_ips|authorized_ips/i.test(msg)
+}

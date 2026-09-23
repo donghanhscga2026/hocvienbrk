@@ -28,14 +28,30 @@ export async function GET() {
     const invalidSenders: number[] = [];
 
     for (const sender of senders) {
-      // Bỏ qua Brevo senders (không dùng OAuth)
+      // Brevo sender: kiểm tra thật bằng GET /account để phát hiện chặn IP
       if ((sender as any).provider === 'brevo') {
-        results.push({
-          id: sender.id,
-          email: sender.email,
-          label: sender.label,
-          isValid: true,
-        });
+        try {
+          const s = sender as any;
+          let apiKey: string | null = s.apiKeyEnvVar ? process.env[s.apiKeyEnvVar] || null : null;
+          if (!apiKey && s.apiKeyEncrypted) {
+            const { decrypt } = await import("@/lib/email-encryptor");
+            apiKey = decrypt(s.apiKeyEncrypted);
+          }
+          if (!apiKey) throw new Error(`Chưa cấu hình API key (${s.apiKeyEnvVar || 'không có env var'})`);
+          const { validateApiKey, isBrevoIpBlockedError } = await import("@/lib/brevo");
+          await validateApiKey(apiKey);
+          results.push({ id: sender.id, email: sender.email, label: sender.label, isValid: true });
+        } catch (error: any) {
+          const { isBrevoIpBlockedError } = await import("@/lib/brevo");
+          const blocked = isBrevoIpBlockedError(error);
+          results.push({
+            id: sender.id, email: sender.email, label: sender.label, isValid: false,
+            error: blocked
+              ? `Brevo chặn IP chưa whitelist. Vào app.brevo.com/security/authorised_ips để tắt giới hạn hoặc thêm IP Vercel. (${error.message})`
+              : (error.message || 'Lỗi kết nối Brevo'),
+          });
+          invalidSenders.push(sender.id);
+        }
         continue
       }
 
