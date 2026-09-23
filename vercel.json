@@ -1,3 +1,16 @@
 {
-  "regions": ["sin1"]
+  "regions": ["sin1"],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "zoom.tenmien.com"
+        }
+      ],
+      "destination": "https://us06web.zoom.us/j/9789413193?pwd=LQDzDDqOWgb5pLk3RhCmFw3KuDUoIR.1",
+      "permanent": false
+    }
+  ]
 }
