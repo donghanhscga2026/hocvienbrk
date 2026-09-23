@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
+import { isValidImageUrl } from '@/lib/image-utils'
 import { Lightbulb } from 'lucide-react'
 
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })
@@ -228,7 +229,7 @@ export default function MessageCard({
                 <Dialog open={isOpen}>
                     <DialogContent className="sm:max-w-lg bg-brk-surface border-brk-outline text-brk-on-surface overflow-hidden p-0 shadow-xl">
                         <div className="relative w-full h-64">
-                            {heroImage ? (
+                            {heroImage && isValidImageUrl(heroImage) ? (
                                 <Image
                                     src={heroImage}
                                     alt="Detail Background"

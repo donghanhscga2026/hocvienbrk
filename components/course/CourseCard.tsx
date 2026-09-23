@@ -9,6 +9,7 @@ import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModa
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction, getBrkMbvBalanceAction, toggleHiddenFromGifts } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
+import { isValidImageUrl } from '@/lib/image-utils'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
 import { Share2, BookOpen, Users, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react'
@@ -215,7 +216,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                     title={course.name_lop}
                 >
                     <Image
-                        src={course.link_anh_bia || '/og-image.png'}
+                        src={isValidImageUrl(course.link_anh_bia) ? course.link_anh_bia : '/og-image.png'}
                         alt={course.name_lop}
                         fill
                         unoptimized={course.link_anh_bia?.includes('postimg.cc') ?? false}

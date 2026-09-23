@@ -138,6 +138,16 @@ async function main() {
                 order: 2,
                 isActive: true,
             },
+            {
+                slug: 'vouchers',
+                name: 'Voucher',
+                description: 'bgPurple500|Quản lý voucher và mã giảm giá',
+                icon: 'Tag',
+                url: '/tools/vouchers',
+                roles: [Role.ADMIN, Role.TEACHER],
+                order: 12,
+                isActive: true,
+            },
         ]
 
         for (const tool of tools) {

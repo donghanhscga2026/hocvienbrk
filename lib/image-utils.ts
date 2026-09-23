@@ -200,7 +200,27 @@ export async function resolveImageUrl(
         console.log(`✅ [resolveImageUrl] Đã migrate "${trimmed}" -> "${storedUrl}"`);
         return storedUrl;
     } catch (error: any) {
-        console.warn(`⚠️ [resolveImageUrl] Không thể tải/nén "${trimmed}": ${error.message}`);
-        return trimmed;
+        console.warn(`⚠️ [resolveImageUrl] Không thể tải/nén "${trimmed}": ${error.message}`)
+        return trimmed
+    }
+}
+
+/**
+ * Kiểm tra xem một giá trị link_anh_bia có phải URL ảnh hợp lệ không.
+ * Bỏ qua các placeholder bị lỗi phổ biến như "image.png".
+ */
+export function isValidImageUrl(url: string | null | undefined): boolean {
+    if (!url) return false
+    const trimmed = url.trim()
+    if (!trimmed) return false
+    // Các giá trị placeholder không hợp lệ
+    const invalidValues = ['image.png', 'image.jpg', 'image.jpeg', 'image.gif', '']
+    if (invalidValues.includes(trimmed.toLowerCase())) return false
+    // Phải là URL hợp lệ có protocol http/https hoặc là relative path bắt đầu bằng /
+    try {
+        const parsed = new URL(trimmed)
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+        return trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../')
     }
 }

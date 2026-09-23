@@ -2676,3 +2676,214 @@ export async function getSharingSponsorTreeAction(userId: number) {
     }
 }
 
+// ==========================================
+// VOUCHER MANAGEMENT
+// ==========================================
+
+export async function createVoucher(data: {
+    code: string
+    name: string
+    type: 'VIP' | 'ALL' | 'CASH'
+    value?: number
+    durationDays?: number | null
+    description?: string | null
+}) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) {
+            return { success: false, error: "Unauthorized: Admin only" }
+        }
+
+        const existing = await prisma.voucher.findUnique({ where: { code: data.code } })
+        if (existing) {
+            return { success: false, error: "Voucher code already exists" }
+        }
+
+        const voucher = await prisma.voucher.create({
+            data: {
+                code: data.code,
+                name: data.name,
+                type: data.type,
+                value: data.value ?? 0,
+                durationDays: data.durationDays ?? null,
+                description: data.description ?? null,
+                isActive: true
+            }
+        })
+
+        revalidatePath('/api/vouchers')
+        return { success: true, voucher }
+    } catch (error: any) {
+        console.error('createVoucher error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function deleteVoucher(voucherId: number) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) {
+            return { success: false, error: "Unauthorized: Admin only" }
+        }
+
+        const voucher = await prisma.voucher.findUnique({ where: { id: voucherId } })
+        if (!voucher) {
+            return { success: false, error: "Voucher not found" }
+        }
+
+        const usedInCourse = await prisma.courseVoucherAward.count({ where: { voucherId } })
+        const usedInAccepted = await prisma.courseAcceptedVoucher.count({ where: { voucherId } })
+        if (usedInCourse > 0 || usedInAccepted > 0) {
+            return { 
+                success: false, 
+                error: "Không thể xóa: Voucher đang được sử dụng trong khóa học",
+                usedInCourse,
+                usedInAccepted
+            }
+        }
+
+        await prisma.voucher.delete({ where: { id: voucherId } })
+
+        revalidatePath('/api/vouchers')
+        return { success: true, deletedId: voucherId }
+    } catch (error: any) {
+        console.error('deleteVoucher error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function getVouchersWithCourses() {
+    try {
+        const session = await auth()
+        if (!session?.user?.id) {
+            return { success: false, error: "Unauthorized" }
+        }
+
+        const userRole = session.user.role as Role
+        const userId = Number(session.user.id)
+
+        let vouchers
+        if (userRole === Role.ADMIN) {
+            vouchers = await prisma.voucher.findMany({
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    awardedCourses: {
+                        include: { course: { select: { id: true, id_khoa: true, name_lop: true, teacherId: true } } }
+                    },
+                    acceptedCourses: {
+                        include: { course: { select: { id: true, id_khoa: true, name_lop: true, teacherId: true } } }
+                    }
+                }
+            })
+        } else if (userRole === Role.TEACHER) {
+            const teacherCourses = await prisma.course.findMany({
+                where: { teacherId: userId },
+                select: { id: true }
+            })
+            const courseIds = teacherCourses.map(c => c.id)
+            const voucherAwardIds = await prisma.courseVoucherAward.findMany({
+                where: { courseId: { in: courseIds } },
+                select: { voucherId: true }
+            })
+            const acceptedVoucherIds = await prisma.courseAcceptedVoucher.findMany({
+                where: { courseId: { in: courseIds } },
+                select: { voucherId: true }
+            })
+            const allVoucherIds = [...voucherAwardIds, ...acceptedVoucherIds].map(v => v.voucherId)
+            const uniqueVoucherIds = [...new Set(allVoucherIds)]
+            vouchers = await prisma.voucher.findMany({
+                where: { id: { in: uniqueVoucherIds } },
+                orderBy: { createdAt: 'desc' }
+            })
+        } else {
+            return { success: false, error: "Forbidden" }
+        }
+
+        return { success: true, vouchers }
+    } catch (error: any) {
+        console.error('getVouchersWithCourses error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+// ==========================================
+// VOUCHER ↔ COURSE LINKING
+// ==========================================
+
+export async function awardVoucherToCourse(data: { voucherId: number; courseId: number }) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) {
+            return { success: false, error: "Unauthorized: Admin only" }
+        }
+
+        const existing = await prisma.courseVoucherAward.findFirst({
+            where: { voucherId: data.voucherId, courseId: data.courseId }
+        })
+        if (existing) {
+            return { success: false, error: "Voucher đã được gắn cho khóa này" }
+        }
+
+        const award = await prisma.courseVoucherAward.create({
+            data: { voucherId: data.voucherId, courseId: data.courseId }
+        })
+
+        revalidatePath('/api/vouchers')
+        return { success: true, award }
+    } catch (error: any) {
+        console.error('awardVoucherToCourse error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function acceptVoucherToCourse(data: { voucherId: number; courseId: number }) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) {
+            return { success: false, error: "Unauthorized: Admin only" }
+        }
+
+        const existing = await prisma.courseAcceptedVoucher.findFirst({
+            where: { voucherId: data.voucherId, courseId: data.courseId }
+        })
+        if (existing) {
+            return { success: false, error: "Voucher đã được chấp nhận cho khóa này" }
+        }
+
+        const accepted = await prisma.courseAcceptedVoucher.create({
+            data: { voucherId: data.voucherId, courseId: data.courseId }
+        })
+
+        revalidatePath('/api/vouchers')
+        return { success: true, accepted }
+    } catch (error: any) {
+        console.error('acceptVoucherToCourse error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function removeVoucherFromCourse(data: { voucherId: number; courseId: number; type: 'award' | 'accepted' }) {
+    try {
+        const session = await auth()
+        if (session?.user?.role !== Role.ADMIN) {
+            return { success: false, error: "Unauthorized: Admin only" }
+        }
+
+        if (data.type === 'award') {
+            await prisma.courseVoucherAward.deleteMany({
+                where: { voucherId: data.voucherId, courseId: data.courseId }
+            })
+        } else {
+            await prisma.courseAcceptedVoucher.deleteMany({
+                where: { voucherId: data.voucherId, courseId: data.courseId }
+            })
+        }
+
+        revalidatePath('/api/vouchers')
+        return { success: true }
+    } catch (error: any) {
+        console.error('removeVoucherFromCourse error:', error)
+        return { success: false, error: error.message }
+    }
+}
+

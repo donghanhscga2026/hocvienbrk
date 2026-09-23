@@ -13,6 +13,7 @@ import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import MainHeader from '@/components/layout/MainHeader'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
+import { isValidImageUrl } from '@/lib/image-utils'
 
 interface CourseLesson {
     id: string
@@ -235,10 +236,10 @@ export default function CourseLandingTemplate({
                 <div className="container mx-auto px-4">
                     <div className="max-w-lg mx-auto">
                         <div className="bg-brk-surface rounded-3xl shadow-2xl border border-brk-outline p-6 md:p-8">
-                            {course.link_anh_bia && (
+                            {isValidImageUrl(course.link_anh_bia) && (
                                 <div className="relative aspect-video w-full rounded-2xl overflow-hidden mb-4 bg-brk-background">
                                     <Image
-                                        src={course.link_anh_bia}
+                                        src={course.link_anh_bia!}
                                         alt={course.name_lop}
                                         fill
                                         priority

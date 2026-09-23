@@ -2126,3 +2126,50 @@ Mở rộng tính năng auto-approve thanh toán khóa học cho tất cả các
 
 
 - ✅ Đã tạo cổng Webhook SePay/Casso tự động nhận diện giao dịch qua accountNumber tại app/api/webhooks/sepay/route.ts
+
+## ✅ [Fix] Lỗi "Cannot read 'image.png'" — Invalid Image URL (2026-09-23)
+
+### Vấn đề
+`course.link_anh_bia` chứa giá trị placeholder bị lỗi `"image.png"` trong database. Next.js `<Image>` component coi chuỗi này là URL hợp lệ → cố load → lỗi "Cannot read 'image.png' (this model does not support image input)".
+
+### Nguyên nhân
+- `CourseCard.tsx` dùng `course.link_anh_bia || '/og-image.png'` → `"image.png"` là truthy nên fallback không bật
+- `CourseLandingTemplate.tsx` dùng `course.link_anh_bia && <Image>` → `"image.png"` là truthy
+
+### Fix
+- Thêm `isValidImageUrl()` vào `lib/image-utils.ts` — kiểm tra URL hợp lệ, bỏ qua placeholder như `"image.png"`, `"image.jpg"`, `""`
+- Sửa `CourseCard.tsx` và `CourseLandingTemplate.tsx` dùng `isValidImageUrl(course.link_anh_bia)` thay cho truthiness check
+- `npx tsc --noEmit` → ✅ Exit code: 0
+
+### File đã sửa
+- `lib/image-utils.ts` — thêm `isValidImageUrl()`
+- `components/course\CourseCard.tsx` — dùng `isValidImageUrl` cho Image src
+- `components\landing\CourseLandingTemplate.tsx` — dùng `isValidImageUrl` cho Image src
+
+### Trạng thái
+- ✅ Build sạch lỗi TypeScript
+- ✅ Fallback `/og-image.png` hiển thị khi `link_anh_bia` không hợp lệ
+
+## ✅ [Feature] Trang quản lý Voucher đầy đủ — Phân quyền ADMIN/TEACHER (2026-09-23)
+
+### Mục tiêu
+Tạo trang quản lý voucher (CRUD) cho admin và teacher với phân quyền đúng:
+- **ADMIN**: Toàn bộ voucher trong hệ thống
+- **TEACHER**: Chỉ voucher gắn với khóa của mình
+
+### File đã tạo/sửa
+- `app/api/vouchers/route.ts` — thêm `POST` (tạo), `DELETE` (xóa); GET lọc theo role
+- `app/actions/admin-actions.ts` — thêm `createVoucher`, `deleteVoucher`, `getVouchersWithCourses`
+- `app/tools/vouchers/page.tsx` — trang quản lý voucher mới: table, stats, tạo modal, xoá xác nhận
+- `prisma/seed.ts` — thêm Tool entry `vouchers` với roles `[Role.ADMIN, Role.TEACHER]`
+- `app/tools/page.tsx` — thêm `Tag` vào iconMap
+
+### Quy tắc phân quyền
+- **ADMIN**: Tạo, xóa, xem tất cả voucher + associated courses
+- **TEACHER**: Chỉ xem voucher gắn với `course.teacherId = userId` (qua `CourseVoucherAward`, `CourseAcceptedVoucher`)
+- `createVoucher` / `deleteVoucher` action: chỉ ADMIN mới gọi được
+
+### Trạng thái
+- ✅ `npx tsc --noEmit` → Exit code: 0
+- ✅ Trang `/tools/vouchers` hoạt động
+- ✅ API `GET/POST/DELETE /api/vouchers` hoàn chỉnh

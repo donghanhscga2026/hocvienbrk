@@ -7,6 +7,7 @@ import { Clock, CheckCircle, XCircle, AlertCircle, QrCode, RotateCcw, Ban, Squar
 import Image from 'next/image'
 import MainHeader from '@/components/layout/MainHeader'
 import { resolveBankBin } from '@/lib/bank-bin'
+import { isValidImageUrl } from '@/lib/image-utils'
 
 interface PaymentData {
   id: number
@@ -846,15 +847,15 @@ export default function PaymentsPage() {
                     </div>
                   )}
 
-                  {/* Proof Image */}
-                  {payment.proofImage && (
-                    <div className="mb-2.5">
-                      <p className="text-[9px] text-blue-600 font-bold uppercase mb-1.5">📎 Biên lai</p>
-                      <div className="relative w-full h-36 border-2 border-blue-100 rounded-lg overflow-hidden">
-                        <Image src={payment.proofImage} alt="Biên lai" fill className="object-cover" />
-                      </div>
-                    </div>
-                  )}
+{/* Proof Image */}
+                      {payment.proofImage && isValidImageUrl(payment.proofImage) && (
+                        <div className="mb-2.5">
+                          <p className="text-[9px] text-blue-600 font-bold uppercase mb-1.5">📎 Biên lai</p>
+                          <div className="relative w-full h-36 border-2 border-blue-100 rounded-lg overflow-hidden">
+                            <Image src={payment.proofImage} alt="Biên lai" fill className="object-cover" />
+                          </div>
+                        </div>
+                      )}
 
                   {/* Action Buttons */}
                   <div className="pt-2 border-t border-gray-100 space-y-1.5">
