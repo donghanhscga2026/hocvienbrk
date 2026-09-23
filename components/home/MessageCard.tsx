@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
-import { isValidImageUrl } from '@/lib/image-utils'
+import { isValidImageUrl } from '@/lib/image-validation'
 import { Lightbulb } from 'lucide-react'
 
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => mod.Dialog), { ssr: false })

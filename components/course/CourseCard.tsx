@@ -9,7 +9,7 @@ import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModa
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction, getBrkMbvBalanceAction, toggleHiddenFromGifts } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
-import { isValidImageUrl } from '@/lib/image-utils'
+import { isValidImageUrl } from '@/lib/image-validation'
 import ShareModal from '@/components/share/ShareModal'
 import LessonTocModal from './LessonTocModal'
 import { Share2, BookOpen, Users, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react'

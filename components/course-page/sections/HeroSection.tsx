@@ -4,7 +4,7 @@ import React from 'react'
 import Image from 'next/image'
 import { Share2, BookOpen, Clock, Users, ListChecks } from 'lucide-react'
 import { HeroSectionContent } from '@/lib/course-page/types'
-import { isValidImageUrl } from '@/lib/image-utils'
+import { isValidImageUrl } from '@/lib/image-validation'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 
 interface HeroSectionProps {

@@ -13,7 +13,7 @@ import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import MainHeader from '@/components/layout/MainHeader'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
-import { isValidImageUrl } from '@/lib/image-utils'
+import { isValidImageUrl } from '@/lib/image-validation'
 
 interface CourseLesson {
     id: string

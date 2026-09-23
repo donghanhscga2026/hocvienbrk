@@ -7,7 +7,7 @@ import { Clock, CheckCircle, XCircle, AlertCircle, QrCode, RotateCcw, Ban, Squar
 import Image from 'next/image'
 import MainHeader from '@/components/layout/MainHeader'
 import { resolveBankBin } from '@/lib/bank-bin'
-import { isValidImageUrl } from '@/lib/image-utils'
+import { isValidImageUrl } from '@/lib/image-validation'
 
 interface PaymentData {
   id: number
