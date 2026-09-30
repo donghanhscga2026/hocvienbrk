@@ -484,7 +484,7 @@ export async function sendWelcomeEmail(to: string, studentName: string, studentI
 export async function sendOtpStatusNotification(
   email: string, 
   studentName: string, 
-  otpCode: string, 
+  _otpCode: string, 
   success: boolean, 
   errorMsg?: string, 
   userId?: number
@@ -495,7 +495,7 @@ export async function sendOtpStatusNotification(
               `━━━━━━━━━━━━━━\n` +
               `👤 Thành viên: <b>${studentName}</b> ${userId ? `(#${userId})` : ''}\n` +
               `📧 Email: <code>${email}</code>\n` +
-              `🔑 Mã OTP: <code>${otpCode}</code>${errorInfo}`;
+              `🔐 Mã OTP: [REDACTED]${errorInfo}`;
   
   await sendTelegram(msg, 'CRON_LOG');
 }
