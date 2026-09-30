@@ -49,7 +49,7 @@ export async function POST(request: Request) {
         // Gửi thông báo Telegram
         try {
             const { sendTelegram } = await import("@/lib/notifications")
-            const msg = `🔐 <b>ĐẶT LẠI MẬT KHẨU</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n🔑 Mật khẩu mới: <code>${newPassword}</code>\n\n✅ Đã đặt lại mật khẩu thành công qua chức năng Quên mật khẩu.`
+            const msg = `🔐 <b>ĐẶT LẠI MẬT KHẨU</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}\n\n✅ Đã đặt lại mật khẩu thành công qua chức năng Quên mật khẩu.`
             await sendTelegram(msg, 'CHANGE')
 
             const { logActivity } = await import("@/lib/activity-logger");
@@ -59,7 +59,6 @@ export async function POST(request: Request) {
                 detail: 'Đặt lại mật khẩu qua Quên mật khẩu',
                 metadata: { 
                     email: user.email || null,
-                    newPassword: newPassword
                 }
             })
         } catch (error) {
