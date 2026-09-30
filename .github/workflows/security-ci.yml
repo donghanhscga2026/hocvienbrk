@@ -28,6 +28,15 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - name: Lint security-critical changed files
-        run: npx eslint auth.ts auth.config.ts proxy.ts app/login/page.tsx app/api/auth/change-password/route.ts app/api/auth/report-failed-login/route.ts app/api/auth/reset-password/route.ts app/api/auth/forgot-password/route.ts lib/notifications.ts --rule '@typescript-eslint/no-explicit-any: off' --rule 'react-hooks/set-state-in-effect: off' --rule '@typescript-eslint/no-unused-vars: warn'
+        run: >-
+          npx eslint auth.ts auth.config.ts proxy.ts app/login/page.tsx
+          app/api/auth/change-password/route.ts
+          app/api/auth/report-failed-login/route.ts
+          app/api/auth/reset-password/route.ts
+          app/api/auth/forgot-password/route.ts
+          lib/notifications.ts
+          --rule "@typescript-eslint/no-explicit-any:off"
+          --rule "react-hooks/set-state-in-effect:off"
+          --rule "@typescript-eslint/no-unused-vars:warn"
       - name: Production build
         run: npm run build
