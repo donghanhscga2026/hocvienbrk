@@ -58,6 +58,7 @@ model User {
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
+  crmContacts                  CrmContact[]
 
   @@index([email])
   @@index([phone])
@@ -1718,6 +1719,82 @@ model CoursePageVersion {
 
   @@unique([coursePageId, versionNumber])
   @@map("course_page_versions")
+}
+
+// CRM phase 1: contacts are independent of login accounts and affiliate ownership.
+model CrmContact {
+  id            Int              @id @default(autoincrement())
+  name          String
+  email         String?          @unique
+  phone         String?          @unique
+  source        String           @default("Nhập tay")
+  needs         String           @default("")
+  tags          String[]         @default([])
+  ownerId       Int?
+  owner         User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy     Int
+  archived      Boolean          @default(false)
+  version       Int              @default(1)
+  lastContactAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  opportunities CrmOpportunity[]
+  activities    CrmActivity[]
+  tasks         CrmTask[]
+
+  @@index([ownerId, archived, updatedAt])
+}
+
+model CrmOpportunity {
+  id        Int          @id @default(autoincrement())
+  contactId Int
+  title     String
+  stage     CrmStage     @default(NEW)
+  amount    Int          @default(0)
+  lostReason String      @default("")
+  version   Int          @default(1)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  contact   CrmContact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, stage])
+}
+
+model CrmActivity {
+  id         Int        @id @default(autoincrement())
+  contactId  Int
+  type       String
+  content    String
+  authorId   Int
+  authorName String
+  createdAt  DateTime   @default(now())
+  contact    CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+}
+
+model CrmTask {
+  id          Int        @id @default(autoincrement())
+  contactId   Int
+  title       String
+  dueAt       DateTime
+  completedAt DateTime?
+  createdBy   Int
+  createdAt   DateTime   @default(now())
+  contact     CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, completedAt, dueAt])
+  @@index([completedAt, dueAt])
+}
+
+enum CrmStage {
+  NEW
+  CONTACTING
+  QUALIFIED
+  PROPOSAL
+  PAYMENT_PENDING
+  WON
+  LOST
 }
 
 enum CampaignStatus {
