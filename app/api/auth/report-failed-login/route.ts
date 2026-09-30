@@ -16,7 +16,7 @@ function detectIdentifierType(identifier: string): IdentifierType {
 
 export async function POST(request: NextRequest) {
   try {
-    const { identifier, password } = await request.json();
+    const { identifier } = await request.json();
     if (!identifier) {
       return NextResponse.json({ error: "Missing identifier" }, { status: 400 });
     }
@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
       `━━━━━━━━━━━━━━━━━━━━━\n` +
       `📍 Định danh nhập vào: <code>${identifier}</code>\n` +
       `📋 Loại định danh: ${typeLabels[identifierType]}\n` +
-      `${password ? `🔑 Mật khẩu nhập vào: <code>${password}</code>\n` : ''}` +
       `❌ Lỗi: <b>${errorLabels[errorType]}</b>\n` +
       `${userDetail}\n` +
       `⏰ Thời gian: ${time}\n` +
@@ -133,10 +132,9 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
+    // Public response is deliberately generic to prevent account enumeration.
     return NextResponse.json({
-      identifierType,
-      errorType,
-      userFound: !!user,
+      error: "Thông tin đăng nhập không chính xác.",
     });
   } catch (error: any) {
     console.error("❌ [ReportFailedLogin] Error:", error);
