@@ -261,9 +261,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.isTempLogin = (user as any).isTempLogin;
             }
 
-            // Chỉ fetch role + phone từ DB khi cần đồng bộ (trigger update) hoặc token chưa có role.
-            // Tránh 1 DB round-trip trên mọi lần gọi auth() → giảm latency cho server actions/API.
-            if (token.sub != null && (trigger === "update" || token.role == null)) {
+            // Authorization-sensitive claims must be refreshed from the database on every
+            // JWT evaluation. This prevents a demoted/deleted admin from retaining stale
+            // privileges until the JWT naturally expires.
+            if (token.sub != null) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: parseInt(token.sub as string) },
@@ -272,6 +273,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     if (dbUser) {
                         token.role = dbUser.role;
                         if (dbUser.phone) token.phone = dbUser.phone;
+                    } else {
+                        // Deleted users must not keep an authenticated identity from a stale JWT.
+                        token.sub = undefined;
+                        token.role = undefined;
                     }
                 } catch (e) {
                     console.error("[Auth] Error fetching user in JWT:", e);
