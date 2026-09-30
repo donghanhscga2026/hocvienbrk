@@ -96,8 +96,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
                         headerList.get('x-real-ip') || '127.0.0.1'
 
-                    const byIdentifier = checkRateLimit(`login:id:${identifier}`, { max: 5, windowMs: 15 * 60 * 1000 })
-                    const byIp = checkRateLimit(`login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
+                    const byIdentifier = await checkRateLimit(`login:id:${identifier}`, { max: 5, windowMs: 15 * 60 * 1000 })
+                    const byIp = await checkRateLimit(`login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
 
                     if (!byIdentifier.allowed || !byIp.allowed) {
                         console.warn(`⚠️ [Auth] Rate limit đăng nhập: identifier="${identifier}" ip="${ip}"`)
