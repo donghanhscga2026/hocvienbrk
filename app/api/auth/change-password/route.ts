@@ -44,7 +44,7 @@ export async function POST(request: Request) {
             id: parseInt(session.user.id),
             name: session.user.name || "Unknown",
             email: session.user.email || ""
-        }, newPassword)
+        })
 
         const { logActivity } = await import("@/lib/activity-logger");
         await logActivity({
