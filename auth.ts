@@ -20,11 +20,13 @@ class CustomLoginError extends CredentialsSignin {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MẬT KHẨU MẶC ĐỊNH - CẤU HÌNH
 // ═══════════════════════════════════════════════════════════════════════════════
-const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"; // Brk#3773
+// Legacy default password must be supplied only through server environment configuration.
+// Do not keep a shared default password or its plaintext value in source control.
+const LEGACY_DEFAULT_PASSWORD = process.env.LEGACY_DEFAULT_PASSWORD
 
-export async function isDefaultPassword(password: string): Promise<boolean> {
-  // So sánh với hash của "Brk#3773"
-  return bcrypt.compare("Brk#3773", password);
+export async function isDefaultPassword(passwordHash: string): Promise<boolean> {
+  if (!LEGACY_DEFAULT_PASSWORD) return false
+  return bcrypt.compare(LEGACY_DEFAULT_PASSWORD, passwordHash)
 }
 
 const baseAdapter = PrismaAdapter(prisma)
@@ -192,8 +194,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 }
 
                 if (isLoginFailed || !user) {
-                    console.log(`❌ [Auth] Đăng nhập thất bại cho "${identifier}": ${failReason || "Không tìm thấy người dùng"}`);
-                    throw new CustomLoginError(failReason, errorCode);
+                    console.warn(`⚠️ [Auth] Đăng nhập thất bại (${errorCode || "INVALID_CREDENTIALS"}).`);
+                    throw new CustomLoginError("Thông tin đăng nhập không chính xác.", "INVALID_CREDENTIALS");
                 }
 
                 // Ở đây user chắc chắn không null
@@ -277,7 +279,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
 
             if (trigger === "update") {
-                if (session?.role) token.role = session.role;
                 if (session?.phone) token.phone = session.phone;
                 if (session?.isTempLogin !== undefined) token.isTempLogin = session.isTempLogin;
             }
