@@ -101,32 +101,13 @@ function LoginForm() {
                     const errRes = await fetch('/api/auth/report-failed-login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ identifier: data.identifier, password: data.password })
+                        body: JSON.stringify({ identifier: data.identifier })
                     })
                     const errData = await errRes.json()
 
-                    switch (errData.errorType) {
-                        case 'NOT_FOUND':
-                            if (errData.identifierType === 'student_id') {
-                                errorMsg = `Mã thành viên này không tồn tại.`
-                                extraAction = 'forgot_id'
-                            } else if (errData.identifierType === 'email') {
-                                errorMsg = `Email này chưa đăng ký tài khoản.`
-                                extraAction = 'register'
-                            } else {
-                                errorMsg = `Số điện thoại này chưa đăng ký tài khoản.`
-                                extraAction = 'register'
-                            }
-                            break
-                        case 'INVALID_PASSWORD':
-                            errorMsg = `Mật khẩu không chính xác.`
-                            extraAction = 'forgot_password'
-                            break
-                        case 'NO_PASSWORD':
-                            errorMsg = `Tài khoản này chưa thiết lập mật khẩu.`
-                            extraAction = 'forgot_password'
-                            break
-                    }
+                    // Keep the public error generic so attackers cannot enumerate accounts.
+                    errorMsg = "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại."
+                    extraAction = "forgot_password"
                 } catch {
                     // report-failed-login thất bại, dùng thông tin cơ bản
                     const identifier = data.identifier
