@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         }
 
         const ip = getClientIp(request)
-        const byIp = checkRateLimit(`reset-password-link:ip:${ip}`, { max: 10, windowMs: 15 * 60 * 1000 })
+        const byIp = await checkRateLimit(`reset-password-link:ip:${ip}`, { max: 10, windowMs: 15 * 60 * 1000 })
         if (!byIp.allowed) {
             return NextResponse.json({ error: "Bạn thử quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
         }
