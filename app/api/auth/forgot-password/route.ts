@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         const user = await resolveUserForPasswordReset({ studentId, email })
 
         if (!user) {
-            return NextResponse.json({ error: studentId ? "Không tìm thấy tài khoản" : "Không tìm thấy tài khoản với email này" }, { status: 404 })
+            return NextResponse.json({ success: true, message: "Nếu tài khoản tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi." })
         }
 
         const otp = generateOTP()
