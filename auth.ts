@@ -9,6 +9,7 @@ import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { decryptMfaSecret, verifyTotp } from "@/lib/mfa"
 
 class CustomLoginError extends CredentialsSignin {
   constructor(message: string, code: string) {
@@ -78,15 +79,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
                 identifier: { label: "Student ID / Email / Phone", type: "text" },
                 password: { label: "Password", type: "password" },
+                otp: { label: "Authenticator code", type: "text" },
             },
             authorize: async (credentials) => {
                 const parsedCredentials = z
-                    .object({ identifier: z.string(), password: z.string() })
+                    .object({ identifier: z.string(), password: z.string(), otp: z.string().optional() })
                     .safeParse(credentials)
 
                 if (!parsedCredentials.success) return null;
 
-                const { identifier, password } = parsedCredentials.data
+                const { identifier, password, otp } = parsedCredentials.data
 
                 // Chặn dò mật khẩu hàng loạt: giới hạn theo identifier VÀ theo IP
                 // (IP để chặn kiểu tấn công dò tuần tự nhiều ID khác nhau từ 1 nguồn).
@@ -196,6 +198,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (isLoginFailed || !user) {
                     console.warn(`⚠️ [Auth] Đăng nhập thất bại (${errorCode || "INVALID_CREDENTIALS"}).`);
                     throw new CustomLoginError("Thông tin đăng nhập không chính xác.", "INVALID_CREDENTIALS");
+                }
+
+                // Admin đã bật MFA phải hoàn tất yếu tố thứ hai trước khi được cấp session.
+                if (user.role === "ADMIN" && user.mfaEnabled) {
+                    if (!user.mfaSecret || !otp || !verifyTotp(decryptMfaSecret(user.mfaSecret), otp.trim())) {
+                        throw new CustomLoginError("Cần mã xác thực quản trị viên hợp lệ.", "MFA_REQUIRED");
+                    }
                 }
 
                 // Ở đây user chắc chắn không null
