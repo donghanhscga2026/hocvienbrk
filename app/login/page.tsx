@@ -36,6 +36,7 @@ function LoginForm() {
         defaultValues: {
             identifier: "",
             password: "",
+            otp: "",
             newPassword: "",
             confirmPassword: ""
         }
@@ -89,6 +90,7 @@ function LoginForm() {
             const result = await signIn("credentials", {
                 identifier: data.identifier,
                 password: data.password,
+                otp: data.otp || "",
                 callbackUrl: callbackUrl,
                 redirect: false,
             })
@@ -430,6 +432,19 @@ function LoginForm() {
                                     Quên mật khẩu?
                                 </Link>
                             </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-brk-accent mb-1.5">Mã Authenticator <span className="text-brk-muted">(chỉ Admin đã bật MFA)</span></label>
+                            <input
+                                {...register("otp")}
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                maxLength={6}
+                                pattern="[0-9]{6}"
+                                className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm placeholder:text-brk-muted focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
+                                placeholder="6 chữ số"
+                            />
                         </div>
                         <button
                             type="submit"
