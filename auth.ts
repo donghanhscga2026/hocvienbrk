@@ -10,6 +10,7 @@ import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decryptMfaSecret, verifyTotp } from "@/lib/mfa"
+import { randomBytes } from "node:crypto"
 
 class CustomLoginError extends CredentialsSignin {
   constructor(message: string, code: string) {
@@ -317,7 +318,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     events: {
         async createUser({ user }) {
-            console.log(`👤 Người dùng mới được tạo qua OAuth: ${user.email} (ID: ${user.id})`);
+            console.log(`👤 Người dùng mới được tạo qua OAuth (ID: ${user.id})`);
             try {
                 const { cookies } = await import("next/headers");
                 const cookieStore = await cookies();
@@ -381,7 +382,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
         },
         async signIn({ user, account }) {
-            console.log(`🔐 Sự kiện signIn kích hoạt cho user: ${user.email}, Provider: ${account?.provider}`);
+            console.log(`🔐 Sự kiện signIn kích hoạt. Provider: ${account?.provider}`);
             
             if (user && (account?.provider === 'credentials' || account?.provider === 'google')) {
                 try {
@@ -412,8 +413,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     // GỬI THÔNG BÁO XÁC MINH CHO THÀNH VIÊN CHƯA XÁC MINH
                     if ((user as any).isUnverified) {
-                        console.log(`📧 Gửi nhắc nhở xác minh cho thành viên cũ: ${user.email}`);
-                        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        console.log("📧 Gửi nhắc nhở xác minh cho thành viên cũ.");
+                        const token = randomBytes(32).toString("base64url");
                         
                         await prisma.verificationToken.upsert({
                             where: { 
