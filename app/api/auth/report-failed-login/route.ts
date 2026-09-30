@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // Chặn dò quét identifier hàng loạt (endpoint này không yêu cầu đăng nhập)
     const ip = getClientIp(request);
-    const byIp = checkRateLimit(`report-failed-login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 });
+    const byIp = await checkRateLimit(`report-failed-login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 });
     if (!byIp.allowed) {
       return NextResponse.json({ error: "Bạn thử quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 });
     }
