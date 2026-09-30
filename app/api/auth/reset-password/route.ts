@@ -10,11 +10,11 @@ export async function POST(request: Request) {
         const { email, studentId, otp, newPassword } = await request.json()
 
         const ip = getClientIp(request)
-        const byIdentifier = checkRateLimit(
+        const byIdentifier = await checkRateLimit(
             `reset-password:${rateLimitKeyFor({ studentId, email })}`,
             { max: 5, windowMs: 15 * 60 * 1000 }
         )
-        const byIp = checkRateLimit(`reset-password:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
+        const byIp = await checkRateLimit(`reset-password:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
         if (!byIdentifier.allowed || !byIp.allowed) {
             return NextResponse.json({ error: "Quá nhiều yêu cầu. Vui lòng thử lại sau." }, { status: 429 })
         }
