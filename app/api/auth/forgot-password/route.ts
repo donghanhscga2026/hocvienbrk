@@ -18,8 +18,8 @@ export async function POST(request: Request) {
 
         // Chặn spam gửi OTP hàng loạt (tốn quota email + có thể dùng để enumerate tài khoản)
         const ip = getClientIp(request)
-        const byIdentifier = checkRateLimit(`forgot-password:${rateLimitKeyFor({ studentId, email })}`, { max: 3, windowMs: 15 * 60 * 1000 })
-        const byIp = checkRateLimit(`forgot-password:ip:${ip}`, { max: 10, windowMs: 60 * 60 * 1000 })
+        const byIdentifier = await checkRateLimit(`forgot-password:${rateLimitKeyFor({ studentId, email })}`, { max: 3, windowMs: 15 * 60 * 1000 })
+        const byIp = await checkRateLimit(`forgot-password:ip:${ip}`, { max: 10, windowMs: 60 * 60 * 1000 })
         if (!byIdentifier.allowed || !byIp.allowed) {
             return NextResponse.json({ error: "Bạn yêu cầu quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
         }
