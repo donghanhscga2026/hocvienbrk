@@ -8,6 +8,7 @@ export const STAGE_LABELS: Record<CrmStageValue, string> = {
 export const ACTIVITY_LABELS: Record<string, string> = {
   NOTE: 'Ghi chú', CALL: 'Gọi điện', ZALO: 'Zalo', EMAIL: 'Email', MEETING: 'Gặp trực tiếp',
   CREATED: 'Tạo hồ sơ', UPDATED: 'Cập nhật hồ sơ', OPPORTUNITY: 'Cơ hội tư vấn', TASK: 'Công việc',
+  IMPORT: 'Nhập dữ liệu', LINK: 'Liên kết tài khoản', FORM: 'Đăng ký qua form',
 }
 export const CRM_ROLES = ['ADMIN', 'TEACHER', 'INSTRUCTOR'] as const
 export type CrmActor = { id: number; role: string; name: string }
@@ -38,7 +39,7 @@ export function vietnamDayBounds(now = new Date()) {
 }
 export type CrmOwner = { id: number; name: string | null; email: string }
 export type CrmTaskView = { id: number; contactId: number; title: string; dueAt: string; completedAt: string | null }
-export type CrmOpportunityView = { id: number; title: string; stage: CrmStageValue; amount: number; lostReason: string; version: number }
+export type CrmOpportunityView = { id: number; title: string; stage: CrmStageValue; amount: number; lostReason: string; version: number; courseId?: number | null }
 export type CrmContactView = {
   id: number; name: string; email: string | null; phone: string | null; source: string; needs: string;
   tags: string[]; ownerId: number | null; owner: CrmOwner | null; archived: boolean; version: number;

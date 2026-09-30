@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { getCrmActor } from '@/lib/crm/auth'
 import { crmCommand, crmQuery } from '@/lib/crm/validation'
 import { CrmError, readCrm, writeCrm } from '@/lib/crm/service'
+import { crmBody } from '@/lib/crm/http'
 
 export const dynamic = 'force-dynamic'
 function respond(data: unknown, status = 200) {
@@ -32,13 +33,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // Browser writes must originate from the same site; no permissive CORS or CSRF bypass.
-    const origin = request.headers.get('origin')
-    if (!origin || origin !== new URL(request.url).origin) throw new CrmError('Nguồn gửi yêu cầu không hợp lệ.', 403)
-    if (!request.headers.get('content-type')?.includes('application/json')) throw new CrmError('Yêu cầu phải là JSON.', 415)
+    const raw = await crmBody(request, 16000)
     const actor = await getCrmActor()
-    const raw = await request.text()
-    if (raw.length > 16000) throw new CrmError('Nội dung vượt quá giới hạn.', 413)
-    const command = crmCommand.parse(JSON.parse(raw))
+    const command = crmCommand.parse(raw)
     return respond(await writeCrm(prisma, actor, command), command.action.endsWith('.create') ? 201 : 200)
   } catch (error) { return failure(error) }
 }

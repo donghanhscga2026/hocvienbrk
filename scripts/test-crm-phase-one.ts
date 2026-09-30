@@ -13,6 +13,7 @@ import bcrypt from 'bcryptjs'
 import { crmCommand, crmQuery } from '../lib/crm/validation'
 import { CrmError, readCrm, writeCrm } from '../lib/crm/service'
 import { canAccessContact, CrmActor, vietnamDayBounds, vietnamInputToIso } from '../lib/crm/shared'
+import { testPhaseTwo } from './test-crm-phase-two-db'
 
 async function main() {
   if (!process.argv.includes('--execute')) {
@@ -34,7 +35,7 @@ async function main() {
   try {
     await adminDb.$executeRawUnsafe('CREATE DATABASE "' + databaseName + '"')
     // Extract the pristine baseline from the backup ref; never change the project schema.
-    const baseline = execFileSync('git', ['show', 'backup/pre-crm-phase-1-2026-09-30:prisma/schema.prisma'], { encoding: 'utf8' })
+    const baseline = execFileSync('git', ['show', '47aa72fdd4d440b7708ecd7f8bd3ab765eedbcd1:prisma/schema.prisma'], { encoding: 'utf8' })
     const baselinePath = join(temp, 'before.prisma')
     writeFileSync(baselinePath, baseline, 'utf8')
     const env = { ...process.env, DATABASE_URL: url.toString(), DIRECT_URL: url.toString() }
@@ -47,6 +48,7 @@ async function main() {
       await db.$executeRawUnsafe('ALTER DEFAULT PRIVILEGES GRANT ALL ON SEQUENCES TO "' + role + '"')
     }
     execFileSync('npx', ['prisma', 'db', 'execute', '--url', url.toString(), '--file', 'prisma/migrations/20260930110000_crm_phase_one/migration.sql'], { env, stdio: 'pipe' })
+    execFileSync('npx', ['prisma', 'db', 'execute', '--url', url.toString(), '--file', 'prisma/migrations/20260930160000_crm_phase_two/migration.sql'], { env, stdio: 'pipe' })
     const drift = execFileSync('npx', ['prisma', 'migrate', 'diff', '--from-url', url.toString(), '--to-schema-datamodel', 'prisma/schema.prisma', '--script'], { env, encoding: 'utf8' })
     check(drift.includes('This is an empty migration'), 'Migration must match Prisma schema without drift')
     console.log('Before test: contacts=' + await db.crmContact.count() + ', tasks=' + await db.crmTask.count())
@@ -127,6 +129,7 @@ async function main() {
       writeCrm(db, other, command({ action: 'contact.update', contactId, version: 4, data: { ...data, ownerId: 102, name: 'Update B' } })),
     ])
     check(concurrent.filter(item => item.status === 'fulfilled').length === 1 && concurrent.filter(item => item.status === 'rejected').length === 1, 'Concurrent edits cannot silently overwrite each other')
+    assertions += await testPhaseTwo(db)
     console.log('After test: contacts=' + await db.crmContact.count() + ', opportunities=' + await db.crmOpportunity.count() + ', tasks=' + await db.crmTask.count())
     console.log('PASS: ' + assertions + ' integration assertions, migration matches schema.')
   } finally {

@@ -23,6 +23,7 @@ export const contactFields = z.object({
   ownerId: id.nullable(), archived: z.boolean(),
 }).strict().refine(value => value.email || value.phone, { message: 'Cần ít nhất email hoặc số điện thoại.', path: ['email'] })
 const opportunityFields = z.object({
+  courseId: recordId.nullable().default(null),
   title: text(200).min(1, 'Vui lòng nhập tên cơ hội.'), stage: z.enum(CRM_STAGES),
   amount: z.number().int().min(0).max(2000000000), lostReason: text(1000),
 }).strict().refine(value => value.stage !== 'LOST' || !!value.lostReason, {

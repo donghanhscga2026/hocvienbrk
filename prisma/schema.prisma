@@ -59,6 +59,7 @@ model User {
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
   crmContacts                  CrmContact[]
+  crmIdentityContact           CrmContact? @relation("CrmIdentity")
 
   @@index([email])
   @@index([phone])
@@ -342,6 +343,7 @@ model CourseCategory {
 }
 
 model Course {
+  crmOpportunities CrmOpportunity[]
   id                          Int                     @id @default(autoincrement())
   id_khoa                     String                  @unique
   name_lop                    String
@@ -1115,6 +1117,7 @@ model Theme {
 }
 
 model LandingPage {
+  crmSubmissions   CrmSubmission[]
   id               Int                   @id @default(autoincrement())
   slug             String                @unique
   title            String
@@ -1723,6 +1726,9 @@ model CoursePageVersion {
 
 // CRM phase 1: contacts are independent of login accounts and affiliate ownership.
 model CrmContact {
+  linkedUserId  Int? @unique
+  linkedUser    User? @relation("CrmIdentity", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  submissions   CrmSubmission[]
   id            Int              @id @default(autoincrement())
   name          String
   email         String?          @unique
@@ -1746,6 +1752,8 @@ model CrmContact {
 }
 
 model CrmOpportunity {
+  courseId  Int?
+  course    Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
   id        Int          @id @default(autoincrement())
   contactId Int
   title     String
@@ -1795,6 +1803,23 @@ enum CrmStage {
   PAYMENT_PENDING
   WON
   LOST
+}
+
+// Public intake is auditable and never rewrites an existing customer's identity.
+model CrmSubmission {
+  id         Int @id @default(autoincrement())
+  key        String @unique
+  landingId  Int
+  landing    LandingPage @relation(fields: [landingId], references: [id], onDelete: Restrict)
+  contactId  Int?
+  contact    CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  data       Json
+  status     String @default("RECEIVED")
+  ipHash     String
+  createdAt  DateTime @default(now())
+
+  @@index([ipHash, createdAt])
+  @@index([status, createdAt])
 }
 
 enum CampaignStatus {

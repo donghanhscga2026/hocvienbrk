@@ -99,8 +99,13 @@ export async function writeCrm(db: PrismaClient, actor: CrmActor, command: CrmCo
     if (!locked.count) throw new CrmError('Không tìm thấy khách hoặc không có quyền truy cập.', 404)
     const contact = await tx.crmContact.findUniqueOrThrow({ where: { id: command.contactId } })
     if (contact.archived && command.action !== 'contact.update') throw new CrmError('Khách đã lưu trữ. Hãy khôi phục trước khi chăm sóc.')
+    if ((command.action === 'opportunity.create' || command.action === 'opportunity.update') && command.data.courseId != null) {
+      const enrollment = contact.linkedUserId == null ? null : await tx.enrollment.findUnique({ where: { userId_courseId: { userId: contact.linkedUserId, courseId: command.data.courseId } }, select: { id: true } })
+      if (!enrollment) throw new CrmError('Khóa học chưa thuộc tài khoản liên kết của khách.')
+    }
     if (command.action === 'contact.update') {
       if (contact.version !== command.version) throw new CrmError('Hồ sơ đã được cập nhật ở nơi khác. Hãy tải lại trước khi lưu.', 409)
+      if (contact.linkedUserId != null && (contact.email !== command.data.email || contact.phone !== command.data.phone)) throw new CrmError('Hãy nhờ quản trị viên hủy liên kết tài khoản trước khi đổi email hoặc điện thoại.', 409)
       await validateOwner(tx, actor, command.data.ownerId)
       await tx.crmContact.update({ where: { id: contact.id }, data: { ...command.data, version: { increment: 1 } } })
       const changes: string[] = []

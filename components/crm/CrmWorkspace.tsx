@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarClock, Check, ChevronLeft, ChevronRight, Loader2, Plus, Search, Users, X } from 'lucide-react'
+import CrmDataTools, { CrmWebsitePanel, integrationRequest } from './CrmDataTools'
 import {
   ACTIVITY_LABELS, CRM_STAGES, CrmContactView, CrmDetail, CrmOpportunityView, CrmOwner, CrmStageValue,
   CrmTaskView, formatCrmDate, isOpenStage, STAGE_LABELS, vietnamInputToIso,
@@ -68,15 +69,23 @@ function ContactEditor({ contact, owners, actorId, isAdmin, busy, onSave, onCanc
     <div className="flex gap-2"><button disabled={busy} className={button} type="submit">{busy ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}Lưu hồ sơ</button><button type="button" disabled={busy} className={secondary} onClick={onCancel}>Hủy</button></div>
   </form>
 }
-function OpportunityEditor({ opportunity, busy, onSave, onCancel }: {
-  opportunity?: CrmOpportunityView; busy: boolean; onSave: (data: Command) => Promise<boolean>; onCancel: () => void;
+function OpportunityEditor({ opportunity, contactId, busy, onSave, onCancel }: {
+  opportunity?: CrmOpportunityView; contactId: number; busy: boolean; onSave: (data: Command) => Promise<boolean>; onCancel: () => void;
 }) {
   const [title, setTitle] = useState(opportunity?.title || '')
   const [stage, setStage] = useState<CrmStageValue>(opportunity?.stage || 'NEW')
   const [amount, setAmount] = useState(String(opportunity?.amount || 0))
   const [reason, setReason] = useState(opportunity?.lostReason || '')
-  return <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={async e => { e.preventDefault(); await onSave({ title, stage, amount: Number(amount), lostReason: stage === 'LOST' ? reason : '' }) }}>
+  const [courseId, setCourseId] = useState(String(opportunity?.courseId || ''))
+  const [courses, setCourses] = useState<{ id: number; title: string }[]>([])
+  useEffect(() => {
+    let active = true
+    integrationRequest<{ enrollments: { course: { id: number; title: string } }[] }>('?view=website&contactId=' + contactId).then(data => { if (active) setCourses(data.enrollments.map(item => item.course)) }).catch(() => {})
+    return () => { active = false }
+  }, [contactId])
+  return <form className="space-y-3 rounded-xl border bg-white p-4" onSubmit={async e => { e.preventDefault(); await onSave({ title, stage, amount: Number(amount), lostReason: stage === 'LOST' ? reason : '', courseId: courseId ? Number(courseId) : null }) }}>
     <Field label="Khóa học / dịch vụ đang tư vấn *"><input required maxLength={200} className={input} value={title} onChange={e => setTitle(e.target.value)} /></Field>
+    <Field label="Liên kết khóa đã đăng ký (nếu có)"><select className={input} value={courseId} onChange={e => setCourseId(e.target.value)}><option value="">Chưa liên kết / dịch vụ khác</option>{courseId && !courses.some(course => String(course.id) === courseId) && <option value={courseId}>Khóa #{courseId}</option>}{courses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}</select></Field>
     <div className="grid gap-3 sm:grid-cols-2"><Field label="Bước tư vấn"><select className={input} value={stage} onChange={e => setStage(e.target.value as CrmStageValue)}>{CRM_STAGES.map(key => <option key={key} value={key}>{STAGE_LABELS[key]}</option>)}</select></Field><Field label="Giá trị dự kiến (VNĐ)"><input required type="number" min={0} max={2000000000} step={1} className={input} value={amount} onChange={e => setAmount(e.target.value)} /></Field></div>
     {stage === 'LOST' && <Field label="Lý do chưa thành công *"><textarea required maxLength={1000} className={input} value={reason} onChange={e => setReason(e.target.value)} /></Field>}
     {stage === 'WON' && <p className="text-xs text-slate-500">Đánh dấu chốt thành công thủ công. Đây không phải xác nhận tiền đã thanh toán.</p>}
@@ -198,6 +207,7 @@ export default function CrmWorkspace() {
   return <main className="mx-auto max-w-7xl space-y-5 p-3 text-slate-800 sm:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Khách hàng & chăm sóc</h1><p className="mt-1 text-sm text-slate-500">Biết khách đang ở đâu và việc cần làm tiếp theo.</p></div><button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button></div>
     {feedback}
+    {actor?.isAdmin && <CrmDataTools owners={owners} actorId={actor.id} onChanged={() => setRevision(value => value + 1)} />}
     <div className="grid grid-cols-3 gap-2 sm:gap-4">{[
       { label: 'Việc hôm nay', value: tasks.stats.today, run: () => { setTab('tasks'); setDue('today'); setTaskPage(1) } },
       { label: 'Việc quá hạn', value: tasks.stats.overdue, run: () => { setTab('tasks'); setDue('overdue'); setTaskPage(1) } },
@@ -241,8 +251,9 @@ export default function CrmWorkspace() {
         <p className="text-xs text-slate-500">Giá trị đang tư vấn: {money(detail.opportunities.filter(item => isOpenStage(item.stage)).reduce((sum, item) => sum + item.amount, 0))}. Giá trị này chưa phải doanh thu thanh toán.</p>
         {detail.opportunities.map(item => <article key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-3"><div><strong className="text-sm">{item.title}</strong><p className="text-sm text-slate-500">{STAGE_LABELS[item.stage]} · {money(item.amount)}</p>{item.lostReason && <p className="mt-1 break-words text-xs">Lý do: {item.lostReason}</p>}</div>{!detail.archived && <button disabled={busy} className={secondary} onClick={() => setOpportunity(item)}>Sửa / chuyển bước</button>}</article>)}
         {!detail.opportunities.length && <p className="text-sm text-slate-500">Chưa có cơ hội tư vấn.</p>}
-        {opportunity && !detail.archived && <OpportunityEditor key={opportunity === 'new' ? 'new' : opportunity.id} opportunity={opportunity === 'new' ? undefined : opportunity} busy={busy} onCancel={() => setOpportunity(null)} onSave={async data => { const command = opportunity === 'new' ? { action: 'opportunity.create', contactId: detail.id, data } : { action: 'opportunity.update', contactId: detail.id, opportunityId: opportunity.id, version: opportunity.version, data }; const ok = await mutate(command); if (ok) setOpportunity(null); return ok }} />}
+        {opportunity && !detail.archived && <OpportunityEditor key={opportunity === 'new' ? 'new' : opportunity.id} contactId={detail.id} opportunity={opportunity === 'new' ? undefined : opportunity} busy={busy} onCancel={() => setOpportunity(null)} onSave={async data => { const command = opportunity === 'new' ? { action: 'opportunity.create', contactId: detail.id, data } : { action: 'opportunity.update', contactId: detail.id, opportunityId: opportunity.id, version: opportunity.version, data }; const ok = await mutate(command); if (ok) setOpportunity(null); return ok }} />}
       </section>
+      <CrmWebsitePanel key={detail.version} contactId={detail.id} version={detail.version} isAdmin={actor.isAdmin && !detail.archived} onChanged={() => setRevision(value => value + 1)} />
       <section className="space-y-3 rounded-2xl border bg-white p-4"><h3 className="font-bold">Lịch chăm sóc & việc tiếp theo</h3>{detail.tasks.map(task => <div key={task.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 text-sm"><div><p className={task.completedAt ? 'line-through text-slate-400' : ''}>{task.title}</p><p className="text-xs text-slate-500">{formatCrmDate(task.dueAt)}{task.completedAt ? ' · Hoàn thành ' + formatCrmDate(task.completedAt) : ''}</p></div>{!detail.archived && <button disabled={busy} className={secondary} onClick={() => void mutate({ action: 'task.toggle', contactId: detail.id, taskId: task.id, completed: !task.completedAt })}>{task.completedAt ? 'Mở lại' : 'Hoàn thành'}</button>}</div>)}{!detail.archived && <TaskForm busy={busy} onSave={data => mutate({ action: 'task.create', contactId: detail.id, ...data })} />}</section>
       <section className="space-y-4 rounded-2xl border bg-white p-4"><h3 className="font-bold">Nhật ký chăm sóc</h3>{!detail.archived && <ActivityForm busy={busy} onSave={data => mutate({ action: 'activity.create', contactId: detail.id, ...data })} />}<div className="space-y-3">{detail.activities.map(activity => <article key={activity.id} className="border-l-2 border-emerald-200 pl-3"><p className="text-xs text-slate-500">{ACTIVITY_LABELS[activity.type] || activity.type} · {activity.authorName} · {formatCrmDate(activity.createdAt)}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm">{activity.content}</p></article>)}</div><div className="flex items-center justify-between text-xs"><button disabled={activityPage === 1} className={secondary} onClick={() => setActivityPage(value => value - 1)}>Mới hơn</button><span>{detail.activityTotal} hoạt động</span><button disabled={activityPage * 30 >= detail.activityTotal} className={secondary} onClick={() => setActivityPage(value => value + 1)}>Cũ hơn</button></div></section>
     </> : <p>Không thể mở hồ sơ này.</p>}</Modal>}

@@ -1,5 +1,8 @@
 'use client'
 
+import { ComponentProps, useEffect } from 'react'
+import type { LandingPage } from '@prisma/client'
+import type { TestimonialItem } from '@/lib/landing/templates/testimonial'
 import {
     HeroCTATemplate,
     FeatureGridTemplate,
@@ -8,12 +11,18 @@ import {
     TestimonialTemplate,
 } from '@/lib/landing/templates'
 import CourseLandingTemplate from '@/components/landing/CourseLandingTemplate'
+import CrmLeadForm, { submitCrmLead } from '@/components/crm/CrmLeadForm'
 
 interface LandingPageClientProps {
-    landing: any
+    landing: LandingPage
 }
 
 export function LandingPageClient({ landing }: LandingPageClientProps) {
+    const config = landing.config && typeof landing.config === 'object' && !Array.isArray(landing.config) ? landing.config : {}
+    return <><LandingPageContent landing={landing} />{config.crmCapture === true && landing.template !== 'webinar-reg' && <CrmLeadForm slug={landing.slug} />}</>
+}
+
+function LandingPageContent({ landing }: LandingPageClientProps) {
     const config = typeof landing.config === 'object' && landing.config !== null
         ? landing.config as Record<string, unknown>
         : {}
@@ -23,7 +32,7 @@ export function LandingPageClient({ landing }: LandingPageClientProps) {
         : []
     
     // Tăng view count (client-side)
-    fetch(`/api/landing/view?id=${landing.id}`, { method: 'POST' }).catch(console.error)
+    useEffect(() => { fetch(`/api/landing/view?id=${landing.id}`, { method: 'POST' }).catch(console.error) }, [landing.id])
     
     switch (landing.template) {
         case 'hero-cta':
@@ -106,6 +115,7 @@ export function LandingPageClient({ landing }: LandingPageClientProps) {
                     webinarDuration={config.webinarDuration as string | undefined}
                     spotsLeft={config.spotsLeft as number | undefined}
                     spotsTotal={config.spotsTotal as number | undefined}
+                    onRegister={config.crmCapture === true ? data => submitCrmLead(landing.slug, data) : undefined}
                     ctaText={landing.ctaText}
                     ctaLink={landing.ctaLink || undefined}
                     features={features}
@@ -120,7 +130,7 @@ export function LandingPageClient({ landing }: LandingPageClientProps) {
             
         case 'testimonial':
             const testimonialItems = Array.isArray(config.testimonials)
-                ? config.testimonials as any[]
+                ? config.testimonials as TestimonialItem[]
                 : []
             const statsData = config.stats as { students?: string; rating?: string; courses?: string } | undefined
             
@@ -161,17 +171,7 @@ export function LandingPageClient({ landing }: LandingPageClientProps) {
     }
 }
 
-interface CourseLandingClientProps {
-    course: any
-    lessons: any[]
-    testimonials: any[]
-    enrollment: any
-    userPhone: string | null
-    userId: number | null
-    session: any
-    totalHours: number
-    activeStudentCount: number
-}
+type CourseLandingClientProps = ComponentProps<typeof CourseLandingTemplate>
 
 export function CourseLandingClient({
     course,
