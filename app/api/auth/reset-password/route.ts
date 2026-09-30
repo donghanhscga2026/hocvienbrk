@@ -2,11 +2,22 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { validatePasswordStrength } from "@/lib/password-policy"
-import { resolveUserForPasswordReset } from "@/lib/password-reset-lookup"
+import { resolveUserForPasswordReset, rateLimitKeyFor } from "@/lib/password-reset-lookup"
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
     try {
         const { email, studentId, otp, newPassword } = await request.json()
+
+        const ip = getClientIp(request)
+        const byIdentifier = checkRateLimit(
+            `reset-password:${rateLimitKeyFor({ studentId, email })}`,
+            { max: 5, windowMs: 15 * 60 * 1000 }
+        )
+        const byIp = checkRateLimit(`reset-password:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
+        if (!byIdentifier.allowed || !byIp.allowed) {
+            return NextResponse.json({ error: "Quá nhiều yêu cầu. Vui lòng thử lại sau." }, { status: 429 })
+        }
 
         if ((!email && !studentId) || !otp || !newPassword) {
             return NextResponse.json({ error: "Thiếu thông tin bắt buộc" }, { status: 400 })
@@ -19,7 +30,8 @@ export async function POST(request: Request) {
 
         const user = await resolveUserForPasswordReset({ studentId, email })
         if (!user) {
-            return NextResponse.json({ error: "Không tìm thấy tài khoản" }, { status: 404 })
+            // Keep recovery responses generic to avoid account enumeration.
+            return NextResponse.json({ error: "Mã xác minh không hợp lệ hoặc đã hết hạn" }, { status: 400 })
         }
 
         const resetRecord = await prisma.passwordReset.findFirst({
