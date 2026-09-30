@@ -19,6 +19,8 @@ jobs:
       DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
       AUTH_SECRET: ci-only-not-for-production-ci-only-not-for-production
       NEXTAUTH_SECRET: ci-only-not-for-production-ci-only-not-for-production
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
