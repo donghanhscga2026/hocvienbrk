@@ -535,9 +535,9 @@ export async function sendLoginNotification(user: { id: number; name: string }, 
   await sendTelegram(msg, 'CHANGE'); // Chuyển từ FAILED_LOGIN sang CHANGE (Kênh biến động tài khoản bảo mật hơn)
 }
 
-export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }, newPassword?: string) {
-  const pwdInfo = newPassword ? `\n🔑 Mật khẩu mới: <code>${newPassword}</code>` : '';
-  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Thành viên: <b>${user.name}</b> (#${user.id})\n📧 Email: ${user.email}${pwdInfo}\n\n✅ Đã đổi từ mật khẩu mặc định sang mật khẩu cá nhân`;
+export async function sendPasswordChangedNotification(user: { id: number; name: string; email: string }) {
+  // Never accept, log, email, or forward plaintext passwords.
+  const msg = `🔐 <b>ĐỔI MẬT KHẨU</b>\n👤 Thành viên: <b>${escapeHtml(user.name)}</b> (#${user.id})\n📧 Email: ${escapeHtml(user.email)}\n\n✅ Mật khẩu đã được thay đổi`;
   await sendTelegram(msg, 'CHANGE');
 }
 
