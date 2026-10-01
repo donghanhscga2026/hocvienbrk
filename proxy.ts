@@ -41,7 +41,7 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
         return NextResponse.next()
     }
 
-    if (ADMIN_ONLY_PREFIXES.some((p) => nextUrl.pathname.startsWith(p))) {
+    if (nextUrl.pathname.startsWith('/admin') || ADMIN_ONLY_PREFIXES.some((p) => nextUrl.pathname.startsWith(p))) {
         const role = (request.auth as { user?: { role?: string } } | null)?.user?.role
         if (role !== 'ADMIN') {
             return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 403 })

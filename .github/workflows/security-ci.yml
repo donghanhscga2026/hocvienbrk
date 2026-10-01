@@ -1,0 +1,47 @@
+name: Security CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches:
+      - "security/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      AUTH_SECRET: ci-only-not-for-production-ci-only-not-for-production
+      NEXTAUTH_SECRET: ci-only-not-for-production-ci-only-not-for-production
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+        continue-on-error: true
+      - name: Lint security-critical changed files
+        run: >-
+          npx eslint auth.ts auth.config.ts proxy.ts app/login/page.tsx
+          app/api/auth/change-password/route.ts
+          app/api/auth/report-failed-login/route.ts
+          app/api/auth/reset-password/route.ts
+          app/api/auth/forgot-password/route.ts
+          lib/notifications.ts
+          --rule "@typescript-eslint/no-explicit-any:off"
+          --rule "react-hooks/set-state-in-effect:off"
+          --rule "@typescript-eslint/no-unused-vars:warn"
+      - name: Production build
+        run: npm run build

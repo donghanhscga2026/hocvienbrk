@@ -118,7 +118,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
         return { success: false, message: "Mật khẩu hiện tại không đúng" }
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
     await prisma.user.update({
         where: { id: userId },
         data: { password: hashedPassword }
@@ -131,7 +131,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
             id: userId,
             name: user.name || "Unknown",
             email: user.email || ""
-        }, newPassword)
+        })
     } catch (e) {
         console.error("Failed to send password change Telegram notification:", e)
     }
@@ -142,8 +142,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
         action: 'PASSWORD_CHANGE',
         detail: 'Đổi mật khẩu từ cài đặt tài khoản',
         metadata: { 
-            email: user?.email || null,
-            newPassword: newPassword
+            email: user?.email || null
         }
     })
 
