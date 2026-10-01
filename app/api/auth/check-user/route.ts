@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     // Chặn dò quét hàng loạt email/SĐT tồn tại trong hệ thống
     const ip = getClientIp(request)
-    const byIp = checkRateLimit(`check-user:ip:${ip}`, { max: 15, windowMs: 10 * 60 * 1000 })
+    const byIp = await checkRateLimit(`check-user:ip:${ip}`, { max: 15, windowMs: 10 * 60 * 1000 })
     if (!byIp.allowed) {
       return NextResponse.json({ error: "Bạn thử quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
     }

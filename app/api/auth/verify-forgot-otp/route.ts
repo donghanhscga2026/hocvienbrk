@@ -13,8 +13,8 @@ export async function POST(request: Request) {
 
         // OTP chỉ có 6 số — bắt buộc giới hạn số lần thử để chống dò brute-force
         const ip = getClientIp(request)
-        const byIdentifier = checkRateLimit(`verify-forgot-otp:${rateLimitKeyFor({ studentId, email })}`, { max: 8, windowMs: 15 * 60 * 1000 })
-        const byIp = checkRateLimit(`verify-forgot-otp:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 })
+        const byIdentifier = await checkRateLimit(`verify-forgot-otp:${rateLimitKeyFor({ studentId, email })}`, { max: 8, windowMs: 15 * 60 * 1000 })
+        const byIp = await checkRateLimit(`verify-forgot-otp:ip:${ip}`, { max: 30, windowMs: 15 * 60 * 1000 })
         if (!byIdentifier.allowed || !byIp.allowed) {
             return NextResponse.json({ 
                 error: "Bạn thử sai quá nhiều lần. Vui lòng thử lại sau ít phút.", 

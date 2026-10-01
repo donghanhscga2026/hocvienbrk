@@ -20,7 +20,7 @@ export async function GET(
         // hợp lệ trên production (nhiều người dùng chung 1 IP, hoặc trình duyệt gọi
         // lại theo re-render). Nới rộng hơn nhiều, chỉ để chặn quét hàng loạt thật sự.
         const ip = getClientIp(request)
-        const byIp = checkRateLimit(`user-lookup:ip:${ip}`, { max: 120, windowMs: 60 * 1000 })
+        const byIp = await checkRateLimit(`user-lookup:ip:${ip}`, { max: 120, windowMs: 60 * 1000 })
         if (!byIp.allowed) {
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
         }

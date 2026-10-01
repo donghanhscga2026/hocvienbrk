@@ -100,6 +100,8 @@ async function getSystemRootUser(systemId: number): Promise<{ id: number; name: 
 }
 
 export async function getSystemRootUserAction(systemId: number) {
+    const session = await auth()
+    if (!session?.user?.id) return null
     return getSystemRootUser(systemId)
 }
 
@@ -1603,6 +1605,8 @@ export async function getCurrentUserRoleAction(systemId?: number) {
 export async function getMemberDetailsAction(userId: number, systemId?: number) {
     try {
         const session = await auth(); if (!session?.user?.id) throw new Error("Unauthorized")
+        const requesterId = parseInt(session.user.id)
+        const canViewSensitive = session.user.role === Role.ADMIN || requesterId === userId
 
         // Parallel queries phase 1: User & Enrollment info
         const [user, enrollment] = await Promise.all([
@@ -1633,7 +1637,13 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
         if (!systemId || systemId === 1) {
             const tcaRaw = await prisma.tCAMember.findFirst({ where: { userId }, select: { level: true, personalScore: true, totalScore: true, groupName: true, chuc_danh: true, name: true, tcaId: true } })
             const tca = tcaRaw ? { ...tcaRaw, personalScore: tcaRaw.personalScore != null ? Number(tcaRaw.personalScore) : 0, totalScore: tcaRaw.totalScore != null ? Number(tcaRaw.totalScore) : 0 } : null
-            return { success: true, user, tca, systemData: null, enrollment }
+            return {
+                success: true,
+                user: canViewSensitive ? user : { ...user, email: null, phone: null },
+                tca,
+                systemData: null,
+                enrollment
+            }
         }
 
         // Non-TCA system (BRK / KTC / YTB)
@@ -1676,7 +1686,7 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
 
         return {
             success: true,
-            user,
+            user: canViewSensitive ? user : { ...user, email: null, phone: null },
             tca: null,
             enrollment,
             systemData: {
@@ -1698,7 +1708,7 @@ export async function getMemberDetailsAction(userId: number, systemId?: number) 
                     : latestLegacyTimeline?.accumulatedTeamSize ?? 1,
                 upline1,
                 upline2,
-                wallet: wallet ? {
+                wallet: canViewSensitive && wallet ? {
                     balance: Number(wallet.balance),
                     brkd: Number(wallet.brkd),
                     voucherBalance: Number(wallet.voucherBalance),

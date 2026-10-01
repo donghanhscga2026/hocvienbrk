@@ -18,8 +18,8 @@ export async function POST(request: Request) {
 
         // Chặn spam gửi OTP hàng loạt (tốn quota email + có thể dùng để enumerate tài khoản)
         const ip = getClientIp(request)
-        const byIdentifier = checkRateLimit(`forgot-password:${rateLimitKeyFor({ studentId, email })}`, { max: 3, windowMs: 15 * 60 * 1000 })
-        const byIp = checkRateLimit(`forgot-password:ip:${ip}`, { max: 10, windowMs: 60 * 60 * 1000 })
+        const byIdentifier = await checkRateLimit(`forgot-password:${rateLimitKeyFor({ studentId, email })}`, { max: 3, windowMs: 15 * 60 * 1000 })
+        const byIp = await checkRateLimit(`forgot-password:ip:${ip}`, { max: 10, windowMs: 60 * 60 * 1000 })
         if (!byIdentifier.allowed || !byIp.allowed) {
             return NextResponse.json({ error: "Bạn yêu cầu quá nhiều lần. Vui lòng thử lại sau." }, { status: 429 })
         }
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         const user = await resolveUserForPasswordReset({ studentId, email })
 
         if (!user) {
-            return NextResponse.json({ error: studentId ? "Không tìm thấy tài khoản" : "Không tìm thấy tài khoản với email này" }, { status: 404 })
+            return NextResponse.json({ success: true, message: "Nếu tài khoản tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi." })
         }
 
         const otp = generateOTP()

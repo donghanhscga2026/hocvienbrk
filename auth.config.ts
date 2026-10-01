@@ -13,8 +13,7 @@ export const authConfig = {
             const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
 
             if (isOnAdmin) {
-                if (isLoggedIn) return true;
-                return false;
+                return isLoggedIn && auth?.user?.role === 'ADMIN';
             }
             if (isOnDashboard) {
                 if (isLoggedIn) return true;
@@ -33,7 +32,7 @@ export const authConfig = {
             }
 
             if (trigger === "update") {
-                if (session?.role) token.role = session.role;
+                // Never trust client-supplied session data to elevate authorization role.
                 if (session?.phone) token.phone = session.phone;
             }
             

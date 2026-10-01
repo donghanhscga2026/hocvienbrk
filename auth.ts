@@ -9,6 +9,8 @@ import { Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { decryptMfaSecret, verifyTotp } from "@/lib/mfa"
+import { randomBytes } from "node:crypto"
 
 class CustomLoginError extends CredentialsSignin {
   constructor(message: string, code: string) {
@@ -20,11 +22,13 @@ class CustomLoginError extends CredentialsSignin {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MẬT KHẨU MẶC ĐỊNH - CẤU HÌNH
 // ═══════════════════════════════════════════════════════════════════════════════
-const DEFAULT_PASSWORD_HASH = "$2a$10$K.0H2bV8r3kPQZ3kP8YQ2.tQZQ3dZ4vF5H1dQ1pO7gK8sD6yN3q"; // Brk#3773
+// Legacy default password must be supplied only through server environment configuration.
+// Do not keep a shared default password or its plaintext value in source control.
+const LEGACY_DEFAULT_PASSWORD = process.env.LEGACY_DEFAULT_PASSWORD
 
-export async function isDefaultPassword(password: string): Promise<boolean> {
-  // So sánh với hash của "Brk#3773"
-  return bcrypt.compare("Brk#3773", password);
+export async function isDefaultPassword(passwordHash: string): Promise<boolean> {
+  if (!LEGACY_DEFAULT_PASSWORD) return false
+  return bcrypt.compare(LEGACY_DEFAULT_PASSWORD, passwordHash)
 }
 
 const baseAdapter = PrismaAdapter(prisma)
@@ -76,15 +80,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
                 identifier: { label: "Student ID / Email / Phone", type: "text" },
                 password: { label: "Password", type: "password" },
+                otp: { label: "Authenticator code", type: "text" },
             },
             authorize: async (credentials) => {
                 const parsedCredentials = z
-                    .object({ identifier: z.string(), password: z.string() })
+                    .object({ identifier: z.string(), password: z.string(), otp: z.string().optional() })
                     .safeParse(credentials)
 
                 if (!parsedCredentials.success) return null;
 
-                const { identifier, password } = parsedCredentials.data
+                const { identifier, password, otp } = parsedCredentials.data
 
                 // Chặn dò mật khẩu hàng loạt: giới hạn theo identifier VÀ theo IP
                 // (IP để chặn kiểu tấn công dò tuần tự nhiều ID khác nhau từ 1 nguồn).
@@ -94,8 +99,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const ip = headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ||
                         headerList.get('x-real-ip') || '127.0.0.1'
 
-                    const byIdentifier = checkRateLimit(`login:id:${identifier}`, { max: 5, windowMs: 15 * 60 * 1000 })
-                    const byIp = checkRateLimit(`login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
+                    const byIdentifier = await checkRateLimit(`login:id:${identifier}`, { max: 5, windowMs: 15 * 60 * 1000 })
+                    const byIp = await checkRateLimit(`login:ip:${ip}`, { max: 20, windowMs: 15 * 60 * 1000 })
 
                     if (!byIdentifier.allowed || !byIp.allowed) {
                         console.warn(`⚠️ [Auth] Rate limit đăng nhập: identifier="${identifier}" ip="${ip}"`)
@@ -192,8 +197,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 }
 
                 if (isLoginFailed || !user) {
-                    console.log(`❌ [Auth] Đăng nhập thất bại cho "${identifier}": ${failReason || "Không tìm thấy người dùng"}`);
-                    throw new CustomLoginError(failReason, errorCode);
+                    console.warn(`⚠️ [Auth] Đăng nhập thất bại (${errorCode || "INVALID_CREDENTIALS"}).`);
+                    throw new CustomLoginError("Thông tin đăng nhập không chính xác.", "INVALID_CREDENTIALS");
+                }
+
+                // Admin đã bật MFA phải hoàn tất yếu tố thứ hai trước khi được cấp session.
+                if (user.role === "ADMIN" && user.mfaEnabled) {
+                    if (!user.mfaSecret || !otp || !verifyTotp(decryptMfaSecret(user.mfaSecret), otp.trim())) {
+                        throw new CustomLoginError("Cần mã xác thực quản trị viên hợp lệ.", "MFA_REQUIRED");
+                    }
                 }
 
                 // Ở đây user chắc chắn không null
@@ -259,9 +271,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.isTempLogin = (user as any).isTempLogin;
             }
 
-            // Chỉ fetch role + phone từ DB khi cần đồng bộ (trigger update) hoặc token chưa có role.
-            // Tránh 1 DB round-trip trên mọi lần gọi auth() → giảm latency cho server actions/API.
-            if (token.sub != null && (trigger === "update" || token.role == null)) {
+            // Authorization-sensitive claims must be refreshed from the database on every
+            // JWT evaluation. This prevents a demoted/deleted admin from retaining stale
+            // privileges until the JWT naturally expires.
+            if (token.sub != null) {
                 try {
                     const dbUser = await prisma.user.findUnique({
                         where: { id: parseInt(token.sub as string) },
@@ -270,6 +283,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     if (dbUser) {
                         token.role = dbUser.role;
                         if (dbUser.phone) token.phone = dbUser.phone;
+                    } else {
+                        // Deleted users must not keep an authenticated identity from a stale JWT.
+                        token.sub = undefined;
+                        token.role = undefined;
                     }
                 } catch (e) {
                     console.error("[Auth] Error fetching user in JWT:", e);
@@ -277,7 +294,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
 
             if (trigger === "update") {
-                if (session?.role) token.role = session.role;
                 if (session?.phone) token.phone = session.phone;
                 if (session?.isTempLogin !== undefined) token.isTempLogin = session.isTempLogin;
             }
@@ -302,7 +318,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     events: {
         async createUser({ user }) {
-            console.log(`👤 Người dùng mới được tạo qua OAuth: ${user.email} (ID: ${user.id})`);
+            console.log(`👤 Người dùng mới được tạo qua OAuth (ID: ${user.id})`);
             try {
                 const { cookies } = await import("next/headers");
                 const cookieStore = await cookies();
@@ -366,7 +382,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
         },
         async signIn({ user, account }) {
-            console.log(`🔐 Sự kiện signIn kích hoạt cho user: ${user.email}, Provider: ${account?.provider}`);
+            console.log(`🔐 Sự kiện signIn kích hoạt. Provider: ${account?.provider}`);
             
             if (user && (account?.provider === 'credentials' || account?.provider === 'google')) {
                 try {
@@ -397,8 +413,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     // GỬI THÔNG BÁO XÁC MINH CHO THÀNH VIÊN CHƯA XÁC MINH
                     if ((user as any).isUnverified) {
-                        console.log(`📧 Gửi nhắc nhở xác minh cho thành viên cũ: ${user.email}`);
-                        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        console.log("📧 Gửi nhắc nhở xác minh cho thành viên cũ.");
+                        const token = randomBytes(32).toString("base64url");
                         
                         await prisma.verificationToken.upsert({
                             where: { 
