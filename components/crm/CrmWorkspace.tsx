@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from '
 import { CalendarClock, Check, ChevronLeft, ChevronRight, Loader2, Plus, Search, Users, X } from 'lucide-react'
 import CrmDataTools, { CrmWebsitePanel, integrationRequest } from './CrmDataTools'
 import CrmPhaseThree, { CrmEmailConsent } from './CrmPhaseThree'
+import CrmStudents from './CrmStudents'
 import {
   ACTIVITY_LABELS, CRM_STAGES, CrmContactView, CrmDetail, CrmOpportunityView, CrmOwner, CrmStageValue,
   CrmTaskView, formatCrmDate, isOpenStage, STAGE_LABELS, vietnamInputToIso,
@@ -59,10 +60,10 @@ function ContactEditor({ contact, owners, actorId, isAdmin, busy, onSave, onCanc
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Họ tên *"><input autoFocus required maxLength={150} className={input} value={name} onChange={e => setName(e.target.value)} /></Field>
       <Field label="Nguồn khách *"><input required maxLength={100} className={input} value={source} onChange={e => setSource(e.target.value)} placeholder="Facebook, người giới thiệu…" /></Field>
-      <Field label="Email"><input type="email" maxLength={254} className={input} value={email} onChange={e => setEmail(e.target.value)} /></Field>
-      <Field label="Điện thoại"><input type="tel" maxLength={40} className={input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="090… hoặc +84…" /></Field>
+      <Field label="Email"><input readOnly={contact?.studentProfile} type="email" maxLength={254} className={input} value={email} onChange={e => setEmail(e.target.value)} /></Field>
+      <Field label="Điện thoại"><input readOnly={contact?.studentProfile} type="tel" maxLength={40} className={input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="090… hoặc +84…" /></Field>
       <Field label="Nhãn (cách nhau bằng dấu phẩy)"><input maxLength={600} className={input} value={tags} onChange={e => setTags(e.target.value)} placeholder="Quan tâm AI, Cần tư vấn" /></Field>
-      <Field label="Người phụ trách"><select disabled={!isAdmin} className={input} value={owner} onChange={e => setOwner(e.target.value)}><option value="">Chưa phân công</option>{owners.map(person => <option key={person.id} value={person.id}>{person.name || person.email} · #{person.id}</option>)}</select></Field>
+      <Field label="Người phụ trách"><select disabled={!isAdmin || contact?.studentProfile} className={input} value={owner} onChange={e => setOwner(e.target.value)}><option value="">Chưa phân công</option>{owners.map(person => <option key={person.id} value={person.id}>{person.name || person.email} · #{person.id}</option>)}</select></Field>
     </div>
     <Field label="Nhu cầu, mục tiêu, ngân sách, thời điểm dự kiến"><textarea maxLength={4000} rows={4} className={input} value={needs} onChange={e => setNeeds(e.target.value)} /></Field>
     <p className="text-xs text-slate-500">Cần ít nhất email hoặc điện thoại. Khách chưa có tài khoản vẫn được lưu.</p>
@@ -208,6 +209,7 @@ export default function CrmWorkspace() {
   return <main className="mx-auto max-w-7xl space-y-5 p-3 text-slate-800 sm:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Khách hàng & chăm sóc</h1><p className="mt-1 text-sm text-slate-500">Biết khách đang ở đâu và việc cần làm tiếp theo.</p></div><button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button></div>
     {feedback}
+    {actor && <CrmStudents actorId={actor.id} isAdmin={actor.isAdmin} onChanged={() => setRevision(value => value + 1)} />}
     {actor?.isAdmin && <CrmDataTools owners={owners} actorId={actor.id} onChanged={() => setRevision(value => value + 1)} />}
     {actor && <CrmPhaseThree isAdmin={actor.isAdmin} owners={owners} onChanged={() => setRevision(value => value + 1)} onOpen={open} onUnscheduled={() => { setTab('contacts'); setUnscheduled(true); setPage(1) }} />}
     <div className="grid grid-cols-3 gap-2 sm:gap-4">{[

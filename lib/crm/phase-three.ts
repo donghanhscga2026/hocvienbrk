@@ -119,7 +119,10 @@ export async function readPhaseThree(db: PrismaClient, actor: CrmActor, query: z
     db.crmContact.groupBy({ by: ['source'], where: { ...scope, createdAt: period }, _count: { _all: true }, orderBy: { _count: { source: 'desc' } }, take: 20 }),
     db.crmContact.groupBy({ by: ['ownerId'], where: { ...scope, createdAt: period }, _count: { _all: true }, orderBy: { _count: { ownerId: 'desc' } }, take: 100 }),
     db.crmOpportunity.groupBy({ by: ['stage'], where: { contact: scope, createdAt: period }, _count: { _all: true }, _sum: { amount: true } }),
-    db.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: period, enrollment: { user: { crmIdentityContact: { is: scope } } } }, _count: { _all: true }, _sum: { amount: true } }),
+    db.payment.aggregate({ where: { status: 'VERIFIED', verifiedAt: period, enrollment: {
+      ...(actor.role === 'ADMIN' ? {} : { course: { teacherId: actor.id } }),
+      user: { OR: [{ crmIdentityContact: { is: scope } }, { crmStudentProfiles: { some: scope } }] },
+    } }, _count: { _all: true }, _sum: { amount: true } }),
   ])
   const users = await db.user.findMany({ where: { id: { in: owners.flatMap(r => r.ownerId == null ? [] : [r.ownerId]) } }, select: { id: true, name: true } })
   return { from: range.first, to: range.last, contacts, sources: sources.map(r => ({ label: r.source, count: r._count._all })),

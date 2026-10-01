@@ -66,7 +66,7 @@ export async function testPhaseThree(db: PrismaClient) {
   const linked = await db.crmContact.create({ data: { name: 'Linked', email: 'website301@crm.invalid', source: 'Phase3', ownerId: 101, createdBy: 0, linkedUserId: 301 } })
   const oldTaskContact = await db.crmContact.create({ data: { name: 'Has task', email: 'hastask@crm.invalid', source: 'Phase3', ownerId: 102, createdBy: 0 } })
   await db.crmTask.create({ data: { contactId: oldTaskContact.id, title: 'Existing task', dueAt: new Date(), createdBy: 0 } })
-  const course = await db.course.create({ data: { id_khoa: 'PHASE3', name_lop: 'Phase three course' } })
+  const course = await db.course.create({ data: { id_khoa: 'PHASE3', name_lop: 'Phase three course', teacherId: 101 } })
   const opportunity = await db.crmOpportunity.create({ data: { contactId: linked.id, title: 'Local course', stage: 'PROPOSAL', amount: 5000, courseId: course.id } })
   await write({ action: 'settings.save', version: 0, lead: true, enrollment: true, payment: true })
   check((await runAutomation(db)).events === 0, 'Historical phase two fixtures not processed')

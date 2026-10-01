@@ -62,6 +62,7 @@ model User {
   userVouchers                 UserVoucher[]
   crmContacts                  CrmContact[]
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
+  crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
 
   @@index([email])
   @@index([phone])
@@ -1731,6 +1732,9 @@ model CoursePageVersion {
 
 // CRM phase 1: contacts are independent of login accounts and affiliate ownership.
 model CrmContact {
+  studentProfile Boolean @default(false)
+  studentUserId Int?
+  studentUser User? @relation("CrmStudentProfile", fields: [studentUserId], references: [id], onDelete: SetNull)
   marketingEmailAllowed Boolean @default(false)
   automationEvents CrmAutomationEvent[]
   linkedUserId  Int? @unique
@@ -1756,6 +1760,8 @@ model CrmContact {
   tasks         CrmTask[]
 
   @@index([ownerId, archived, updatedAt])
+  @@unique([ownerId, studentUserId])
+  @@index([studentUserId])
 }
 
 model CrmOpportunity {
@@ -1832,6 +1838,7 @@ model CrmSubmission {
 
 // Mặc định tắt; mỗi quy tắc chỉ xét sự kiện phát sinh từ lần bật gần nhất.
 model CrmAutomationSettings {
+  studentSyncEnabled Boolean @default(false)
   id Int @id @default(1)
   version Int @default(1)
   leadSince DateTime?

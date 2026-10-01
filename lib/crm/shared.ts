@@ -1,4 +1,5 @@
 // Safe to import from both client and server; no Prisma or authentication here.
+import type { Prisma } from '@prisma/client'
 export const CRM_STAGES = ['NEW', 'CONTACTING', 'QUALIFIED', 'PROPOSAL', 'PAYMENT_PENDING', 'WON', 'LOST'] as const
 export type CrmStageValue = typeof CRM_STAGES[number]
 export const STAGE_LABELS: Record<CrmStageValue, string> = {
@@ -18,8 +19,12 @@ export function canAccessContact(actor: CrmActor, ownerId: number | null) {
   return canUseCrm(actor.role) && (actor.role === 'ADMIN' || ownerId === actor.id)
 }
 // Always constrain queries on the server, including dashboards and nested records.
-export function contactScope(actor: CrmActor) {
-  return actor.role === 'ADMIN' ? {} : { ownerId: actor.id }
+export function contactScope(actor: CrmActor): Prisma.CrmContactWhereInput {
+  // Hồ sơ học viên chỉ còn được xem khi giáo viên vẫn phụ trách khóa đã đăng ký.
+  return actor.role === 'ADMIN' ? {} : { ownerId: actor.id, OR: [
+    { studentProfile: false },
+    { studentProfile: true, studentUser: { enrollments: { some: { course: { teacherId: actor.id } } } } },
+  ] }
 }
 export function isOpenStage(stage: string) { return stage !== 'WON' && stage !== 'LOST' }
 export function formatCrmDate(value: string | Date) {
@@ -42,6 +47,7 @@ export type CrmOwner = { id: number; name: string | null; email: string }
 export type CrmTaskView = { id: number; contactId: number; title: string; dueAt: string; completedAt: string | null }
 export type CrmOpportunityView = { id: number; title: string; stage: CrmStageValue; amount: number; lostReason: string; version: number; courseId?: number | null }
 export type CrmContactView = {
+  studentProfile?: boolean;
   id: number; name: string; email: string | null; phone: string | null; source: string; needs: string;
   tags: string[]; ownerId: number | null; owner: CrmOwner | null; archived: boolean; version: number;
   lastContactAt: string | null; updatedAt: string; opportunities: CrmOpportunityView[]; tasks: CrmTaskView[];
