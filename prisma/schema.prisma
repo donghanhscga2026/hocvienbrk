@@ -60,6 +60,8 @@ model User {
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
+  crmContacts                  CrmContact[]
+  crmIdentityContact           CrmContact? @relation("CrmIdentity")
 
   @@index([email])
   @@index([phone])
@@ -343,6 +345,7 @@ model CourseCategory {
 }
 
 model Course {
+  crmOpportunities CrmOpportunity[]
   id                          Int                     @id @default(autoincrement())
   id_khoa                     String                  @unique
   name_lop                    String
@@ -1116,6 +1119,7 @@ model Theme {
 }
 
 model LandingPage {
+  crmSubmissions   CrmSubmission[]
   id               Int                   @id @default(autoincrement())
   slug             String                @unique
   title            String
@@ -1720,6 +1724,104 @@ model CoursePageVersion {
 
   @@unique([coursePageId, versionNumber])
   @@map("course_page_versions")
+}
+
+// CRM phase 1: contacts are independent of login accounts and affiliate ownership.
+model CrmContact {
+  linkedUserId  Int? @unique
+  linkedUser    User? @relation("CrmIdentity", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  submissions   CrmSubmission[]
+  id            Int              @id @default(autoincrement())
+  name          String
+  email         String?          @unique
+  phone         String?          @unique
+  source        String           @default("Nhập tay")
+  needs         String           @default("")
+  tags          String[]         @default([])
+  ownerId       Int?
+  owner         User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy     Int
+  archived      Boolean          @default(false)
+  version       Int              @default(1)
+  lastContactAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  opportunities CrmOpportunity[]
+  activities    CrmActivity[]
+  tasks         CrmTask[]
+
+  @@index([ownerId, archived, updatedAt])
+}
+
+model CrmOpportunity {
+  courseId  Int?
+  course    Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  id        Int          @id @default(autoincrement())
+  contactId Int
+  title     String
+  stage     CrmStage     @default(NEW)
+  amount    Int          @default(0)
+  lostReason String      @default("")
+  version   Int          @default(1)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  contact   CrmContact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, stage])
+}
+
+model CrmActivity {
+  id         Int        @id @default(autoincrement())
+  contactId  Int
+  type       String
+  content    String
+  authorId   Int
+  authorName String
+  createdAt  DateTime   @default(now())
+  contact    CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+}
+
+model CrmTask {
+  id          Int        @id @default(autoincrement())
+  contactId   Int
+  title       String
+  dueAt       DateTime
+  completedAt DateTime?
+  createdBy   Int
+  createdAt   DateTime   @default(now())
+  contact     CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, completedAt, dueAt])
+  @@index([completedAt, dueAt])
+}
+
+enum CrmStage {
+  NEW
+  CONTACTING
+  QUALIFIED
+  PROPOSAL
+  PAYMENT_PENDING
+  WON
+  LOST
+}
+
+// Public intake is auditable and never rewrites an existing customer's identity.
+model CrmSubmission {
+  id         Int @id @default(autoincrement())
+  key        String @unique
+  landingId  Int
+  landing    LandingPage @relation(fields: [landingId], references: [id], onDelete: Restrict)
+  contactId  Int?
+  contact    CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  data       Json
+  status     String @default("RECEIVED")
+  ipHash     String
+  createdAt  DateTime @default(now())
+
+  @@index([ipHash, createdAt])
+  @@index([status, createdAt])
 }
 
 enum CampaignStatus {

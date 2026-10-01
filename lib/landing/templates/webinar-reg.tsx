@@ -16,7 +16,7 @@ export interface WebinarRegTemplateProps {
     ctaText: string
     ctaLink?: string
     features?: string[]
-    onRegister?: (data: { name: string; email: string; phone: string }) => Promise<void>
+    onRegister?: (data: { name: string; email: string; phone: string; website?: string }) => Promise<void>
     config?: {
         backgroundColor?: string
         textColor?: string
@@ -44,17 +44,23 @@ export function WebinarRegTemplate({
     const [formData, setFormData] = useState({ name: '', email: '', phone: '' })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitted, setSubmitted] = useState(false)
+    const [error, setError] = useState('')
+    const [consent, setConsent] = useState(false)
+    const [website, setWebsite] = useState('')
     const accentColor = config.accentColor || '#2563eb'
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        setError('')
+        if (!onRegister) { setError('Form này chưa mở đăng ký. Vui lòng liên hệ người tổ chức.'); return }
+        if (!consent) { setError('Vui lòng đồng ý cho liên hệ về đăng ký này.'); return }
         if (onRegister) {
             setIsSubmitting(true)
             try {
-                await onRegister(formData)
+                await onRegister({ ...formData, website })
                 setSubmitted(true)
             } catch (error) {
-                console.error('Registration failed:', error)
+                setError(error instanceof Error ? error.message : 'Chưa thể đăng ký. Vui lòng thử lại.')
             } finally {
                 setIsSubmitting(false)
             }
@@ -73,7 +79,7 @@ export function WebinarRegTemplate({
                     </div>
                     <h1 className="text-3xl font-bold mb-4">Đăng ký thành công!</h1>
                     <p className="text-gray-600 mb-8">
-                        Cảm ơn bạn đã đăng ký. Chúng tôi sẽ gửi email xác nhận trong giây lát.
+                        Đã tiếp nhận thông tin đăng ký. Người tổ chức sẽ liên hệ để hướng dẫn bạn.
                     </p>
                 </div>
             </div>
@@ -191,6 +197,8 @@ export function WebinarRegTemplate({
                             <p className="text-gray-500 mb-6">Điền thông tin để nhận link webinar</p>
                             
                             <form onSubmit={handleSubmit} className="space-y-4">
+                                {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+                                <label className="hidden" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={website} onChange={e => setWebsite(e.target.value)} /></label>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Họ và tên
@@ -230,6 +238,7 @@ export function WebinarRegTemplate({
                                         placeholder="0901 234 567"
                                     />
                                 </div>
+                                <label className="flex items-start gap-2 text-sm text-gray-600"><input required type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1" />Tôi đồng ý lưu thông tin và được liên hệ về đăng ký này.</label>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
@@ -240,7 +249,7 @@ export function WebinarRegTemplate({
                                 </button>
                             </form>
                             <p className="text-xs text-gray-400 text-center mt-4">
-                                Đăng ký即表示 bạn đồng ý với điều khoản sử dụng
+                                Thông tin được dùng để xử lý đăng ký và liên hệ với bạn.
                             </p>
                         </div>
                     </div>
