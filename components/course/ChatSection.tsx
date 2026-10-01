@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useOptimistic, useTransition, memo } from 'react'
+import CrmRequestForm from '@/components/crm/CrmRequestForm'
 import { getCommentsByLesson, createComment, updateComment } from '@/app/actions/comment-actions'
 import { Send, LogIn, Loader2, MessageCircle, X, Bold, Palette, Type, Smile, Image as ImageIcon } from 'lucide-react'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
@@ -27,6 +28,7 @@ interface Comment {
 }
 
 interface ChatSectionProps {
+    courseId: number
     lessonId: string
     session: any
 }
@@ -187,7 +189,7 @@ const CommentItem = ({
 
 const COMMENTS_PAGE_SIZE = 20
 
-function ChatSection({ lessonId, session }: ChatSectionProps) {
+function ChatSection({ lessonId, session, courseId }: ChatSectionProps) {
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     // [PAGINATE] Chỉ tải 20 bình luận GỐC mới nhất mỗi lần — "totalTopLevel" =
@@ -522,6 +524,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                 </h3>
             </div>
 
+            {session?.user && <div className="shrink-0 max-h-[40vh] overflow-y-auto p-2"><CrmRequestForm key={lessonId} courseId={courseId} lessonId={lessonId} signedIn /></div>}
             <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -547,6 +550,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 isBeingEdited={editingId === comment.id}
                                 onStartEdit={handleStartEdit}
                             />
+                            {currentUserId === comment.userId && typeof comment.id === 'number' && <CrmRequestForm courseId={courseId} lessonId={lessonId} commentId={comment.id} initialContent={comment.content} signedIn />}
                             {repliesByParent[String(comment.id)]?.length > 0 && (
                                 <div className="ml-11 pl-3 border-l-2 border-zinc-800 -mt-1">
                                     {repliesByParent[String(comment.id)].map(reply => (

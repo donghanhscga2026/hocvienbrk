@@ -4,6 +4,8 @@ import { CrmCommand, crmQuery } from './validation'
 import { z } from 'zod'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { projectStudent, studentIdentity, studentUserSelect } from './student-profile'
+import { learningSummaries } from './learning'
+import { requestScope } from './requests'
 
 export class CrmError extends Error {
   constructor(message: string, public status = 400) { super(message) }
@@ -42,7 +44,8 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
       },
     })
     if (!contact) throw new CrmError('Không tìm thấy khách hoặc không có quyền truy cập.', 404)
-    return { contact: { ...projectStudent(contact), activityTotal: contact._count.activities } }
+    const learning = await learningSummaries(db, actor, [contact])
+    return { contact: { ...projectStudent(contact), learning: learning.get(contact.id) || [], activityTotal: contact._count.activities } }
   }
   const base: Prisma.CrmContactWhereInput = { ...scope, archived: false }
   const now = new Date()
@@ -82,7 +85,9 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
     }, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }], take: 20, skip: (query.page - 1) * 20 }),
     db.crmContact.count({ where }),
   ])
-  return { contacts: contacts.map(projectStudent), total, page: query.page }
+  const learning = await learningSummaries(db, actor, contacts)
+  const counts = await db.crmRequest.groupBy({ by: ['contactId'], where: { AND: [requestScope(actor)], contactId: { in: contacts.map(c => c.id) }, status: { not: 'RESOLVED' } }, _count: true })
+  return { contacts: contacts.map(contact => ({ ...projectStudent(contact), learning: learning.get(contact.id) || [], pendingRequests: counts.find(c => c.contactId === contact.id)?._count || 0 })), total, page: query.page }
 }
 
 export async function writeCrm(db: PrismaClient, actor: CrmActor, command: CrmCommand) {
@@ -110,6 +115,24 @@ export async function writeCrm(db: PrismaClient, actor: CrmActor, command: CrmCo
       const teacherId = contact.studentProfile ? contact.ownerId : actor.role === 'ADMIN' ? undefined : actor.id
       const enrollment = userId == null ? null : await tx.enrollment.findFirst({ where: { userId, courseId: command.data.courseId, ...(teacherId == null ? {} : { course: { teacherId } }) }, select: { id: true } })
       if (!enrollment) throw new CrmError('Khóa học chưa thuộc tài khoản liên kết của khách.')
+    }
+    if (command.action === 'care.update') {
+      if (contact.version !== command.version) throw new CrmError('Hồ sơ đã thay đổi. Hãy tải lại trước khi lưu.', 409)
+      if (command.opportunity) {
+        const change = command.opportunity
+        if (change.stage === 'LOST' && !change.lostReason) throw new CrmError('Cần ghi lý do chưa thành công.')
+        const previous = await tx.crmOpportunity.findFirst({ where: { id: change.id, contactId: contact.id } })
+        if (!previous || previous.version !== change.version) throw new CrmError('Cơ hội đã thay đổi. Hãy tải lại.', 409)
+        await tx.crmOpportunity.update({ where: { id: previous.id }, data: { stage: change.stage, lostReason: change.stage === 'LOST' ? change.lostReason : '', version: { increment: 1 } } })
+        await log(contact.id, 'OPPORTUNITY', previous.title + ': ' + STAGE_LABELS[previous.stage] + ' → ' + STAGE_LABELS[change.stage])
+      }
+      await log(contact.id, 'NOTE', command.note)
+      if (command.task) {
+        await tx.crmTask.create({ data: { contactId: contact.id, title: command.task.title, dueAt: command.task.dueAt, createdBy: actor.id } })
+        await log(contact.id, 'TASK', 'Hẹn công việc: ' + command.task.title)
+      }
+      await tx.crmContact.update({ where: { id: contact.id }, data: { version: { increment: 1 }, lastContactAt: new Date() } })
+      return { contactId: contact.id }
     }
     if (command.action === 'contact.update') {
       if (contact.version !== command.version) throw new CrmError('Hồ sơ đã được cập nhật ở nơi khác. Hãy tải lại trước khi lưu.', 409)

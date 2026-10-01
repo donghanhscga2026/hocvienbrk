@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
+import CrmRequestForm from '@/components/crm/CrmRequestForm'
 import CoursePageView from '@/components/course-page/CoursePageView'
 
 const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
@@ -177,7 +178,7 @@ export default async function KhoaHocPage({ params }: PageProps) {
     // coursePage đã được lấy song song ở trên cùng các query khác
     if (coursePage && (coursePage as any).useTemplate !== false) {
         return (
-            <CoursePageView
+            <><CoursePageView
                 coursePage={coursePage as any}
                 course={course}
                 enrollment={enrollment}
@@ -188,12 +189,12 @@ export default async function KhoaHocPage({ params }: PageProps) {
                 testimonials={testimonials}
                 totalHours={totalHours}
                 activeStudentCount={activeStudentCount}
-            />
+            /><div className="mx-auto max-w-3xl p-4"><CrmRequestForm courseId={course.id} signedIn={userId != null} /></div></>
         )
     }
 
     return (
-        <CourseLandingClient
+        <><CourseLandingClient
             course={course}
             lessons={lessons}
             testimonials={testimonials}
@@ -203,6 +204,6 @@ export default async function KhoaHocPage({ params }: PageProps) {
             session={session}
             totalHours={totalHours}
             activeStudentCount={activeStudentCount}
-        />
+        /><div className="mx-auto max-w-3xl p-4"><CrmRequestForm courseId={course.id} signedIn={userId != null} /></div></>
     )
 }

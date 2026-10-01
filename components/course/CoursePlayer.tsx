@@ -78,6 +78,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     useEffect(() => {
         setIsMounted(true)
 
+        const requestedLesson = new URLSearchParams(window.location.search).get('lesson')
+        if (requestedLesson && course.lessons.some((lesson: { id: string }) => lesson.id === requestedLesson)) {
+            setCurrentLessonId(requestedLesson)
+            setMobileTab('content')
+            return
+        }
         // Chỉ tìm bài học cũ khi đã ở client
         if (enrollment.lastLessonId) {
             setCurrentLessonId(enrollment.lastLessonId)
@@ -439,7 +445,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 onMouseEnter={() => setChatHovered(true)}
                                 onMouseLeave={() => setChatHovered(false)}
                             >
-                                <ChatSection lessonId={currentLessonId!} session={session} />
+                                <ChatSection courseId={course.id} lessonId={currentLessonId!} session={session} />
                             </div>
                         </div>
                     )}
@@ -476,7 +482,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             )}
                                         </div>
                                         <div className="flex-1 min-h-0">
-                                            <ChatSection lessonId={currentLessonId!} session={session} />
+                                            <ChatSection courseId={course.id} lessonId={currentLessonId!} session={session} />
                                         </div>
                                     </div>
                                 )}
@@ -834,5 +840,4 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
         </div>
     )
 }
-
 

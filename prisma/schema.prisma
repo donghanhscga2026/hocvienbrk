@@ -347,6 +347,7 @@ model CourseCategory {
 }
 
 model Course {
+  crmRequests CrmRequest[]
   crmOpportunities CrmOpportunity[]
   id                          Int                     @id @default(autoincrement())
   id_khoa                     String                  @unique
@@ -1732,6 +1733,7 @@ model CoursePageVersion {
 
 // CRM phase 1: contacts are independent of login accounts and affiliate ownership.
 model CrmContact {
+  requests CrmRequest[]
   studentProfile Boolean @default(false)
   studentUserId Int?
   studentUser User? @relation("CrmStudentProfile", fields: [studentUserId], references: [id], onDelete: SetNull)
@@ -1762,6 +1764,39 @@ model CrmContact {
   @@index([ownerId, archived, updatedAt])
   @@unique([ownerId, studentUserId])
   @@index([studentUserId])
+}
+
+// Explicit support/consultation only; ordinary lesson interactions remain in LMS.
+model CrmRequest {
+  id String @id @default(uuid())
+  key String @unique
+  contactId Int?
+  contact CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  ownerId Int?
+  courseId Int?
+  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  userId Int?
+  lessonId String?
+  commentId Int?
+  category String
+  status String @default("NEW")
+  content String
+  name String
+  email String?
+  phone String?
+  source String
+  ipHash String
+  resolution String @default("")
+  history Json @default("[]")
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, status, createdAt])
+  @@index([contactId, status])
+  @@index([ipHash, createdAt])
+  @@index([courseId])
+  @@index([createdAt])
 }
 
 model CrmOpportunity {

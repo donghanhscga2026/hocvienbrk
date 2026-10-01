@@ -31,6 +31,12 @@ const opportunityFields = z.object({
 })
 const dueAt = z.iso.datetime({ offset: true }).transform(value => new Date(value))
 export const crmCommand = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('care.update'), contactId: recordId, version: recordId,
+    note: text(4000).min(1),
+    opportunity: z.object({ id: recordId, version: recordId, stage: z.enum(CRM_STAGES), lostReason: text(1000) }).strict().nullable(),
+    task: z.object({ title: text(200).min(1), dueAt }).strict().nullable(),
+  }).strict(),
   z.object({ action: z.literal('contact.create'), data: contactFields }).strict(),
   z.object({ action: z.literal('contact.update'), contactId: recordId, version: recordId, data: contactFields }).strict(),
   z.object({ action: z.literal('activity.create'), contactId: recordId, type: z.enum(['NOTE', 'CALL', 'ZALO', 'EMAIL', 'MEETING']), content: text(4000).min(1) }).strict(),
