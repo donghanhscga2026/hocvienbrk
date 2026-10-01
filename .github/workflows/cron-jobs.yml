@@ -10,6 +10,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  crm-automation:
+    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process enabled CRM rules
+        run: |
+          curl --fail --silent --show-error --max-time 60 -X GET "${{ vars.SITE_URL }}/api/cron/crm-automation?execute=1" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
   mbtca-orchestrator:
     if: github.event.schedule == '5 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

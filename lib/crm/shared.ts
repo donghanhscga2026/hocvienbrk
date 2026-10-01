@@ -9,6 +9,7 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   NOTE: 'Ghi chú', CALL: 'Gọi điện', ZALO: 'Zalo', EMAIL: 'Email', MEETING: 'Gặp trực tiếp',
   CREATED: 'Tạo hồ sơ', UPDATED: 'Cập nhật hồ sơ', OPPORTUNITY: 'Cơ hội tư vấn', TASK: 'Công việc',
   IMPORT: 'Nhập dữ liệu', LINK: 'Liên kết tài khoản', FORM: 'Đăng ký qua form',
+  AUTOMATION: 'CRM tự động', CONSENT: 'Quyền nhận email',
 }
 export const CRM_ROLES = ['ADMIN', 'TEACHER', 'INSTRUCTOR'] as const
 export type CrmActor = { id: number; role: string; name: string }
