@@ -308,11 +308,6 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
     return (
         <div className="flex flex-col h-full bg-black text-zinc-300">
-            {isAuditor && (
-                <div className="bg-yellow-500/15 border border-yellow-500 text-yellow-900 px-4 py-3 text-sm font-bold text-center">
-                    ⚠️ Bạn đang học ở chế độ DỰ THÍNH. Bạn vẫn xem được video, nhưng không được nhận link Zoom/live trực tiếp và quyền lợi đồng hành đầy đủ.
-                </div>
-            )}
             {/* Header */}
             {/* [FIX] z-[60] (thay vì z-50 trước đây) — cao hơn mọi overlay NỘI DUNG
                 trong trang (danh sách học phần, ô soạn thảo mở rộng, các modal nhỏ...
@@ -367,6 +362,15 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     như panel đè phủ lên chứ không đẩy nội dung xuống đúng nghĩa. Cho
                     phép cuộn thì phần bị đẩy xuống vẫn xem được bằng cách cuộn main. */}
                 <main className="flex-1 flex flex-col min-h-0 overflow-y-auto items-center bg-zinc-950">
+                    {/* Thông báo ở trong vùng đã chừa header; chỉ mở chi tiết khi cần. */}
+                    {isAuditor && (
+                        <details className="w-full shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 text-amber-200">
+                            <summary className="flex min-h-9 cursor-pointer items-center gap-2 py-1 text-xs font-medium">
+                                Học dự thính <span className="text-amber-200/70">· Xem quyền lợi</span>
+                            </summary>
+                            <p className="pb-3 text-xs leading-relaxed">Bạn vẫn xem được video, nhưng không được nhận link Zoom/live trực tiếp và quyền lợi đồng hành đầy đủ.</p>
+                        </details>
+                    )}
                     {/* [FIX] Trên mobile, khung video/nội dung chỉ hiện ở tab "Nội dung" —
                         trước đây hiện cố định phía trên cả 3 tab, chiếm chỗ và lẫn cả vào
                         tab "Danh sách" bài học. Desktop không có khái niệm tab nên luôn hiện. */}
@@ -376,8 +380,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 className={isMobile ? '' : 'grid transition-[grid-template-rows] duration-300 ease-in-out'}
                                 style={!isMobile ? { gridTemplateRows: chatHovered ? '0fr' : '1fr' } : undefined}
                             >
-                                <div className={isMobile ? '' : 'overflow-hidden border-2 border-white shadow-2xl bg-black min-h-0'}>
-                                    {!videoHidden && (
+                                <div className={isMobile ? (videoHidden ? 'hidden' : '') : 'overflow-hidden border-2 border-white shadow-2xl bg-black min-h-0'}>
+                                    {/* Mobile chỉ thu gọn bằng CSS để giữ vị trí phát và nội dung đang học. */}
+                                    {(!videoHidden || isMobile) && (
                                         <VideoPlayer
                                             key={currentLessonId}
                                             ref={videoPlayerRef}
@@ -457,7 +462,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     {/* [HYDRATION FIX] Chỉ render Mobile logic khi đã Mounted và là Mobile */}
                     {isMounted && isMobile && (
                         <>
-                            <div className="flex-1 min-h-0 w-full flex flex-col">
+                            {/* Sàn chiều cao cho phần đọc bình luận; nội dung dài cuộn trong main. */}
+                            <div className={`w-full flex flex-col ${mobileTab === 'content' ? 'flex-1 shrink-0 min-h-[max(360px,50dvh)]' : 'flex-1 min-h-0'}`}>
                                 {mobileTab === 'list' && (
                                     <div className="flex-1 overflow-y-auto">
                                         <LessonSidebarMobile
@@ -472,12 +478,14 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                     </div>
                                 )}
                                 {mobileTab === 'content' && (
-                                    // [FIX] min-h-[220px] (thay vì min-h-0) — cùng lý do như bản
-                                    // desktop: tránh bị ép co gần bằng 0 khi khung video phía trên
-                                    // cao hơn lúc panel học phần hiện ra.
-                                    <div className="flex-1 flex flex-col min-h-[220px]">
-                                        <div className="px-4 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
-                                            <p className="text-base font-bold text-white leading-tight">{currentLesson?.title}</p>
+                                    <div className="flex-1 flex flex-col min-h-0">
+                                        <div className="px-4 py-2 bg-zinc-900 border-b border-zinc-800 shrink-0">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <p title={currentLesson?.title} className="min-w-0 truncate text-sm font-bold text-white">{currentLesson?.title}</p>
+                                                <button type="button" aria-expanded={!videoHidden} onClick={() => setVideoHidden(value => !value)} className="min-h-11 shrink-0 rounded-lg px-2 text-xs font-semibold text-orange-400 hover:bg-white/5">
+                                                    {videoHidden ? 'Hiện bài học' : 'Thu gọn bài học'}
+                                                </button>
+                                            </div>
                                             {currentLesson?.type !== 'TEXT' && currentLesson?.type !== 'ALL' && (
                                                 <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung &rarr;</button>
                                             )}

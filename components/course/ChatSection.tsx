@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useOptimistic, useTransition, memo } from 'react'
-import CrmRequestForm from '@/components/crm/CrmRequestForm'
 import { getCommentsByLesson, createComment, updateComment } from '@/app/actions/comment-actions'
 import { Send, LogIn, Loader2, MessageCircle, X, Bold, Palette, Type, Smile, Image as ImageIcon } from 'lucide-react'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
@@ -189,7 +188,7 @@ const CommentItem = ({
 
 const COMMENTS_PAGE_SIZE = 20
 
-function ChatSection({ lessonId, session, courseId }: ChatSectionProps) {
+function ChatSection({ lessonId, session }: ChatSectionProps) {
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     // [PAGINATE] Chỉ tải 20 bình luận GỐC mới nhất mỗi lần — "totalTopLevel" =
@@ -513,8 +512,8 @@ function ChatSection({ lessonId, session, courseId }: ChatSectionProps) {
     }, [optimisticComments])
 
     return (
-        <div className="relative flex flex-col h-full bg-zinc-950">
-            <div className="shrink-0 px-4 py-3 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
+        <div className="relative flex min-h-0 flex-col h-full bg-zinc-950">
+            <div className="shrink-0 px-4 py-2 sm:py-3 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-yellow-400" />
                     Tương tác
@@ -522,10 +521,9 @@ function ChatSection({ lessonId, session, courseId }: ChatSectionProps) {
                         ({loadedTopLevel} của {totalTopLevel} bình luận)
                     </span>
                 </h3>
-                <p className="mt-1 text-xs text-zinc-400">Chia sẻ cảm nghĩ, thảo luận và hỏi bài. Cần giáo viên xử lý riêng? Chọn “Hỏi giáo viên” trên đầu màn hình.</p>
             </div>
 
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar">
+            <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 custom-scrollbar">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
                         <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
@@ -550,7 +548,6 @@ function ChatSection({ lessonId, session, courseId }: ChatSectionProps) {
                                 isBeingEdited={editingId === comment.id}
                                 onStartEdit={handleStartEdit}
                             />
-                            {currentUserId === comment.userId && typeof comment.id === 'number' && <CrmRequestForm courseId={courseId} lessonId={lessonId} commentId={comment.id} initialContent={comment.content} signedIn />}
                             {repliesByParent[String(comment.id)]?.length > 0 && (
                                 <div className="ml-11 pl-3 border-l-2 border-zinc-800 -mt-1">
                                     {repliesByParent[String(comment.id)].map(reply => (
