@@ -280,7 +280,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     // Nội dung tooltip + tốc độ/thời gian đọc từ AttentionHighlightContext (DB,
     // chỉnh trong /tools/settings/attention-tooltip).
     const { config: attnConfig, getItem: getAttnItem } = useAttentionHighlightSettings()
-    const backAttn = getAttnItem('courseplayer.back', 'Thoát ra khỏi bài học')
+    const backAttn = getAttnItem('courseplayer.back', 'Về trang khóa học')
     const listTabAttn = getAttnItem('courseplayer.tab.list', 'Danh sách toàn bộ bài học')
     const contentTabAttn = getAttnItem('courseplayer.tab.content', 'Xem video & tương tác')
     const recordTabAttn = getAttnItem('courseplayer.tab.record', 'Nộp bài & xem điểm')
@@ -317,12 +317,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 z-[60] fixed top-[env(safe-area-inset-top)] left-0 right-0">
                 <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
                     <button
-                        onClick={() => router.back()}
-                        aria-label="Quay ra"
+                        onClick={() => router.replace(`/khoa-hoc/${encodeURIComponent(course.id_khoa)}`)}
+                        aria-label="Về khóa học"
                         className="shrink-0 flex items-center gap-1.5 pl-2.5 pr-3.5 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all"
                     >
                         <ArrowLeft className="w-5 h-5" strokeWidth={2.75} />
-                        <span className="hidden text-xs font-black tracking-wide sm:inline">Thoát ra</span>
+                        <span className="hidden text-xs font-black tracking-wide sm:inline">Về khóa học</span>
                     </button>
                 </AttentionHighlight>
 

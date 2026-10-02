@@ -1,0 +1,36 @@
+name: Notification navigation
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - public/sw.js
+      - components/course/**
+      - app/khoa-hoc/**
+      - scripts/test-web-push-click.cjs
+      - scripts/test-notification-navigation.cjs
+      - .github/workflows/notification-navigation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  navigation:
+    name: Notification click and browser Back
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/test-web-push-click.cjs
+      - name: Install isolated browser test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/navigation-browser" --no-package-lock playwright@1.62.1
+          "$RUNNER_TEMP/navigation-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Test real Next.js navigation in Chromium
+        run: NODE_PATH="$RUNNER_TEMP/navigation-browser/node_modules" node scripts/test-notification-navigation.cjs

@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
+import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
 
 const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
@@ -13,6 +14,7 @@ const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
 
 interface PageProps {
     params: Promise<{ id: string }>
+    searchParams?: Promise<{ notificationLesson?: string | string[] }>
 }
 
 // [OPTIMIZE] cache() giúp generateMetadata và component trang dùng chung 1 lần
@@ -75,7 +77,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
 }
 
-export default async function KhoaHocPage({ params }: PageProps) {
+export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     let { id } = await params
     const session = await getSession()
 
@@ -174,35 +176,48 @@ export default async function KhoaHocPage({ params }: PageProps) {
             }))
     ].slice(0, 5)
 
+    // Chỉ tự mở bài từ thông báo khi bài đó thực sự thuộc khóa học này.
+    const requestedLesson = (await searchParams)?.notificationLesson
+    const notificationEntry = typeof requestedLesson === 'string'
+        && lessons.some(lesson => lesson.id === requestedLesson)
+        ? <NotificationLessonEntry courseSlug={course.id_khoa} lessonId={requestedLesson} />
+        : null
+
     // coursePage đã được lấy song song ở trên cùng các query khác
     if (coursePage && (coursePage as any).useTemplate !== false) {
         return (
-            <CoursePageView
-                coursePage={coursePage as any}
-                course={course}
-                enrollment={enrollment}
-                userPhone={userPhone}
-                userId={userId}
-                session={session}
-                lessons={lessons}
-                testimonials={testimonials}
-                totalHours={totalHours}
-                activeStudentCount={activeStudentCount}
-            />
+            <>
+                {notificationEntry}
+                <CoursePageView
+                    coursePage={coursePage as any}
+                    course={course}
+                    enrollment={enrollment}
+                    userPhone={userPhone}
+                    userId={userId}
+                    session={session}
+                    lessons={lessons}
+                    testimonials={testimonials}
+                    totalHours={totalHours}
+                    activeStudentCount={activeStudentCount}
+                />
+            </>
         )
     }
 
     return (
-        <CourseLandingClient
-            course={course}
-            lessons={lessons}
-            testimonials={testimonials}
-            enrollment={enrollment}
-            userPhone={userPhone}
-            userId={userId}
-            session={session}
-            totalHours={totalHours}
-            activeStudentCount={activeStudentCount}
-        />
+        <>
+            {notificationEntry}
+            <CourseLandingClient
+                course={course}
+                lessons={lessons}
+                testimonials={testimonials}
+                enrollment={enrollment}
+                userPhone={userPhone}
+                userId={userId}
+                session={session}
+                totalHours={totalHours}
+                activeStudentCount={activeStudentCount}
+            />
+        </>
     )
 }

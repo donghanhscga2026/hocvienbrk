@@ -6,7 +6,8 @@ const vm = require('node:vm')
 // Chạy handler thật với WindowClient giả; không gửi Push hay gọi DB thật.
 const source = fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8')
 const origin = 'https://test.invalid'
-const target = origin + '/courses/test/learn?lesson=lesson-a'
+const lesson = origin + '/courses/test/learn?lesson=lesson-a'
+const target = origin + '/khoa-hoc/test?notificationLesson=lesson-a'
 let checks = 0
 async function scenario(options = {}) {
   const events = {}, actions = []
@@ -34,7 +35,7 @@ async function scenario(options = {}) {
   context.readPushState = async () => options.boundUser ?? '3'
   let task
   events.notificationclick({
-    notification: { data: { url: options.url ?? target, userId: '3' }, close: () => actions.push(['close']) },
+    notification: { data: { url: options.url ?? lesson, userId: '3' }, close: () => actions.push(['close']) },
     waitUntil: value => { task = value },
   })
   await task
@@ -72,7 +73,7 @@ async function run() {
   await check('Focused browser tab cannot absorb notification click',
     {clients: actions => [{...oldClient(actions),focused:true,visibilityState:'visible'}]}, opened)
   await check('Existing target URL still lets browser choose installed app',
-    {clients: actions => [oldClient(actions,{url:target})]}, opened)
+    {clients: actions => [oldClient(actions,{url:lesson})]}, opened)
   await check('Null openWindow result does not create duplicate windows',
     {openNull:true,clients: actions => [oldClient(actions)]}, [['open',target]])
   await check('Second focus rejection does not open duplicate windows',
@@ -106,6 +107,11 @@ async function run() {
   await check('Cross-origin notification cannot open',
     {url:'https://evil.invalid/courses/test/learn?lesson=lesson-a'}, [])
   await check('Non-lesson destination cannot open', {url:origin+'/tools/crm'}, [])
+  await check('Existing notification query parameters cannot control destination',
+    {url:lesson+'&notificationLesson=other&redirect=https://evil.invalid'}, opened)
+  await check('Course and lesson identifiers remain encoded',
+    {url:origin+'/courses/khoa%20hoc/learn?lesson=bai%20mot'},
+    [['open',origin+'/khoa-hoc/khoa%20hoc?notificationLesson=bai+mot'],['focus-new']])
   console.log(JSON.stringify({result:'passed',assertions:checks,scope:'notification click; no network or database'}))
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
