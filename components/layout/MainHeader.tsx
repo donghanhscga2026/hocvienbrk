@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, HelpCircle, Menu, Share2, Wallet, Wrench, X } from 'lucide-react'
+import { Wallet, Wrench } from 'lucide-react'
 import { useHomeSlug } from '@/hooks/useHomeSlug'
 import { useAttentionCycle } from '@/hooks/useAttentionCycle'
 import { AttentionHighlight } from '@/components/ui/attention-highlight'
@@ -15,8 +15,6 @@ import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
-import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
-import { useFloatingAssistant } from '@/components/assistant/AssistantProvider'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
 const MbwDashboardPopup = dynamic(() => import('@/components/mbw/MbwDashboardPopup'), { ssr: false })
@@ -31,8 +29,6 @@ export default function MainHeader({ title }: MainHeaderProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { data: session } = useSession()
-    const menu = useRef<HTMLDialogElement>(null)
-    const { setIsOpen: openHelp } = useFloatingAssistant()
     const [showShare, setShowShare] = useState(false)
     const { homeSlug, isReady } = useHomeSlug()
     const { open: openMbw } = useMbwDashboard()
@@ -90,18 +86,18 @@ export default function MainHeader({ title }: MainHeaderProps) {
 
     return (
         <>
-            <header className="sticky top-0 z-50 w-full pt-[env(safe-area-inset-top)] bg-brk-surface text-brk-on-surface shadow-xl">
-                <div className="flex min-h-14 flex-nowrap items-center justify-between gap-1 px-2 py-1 sm:gap-2 sm:px-4">
+            <header className="sticky top-0 z-50 w-full bg-brk-surface text-brk-on-surface shadow-xl">
+                <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-2 py-1 sm:px-4">
                     <div className="flex items-center gap-2 shrink-0">
                         <AttentionHighlight {...getStatus('logo')}>
-                            <Link href="/" className="flex min-h-11 w-11 shrink-0 items-center justify-center transition-opacity hover:opacity-80 md:w-auto">
+                            <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
                                 <Image
                                     src="/logobrk-50px.png"
                                     alt="MFC Logo"
                                     width={120}
                                     height={40}
                                     priority
-                                    className="max-w-11 object-contain md:max-w-none"
+                                    className="object-contain"
                                     style={{ height: '36px', width: 'auto' }}
                                 />
                             </Link>
@@ -110,7 +106,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                         <AttentionHighlight {...getStatus('home')}>
                             <button
                                 onClick={() => router.push(hasCustomHome ? `/page/${homeSlug}` : '/page/brk')}
-                                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center transition-opacity hover:opacity-80"
+                                className="shrink-0 transition-opacity hover:opacity-80"
                                 title={`Trang chủ: ${hasCustomHome ? homeSlug : 'brk'}`}
                             >
                                 <Image
@@ -126,7 +122,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                         </AttentionHighlight>
 
                         {showBackButton && (
-                            <AttentionHighlight {...getStatus('back')} className="hidden md:flex">
+                            <AttentionHighlight {...getStatus('back')}>
                                 <button
                                     onClick={handleBackClick}
                                     className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
@@ -148,11 +144,11 @@ export default function MainHeader({ title }: MainHeaderProps) {
 
                     <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
                         <NotificationBell />
-                        <AttentionHighlight {...getStatus('help')} className="hidden md:flex">
+                        <AttentionHighlight {...getStatus('help')}>
                             <AssistantHeaderIcon />
                         </AttentionHighlight>
 
-                        <AttentionHighlight {...getStatus('tools')} className="hidden md:flex">
+                        <AttentionHighlight {...getStatus('tools')}>
                             <button
                                 onClick={() => router.push('/tools')}
                                 className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10 text-brk-primary flex items-center justify-center"
@@ -163,7 +159,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                         </AttentionHighlight>
 
                         {userId && (
-                            <AttentionHighlight {...getStatus('share')} className="hidden md:flex">
+                            <AttentionHighlight {...getStatus('share')}>
                                 <button
                                     onClick={() => setShowShare(true)}
                                     className="shrink-0 transition-opacity hover:opacity-80"
@@ -182,7 +178,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                         )}
 
                         {userId && (
-                            <AttentionHighlight {...getStatus('wallet')} className="hidden md:flex">
+                            <AttentionHighlight {...getStatus('wallet')}>
                                 <button
                                     onClick={openMbw}
                                     className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
@@ -196,22 +192,9 @@ export default function MainHeader({ title }: MainHeaderProps) {
                         <AttentionHighlight {...getStatus('avatar')}>
                             <UserMenu />
                         </AttentionHighlight>
-                        <button type="button" aria-label="Mở menu MFC" aria-haspopup="dialog" onClick={() => menu.current?.showModal()} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl text-brk-primary hover:bg-brk-background"><Menu size={22} /></button>
                     </div>
                 </div>
             </header>
-            {/* Menu phụ giúp thanh đầu trang luôn nằm trên một hàng ở điện thoại. */}
-            <dialog ref={menu} aria-label="Menu MFC" className="m-auto max-h-[90dvh] w-[calc(100%_-_1.5rem)] max-w-sm overflow-y-auto rounded-2xl border border-brk-outline bg-brk-surface p-0 text-brk-on-surface shadow-2xl backdrop:bg-black/60">
-                <div className="flex items-center justify-between gap-3 border-b border-brk-outline p-4"><h2 className="min-w-0 break-words font-bold">{title || 'Menu MFC'}</h2><button type="button" aria-label="Đóng menu MFC" onClick={() => menu.current?.close()} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl"><X size={20} /></button></div>
-                <div className="grid gap-1 p-3">
-                    {showBackButton && <button type="button" className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-brk-background" onClick={() => { menu.current?.close(); handleBackClick() }}><ArrowLeft size={18} />Quay lại</button>}
-                    <button type="button" className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-brk-background" onClick={() => { menu.current?.close(); router.push('/tools') }}><Wrench size={18} />Công cụ & tiện ích</button>
-                    <button type="button" className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-brk-background" onClick={() => { menu.current?.close(); openHelp(true) }}><HelpCircle size={18} />Trợ giúp</button>
-                    {userId && <button type="button" className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-brk-background" onClick={() => { menu.current?.close(); setShowShare(true) }}><Share2 size={18} />Chia sẻ link affiliate</button>}
-                    {userId && <button type="button" className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-brk-background" onClick={() => { menu.current?.close(); openMbw() }}><Wallet size={18} />Ví MBW</button>}
-                    <InstallAppButton className="w-full text-left hover:bg-brk-background" onBeforeOpen={() => menu.current?.close()} />
-                </div>
-            </dialog>
 
             {showShare && (
                 <ShareModal
