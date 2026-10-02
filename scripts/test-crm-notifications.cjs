@@ -116,6 +116,7 @@ async function run() {
     const module = { exports: {} }
     new Function('require', 'exports', 'module', ts.transpileModule(fs.readFileSync(repo + '/' + path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(name => {
       if (name in aliases) return aliases[name]
+      if (name.startsWith('node:')) return require(name)
       return require(repo + '/node_modules/' + name)
     }, module.exports, module)
     return module.exports
@@ -126,10 +127,15 @@ async function run() {
     try { const result = await operation(fake); await db.exec('COMMIT'); return result }
     catch (error) { await db.exec('ROLLBACK'); throw error }
   }
+  const config = load('lib/web-push-config.ts', {})
+  const subscriptions = load('lib/web-push-subscriptions.ts', {
+    '@/lib/prisma':{default:fake}, '@/lib/crm/service':{CrmError}, './web-push-config':config,
+  })
   const announcements = load('lib/lesson-announcements.ts', {
     '@/lib/prisma': {default:fake},
     '@/lib/app-notifications': {notificationActor:async()=>actor(1,'TEACHER')},
     '@/lib/crm/service': {CrmError},
+    '@/lib/web-push-config':config, '@/lib/web-push-subscriptions':subscriptions,
   })
   await db.exec(`UPDATE public."Enrollment" SET "studyMode"='AUDITOR' WHERE id=100;
     INSERT INTO public."User" (id,email,role,"updatedAt") VALUES (5,'5@test.invalid','STUDENT',now()),(6,'6@test.invalid','STUDENT',now());
@@ -214,7 +220,7 @@ async function run() {
   ok((await notificationRoute.PATCH(new Request('https://test.invalid/api/notifications',{method:'PATCH',headers:{origin:'https://evil.invalid','content-type':'application/json'},body:JSON.stringify({all:true})}))).status===403,'Notification writes require same origin')
   ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?page=0'))).status===400,'Notification paging validated')
   sessionUser=null; ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications'))).status===401,'Anonymous notification API rejected')
-  const announcementRoute=load('app/api/courses/[id]/lessons/[lessonId]/announce/route.ts',{'@/lib/crm/http':http,'@/lib/app-notifications':{notificationActor:authActor},'@/lib/lesson-announcements':announcements})
+  const announcementRoute=load('app/api/courses/[id]/lessons/[lessonId]/announce/route.ts',{'@/lib/crm/http':http,'@/lib/app-notifications':{notificationActor:authActor},'@/lib/lesson-announcements':announcements,'@/lib/web-push-config':config,'@/lib/web-push-worker':{processWebPush:async()=>{}},'next/server':{after:()=>{}}})
   const context={params:Promise.resolve({id:'10',lessonId:'lesson-a'})}
   const postAnnouncement=(body,origin='https://test.invalid')=>announcementRoute.POST(new Request('https://test.invalid/api/courses/10/lessons/lesson-a/announce',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}),context)
   ok((await announcementRoute.GET(new Request('https://test.invalid'),context)).status===401,'Anonymous preview blocked')
@@ -223,6 +229,70 @@ async function run() {
   ok((await postAnnouncement({id:batch,title:'Valid',recipientId:5})).status===400,'Recipient override rejected')
   ok((await postAnnouncement({id:batch,title:' '})).status===400,'Blank announcement rejected')
   ok((await postAnnouncement({id:batch,title:'Valid'})).status===403,'Student cannot send announcement via API')
+
+  // Web Push dùng SQL thật trong DB dùng một lần; dịch vụ gửi được thay bằng mock.
+  const beforeMigration = JSON.stringify(await q('SELECT id,email,role FROM public."User" ORDER BY id'))
+  await db.exec(fs.readFileSync(repo+'/prisma/migrations/20261002095356_lesson_web_push/migration.sql','utf8'))
+  ok(beforeMigration===JSON.stringify(await q('SELECT id,email,role FROM public."User" ORDER BY id')),'Push migration preserves existing users')
+  for (const table of ['WebPushSubscription','WebPushDelivery']) {
+    const perms=await q('SELECT relrowsecurity rls,has_table_privilege(\'anon\',oid,\'SELECT\') anon,has_table_privilege(\'authenticated\',oid,\'SELECT\') auth FROM pg_class WHERE oid=$1::regclass',['public."'+table+'"'])
+    ok(perms[0].rls && !perms[0].anon && !perms[0].auth,'Push table private: '+table)
+  }
+  const crypto=require('node:crypto'), pair=crypto.createECDH('prime256v1');pair.generateKeys()
+  const origin='https://test.invalid'
+  process.env.WEB_PUSH_VAPID_PUBLIC_KEY=pair.getPublicKey().toString('base64url')
+  process.env.WEB_PUSH_VAPID_PRIVATE_KEY=pair.getPrivateKey().toString('base64url')
+  process.env.WEB_PUSH_VAPID_SUBJECT='mailto:test@test.invalid'
+  process.env.WEB_PUSH_ORIGINS=origin
+  ok(!!config.pushConfig(origin) && !config.pushConfig('https://evil.invalid'),'Exact origin allowlist')
+  for (const endpoint of ['http://fcm.googleapis.com/x','https://127.0.0.1/x','https://web.push.apple.com.evil.invalid/x','https://fcm.googleapis.com:8443/x','https://user@fcm.googleapis.com/x']) ok(!config.safePushEndpoint(endpoint),'Reject unsafe push endpoint')
+  const input=suffix=>({endpoint:'https://fcm.googleapis.com/test-'+suffix,keys:{p256dh:pair.getPublicKey().toString('base64url'),auth:crypto.randomBytes(16).toString('base64url')},publicKey:process.env.WEB_PUSH_VAPID_PUBLIC_KEY})
+  const device=input('a')
+  await subscriptions.registerPushDevice(3,origin,device)
+  await subscriptions.registerPushDevice(3,origin,device)
+  ok(Number((await q('SELECT count(*) n FROM public."WebPushSubscription"'))[0].n)===1,'Device registration idempotent')
+  await assert.rejects(subscriptions.registerPushDevice(4,origin,device),e=>e.status===409);checks++
+  const deviceId=config.pushEndpointId(device.endpoint)
+  ok(!(await subscriptions.pushDeviceStatus(4,origin,deviceId)).registered,'Foreign registration not disclosed')
+  await subscriptions.removePushDevice(4,origin,deviceId)
+  ok((await subscriptions.pushDeviceStatus(3,origin,deviceId)).registered,'Foreign deletion blocked')
+  const pushed=await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',crypto.randomUUID(),'Push test',origin)
+  ok(pushed.pushDeviceCount===1 && pushed.pushRecipientCount===1,'Manual send queues opted-in device atomically')
+  const queued=await q('SELECT n."eventKey" FROM public."WebPushDelivery" d JOIN public."AppNotification" n ON n.id=d."notificationId"')
+  const pushBatch=queued[0].eventKey.split(':')[1]
+  await subscriptions.registerPushDevice(3,origin,input('b'))
+  const replay=await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',pushBatch,'Push test',origin)
+  ok(replay.repeated && replay.pushDeviceCount===1,'Replay does not send to newly subscribed devices')
+  const calls=[]
+  let sendError=null
+  const worker=load('lib/web-push-worker.ts',{'@/lib/prisma':{default:fake},'./web-push-config':config,'web-push':{default:{sendNotification:async(subscription,payload)=>{calls.push(JSON.parse(payload));if(sendError) throw sendError}}}})
+  ok((await worker.processWebPush()).pending===1 && calls.length===0,'Worker defaults to dry run')
+  const sentPush=await worker.processWebPush({execute:true,origin})
+  ok(sentPush.sent===1 && calls.length===1 && calls[0].userId==='3' && calls[0].url==='/courses/test-course/learn?lesson=lesson-a','Push carries exact recipient and lesson')
+  await worker.processWebPush({execute:true,origin})
+  ok(calls.length===1,'Sent delivery never resent')
+  await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',crypto.randomUUID(),'Revoked',origin)
+  await db.exec('UPDATE public."Enrollment" SET status=\'CANCELLED\' WHERE id=100')
+  const revoked=await worker.processWebPush({execute:true,origin})
+  ok(revoked.skipped===2 && calls.length===1,'Enrollment revocation prevents pending push')
+  await db.exec('UPDATE public."Enrollment" SET status=\'ACTIVE\' WHERE id=100')
+  await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',crypto.randomUUID(),'Retry',origin)
+  sendError={statusCode:503}
+  const failed=await worker.processWebPush({execute:true,origin})
+  ok(failed.retry===2,'Transient provider failure retains jobs')
+  await db.exec('UPDATE public."WebPushDelivery" SET "nextAttemptAt"=now() WHERE status=\'PENDING\'')
+  sendError={statusCode:410}
+  await worker.processWebPush({execute:true,origin})
+  ok(Number((await q('SELECT count(*) n FROM public."WebPushSubscription"'))[0].n)===0,'Expired endpoints removed with cascading jobs')
+  const pushRoute=load('app/api/push/subscriptions/route.ts',{'@/lib/crm/http':http,'@/lib/app-notifications':{notificationActor:authActor},'@/lib/web-push-config':config,'@/lib/web-push-subscriptions':subscriptions})
+  const pushPost=(data,source=origin)=>pushRoute.POST(new Request(origin+'/api/push/subscriptions',{method:'POST',headers:{origin:source,'content-type':'application/json'},body:JSON.stringify(data)}))
+  ok((await pushPost(input('csrf'),'https://evil.invalid')).status===403,'Device registration blocks CSRF')
+  ok((await pushPost({...input('override'),userId:4})).status===400,'Device API rejects account override')
+  sessionUser=null
+  ok((await pushPost(input('anonymous'))).status===401,'Anonymous device registration blocked')
+  delete process.env.WEB_PUSH_VAPID_PUBLIC_KEY
+  ok(!(await subscriptions.pushDeviceStatus(3,origin,null)).configured,'Unconfigured preview degrades to bell only')
+
   console.log(JSON.stringify({ assertions: checks, result: 'passed', testDatabase: 'disposable only' }))
   await db.close()
   fs.rmSync(temp, { recursive: true, force: true })

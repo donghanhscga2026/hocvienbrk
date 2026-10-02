@@ -1,5 +1,6 @@
 'use client'
 
+import { signOutPushCleanup } from "@/lib/web-push-client"
 import { signIn, signOut, useSession } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense } from "react"
@@ -217,8 +218,9 @@ function LoginForm() {
         }
     }
 
-    function cancelPasswordChange() {
+    async function cancelPasswordChange() {
         setIsChangingPassword(false)
+        await signOutPushCleanup()
         signOut({ callbackUrl: '/login' })
     }
 

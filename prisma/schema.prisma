@@ -61,6 +61,7 @@ model User {
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
   appNotifications             AppNotification[]
+  pushSubscriptions            WebPushSubscription[]
   crmContacts                  CrmContact[]
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
@@ -2122,6 +2123,7 @@ model AppNotification {
   readAt DateTime?
   createdAt DateTime @default(now())
 
+  pushDeliveries WebPushDelivery[]
   @@index([recipientId, notBefore, createdAt])
   @@index([recipientId, readAt])
 }
@@ -2135,4 +2137,41 @@ model LessonAnnouncement {
   recipientCount Int
   createdAt DateTime @default(now())
   @@index([lessonId, courseId, createdAt])
+}
+
+model WebPushSubscription {
+  id String @id
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  origin String
+  endpoint String
+  p256dh String
+  auth String
+  vapidPublicKey String
+  version String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  deliveries WebPushDelivery[]
+  @@index([userId, origin])
+}
+
+model WebPushDelivery {
+  id String @id @default(uuid())
+  notificationId String
+  notification AppNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription WebPushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscriptionVersion String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  leaseToken String?
+  sentAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  @@unique([notificationId, subscriptionId])
+  @@index([subscriptionId])
+  @@index([status, nextAttemptAt])
 }
