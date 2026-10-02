@@ -12,7 +12,7 @@ export function crmFailure(error: unknown) {
   if (error instanceof SyntaxError) return crmResponse({ error: 'JSON không hợp lệ.' }, 400)
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (['P2002', 'P2034', 'P2025'].includes(error.code)) return crmResponse({ error: 'Dữ liệu đã thay đổi hoặc trùng. Hãy xem trước / tải lại.' }, 409)
-    if (['P2021', 'P2022'].includes(error.code)) return crmResponse({ error: 'CRM chưa được khởi tạo đầy đủ. Cần áp dụng migration đợt 1 và đợt 2.' }, 503)
+    if (['P2021', 'P2022'].includes(error.code)) return crmResponse({ error: 'CRM chưa được khởi tạo đầy đủ. Cần áp dụng các migration CRM của bản đang chạy.' }, 503)
   }
   console.error('[CRM phase 2]', error instanceof Error ? error.name : 'Unknown error')
   return crmResponse({ error: 'Không thể xử lý CRM lúc này.' }, 500)

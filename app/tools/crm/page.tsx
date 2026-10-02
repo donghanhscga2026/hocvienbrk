@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCrmActor } from '@/lib/crm/auth'
@@ -12,5 +13,5 @@ export default async function CrmPage() {
     if (error instanceof CrmError && error.status === 403) return <main className="p-6"><h1 className="font-bold">Bạn chưa được cấp quyền CRM.</h1><p>Liên hệ quản trị viên để được phân công khách.</p></main>
     throw error
   }
-  return <div className="min-h-screen bg-slate-50"><MainHeader title="CRM — Khách hàng & chăm sóc" /><CrmWorkspace /></div>
+  return <div className="min-h-screen bg-slate-50"><MainHeader title="CRM — Khách hàng & chăm sóc" /><Suspense fallback={<p className="p-4">Đang tải CRM…</p>}><CrmWorkspace /></Suspense></div>
 }

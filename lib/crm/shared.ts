@@ -1,5 +1,8 @@
 // Safe to import from both client and server; no Prisma or authentication here.
+import type { Prisma } from '@prisma/client'
 export const CRM_STAGES = ['NEW', 'CONTACTING', 'QUALIFIED', 'PROPOSAL', 'PAYMENT_PENDING', 'WON', 'LOST'] as const
+export const REQUEST_CATEGORIES = { LEARNING: 'Câu hỏi học tập', SUPPORT: 'Hỗ trợ kỹ thuật', CONSULTATION: 'Tư vấn khóa học' } as const
+export const REQUEST_STATUSES = { NEW: 'Mới gửi', IN_PROGRESS: 'Đang xử lý', RESOLVED: 'Đã xử lý' } as const
 export type CrmStageValue = typeof CRM_STAGES[number]
 export const STAGE_LABELS: Record<CrmStageValue, string> = {
   NEW: 'Mới tiếp nhận', CONTACTING: 'Đang liên hệ', QUALIFIED: 'Đã rõ nhu cầu',
@@ -9,6 +12,7 @@ export const ACTIVITY_LABELS: Record<string, string> = {
   NOTE: 'Ghi chú', CALL: 'Gọi điện', ZALO: 'Zalo', EMAIL: 'Email', MEETING: 'Gặp trực tiếp',
   CREATED: 'Tạo hồ sơ', UPDATED: 'Cập nhật hồ sơ', OPPORTUNITY: 'Cơ hội tư vấn', TASK: 'Công việc',
   IMPORT: 'Nhập dữ liệu', LINK: 'Liên kết tài khoản', FORM: 'Đăng ký qua form',
+  AUTOMATION: 'CRM tự động', CONSENT: 'Quyền nhận email',
 }
 export const CRM_ROLES = ['ADMIN', 'TEACHER', 'INSTRUCTOR'] as const
 export type CrmActor = { id: number; role: string; name: string }
@@ -17,8 +21,12 @@ export function canAccessContact(actor: CrmActor, ownerId: number | null) {
   return canUseCrm(actor.role) && (actor.role === 'ADMIN' || ownerId === actor.id)
 }
 // Always constrain queries on the server, including dashboards and nested records.
-export function contactScope(actor: CrmActor) {
-  return actor.role === 'ADMIN' ? {} : { ownerId: actor.id }
+export function contactScope(actor: CrmActor): Prisma.CrmContactWhereInput {
+  // Hồ sơ học viên chỉ còn được xem khi giáo viên vẫn phụ trách khóa đã đăng ký.
+  return actor.role === 'ADMIN' ? {} : { ownerId: actor.id, OR: [
+    { studentProfile: false },
+    { studentProfile: true, studentUser: { enrollments: { some: { course: { teacherId: actor.id } } } } },
+  ] }
 }
 export function isOpenStage(stage: string) { return stage !== 'WON' && stage !== 'LOST' }
 export function formatCrmDate(value: string | Date) {
@@ -41,6 +49,9 @@ export type CrmOwner = { id: number; name: string | null; email: string }
 export type CrmTaskView = { id: number; contactId: number; title: string; dueAt: string; completedAt: string | null }
 export type CrmOpportunityView = { id: number; title: string; stage: CrmStageValue; amount: number; lostReason: string; version: number; courseId?: number | null }
 export type CrmContactView = {
+  learning?: { courseId: number; title: string; slug: string; status: string; completed: number; total: number; lastActivityAt: string | null; lastLesson: string | null }[];
+  pendingRequests?: number;
+  studentProfile?: boolean;
   id: number; name: string; email: string | null; phone: string | null; source: string; needs: string;
   tags: string[]; ownerId: number | null; owner: CrmOwner | null; archived: boolean; version: number;
   lastContactAt: string | null; updatedAt: string; opportunities: CrmOpportunityView[]; tasks: CrmTaskView[];

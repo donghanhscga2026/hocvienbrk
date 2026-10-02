@@ -34,7 +34,7 @@ export async function testPhaseTwo(db: PrismaClient) {
   await writePhaseTwo(db, admin, cmd({ action: 'students.execute', userIds: [201], ownerId: 102, token: learnerPreview.token }))
   const contact = await db.crmContact.findUniqueOrThrow({ where: { linkedUserId: 201 } })
   check(contact.ownerId === 101 && contact.needs === 'Nhu cầu', 'Student import preserves owner and existing needs')
-  const course = await db.course.create({ data: { id_khoa: 'CRM-TEST', name_lop: 'AI test' } })
+  const course = await db.course.create({ data: { id_khoa: 'CRM-TEST', name_lop: 'AI test', teacherId: 101 } })
   const enrollment = await db.enrollment.create({ data: { userId: student.id, courseId: course.id } })
   await db.payment.create({ data: { enrollmentId: enrollment.id, amount: 500000, status: 'VERIFIED', verifiedAt: new Date() } })
   const website = await readPhaseTwo(db, teacher, query({ view: 'website', contactId: contact.id })) as { user: { id: number }; enrollments: { payment: { status: string } }[] }

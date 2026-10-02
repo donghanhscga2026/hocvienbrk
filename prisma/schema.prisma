@@ -60,8 +60,10 @@ model User {
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
+  appNotifications             AppNotification[]
   crmContacts                  CrmContact[]
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
+  crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
 
   @@index([email])
   @@index([phone])
@@ -113,6 +115,7 @@ model EmailSender {
 }
 
 model EmailCampaign {
+  crmReceipt       CrmCampaignReceipt?
   id               Int                   @id @default(autoincrement())
   title            String
   status           CampaignStatus        @default(DRAFT)
@@ -345,6 +348,7 @@ model CourseCategory {
 }
 
 model Course {
+  crmRequests CrmRequest[]
   crmOpportunities CrmOpportunity[]
   id                          Int                     @id @default(autoincrement())
   id_khoa                     String                  @unique
@@ -425,6 +429,7 @@ model Lesson {
 }
 
 model Enrollment {
+  crmAutomationEvent CrmAutomationEvent?
   id             Int              @id @default(autoincrement())
   userId         Int
   courseId       Int
@@ -532,6 +537,7 @@ model CourseLibAccess {
 }
 
 model Payment {
+  crmAutomationEvent CrmAutomationEvent?
   id              Int           @id @default(autoincrement())
   enrollmentId    Int           @unique
   amount          Int
@@ -1728,6 +1734,12 @@ model CoursePageVersion {
 
 // CRM phase 1: contacts are independent of login accounts and affiliate ownership.
 model CrmContact {
+  requests CrmRequest[]
+  studentProfile Boolean @default(false)
+  studentUserId Int?
+  studentUser User? @relation("CrmStudentProfile", fields: [studentUserId], references: [id], onDelete: SetNull)
+  marketingEmailAllowed Boolean @default(false)
+  automationEvents CrmAutomationEvent[]
   linkedUserId  Int? @unique
   linkedUser    User? @relation("CrmIdentity", fields: [linkedUserId], references: [id], onDelete: SetNull)
   submissions   CrmSubmission[]
@@ -1751,6 +1763,42 @@ model CrmContact {
   tasks         CrmTask[]
 
   @@index([ownerId, archived, updatedAt])
+  @@unique([ownerId, studentUserId])
+  @@index([studentUserId])
+}
+
+// Explicit support/consultation only; ordinary lesson interactions remain in LMS.
+model CrmRequest {
+  id String @id @default(uuid())
+  key String @unique
+  contactId Int?
+  contact CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  ownerId Int?
+  courseId Int?
+  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  userId Int?
+  lessonId String?
+  commentId Int?
+  category String
+  status String @default("NEW")
+  content String
+  name String
+  email String?
+  phone String?
+  source String
+  ipHash String
+  publicReply String @default("")
+  resolution String @default("")
+  history Json @default("[]")
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, status, createdAt])
+  @@index([contactId, status])
+  @@index([ipHash, createdAt])
+  @@index([courseId])
+  @@index([createdAt])
 }
 
 model CrmOpportunity {
@@ -1809,6 +1857,7 @@ enum CrmStage {
 
 // Public intake is auditable and never rewrites an existing customer's identity.
 model CrmSubmission {
+  crmAutomationEvent CrmAutomationEvent?
   id         Int @id @default(autoincrement())
   key        String @unique
   landingId  Int
@@ -1822,6 +1871,45 @@ model CrmSubmission {
 
   @@index([ipHash, createdAt])
   @@index([status, createdAt])
+}
+
+// Mặc định tắt; mỗi quy tắc chỉ xét sự kiện phát sinh từ lần bật gần nhất.
+model CrmAutomationSettings {
+  studentSyncEnabled Boolean @default(false)
+  id Int @id @default(1)
+  version Int @default(1)
+  leadSince DateTime?
+  enrollmentSince DateTime?
+  paymentSince DateTime?
+  updatedAt DateTime @updatedAt
+}
+
+// Một nguồn chỉ được xử lý một lần, kể cả khi cron hoặc người dùng gọi lại.
+model CrmAutomationEvent {
+  id Int @id @default(autoincrement())
+  sourceKey String @unique
+  kind String
+  contactId Int
+  contact CrmContact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  submissionId Int? @unique
+  submission CrmSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  enrollmentId Int? @unique
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  paymentId Int? @unique
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  taskId Int?
+  createdAt DateTime @default(now())
+  @@index([contactId, createdAt])
+}
+
+// Lưu biên nhận để gửi lại request không tạo nhiều chiến dịch nháp.
+model CrmCampaignReceipt {
+  id Int @id @default(autoincrement())
+  previewKey String @unique
+  campaignId Int @unique
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  actorId Int
+  createdAt DateTime @default(now())
 }
 
 enum CampaignStatus {
@@ -2014,4 +2102,25 @@ enum UserVoucherStatus {
   ACTIVE
   USED
   EXPIRED
+}
+
+// Thông báo riêng tư; chỉ API NextAuth đọc/đánh dấu, không mở Data API.
+model AppNotification {
+  id String @id @default(uuid())
+  eventKey String @unique
+  recipientId Int
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  kind String
+  title String
+  courseId Int?
+  requestId String?
+  taskId Int?
+  enrollmentId Int?
+  commentId Int?
+  notBefore DateTime @default(now())
+  readAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([recipientId, notBefore, createdAt])
+  @@index([recipientId, readAt])
 }

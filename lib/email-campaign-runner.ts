@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { isCrmCampaign, resolveCrmEmailRecipients } from './crm/email-recipients';
 import { getOAuth2Client } from "@/lib/google-auth";
 import { tryDecrypt, decrypt } from "@/lib/email-encryptor";
 import { spinContent } from "@/lib/email-spin";
@@ -381,6 +382,7 @@ async function resolveBaseRecipients(campaignId: number): Promise<Recipient[]> {
   });
 
   if (!campaign) return [];
+  if (isCrmCampaign(campaign.recipientFilter)) return resolveCrmEmailRecipients(prisma, campaign.recipientCsvData || '[]');
 
   // 1. Nguồn danh sách CSV/JSON hoặc Google Sheet hoặc Nhập thủ công dán text
   if (campaign.recipientSource === "CSV" || campaign.recipientSource === "SELECTED_LIST") {
@@ -468,6 +470,7 @@ export async function resolveRecipients(campaignId: number): Promise<Recipient[]
     select: { recipientFilter: true },
   });
   const extra = (campaign?.recipientFilter as any)?.extraEmails;
+  if (isCrmCampaign(campaign?.recipientFilter || null)) return base;
   if (!Array.isArray(extra) || extra.length === 0) return base;
 
   const seen = new Set(base.map(r => r.email.toLowerCase().trim()));
@@ -899,7 +902,7 @@ export async function processCampaignBatch(campaignId: number, batchSize: number
   }
 
   let allRecipients = recipientsCache.get(campaignId);
-  if (!allRecipients) {
+  if (!allRecipients || isCrmCampaign(campaign.recipientFilter)) {
     allRecipients = await resolveRecipients(campaignId);
     recipientsCache.set(campaignId, allRecipients);
   }

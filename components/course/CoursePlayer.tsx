@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
 import {
     ArrowLeft, ListVideo, FileText, X, ClipboardCheck,
@@ -16,6 +17,7 @@ import LessonSidebar from "./LessonSidebar"
 import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
 import ChatSection from "./ChatSection"
+import CrmRequestButton from "@/components/crm/CrmRequestButton"
 import LessonContentBox from "./LessonContentBox"
 // [OPTIMIZE] StartDateModal kéo theo react-day-picker + CSS riêng, nhưng chỉ
 // hiện với học viên CHƯA chọn ngày bắt đầu học (thiểu số) — dynamic-import để
@@ -78,6 +80,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     useEffect(() => {
         setIsMounted(true)
 
+        const requestedLesson = new URLSearchParams(window.location.search).get('lesson')
+        if (requestedLesson && course.lessons.some((lesson: { id: string }) => lesson.id === requestedLesson)) {
+            setCurrentLessonId(requestedLesson)
+            setMobileTab('content')
+            return
+        }
         // Chỉ tìm bài học cũ khi đã ở client
         if (enrollment.lastLessonId) {
             setCurrentLessonId(enrollment.lastLessonId)
@@ -311,7 +319,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 đều đang z-50), để tooltip lóe sáng của nút trên header/nav không còn
                 bị các overlay đó đè lên. Vẫn thấp hơn các modal xác nhận thật sự
                 (z-[100] trở lên) — những modal đó vẫn cần che cả header khi hiện. */}
-            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-3 px-4 bg-zinc-900 z-[60] fixed top-0 left-0 right-0">
+            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 z-[60] fixed top-0 left-0 right-0">
                 <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
                     <button
                         onClick={() => router.back()}
@@ -332,7 +340,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </div>
                 )}
 
-                <h1 className="font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                <h1 className="min-w-0 flex-1 font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                <NotificationBell />
+                <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning />
             </header>
 
             <div className={`flex flex-1 min-h-0 pt-14 ${isMobile ? 'pb-14' : ''}`}>
@@ -439,7 +449,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 onMouseEnter={() => setChatHovered(true)}
                                 onMouseLeave={() => setChatHovered(false)}
                             >
-                                <ChatSection lessonId={currentLessonId!} session={session} />
+                                <ChatSection courseId={course.id} lessonId={currentLessonId!} session={session} />
                             </div>
                         </div>
                     )}
@@ -476,7 +486,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                             )}
                                         </div>
                                         <div className="flex-1 min-h-0">
-                                            <ChatSection lessonId={currentLessonId!} session={session} />
+                                            <ChatSection courseId={course.id} lessonId={currentLessonId!} session={session} />
                                         </div>
                                     </div>
                                 )}
@@ -834,5 +844,3 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
         </div>
     )
 }
-
-

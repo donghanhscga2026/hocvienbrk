@@ -3,6 +3,9 @@ import { canUseCrm, contactScope, CrmActor, isOpenStage, STAGE_LABELS, vietnamDa
 import { CrmCommand, crmQuery } from './validation'
 import { z } from 'zod'
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import { projectStudent, studentIdentity, studentUserSelect } from './student-profile'
+import { learningSummaries } from './learning'
+import { requestScope } from './requests'
 
 export class CrmError extends Error {
   constructor(message: string, public status = 400) { super(message) }
@@ -33,6 +36,7 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
     // Both the record and its activity count share the same authorization filter.
     const contact = await db.crmContact.findFirst({
       where: { id: query.id, ...scope }, include: {
+        studentUser: { select: studentUserSelect },
         owner: { select: ownerSelect }, opportunities: { orderBy: { createdAt: 'desc' } },
         tasks: { orderBy: [{ completedAt: 'asc' }, { dueAt: 'asc' }] },
         activities: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 30, skip: (query.activityPage - 1) * 30 },
@@ -40,7 +44,8 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
       },
     })
     if (!contact) throw new CrmError('Không tìm thấy khách hoặc không có quyền truy cập.', 404)
-    return { contact: { ...contact, activityTotal: contact._count.activities } }
+    const learning = await learningSummaries(db, actor, [contact])
+    return { contact: { ...projectStudent(contact), learning: learning.get(contact.id) || [], activityTotal: contact._count.activities } }
   }
   const base: Prisma.CrmContactWhereInput = { ...scope, archived: false }
   const now = new Date()
@@ -57,26 +62,32 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
     ])
     return { tasks, total, page: query.page, stats: { overdue, today, unscheduled } }
   }
-  const where: Prisma.CrmContactWhereInput = { ...scope, archived: query.archived === 'true' }
+  const where: Prisma.CrmContactWhereInput = { AND: [scope], archived: query.archived === 'true' }
   if (actor.role === 'ADMIN' && query.ownerId !== undefined) where.ownerId = query.ownerId
   if (query.q) where.OR = [
     { name: { contains: query.q, mode: 'insensitive' } }, { email: { contains: query.q, mode: 'insensitive' } },
     { phone: { contains: parsePhoneNumberFromString(query.q, 'VN')?.number || query.q.replace(/[\s().-]/g, '') || query.q, mode: 'insensitive' } },
+    { studentProfile: true, studentUser: { OR: [
+      { email: { contains: query.q, mode: 'insensitive' } }, { phone: { contains: query.q } },
+    ] } },
   ]
   if (query.source) where.source = { contains: query.source, mode: 'insensitive' }
   if (query.tag) where.tags = { has: query.tag }
   if (query.stage) where.opportunities = { some: { stage: query.stage } }
   if (query.due === 'unscheduled') {
-    where.AND = [{ opportunities: { some: { stage: { notIn: ['WON', 'LOST'] } } } }, { tasks: { none: { completedAt: null } } }]
+    where.AND = [scope, { opportunities: { some: { stage: { notIn: ['WON', 'LOST'] } } } }, { tasks: { none: { completedAt: null } } }]
   }
   const [contacts, total] = await Promise.all([
     db.crmContact.findMany({ where, include: {
+      studentUser: { select: studentUserSelect },
       owner: { select: ownerSelect }, opportunities: { orderBy: { createdAt: 'desc' } },
       tasks: { where: { completedAt: null }, orderBy: { dueAt: 'asc' }, take: 1 },
     }, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }], take: 20, skip: (query.page - 1) * 20 }),
     db.crmContact.count({ where }),
   ])
-  return { contacts, total, page: query.page }
+  const learning = await learningSummaries(db, actor, contacts)
+  const counts = await db.crmRequest.groupBy({ by: ['contactId'], where: { AND: [requestScope(actor)], contactId: { in: contacts.map(c => c.id) }, status: { not: 'RESOLVED' } }, _count: true })
+  return { contacts: contacts.map(contact => ({ ...projectStudent(contact), learning: learning.get(contact.id) || [], pendingRequests: counts.find(c => c.contactId === contact.id)?._count || 0 })), total, page: query.page }
 }
 
 export async function writeCrm(db: PrismaClient, actor: CrmActor, command: CrmCommand) {
@@ -97,17 +108,41 @@ export async function writeCrm(db: PrismaClient, actor: CrmActor, command: CrmCo
       where: { id: command.contactId, ...contactScope(actor) }, data: { updatedAt: new Date() },
     })
     if (!locked.count) throw new CrmError('Không tìm thấy khách hoặc không có quyền truy cập.', 404)
-    const contact = await tx.crmContact.findUniqueOrThrow({ where: { id: command.contactId } })
+    const contact = await tx.crmContact.findUniqueOrThrow({ where: { id: command.contactId }, include: { studentUser: { select: studentUserSelect } } })
     if (contact.archived && command.action !== 'contact.update') throw new CrmError('Khách đã lưu trữ. Hãy khôi phục trước khi chăm sóc.')
     if ((command.action === 'opportunity.create' || command.action === 'opportunity.update') && command.data.courseId != null) {
-      const enrollment = contact.linkedUserId == null ? null : await tx.enrollment.findUnique({ where: { userId_courseId: { userId: contact.linkedUserId, courseId: command.data.courseId } }, select: { id: true } })
+      const userId = contact.studentProfile ? contact.studentUserId : contact.linkedUserId
+      const teacherId = contact.studentProfile ? contact.ownerId : actor.role === 'ADMIN' ? undefined : actor.id
+      const enrollment = userId == null ? null : await tx.enrollment.findFirst({ where: { userId, courseId: command.data.courseId, ...(teacherId == null ? {} : { course: { teacherId } }) }, select: { id: true } })
       if (!enrollment) throw new CrmError('Khóa học chưa thuộc tài khoản liên kết của khách.')
+    }
+    if (command.action === 'care.update') {
+      if (contact.version !== command.version) throw new CrmError('Hồ sơ đã thay đổi. Hãy tải lại trước khi lưu.', 409)
+      if (command.opportunity) {
+        const change = command.opportunity
+        if (change.stage === 'LOST' && !change.lostReason) throw new CrmError('Cần ghi lý do chưa thành công.')
+        const previous = await tx.crmOpportunity.findFirst({ where: { id: change.id, contactId: contact.id } })
+        if (!previous || previous.version !== change.version) throw new CrmError('Cơ hội đã thay đổi. Hãy tải lại.', 409)
+        await tx.crmOpportunity.update({ where: { id: previous.id }, data: { stage: change.stage, lostReason: change.stage === 'LOST' ? change.lostReason : '', version: { increment: 1 } } })
+        await log(contact.id, 'OPPORTUNITY', previous.title + ': ' + STAGE_LABELS[previous.stage] + ' → ' + STAGE_LABELS[change.stage])
+      }
+      await log(contact.id, 'NOTE', command.note)
+      if (command.task) {
+        await tx.crmTask.create({ data: { contactId: contact.id, title: command.task.title, dueAt: command.task.dueAt, createdBy: actor.id } })
+        await log(contact.id, 'TASK', 'Hẹn công việc: ' + command.task.title)
+      }
+      await tx.crmContact.update({ where: { id: contact.id }, data: { version: { increment: 1 }, lastContactAt: new Date() } })
+      return { contactId: contact.id }
     }
     if (command.action === 'contact.update') {
       if (contact.version !== command.version) throw new CrmError('Hồ sơ đã được cập nhật ở nơi khác. Hãy tải lại trước khi lưu.', 409)
+      if (contact.studentProfile) {
+        const identity = contact.studentUser ? studentIdentity(contact.studentUser) : { email: null, phone: null }
+        if (command.data.ownerId !== contact.ownerId || command.data.email !== identity.email || command.data.phone !== identity.phone) throw new CrmError('Hồ sơ học viên giữ giáo viên và định danh từ website. Hãy tải lại nếu tài khoản đã đổi.', 409)
+      }
       if (contact.linkedUserId != null && (contact.email !== command.data.email || contact.phone !== command.data.phone)) throw new CrmError('Hãy nhờ quản trị viên hủy liên kết tài khoản trước khi đổi email hoặc điện thoại.', 409)
       await validateOwner(tx, actor, command.data.ownerId)
-      await tx.crmContact.update({ where: { id: contact.id }, data: { ...command.data, version: { increment: 1 } } })
+      await tx.crmContact.update({ where: { id: contact.id }, data: { ...command.data, ...(contact.studentProfile ? { email: null, phone: null } : {}), version: { increment: 1 } } })
       const changes: string[] = []
       if (contact.ownerId !== command.data.ownerId) changes.push('đổi người phụ trách từ #' + (contact.ownerId ?? 'chưa giao') + ' sang #' + (command.data.ownerId ?? 'chưa giao'))
       if (contact.archived !== command.data.archived) changes.push(command.data.archived ? 'lưu trữ hồ sơ' : 'khôi phục hồ sơ')

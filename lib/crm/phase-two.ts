@@ -101,16 +101,20 @@ export async function readPhaseTwo(db: PrismaClient, actor: CrmActor, query: z.i
   if (!canUseCrm(actor.role)) throw new CrmError('Không có quyền CRM.', 403)
   if (query.view === 'website') {
     if (!query.contactId) throw new CrmError('Thiếu hồ sơ khách.')
-    const contact = await db.crmContact.findFirst({ where: { id: query.contactId, ...contactScope(actor) }, select: { id: true, linkedUserId: true } })
+    const contact = await db.crmContact.findFirst({ where: { id: query.contactId, ...contactScope(actor) }, select: { id: true, linkedUserId: true, studentUserId: true, studentProfile: true, ownerId: true } })
     if (!contact) throw new CrmError('Không tìm thấy hồ sơ.', 404)
-    const user = contact.linkedUserId == null ? null : await db.user.findUnique({ where: { id: contact.linkedUserId }, select: { id: true, name: true, email: true, phone: true, createdAt: true } })
-    const enrollments = user ? await db.enrollment.findMany({ where: { userId: user.id }, select: {
+    const userId = contact.studentProfile ? contact.studentUserId : contact.linkedUserId
+    const user = userId == null ? null : await db.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true, createdAt: true } })
+    // Kể cả quản trị xem hồ sơ riêng cũng chỉ nhận khóa của giáo viên phụ trách hồ sơ.
+    const teacherId = contact.studentProfile ? contact.ownerId : actor.role === 'ADMIN' ? undefined : actor.id
+    const where: Prisma.EnrollmentWhereInput = { userId: user?.id ?? -1, ...(teacherId == null ? {} : { course: { teacherId } }) }
+    const enrollments = user ? await db.enrollment.findMany({ where, select: {
       id: true, status: true, createdAt: true, course: { select: { id: true, name_lop: true } },
       payment: { select: { id: true, status: true, amount: true, verifiedAt: true } },
       _count: { select: { lessonProgress: true } },
     }, orderBy: { createdAt: 'desc' }, take: 100, skip: (query.page - 1) * 100 }) : []
-    const total = user ? await db.enrollment.count({ where: { userId: user.id } }) : 0
-    return { user, enrollments: enrollments.map(item => ({ ...item, course: { id: item.course.id, title: item.course.name_lop } })), total, page: query.page }
+    const total = user ? await db.enrollment.count({ where }) : 0
+    return { user, studentProfile: contact.studentProfile, enrollments: enrollments.map(item => ({ ...item, course: { id: item.course.id, title: item.course.name_lop } })), total, page: query.page }
   }
   admin(actor)
   if (query.view === 'students') {
@@ -153,6 +157,7 @@ export async function writePhaseTwo(db: PrismaClient, actor: CrmActor, command: 
       const lock = await tx.crmContact.updateMany({ where: { id: command.contactId, version: command.version, archived: false }, data: { version: { increment: 1 } } })
       if (!lock.count) throw new CrmError('Hồ sơ đã thay đổi hoặc được lưu trữ. Hãy tải lại.', 409)
       const contact = await tx.crmContact.findUniqueOrThrow({ where: { id: command.contactId } })
+      if (contact.studentProfile) throw new CrmError('Hồ sơ học viên được liên kết tự động; không đổi sang tài khoản khác.', 409)
       if (command.userId != null) {
         const user = await tx.user.findUnique({ where: { id: command.userId }, select: { email: true, phone: true } })
         if (!user || identityConflict(contact, { email: normalizeEmail(user.email), phone: normalizePhone(user.phone) }) || !((contact.email && normalizeEmail(contact.email) === normalizeEmail(user.email)) || (contact.phone && normalizePhone(contact.phone) === normalizePhone(user.phone)))) throw new CrmError('Định danh không khớp. Kiểm tra email và điện thoại trước khi liên kết.', 409)
