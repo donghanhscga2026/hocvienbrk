@@ -4,13 +4,15 @@ import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createCourseAction, getTeachersAction } from '@/app/actions/course-actions'
 import { updateCourseAction, updateLessonAction, deleteLessonAction } from '@/app/actions/admin-actions'
-import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown } from 'lucide-react'
+import { BookOpen, DollarSign, Settings, Loader2, ArrowLeft, Upload, CheckCircle2, AlertCircle, List, Play, Edit2, X, FileSpreadsheet, Download, Save, Trash2, Plus, Mail, ArrowUp, ArrowDown, Bell } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 
 import { ImportLessonsModal } from '@/components/admin/courses/ImportLessonsModal'
 import { LessonEditModal } from '@/components/admin/courses/LessonEditModal'
 import { AddLessonModal } from '@/components/admin/courses/AddLessonModal'
+
+import { LessonAnnouncementModal } from '@/components/admin/courses/LessonAnnouncementModal'
 
 function isValidDateFormat(str: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(str)
@@ -37,6 +39,7 @@ function CreateCourseContent() {
     }, [lessons, lessonSortDir])
     const [showImport, setShowImport] = useState(false)
     const [selectedLesson, setSelectedLesson] = useState<any>(null)
+    const [announcementLesson, setAnnouncementLesson] = useState<{ id: string; title: string } | null>(null)
     const [showAddLesson, setShowAddLesson] = useState(false)
     
     // Section1: Thông tin cơ bản
@@ -830,19 +833,22 @@ function CreateCourseContent() {
                     </div>
                         <div className="space-y-3">
                             {sortedLessons.map((lesson: any) => (
-                                <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex items-center justify-between group">
-                                    <div className="flex items-center gap-4">
+                                <div key={lesson.id} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-lg shadow-gray-100/50 flex flex-col sm:flex-row gap-3 sm:items-center justify-between group">
+                                    <div className="flex items-center gap-4 min-w-0">
                                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-xs font-black font-mono">
                                             #{lesson.order}
                                         </div>
-                                        <div className="space-y-0.5">
+                                        <div className="space-y-0.5 min-w-0 break-words">
                                             <h4 className="text-sm font-black text-gray-800 leading-tight">{lesson.title}</h4>
                                             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
                                                 <Play className="w-3 h-3" /> {lesson.videoUrl ? 'Đã có Video' : 'Chưa có Video'}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                        <button type="button" onClick={() => setAnnouncementLesson({ id: lesson.id, title: lesson.title })} className="min-h-11 px-3 rounded-xl bg-indigo-50 text-indigo-700 flex items-center gap-2 text-xs font-semibold">
+                                            <Bell className="w-4 h-4" /> Thông báo học viên
+                                        </button>
                                         <button
                                             onClick={() => setSelectedLesson(lesson)}
                                             className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all active:scale-90"
@@ -869,6 +875,7 @@ function CreateCourseContent() {
             </div>
 
             {/* MODALS */}
+            {announcementLesson && courseId && <LessonAnnouncementModal courseId={courseId} lesson={announcementLesson} onClose={() => setAnnouncementLesson(null)} />}
             {selectedLesson && (
                 <LessonEditModal
                     lesson={selectedLesson}
