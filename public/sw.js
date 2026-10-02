@@ -74,8 +74,15 @@ self.addEventListener('push',event => {
 self.addEventListener('notificationclick',event => {
   event.notification.close()
   event.waitUntil((async () => {
-    const data=event.notification.data, url=lessonUrl(data?.url)
-    if (!url || await readPushState('user') !== data.userId) return
+    const data=event.notification.data, lesson=lessonUrl(data?.url)
+    if (!lesson || await readPushState('user') !== data.userId) return
+    // Trang khóa học tạo một mục lịch sử thật trước khi chuyển vào bài.
+    // Back của điện thoại sẽ trở về khóa học thay vì đóng cửa sổ mới.
+    const destination=new URL(lesson)
+    const coursePath=destination.pathname.replace(/^\/courses\//,'/khoa-hoc/').replace(/\/learn$/,'')
+    const entry=new URL(coursePath,self.location.origin)
+    entry.searchParams.set('notificationLesson',destination.searchParams.get('lesson'))
+    const url=entry.href
 
     // Để Chrome chọn app standalone đã cài; focus một tab cùng tên miền
     // trước sẽ bỏ qua bước này và đưa người dùng vào trình duyệt.
