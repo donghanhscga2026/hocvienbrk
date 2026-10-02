@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CalendarClock, Check, ChevronLeft, ChevronRight, Loader2, Plus, Search, Users, X } from 'lucide-react'
 import CrmDataTools, { CrmWebsitePanel, integrationRequest } from './CrmDataTools'
 import CrmPhaseThree, { CrmEmailConsent } from './CrmPhaseThree'
@@ -118,7 +119,9 @@ function TaskForm({ busy, onSave }: { busy: boolean; onSave: (data: Command) => 
 }
 
 export default function CrmWorkspace() {
+  const queryView = useSearchParams().get('view')
   const [tab, setTab] = useState<'contacts' | 'cards' | 'board' | 'tasks' | 'requests'>('contacts')
+  useEffect(() => { if (queryView === 'requests' || queryView === 'tasks') setTab(queryView) }, [queryView])
   const [contacts, setContacts] = useState<CrmContactView[]>([])
   const [total, setTotal] = useState(0)
   const [owners, setOwners] = useState<CrmOwner[]>([])

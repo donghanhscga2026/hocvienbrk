@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     const actor = await getCrmActor()
     const params = new URL(request.url).searchParams
     if (params.has('sourceId')) return crmResponse(await requestSource(prisma, actor, z.uuid().parse(params.get('sourceId'))))
-    const q = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED']).optional(), contactId: z.coerce.number().int().positive().optional() }).strict().parse(Object.fromEntries(new URL(request.url).searchParams))
-    return crmResponse(await readRequests(prisma, actor, q.page, q.status, q.contactId))
+    const q = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED']).optional(), request: z.uuid().optional(), contactId: z.coerce.number().int().positive().optional() }).strict().parse(Object.fromEntries(new URL(request.url).searchParams))
+    return crmResponse(await readRequests(prisma, actor, q.page, q.status, q.contactId, q.request))
   } catch (e) { return crmFailure(e) }
 }
 export async function POST(request: Request) {

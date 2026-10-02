@@ -6,6 +6,7 @@ import CourseThemeProvider from './CourseThemeProvider'
 import SectionRenderer from './SectionRenderer'
 import ShareLinkModal from './ShareLinkModal'
 import RegistrationFlowModal from './RegistrationFlowModal'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import { CoursePage } from '@/lib/course-page/types'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
@@ -164,7 +165,7 @@ export default function CoursePageView({
         >
           {isEnrolled ? 'Vào học ngay' : coursePage.navigation.ctaText}
         </button>
-        <CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} />
+        <div className="flex items-center justify-end gap-1"><NotificationBell /><CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} /></div>
         </div>
       </nav>
 

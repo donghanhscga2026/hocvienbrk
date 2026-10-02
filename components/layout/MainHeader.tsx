@@ -13,6 +13,7 @@ import { useAttentionHighlightSettings } from '@/app/contexts/AttentionHighlight
 import UserMenu from './UserMenu'
 import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
@@ -86,7 +87,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
     return (
         <>
             <header className="sticky top-0 z-50 w-full bg-brk-surface text-brk-on-surface shadow-xl">
-                <div className="flex items-center justify-between h-14 px-2 sm:px-4">
+                <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 px-2 py-1 sm:px-4">
                     <div className="flex items-center gap-2 shrink-0">
                         <AttentionHighlight {...getStatus('logo')}>
                             <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
@@ -141,7 +142,8 @@ export default function MainHeader({ title }: MainHeaderProps) {
                     </div>
 
 
-                    <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+                        <NotificationBell />
                         <AttentionHighlight {...getStatus('help')}>
                             <AssistantHeaderIcon />
                         </AttentionHighlight>

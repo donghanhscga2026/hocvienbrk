@@ -11,7 +11,7 @@ export default function CrmRequestForm({ courseId, lessonId, commentId, initialC
   const style = 'w-full min-h-11 rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900'
   return <section className="rounded-xl border border-emerald-200 bg-white p-3 text-slate-800">
     {!hideTrigger && <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 text-sm font-semibold text-emerald-800">{commentId ? 'Nhờ giáo viên giải đáp bình luận này' : lessonId ? 'Gửi yêu cầu hỗ trợ' : 'Yêu cầu tư vấn khóa học'}</button>}
-    {open && (done ? <p role="status" className="text-sm">Đã gửi yêu cầu đến người phụ trách. Bạn có thể trao đổi tiếp trong bài học hoặc qua kênh liên hệ của khóa.</p> : <form className="space-y-3" onSubmit={async e => {
+    {open && (done ? <p role="status" className="text-sm">Đã gửi yêu cầu đến người phụ trách. {signedIn ? 'Bạn sẽ nhận thông báo qua chuông khi có phản hồi; xem lại tại “Yêu cầu của tôi”.' : 'Người phụ trách sẽ liên hệ qua thông tin bạn đã cung cấp.'}</p> : <form className="space-y-3" onSubmit={async e => {
       e.preventDefault(); if (busy) return; setBusy(true); setError(''); key.current ||= crypto.randomUUID()
       try {
         const response = await fetch('/api/crm/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key.current, courseId, lessonId, commentId, category, content, name, email, phone, website, consent }) })

@@ -11,16 +11,16 @@ export const requestInput = z.object({
   name: z.string().trim().max(150).default(''), email: z.string().max(254).default(''), phone: z.string().max(40).default(''),
   consent: z.literal(true), website: z.string().max(100).default(''),
 }).strict()
-export const requestUpdate = z.object({ id: z.uuid(), version: z.number().int().positive(), status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED']), resolution: z.string().trim().max(4000), ownerId: z.number().int().nonnegative().nullable().optional() }).strict()
+export const requestUpdate = z.object({ id: z.uuid(), version: z.number().int().positive(), status: z.enum(['NEW', 'IN_PROGRESS', 'RESOLVED']), resolution: z.string().trim().max(4000), publicReply: z.string().trim().max(4000).optional(), ownerId: z.number().int().nonnegative().nullable().optional() }).strict()
 
 export function requestScope(actor: CrmActor): Prisma.CrmRequestWhereInput {
   if (!canUseCrm(actor.role)) throw new CrmError('Bạn không có quyền sử dụng CRM.', 403)
   return actor.role === 'ADMIN' ? {} : { ownerId: actor.id, OR: [{ course: { teacherId: actor.id } }, { courseId: null }] }
 }
-export async function readRequests(db: PrismaClient, actor: CrmActor, page: number, status?: string, contactId?: number) {
+export async function readRequests(db: PrismaClient, actor: CrmActor, page: number, status?: string, contactId?: number, requestId?: string) {
   const scope = requestScope(actor)
   if (contactId != null && !await db.crmContact.findFirst({ where: { id: contactId, ...contactScope(actor) }, select: { id: true } })) throw new CrmError('Không có quyền xem hồ sơ.', 404)
-  const where = { AND: [scope], ...(status ? { status } : {}), ...(contactId == null ? {} : { contactId }) }
+  const where = { AND: [scope], ...(requestId ? { id: requestId } : {}), ...(status ? { status } : {}), ...(contactId == null ? {} : { contactId }) }
   const [requests, total] = await Promise.all([
     db.crmRequest.findMany({ where, include: { course: { select: { name_lop: true, id_khoa: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
     db.crmRequest.count({ where }),
@@ -44,7 +44,7 @@ export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unkn
     if (input.ownerId != null && (!owner || !canUseCrm(owner.role))) throw new CrmError('Người phụ trách không có quyền CRM.')
   }
   const history = Array.isArray(previous.history) ? previous.history : []
-  const result = await db.crmRequest.updateMany({ where: { id: input.id, version: input.version, ...requestScope(actor) }, data: { ownerId: input.ownerId, status: input.status, resolution: input.resolution, history: [...history, { ownerId: previous.ownerId, status: previous.status, resolution: previous.resolution, changedBy: actor.id, changedAt: new Date().toISOString() }], version: { increment: 1 } } })
+  const result = await db.crmRequest.updateMany({ where: { id: input.id, version: input.version, ...requestScope(actor) }, data: { ownerId: input.ownerId, status: input.status, resolution: input.resolution, publicReply: input.publicReply, history: [...history, { ownerId: previous.ownerId, status: previous.status, resolution: previous.resolution, publicReply: previous.publicReply, changedBy: actor.id, changedAt: new Date().toISOString() }], version: { increment: 1 } } })
   if (!result.count) throw new CrmError('Yêu cầu đã thay đổi hoặc bạn không có quyền. Hãy tải lại.', 409)
   return { updated: true }
 }

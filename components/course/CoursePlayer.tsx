@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
 import {
     ArrowLeft, ListVideo, FileText, X, ClipboardCheck,
@@ -318,7 +319,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 đều đang z-50), để tooltip lóe sáng của nút trên header/nav không còn
                 bị các overlay đó đè lên. Vẫn thấp hơn các modal xác nhận thật sự
                 (z-[100] trở lên) — những modal đó vẫn cần che cả header khi hiện. */}
-            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-3 px-4 bg-zinc-900 z-[60] fixed top-0 left-0 right-0">
+            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 z-[60] fixed top-0 left-0 right-0">
                 <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
                     <button
                         onClick={() => router.back()}
@@ -340,6 +341,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 )}
 
                 <h1 className="min-w-0 flex-1 font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                <NotificationBell />
                 <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning />
             </header>
 

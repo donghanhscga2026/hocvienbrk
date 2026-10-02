@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
+    "test:crm-notifications": "node scripts/test-crm-notifications.cjs",
     "process-legacy": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/process-legacy-users.ts",
     "fill-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fill-missing-ids.ts",
     "change-id": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/change-id.ts",
@@ -56,6 +57,7 @@
     }
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "@tailwindcss/postcss": "^4",
     "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "^20",

@@ -60,6 +60,7 @@ model User {
   closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
   closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
   userVouchers                 UserVoucher[]
+  appNotifications             AppNotification[]
   crmContacts                  CrmContact[]
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
@@ -1786,6 +1787,7 @@ model CrmRequest {
   phone String?
   source String
   ipHash String
+  publicReply String @default("")
   resolution String @default("")
   history Json @default("[]")
   version Int @default(1)
@@ -2100,4 +2102,25 @@ enum UserVoucherStatus {
   ACTIVE
   USED
   EXPIRED
+}
+
+// Thông báo riêng tư; chỉ API NextAuth đọc/đánh dấu, không mở Data API.
+model AppNotification {
+  id String @id @default(uuid())
+  eventKey String @unique
+  recipientId Int
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  kind String
+  title String
+  courseId Int?
+  requestId String?
+  taskId Int?
+  enrollmentId Int?
+  commentId Int?
+  notBefore DateTime @default(now())
+  readAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([recipientId, notBefore, createdAt])
+  @@index([recipientId, readAt])
 }
