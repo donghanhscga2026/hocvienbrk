@@ -3,6 +3,9 @@ import prisma from '@/lib/prisma'
 import { notificationActor } from '@/lib/app-notifications'
 import { CrmError } from '@/lib/crm/service'
 
+import { pushConfig } from '@/lib/web-push-config'
+import { queueAnnouncementPush } from '@/lib/web-push-subscriptions'
+
 type Actor = Awaited<ReturnType<typeof notificationActor>>
 type Send = { id: string; lessonId: string; courseId: number; senderId: number; title: string; recipientCount: number; createdAt: Date }
 async function manageable(tx: Prisma.TransactionClient, actor: Actor, courseId: number, lessonId: string) {
@@ -15,15 +18,20 @@ async function manageable(tx: Prisma.TransactionClient, actor: Actor, courseId: 
   if (!rows[0]) throw new CrmError('Không tìm thấy bài học hoặc bạn không có quyền quản lý.', 403)
   return rows[0]
 }
-export async function previewLessonAnnouncement(actor: Actor, courseId: number, lessonId: string) {
+export async function previewLessonAnnouncement(actor: Actor, courseId: number, lessonId: string, origin?: string) {
   return prisma.$transaction(async tx => {
     const lesson = await manageable(tx, actor, courseId, lessonId)
     const counts = await tx.$queryRaw<{ count: bigint }[]>(Prisma.sql`SELECT count(*) AS count FROM public."Enrollment" WHERE "courseId"=${courseId} AND status='ACTIVE'`)
     const last = await tx.$queryRaw<Send[]>(Prisma.sql`SELECT * FROM public."LessonAnnouncement" WHERE "lessonId"=${lessonId} AND "courseId"=${courseId} ORDER BY "createdAt" DESC,id DESC LIMIT 1`)
-    return { recipientCount: Number(counts[0].count), defaultTitle: ('Bài học mới: ' + lesson.title + ' — ' + lesson.courseName).slice(0,500), lastSent: last[0] ? { createdAt: last[0].createdAt, recipientCount: last[0].recipientCount } : null }
+    const config = pushConfig(origin)
+    const pushCounts = config ? await tx.$queryRaw<{ users: bigint; devices: bigint }[]>(Prisma.sql`
+      SELECT count(DISTINCT s."userId") AS users,count(*) AS devices FROM public."WebPushSubscription" s
+      JOIN public."Enrollment" e ON e."userId"=s."userId" AND e."courseId"=${courseId} AND e.status='ACTIVE'
+      WHERE s.origin=${origin!} AND s."vapidPublicKey"=${config.publicKey}`) : []
+    return { pushEnabled: !!config, pushRecipientCount: Number(pushCounts[0]?.users ?? 0), pushDeviceCount: Number(pushCounts[0]?.devices ?? 0), recipientCount: Number(counts[0].count), defaultTitle: ('Bài học mới: ' + lesson.title + ' — ' + lesson.courseName).slice(0,500), lastSent: last[0] ? { createdAt: last[0].createdAt, recipientCount: last[0].recipientCount } : null }
   })
 }
-export async function sendLessonAnnouncement(actor: Actor, courseId: number, lessonId: string, id: string, title: string) {
+export async function sendLessonAnnouncement(actor: Actor, courseId: number, lessonId: string, id: string, title: string, origin?: string) {
   return prisma.$transaction(async tx => {
     // Tuần tự hóa cùng mã gửi; thử lại sau lỗi mạng trả kết quả cũ.
     await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${id},0))`)
@@ -31,7 +39,7 @@ export async function sendLessonAnnouncement(actor: Actor, courseId: number, les
     const prior = await tx.$queryRaw<Send[]>(Prisma.sql`SELECT * FROM public."LessonAnnouncement" WHERE id=${id}`)
     if (prior[0]) {
       if (prior[0].senderId !== actor.id || prior[0].courseId !== courseId || prior[0].lessonId !== lessonId || prior[0].title !== title) throw new CrmError('Mã gửi đã được sử dụng. Hãy mở lại hộp thông báo.',409)
-      return { recipientCount: prior[0].recipientCount, createdAt: prior[0].createdAt, repeated: true }
+      return { ...await queueAnnouncementPush(tx,id,origin,false), recipientCount: prior[0].recipientCount, createdAt: prior[0].createdAt, repeated: true }
     }
     // Bản ghi gửi và chuông thông báo cùng giao dịch, lỗi sẽ hoàn tác toàn bộ.
     const sent = await tx.$queryRaw<{ recipientCount: number; createdAt: Date }[]>(Prisma.sql`
@@ -48,6 +56,6 @@ export async function sendLessonAnnouncement(actor: Actor, courseId: number, les
       )
       SELECT "recipientCount","createdAt" FROM batch`)
     if (!sent[0]) throw new CrmError('Chưa có học viên được kích hoạt để nhận thông báo.',409)
-    return { ...sent[0], repeated: false }
+    return { ...sent[0], ...await queueAnnouncementPush(tx,id,origin), repeated: false }
   }, { timeout: 15000 })
 }

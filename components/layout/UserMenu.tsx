@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { signOutPushCleanup } from '@/lib/web-push-client'
 import { signOut, useSession } from 'next-auth/react'
 import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet } from 'lucide-react'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
@@ -154,7 +155,7 @@ export default function UserMenu() {
                     </button>
                     <InstallAppButton className="w-full px-4 text-brk-on-surface hover:bg-brk-background" onBeforeOpen={() => setIsUserMenuOpen(false)} />
                     <button
-                        onClick={() => signOut()}
+                        onClick={async () => { await signOutPushCleanup(); await signOut() }}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-accent hover:bg-brk-background transition-colors"
                     >
                         <LogOut className="h-4 w-4" />

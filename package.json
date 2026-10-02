@@ -1,7 +1,9 @@
 {
   "name": "brk-academy",
   "version": "0.1.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
@@ -49,6 +51,7 @@
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.1",
     "uuid": "^13.0.0",
+    "web-push": "3.6.7",
     "zod": "^4.3.6"
   },
   "overrides": {
@@ -63,6 +66,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "3.6.4",
     "d3-hierarchy": "^3.1.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.7",

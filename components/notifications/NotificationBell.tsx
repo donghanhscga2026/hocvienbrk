@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import PushDeviceSettings from './PushDeviceSettings'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Bell, X } from 'lucide-react'
@@ -55,6 +56,7 @@ export default function NotificationBell() {
     <dialog ref={dialog} aria-label="Thông báo của bạn" onCancel={e => { e.preventDefault(); setOpen(false) }} className="m-auto max-h-[90dvh] w-[calc(100%_-_1rem)] max-w-lg overflow-y-auto rounded-2xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-black/60">
       <div className="sticky top-0 flex items-center justify-between border-b bg-white p-4"><h2 className="font-bold">Thông báo <span className="text-sm font-normal">({unread} chưa đọc)</span></h2><button type="button" aria-label="Đóng thông báo" className="min-h-11 min-w-11" onClick={() => setOpen(false)}><X className="mx-auto" size={20} /></button></div>
       <div className="space-y-3 p-4">
+        <PushDeviceSettings userId={String(session?.user?.id)} onBeforeInstall={() => setOpen(false)} />
         <div className="flex flex-wrap gap-2"><button disabled={busy || !unread} className="min-h-11 rounded-lg border px-3 text-sm" onClick={async () => { setBusy(true); try { await mark(); await load() } catch (e) { setError(e instanceof Error ? e.message : 'Không lưu được.') } finally { setBusy(false) } }}>Đánh dấu tất cả đã đọc</button><button className="min-h-11 rounded-lg border px-3 text-sm" onClick={() => { router.push('/my-requests'); setOpen(false) }}>Yêu cầu của tôi</button></div>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         {!current ? <p role="status">Đang tải thông báo…</p> : current.notifications.length ? current.notifications.map(row => <button key={row.id} disabled={busy} className={'block w-full rounded-xl border p-3 text-left ' + (row.readAt ? 'bg-white' : 'border-emerald-200 bg-emerald-50')} onClick={async () => {

@@ -81,3 +81,17 @@ jobs:
         run: |
           curl -s -o /dev/null -w "%{http_code}" -X GET "${{ vars.SITE_URL }}/api/cron/brk-grace-processing" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  web-push:
+    if: ${{ vars.WEB_PUSH_ENABLED == 'true' && (github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retry lesson push queue
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$SITE_URL" && test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error --max-time 65 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron/web-push?execute=1"

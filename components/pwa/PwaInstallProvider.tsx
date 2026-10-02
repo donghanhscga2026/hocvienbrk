@@ -3,10 +3,17 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { Download, PlusSquare, Share2, X } from 'lucide-react'
 
+import { useSession } from 'next-auth/react'
+import { clearChangedPushAccount } from '@/lib/web-push-client'
+
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 const InstallContext = createContext<{ installed: boolean; install: () => void }>({ installed: false, install: () => {} })
 
 export default function PwaInstallProvider({ children }: { children: ReactNode }) {
+  const {data:session,status} = useSession()
+  useEffect(() => {
+    if (status !== 'loading') void clearChangedPushAccount(session?.user?.id ? String(session.user.id) : null).catch(()=>{})
+  },[status,session?.user?.id])
   const pending = useRef<InstallEvent | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
   const [installed, setInstalled] = useState(false)
@@ -27,7 +34,7 @@ export default function PwaInstallProvider({ children }: { children: ReactNode }
     window.addEventListener('beforeinstallprompt', beforeInstall)
     window.addEventListener('appinstalled', didInstall)
     display.addEventListener('change', refresh)
-    // Service worker chỉ xử lý màn hình mất mạng; không cache API, tài khoản hay CRM.
+    // Service worker xử lý mất mạng và thông báo; không cache API, tài khoản hay CRM.
     if ('serviceWorker' in navigator && window.isSecureContext && process.env.NODE_ENV === 'production') {
       void navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => {})
     }
