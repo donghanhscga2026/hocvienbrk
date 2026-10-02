@@ -16,11 +16,11 @@ export default function ToolHeader({ title, backUrl }: ToolHeaderProps) {
 
   return (
     <header className="bg-brk-surface text-brk-on-surface shadow-lg sticky top-0 z-50">
-      <div className="flex items-center justify-between p-4">
+      <div className="flex min-h-14 items-center justify-between gap-2 p-2 sm:p-4">
         <div className="flex items-center gap-1">
           <Link 
             href={effectiveBackUrl} 
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="flex min-h-11 min-w-11 items-center justify-center gap-1 px-2 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
           >
             <Image
               src="/icon Back.png"
@@ -34,9 +34,9 @@ export default function ToolHeader({ title, backUrl }: ToolHeaderProps) {
           </Link>
         </div>
         
-        <h1 className="text-sm font-bold uppercase absolute left-1/2 -translate-x-1/2">{pageTitle}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-center text-sm font-bold">{pageTitle}</h1>
         
-        <div className="w-20" />
+        <div className="w-11 shrink-0 sm:w-20" />
       </div>
     </header>
   )

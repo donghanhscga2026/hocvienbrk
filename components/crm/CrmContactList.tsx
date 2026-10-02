@@ -26,7 +26,22 @@ export default function CrmContactList({ contacts, now, onOpen, onEdit, onCare, 
   contacts: CrmContactView[]; now: number; onOpen: (id: number) => void; onEdit: (id: number) => void; onCare: (id: number) => void; onRequests: (id: number) => void;
 }) {
   const action = 'min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50'
-  return <div className="overflow-hidden rounded-2xl border bg-white">
+  return <>
+    {/* Bản mobile gọn: chỉ mở thông tin học tập và tư vấn khi cần. */}
+    <div className="space-y-3 xl:hidden">{contacts.map(contact => {
+      const course = contact.learning?.[0]
+      const pending = contact.pendingRequests || 0
+      const task = contact.tasks[0]
+      const overdue = !!task && new Date(task.dueAt).getTime() < now
+      return <article key={contact.id} className="min-w-0 space-y-3 rounded-2xl border bg-white p-3">
+        <div className="flex min-w-0 items-start justify-between gap-2"><div className="min-w-0 flex-1"><button className="block max-w-full truncate text-left font-semibold text-emerald-800" onClick={() => onOpen(contact.id)}>{contact.name}</button><p className="truncate text-xs text-slate-500">{contact.phone || contact.email}</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs">{contact.studentProfile || contact.learning?.length ? 'Học viên' : 'Khách hàng'}</span></div>
+        {course && <p className="truncate text-xs text-slate-600">{course.title} · {course.total ? Math.min(100, Math.round(course.completed / course.total * 100)) + '%' : 'Chưa có bài học'}{(contact.learning?.length || 0) > 1 && ' · +' + ((contact.learning?.length || 0) - 1) + ' khóa'}</p>}
+        <div className="flex flex-wrap gap-2">{pending > 0 && <button className="min-h-11 rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-900" onClick={() => onRequests(contact.id)}>{pending} yêu cầu chờ</button>}{task && <span className={'flex min-h-11 min-w-0 items-center rounded-lg px-3 text-xs ' + (overdue ? 'bg-red-50 text-red-800' : 'bg-slate-50 text-slate-600')}>{overdue ? 'Có việc quá hạn' : 'Hẹn: ' + formatCrmDate(task.dueAt)}</span>}</div>
+        <div className="flex gap-2"><button className={action + ' flex-1'} onClick={() => onOpen(contact.id)}>Mở hồ sơ</button><button disabled={contact.archived} className={action + ' flex-1 text-emerald-800 disabled:opacity-50'} onClick={() => onCare(contact.id)}>Chăm sóc</button></div>
+        <details className="rounded-xl bg-slate-50 px-3"><summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-slate-600">Xem chi tiết học tập & tư vấn</summary><div className="space-y-3 pb-3"><LearningSummary contact={contact} /><p className="break-words text-xs text-slate-500">Phụ trách: {contact.owner?.name || contact.owner?.email || 'Chưa phân công'} · Nguồn: {contact.source}</p>{contact.opportunities.map(item => <p key={item.id} className="break-words text-xs">{item.title}: <strong>{STAGE_LABELS[item.stage]}</strong></p>)}{task && <p className="break-words text-xs">{task.title} · {formatCrmDate(task.dueAt)}</p>}<button className={action} onClick={() => onEdit(contact.id)}>Sửa hồ sơ</button></div></details>
+      </article>
+    })}</div>
+    <div className="hidden overflow-hidden rounded-2xl border bg-white xl:block">
     <table className="block w-full table-fixed text-left text-sm xl:table">
       <caption className="sr-only">Hồ sơ, học tập, việc cần xử lý và lịch chăm sóc tiếp theo</caption>
       <thead className="hidden bg-slate-50 text-xs text-slate-600 xl:table-header-group"><tr>{['Khách hàng / Học viên', 'Khóa học & tiến độ', 'Cần xử lý', 'Việc tiếp theo', 'Thao tác'].map(label => <th key={label} scope="col" className="p-3">{label}</th>)}</tr></thead>
@@ -59,4 +74,5 @@ export default function CrmContactList({ contacts, now, onOpen, onEdit, onCare, 
       })}</tbody>
     </table>
   </div>
+  </>
 }

@@ -319,7 +319,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 đều đang z-50), để tooltip lóe sáng của nút trên header/nav không còn
                 bị các overlay đó đè lên. Vẫn thấp hơn các modal xác nhận thật sự
                 (z-[100] trở lên) — những modal đó vẫn cần che cả header khi hiện. */}
-            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 z-[60] fixed top-0 left-0 right-0">
+            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 z-[60] fixed top-[env(safe-area-inset-top)] left-0 right-0">
                 <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
                     <button
                         onClick={() => router.back()}
@@ -327,7 +327,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         className="shrink-0 flex items-center gap-1.5 pl-2.5 pr-3.5 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all"
                     >
                         <ArrowLeft className="w-5 h-5" strokeWidth={2.75} />
-                        <span className="text-xs font-black tracking-wide">THOÁT RA</span>
+                        <span className="hidden text-xs font-black tracking-wide sm:inline">Thoát ra</span>
                     </button>
                 </AttentionHighlight>
 
@@ -342,10 +342,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
 
                 <h1 className="min-w-0 flex-1 font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
                 <NotificationBell />
-                <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning />
+                <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning compact />
             </header>
 
-            <div className={`flex flex-1 min-h-0 pt-14 ${isMobile ? 'pb-14' : ''}`}>
+            <div className={`flex flex-1 min-h-0 pt-[calc(3.5rem_+_env(safe-area-inset-top))] ${isMobile ? 'pb-[calc(3.5rem_+_env(safe-area-inset-bottom))]' : ''}`}>
                 {!isMobile && (
                     <LessonSidebar
                         lessons={course.lessons}
@@ -508,7 +508,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 )}
                             </div>
 
-                            <nav className="h-14 bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-[60]">
+                            <nav className="h-[calc(3.5rem_+_env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-[60]">
                                 {[
                                     { id: 'list', icon: ListVideo, label: 'Danh sách' },
                                     { id: 'content', icon: FileText, label: 'Nội dung' },
