@@ -41,6 +41,7 @@ async function run() {
     INSERT INTO public."CrmRequest" (id,key,"ownerId","courseId","userId",category,content,name,source,"ipHash",resolution,"updatedAt") VALUES ('old-request','old-key',1,10,3,'LEARNING','Old content','Student','Lesson','hash','Private old note',now());`)
   const oldData = JSON.stringify(await q('SELECT id,content,resolution,status,version FROM public."CrmRequest"'))
   await db.exec(fs.readFileSync(repo + '/prisma/migrations/20261002020627_crm_notifications/migration.sql', 'utf8'))
+  await db.exec(fs.readFileSync(repo + '/prisma/migrations/20261002084517_lesson_announcements/migration.sql', 'utf8'))
   ok(await count() === 0, 'No historic notification backfill')
   ok(oldData === JSON.stringify(await q('SELECT id,content,resolution,status,version FROM public."CrmRequest"')), 'Historic request data preserved')
   ok((await q(`SELECT "publicReply" FROM public."CrmRequest" WHERE id='old-request'`))[0].publicReply === '', 'Private note never becomes public reply')
@@ -119,6 +120,53 @@ async function run() {
     }, module.exports, module)
     return module.exports
   }
+  fake.$transaction = async operation => {
+    if (Array.isArray(operation)) return Promise.all(operation)
+    await db.exec('BEGIN')
+    try { const result = await operation(fake); await db.exec('COMMIT'); return result }
+    catch (error) { await db.exec('ROLLBACK'); throw error }
+  }
+  const announcements = load('lib/lesson-announcements.ts', {
+    '@/lib/prisma': {default:fake},
+    '@/lib/app-notifications': {notificationActor:async()=>actor(1,'TEACHER')},
+    '@/lib/crm/service': {CrmError},
+  })
+  await db.exec(`UPDATE public."Enrollment" SET "studyMode"='AUDITOR' WHERE id=100;
+    INSERT INTO public."User" (id,email,role,"updatedAt") VALUES (5,'5@test.invalid','STUDENT',now()),(6,'6@test.invalid','STUDENT',now());
+    INSERT INTO public."Enrollment" (id,"userId","courseId",status,"updatedAt") VALUES (105,5,10,'PENDING',now()),(106,6,20,'ACTIVE',now());`)
+  const preview = await announcements.previewLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a')
+  ok(preview.recipientCount === 2 && preview.lastSent === null, 'Preview counts only active enrollments without sending')
+  await assert.rejects(announcements.previewLessonAnnouncement(actor(2,'TEACHER'),10,'lesson-a'), e=>e.status===403)
+  checks++
+  await assert.rejects(announcements.sendLessonAnnouncement(actor(3),10,'lesson-a','student-send','Blocked'),e=>e.status===403)
+  checks++
+  const batch = '00000000-0000-4000-8000-000000000010'
+  const send = await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',batch,'Bài học mới')
+  ok(send.recipientCount===2 && !send.repeated, 'Manual send reaches active students')
+  const afterSend=await count()
+  const retry=await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',batch,'Bài học mới')
+  ok(retry.repeated && await count()===afterSend,'Same token retry sends no duplicates')
+  await assert.rejects(announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a',batch,'Changed'),e=>e.status===409)
+  checks++
+  ok((await visible(3)).some(r=>r.kind==='LESSON_ANNOUNCEMENT' && r.href==='/courses/test-course/learn?lesson=lesson-a'),'Announcement links to exact lesson')
+  await db.exec(`UPDATE public."Enrollment" SET status='PENDING' WHERE "userId"=4 AND "courseId"=10`)
+  ok(!(await visible(4)).some(r=>r.kind==='LESSON_ANNOUNCEMENT'),'Revoked enrollment hides announcement immediately')
+  ok((await announcements.previewLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a')).lastSent.recipientCount===2,'Last send retains actual recipient count')
+  const resend=await announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a','00000000-0000-4000-8000-000000000011','Deliberate resend')
+  ok(resend.recipientCount===1,'New token allows deliberate resend with current recipients')
+  ok(!(await visible(5)).some(r=>r.kind==='LESSON_ANNOUNCEMENT') && !(await visible(6)).some(r=>r.kind==='LESSON_ANNOUNCEMENT'),'Pending and other-course students receive no lesson announcement')
+  await db.exec(`UPDATE public."Enrollment" SET status='PENDING' WHERE id=106`)
+  await assert.rejects(announcements.sendLessonAnnouncement(actor(2,'TEACHER'),20,'lesson-b','empty-send','No audience'),e=>e.status===409)
+  checks++
+  ok(Number((await q(`SELECT count(*) n FROM public."LessonAnnouncement" WHERE id='empty-send'`))[0].n)===0,'Empty audience leaves no send history')
+  await db.exec(`CREATE FUNCTION reject_test_notification() RETURNS trigger LANGUAGE plpgsql AS $body$ BEGIN IF NEW.kind='LESSON_ANNOUNCEMENT' THEN RAISE EXCEPTION 'test failure'; END IF; RETURN NEW; END $body$;
+    CREATE TRIGGER reject_test_notification BEFORE INSERT ON public."AppNotification" FOR EACH ROW EXECUTE FUNCTION reject_test_notification();`)
+  await assert.rejects(announcements.sendLessonAnnouncement(actor(1,'TEACHER'),10,'lesson-a','failed-send','Failure'))
+  checks++
+  ok(Number((await q(`SELECT count(*) n FROM public."LessonAnnouncement" WHERE id='failed-send'`))[0].n)===0,'Notification failure rolls back send history')
+  await db.exec('DROP TRIGGER reject_test_notification ON public."AppNotification"; DROP FUNCTION reject_test_notification();')
+  const privacy=await q(`SELECT relrowsecurity rls,has_table_privilege('anon',oid,'SELECT') anon,has_table_privilege('authenticated',oid,'SELECT') authenticated FROM pg_class WHERE oid='public."LessonAnnouncement"'::regclass`)
+  ok(privacy[0].rls && !privacy[0].anon && !privacy[0].authenticated,'Send history is private with RLS')
   const http = load('lib/crm/http.ts', { './service': { CrmError } })
   let sessionUser = 3
   const authActor = async () => { if (sessionUser == null) throw new CrmError('Login',401); return actor(sessionUser) }
@@ -166,6 +214,15 @@ async function run() {
   ok((await notificationRoute.PATCH(new Request('https://test.invalid/api/notifications',{method:'PATCH',headers:{origin:'https://evil.invalid','content-type':'application/json'},body:JSON.stringify({all:true})}))).status===403,'Notification writes require same origin')
   ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications?page=0'))).status===400,'Notification paging validated')
   sessionUser=null; ok((await notificationRoute.GET(new Request('https://test.invalid/api/notifications'))).status===401,'Anonymous notification API rejected')
+  const announcementRoute=load('app/api/courses/[id]/lessons/[lessonId]/announce/route.ts',{'@/lib/crm/http':http,'@/lib/app-notifications':{notificationActor:authActor},'@/lib/lesson-announcements':announcements})
+  const context={params:Promise.resolve({id:'10',lessonId:'lesson-a'})}
+  const postAnnouncement=(body,origin='https://test.invalid')=>announcementRoute.POST(new Request('https://test.invalid/api/courses/10/lessons/lesson-a/announce',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}),context)
+  ok((await announcementRoute.GET(new Request('https://test.invalid'),context)).status===401,'Anonymous preview blocked')
+  sessionUser=3
+  ok((await postAnnouncement({id:batch,title:'Valid'},'https://evil.invalid')).status===403,'Announcement CSRF rejected')
+  ok((await postAnnouncement({id:batch,title:'Valid',recipientId:5})).status===400,'Recipient override rejected')
+  ok((await postAnnouncement({id:batch,title:' '})).status===400,'Blank announcement rejected')
+  ok((await postAnnouncement({id:batch,title:'Valid'})).status===403,'Student cannot send announcement via API')
   console.log(JSON.stringify({ assertions: checks, result: 'passed', testDatabase: 'disposable only' }))
   await db.close()
   fs.rmSync(temp, { recursive: true, force: true })

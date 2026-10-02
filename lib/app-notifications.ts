@@ -36,6 +36,10 @@ export function visibleNotifications(actor: Actor) {
         OR (n.kind = 'ENROLLMENT_TEACHER' AND ${crm} AND e.id IS NOT NULL AND c."teacherId" = ${actor.id})
         OR (n.kind = 'ENROLLMENT_RECEIVED' AND e."userId" = ${actor.id})
         OR (n.kind = 'ENROLLMENT_ACTIVE' AND e."userId" = ${actor.id} AND e.status = 'ACTIVE')
+        OR (n.kind = 'LESSON_ANNOUNCEMENT' AND EXISTS (
+          SELECT 1 FROM public."Lesson" al JOIN public."Enrollment" ae ON ae."courseId"=al."courseId"
+          WHERE al.id=n."lessonId" AND al."courseId"=n."courseId" AND ae."userId"=${actor.id} AND ae.status='ACTIVE'
+        ))
         OR (n.kind = 'COMMENT_REPLY' AND lc.id IS NOT NULL AND EXISTS (
           SELECT 1 FROM public."LessonComment" p WHERE p.id = lc."parentId" AND p."userId" = ${actor.id}
         ) AND (${admin} OR c."teacherId" = ${actor.id} OR EXISTS (
@@ -49,12 +53,13 @@ export function visibleNotifications(actor: Actor) {
       )`
 }
 
-type NotificationRow = { id: string; kind: string; title: string; readAt: Date | null; createdAt: Date; notBefore: Date; requestId: string | null; taskId: number | null; commentId: number | null; slug: string | null; commentLessonId: string | null }
+type NotificationRow = { id: string; kind: string; title: string; readAt: Date | null; createdAt: Date; notBefore: Date; requestId: string | null; taskId: number | null; commentId: number | null; slug: string | null; commentLessonId: string | null; lessonId?: string | null }
 export function notificationHref(row: NotificationRow) {
   if (row.kind === 'REQUEST_INCOMING') return '/tools/crm?view=requests&request=' + encodeURIComponent(row.requestId!)
   if (row.kind.startsWith('REQUEST_')) return '/my-requests?request=' + encodeURIComponent(row.requestId!)
   if (row.kind === 'TASK_DUE') return '/tools/crm?view=tasks'
   if (row.slug && row.kind === 'COMMENT_REPLY') return '/courses/' + encodeURIComponent(row.slug) + '/learn?lesson=' + encodeURIComponent(row.commentLessonId!)
+  if (row.slug && row.kind === 'LESSON_ANNOUNCEMENT' && row.lessonId) return '/courses/' + encodeURIComponent(row.slug) + '/learn?lesson=' + encodeURIComponent(row.lessonId)
   return row.slug ? '/khoa-hoc/' + encodeURIComponent(row.slug) : '/tools'
 }
 export async function readNotifications(actor: Actor, page: number) {

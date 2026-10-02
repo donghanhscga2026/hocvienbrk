@@ -2117,10 +2117,22 @@ model AppNotification {
   taskId Int?
   enrollmentId Int?
   commentId Int?
+  lessonId String?
   notBefore DateTime @default(now())
   readAt DateTime?
   createdAt DateTime @default(now())
 
   @@index([recipientId, notBefore, createdAt])
   @@index([recipientId, readAt])
+}
+
+model LessonAnnouncement {
+  id String @id
+  lessonId String
+  courseId Int
+  senderId Int
+  title String
+  recipientCount Int
+  createdAt DateTime @default(now())
+  @@index([lessonId, courseId, createdAt])
 }
