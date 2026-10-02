@@ -53,6 +53,7 @@ export const crmQuery = z.object({
   q: text(150).default(''), source: text(100).default(''), tag: text(40).default(''),
   stage: z.enum(CRM_STAGES).optional(), ownerId: z.coerce.number().int().nonnegative().optional(),
   archived: z.enum(['true', 'false']).default('false'),
+  group: z.enum(['all', 'students', 'consultation']).default('all'),
   due: z.enum(['all', 'today', 'overdue', 'done', 'unscheduled']).default('all'),
   activityPage: z.coerce.number().int().min(1).max(100000).default(1),
 }).strict()

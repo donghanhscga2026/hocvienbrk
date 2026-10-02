@@ -6,6 +6,7 @@ import { signOut, useSession } from 'next-auth/react'
 import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet } from 'lucide-react'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
+import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 
 export default function UserMenu() {
@@ -77,10 +78,11 @@ export default function UserMenu() {
     if (!session) return (
         <button
             onClick={openAssistant}
-            className="flex items-center gap-1.5 rounded-full bg-brk-primary px-3 py-1.5 text-xs font-bold text-brk-on-primary hover:opacity-90 transition-opacity"
+            aria-label="Đăng nhập"
+            className="flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full bg-brk-primary px-3 py-1.5 text-xs font-bold text-brk-on-primary hover:opacity-90 transition-opacity"
         >
             <LogIn className="h-3.5 w-3.5" />
-            <span>Đăng nhập</span>
+            <span className="hidden sm:inline">Đăng nhập</span>
         </button>
     )
 
@@ -88,7 +90,9 @@ export default function UserMenu() {
         <div className="relative" ref={userMenuRef}>
             <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center justify-center transition-all hover:opacity-80"
+                aria-label="Mở menu tài khoản"
+                aria-expanded={isUserMenuOpen}
+                className="flex min-h-11 min-w-11 items-center justify-center transition-all hover:opacity-80"
             >
                 {userImage ?? session.user?.image ? (
                     <img
@@ -104,7 +108,7 @@ export default function UserMenu() {
             </button>
 
             {isUserMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-brk-outline bg-brk-surface py-2 shadow-xl animate-in fade-in slide-in-from-top-2 z-[60]">
+                <div className="absolute right-0 top-full mt-2 max-h-[calc(100dvh_-_5rem)] w-56 max-w-[calc(100vw_-_1.5rem)] overflow-y-auto rounded-xl border border-brk-outline bg-brk-surface py-2 shadow-xl animate-in fade-in slide-in-from-top-2 z-[60]">
                     <div className="border-b border-brk-outline px-4 py-2 mb-1">
                         <p className="text-xs font-bold text-brk-on-surface truncate">{session.user?.name}</p>
                         <p className="text-[10px] text-brk-muted truncate">{session.user?.email}</p>
@@ -139,6 +143,16 @@ export default function UserMenu() {
                         <Settings className="h-4 w-4" />
                         Cài đặt tài khoản
                     </Link>
+                    {/* Đóng menu avatar trước khi mở cửa sổ Ví MBW. */}
+                    <button
+                        type="button"
+                        onClick={() => { setIsUserMenuOpen(false); openMbw() }}
+                        className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-on-surface hover:bg-brk-background transition-colors"
+                    >
+                        <Wallet className="h-4 w-4 text-brk-primary" />
+                        Ví MBW
+                    </button>
+                    <InstallAppButton className="w-full px-4 text-brk-on-surface hover:bg-brk-background" onBeforeOpen={() => setIsUserMenuOpen(false)} />
                     <button
                         onClick={() => signOut()}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-accent hover:bg-brk-background transition-colors"

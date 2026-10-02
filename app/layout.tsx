@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import Script from "next/script";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import "./globals.css";
 import Providers from "./providers";
+import PwaInstallProvider from "@/components/pwa/PwaInstallProvider";
 import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
 import AffiliateTracker from "@/components/AffiliateTracker";
 import AccountAssistantTrigger from "@/components/auth/AccountAssistantTrigger";
@@ -27,6 +28,9 @@ export const metadata: Metadata = {
     default: "MFC - Dòng chảy Phước Báu",
     template: "%s | MFC - Dòng chảy Phước Báu",
   },
+  applicationName: "MFC",
+  appleWebApp: { capable: true, title: "MFC", statusBarStyle: "default" },
+  icons: { apple: "/pwa/apple-touch-icon.png" },
   description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
   openGraph: {
     title: "MFC - Dòng chảy Phước Báu",
@@ -51,6 +55,8 @@ export const metadata: Metadata = {
     images: ["https://giautoandien.io.vn/og-image.png"],
   },
 };
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#047857" };
 
 // [OPTIMIZE] Theme gần như không đổi (chỉ khi admin chỉnh trong /tools/settings/theme)
 // nhưng RootLayout bọc MỌI trang — cache 1 giờ, làm mới ngay lập tức khi admin lưu
@@ -108,9 +114,11 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: INITIAL_SCRIPT }}
         />
         <Providers session={session} attentionHighlight={attentionHighlight}>
+          <PwaInstallProvider>
           {children}
           <AffiliateTracker />
           <AccountAssistantTrigger />
+          </PwaInstallProvider>
         </Providers>
         <PendingSurveyHandler />
       </body>

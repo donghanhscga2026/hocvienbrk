@@ -74,8 +74,19 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
   if (query.source) where.source = { contains: query.source, mode: 'insensitive' }
   if (query.tag) where.tags = { has: query.tag }
   if (query.stage) where.opportunities = { some: { stage: query.stage } }
+  // Lọc trước khi phân trang, luôn giữ nguyên phạm vi quyền của giáo viên.
+  if (query.group === 'students') {
+    const enrollment = { some: actor.role === 'ADMIN' ? {} : { course: { teacherId: actor.id } } }
+    where.AND = [scope, { OR: [
+      { studentProfile: true },
+      { studentProfile: false, linkedUser: { enrollments: enrollment } },
+    ] }]
+  }
+  if (query.group === 'consultation') {
+    where.AND = [scope, { opportunities: { some: { stage: { notIn: ['WON', 'LOST'] } } } }]
+  }
   if (query.due === 'unscheduled') {
-    where.AND = [scope, { opportunities: { some: { stage: { notIn: ['WON', 'LOST'] } } } }, { tasks: { none: { completedAt: null } } }]
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : [scope]), { opportunities: { some: { stage: { notIn: ['WON', 'LOST'] } } } }, { tasks: { none: { completedAt: null } } }]
   }
   const [contacts, total] = await Promise.all([
     db.crmContact.findMany({ where, include: {
