@@ -76,9 +76,26 @@ self.addEventListener('notificationclick',event => {
   event.waitUntil((async () => {
     const data=event.notification.data, url=lessonUrl(data?.url)
     if (!url || await readPushState('user') !== data.userId) return
-    const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true})
-    const client=clients.find(item=>new URL(item.url).origin===self.location.origin)
-    if (client) { await client.navigate(url); await client.focus() }
-    else await self.clients.openWindow(url)
+
+    let windows=[]
+    try { windows=await self.clients.matchAll({type:'window',includeUncontrolled:true}) } catch {}
+    const sameOrigin=windows.filter(client => {
+      try { return new URL(client.url).origin===self.location.origin } catch { return false }
+    })
+    const client=sameOrigin.find(item=>item.focused)
+      || sameOrigin.find(item=>item.visibilityState==='visible') || sameOrigin[0]
+    if (client) {
+      try {
+        // Đưa app ra màn hình trước: navigate có thể thay Document/WindowClient,
+        // khiến focus gọi sau đó bị từ chối và bài học chỉ mở ngầm trên Android.
+        const active=await client.focus() || client
+        if (active.url===url) return
+        if (await active.navigate(url)) return
+      } catch { /* Cửa sổ cũ không còn dùng được: mở đúng URL bằng cách dự phòng. */ }
+    }
+    const opened=await self.clients.openWindow(url)
+    if (opened) {
+      try { await opened.focus() } catch { /* openWindow đã yêu cầu mở app; một số trình duyệt không cho focus lần nữa. */ }
+    }
   })())
 })
