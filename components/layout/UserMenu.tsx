@@ -143,6 +143,15 @@ export default function UserMenu() {
                         <Settings className="h-4 w-4" />
                         Cài đặt tài khoản
                     </Link>
+                    {/* Đóng menu avatar trước khi mở cửa sổ Ví MBW. */}
+                    <button
+                        type="button"
+                        onClick={() => { setIsUserMenuOpen(false); openMbw() }}
+                        className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-on-surface hover:bg-brk-background transition-colors"
+                    >
+                        <Wallet className="h-4 w-4 text-brk-primary" />
+                        Ví MBW
+                    </button>
                     <InstallAppButton className="w-full px-4 text-brk-on-surface hover:bg-brk-background" onBeforeOpen={() => setIsUserMenuOpen(false)} />
                     <button
                         onClick={() => signOut()}

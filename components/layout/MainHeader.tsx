@@ -5,14 +5,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Wallet, Wrench } from 'lucide-react'
+import { Wrench } from 'lucide-react'
 import { useHomeSlug } from '@/hooks/useHomeSlug'
 import { useAttentionCycle } from '@/hooks/useAttentionCycle'
 import { AttentionHighlight } from '@/components/ui/attention-highlight'
 import { useAttentionHighlightSettings } from '@/app/contexts/AttentionHighlightContext'
 import UserMenu from './UserMenu'
 import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
-import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
 
@@ -31,7 +30,6 @@ export default function MainHeader({ title }: MainHeaderProps) {
     const { data: session } = useSession()
     const [showShare, setShowShare] = useState(false)
     const { homeSlug, isReady } = useHomeSlug()
-    const { open: openMbw } = useMbwDashboard()
 
     const userId = session?.user?.id != null ? String(session.user.id) : null
 
@@ -70,7 +68,6 @@ export default function MainHeader({ title }: MainHeaderProps) {
     const helpAttn = getAttnItem('mainheader.help', 'Trợ giúp')
     const toolsAttn = getAttnItem('mainheader.tools', 'Công cụ & Tiện ích')
     const shareAttn = getAttnItem('mainheader.share', 'Chia sẻ link')
-    const walletAttn = getAttnItem('mainheader.wallet', 'Ngân hàng Phước báu')
     const avatarAttn = getAttnItem('mainheader.avatar', 'Cá nhân')
 
     const { getStatus } = useAttentionCycle([
@@ -80,7 +77,6 @@ export default function MainHeader({ title }: MainHeaderProps) {
         { id: 'help', tooltip: helpAttn.tooltip, visible: helpAttn.enabled },
         { id: 'tools', tooltip: toolsAttn.tooltip, visible: toolsAttn.enabled },
         { id: 'share', tooltip: shareAttn.tooltip, visible: !!userId && shareAttn.enabled },
-        { id: 'wallet', tooltip: walletAttn.tooltip, visible: !!userId && walletAttn.enabled },
         { id: 'avatar', tooltip: avatarAttn.tooltip, visible: avatarAttn.enabled }
     ], { idleDelayMs: attnConfig.idleDelayMs, cycleIntervalMs: attnConfig.cycleIntervalMs })
 
@@ -173,18 +169,6 @@ export default function MainHeader({ title }: MainHeaderProps) {
                                         className="object-contain"
                                         style={{ width: 'auto', height: '32px' }}
                                     />
-                                </button>
-                            </AttentionHighlight>
-                        )}
-
-                        {userId && (
-                            <AttentionHighlight {...getStatus('wallet')}>
-                                <button
-                                    onClick={openMbw}
-                                    className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10"
-                                    title="Ví MBW — Dòng chảy Phước Báu"
-                                >
-                                    <Wallet className="w-6 h-6 text-brk-primary" />
                                 </button>
                             </AttentionHighlight>
                         )}
