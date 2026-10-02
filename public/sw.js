@@ -77,25 +77,30 @@ self.addEventListener('notificationclick',event => {
     const data=event.notification.data, url=lessonUrl(data?.url)
     if (!url || await readPushState('user') !== data.userId) return
 
+    // Để Chrome chọn app standalone đã cài; focus một tab cùng tên miền
+    // trước sẽ bỏ qua bước này và đưa người dùng vào trình duyệt.
+    let openError
+    try {
+      const opened=await self.clients.openWindow(url)
+      if (opened) {
+        try { await opened.focus() } catch { /* Cửa sổ đã được mở; không mở thêm bản thứ hai. */ }
+      }
+      return
+    } catch (error) { openError=error }
+
+    // Chỉ dùng cửa sổ có sẵn khi trình duyệt từ chối openWindow.
     let windows=[]
     try { windows=await self.clients.matchAll({type:'window',includeUncontrolled:true}) } catch {}
     const sameOrigin=windows.filter(client => {
       try { return new URL(client.url).origin===self.location.origin } catch { return false }
     })
-    const client=sameOrigin.find(item=>item.focused)
-      || sameOrigin.find(item=>item.visibilityState==='visible') || sameOrigin[0]
-    if (client) {
+    for (const client of sameOrigin) {
       try {
-        // Đưa app ra màn hình trước: navigate có thể thay Document/WindowClient,
-        // khiến focus gọi sau đó bị từ chối và bài học chỉ mở ngầm trên Android.
+        // Focus trước navigate để tránh bài học mở ngầm trên Android.
         const active=await client.focus() || client
-        if (active.url===url) return
-        if (await active.navigate(url)) return
-      } catch { /* Cửa sổ cũ không còn dùng được: mở đúng URL bằng cách dự phòng. */ }
+        if (active.url===url || await active.navigate(url)) return
+      } catch { /* Thử cửa sổ kế tiếp nếu cửa sổ này không còn dùng được. */ }
     }
-    const opened=await self.clients.openWindow(url)
-    if (opened) {
-      try { await opened.focus() } catch { /* openWindow đã yêu cầu mở app; một số trình duyệt không cho focus lần nữa. */ }
-    }
+    throw openError
   })())
 })

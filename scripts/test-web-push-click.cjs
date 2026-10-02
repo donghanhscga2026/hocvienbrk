@@ -15,11 +15,13 @@ async function scenario(options = {}) {
     addEventListener: (name, handler) => { events[name] = handler },
     clients: {
       matchAll: async () => {
+        actions.push(['match'])
         if (options.matchError) throw new Error('Client enumeration failed')
         return options.clients ? options.clients(actions) : []
       },
       openWindow: async url => {
         actions.push(['open',url])
+        if (options.openError) throw new Error('Opening refused')
         return options.openNull ? null : { focus: async () => {
           actions.push(['focus-new'])
           if (options.openFocusError) throw new Error('Already activated')
@@ -62,38 +64,48 @@ async function check(message, options, expected) {
   checks++
 }
 async function run() {
-  await check('Closed app opens exact lesson', {}, [['open',target],['focus-new']])
-  await check('Android background app focuses BEFORE navigation',
-    {clients: actions => [oldClient(actions)]}, [['focus-old'],['navigate',target]])
-  await check('Rejected focus falls back to opening app',
-    {clients: actions => [oldClient(actions,{focusError:true})]}, [['focus-old'],['open',target],['focus-new']])
-  await check('Rejected navigation opens fallback',
-    {clients: actions => [oldClient(actions,{navigateError:true})]}, [['focus-old'],['navigate',target],['open',target],['focus-new']])
-  await check('Null navigation opens fallback',
-    {clients: actions => [oldClient(actions,{navigateNull:true})]}, [['focus-old'],['navigate',target],['open',target],['focus-new']])
-  await check('Current lesson only focuses; no reload/duplicate app',
-    {clients: actions => [oldClient(actions,{url:target})]}, [['focus-old']])
-  await check('Enumeration error can still open app',
-    {matchError:true}, [['open',target],['focus-new']])
-  await check('No WindowClient returned by openWindow is valid',
-    {openNull:true}, [['open',target]])
-  await check('Second focus rejection does not discard opened app',
-    {openFocusError:true}, [['open',target],['focus-new']])
-  await check('Other origins never reused',
-    {clients: actions => [oldClient(actions,{url:'https://other.invalid/'})]}, [['open',target],['focus-new']])
-  await check('Invalid client URL does not block opening app',
-    {clients: actions => [oldClient(actions,{url:'not a URL'})]}, [['open',target],['focus-new']])
-  await check('Old account notification cannot open',
-    {boundUser:'4'}, [])
-  await check('Logout notification cannot open',
-    {boundUser:''}, [])
+  const opened = [['open',target],['focus-new']]
+  const fallback = [['open',target],['match']]
+  await check('Closed app requests installed-app routing', {}, opened)
+  await check('Background window does not bypass installed-app routing',
+    {clients: actions => [oldClient(actions)]}, opened)
+  await check('Focused browser tab cannot absorb notification click',
+    {clients: actions => [{...oldClient(actions),focused:true,visibilityState:'visible'}]}, opened)
+  await check('Existing target URL still lets browser choose installed app',
+    {clients: actions => [oldClient(actions,{url:target})]}, opened)
+  await check('Null openWindow result does not create duplicate windows',
+    {openNull:true,clients: actions => [oldClient(actions)]}, [['open',target]])
+  await check('Second focus rejection does not open duplicate windows',
+    {openFocusError:true}, opened)
+  await check('Failed open falls back to focus BEFORE navigation',
+    {openError:true,clients: actions => [oldClient(actions)]},
+    [...fallback,['focus-old'],['navigate',target]])
+  await check('Fallback at exact lesson only focuses',
+    {openError:true,clients: actions => [oldClient(actions,{url:target})]},
+    [...fallback,['focus-old']])
+  await check('Rejected fallback focus tries next window',
+    {openError:true,clients: actions => [oldClient(actions,{focusError:true}),oldClient(actions)]},
+    [...fallback,['focus-old'],['focus-old'],['navigate',target]])
+  await check('Rejected fallback navigation tries next window',
+    {openError:true,clients: actions => [oldClient(actions,{navigateError:true}),oldClient(actions)]},
+    [...fallback,['focus-old'],['navigate',target],['focus-old'],['navigate',target]])
+  await check('Null fallback navigation tries next window',
+    {openError:true,clients: actions => [oldClient(actions,{navigateNull:true}),oldClient(actions)]},
+    [...fallback,['focus-old'],['navigate',target],['focus-old'],['navigate',target]])
+  await check('Fallback excludes foreign and malformed client URLs',
+    {openError:true,clients: actions => [
+      oldClient(actions,{url:'https://other.invalid/'}),
+      oldClient(actions,{url:'not a URL'}),oldClient(actions)]},
+    [...fallback,['focus-old'],['navigate',target]])
+  await assert.rejects(scenario({openError:true,matchError:true}), /Opening refused/)
+  checks++
+  await assert.rejects(scenario({openError:true}), /Opening refused/)
+  checks++
+  await check('Old account notification cannot open', {boundUser:'4'}, [])
+  await check('Logout notification cannot open', {boundUser:''}, [])
   await check('Cross-origin notification cannot open',
     {url:'https://evil.invalid/courses/test/learn?lesson=lesson-a'}, [])
-  await check('Non-lesson destination cannot open',
-    {url:origin+'/tools/crm'}, [])
-  await check('Visible client preferred over stale hidden window',
-    {clients: actions => [oldClient(actions,{focusError:true}), {...oldClient(actions),visibilityState:'visible'}]},
-    [['focus-old'],['navigate',target]])
+  await check('Non-lesson destination cannot open', {url:origin+'/tools/crm'}, [])
   console.log(JSON.stringify({result:'passed',assertions:checks,scope:'notification click; no network or database'}))
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
