@@ -522,9 +522,9 @@ function ChatSection({ lessonId, session, courseId }: ChatSectionProps) {
                         ({loadedTopLevel} của {totalTopLevel} bình luận)
                     </span>
                 </h3>
+                <p className="mt-1 text-xs text-zinc-400">Chia sẻ cảm nghĩ, thảo luận và hỏi bài. Cần giáo viên xử lý riêng? Chọn “Hỏi giáo viên” trên đầu màn hình.</p>
             </div>
 
-            {session?.user && <div className="shrink-0 max-h-[40vh] overflow-y-auto p-2"><CrmRequestForm key={lessonId} courseId={courseId} lessonId={lessonId} signedIn /></div>}
             <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-4 py-3 custom-scrollbar">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">

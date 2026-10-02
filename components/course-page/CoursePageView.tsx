@@ -6,6 +6,7 @@ import CourseThemeProvider from './CourseThemeProvider'
 import SectionRenderer from './SectionRenderer'
 import ShareLinkModal from './ShareLinkModal'
 import RegistrationFlowModal from './RegistrationFlowModal'
+import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import { CoursePage } from '@/lib/course-page/types'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 
@@ -129,21 +130,23 @@ export default function CoursePageView({
 
       {/* Navigation */}
       <nav
-        className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex justify-between items-center"
+        className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex justify-between items-center gap-3"
         style={{
           background: 'rgba(23,24,35,0.92)',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border-dark)',
         }}
       >
-        <div style={{
+        <div className="min-w-0 flex-1 truncate" style={{
           fontFamily: 'Cormorant Garamond, Georgia, serif',
           fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-heading)',
         }}>
           {coursePage.navigation.shortName}
         </div>
 
+        <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
         <button
+          className="min-h-11 max-w-[190px] truncate"
           onClick={() => handleAction('open_registration')}
           style={{
             background: 'var(--accent)',
@@ -161,10 +164,12 @@ export default function CoursePageView({
         >
           {isEnrolled ? 'Vào học ngay' : coursePage.navigation.ctaText}
         </button>
+        <CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} />
+        </div>
       </nav>
 
       {/* Page sections */}
-      <div className="pt-[72px]">
+      <div className="pt-[124px] sm:pt-[80px]">
         <SectionRenderer
           sections={coursePage.sections}
           isEnrolled={isEnrolled}

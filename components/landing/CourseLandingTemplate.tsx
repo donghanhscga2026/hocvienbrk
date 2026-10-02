@@ -11,6 +11,7 @@ import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceActi
 import { useRouter } from 'next/navigation'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import MainHeader from '@/components/layout/MainHeader'
+import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import { isValidImageUrl } from '@/lib/image-validation'
@@ -339,11 +340,13 @@ export default function CourseLandingTemplate({
                                             {copied ? '✓ Đã sao chép' : 'Chia sẻ'}
                                         </button>
                                     </div>
+                                    <div className="mt-3 flex justify-center"><CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} /></div>
                                     {shareInfo && <p className="mt-3 text-center text-xs text-brk-muted">{shareInfo}</p>}
                                 </>
                             ) : (
                                 <>
                                     {getCTAButton()}
+                                    <div className="mt-3 flex justify-center"><CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} /></div>
                                     <div className="mt-4 space-y-3">
                                         <button
                                             onClick={handleCopyShareLink}
@@ -489,7 +492,7 @@ export default function CourseLandingTemplate({
                                             ))}
                                         </div>
                                         <p className="text-brk-on-surface mb-4 leading-relaxed">
-                                            "{testimonial.content}"
+                                            &quot;{testimonial.content}&quot;
                                         </p>
                                         <div className="flex items-center gap-3">
                                             {testimonial.avatar ? (

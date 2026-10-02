@@ -16,6 +16,7 @@ import LessonSidebar from "./LessonSidebar"
 import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
 import ChatSection from "./ChatSection"
+import CrmRequestButton from "@/components/crm/CrmRequestButton"
 import LessonContentBox from "./LessonContentBox"
 // [OPTIMIZE] StartDateModal kéo theo react-day-picker + CSS riêng, nhưng chỉ
 // hiện với học viên CHƯA chọn ngày bắt đầu học (thiểu số) — dynamic-import để
@@ -338,7 +339,8 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </div>
                 )}
 
-                <h1 className="font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                <h1 className="min-w-0 flex-1 font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning />
             </header>
 
             <div className={`flex flex-1 min-h-0 pt-14 ${isMobile ? 'pb-14' : ''}`}>
@@ -840,4 +842,3 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
         </div>
     )
 }
-

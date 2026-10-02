@@ -2,15 +2,15 @@
 import { useRef, useState } from 'react'
 import { REQUEST_CATEGORIES } from '@/lib/crm/shared'
 
-export default function CrmRequestForm({ courseId, lessonId, commentId, initialContent = '', signedIn = false }: { courseId?: number; lessonId?: string; commentId?: number; initialContent?: string; signedIn?: boolean }) {
-  const [open, setOpen] = useState(false); const [content, setContent] = useState(initialContent)
-  const [category, setCategory] = useState<keyof typeof REQUEST_CATEGORIES>(lessonId ? 'LEARNING' : 'CONSULTATION')
+export default function CrmRequestForm({ courseId, lessonId, commentId, initialContent = '', signedIn = false, initiallyOpen = false, hideTrigger = false, defaultCategory }: { courseId?: number; lessonId?: string; commentId?: number; initialContent?: string; signedIn?: boolean; initiallyOpen?: boolean; hideTrigger?: boolean; defaultCategory?: keyof typeof REQUEST_CATEGORIES }) {
+  const [open, setOpen] = useState(initiallyOpen); const [content, setContent] = useState(initialContent)
+  const [category, setCategory] = useState<keyof typeof REQUEST_CATEGORIES>(defaultCategory || (lessonId ? 'LEARNING' : 'CONSULTATION'))
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [phone, setPhone] = useState(''); const [website, setWebsite] = useState('')
   const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false); const [done, setDone] = useState(false); const [error, setError] = useState('')
   const key = useRef<string | null>(null)
   const style = 'w-full min-h-11 rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900'
   return <section className="rounded-xl border border-emerald-200 bg-white p-3 text-slate-800">
-    <button type="button" onClick={() => setOpen(!open)} className="min-h-11 text-sm font-semibold text-emerald-800">{commentId ? 'Nhờ giáo viên giải đáp bình luận này' : lessonId ? 'Gửi yêu cầu hỗ trợ' : 'Yêu cầu tư vấn khóa học'}</button>
+    {!hideTrigger && <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-11 text-sm font-semibold text-emerald-800">{commentId ? 'Nhờ giáo viên giải đáp bình luận này' : lessonId ? 'Gửi yêu cầu hỗ trợ' : 'Yêu cầu tư vấn khóa học'}</button>}
     {open && (done ? <p role="status" className="text-sm">Đã gửi yêu cầu đến người phụ trách. Bạn có thể trao đổi tiếp trong bài học hoặc qua kênh liên hệ của khóa.</p> : <form className="space-y-3" onSubmit={async e => {
       e.preventDefault(); if (busy) return; setBusy(true); setError(''); key.current ||= crypto.randomUUID()
       try {
@@ -25,7 +25,7 @@ export default function CrmRequestForm({ courseId, lessonId, commentId, initialC
       <label hidden aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={website} onChange={e => setWebsite(e.target.value)} /></label>
       <label className="flex gap-2 text-xs"><input required type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />Tôi đồng ý lưu yêu cầu và thông tin liên hệ để người phụ trách xử lý.</label>
       <button disabled={busy || !consent} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
-      <p className="text-xs text-slate-500">Bình luận thông thường vẫn được lưu ở bài học. Form này tạo yêu cầu riêng trong CRM.</p>
+      <p className="text-xs text-slate-500">Bình luận thông thường vẫn ở bài học. Yêu cầu này được gửi riêng đến người phụ trách để theo dõi và xử lý.</p>
     </form>)}
   </section>
 }
