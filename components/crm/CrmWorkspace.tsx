@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CalendarClock, Check, ChevronLeft, ChevronRight, Loader2, Plus, Search, Users, X } from 'lucide-react'
+import { CalendarClock, Check, ChevronLeft, ChevronRight, GitBranch, LayoutGrid, List, Loader2, Menu, MessageCircle, Plus, Search, Users, X } from 'lucide-react'
 import CrmDataTools, { CrmWebsitePanel, integrationRequest } from './CrmDataTools'
 import CrmPhaseThree, { CrmEmailConsent } from './CrmPhaseThree'
 import CrmStudents from './CrmStudents'
@@ -122,6 +122,10 @@ export default function CrmWorkspace() {
   const queryView = useSearchParams().get('view')
   const [tab, setTab] = useState<'contacts' | 'cards' | 'board' | 'tasks' | 'requests'>('contacts')
   useEffect(() => { if (queryView === 'requests' || queryView === 'tasks') setTab(queryView) }, [queryView])
+  // Giữ kiểu xem khách hàng khi chuyển qua các mục chức năng khác.
+  const [contactView, setContactView] = useState<'contacts' | 'cards'>('contacts')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [newRequests, setNewRequests] = useState<number | null>(null)
   const [contacts, setContacts] = useState<CrmContactView[]>([])
   const [total, setTotal] = useState(0)
   const [owners, setOwners] = useState<CrmOwner[]>([])
@@ -192,6 +196,16 @@ export default function CrmWorkspace() {
     return () => abort.abort()
   }, [selected, revision, activityPage])
 
+  // Dùng API hiện có để đếm yêu cầu mới trong phạm vi quyền của giáo viên.
+  useEffect(() => {
+    const abort = new AbortController()
+    setNewRequests(null)
+    request<{ total: number }>('/api/crm/requests?status=NEW&page=1', { signal: abort.signal })
+      .then(data => { if (!abort.signal.aborted) setNewRequests(data.total) })
+      .catch(() => { if (!abort.signal.aborted) setNewRequests(null) })
+    return () => abort.abort()
+  }, [revision, tab])
+
   const mutate = useCallback(async (command: Command) => {
     setBusy(true); setError(''); setNotice('')
     try {
@@ -213,7 +227,36 @@ export default function CrmWorkspace() {
     <p className="text-xs text-slate-500">{contact.tasks[0] ? 'Hẹn: ' + formatCrmDate(contact.tasks[0].dueAt) + ' · ' + contact.tasks[0].title : 'Chưa có lịch chăm sóc tiếp theo'}</p>
   </button>
 
-  return <main className="mx-auto max-w-7xl space-y-5 p-3 text-slate-800 sm:p-6">
+  const customerSection = tab === 'contacts' || tab === 'cards'
+  const sectionTitle = customerSection ? 'Khách hàng / Học viên' : tab === 'requests' ? 'Yêu cầu cần giải đáp' : tab === 'board' ? 'Theo bước tư vấn' : 'Công việc'
+
+  return <main className="mx-auto max-w-[1600px] p-3 text-slate-800 sm:p-6">
+    <div className="grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
+      {/* Menu chức năng nằm bên trái; trên điện thoại có thể thu gọn. */}
+      <aside className="rounded-2xl border border-slate-200 bg-white p-3 lg:sticky lg:top-20">
+        <div className="flex items-center justify-between gap-2 px-2 py-2">
+          <p className="font-bold text-emerald-800">CRM · Chăm sóc</p>
+          <button type="button" className={secondary + ' lg:hidden'} aria-label="Mở hoặc đóng menu CRM" aria-expanded={menuOpen} aria-controls="crm-sidebar-menu" onClick={() => setMenuOpen(value => !value)}><Menu size={18} />Menu</button>
+        </div>
+        <nav id="crm-sidebar-menu" aria-label="Các mục CRM" className={(menuOpen ? 'grid' : 'hidden') + ' mt-2 gap-2 lg:grid'}>
+          {([
+            { key: 'contacts', label: 'Khách hàng / Học viên', icon: Users },
+            { key: 'requests', label: 'Yêu cầu cần giải đáp', icon: MessageCircle },
+            { key: 'board', label: 'Theo bước tư vấn', icon: GitBranch },
+            { key: 'tasks', label: 'Công việc', icon: CalendarClock },
+          ] as const).map(item => {
+            const active = item.key === 'contacts' ? customerSection : tab === item.key
+            const Icon = item.icon
+            const count = item.key === 'requests' ? newRequests : item.key === 'tasks' ? tasks.stats.today + tasks.stats.overdue : null
+            return <button key={item.key} type="button" aria-current={active ? 'page' : undefined} className={'flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-emerald-600 ' + (active ? 'bg-emerald-700 font-semibold text-white' : 'text-slate-600 hover:bg-slate-100')} onClick={() => { setTab(item.key === 'contacts' ? contactView : item.key); setMenuOpen(false) }}>
+              <Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span>
+              {count != null && count > 0 && <span aria-label={item.key === 'requests' ? count + ' yêu cầu mới' : count + ' công việc đến hạn hoặc quá hạn'} className={'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ' + (active ? 'bg-white text-emerald-800' : 'bg-amber-100 text-amber-900')}>{count}</span>}
+            </button>
+          })}
+        </nav>
+        <p className="hidden px-2 pt-3 text-xs leading-relaxed text-slate-500 lg:block">Ưu tiên yêu cầu mới và công việc đến hạn.</p>
+      </aside>
+      <section aria-label={sectionTitle} className="min-w-0 space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold">Khách hàng & chăm sóc</h1><p className="mt-1 text-sm text-slate-500">Biết khách đang ở đâu và việc cần làm tiếp theo.</p></div><button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button></div>
     {feedback}
     <details className="rounded-xl border bg-white p-3"><summary className="cursor-pointer text-sm font-semibold">Đồng bộ học viên, báo cáo & công cụ quản trị</summary><div className="mt-3 space-y-4">
@@ -226,7 +269,13 @@ export default function CrmWorkspace() {
       { label: 'Việc quá hạn', value: tasks.stats.overdue, run: () => { setTab('tasks'); setDue('overdue'); setTaskPage(1) } },
       { label: 'Cần lịch tiếp theo', value: tasks.stats.unscheduled, run: () => { setTab('contacts'); setUnscheduled(true); setArchived(false); setStage(''); setSource(''); setTag(''); setOwner(''); setSearch(''); setQuery(''); setPage(1) } },
     ].map(item => <button key={item.label} className="rounded-2xl border bg-white p-3 text-left sm:p-4" onClick={item.run}><div className="text-2xl font-bold text-emerald-800">{item.value}</div><div className="mt-1 text-xs sm:text-sm">{item.label}</div></button>)}</div>
-    <nav aria-label="Chế độ CRM" className="flex flex-wrap gap-2">{([{ key: 'contacts', label: 'Danh sách' }, { key: 'cards', label: 'Dạng thẻ' }, { key: 'requests', label: 'Yêu cầu cần giải đáp' }, { key: 'board', label: 'Theo bước tư vấn' }, { key: 'tasks', label: 'Công việc' }] as const).map(item => <button key={item.key} aria-pressed={tab === item.key} className={tab === item.key ? button : secondary} onClick={() => setTab(item.key)}>{item.key === 'tasks' ? <CalendarClock size={16} /> : <Users size={16} />}{item.label}</button>)}</nav>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><h2 className="text-xl font-bold">{sectionTitle}</h2>{customerSection && <p className="mt-1 text-sm text-slate-500">Xem khóa học, tiến độ và việc chăm sóc tiếp theo.</p>}</div>
+      {/* Hai kiểu xem dùng chung danh sách, bộ lọc và phân trang. */}
+      {customerSection && <div role="group" aria-label="Kiểu xem khách hàng" className="ml-auto flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
+        {([{ key: 'contacts', label: 'Danh sách', icon: List }, { key: 'cards', label: 'Dạng thẻ', icon: LayoutGrid }] as const).map(item => <button key={item.key} type="button" aria-pressed={tab === item.key} className={tab === item.key ? button : secondary} onClick={() => { setContactView(item.key); setTab(item.key) }}><item.icon size={16} />{item.label}</button>)}
+      </div>}
+    </div>
     {tab === 'requests' ? <CrmRequests owners={owners} isAdmin={actor?.isAdmin} onChanged={() => setRevision(v => v + 1)} onOpen={open} /> : tab !== 'tasks' ? <>
       <form className="grid gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={e => { e.preventDefault(); setSearch(query); resetPage() }}>
         <Field label="Tìm tên, email hoặc điện thoại"><div className="flex gap-2"><input className={input} value={query} onChange={e => setQuery(e.target.value)} maxLength={150} /><button aria-label="Tìm khách" className={secondary}><Search size={18} /></button></div></Field>
@@ -250,6 +299,8 @@ export default function CrmWorkspace() {
       {loading ? <p role="status">Đang tải công việc…</p> : <div className="space-y-3">{tasks.tasks.map(task => <article key={task.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-4"><button className="min-w-0 flex-1 text-left" onClick={() => open(task.contactId)}><strong className="block break-words">{task.title}</strong><span className="text-sm text-slate-500">{task.contact.name} · {task.contact.owner?.name || 'Chưa phân công'}</span><span className={'mt-1 block text-xs ' + (!task.completedAt && new Date(task.dueAt).getTime() < loadedAt ? 'text-red-700' : 'text-slate-500')}>{formatCrmDate(task.dueAt)} · giờ Việt Nam</span></button><button disabled={busy} className={secondary} onClick={() => void mutate({ action: 'task.toggle', contactId: task.contactId, taskId: task.id, completed: !task.completedAt })}>{task.completedAt ? 'Mở lại' : 'Hoàn thành'}</button></article>)}{tasks.tasks.length === 0 && <p className="rounded-xl bg-white p-6">Không có công việc phù hợp.</p>}</div>}
       <Pagination page={taskPage} total={tasks.total} onPage={setTaskPage} />
     </>}
+      </section>
+    </div>
 
     {create && actor && <Modal title="Thêm khách mới" onClose={close}>{feedback}<ContactEditor owners={owners} actorId={actor.id} isAdmin={actor.isAdmin} busy={busy} onCancel={close} onSave={async data => { const ok = await mutate({ action: 'contact.create', data }); if (ok) { setCreate(false); setPage(1) } return ok }} /></Modal>}
     {selected != null && <Modal title={detail?.name || 'Hồ sơ khách'} onClose={close}>{feedback}{detailLoading ? <p role="status">Đang tải hồ sơ…</p> : detail && actor ? <>
