@@ -56,6 +56,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "w.ladicdn.com",
+      },
+      {
+        protocol: "https",
         hostname: "i.imgur.com",
       },
       {
