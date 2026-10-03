@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, Compass, Home, MessagesSquare, Route, Wrench } from 'lucide-react'
+import { BookOpen, Compass, Home, MessagesSquare, Route, Wrench, UserRound } from 'lucide-react'
 import HomeAreaLink, { type HomeArea } from './HomeAreaLink'
 import { CourseListRow } from './CourseCatalog'
 import type { CatalogCourse, CatalogEnrollment } from '@/lib/course-catalog'
@@ -13,12 +13,12 @@ interface Props {
   courses: CatalogCourse[]; activeCourses: CatalogCourse[]; enrollments: Record<number, CatalogEnrollment>
   catalog?: ReactNode; myCourses?: ReactNode; roadmap?: ReactNode; community?: ReactNode; message?: ReactNode
   discoveryPreview?: ReactNode; communityPreview?: ReactNode
-  roadmapTitle: string; onOpenMembership: () => void; isLoggedIn: boolean
+  roadmapTitle: string; isLoggedIn: boolean
 }
 
 const headingClass = 'text-xl font-semibold leading-snug text-brk-on-surface sm:text-[22px]'
 
-export default function HomeOverview({ title, activeCourses, enrollments, catalog, myCourses, roadmap, community, message, roadmapTitle, onOpenMembership, isLoggedIn }: Props) {
+export default function HomeOverview({ title, activeCourses, enrollments, catalog, myCourses, roadmap, community, message, roadmapTitle, isLoggedIn }: Props) {
   const params = useSearchParams()
   const navigation = useRef<HTMLElement>(null)
   const links = [
@@ -46,7 +46,7 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
     <p className="mt-0 text-sm text-brk-muted">Mở các tiện ích hỗ trợ học tập và công việc.</p>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
       <Link href="/tools" className="flex min-w-0 items-start gap-4 rounded-2xl border border-brk-outline bg-brk-surface p-5 hover:border-brk-primary"><Wrench className="mt-1 h-6 w-6 shrink-0 text-brk-primary" aria-hidden /><div><h3 className="font-bold text-brk-on-surface">Khám phá công cụ</h3><p className="mt-2 text-sm text-brk-muted">Chọn công cụ phù hợp với vai trò và quyền truy cập của bạn.</p><span className="mt-3 inline-block text-sm font-semibold text-brk-primary">Mở khu công cụ →</span></div></Link>
-      {isLoggedIn ? <button type="button" onClick={onOpenMembership} className="flex min-w-0 items-start gap-4 rounded-2xl border border-brk-outline bg-brk-surface p-5 text-left hover:border-brk-primary"><Compass className="mt-1 h-6 w-6 shrink-0 text-brk-primary" aria-hidden /><div><h3 className="font-bold text-brk-on-surface">Bảng thành viên</h3><p className="mt-2 text-sm text-brk-muted">Thông tin và hoạt động của tài khoản.</p><span className="mt-3 inline-block text-sm font-semibold text-brk-primary">Mở bảng thành viên →</span></div></button> : <div className="rounded-2xl border border-brk-outline bg-brk-surface p-5"><h3 className="font-bold text-brk-on-surface">Học theo nhịp của bạn</h3><p className="mt-2 text-sm text-brk-muted">Đăng nhập để theo dõi các khóa đã đăng ký và tiến độ học.</p><Link href="/login" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brk-primary">Đăng nhập →</Link></div>}
+      {isLoggedIn ? <Link href="/account-settings" className="flex min-w-0 items-start gap-4 rounded-2xl border border-brk-outline bg-brk-surface p-5 hover:border-brk-primary"><UserRound className="mt-1 h-6 w-6 shrink-0 text-brk-primary" aria-hidden /><div><h3 className="font-bold text-brk-on-surface">Tài khoản của tôi</h3><p className="mt-2 text-sm text-brk-muted">Cập nhật thông tin cá nhân, bảo mật và tài khoản nhận thanh toán.</p><span className="mt-3 inline-block text-sm font-semibold text-brk-primary">Quản lý tài khoản →</span></div></Link> : <div className="rounded-2xl border border-brk-outline bg-brk-surface p-5"><h3 className="font-bold text-brk-on-surface">Học theo nhịp của bạn</h3><p className="mt-2 text-sm text-brk-muted">Đăng nhập để theo dõi các khóa đã đăng ký và tiến độ học.</p><Link href="/login" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brk-primary">Đăng nhập →</Link></div>}
     </div>
   </section>
 

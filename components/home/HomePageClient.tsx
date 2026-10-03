@@ -12,7 +12,6 @@ import CourseCatalog from '@/components/home/CourseCatalog'
 import RealityMap from '@/components/home/RealityMap'
 import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
 import CommunityBoard from '@/components/home/CommunityBoard'
-import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { Check } from 'lucide-react'
 
@@ -68,7 +67,6 @@ function HomePageContent({
   const paymentCourseId = searchParams.get('paymentCourseId')
   const [courseToPay, setCourseToPay] = useState<any>(null)
   const [showActivatedToast, setShowActivatedToast] = useState(false)
-  const { open: openMbw } = useMbwDashboard()
 
   useEffect(() => {
     if (paymentCourseId) {
@@ -123,7 +121,6 @@ function HomePageContent({
         activeCourses={myActiveCourses.filter(course => personal.learning.some(item => item.id === course.id))}
         enrollments={enrollmentsMap}
         isLoggedIn={!!session?.user}
-        onOpenMembership={openMbw}
         message={message}
         roadmapTitle={customPath?.length ? (profile.roadmapTitle || 'Xem lộ trình của tôi') : (profile.surveyTitle || 'Thiết kế lộ trình')}
         myCourses={session?.user ? <PersonalCourses learning={personal.learning} teaching={personal.teaching} enrollments={enrollmentsMap} userPhone={userPhone} userId={userId ?? sessionUserId} profileSlug={profile.slug} canDiscover={profile.showAllCourses !== false} /> : undefined}
