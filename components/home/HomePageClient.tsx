@@ -1,10 +1,10 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import CourseSection from '@/components/home/CourseSection'
-import CourseCard from '@/components/course/CourseCard'
+import HomeOverview from '@/components/home/HomeOverview'
 import CourseCatalog from '@/components/home/CourseCatalog'
 import RealityMap from '@/components/home/RealityMap'
 import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
@@ -18,6 +18,7 @@ import { Check } from 'lucide-react'
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 
 interface HomePageClientProps {
+  message?: ReactNode
   profile: any
   courses: any[]
   myActiveCourses: any[]
@@ -41,6 +42,7 @@ interface HomePageClientProps {
 
 function HomePageContent({
   profile,
+  message,
   courses,
   myActiveCourses,
   myCompletedCourses,
@@ -64,21 +66,6 @@ function HomePageContent({
   const [courseToPay, setCourseToPay] = useState<any>(null)
   const [showActivatedToast, setShowActivatedToast] = useState(false)
   const { open: openMbw } = useMbwDashboard()
-
-  useEffect(() => {
-    if (!session?.user) return
-
-    if (typeof window === 'undefined') return
-
-    const autoOpenKey = 'mbw-auto-opened'
-    const hasAutoOpened = window.sessionStorage.getItem(autoOpenKey) === '1'
-    if (hasAutoOpened) return
-
-    window.sessionStorage.setItem(autoOpenKey, '1')
-    const timer = window.setTimeout(() => openMbw(), 500)
-
-    return () => window.clearTimeout(timer)
-  }, [session?.user, openMbw])
 
   useEffect(() => {
     if (paymentCourseId) {
@@ -115,166 +102,31 @@ function HomePageContent({
     return () => { clearInterval(interval); clearTimeout(timeout) }
   }, [courseToPay, enrollmentsMap])
 
-  // Dynamic section titles từ profile
-  const surveyTitle = profile.surveyTitle || 'Thiết kế lộ trình'
-  const roadmapTitle = profile.roadmapTitle || 'Lộ trình Zero 2 Hero'
-  const coursesTitle = 'Quà tặng của tôi'
-  const allCoursesTitle = profile.allCoursesTitle || 'Tất cả Quà tặng'
-  const communityTitle = profile.communityTitle || 'Bảng tin'
-  const topCoursesTitle = 'Quà tặng mới cập nhật'
-
-  // Auto-hide: Survey section khi không có survey
   const showSurvey = survey && (survey.flow || (survey.questions && survey.questions.length > 0))
-
-  // Auto-hide: Community section khi không có posts HOẶC showCommunity = false
-  const showCommunity = profile.showCommunity !== false && posts && posts.length > 0
-
-  // Top courses: ưu tiên ghim (pin > 0), sau đó lấy 3 khóa mới cập nhật nhất (loại bỏ các khóa học đã kích hoạt)
-  const pinnedCourses = courses
-    .filter((course) => course.pin != null && course.pin > 0 && enrollmentsMap[course.id]?.status !== 'ACTIVE')
-    .sort((a, b) => a.pin - b.pin)
-  const latestUpdatedCourses = courses
-    .filter((course) => (!course.pin || course.pin <= 0) && enrollmentsMap[course.id]?.status !== 'ACTIVE')
-    .sort((a, b) => {
-      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-      return dateB - dateA
-    })
-  const topCourses = [
-    ...pinnedCourses.slice(0, 3),
-    ...latestUpdatedCourses
-      .filter((course) => !pinnedCourses.some((p) => p.id === course.id))
-      .slice(0, Math.max(0, 3 - pinnedCourses.length))
-  ]
-
-  const showGiftSection = giftCourses.length > 0
-  const displayLatestCourses = latestCourses.length > 0 ? latestCourses : topCourses
+  const showCommunity = profile.showCommunity !== false && posts.length > 0
+  const hasMyCourses = !!session?.user && (myActiveCourses.length > 0 || myCompletedCourses.length > 0)
+  const featuredIds = giftCourses.length ? giftCourses.map(course => course.id) : courses.filter(course => course.pin > 0).sort((a, b) => a.pin - b.pin).map(course => course.id)
+  const latestIds = latestCourses.length ? latestCourses.map(course => course.id) : [...courses].sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()).slice(0, 6).map(course => course.id)
 
   return (
     <>
-      {/* Lối vào nhanh: người tìm khóa học không phải cuộn qua bảng tin/lộ trình. */}
-      <nav aria-label="Đi nhanh đến khóa học" className="container mx-auto flex flex-wrap gap-3 px-4 py-5">
-        {profile.showAllCourses !== false && <a href="#catalog" className="flex min-h-12 items-center rounded-2xl bg-brk-primary px-5 text-sm font-semibold text-brk-on-primary">Tìm khóa học</a>}
-        {session?.user && (myActiveCourses.length > 0 || myCompletedCourses.length > 0) && <a href="#my-courses" className="flex min-h-12 items-center rounded-2xl border border-brk-outline bg-brk-surface px-5 text-sm font-semibold text-brk-on-surface">Khóa học của tôi</a>}
-      </nav>
-      {/* Survey / Roadmap Section - Auto-hide khi không có survey */}
-      {showSurvey && (
-        <section className="container mx-auto px-4 py-8">
-          {!customPath || customPath.length === 0 ? (
-            <Zero2HeroSurvey
-              session={session}
-              survey={survey}
-            />
-          ) : (
-            <RealityMap
-              customPath={customPath}
-              enrollmentsMap={enrollmentsMap}
-              allCourses={courses}
-              userGoal={userGoal || 'Hoàn thiện kỹ năng'}
-              targetPointId={targetPointId}
-              roadmapPoints={roadmapPoints}
-              onReset={resetSurveyAction}
-            />
-          )}
-        </section>
-      )}
-
-      {/* Community Section - Auto-hide khi không có bài đăng */}
-      {showCommunity && (
-        <section className="container mx-auto px-4 py-8">
-          <CommunityBoard
-            posts={posts}
-            isAdmin={session?.user?.role === 'ADMIN'}
-            title={communityTitle}
-          />
-        </section>
-      )}
-
-      {showGiftSection && (
-        <section className="container mx-auto px-4 py-8">
-          <div className="mb-10 text-center">
-            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
-              Quà tặng từ trái tim
-            </h2>
-            <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-brk-accent"></div>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {giftCourses.map((course, index: number) => (
-              <div key={course.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
-                <CourseCard
-                  course={course}
-                  isLoggedIn={!!session}
-                  enrollment={enrollmentsMap[course.id] || null}
-                  userPhone={userPhone}
-                  userId={userId}
-                  priority={index === 0}
-                  darkMode={false}
-                  profileSlug={profile.slug}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {displayLatestCourses.length > 0 && (
-        <section className="container mx-auto px-4 py-8">
-          <div className="mb-10 text-center">
-            <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-brk-on-surface">
-              {topCoursesTitle}
-            </h2>
-            <div className="mx-auto mt-3 h-1.5 w-16 rounded-full bg-brk-accent"></div>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {displayLatestCourses.map((course, index: number) => (
-              <div key={course.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationDelay: `${index * 50}ms` }}>
-                <CourseCard
-                  course={course}
-                  isLoggedIn={!!session}
-                  enrollment={enrollmentsMap[course.id] || null}
-                  userPhone={userPhone}
-                  userId={userId}
-                  priority={index === 0}
-                  darkMode={false}
-                  profileSlug={profile.slug}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Khóa của tôi và danh mục đầy đủ đều dùng đúng phạm vi courses của trang. */}
-      <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
-        {session?.user && (myActiveCourses.length > 0 || myCompletedCourses.length > 0) && (
-          <div id="my-courses" className="scroll-mt-24">
-            <CourseSection
-              title={coursesTitle}
-              courses={myActiveCourses}
-              hiddenCourses={myCompletedCourses}
-              session={session}
-              enrollmentsMap={enrollmentsMap}
-              userPhone={userPhone}
-              userId={userId}
-              darkMode={false}
-              accentColor="bg-brk-accent"
-              profileSlug={profile.slug}
-              showAllCourses={showAllCourses}
-            />
-          </div>
-        )}
-        {profile.showAllCourses !== false && (
-          <CourseCatalog
-            title={allCoursesTitle}
-            courses={courses}
-            enrollmentsMap={enrollmentsMap}
-            isLoggedIn={!!session?.user}
-            userPhone={userPhone}
-            userId={userId}
-            profileSlug={profile.slug}
-          />
-        )}
-      </section>
+      <HomeOverview
+        title={profile.title || 'Học tập và phát triển cùng nhau'}
+        subtitle={profile.subtitle}
+        heroImage={profile.heroImage}
+        userName={session?.user?.name}
+        courses={courses}
+        activeCourses={myActiveCourses}
+        enrollments={enrollmentsMap}
+        isLoggedIn={!!session?.user}
+        onOpenMembership={openMbw}
+        message={message}
+        roadmapTitle={customPath?.length ? (profile.roadmapTitle || 'Xem lộ trình của tôi') : (profile.surveyTitle || 'Thiết kế lộ trình')}
+        myCourses={hasMyCourses ? <CourseSection title="Khóa học của tôi" courses={myActiveCourses} hiddenCourses={myCompletedCourses} session={session} enrollmentsMap={enrollmentsMap} userPhone={userPhone} userId={userId} darkMode={false} accentColor="bg-brk-accent" profileSlug={profile.slug} showAllCourses={showAllCourses} /> : undefined}
+        catalog={profile.showAllCourses !== false ? <div id="khoa-hoc" className="scroll-mt-24"><CourseCatalog title={profile.allCoursesTitle || 'Khám phá khóa học'} courses={courses} enrollmentsMap={enrollmentsMap} isLoggedIn={!!session?.user} userPhone={userPhone} userId={userId} profileSlug={profile.slug} featuredIds={featuredIds} latestIds={latestIds} /></div> : undefined}
+        roadmap={showSurvey ? (!customPath?.length ? <Zero2HeroSurvey session={session} survey={survey} /> : <RealityMap customPath={customPath} enrollmentsMap={enrollmentsMap} allCourses={courses} userGoal={userGoal || 'Hoàn thiện kỹ năng'} targetPointId={targetPointId} roadmapPoints={roadmapPoints} onReset={resetSurveyAction} />) : undefined}
+        community={showCommunity ? <CommunityBoard posts={posts} isAdmin={session?.user?.role === 'ADMIN'} title={profile.communityTitle || 'Cộng đồng và chia sẻ'} /> : undefined}
+      />
 
       {/* Payment Modal */}
       {courseToPay && (

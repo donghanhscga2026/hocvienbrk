@@ -27,6 +27,7 @@ async function run() {
     write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2017',jsx:'preserve',module:'esnext',moduleResolution:'bundler',esModuleInterop:true,baseUrl:'.',paths:{'@/*':['./*']}}}))
     copy('postcss.config.mjs')
     copy('components/home/CourseCatalog.tsx')
+    copy('components/home/HomeOverview.tsx')
     copy('lib/course-catalog.ts')
     copy('lib/image-validation.ts')
     write('components/course/CourseCard.tsx',`export default function Card({course}:{course:{name_lop:string}}) {return <article data-testid="gallery-card" className="rounded-2xl border p-5">{course.name_lop}</article>}`)
@@ -38,7 +39,7 @@ async function run() {
       category:index<2?'Công nghệ':'Kinh doanh',teacher:{id:index===0?10:20,name:index===0?'Hương Lucy':'Thầy Cường'},_count:{lessons:12},updatedAt:'2026-10-01',
     }))
     const enrollments={1:{status:'ACTIVE',startedAt:null,completedCount:4,totalLessons:12},2:{status:'PENDING',startedAt:null,completedCount:0,totalLessons:12}}
-    write('app/page.tsx',`import Catalog from '@/components/home/CourseCatalog';export default function Page(){return <main className="mx-auto max-w-7xl p-4"><Catalog title="Tất cả khóa học" courses={${JSON.stringify(courses)}} enrollmentsMap={${JSON.stringify(enrollments)}} isLoggedIn userPhone={null} userId={1}/></main>}`)
+    write('app/page.tsx',`'use client';import {useSearchParams} from 'next/navigation';import Catalog from '@/components/home/CourseCatalog';import Overview from '@/components/home/HomeOverview';const courses=${JSON.stringify(courses)};const enrollments=${JSON.stringify(enrollments)};export default function Page(){const guest=useSearchParams().get('guest')==='1';return <Overview title="Học tập và phát triển cùng nhau" courses={courses} activeCourses={guest?[]:[courses[0]]} enrollments={enrollments} isLoggedIn={!guest} userName="Học viên" onOpenMembership={()=>{}} myCourses={guest?undefined:<p>Tất cả khóa học của tôi</p>} roadmapTitle="Thiết kế lộ trình" roadmap={<p>Nội dung lộ trình</p>} community={<h2>Cộng đồng và chia sẻ</h2>} message={<p>Thông điệp của trang</p>} catalog={<Catalog title="Tất cả khóa học" courses={courses} enrollmentsMap={guest?{}:enrollments} isLoggedIn={!guest} userPhone={null} userId={guest?null:1} featuredIds={[1]} latestIds={[2,3]}/>}/>}`)
     server=spawn(process.execPath,[path.join(repo,'node_modules/next/dist/bin/next'),'dev','--webpack','-H','127.0.0.1','-p','3108'],{cwd:fixture,env:{...process.env,NODE_ENV:'development',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe']})
     server.stdout.on('data',chunk=>{logs+=chunk});server.stderr.on('data',chunk=>{logs+=chunk})
     let ready=false
@@ -55,14 +56,17 @@ async function run() {
     await page.goto(base)
     await page.getByRole('button',{name:'Danh sách',exact:true}).waitFor()
     assert.equal(await page.getByRole('button',{name:'Danh sách',exact:true}).getAttribute('aria-pressed'),'true');checks++
-    assert.equal(await page.locator('article').count(),12);checks++
+    assert.equal(await page.locator('#catalog article').count(),12);checks++
     await page.getByRole('button',{name:'Xem thêm 2 khóa học'}).click()
-    await page.waitForFunction(()=>document.querySelectorAll('article').length===14)
-    assert.equal(await page.locator('article').count(),14);checks++
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===14)
+    assert.equal(await page.locator('#catalog article').count(),14);checks++
     const search=page.getByRole('searchbox',{name:'Tìm khóa học'})
+    await page.getByRole('button',{name:'Nổi bật',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===1);checks++
+    await page.getByRole('button',{name:'Tất cả',exact:true}).click()
     await search.fill('huong')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
-    assert.equal(await page.locator('article').count(),1);checks++
+    assert.equal(await page.locator('#catalog article').count(),1);checks++
     await page.getByRole('button',{name:'Thẻ',exact:true}).click()
     await page.getByTestId('gallery-card').first().waitFor()
     assert.equal(await page.getByTestId('gallery-card').count(),1);checks++
@@ -73,7 +77,7 @@ async function run() {
     const sidebar=page.getByRole('complementary',{name:'Bộ lọc khóa học'})
     await sidebar.getByRole('combobox',{name:'Giáo viên',exact:true}).selectOption('10')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
-    assert.equal(await page.locator('article').count(),1);checks++
+    assert.equal(await page.locator('#catalog article').count(),1);checks++
     await page.getByRole('button',{name:'Bỏ lọc Giáo viên: Hương Lucy'}).click()
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent==='14 khóa học');checks++
     await sidebar.getByRole('combobox',{name:'Khoảng phí niêm yết'}).selectOption('to1m')
@@ -87,8 +91,8 @@ async function run() {
     const dialog=page.getByRole('dialog',{name:'Lọc khóa học'})
     await dialog.getByRole('combobox',{name:'Trạng thái của tôi'}).selectOption('active')
     await dialog.getByRole('button',{name:'Xem 1 kết quả'}).click()
-    assert.ok(await page.getByRole('link',{name:'Tiếp tục học'}).isVisible());checks++
-    assert.equal(await page.getByRole('link',{name:'Tiếp tục học'}).getAttribute('href'),'/courses/KH1/learn');checks++
+    assert.ok(await page.locator('#catalog').getByRole('link',{name:'Tiếp tục học'}).isVisible());checks++
+    assert.equal(await page.locator('#catalog').getByRole('link',{name:'Tiếp tục học'}).getAttribute('href'),'/courses/KH1/learn');checks++
     await page.getByRole('button',{name:'Bỏ lọc Đang học'}).click()
     await search.fill('x'.repeat(250))
     await page.getByRole('heading',{name:'Không có khóa học phù hợp'}).waitFor()
@@ -100,8 +104,17 @@ async function run() {
     await page.keyboard.press('Escape')
     await dialog.waitFor({state:'hidden'})
     assert.equal(await dialog.isVisible(),false);checks++
+    assert.equal(await page.getByText('Nội dung lộ trình',{exact:true}).isVisible(),false);checks++
+    await page.getByText('Thiết kế lộ trình',{exact:true}).click()
+    assert.ok(await page.getByText('Nội dung lộ trình',{exact:true}).isVisible());checks++
+    assert.ok(await page.evaluate(()=>document.querySelector('#my-courses').compareDocumentPosition(document.querySelector('#catalog')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
+    await page.goto(base+'?guest=1')
+    await page.getByRole('heading',{name:'Học tập và phát triển cùng nhau'}).waitFor()
+    assert.equal(await page.locator('#my-courses').count(),0);checks++
+    assert.ok(await page.getByRole('link',{name:'Khám phá khóa học',exact:true}).isVisible());checks++
+    await noOverflow(page)
     assert.deepEqual(errors,[]);checks++
-    console.log(JSON.stringify({result:'passed',checks,scope:'real catalog UI + Tailwind + Next.js; 1440/390/360px; gallery card stubbed; fixtures only'}))
+    console.log(JSON.stringify({result:'passed',checks,scope:'real homepage overview + catalog UI + Tailwind + Next.js; member/guest; 1440/390/360px; secondary slots and gallery stubbed; fixtures only'}))
   }catch(error){console.error(logs.slice(-5000));throw error}
   finally{
     if(browser)await browser.close()

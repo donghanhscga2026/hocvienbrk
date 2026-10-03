@@ -14,11 +14,13 @@ import {
 interface Props {
   title: string; courses: CatalogCourse[]; enrollmentsMap: Record<number, CatalogEnrollment>
   isLoggedIn: boolean; userPhone: string | null; userId: number | null; profileSlug?: string | null
+  featuredIds?: number[]; latestIds?: number[]
 }
 const fieldClass = 'mt-2 w-full min-w-0 rounded-xl border border-brk-outline bg-brk-surface px-3 py-3 text-sm text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-accent'
 const viewKey = 'mfc-course-catalog-view'
 
-export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug }: Props) {
+export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [] }: Props) {
+  const [group, setGroup] = useState<'all' | 'featured' | 'latest'>('all')
   const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS })
   const [view, setView] = useState<'list' | 'gallery'>('list')
   const [limit, setLimit] = useState(12)
@@ -41,13 +43,13 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
     setFilters(previous => ({ ...previous, [key]: value }))
     setLimit(12)
   }
-  const clear = () => { setFilters({ ...EMPTY_CATALOG_FILTERS, sort: filters.sort }); setLimit(12) }
+  const clear = () => { setFilters({ ...EMPTY_CATALOG_FILTERS, sort: filters.sort }); setGroup('all'); setLimit(12) }
   const categories = useMemo(() => [...new Set(courses.map(catalogCategory))].sort((a, b) => a.localeCompare(b, 'vi')), [courses])
   const teachers = useMemo(() => [...new Map(courses.flatMap(course => course.teacher
     ? [[String(course.teacher.id), course.teacher.name || 'Giáo viên'] as const] : [])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1], 'vi')), [courses])
   const feeTypes = useMemo(() => [...new Set(courses.map(catalogFee))], [courses])
-  const results = useMemo(() => filterCatalog(courses, enrollmentsMap, { ...filters, query: deferredQuery }), [courses, enrollmentsMap, filters, deferredQuery])
+  const results = useMemo(() => filterCatalog(courses.filter(course => group === 'all' || (group === 'featured' ? featuredIds : latestIds).includes(course.id)), enrollmentsMap, { ...filters, query: deferredQuery }), [courses, enrollmentsMap, filters, deferredQuery, group, featuredIds, latestIds])
   const activeFilters = [
     { key: 'query' as const, value: filters.query, label: `Tìm: ${filters.query}` },
     { key: 'category' as const, value: filters.category, label: `Danh mục: ${filters.category}` },
@@ -96,6 +98,10 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
         <h2 className="text-2xl font-bold text-brk-on-surface sm:text-3xl">{title}</h2>
         <p className="mt-2 text-sm text-brk-muted">Tìm khóa học theo chủ đề, giáo viên hoặc mức phí.</p>
       </div>
+      <div role="group" aria-label="Khám phá nhanh" className="mb-5 flex flex-wrap gap-2">
+        {([['all', 'Tất cả'], ['featured', 'Nổi bật'], ['latest', 'Mới cập nhật']] as const).filter(([value]) => value === 'all' || (value === 'featured' ? featuredIds : latestIds).length > 0).map(([value, label]) => <button key={value} type="button" aria-pressed={group === value} onClick={() => { setGroup(value); setLimit(12) }} className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${group === value ? 'border-brk-primary bg-brk-primary text-brk-on-primary' : 'border-brk-outline text-brk-on-surface'}`}>{label}</button>)}
+        <button type="button" aria-pressed={filters.price === 'free'} onClick={() => { setGroup('all'); update('price', filters.price === 'free' ? '' : 'free') }} className="min-h-11 rounded-full border border-brk-outline px-4 text-sm font-semibold text-brk-on-surface">Không yêu cầu phí</button>
+      </div>
       <label className="relative mb-5 block">
         <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brk-muted" />
         <span className="sr-only">Tìm khóa học</span>
@@ -119,7 +125,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
               ))}
             </div>
           </div>
-          <p role="status" aria-live="polite" className="mb-4 text-sm text-brk-muted">{results.length} khóa học{activeFilters.length > 0 ? ` phù hợp · trên ${courses.length} khóa` : ''}</p>
+          <p role="status" aria-live="polite" className="mb-4 text-sm text-brk-muted">{results.length} khóa học{activeFilters.length > 0 || group !== 'all' ? ` phù hợp · trên ${courses.length} khóa` : ''}</p>
           {activeFilters.length > 0 && <div className="mb-5 flex flex-wrap gap-2">
             {activeFilters.map(item => <button type="button" key={item.key} aria-label={`Bỏ lọc ${item.label}`} onClick={() => update(item.key, '')} className="flex min-w-0 max-w-full items-center gap-2 rounded-full bg-brk-background px-3 py-2 text-xs text-brk-on-surface"><span className="min-w-0 break-words">{item.label}</span><X className="h-3.5 w-3.5 shrink-0" /></button>)}
             <button type="button" onClick={clear} className="px-2 py-2 text-xs font-semibold text-brk-primary underline">Xóa tất cả</button>
