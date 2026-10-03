@@ -77,7 +77,9 @@ export type CourseSectionType =
   | 'pricing'
   | 'closing_message'
   | 'curriculum'
-  | 'testimonials';
+  | 'testimonials'
+  | 'rich_content'
+  | 'wigrow_artwork';
 
 export type SectionVisibility = 'all' | 'unregistered' | 'registered';
 
@@ -290,6 +292,23 @@ export interface ClosingMessageSectionContent {
 }
 export type ClosingMessageSection = CourseSectionBase<'closing_message', ClosingMessageSectionContent>;
 
+
+export interface RichContentSectionContent {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  paragraphs?: string[];
+  imageUrl?: string;
+  imageAlt?: string;
+  imagePosition?: 'left' | 'right' | 'top';
+  cta?: {
+    label: string;
+    action: 'open_registration' | 'scroll' | 'external_link';
+    target?: string;
+  };
+}
+export type RichContentSection = CourseSectionBase<'rich_content', RichContentSectionContent>;
+
 export type CourseSection =
   | HeroSection
   | QuoteSection
@@ -302,7 +321,8 @@ export type CourseSection =
   | ValueStackSection
   | RoadmapSection
   | PricingSection
-  | ClosingMessageSection;
+  | ClosingMessageSection
+  | RichContentSection;
 
 export interface CoursePage {
   id: string;
