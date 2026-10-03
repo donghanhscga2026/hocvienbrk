@@ -1,10 +1,11 @@
 'use client'
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { LayoutGrid, List, Search, X, BookOpen, ArrowRight } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
+import CourseInstructor from '@/components/course/CourseInstructor'
 import { isValidImageUrl } from '@/lib/image-validation'
 import {
   CatalogCourse, CatalogEnrollment, CatalogFilters, EMPTY_CATALOG_FILTERS,
@@ -19,6 +20,12 @@ interface Props {
 }
 const fieldClass = 'mt-2 w-full min-w-0 rounded-xl border border-brk-outline bg-brk-surface px-3 py-3 text-sm text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-accent'
 const viewKey = 'mfc-course-catalog-view'
+const subscribeWidth = (callback: () => void) => {
+  const media = [window.matchMedia('(min-width: 640px)'), window.matchMedia('(min-width: 1024px)')]
+  media.forEach(query => query.addEventListener('change', callback))
+  return () => media.forEach(query => query.removeEventListener('change', callback))
+}
+const previewSize = () => window.innerWidth >= 1024 ? 6 : window.innerWidth >= 640 ? 4 : 2
 
 export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [], discoveryCourses }: Props) {
   const [scope, setScope] = useState<'discover' | 'all'>('discover')
@@ -26,16 +33,19 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   const categoryTabs = useRef<HTMLDivElement>(null)
   const [group, setGroup] = useState<'all' | 'featured' | 'latest'>('all')
   const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS })
-  const [view, setView] = useState<'list' | 'gallery'>('list')
+  const [view, setView] = useState<'list' | 'gallery'>('gallery')
   const [limit, setLimit] = useState(12)
+  const [expanded, setExpanded] = useState(false)
+  const overview = useRef<{ filters: CatalogFilters; scroll: number } | null>(null)
+  const categoryLimit = useSyncExternalStore(subscribeWidth, previewSize, () => 6)
   const deferredQuery = useDeferredValue(filters.query)
 
   useEffect(() => {
-    // Đọc lựa chọn trong trình duyệt sau hydration; lần đầu luôn là danh sách.
+    // Giữ lựa chọn hiển thị của người dùng sau hydration.
     try {
       const saved = window.localStorage.getItem(viewKey)
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved === 'gallery') setView('gallery')
+      if (saved === 'gallery' || saved === 'list') setView(saved)
     } catch { /* Trình duyệt chặn lưu trữ: vẫn đổi view bình thường. */ }
   }, [])
   const changeView = (next: 'list' | 'gallery') => {
@@ -53,6 +63,27 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
     .sort((a, b) => a[1].localeCompare(b[1], 'vi')), [courses])
   const feeTypes = useMemo(() => [...new Set(courses.map(catalogFee))], [courses])
   const results = useMemo(() => filterCatalog(sourceCourses.filter(course => group === 'all' || (group === 'featured' ? featuredIds : latestIds).includes(course.id)), enrollmentsMap, { ...filters, query: deferredQuery }), [sourceCourses, enrollmentsMap, filters, deferredQuery, group, featuredIds, latestIds])
+  const categoryGroups = categories.map(name => ({ name, courses: results.filter(course => catalogCategory(course) === name) })).filter(section => section.courses.length > 0)
+  const openAll = (category: string) => {
+    overview.current = { filters: { ...filters }, scroll: window.scrollY }
+    update('category', category)
+    setExpanded(true)
+    requestAnimationFrame(() => document.getElementById('catalog-results')?.scrollIntoView({ block: 'start' }))
+  }
+  const returnToOverview = () => {
+    if (overview.current) setFilters(overview.current.filters)
+    setExpanded(false)
+    const scroll = overview.current?.scroll
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (scroll !== undefined) window.scrollTo({ top: scroll })
+      document.getElementById('catalog-overview-toggle')?.focus({ preventScroll: true })
+    }))
+  }
+  const renderCourses = (items: CatalogCourse[]) => <div className={view === 'gallery' ? 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
+    {items.map(course => view === 'gallery' ? <div key={course.id} className="min-w-0">
+      <CourseCard course={course} isLoggedIn={isLoggedIn} enrollment={enrollmentsMap[course.id] || null} userPhone={userPhone} userId={userId} profileSlug={profileSlug} />
+    </div> : <CourseListRow key={course.id} course={course} enrollment={enrollmentsMap[course.id]} />)}
+  </div>
   const activeFilters = [
     { key: 'query' as const, value: filters.query, label: `Tìm: ${filters.query}` },
     { key: 'category' as const, value: filters.category, label: `Danh mục: ${filters.category}` },
@@ -131,7 +162,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
       <section aria-label="Bộ lọc khóa học" className="mb-5 min-w-0 max-w-full overflow-x-auto rounded-xl bg-brk-background p-3 text-brk-on-surface">
         {filterFields()}
       </section>
-      <div id="catalog-results" role="tabpanel" aria-labelledby={`catalog-category-${Math.max(0, ['', ...categories].indexOf(filters.category))}`} className="min-w-0">
+      <div id="catalog-results" role="tabpanel" aria-labelledby={`catalog-category-${Math.max(0, ['', ...categories].indexOf(filters.category))}`} className="min-w-0 scroll-mt-32">
         <div className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <label className="min-w-0 flex-1 sm:flex-none"><span className="sr-only">Sắp xếp khóa học</span>
@@ -145,19 +176,29 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
               ))}
             </div>
           </div>
+          <button id="catalog-overview-toggle" type="button" onClick={() => expanded ? returnToOverview() : openAll(filters.category)} className="mb-4 min-h-11 rounded-xl border border-brk-outline px-4 text-sm font-semibold text-brk-primary">
+            {expanded ? '← Quay lại các danh mục' : 'Xem toàn bộ khóa học'}
+          </button>
           <p role="status" aria-live="polite" className="mb-4 text-sm text-brk-muted">{results.length} khóa học{activeFilters.length > 0 || group !== 'all' ? ` phù hợp · trên ${sourceCourses.length} khóa` : ''}</p>
           {activeFilters.length > 0 && <div className="mb-5 flex flex-wrap gap-2">
             {activeFilters.map(item => <button type="button" key={item.key} aria-label={`Bỏ lọc ${item.label}`} onClick={() => update(item.key, '')} className="flex min-w-0 max-w-full items-center gap-2 rounded-full bg-brk-background px-3 py-2 text-xs text-brk-on-surface"><span className="min-w-0 break-words">{item.label}</span><X className="h-3.5 w-3.5 shrink-0" /></button>)}
             <button type="button" onClick={clear} className="px-2 py-2 text-xs font-semibold text-brk-primary underline">Xóa tất cả</button>
           </div>}
           {results.length === 0 ? <div className="rounded-2xl bg-brk-background px-5 py-12 text-center text-brk-on-surface"><Search className="mx-auto mb-3 h-7 w-7 text-brk-muted" /><h3 className="font-semibold">Không có khóa học phù hợp</h3><p className="mt-2 text-sm text-brk-muted">Thử tên khác hoặc bỏ bớt điều kiện lọc.</p><button type="button" onClick={() => { setScope('all'); clear() }} className="mt-5 min-h-11 rounded-xl bg-brk-primary px-5 font-semibold text-brk-on-primary">Xem tất cả khóa học</button></div>
-            : <div className={view === 'gallery' ? 'grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-3'}>
-              {results.slice(0, limit).map(course => view === 'gallery' ? <div key={course.id} className="min-w-0">
-                <p className="mb-2 truncate text-xs text-brk-muted">{course.teacher?.name || 'Giáo viên chưa cập nhật'} · {catalogCategory(course)}</p>
-                <CourseCard course={course} isLoggedIn={isLoggedIn} enrollment={enrollmentsMap[course.id] || null} userPhone={userPhone} userId={userId} profileSlug={profileSlug} />
-              </div> : <CourseListRow key={course.id} course={course} enrollment={enrollmentsMap[course.id]} />)}
-            </div>}
-          {results.length > limit && <button type="button" onClick={() => setLimit(value => value + 12)} className="mt-6 min-h-12 w-full rounded-xl border border-brk-outline font-semibold text-brk-on-surface hover:bg-brk-background">Xem thêm {Math.min(12, results.length - limit)} khóa học</button>}
+            : expanded ? renderCourses(results.slice(0, limit))
+              : <div className="space-y-8">
+                {categoryGroups.map(section => {
+                  const shown = section.courses.slice(0, view === 'gallery' ? categoryLimit : 2)
+                  return <section key={section.name} aria-label={`Khóa học danh mục ${section.name}`} className="min-w-0">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div><h3 className="text-xl font-bold text-brk-on-surface">{section.name}</h3><p className="mt-1 text-sm text-brk-muted">{section.courses.length} khóa học · Đang hiển thị {shown.length}</p></div>
+                      <button type="button" aria-label={`Xem toàn bộ danh mục ${section.name}`} onClick={() => openAll(section.name)} className="min-h-11 rounded-xl bg-brk-background px-4 text-sm font-semibold text-brk-primary">Xem toàn bộ <ArrowRight className="ml-1 inline h-4 w-4" /></button>
+                    </div>
+                    {renderCourses(shown)}
+                  </section>
+                })}
+              </div>}
+          {expanded && results.length > limit && <button type="button" onClick={() => setLimit(value => value + 12)} className="mt-6 min-h-12 w-full rounded-xl border border-brk-outline font-semibold text-brk-on-surface hover:bg-brk-background">Xem thêm {Math.min(12, results.length - limit)} khóa học</button>}
         </div>
       </div>
 
@@ -177,7 +218,7 @@ export function CourseListRow({ course, enrollment, management = false, gallery 
     <div className="min-w-0 flex-1">
       <p className="mb-1 text-xs text-brk-muted">{catalogCategory(course)}</p>
       <h3 className="break-words font-bold leading-snug text-brk-on-surface"><Link href={detail} className="hover:underline">{course.name_lop}</Link></h3>
-      <p className="mt-1 break-words text-sm text-brk-muted">{course.teacher?.name || 'Giáo viên chưa cập nhật'}</p>
+      <CourseInstructor name={course.teacher?.name} />
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brk-muted"><span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{course._count?.lessons || 0} bài</span>{management ? <span>{course.activeStudentCount ?? course._count?.enrollments ?? 0} học viên đang học</span> : status !== 'new' && <span className="font-semibold text-brk-primary">{STATUS_LABELS[status]}</span>}</div>
       {!management && enrollment && (status === 'active' || status === 'completed') && <div className="mt-2"><p className="text-xs text-brk-muted">Đã học {completed}/{total} bài · {progress}%</p><div role="progressbar" aria-label={`Tiến độ ${course.name_lop}`} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="mt-1 h-1.5 max-w-64 overflow-hidden rounded-full bg-brk-background"><div className="h-full rounded-full bg-brk-accent" style={{width:`${progress}%`}} /></div></div>}
     </div>

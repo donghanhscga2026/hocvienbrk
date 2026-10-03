@@ -28,12 +28,13 @@ async function run() {
     copy('postcss.config.mjs')
     fs.mkdirSync(path.join(fixture,'public'),{recursive:true})
     fs.copyFileSync(path.join(repo,'public/og-image.png'),path.join(fixture,'public/og-image.png'))
+    copy('components/course/CourseInstructor.tsx')
     copy('components/home/CourseCatalog.tsx')
     copy('components/home/HomeOverview.tsx')
     copy('components/home/PersonalCourses.tsx')
     copy('lib/course-catalog.ts')
     copy('lib/image-validation.ts')
-    write('components/course/CourseCard.tsx',`export default function Card({course}:{course:{name_lop:string}}) {return <article data-testid="gallery-card" className="rounded-2xl border p-5">{course.name_lop}</article>}`)
+    write('components/course/CourseCard.tsx',`import Instructor from './CourseInstructor';export default function Card({course}:{course:{name_lop:string;teacher?:{name:string}}}) {return <article data-testid="gallery-card" className="rounded-2xl border p-5"><h3>{course.name_lop}</h3><Instructor name={course.teacher?.name}/></article>}`)
     write('app/globals.css',`@import "tailwindcss"; @theme {--color-brk-primary:#047857;--color-brk-accent:#10b981;--color-brk-on-primary:#ffffff;--color-brk-on-surface:#1f2937;--color-brk-surface:#ffffff;--color-brk-background:#f1f5f9;--color-brk-muted:#64748b;--color-brk-outline:#dbe2ea;} body {font-family:Arial,sans-serif;}`)
     write('app/layout.tsx',`import './globals.css';export default function Layout({children}:{children:React.ReactNode}){return <html><body>{children}</body></html>}`)
     const courses=Array.from({length:14},(_,index)=>({
@@ -60,8 +61,25 @@ async function run() {
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
     const catalog=page.locator('#catalog')
     await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).waitFor()
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===6);checks++
+    assert.equal(await catalog.getByRole('region',{name:'Khóa học danh mục Kinh doanh'}).count(),1);checks++
+    await page.setViewportSize({width:390,height:844})
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===2);checks++
+    await noOverflow(page)
+    await catalog.getByRole('button',{name:'Xem toàn bộ danh mục Kinh doanh',exact:true}).click()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===10);checks++
+    await catalog.getByRole('button',{name:'← Quay lại các danh mục',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===2);checks++
+    assert.equal(await catalog.getByRole('tab',{name:'Tất cả danh mục',exact:true}).getAttribute('aria-selected'),'true');checks++
+    await page.setViewportSize({width:1440,height:1000})
     await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===8)
+    assert.equal(await catalog.getByRole('region',{name:'Khóa học danh mục Công nghệ'}).count(),1);checks++
+    const instructor=catalog.locator('article').getByText('Hương Lucy',{exact:true}).first()
+    assert.equal(await instructor.evaluate(el=>getComputedStyle(el).fontSize),'16px');checks++
+    assert.ok(await instructor.evaluate(el=>!!el.closest('article')));checks++
+    await catalog.getByRole('button',{name:'Xem toàn bộ khóa học',exact:true}).click()
+    await catalog.getByRole('button',{name:'Danh sách',exact:true}).click()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===12)
     await catalog.getByRole('button',{name:'Danh sách',exact:true}).waitFor()
     assert.equal(await catalog.getByRole('button',{name:'Danh sách',exact:true}).getAttribute('aria-pressed'),'true');checks++
@@ -95,6 +113,7 @@ async function run() {
     checks++
     await catalog.getByRole('button',{name:'Danh sách',exact:true}).click()
     await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).click()
+    await catalog.getByRole('button',{name:'Xem toàn bộ khóa học',exact:true}).click()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===12)
     const sidebar=page.getByRole('region',{name:'Bộ lọc khóa học'})
     await sidebar.getByRole('combobox',{name:'Giáo viên',exact:true}).selectOption('10')
