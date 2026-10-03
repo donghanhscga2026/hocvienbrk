@@ -4,7 +4,8 @@ const IMG = {
   hero: 'https://w.ladicdn.com/s750x1000/63ea07ec81c3610012d4afa0/gia-dinh-ngam-binh-minh-ben-thung-lung-20261003094557-1swxa.png',
   seed: 'https://w.ladicdn.com/s750x1000/63ea07ec81c3610012d4afa0/dong-hanh-cung-con-yeu-thuong-nay-mam-20261003094317-zx8l7.png',
   environment: 'https://w.ladicdn.com/s750x1000/63ea07ec81c3610012d4afa0/pique-nique-familial-au-jardin-dore-20261003102144-hw5vt.png',
-  experts: 'https://w.ladicdn.com/s450x400/63ea07ec81c3610012d4afa0/3-20261003094948-qwvft.png',
+  expertCuong: 'https://w.ladicdn.com/s550x550/63ea07ec81c3610012d4afa0/7795333d9d4d1d13445c-20261003085616-lwvmg.jpg',
+  expertHuong: 'https://w.ladicdn.com/s550x650/63ea07ec81c3610012d4afa0/2aobor2vwqeptssfwxmgwuspvclt2mjf14ylhzt6-20261003102820-jhqx_.jpg',
   journey: 'https://w.ladicdn.com/s700x950/63ea07ec81c3610012d4afa0/2aobor2w9dx9n9aky9xswqrin1ggkuyvvim0fsla-20261003105147-h47uh.jpg',
 }
 
@@ -76,8 +77,8 @@ export function createWiGrowCoursePage(slug: string): CoursePage {
       { id:'wg-art-environment', sectionKey:'art-environment', type:'wigrow_artwork', enabled:true, sortOrder:60, visibility:'all', variant:'source', anchorId:'kien-tao-moi-truong', content:{ imageUrl:IMG.environment, imageAlt:'Kiến tạo môi trường – Cùng con trưởng thành', maxWidth:750, background:'#ffffff' }},
       { id:'wg-experts', sectionKey:'experts', type:'instructor', enabled:true, sortOrder:70, visibility:'all', variant:'section-soft', anchorId:'chuyen-gia', content:{
         eyebrow:'CHUYÊN GIA', title:'Đồng hành cùng các chuyên gia', instructors:[
-          {id:'ngo-manh-cuong',name:'Thầy Ngô Mạnh Cường',role:'Nhà đào tạo Tâm Thức và Năng Lượng • Cố vấn nâng tầm Nhân Hiệu & Thương Hiệu',imageUrl:IMG.experts,bio:[]},
-          {id:'tran-ngoc-huong',name:'Cô Trần Ngọc Hương',role:'Thạc sĩ tâm lý học',bio:['“Đừng yêu con chỉ vì con trở thành người mà ba mẹ mong muốn. Hãy yêu con cả khi con đang học cách trở thành chính mình.”']}
+          {id:'ngo-manh-cuong',name:'Thầy Ngô Mạnh Cường',role:'Nhà đào tạo Tâm Thức và Năng Lượng • Cố vấn nâng tầm Nhân Hiệu & Thương Hiệu',imageUrl:IMG.expertCuong,bio:[]},
+          {id:'tran-ngoc-huong',name:'Cô Trần Ngọc Hương',role:'Thạc sĩ tâm lý học',imageUrl:IMG.expertHuong,bio:['“Đừng yêu con chỉ vì con trở thành người mà ba mẹ mong muốn. Hãy yêu con cả khi con đang học cách trở thành chính mình.”']}
         ]
       }},
       { id:'wg-art-journey', sectionKey:'art-journey', type:'wigrow_artwork', enabled:true, sortOrder:80, visibility:'all', variant:'source', anchorId:'sau-hanh-trinh', content:{ imageUrl:IMG.journey, imageAlt:'Sau hành trình, cha mẹ có thể', maxWidth:700, background:'#ffffff' }},
