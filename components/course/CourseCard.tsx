@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import PaymentModal from './PaymentModal'
+import CourseInstructor from './CourseInstructor'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import UploadProofModal from '@/components/payment/UploadProofModal'
 import { enrollInCourseAction, getBrkMbvBalanceAction, toggleHiddenFromGifts } from '@/app/actions/course-actions'
@@ -241,6 +242,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             {course.name_lop}
                         </h3>
                     </div>
+
+                    <CourseInstructor name={course.teacher?.name} />
 
                     {/* Badges - [Số tiền/Dạng phí] [Chia sẻ] [Kích hoạt] [Mục lục] */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
