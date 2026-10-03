@@ -2173,3 +2173,32 @@ Tạo trang quản lý voucher (CRUD) cho admin và teacher với phân quyền 
 - ✅ `npx tsc --noEmit` → Exit code: 0
 - ✅ Trang `/tools/vouchers` hoạt động
 - ✅ API `GET/POST/DELETE /api/vouchers` hoàn chỉnh
+
+
+---
+
+## ✅ Chuẩn hóa quy trình GitHub, CI và Vercel cho đội phát triển (2026-10-03)
+
+### Mục tiêu
+Thiết lập quy trình an toàn để nhiều developer/AI phát triển song song mà không sửa trực tiếp `master`, có CI, Vercel Preview, bảo vệ branch và quy tắc database rõ ràng.
+
+### Các hạng mục đã xác nhận
+- Ruleset `Protect Master` đang Active: bắt buộc PR, required status check, branch up-to-date, resolve conversation, chặn xóa và force push.
+- Security CI chuẩn hóa với required job `TypeScript, Prisma, Security & Build`.
+- Pull Request template đã áp dụng checklist TypeScript, Prisma, build, Preview, database và security.
+- `.github/TEAM_WORKFLOW.md` đã chuẩn hóa luồng nhiều developer.
+- `docs/GITHUB_VERCEL_TEAM_WORKFLOW.md` là SOP tổng thể cho GitHub + Vercel.
+- Vercel Preview dùng cho nghiệm thu trước merge.
+- Do Preview chưa có staging database riêng, mặc định chỉ UI/read-only; CRUD hiếm dùng cơ chế `test_<tablename>` có kiểm soát, không coi đây là isolation hoàn chỉnh.
+- CODEOWNERS/required approval chưa bật cho đến khi có reviewer kỹ thuật độc lập.
+- MFC PR Watch theo dõi PR cần chú ý: CI/Vercel lỗi, conflict, tồn đọng và conversation chưa Resolve.
+
+### Quy trình chuẩn
+`master → branch riêng → local test → PR → CI → Vercel Preview → nghiệm thu → merge`.
+
+### Trạng thái
+- ✅ Quy trình branch/PR đã được kiểm thử thực tế.
+- ✅ Security CI và Vercel Preview đã chạy thành công trên PR quy trình.
+- ✅ Ruleset đã chặn đường merge không đáp ứng điều kiện bắt buộc.
+- ✅ Team workflow đã được merge vào `master`.
+- ⏳ CODEOWNERS sẽ triển khai khi có reviewer độc lập phù hợp.
