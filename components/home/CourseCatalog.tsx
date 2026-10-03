@@ -1,9 +1,9 @@
 'use client'
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { LayoutGrid, List, Search, SlidersHorizontal, X, BookOpen, ArrowRight } from 'lucide-react'
+import { LayoutGrid, List, Search, X, BookOpen, ArrowRight } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
 import { isValidImageUrl } from '@/lib/image-validation'
 import {
@@ -24,7 +24,6 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS })
   const [view, setView] = useState<'list' | 'gallery'>('list')
   const [limit, setLimit] = useState(12)
-  const dialog = useRef<HTMLDialogElement>(null)
   const deferredQuery = useDeferredValue(filters.query)
 
   useEffect(() => {
@@ -59,36 +58,36 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
     { key: 'status' as const, value: filters.status, label: STATUS_LABELS[filters.status] },
   ].filter(item => item.value)
 
-  // Sidebar và hộp lọc mobile dùng cùng dữ liệu, không tải danh sách giáo viên toàn hệ thống.
+  // Một hàng bộ lọc dùng cùng dữ liệu; cuộn ngang trong khung trên điện thoại.
   const filterFields = () => (
-    <div className="space-y-5">
-      <label className="block text-sm font-semibold">Danh mục
+    <div className="flex min-w-max items-start gap-3">
+      <label className="block w-44 shrink-0 text-sm font-semibold">Danh mục
         <select aria-label="Danh mục" value={filters.category} onChange={event => update('category', event.target.value)} className={fieldClass}>
           <option value="">Tất cả danh mục</option>{categories.map(category => <option key={category}>{category}</option>)}
         </select>
       </label>
-      <label className="block text-sm font-semibold">Giáo viên
+      <label className="block w-44 shrink-0 text-sm font-semibold">Giáo viên
         <select aria-label="Giáo viên" value={filters.teacher} onChange={event => update('teacher', event.target.value)} className={fieldClass}>
           <option value="">Tất cả giáo viên</option>{teachers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </label>
-      <label className="block text-sm font-semibold">Loại phí
+      <label className="block w-44 shrink-0 text-sm font-semibold">Loại phí
         <select aria-label="Loại phí" value={filters.fee} onChange={event => update('fee', event.target.value)} className={fieldClass}>
           <option value="">Tất cả loại phí</option>{feeTypes.map(fee => <option key={fee} value={fee}>{FEE_LABELS[fee]}</option>)}
         </select>
       </label>
-      <label className="block text-sm font-semibold">Khoảng phí niêm yết
+      <label className="block w-44 shrink-0 text-sm font-semibold">Khoảng phí niêm yết
         <select aria-label="Khoảng phí niêm yết" value={filters.price} onChange={event => update('price', event.target.value)} className={fieldClass}>
           <option value="">Tất cả mức phí</option>{Object.entries(PRICE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <span className="mt-2 block text-xs font-normal text-brk-muted">Chưa tính ưu đãi hoặc số dư ví.</span>
       </label>
-      {isLoggedIn && <label className="block text-sm font-semibold">Trạng thái của tôi
+      {isLoggedIn && <label className="block w-44 shrink-0 text-sm font-semibold">Trạng thái của tôi
         <select aria-label="Trạng thái của tôi" value={filters.status} onChange={event => update('status', event.target.value)} className={fieldClass}>
           <option value="">Tất cả trạng thái</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>}
-      <button type="button" onClick={clear} className="min-h-11 w-full rounded-xl border border-brk-outline text-sm font-semibold hover:bg-brk-background">Xóa bộ lọc</button>
+      <button type="button" onClick={clear} className="mt-7 min-h-12 shrink-0 rounded-xl border border-brk-outline px-4 text-sm font-semibold hover:bg-brk-background">Xóa bộ lọc</button>
     </div>
   )
 
@@ -107,13 +106,12 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
         <span className="sr-only">Tìm khóa học</span>
         <input type="search" value={filters.query} onChange={event => update('query', event.target.value)} placeholder="Tên khóa học, mã khóa hoặc giáo viên…" className="min-h-12 w-full rounded-2xl border border-brk-outline bg-brk-background py-3 pl-12 pr-4 text-base text-brk-on-surface outline-none focus:ring-2 focus:ring-brk-accent" />
       </label>
-      <div className="grid min-w-0 gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
-        <aside aria-label="Bộ lọc khóa học" className="hidden self-start rounded-2xl bg-brk-background p-4 text-brk-on-surface lg:sticky lg:top-24 lg:block">
-          <h3 className="mb-5 flex items-center gap-2 font-semibold"><SlidersHorizontal className="h-4 w-4" />Bộ lọc</h3>{filterFields()}
-        </aside>
+      <section aria-label="Bộ lọc khóa học" className="mb-5 min-w-0 max-w-full overflow-x-auto rounded-xl bg-brk-background p-3 text-brk-on-surface">
+        {filterFields()}
+      </section>
+      <div className="min-w-0">
         <div className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => dialog.current?.showModal()} className="flex min-h-11 items-center gap-2 rounded-xl border border-brk-outline px-3 text-sm font-semibold text-brk-on-surface lg:hidden"><SlidersHorizontal className="h-4 w-4" />Lọc{activeFilters.length > 0 && ` (${activeFilters.length})`}</button>
             <label className="min-w-0 flex-1 sm:flex-none"><span className="sr-only">Sắp xếp khóa học</span>
               <select aria-label="Sắp xếp khóa học" value={filters.sort} onChange={event => update('sort', event.target.value as CatalogFilters['sort'])} className="min-h-11 w-full rounded-xl border border-brk-outline bg-brk-surface px-3 text-sm text-brk-on-surface">
                 <option value="updated">Mới cập nhật</option><option value="name">Tên A–Z</option><option value="price-asc">Phí thấp đến cao</option><option value="price-desc">Phí cao đến thấp</option>
@@ -140,12 +138,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
           {results.length > limit && <button type="button" onClick={() => setLimit(value => value + 12)} className="mt-6 min-h-12 w-full rounded-xl border border-brk-outline font-semibold text-brk-on-surface hover:bg-brk-background">Xem thêm {Math.min(12, results.length - limit)} khóa học</button>}
         </div>
       </div>
-      {/* Dialog gốc có quản lý focus, Escape và backdrop; không chiếm cột trên mobile. */}
-      <dialog ref={dialog} aria-labelledby="catalog-filter-title" className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-3xl border-0 bg-brk-surface p-5 text-brk-on-surface backdrop:bg-black/50 sm:inset-0 sm:m-auto sm:max-w-md sm:rounded-3xl">
-        <div className="mb-6 flex items-center justify-between"><h3 id="catalog-filter-title" className="text-xl font-bold">Lọc khóa học</h3><button type="button" aria-label="Đóng bộ lọc" onClick={() => dialog.current?.close()} className="flex h-11 w-11 items-center justify-center rounded-full bg-brk-background"><X className="h-5 w-5" /></button></div>
-        {filterFields()}
-        <button type="button" onClick={() => dialog.current?.close()} className="mt-6 min-h-12 w-full rounded-xl bg-brk-primary font-semibold text-brk-on-primary">Xem {results.length} kết quả</button>
-      </dialog>
+
     </div>
   )
 }

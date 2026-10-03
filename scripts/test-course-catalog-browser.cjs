@@ -74,7 +74,7 @@ async function run() {
     await page.waitForFunction(()=>document.querySelector('button[aria-label="Thẻ"]').getAttribute('aria-pressed')==='true')
     checks++
     await page.getByRole('button',{name:'Danh sách',exact:true}).click()
-    const sidebar=page.getByRole('complementary',{name:'Bộ lọc khóa học'})
+    const sidebar=page.getByRole('region',{name:'Bộ lọc khóa học'})
     await sidebar.getByRole('combobox',{name:'Giáo viên',exact:true}).selectOption('10')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
     assert.equal(await page.locator('#catalog article').count(),1);checks++
@@ -85,12 +85,10 @@ async function run() {
     assert.ok(await page.getByRole('heading',{name:'Đào tạo AI',exact:true}).isVisible());checks++
     await sidebar.getByRole('button',{name:'Xóa bộ lọc'}).click()
     await page.setViewportSize({width:390,height:844})
-    assert.equal(await sidebar.isVisible(),false);checks++
+    assert.equal(await sidebar.isVisible(),true);checks++
     await noOverflow(page)
-    await page.getByRole('button',{name:'Lọc',exact:true}).click()
-    const dialog=page.getByRole('dialog',{name:'Lọc khóa học'})
-    await dialog.getByRole('combobox',{name:'Trạng thái của tôi'}).selectOption('active')
-    await dialog.getByRole('button',{name:'Xem 1 kết quả'}).click()
+    await sidebar.getByRole('combobox',{name:'Trạng thái của tôi'}).selectOption('active')
+    await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
     assert.ok(await page.locator('#catalog').getByRole('link',{name:'Tiếp tục học'}).isVisible());checks++
     assert.equal(await page.locator('#catalog').getByRole('link',{name:'Tiếp tục học'}).getAttribute('href'),'/courses/KH1/learn');checks++
     await page.getByRole('button',{name:'Bỏ lọc Đang học'}).click()
@@ -100,18 +98,15 @@ async function run() {
     await page.getByRole('button',{name:'Xem tất cả khóa học',exact:true}).click()
     await page.setViewportSize({width:360,height:780})
     await noOverflow(page)
-    await page.getByRole('button',{name:'Lọc',exact:true}).click()
-    await page.keyboard.press('Escape')
-    await dialog.waitFor({state:'hidden'})
-    assert.equal(await dialog.isVisible(),false);checks++
-    assert.equal(await page.getByText('Nội dung lộ trình',{exact:true}).isVisible(),false);checks++
-    await page.getByText('Thiết kế lộ trình',{exact:true}).click()
     assert.ok(await page.getByText('Nội dung lộ trình',{exact:true}).isVisible());checks++
+    assert.ok(await page.evaluate(()=>document.querySelector('[aria-label="Thông điệp"]').compareDocumentPosition(document.querySelector('#learning-path')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
+    assert.ok(await page.evaluate(()=>document.querySelector('#learning-path').compareDocumentPosition(document.querySelector('#ecosystem')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
+    assert.ok(await page.evaluate(()=>document.querySelector('#ecosystem').compareDocumentPosition(document.querySelector('#catalog')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
     assert.ok(await page.evaluate(()=>document.querySelector('#my-courses').compareDocumentPosition(document.querySelector('#catalog')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
     await page.goto(base+'?guest=1')
-    await page.getByRole('heading',{name:'Học tập và phát triển cùng nhau'}).waitFor()
+    await page.getByText('Thông điệp của trang',{exact:true}).waitFor()
     assert.equal(await page.locator('#my-courses').count(),0);checks++
-    assert.ok(await page.getByRole('link',{name:'Khám phá khóa học',exact:true}).isVisible());checks++
+    assert.ok(await page.getByRole('searchbox',{name:'Tìm khóa học'}).isVisible());checks++
     await noOverflow(page)
     assert.deepEqual(errors,[]);checks++
     console.log(JSON.stringify({result:'passed',checks,scope:'real homepage overview + catalog UI + Tailwind + Next.js; member/guest; 1440/390/360px; secondary slots and gallery stubbed; fixtures only'}))
