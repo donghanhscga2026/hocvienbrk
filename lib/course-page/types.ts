@@ -78,7 +78,8 @@ export type CourseSectionType =
   | 'closing_message'
   | 'curriculum'
   | 'testimonials'
-  | 'rich_content';
+  | 'rich_content'
+  | 'wigrow_artwork';
 
 export type SectionVisibility = 'all' | 'unregistered' | 'registered';
 
