@@ -17,6 +17,7 @@ import ClosingMessageSection from './sections/ClosingMessageSection'
 import CurriculumSection from './sections/CurriculumSection'
 import TestimonialsSection from './sections/TestimonialsSection'
 import RichContentSection from './sections/RichContentSection'
+import WiGrowArtworkSection from './sections/WiGrowArtworkSection'
 
 const sectionRegistry: Record<CourseSectionType, React.ComponentType<any>> = {
   hero: HeroSection,
@@ -34,6 +35,7 @@ const sectionRegistry: Record<CourseSectionType, React.ComponentType<any>> = {
   curriculum: CurriculumSection,
   testimonials: TestimonialsSection,
   rich_content: RichContentSection,
+  wigrow_artwork: WiGrowArtworkSection,
 }
 
 interface SectionRendererProps {
