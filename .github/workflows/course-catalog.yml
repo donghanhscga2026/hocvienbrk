@@ -1,0 +1,33 @@
+name: Course catalog
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - components/home/**
+      - lib/course-catalog.ts
+      - app/actions/site-profile-actions.ts
+      - scripts/test-course-catalog*.cjs
+      - .github/workflows/course-catalog.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  catalog:
+    name: Course filters and mobile catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/test-course-catalog.cjs
+      - run: npx eslint components/home/CourseCatalog.tsx lib/course-catalog.ts
+      - name: Install isolated browser tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/catalog-browser" --no-package-lock playwright@1.62.1
+          "$RUNNER_TEMP/catalog-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Verify desktop and phone catalog
+        run: NODE_PATH="$RUNNER_TEMP/catalog-browser/node_modules" node scripts/test-course-catalog-browser.cjs

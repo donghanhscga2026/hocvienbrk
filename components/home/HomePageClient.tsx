@@ -5,6 +5,7 @@ import { useEffect, useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import CourseSection from '@/components/home/CourseSection'
 import CourseCard from '@/components/course/CourseCard'
+import CourseCatalog from '@/components/home/CourseCatalog'
 import RealityMap from '@/components/home/RealityMap'
 import Zero2HeroSurvey from '@/components/home/Zero2HeroSurvey'
 import CommunityBoard from '@/components/home/CommunityBoard'
@@ -43,7 +44,6 @@ function HomePageContent({
   courses,
   myActiveCourses,
   myCompletedCourses,
-  groupedOtherCourses,
   posts = [],
   session,
   enrollmentsMap,
@@ -152,6 +152,11 @@ function HomePageContent({
 
   return (
     <>
+      {/* Lối vào nhanh: người tìm khóa học không phải cuộn qua bảng tin/lộ trình. */}
+      <nav aria-label="Đi nhanh đến khóa học" className="container mx-auto flex flex-wrap gap-3 px-4 py-5">
+        {profile.showAllCourses !== false && <a href="#catalog" className="flex min-h-12 items-center rounded-2xl bg-brk-primary px-5 text-sm font-semibold text-brk-on-primary">Tìm khóa học</a>}
+        {session?.user && (myActiveCourses.length > 0 || myCompletedCourses.length > 0) && <a href="#my-courses" className="flex min-h-12 items-center rounded-2xl border border-brk-outline bg-brk-surface px-5 text-sm font-semibold text-brk-on-surface">Khóa học của tôi</a>}
+      </nav>
       {/* Survey / Roadmap Section - Auto-hide khi không có survey */}
       {showSurvey && (
         <section className="container mx-auto px-4 py-8">
@@ -239,57 +244,35 @@ function HomePageContent({
         </section>
       )}
 
-      {/* Courses Section */}
+      {/* Khóa của tôi và danh mục đầy đủ đều dùng đúng phạm vi courses của trang. */}
       <section id="khoa-hoc" className="container mx-auto px-4 pb-24">
-        {session?.user ? (
-          <>
-            {(myActiveCourses.length > 0 || myCompletedCourses.length > 0) && (
-              <CourseSection
-                title={coursesTitle}
-                courses={myActiveCourses}
-                hiddenCourses={myCompletedCourses}
-                session={session}
-                enrollmentsMap={enrollmentsMap}
-
-                userPhone={userPhone}
-                userId={userId}
-                darkMode={false}
-                accentColor="bg-brk-accent"
-                profileSlug={profile.slug}
-                showAllCourses={showAllCourses}
-              />
-            )}
-
-            {profile.showAllCourses !== false && groupedOtherCourses.length > 0 && (
-              <CourseSection
-                title={allCoursesTitle}
-                groupedCourses={groupedOtherCourses}
-                session={session}
-                enrollmentsMap={enrollmentsMap}
-
-                userPhone={userPhone}
-                userId={userId}
-                accentColor="bg-blue-600"
-                profileSlug={profile.slug}
-                showAllCourses={showAllCourses}
-              />
-            )}
-          </>
-        ) : (
-          profile.showAllCourses !== false && groupedOtherCourses.length > 0 && (
+        {session?.user && (myActiveCourses.length > 0 || myCompletedCourses.length > 0) && (
+          <div id="my-courses" className="scroll-mt-24">
             <CourseSection
-              title={allCoursesTitle}
-              groupedCourses={groupedOtherCourses}
+              title={coursesTitle}
+              courses={myActiveCourses}
+              hiddenCourses={myCompletedCourses}
               session={session}
               enrollmentsMap={enrollmentsMap}
-
               userPhone={userPhone}
               userId={userId}
-              accentColor="bg-blue-600"
+              darkMode={false}
+              accentColor="bg-brk-accent"
               profileSlug={profile.slug}
               showAllCourses={showAllCourses}
             />
-          )
+          </div>
+        )}
+        {profile.showAllCourses !== false && (
+          <CourseCatalog
+            title={allCoursesTitle}
+            courses={courses}
+            enrollmentsMap={enrollmentsMap}
+            isLoggedIn={!!session?.user}
+            userPhone={userPhone}
+            userId={userId}
+            profileSlug={profile.slug}
+          />
         )}
       </section>
 
