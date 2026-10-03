@@ -3,7 +3,8 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
-import CourseSection from '@/components/home/CourseSection'
+import PersonalCourses from '@/components/home/PersonalCourses'
+import { splitHomeCourses } from '@/lib/course-catalog'
 import HomeOverview from '@/components/home/HomeOverview'
 import CourseCatalog from '@/components/home/CourseCatalog'
 import RealityMap from '@/components/home/RealityMap'
@@ -104,7 +105,8 @@ function HomePageContent({
 
   const showSurvey = survey && (survey.flow || (survey.questions && survey.questions.length > 0))
   const showCommunity = profile.showCommunity !== false && posts.length > 0
-  const hasMyCourses = !!session?.user && (myActiveCourses.length > 0 || myCompletedCourses.length > 0)
+  const sessionUserId = session?.user?.id != null && Number.isInteger(Number(session.user.id)) ? Number(session.user.id) : null
+  const personal = splitHomeCourses(courses, enrollmentsMap, session?.user ? (userId ?? sessionUserId) : null, session?.user?.role)
   const featuredIds = giftCourses.length ? giftCourses.map(course => course.id) : courses.filter(course => course.pin > 0).sort((a, b) => a.pin - b.pin).map(course => course.id)
   const latestIds = latestCourses.length ? latestCourses.map(course => course.id) : [...courses].sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()).slice(0, 6).map(course => course.id)
 
@@ -122,8 +124,8 @@ function HomePageContent({
         onOpenMembership={openMbw}
         message={message}
         roadmapTitle={customPath?.length ? (profile.roadmapTitle || 'Xem lộ trình của tôi') : (profile.surveyTitle || 'Thiết kế lộ trình')}
-        myCourses={hasMyCourses ? <CourseSection title="Khóa học của tôi" courses={myActiveCourses} hiddenCourses={myCompletedCourses} session={session} enrollmentsMap={enrollmentsMap} userPhone={userPhone} userId={userId} darkMode={false} accentColor="bg-brk-accent" profileSlug={profile.slug} showAllCourses={showAllCourses} /> : undefined}
-        catalog={profile.showAllCourses !== false ? <div id="khoa-hoc" className="scroll-mt-24"><CourseCatalog title={profile.allCoursesTitle || 'Khám phá khóa học'} courses={courses} enrollmentsMap={enrollmentsMap} isLoggedIn={!!session?.user} userPhone={userPhone} userId={userId} profileSlug={profile.slug} featuredIds={featuredIds} latestIds={latestIds} /></div> : undefined}
+        myCourses={session?.user ? <PersonalCourses learning={personal.learning} teaching={personal.teaching} enrollments={enrollmentsMap} userPhone={userPhone} userId={userId ?? sessionUserId} profileSlug={profile.slug} canDiscover={profile.showAllCourses !== false} /> : undefined}
+        catalog={profile.showAllCourses !== false ? <div id="khoa-hoc" className="scroll-mt-24"><CourseCatalog title={profile.allCoursesTitle || 'Khám phá khóa học'} courses={courses} discoveryCourses={session?.user ? personal.discover : undefined} enrollmentsMap={enrollmentsMap} isLoggedIn={!!session?.user} userPhone={userPhone} userId={userId} profileSlug={profile.slug} featuredIds={featuredIds} latestIds={latestIds} /></div> : undefined}
         roadmap={showSurvey ? (!customPath?.length ? <Zero2HeroSurvey session={session} survey={survey} /> : <RealityMap customPath={customPath} enrollmentsMap={enrollmentsMap} allCourses={courses} userGoal={userGoal || 'Hoàn thiện kỹ năng'} targetPointId={targetPointId} roadmapPoints={roadmapPoints} onReset={resetSurveyAction} />) : undefined}
         community={showCommunity ? <CommunityBoard posts={posts} isAdmin={session?.user?.role === 'ADMIN'} title={profile.communityTitle || 'Cộng đồng và chia sẻ'} /> : undefined}
       />

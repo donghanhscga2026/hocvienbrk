@@ -57,6 +57,17 @@ export function catalogStatus(enrollment?: CatalogEnrollment) {
   return enrollment?.status === 'ACTIVE' ? 'active' : enrollment?.status === 'COMPLETED' ? 'completed'
     : enrollment?.status === 'PENDING' ? 'pending' : 'new'
 }
+// Chỉ phân nhóm dữ liệu đã được server cho phép hiển thị trên trang này.
+export function splitHomeCourses(courses: CatalogCourse[], enrollments: Record<number, CatalogEnrollment>, userId: number | null, role?: string) {
+  if (userId == null) return { learning: [], teaching: [], discover: courses }
+  const isTeaching = (course: CatalogCourse) => (role === 'TEACHER' || role === 'ADMIN') && course.teacher?.id === userId
+  const isEnrolled = (course: CatalogCourse) => catalogStatus(enrollments[course.id]) !== 'new'
+  return {
+    learning: courses.filter(course => isEnrolled(course) && !enrollments[course.id]?.hiddenFromGifts),
+    teaching: courses.filter(isTeaching),
+    discover: courses.filter(course => !isEnrolled(course) && !isTeaching(course)),
+  }
+}
 export function filterCatalog(courses: CatalogCourse[], enrollments: Record<number, CatalogEnrollment>, filters: CatalogFilters) {
   const terms = normalizeCatalogText(filters.query).split(/\s+/).filter(Boolean)
   return courses.filter(course => {

@@ -15,11 +15,14 @@ interface Props {
   title: string; courses: CatalogCourse[]; enrollmentsMap: Record<number, CatalogEnrollment>
   isLoggedIn: boolean; userPhone: string | null; userId: number | null; profileSlug?: string | null
   featuredIds?: number[]; latestIds?: number[]
+  discoveryCourses?: CatalogCourse[]
 }
 const fieldClass = 'mt-2 w-full min-w-0 rounded-xl border border-brk-outline bg-brk-surface px-3 py-3 text-sm text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-accent'
 const viewKey = 'mfc-course-catalog-view'
 
-export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [] }: Props) {
+export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [], discoveryCourses }: Props) {
+  const [scope, setScope] = useState<'discover' | 'all'>('discover')
+  const sourceCourses = scope === 'discover' && discoveryCourses ? discoveryCourses : courses
   const [group, setGroup] = useState<'all' | 'featured' | 'latest'>('all')
   const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS })
   const [view, setView] = useState<'list' | 'gallery'>('list')
@@ -48,7 +51,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
     ? [[String(course.teacher.id), course.teacher.name || 'Giáo viên'] as const] : [])).entries()]
     .sort((a, b) => a[1].localeCompare(b[1], 'vi')), [courses])
   const feeTypes = useMemo(() => [...new Set(courses.map(catalogFee))], [courses])
-  const results = useMemo(() => filterCatalog(courses.filter(course => group === 'all' || (group === 'featured' ? featuredIds : latestIds).includes(course.id)), enrollmentsMap, { ...filters, query: deferredQuery }), [courses, enrollmentsMap, filters, deferredQuery, group, featuredIds, latestIds])
+  const results = useMemo(() => filterCatalog(sourceCourses.filter(course => group === 'all' || (group === 'featured' ? featuredIds : latestIds).includes(course.id)), enrollmentsMap, { ...filters, query: deferredQuery }), [sourceCourses, enrollmentsMap, filters, deferredQuery, group, featuredIds, latestIds])
   const activeFilters = [
     { key: 'query' as const, value: filters.query, label: `Tìm: ${filters.query}` },
     { key: 'category' as const, value: filters.category, label: `Danh mục: ${filters.category}` },
@@ -97,6 +100,9 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
         <h2 className="text-2xl font-bold text-brk-on-surface sm:text-3xl">{title}</h2>
         <p className="mt-2 text-sm text-brk-muted">Tìm khóa học theo chủ đề, giáo viên hoặc mức phí.</p>
       </div>
+      {discoveryCourses && <div role="group" aria-label="Phạm vi khám phá" className="mb-4 flex flex-wrap gap-2">
+        {([['discover', `Khóa học khác (${discoveryCourses.length})`], ['all', `Tất cả khóa học (${courses.length})`]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={scope === value} onClick={() => { setScope(value); clear() }} className={`min-h-11 rounded-xl px-4 text-sm font-semibold ${scope === value ? 'bg-brk-primary text-brk-on-primary' : 'border border-brk-outline text-brk-on-surface'}`}>{label}</button>)}
+      </div>}
       <div role="group" aria-label="Khám phá nhanh" className="mb-5 flex flex-wrap gap-2">
         {([['all', 'Tất cả'], ['featured', 'Nổi bật'], ['latest', 'Mới cập nhật']] as const).filter(([value]) => value === 'all' || (value === 'featured' ? featuredIds : latestIds).length > 0).map(([value, label]) => <button key={value} type="button" aria-pressed={group === value} onClick={() => { setGroup(value); setLimit(12) }} className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${group === value ? 'border-brk-primary bg-brk-primary text-brk-on-primary' : 'border-brk-outline text-brk-on-surface'}`}>{label}</button>)}
         <button type="button" aria-pressed={filters.price === 'free'} onClick={() => { setGroup('all'); update('price', filters.price === 'free' ? '' : 'free') }} className="min-h-11 rounded-full border border-brk-outline px-4 text-sm font-semibold text-brk-on-surface">Không yêu cầu phí</button>
@@ -123,12 +129,12 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
               ))}
             </div>
           </div>
-          <p role="status" aria-live="polite" className="mb-4 text-sm text-brk-muted">{results.length} khóa học{activeFilters.length > 0 || group !== 'all' ? ` phù hợp · trên ${courses.length} khóa` : ''}</p>
+          <p role="status" aria-live="polite" className="mb-4 text-sm text-brk-muted">{results.length} khóa học{activeFilters.length > 0 || group !== 'all' ? ` phù hợp · trên ${sourceCourses.length} khóa` : ''}</p>
           {activeFilters.length > 0 && <div className="mb-5 flex flex-wrap gap-2">
             {activeFilters.map(item => <button type="button" key={item.key} aria-label={`Bỏ lọc ${item.label}`} onClick={() => update(item.key, '')} className="flex min-w-0 max-w-full items-center gap-2 rounded-full bg-brk-background px-3 py-2 text-xs text-brk-on-surface"><span className="min-w-0 break-words">{item.label}</span><X className="h-3.5 w-3.5 shrink-0" /></button>)}
             <button type="button" onClick={clear} className="px-2 py-2 text-xs font-semibold text-brk-primary underline">Xóa tất cả</button>
           </div>}
-          {results.length === 0 ? <div className="rounded-2xl bg-brk-background px-5 py-12 text-center text-brk-on-surface"><Search className="mx-auto mb-3 h-7 w-7 text-brk-muted" /><h3 className="font-semibold">Không có khóa học phù hợp</h3><p className="mt-2 text-sm text-brk-muted">Thử tên khác hoặc bỏ bớt điều kiện lọc.</p><button type="button" onClick={clear} className="mt-5 min-h-11 rounded-xl bg-brk-primary px-5 font-semibold text-brk-on-primary">Xem tất cả khóa học</button></div>
+          {results.length === 0 ? <div className="rounded-2xl bg-brk-background px-5 py-12 text-center text-brk-on-surface"><Search className="mx-auto mb-3 h-7 w-7 text-brk-muted" /><h3 className="font-semibold">Không có khóa học phù hợp</h3><p className="mt-2 text-sm text-brk-muted">Thử tên khác hoặc bỏ bớt điều kiện lọc.</p><button type="button" onClick={() => { setScope('all'); clear() }} className="mt-5 min-h-11 rounded-xl bg-brk-primary px-5 font-semibold text-brk-on-primary">Xem tất cả khóa học</button></div>
             : <div className={view === 'gallery' ? 'grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-3'}>
               {results.slice(0, limit).map(course => view === 'gallery' ? <div key={course.id} className="min-w-0">
                 <p className="mb-2 truncate text-xs text-brk-muted">{course.teacher?.name || 'Giáo viên chưa cập nhật'} · {catalogCategory(course)}</p>
@@ -143,25 +149,25 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   )
 }
 
-function CourseListRow({ course, enrollment }: { course: CatalogCourse; enrollment?: CatalogEnrollment }) {
+export function CourseListRow({ course, enrollment, management = false, gallery = false }: { course: CatalogCourse; enrollment?: CatalogEnrollment; management?: boolean; gallery?: boolean }) {
   const status = catalogStatus(enrollment)
   const detail = `/khoa-hoc/${encodeURIComponent(course.id_khoa)}`
   const total = enrollment?.totalLessons || course._count?.lessons || 0
   const completed = Math.min(total, Math.max(0, enrollment?.completedCount || 0))
   const progress = total ? Math.round(completed / total * 100) : 0
   const price = Math.max(0, Number(course.phi_coc) || 0)
-  return <article className="flex min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-brk-outline p-3 sm:items-center sm:gap-4 sm:p-4">
-    <Link href={detail} className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-brk-background sm:h-24 sm:w-36"><Image src={isValidImageUrl(course.link_anh_bia) ? course.link_anh_bia! : '/og-image.png'} alt={course.name_lop} fill sizes="(max-width:640px) 96px,144px" className="object-cover" /></Link>
+  return <article className={`flex min-w-0 flex-wrap items-start gap-3 rounded-2xl border border-brk-outline bg-brk-surface p-3 sm:gap-4 sm:p-4 ${gallery ? 'h-full flex-col' : 'sm:items-center'}`}>
+    <Link href={detail} className={`relative shrink-0 overflow-hidden rounded-xl bg-brk-background ${gallery ? 'h-36 w-full' : 'h-20 w-24 sm:h-24 sm:w-36'}`}><Image src={isValidImageUrl(course.link_anh_bia) ? course.link_anh_bia! : '/og-image.png'} alt={course.name_lop} fill sizes={gallery ? '(max-width:640px) 100vw,33vw' : '(max-width:640px) 96px,144px'} className="object-cover" /></Link>
     <div className="min-w-0 flex-1">
       <p className="mb-1 text-xs text-brk-muted">{catalogCategory(course)}</p>
       <h3 className="break-words font-bold leading-snug text-brk-on-surface"><Link href={detail} className="hover:underline">{course.name_lop}</Link></h3>
       <p className="mt-1 break-words text-sm text-brk-muted">{course.teacher?.name || 'Giáo viên chưa cập nhật'}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brk-muted"><span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{course._count?.lessons || 0} bài</span>{status !== 'new' && <span className="font-semibold text-brk-primary">{STATUS_LABELS[status]}</span>}</div>
-      {enrollment && (status === 'active' || status === 'completed') && <div className="mt-2"><p className="text-xs text-brk-muted">Đã học {completed}/{total} bài · {progress}%</p><div role="progressbar" aria-label={`Tiến độ ${course.name_lop}`} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="mt-1 h-1.5 max-w-64 overflow-hidden rounded-full bg-brk-background"><div className="h-full rounded-full bg-brk-accent" style={{width:`${progress}%`}} /></div></div>}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brk-muted"><span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{course._count?.lessons || 0} bài</span>{management ? <span>{course.activeStudentCount ?? course._count?.enrollments ?? 0} học viên đang học</span> : status !== 'new' && <span className="font-semibold text-brk-primary">{STATUS_LABELS[status]}</span>}</div>
+      {!management && enrollment && (status === 'active' || status === 'completed') && <div className="mt-2"><p className="text-xs text-brk-muted">Đã học {completed}/{total} bài · {progress}%</p><div role="progressbar" aria-label={`Tiến độ ${course.name_lop}`} aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="mt-1 h-1.5 max-w-64 overflow-hidden rounded-full bg-brk-background"><div className="h-full rounded-full bg-brk-accent" style={{width:`${progress}%`}} /></div></div>}
     </div>
     <div className="flex w-full flex-wrap items-center justify-between gap-3 border-t border-brk-outline pt-3 sm:w-auto sm:max-w-48 sm:flex-col sm:items-end sm:border-0 sm:pt-0">
       <div><p className="text-sm font-bold text-brk-on-surface sm:text-right">{price === 0 ? 'Không yêu cầu phí' : `${price.toLocaleString('vi-VN')}đ`}</p>{price > 0 && <p className="text-xs text-brk-muted sm:text-right">{FEE_LABELS[catalogFee(course)]}</p>}</div>
-      <Link href={status === 'active' ? `/courses/${encodeURIComponent(course.id_khoa)}/learn` : detail} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-brk-on-primary">{status === 'active' ? 'Tiếp tục học' : 'Xem khóa học'}<ArrowRight className="h-4 w-4" /></Link>
+      <Link href={management ? `/tools/courses/new?id=${course.id}` : status === 'active' ? `/courses/${encodeURIComponent(course.id_khoa)}/learn` : detail} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-brk-on-primary">{management ? 'Quản lý khóa học' : status === 'active' ? 'Tiếp tục học' : 'Xem khóa học'}<ArrowRight className="h-4 w-4" /></Link>
     </div>
   </article>
 }

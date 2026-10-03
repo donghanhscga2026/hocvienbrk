@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.join(__dirname, '../lib/course-catalog.ts'),
 const compiled = ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText
 const context = {exports:{}, Date}
 vm.runInNewContext(compiled, context)
-const {filterCatalog,EMPTY_CATALOG_FILTERS,normalizeCatalogText} = context.exports
+const {filterCatalog,EMPTY_CATALOG_FILTERS,normalizeCatalogText,splitHomeCourses} = context.exports
 const course = (id, price, extra={}) => ({id,id_khoa:'KH'+id,name_lop:'Khóa '+id,phi_coc:price,feeType:price ? 'PHI_CAM_KET':'MIEN_PHI',createdAt:'2026-10-01',...extra})
 const courses = [
   course(1,0,{name_lop:'Thiết kế website',courseCategory:{id:1,name:'Công nghệ'},teacher:{id:10,name:'Hương Lucy'}}),
@@ -48,4 +48,18 @@ check({sort:'price-asc'},[1,6,2,3,4,5],'Ascending fee uses stable ID tie-break')
 check({sort:'price-desc'},[5,4,3,2,1,6],'Descending fee uses stable ID tie-break')
 assert.equal(courses[0].id,1,'Filtering does not mutate input order');checks++
 assert.equal(normalizeCatalogText('  ĐÀO TẠO  '),'dao tao');checks++
+const ids = list => Array.from(list, course => course.id)
+const student = splitHomeCourses(courses,enrollments,20,'STUDENT')
+assert.deepEqual(ids(student.learning),[1,2,3]);checks++
+assert.deepEqual(ids(student.teaching),[]);checks++
+assert.deepEqual(ids(student.discover),[4,5,6]);checks++
+const teacher = splitHomeCourses(courses,enrollments,20,'TEACHER')
+assert.deepEqual(ids(teacher.teaching),[2,3]);checks++
+assert.deepEqual(ids(teacher.discover),[4,5,6]);checks++
+const hidden = splitHomeCourses(courses,{...enrollments,1:{status:'ACTIVE',hiddenFromGifts:true}},20,'ADMIN')
+assert.deepEqual(ids(hidden.learning),[2,3]);checks++
+assert.ok(!ids(hidden.discover).includes(1));checks++
+assert.deepEqual(ids(splitHomeCourses(courses,enrollments,null,'TEACHER').discover),[1,2,3,4,5,6]);checks++
+assert.deepEqual(ids(splitHomeCourses(courses,enrollments,0,'TEACHER').teaching),[]);checks++
+assert.deepEqual(ids(splitHomeCourses(courses,enrollments,10,'TEACHER').teaching),[1]);checks++
 console.log(JSON.stringify({result:'passed',checks,scope:'real catalog filter; fixtures only; no network or database'}))
