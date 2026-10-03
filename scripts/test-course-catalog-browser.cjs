@@ -287,10 +287,10 @@ async function run() {
     assert.deepEqual(await manyTabs.getByRole('tab').allTextContents(),['Tất cả danh mục','Nền tảng - Cơ bản','Nội tâm - triết lý nhân sinh','Sức khỏe - Thể chất']);checks++
     assert.ok(await catalog.locator('article').first().evaluate(el=>el.getBoundingClientRect().top<window.innerHeight));checks++
     assert.equal(await catalog.getByRole('region',{name:'Bộ lọc khóa học'}).count(),0);checks++
-    await catalog.getByRole('button',{name:'Thêm danh mục',exact:true}).click()
+    await catalog.getByRole('button',{name:'Thêm danh mục →',exact:true}).click()
     assert.equal(await manyTabs.getByRole('tab').count(),13);checks++
     await manyTabs.getByRole('tab',{name:'Huyền học - Tâm linh',exact:true}).click()
-    await catalog.getByRole('button',{name:'Thu gọn danh mục',exact:true}).click()
+    await catalog.getByRole('button',{name:'Thu gọn danh mục →',exact:true}).click()
     assert.equal(await manyTabs.getByRole('tab').count(),4);checks++
     assert.equal(await manyTabs.getByRole('tab',{name:'Huyền học - Tâm linh',exact:true}).getAttribute('aria-selected'),'true');checks++
     await manyTabs.getByRole('tab',{name:'Huyền học - Tâm linh',exact:true}).press('ArrowRight')
