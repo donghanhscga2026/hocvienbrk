@@ -1,6 +1,6 @@
 'use client'
 
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { LayoutGrid, List, Search, X, BookOpen, ArrowRight } from 'lucide-react'
@@ -23,6 +23,7 @@ const viewKey = 'mfc-course-catalog-view'
 export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [], discoveryCourses }: Props) {
   const [scope, setScope] = useState<'discover' | 'all'>('discover')
   const sourceCourses = scope === 'discover' && discoveryCourses ? discoveryCourses : courses
+  const categoryTabs = useRef<HTMLDivElement>(null)
   const [group, setGroup] = useState<'all' | 'featured' | 'latest'>('all')
   const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS })
   const [view, setView] = useState<'list' | 'gallery'>('list')
@@ -64,11 +65,6 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   // Một hàng bộ lọc dùng cùng dữ liệu; cuộn ngang trong khung trên điện thoại.
   const filterFields = () => (
     <div className="flex min-w-max items-start gap-3">
-      <label className="block w-44 shrink-0 text-sm font-semibold">Danh mục
-        <select aria-label="Danh mục" value={filters.category} onChange={event => update('category', event.target.value)} className={fieldClass}>
-          <option value="">Tất cả danh mục</option>{categories.map(category => <option key={category}>{category}</option>)}
-        </select>
-      </label>
       <label className="block w-44 shrink-0 text-sm font-semibold">Giáo viên
         <select aria-label="Giáo viên" value={filters.teacher} onChange={event => update('teacher', event.target.value)} className={fieldClass}>
           <option value="">Tất cả giáo viên</option>{teachers.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
@@ -103,10 +99,30 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
       {discoveryCourses && <div role="group" aria-label="Phạm vi khám phá" className="mb-4 flex flex-wrap gap-2">
         {([['discover', `Khóa học khác (${discoveryCourses.length})`], ['all', `Tất cả khóa học (${courses.length})`]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={scope === value} onClick={() => { setScope(value); clear() }} className={`min-h-11 rounded-xl px-4 text-sm font-semibold ${scope === value ? 'bg-brk-primary text-brk-on-primary' : 'border border-brk-outline text-brk-on-surface'}`}>{label}</button>)}
       </div>}
-      <div role="group" aria-label="Khám phá nhanh" className="mb-5 flex flex-wrap gap-2">
-        {([['all', 'Tất cả'], ['featured', 'Nổi bật'], ['latest', 'Mới cập nhật']] as const).filter(([value]) => value === 'all' || (value === 'featured' ? featuredIds : latestIds).length > 0).map(([value, label]) => <button key={value} type="button" aria-pressed={group === value} onClick={() => { setGroup(value); setLimit(12) }} className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${group === value ? 'border-brk-primary bg-brk-primary text-brk-on-primary' : 'border-brk-outline text-brk-on-surface'}`}>{label}</button>)}
-        <button type="button" aria-pressed={filters.price === 'free'} onClick={() => { setGroup('all'); update('price', filters.price === 'free' ? '' : 'free') }} className="min-h-11 rounded-full border border-brk-outline px-4 text-sm font-semibold text-brk-on-surface">Không yêu cầu phí</button>
+      <div className="mb-5 min-w-0 overflow-x-auto border-b border-brk-outline">
+        <div ref={categoryTabs} role="tablist" aria-label="Danh mục khóa học" className="flex min-w-max gap-2">
+          {['', ...categories].map((category, index) => <button type="button" role="tab" key={category} id={`catalog-category-${index}`} aria-selected={filters.category === category} aria-controls="catalog-results" tabIndex={filters.category === category ? 0 : -1} onClick={() => update('category', category)} onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+            event.preventDefault()
+            const values = ['', ...categories]
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? values.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length
+            update('category', values[next])
+            categoryTabs.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+          }} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm font-semibold ${filters.category === category ? 'border-brk-primary text-brk-primary' : 'border-transparent text-brk-muted hover:text-brk-on-surface'}`}>{category || 'Tất cả danh mục'}</button>)}
+        </div>
       </div>
+      <label className="mb-5 block w-full text-sm font-semibold text-brk-on-surface sm:max-w-xs">Hiển thị
+        <select aria-label="Hiển thị khóa học" value={filters.price === 'free' && group === 'all' ? 'free' : group} onChange={event => {
+          const next = event.target.value
+          if (next === 'free') { setGroup('all'); update('price', 'free') }
+          else { setGroup(next as 'all' | 'featured' | 'latest'); if (filters.price === 'free') update('price', ''); else setLimit(12) }
+        }} className={fieldClass}>
+          <option value="all">Tất cả</option>
+          {featuredIds.length > 0 && <option value="featured">Nổi bật</option>}
+          {latestIds.length > 0 && <option value="latest">Mới cập nhật</option>}
+          <option value="free">Không yêu cầu phí</option>
+        </select>
+      </label>
       <label className="relative mb-5 block">
         <Search aria-hidden className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brk-muted" />
         <span className="sr-only">Tìm khóa học</span>
@@ -115,7 +131,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
       <section aria-label="Bộ lọc khóa học" className="mb-5 min-w-0 max-w-full overflow-x-auto rounded-xl bg-brk-background p-3 text-brk-on-surface">
         {filterFields()}
       </section>
-      <div className="min-w-0">
+      <div id="catalog-results" role="tabpanel" aria-labelledby={`catalog-category-${Math.max(0, ['', ...categories].indexOf(filters.category))}`} className="min-w-0">
         <div className="min-w-0">
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <label className="min-w-0 flex-1 sm:flex-none"><span className="sr-only">Sắp xếp khóa học</span>

@@ -69,10 +69,20 @@ async function run() {
     await page.getByRole('button',{name:'Xem thêm 2 khóa học'}).click()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===14)
     assert.equal(await page.locator('#catalog article').count(),14);checks++
-    const search=page.getByRole('searchbox',{name:'Tìm khóa học'})
-    await page.getByRole('button',{name:'Nổi bật',exact:true}).click()
+    const categoryTabs=catalog.getByRole('tablist',{name:'Danh mục khóa học'})
+    await categoryTabs.getByRole('tab',{name:'Công nghệ',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===2);checks++
+    await categoryTabs.getByRole('tab',{name:'Công nghệ',exact:true}).press('ArrowRight')
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===12);checks++
+    await categoryTabs.getByRole('tab',{name:'Tất cả danh mục',exact:true}).click()
+    assert.equal(await catalog.getByRole('combobox',{name:'Danh mục',exact:true}).count(),0);checks++
+    await catalog.getByRole('combobox',{name:'Hiển thị khóa học'}).selectOption('free')
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===1);checks++
-    await catalog.getByRole('button',{name:'Tất cả',exact:true}).click()
+    await catalog.getByRole('combobox',{name:'Hiển thị khóa học'}).selectOption('all')
+    const search=page.getByRole('searchbox',{name:'Tìm khóa học'})
+    await catalog.getByRole('combobox',{name:'Hiển thị khóa học'}).selectOption('featured')
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===1);checks++
+    await catalog.getByRole('combobox',{name:'Hiển thị khóa học'}).selectOption('all')
     await search.fill('huong')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
     assert.equal(await page.locator('#catalog article').count(),1);checks++
