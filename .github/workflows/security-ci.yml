@@ -75,3 +75,4 @@ jobs:
           name: build-diagnostics
           path: build-output.log
           retention-days: 1
+
