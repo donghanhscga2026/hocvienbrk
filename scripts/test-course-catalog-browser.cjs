@@ -100,9 +100,9 @@ async function run() {
     assert.equal(await sidebar.isVisible(),true);checks++
     await noOverflow(page)
     await sidebar.getByRole('combobox',{name:'Trạng thái của tôi'}).selectOption('active')
-    await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
-    assert.ok(await page.locator('#catalog').getByRole('link',{name:'Tiếp tục học'}).isVisible());checks++
-    assert.equal(await page.locator('#catalog').getByRole('link',{name:'Tiếp tục học'}).getAttribute('href'),'/courses/KH1/learn');checks++
+    await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('2 khóa'))
+    assert.equal(await catalog.getByRole('link',{name:'Tiếp tục học'}).count(),2);checks++
+    assert.equal(await catalog.getByRole('link',{name:'Tiếp tục học'}).first().getAttribute('href'),'/courses/KH1/learn');checks++
     await page.getByRole('button',{name:'Bỏ lọc Đang học'}).click()
     await search.fill('x'.repeat(250))
     await page.getByRole('heading',{name:'Không có khóa học phù hợp'}).waitFor()
