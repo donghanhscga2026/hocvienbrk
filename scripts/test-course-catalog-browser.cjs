@@ -24,6 +24,8 @@ async function run() {
   try {
     fs.symlinkSync(path.join(repo,'node_modules'),path.join(fixture,'node_modules'),'dir')
     write('package.json','{"name":"catalog-fixture","private":true}')
+    // Nút debug Next.js che thanh menu dưới; chỉ tắt trong fixture kiểm thử.
+    write('next.config.mjs','export default {devIndicators:false}')
     write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2017',jsx:'preserve',module:'esnext',moduleResolution:'bundler',esModuleInterop:true,baseUrl:'.',paths:{'@/*':['./*']}}}))
     copy('postcss.config.mjs')
     fs.mkdirSync(path.join(fixture,'public'),{recursive:true})
