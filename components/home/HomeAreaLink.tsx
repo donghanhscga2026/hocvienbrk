@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation'
 import type { AnchorHTMLAttributes } from 'react'
 
-export type HomeArea = 'home' | 'learning' | 'discover' | 'tools' | 'community'
+export type HomeArea = 'home' | 'path' | 'learning' | 'discover' | 'tools' | 'community'
 
 // Giữ trang nhân hiệu và các tham số affiliate khi chuyển khu vực.
 // History API tích hợp với Next.js: nút Back và tải lại vẫn mở đúng khu vực.

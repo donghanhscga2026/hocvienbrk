@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternal
 import Image from 'next/image'
 import Link from 'next/link'
 import { LayoutGrid, List, Search, X, BookOpen, ArrowRight } from 'lucide-react'
-import CourseDiscoveryCard from '@/components/course/CourseDiscoveryCard'
+import CourseCard from '@/components/course/CourseCard'
 import CourseInstructor from '@/components/course/CourseInstructor'
 import { isValidImageUrl } from '@/lib/image-validation'
 import {
@@ -28,7 +28,7 @@ const subscribeWidth = (callback: () => void) => {
 }
 const previewSize = () => window.innerWidth >= 1024 ? 6 : window.innerWidth >= 640 ? 4 : 2
 
-export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, featuredIds = [], latestIds = [], discoveryCourses, initialCategory = '', initialExpanded = false }: Props) {
+export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [], discoveryCourses, initialCategory = '', initialExpanded = false }: Props) {
   const [scope, setScope] = useState<'discover' | 'all'>('discover')
   const sourceCourses = scope === 'discover' && discoveryCourses ? discoveryCourses : courses
   const categoryTabs = useRef<HTMLDivElement>(null)
@@ -82,7 +82,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   }
   const renderCourses = (items: CatalogCourse[]) => <div className={view === 'gallery' ? 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
     {items.map(course => view === 'gallery' ? <div key={course.id} className="min-w-0">
-      <CourseDiscoveryCard course={course} enrollment={enrollmentsMap[course.id]} />
+      <CourseCard course={course} enrollment={enrollmentsMap[course.id] || null} isLoggedIn={isLoggedIn} userPhone={userPhone} userId={userId} profileSlug={profileSlug} />
     </div> : <CourseListRow key={course.id} course={course} enrollment={enrollmentsMap[course.id]} />)}
   </div>
   const activeFilters = [
@@ -125,14 +125,14 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   return (
     <div id="catalog" className="scroll-mt-24 rounded-3xl border border-brk-outline bg-brk-surface p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-brk-on-surface sm:text-3xl">{title}</h2>
+        <h2 className="border-l-4 border-brk-primary pl-4 text-2xl font-extrabold tracking-tight text-brk-on-surface sm:text-3xl">{title}</h2>
         <p className="mt-2 text-sm text-brk-muted">Tìm khóa học theo chủ đề, giáo viên hoặc mức phí.</p>
       </div>
       {discoveryCourses && <div role="group" aria-label="Phạm vi khám phá" className="mb-4 flex flex-wrap gap-2">
         {([['discover', `Khóa học khác (${discoveryCourses.length})`], ['all', `Tất cả khóa học (${courses.length})`]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={scope === value} onClick={() => { setScope(value); clear() }} className={`min-h-11 rounded-xl px-4 text-sm font-semibold ${scope === value ? 'bg-brk-primary text-brk-on-primary' : 'border border-brk-outline text-brk-on-surface'}`}>{label}</button>)}
       </div>}
-      <div className="mb-5 min-w-0 overflow-x-auto border-b border-brk-outline">
-        <div ref={categoryTabs} role="tablist" aria-label="Danh mục khóa học" className="flex min-w-max gap-2">
+      <div className="mb-5 min-w-0">
+        <div ref={categoryTabs} role="tablist" aria-label="Danh mục khóa học" className="flex flex-wrap gap-2">
           {['', ...categories].map((category, index) => <button type="button" role="tab" key={category} id={`catalog-category-${index}`} aria-selected={filters.category === category} aria-controls="catalog-results" tabIndex={filters.category === category ? 0 : -1} onClick={() => update('category', category)} onKeyDown={event => {
             if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
             event.preventDefault()
@@ -140,7 +140,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
             const next = event.key === 'Home' ? 0 : event.key === 'End' ? values.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length
             update('category', values[next])
             categoryTabs.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
-          }} className={`min-h-12 shrink-0 border-b-2 px-4 text-sm font-semibold ${filters.category === category ? 'border-brk-primary text-brk-primary' : 'border-transparent text-brk-muted hover:text-brk-on-surface'}`}>{category || 'Tất cả danh mục'}</button>)}
+          }} className={`min-h-12 max-w-full rounded-xl border px-4 py-2 text-sm font-bold ${filters.category === category ? 'border-brk-primary bg-brk-primary text-brk-on-primary' : 'border-brk-outline text-brk-on-surface hover:border-brk-primary'}`}>{category || 'Tất cả danh mục'}</button>)}
         </div>
       </div>
       <label className="mb-5 block w-full text-sm font-semibold text-brk-on-surface sm:max-w-xs">Hiển thị
@@ -192,7 +192,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
                   const shown = section.courses.slice(0, view === 'gallery' ? categoryLimit : 2)
                   return <section key={section.name} aria-label={`Khóa học danh mục ${section.name}`} className="min-w-0">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                      <div><h3 className="text-xl font-bold text-brk-on-surface">{section.name}</h3><p className="mt-1 text-sm text-brk-muted">{section.courses.length} khóa học · Đang hiển thị {shown.length}</p></div>
+                      <div><h3 className="border-l-4 border-brk-primary pl-3 text-xl font-extrabold text-brk-on-surface">{section.name}</h3><p className="mt-1 text-sm text-brk-muted">{section.courses.length} khóa học · Đang hiển thị {shown.length}</p></div>
                       <button type="button" aria-label={`Xem toàn bộ danh mục ${section.name}`} onClick={() => openAll(section.name)} className="min-h-11 rounded-xl bg-brk-background px-4 text-sm font-semibold text-brk-primary">Xem toàn bộ <ArrowRight className="ml-1 inline h-4 w-4" /></button>
                     </div>
                     {renderCourses(shown)}

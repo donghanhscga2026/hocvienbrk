@@ -27,7 +27,7 @@ export default function PersonalCourses({ learning, teaching, enrollments, userP
   const availableTabs = [{ value: 'learning' as const, label: 'Tôi đang học', count: learning.length }, ...(teaching.length ? [{ value: 'teaching' as const, label: 'Tôi giảng dạy', count: teaching.length }] : [])]
 
   return <section id="my-courses" aria-label="Không gian của tôi" className="scroll-mt-40 min-w-0 rounded-2xl border border-brk-primary/20 bg-brk-background p-4 sm:p-6">
-    <h2 className="text-2xl font-bold text-brk-on-surface">Không gian của tôi</h2>
+    <h2 className="border-l-4 border-brk-primary pl-4 text-2xl font-extrabold tracking-tight text-brk-on-surface sm:text-3xl">Không gian của tôi</h2>
     <p className="mt-2 text-sm text-brk-muted">Các khóa bạn tham gia hoặc phụ trách trên trang này.</p>
     <div ref={tabs} role="tablist" aria-label="Vai trò của tôi" className="mt-5 flex flex-wrap gap-2">
       {availableTabs.map(({ value, label, count }, index) => <button type="button" key={value} id={`my-${value}-tab`} role="tab" aria-selected={selectedTab === value} aria-controls="my-course-panel" tabIndex={selectedTab === value ? 0 : -1} onClick={() => selectTab(value)} onKeyDown={event => {
