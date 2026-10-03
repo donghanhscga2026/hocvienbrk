@@ -16,6 +16,7 @@ import PricingSection from './sections/PricingSection'
 import ClosingMessageSection from './sections/ClosingMessageSection'
 import CurriculumSection from './sections/CurriculumSection'
 import TestimonialsSection from './sections/TestimonialsSection'
+import RichContentSection from './sections/RichContentSection'
 
 const sectionRegistry: Record<CourseSectionType, React.ComponentType<any>> = {
   hero: HeroSection,
@@ -32,6 +33,7 @@ const sectionRegistry: Record<CourseSectionType, React.ComponentType<any>> = {
   closing_message: ClosingMessageSection,
   curriculum: CurriculumSection,
   testimonials: TestimonialsSection,
+  rich_content: RichContentSection,
 }
 
 interface SectionRendererProps {
