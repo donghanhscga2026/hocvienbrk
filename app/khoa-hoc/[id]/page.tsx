@@ -7,6 +7,7 @@ import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
+import { createWiGrowCoursePage, WIGROW_COURSE_SLUG } from '@/lib/course-page/templates/wigrow'
 
 const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
@@ -183,13 +184,18 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
         ? <NotificationLessonEntry courseSlug={course.id_khoa} lessonId={requestedLesson} />
         : null
 
+    // WI.GROW: nếu khóa mục tiêu chưa có CoursePage đã publish trong DB, dùng preset
+    // an toàn ở code để có thể preview trước. Khi admin đã publish cấu hình trong DB,
+    // dữ liệu DB luôn được ưu tiên và có thể chỉnh sửa bằng công cụ quản trị hiện tại.
+    const effectiveCoursePage = coursePage || (id === WIGROW_COURSE_SLUG ? createWiGrowCoursePage(id) : null)
+
     // coursePage đã được lấy song song ở trên cùng các query khác
-    if (coursePage && (coursePage as any).useTemplate !== false) {
+    if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
         return (
             <>
                 {notificationEntry}
                 <CoursePageView
-                    coursePage={coursePage as any}
+                    coursePage={effectiveCoursePage as any}
                     course={course}
                     enrollment={enrollment}
                     userPhone={userPhone}
