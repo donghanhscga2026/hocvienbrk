@@ -93,6 +93,7 @@ async function run() {
     await noOverflow(page)
     await page.getByRole('link',{name:'Liên hệ',exact:true}).scrollIntoViewIfNeeded()
     assert.ok(await page.evaluate(()=>document.querySelector('footer a').getBoundingClientRect().bottom<=document.querySelector('[data-home-mobile-navigation]').getBoundingClientRect().top+1));checks++
+    await page.locator('#course-preview').getByRole('tab',{name:'Kinh doanh',exact:true}).click()
     await page.getByRole('link',{name:'Xem toàn bộ danh mục Kinh doanh',exact:true}).click()
     await page.locator('[data-home-area="discover"]').waitFor()
     assert.equal(new URL(page.url()).searchParams.get('category'),'Kinh doanh');checks++
@@ -220,6 +221,30 @@ async function run() {
     await page.getByText('Thông điệp của trang',{exact:true}).waitFor()
     assert.equal(await page.locator('#my-courses').count(),0);checks++
     assert.equal(await page.locator('#continue-learning').count(),0);checks++
+    await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
+    const homeTabs=page.getByRole('tablist',{name:'Danh mục trên trang chủ'})
+    assert.equal(await homeTabs.getByRole('tab').count(),3);checks++
+    await homeTabs.getByRole('tab',{name:'Công nghệ',exact:true}).click()
+    assert.equal(await page.locator('#course-preview article').count(),2);checks++
+    assert.equal(await page.locator('#course-preview').getByRole('heading',{name:'Thiết kế website',exact:true}).count(),1);checks++
+    assert.equal(await page.locator('#course-preview').getByRole('heading',{name:'Khóa học 3',exact:true}).count(),0);checks++
+    assert.ok(await page.locator('#course-preview').getByRole('link',{name:'Xem toàn bộ danh mục Công nghệ',exact:true}).getAttribute('href').then(href=>new URL(href,base).searchParams.get('category')==='Công nghệ'));checks++
+    await homeTabs.getByRole('tab',{name:'Công nghệ',exact:true}).press('ArrowRight')
+    await page.waitForFunction(()=>document.querySelector('#home-category-2').getAttribute('aria-selected')==='true');checks++
+    assert.equal(await page.locator('#course-preview article').count(),2);checks++
+    await noOverflow(page)
+    await homeTabs.getByRole('tab',{name:'Kinh doanh',exact:true}).press('Home')
+    await page.waitForFunction(()=>document.querySelector('#home-category-0').getAttribute('aria-selected')==='true');checks++
+    assert.equal(await page.locator('#course-preview [role="tabpanel"]').count(),1);checks++
+    await page.setViewportSize({width:1440,height:1000})
+    await page.waitForFunction(()=>document.querySelectorAll('#course-preview article').length===6);checks++
+    assert.ok(await page.locator('#course-preview').getByText('7 học viên đang học',{exact:true}).first().isVisible());checks++
+    await homeTabs.getByRole('tab',{name:'Công nghệ',exact:true}).click()
+    await page.locator('#course-preview').getByRole('link',{name:'Xem toàn bộ danh mục Công nghệ',exact:true}).click()
+    await page.locator('[data-home-area="discover"]').waitFor()
+    assert.equal(await page.locator('#catalog article').count(),2);checks++
+    assert.equal(new URL(page.url()).searchParams.get('guest'),'1');checks++
+    await page.setViewportSize({width:360,height:780})
     await mobileMenu.getByRole('link',{name:'Học tập',exact:true}).click()
     await page.getByRole('heading',{name:'Đăng nhập để xem khóa học của bạn'}).waitFor();checks++
     assert.equal(new URL(page.url()).searchParams.get('guest'),'1');checks++
