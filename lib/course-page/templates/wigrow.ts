@@ -59,13 +59,13 @@ export function createWiGrowCoursePage(slug: string): CoursePage {
       successMode: 'show_message',
     },
     sections: [
-      { id:'wg-art-hero', sectionKey:'art-hero', type:'wigrow_artwork', enabled:true, sortOrder:10, visibility:'all', variant:'source', anchorId:'gioi-thieu', content:{ imageUrl:IMG.hero, imageAlt:'Đồng hành cùng con tuổi dậy thì', maxWidth:750, background:'#ffffff' }},
+      { id:'wg-art-hero', sectionKey:'art-hero', type:'wigrow_artwork', enabled:true, sortOrder:10, visibility:'all', variant:'source', anchorId:'gioi-thieu', content:{ imageUrl:IMG.hero, imageAlt:'Đồng hành cùng con tuổi dậy thì', maxWidth:750, background:'#ffffff', overlay:{ title:'Đồng hành\nCùng con', accent:'Tuổi dậy thì', top:22 } }},
       { id:'wg-intro', sectionKey:'intro', type:'rich_content', enabled:true, sortOrder:20, visibility:'all', variant:'section-light', anchorId:'gioi-thieu-du-an', content:{
         eyebrow:'WI.GROW', title:'Kiến tạo môi trường trưởng thành bắt đầu từ gia đình',
         description:'WI.GROW là dự án thuộc hệ sinh thái WIPA, kiến tạo môi trường trưởng thành bắt đầu từ gia đình, nơi cha mẹ, trẻ và chuyên gia cùng học, cùng thực hành và cùng lan tỏa những giá trị tốt đẹp.',
         cta:{label:'Đăng ký tham gia',action:'open_registration'}
       }},
-      { id:'wg-art-seed', sectionKey:'art-seed', type:'wigrow_artwork', enabled:true, sortOrder:30, visibility:'all', variant:'source', anchorId:'yeu-thuong', content:{ imageUrl:IMG.seed, imageAlt:'Đất lành nuôi hạt – Yêu thương nuôi người', maxWidth:750, background:'#ffffff' }},
+      { id:'wg-art-seed', sectionKey:'art-seed', type:'wigrow_artwork', enabled:true, sortOrder:30, visibility:'all', variant:'source', anchorId:'yeu-thuong', content:{ imageUrl:IMG.seed, imageAlt:'Đất lành nuôi hạt – Yêu thương nuôi người', maxWidth:750, background:'#ffffff', overlay:{ title:'Đất lành nuôi hạt', accent:'Yêu thương nuôi người', description:'Một hạt mầm cần đất tốt để bén rễ. Một đứa trẻ cũng cần một môi trường an toàn để được là chính mình, được lắng nghe và lớn lên trên hành trình yêu thương', top:17 } }},
       { id:'wg-vision', sectionKey:'vision', type:'rich_content', enabled:true, sortOrder:40, visibility:'all', variant:'section-soft', anchorId:'tam-nhin', content:{
         eyebrow:'Tầm nhìn', title:'Gia đình là một môi trường trưởng thành',
         paragraphs:['Mỗi gia đình có thể tự trở thành một môi trường trưởng thành: cha mẹ biết kiến tạo môi trường, trẻ từng bước biết tự dẫn dắt, các gia đình cùng nâng đỡ nhau và trao truyền những giá trị tốt đẹp cho thế hệ tiếp theo.']
@@ -74,7 +74,7 @@ export function createWiGrowCoursePage(slug: string): CoursePage {
         eyebrow:'Sứ mệnh', title:'Kết nối cha mẹ, trẻ và chuyên gia',
         paragraphs:['Kết nối cha mẹ, trẻ và chuyên gia trên một nền tảng nhận thức chung; đưa tri thức vào đời sống gia đình thông qua thực hành, trải nghiệm và kiểm chứng.','Từ đó, nuôi dưỡng năng lực thấu hiểu, lựa chọn, chịu trách nhiệm và tự chủ của mỗi người; lan tỏa những cách làm hiệu quả đến cộng đồng.']
       }},
-      { id:'wg-art-environment', sectionKey:'art-environment', type:'wigrow_artwork', enabled:true, sortOrder:60, visibility:'all', variant:'source', anchorId:'kien-tao-moi-truong', content:{ imageUrl:IMG.environment, imageAlt:'Kiến tạo môi trường – Cùng con trưởng thành', maxWidth:750, background:'#ffffff' }},
+      { id:'wg-art-environment', sectionKey:'art-environment', type:'wigrow_artwork', enabled:true, sortOrder:60, visibility:'all', variant:'source', anchorId:'kien-tao-moi-truong', content:{ imageUrl:IMG.environment, imageAlt:'Kiến tạo môi trường – Cùng con trưởng thành', maxWidth:750, background:'#ffffff', overlay:{ title:'Kiến tạo môi trường', accent:'Cùng con trưởng thành', description:'WI.GROW là dự án thuộc hệ sinh thái WIPA, kiến tạo môi trường trưởng thành bắt đầu từ gia đình, nơi cha mẹ, trẻ và chuyên gia cùng học, cùng thực hành và cùng lan tỏa những giá trị tốt đẹp.', top:16 } }},
       { id:'wg-experts', sectionKey:'experts', type:'instructor', enabled:true, sortOrder:70, visibility:'all', variant:'section-soft', anchorId:'chuyen-gia', content:{
         eyebrow:'CHUYÊN GIA', title:'Đồng hành cùng các chuyên gia', instructors:[
           {id:'ngo-manh-cuong',name:'Thầy Ngô Mạnh Cường',role:'Nhà đào tạo Tâm Thức và Năng Lượng • Cố vấn nâng tầm Nhân Hiệu & Thương Hiệu',imageUrl:IMG.expertCuong,bio:[]},
