@@ -12,6 +12,7 @@ interface InstructorSectionProps {
 
 export default function InstructorSection({ id, variant, content }: InstructorSectionProps) {
   const isImageRight = variant === 'single-image-right'
+  const isWiGrow = variant === 'wigrow'
 
   return (
     <section id={id} className="section-light" style={{ padding: 'var(--section-space) 24px' }}>
@@ -39,18 +40,18 @@ export default function InstructorSection({ id, variant, content }: InstructorSe
               style={{
                 background: '#F6EDDE',
                 borderRadius: 'var(--radius-card)',
-                padding: '48px',
+                padding: isWiGrow ? '18px' : '48px',
                 display: 'flex',
                 flexDirection: isImageRight ? 'row-reverse' : 'row',
-                gap: '40px',
-                alignItems: 'center',
+                gap: isWiGrow ? '14px' : '40px',
+                alignItems: isWiGrow ? 'stretch' : 'center',
                 boxShadow: '0 12px 30px rgba(0,0,0,.08)',
                 flexWrap: 'wrap',
               }}
             >
               {ins.imageUrl && (
-                <div style={{ position: 'relative', width: '180px', height: '180px', borderRadius: '16px', overflow: 'hidden', flexShrink: 0, boxShadow: '0 12px 30px rgba(0,0,0,.15)' }}>
-                  <Image src={ins.imageUrl} alt={ins.imageAlt || ins.name} fill className="object-cover" />
+                <div style={{ position: 'relative', width: isWiGrow ? '42%' : '180px', height: isWiGrow ? 'auto' : '180px', aspectRatio: isWiGrow ? '3 / 4' : undefined, borderRadius: isWiGrow ? '6px' : '16px', overflow: 'hidden', flexShrink: 0, boxShadow: '0 12px 30px rgba(0,0,0,.15)' }}>
+                  <Image src={ins.imageUrl} alt={ins.imageAlt || ins.name} fill sizes={isWiGrow ? '(max-width: 750px) 42vw, 315px' : '180px'} style={{ objectFit: isWiGrow ? 'contain' : 'cover', objectPosition: 'center' }} />
                 </div>
               )}
               <div style={{ flex: 1 }}>
