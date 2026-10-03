@@ -16,6 +16,7 @@ const courseSelect = {
   category: true, phi_coc: true, feeType: true, voucherConfig: true, allowMbvDeduction: true,
   createdAt: true, updatedAt: true,
   teacher: { select: { id: true, name: true } },
+  teacherBankAccount: { select: { accountHolder: true, accountNumber: true, bankName: true, qrCodeUrl: true } },
   courseCategory: { select: { name: true } },
   _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' as const } } } },
 } as const
@@ -35,7 +36,7 @@ export default async function MySpacePage() {
         select: {
           id: true, courseId: true, status: true, startedAt: true, lastLessonId: true,
           course: { select: courseSelect },
-          payment: { select: { id: true, status: true, proofImage: true } },
+          payment: { select: { id: true, status: true, proofImage: true, qrCodeUrl: true, transferContent: true, amount: true, bankName: true, accountNumber: true } },
           _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } },
         },
       }),

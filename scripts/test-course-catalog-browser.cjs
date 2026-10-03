@@ -340,7 +340,7 @@ async function run() {
     const spaceMobile=page.getByRole('navigation',{name:'Menu cá nhân trên điện thoại',exact:true})
     await spaceMobile.getByRole('link',{name:'Tổng quan',exact:true}).click()
     assert.equal(await page.locator('details').getAttribute('open'),null);checks++
-    await page.getByRole('button',{name:'Ví & quyền lợi →',exact:true}).click()
+    await page.getByRole('button',{name:/^Ví & quyền lợi →/}).click()
     assert.equal(await page.evaluate(()=>window.__walletOpened),true);checks++
     await noOverflow(page)
     await page.goto(base+'/my-space?role=student')
