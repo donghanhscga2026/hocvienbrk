@@ -16,7 +16,7 @@ interface Props {
   roadmapTitle: string; onOpenMembership: () => void; isLoggedIn: boolean
 }
 
-const headingClass = 'border-l-4 border-brk-primary pl-4 text-2xl font-extrabold tracking-tight text-brk-on-surface sm:text-3xl'
+const headingClass = 'text-xl font-semibold leading-snug text-brk-on-surface sm:text-[22px]'
 
 export default function HomeOverview({ title, activeCourses, enrollments, catalog, myCourses, roadmap, community, message, roadmapTitle, onOpenMembership, isLoggedIn }: Props) {
   const params = useSearchParams()
@@ -43,7 +43,7 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
   }, [])
 
   const tools = <section id="ecosystem" aria-label="Công cụ trong hệ sinh thái" className="min-w-0">
-    <h2 className={headingClass}>Công cụ đồng hành</h2><p className="mt-3 text-sm text-brk-muted">Mở các tiện ích hỗ trợ học tập và công việc.</p>
+    <p className="mt-0 text-sm text-brk-muted">Mở các tiện ích hỗ trợ học tập và công việc.</p>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
       <Link href="/tools" className="flex min-w-0 items-start gap-4 rounded-2xl border border-brk-outline bg-brk-surface p-5 hover:border-brk-primary"><Wrench className="mt-1 h-6 w-6 shrink-0 text-brk-primary" aria-hidden /><div><h3 className="font-bold text-brk-on-surface">Khám phá công cụ</h3><p className="mt-2 text-sm text-brk-muted">Chọn công cụ phù hợp với vai trò và quyền truy cập của bạn.</p><span className="mt-3 inline-block text-sm font-semibold text-brk-primary">Mở khu công cụ →</span></div></Link>
       {isLoggedIn ? <button type="button" onClick={onOpenMembership} className="flex min-w-0 items-start gap-4 rounded-2xl border border-brk-outline bg-brk-surface p-5 text-left hover:border-brk-primary"><Compass className="mt-1 h-6 w-6 shrink-0 text-brk-primary" aria-hidden /><div><h3 className="font-bold text-brk-on-surface">Bảng thành viên</h3><p className="mt-2 text-sm text-brk-muted">Thông tin và hoạt động của tài khoản.</p><span className="mt-3 inline-block text-sm font-semibold text-brk-primary">Mở bảng thành viên →</span></div></button> : <div className="rounded-2xl border border-brk-outline bg-brk-surface p-5"><h3 className="font-bold text-brk-on-surface">Học theo nhịp của bạn</h3><p className="mt-2 text-sm text-brk-muted">Đăng nhập để theo dõi các khóa đã đăng ký và tiến độ học.</p><Link href="/login" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brk-primary">Đăng nhập →</Link></div>}
@@ -51,7 +51,7 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
   </section>
 
   return <>
-    {area === 'home' && (message ? <section aria-label="Thông điệp">{message}</section> : <h1 className="mx-auto max-w-7xl px-4 py-6 text-3xl font-extrabold text-brk-on-surface">{title}</h1>)}
+    {area === 'home' && (message ? <section aria-label="Thông điệp">{message}</section> : <h1 className="mx-auto max-w-7xl px-4 py-6 text-2xl font-semibold text-brk-on-surface sm:text-[28px]">{title}</h1>)}
     <nav ref={navigation} aria-label="Điều hướng hệ sinh thái" className="sticky top-14 z-40 border-y border-brk-outline bg-brk-surface shadow-sm">
       <div className="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-3 py-3 sm:flex sm:flex-wrap sm:px-6">
         {links.map(({ area: next, label, icon: Icon }) => <HomeAreaLink key={next} area={next} aria-current={area === next ? 'page' : undefined} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-sm font-bold sm:gap-2 sm:px-5 ${area === next ? 'border-brk-primary bg-brk-primary text-brk-on-primary' : 'border-brk-outline text-brk-on-surface hover:border-brk-primary hover:bg-brk-background'}`}>
@@ -59,8 +59,11 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
         </HomeAreaLink>)}
       </div>
     </nav>
-    <div data-home-area={area} className="mx-auto max-w-7xl space-y-8 px-4 py-6 sm:space-y-10 sm:px-6">
-      <h1 id="home-area-title" tabIndex={-1} className={`${headingClass} outline-none`}>{links.find(link => link.area === area)?.label}</h1>
+    <div data-home-area={area} className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:space-y-6 sm:px-6">
+      {area !== 'discover' && <div className={area === 'community' ? 'sr-only' : ''}>
+        <h1 id="home-area-title" tabIndex={-1} className="text-2xl font-semibold leading-tight tracking-tight text-brk-on-surface outline-none sm:text-[28px]">{area === 'path' ? roadmapTitle : area === 'tools' ? 'Công cụ đồng hành' : links.find(link => link.area === area)?.label}</h1>
+        <span aria-hidden className="mt-3 block h-1 w-8 rounded-full bg-brk-primary" />
+      </div>}
       {area === 'home' && <>
         <section id="home-shortcuts" aria-label="Lối vào nhanh" className="min-w-0">
           <p className="mb-5 text-sm text-brk-muted">Chọn khu vực bạn cần để bắt đầu.</p>
@@ -75,7 +78,7 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
           {activeCourses.filter(course => !enrollments[course.id]?.hiddenFromGifts).length ? <div className="space-y-3">{activeCourses.filter(course => !enrollments[course.id]?.hiddenFromGifts).slice(0, 1).map(course => <CourseListRow key={course.id} course={course} enrollment={enrollments[course.id]} />)}</div> : <p className="text-sm text-brk-muted">Bạn chưa có khóa đang học trên trang này. Mở Học tập để xem các khóa đã đăng ký và khóa bạn phụ trách.</p>}
         </section>}
       </>}
-      {area === 'path' && <section id="learning-path"><h2 className={`mb-5 ${headingClass}`}>{roadmapTitle}</h2><div className="min-w-0">{roadmap}</div></section>}
+      {area === 'path' && <section id="learning-path"><div className="min-w-0">{roadmap}</div></section>}
       {area === 'learning' && (myCourses || <section className="rounded-2xl border border-brk-outline bg-brk-surface p-6"><h2 className="text-xl font-bold text-brk-on-surface">Đăng nhập để xem khóa học của bạn</h2><p className="mt-2 text-sm text-brk-muted">Theo dõi tiến độ và tiếp tục các khóa đã đăng ký.</p><Link href="/login" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brk-primary px-5 font-semibold text-brk-on-primary">Đăng nhập</Link></section>)}
       {area === 'discover' && catalog}
       {area === 'tools' && tools}

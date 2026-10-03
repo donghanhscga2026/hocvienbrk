@@ -41,8 +41,8 @@ export default function CommunityBoard({ posts = [], isAdmin, title = 'Bảng ti
                 <div className="flex items-center gap-2">
                     <Newspaper className="w-6 h-6 text-brk-primary" />
                     <div>
-                        <h2 className="text-xl font-black text-brk-on-surface uppercase tracking-tight leading-none">{title}</h2>
-                        <p className="text-[9px] text-brk-accent font-bold uppercase mt-1">({total} bài)</p>
+                        <h2 className="text-2xl font-semibold leading-tight tracking-tight text-brk-on-surface sm:text-[28px]">{title}</h2>
+                        <p className="text-sm text-brk-muted mt-2">({total} bài)</p>
                     </div>
                 </div>
                 

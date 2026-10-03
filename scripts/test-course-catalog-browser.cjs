@@ -48,7 +48,7 @@ async function run() {
       category:index<2?'Công nghệ':'Kinh doanh',teacher:{id:index===0?10:20,name:index===0?'Hương Lucy':'Thầy Cường'},activeStudentCount:7,_count:{lessons:12},updatedAt:'2026-10-01',
     }))
     const enrollments={1:{status:'ACTIVE',startedAt:null,completedCount:4,totalLessons:12},2:{status:'PENDING',startedAt:null,completedCount:0,totalLessons:12},3:{status:'COMPLETED',startedAt:null,completedCount:12,totalLessons:12},4:{status:'ACTIVE',hiddenFromGifts:true,startedAt:null,completedCount:1,totalLessons:12}}
-    write('app/page.tsx',`'use client';import {useEffect,useState} from 'react';import {useSearchParams} from 'next/navigation';import Catalog from '@/components/home/CourseCatalog';import Overview from '@/components/home/HomeOverview';import Preview from '@/components/home/CourseDiscoveryPreview';import Personal from '@/components/home/PersonalCourses';import {catalogCategory,splitHomeCourses} from '@/lib/course-catalog';const courses=${JSON.stringify(courses)};const enrollments=${JSON.stringify(enrollments)};export default function Page(){const [ready,setReady]=useState(false);useEffect(()=>setReady(true),[]);const params=useSearchParams();const guest=params.get('guest')==='1';const canDiscover=params.get('nocatalog')!=='1';const canCommunity=params.get('nocommunity')!=='1';const personal=splitHomeCourses(courses,enrollments,guest?null:10,params.get('role')==='student'?'STUDENT':'TEACHER');const category=params.get('category')||'';return <div data-testid="fixture" data-ready={ready}><Overview title="Học tập và phát triển cùng nhau" courses={courses} activeCourses={personal.learning.filter(course=>enrollments[course.id].status==='ACTIVE')} enrollments={guest?{}:enrollments} isLoggedIn={!guest} userName="Học viên" onOpenMembership={()=>{}} myCourses={guest?undefined:<Personal learning={personal.learning} teaching={personal.teaching} enrollments={enrollments} userPhone={null} userId={10} canDiscover={canDiscover}/>} roadmapTitle="Thiết kế lộ trình" roadmap={<p>Nội dung lộ trình</p>} community={canCommunity?<h2>Cộng đồng và chia sẻ</h2>:undefined} communityPreview={canCommunity?<h2>Hoạt động cộng đồng gần đây</h2>:undefined} message={<p>Thông điệp của trang</p>} discoveryPreview={canDiscover?<Preview courses={guest?courses:personal.discover} enrollments={guest?{}:enrollments}/>:undefined} catalog={canDiscover?<Catalog key={category} initialExpanded={params.get('expanded')==='1'} initialCategory={courses.some(course=>catalogCategory(course)===category)?category:''} title="Tất cả khóa học" courses={courses} discoveryCourses={guest?undefined:personal.discover} enrollmentsMap={guest?{}:enrollments} isLoggedIn={!guest} userPhone={null} userId={guest?null:10} featuredIds={[1]} latestIds={[2,3]}/>:undefined}/></div>}`)
+    write('app/page.tsx',`'use client';import {useEffect,useState} from 'react';import {useSearchParams} from 'next/navigation';import Catalog from '@/components/home/CourseCatalog';import Overview from '@/components/home/HomeOverview';import Preview from '@/components/home/CourseDiscoveryPreview';import Personal from '@/components/home/PersonalCourses';import {catalogCategory,splitHomeCourses} from '@/lib/course-catalog';const baseCourses=${JSON.stringify(courses)};const enrollments=${JSON.stringify(enrollments)};export default function Page(){const [ready,setReady]=useState(false);useEffect(()=>setReady(true),[]);const params=useSearchParams();const courses=params.get('many')==='1'?baseCourses.slice(0,12).map((course,index)=>({...course,category:["Khác","AI - Công nghệ","Nâng cao - Coaching","Ngoại Ngữ","Nền tảng - Cơ bản","Marketing & Sales","Huyền học - Tâm linh","Sức khỏe - Thể chất","Dành Cho Con Yêu","Video - Livestream","Nội tâm - triết lý nhân sinh","Tài chính - kinh doanh - đầu tư"][index]})):baseCourses;const guest=params.get('guest')==='1';const canDiscover=params.get('nocatalog')!=='1';const canCommunity=params.get('nocommunity')!=='1';const personal=splitHomeCourses(courses,enrollments,guest?null:10,params.get('role')==='student'?'STUDENT':'TEACHER');const category=params.get('category')||'';return <div data-testid="fixture" data-ready={ready}><Overview title="Học tập và phát triển cùng nhau" courses={courses} activeCourses={personal.learning.filter(course=>enrollments[course.id].status==='ACTIVE')} enrollments={guest?{}:enrollments} isLoggedIn={!guest} userName="Học viên" onOpenMembership={()=>{}} myCourses={guest?undefined:<Personal learning={personal.learning} teaching={personal.teaching} enrollments={enrollments} userPhone={null} userId={10} canDiscover={canDiscover}/>} roadmapTitle="Thiết kế lộ trình" roadmap={<p>Nội dung lộ trình</p>} community={canCommunity?<h2>Cộng đồng và chia sẻ</h2>:undefined} communityPreview={canCommunity?<h2>Hoạt động cộng đồng gần đây</h2>:undefined} message={<p>Thông điệp của trang</p>} discoveryPreview={canDiscover?<Preview courses={guest?courses:personal.discover} enrollments={guest?{}:enrollments}/>:undefined} catalog={canDiscover?<Catalog key={category} initialExpanded={params.get('expanded')==='1'} initialCategory={courses.some(course=>catalogCategory(course)===category)?category:''} title="Tất cả khóa học" courses={courses} discoveryCourses={guest?undefined:personal.discover} enrollmentsMap={guest?{}:enrollments} isLoggedIn={!guest} userPhone={null} userId={guest?null:10} featuredIds={[1]} latestIds={[2,3]}/>:undefined}/></div>}`)
     write('app/page/[slug]/page.tsx',`'use client';export {default} from '../../page'`)
     server=spawn(process.execPath,[path.join(repo,'node_modules/next/dist/bin/next'),'dev','--webpack','-H','127.0.0.1','-p','3108'],{cwd:fixture,env:{...process.env,NODE_ENV:'development',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe']})
     server.stdout.on('data',chunk=>{logs+=chunk});server.stderr.on('data',chunk=>{logs+=chunk})
@@ -126,7 +126,7 @@ async function run() {
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
     const catalog=page.locator('#catalog')
     await catalog.getByRole('button',{name:'← Quay lại các danh mục',exact:true}).click()
-    await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).waitFor()
+    await catalog.getByRole('combobox',{name:'Phạm vi khám phá'}).waitFor()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===6);checks++
     assert.equal(await catalog.getByRole('region',{name:'Khóa học danh mục Kinh doanh'}).count(),1);checks++
     await page.setViewportSize({width:390,height:844})
@@ -138,7 +138,7 @@ async function run() {
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===2);checks++
     assert.equal(await catalog.getByRole('tab',{name:'Tất cả danh mục',exact:true}).getAttribute('aria-selected'),'true');checks++
     await page.setViewportSize({width:1440,height:1000})
-    await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).click()
+    await catalog.getByRole('combobox',{name:'Phạm vi khám phá'}).selectOption('all')
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===8)
     assert.equal(await catalog.getByRole('region',{name:'Khóa học danh mục Công nghệ'}).count(),1);checks++
     const instructor=catalog.locator('article').getByText('Hương Lucy',{exact:true}).first()
@@ -160,6 +160,8 @@ async function run() {
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===12);checks++
     await categoryTabs.getByRole('tab',{name:'Tất cả danh mục',exact:true}).click()
     assert.equal(await catalog.getByRole('combobox',{name:'Danh mục',exact:true}).count(),0);checks++
+    assert.equal(await catalog.getByRole('region',{name:'Bộ lọc khóa học'}).count(),0);checks++
+    await catalog.getByRole('button',{name:'Bộ lọc',exact:true}).click()
     await catalog.getByRole('combobox',{name:'Hiển thị khóa học'}).selectOption('free')
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===1);checks++
     await catalog.getByRole('combobox',{name:'Hiển thị khóa học'}).selectOption('all')
@@ -178,13 +180,18 @@ async function run() {
     await page.waitForFunction(()=>document.querySelector('#catalog button[aria-label="Thẻ"]').getAttribute('aria-pressed')==='true')
     checks++
     await catalog.getByRole('button',{name:'Danh sách',exact:true}).click()
-    await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).click()
+    await catalog.getByRole('combobox',{name:'Phạm vi khám phá'}).selectOption('all')
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===12)
+    await catalog.getByRole('button',{name:'Bộ lọc',exact:true}).click()
     const sidebar=page.getByRole('region',{name:'Bộ lọc khóa học'})
     await sidebar.getByRole('combobox',{name:'Giáo viên',exact:true}).selectOption('10')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
     assert.equal(await page.locator('#catalog article').count(),1);checks++
+    await catalog.getByRole('button',{name:'Xong, xem khóa học'}).click()
+    assert.equal(await sidebar.count(),0);checks++
+    assert.ok(await page.getByRole('button',{name:'Bỏ lọc Giáo viên: Hương Lucy'}).isVisible());checks++
     await page.getByRole('button',{name:'Bỏ lọc Giáo viên: Hương Lucy'}).click()
+    await catalog.getByRole('button',{name:'Bộ lọc',exact:true}).click()
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent==='14 khóa học');checks++
     await sidebar.getByRole('combobox',{name:'Khoảng phí niêm yết'}).selectOption('to1m')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
@@ -211,6 +218,8 @@ async function run() {
     await mobileMenu.getByRole('link',{name:'Học tập',exact:true}).click()
     await page.locator('[data-home-area="learning"]').waitFor()
     const personal=page.locator('#my-courses')
+    assert.equal(await page.getByRole('heading',{name:'Không gian của tôi',exact:true}).count(),0);checks++
+    assert.equal(await page.getByRole('heading',{name:'Học tập',exact:true}).evaluate(el=>getComputedStyle(el).fontWeight),'600');checks++
     assert.equal(await personal.locator('details').count(),0);checks++
     assert.ok(await personal.getByRole('link',{name:'Tiếp tục học',exact:true}).isVisible());checks++
     await personal.getByRole('button',{name:'Chờ kích hoạt (1)',exact:true}).click()
@@ -270,6 +279,28 @@ async function run() {
     assert.equal(await page.locator('#course-preview').count(),0);checks++
     assert.equal(await mobileMenu.getByRole('link',{name:'Cộng đồng',exact:true}).count(),0);checks++
     await noOverflow(page)
+    await page.goto(base+'?guest=1&many=1&section=discover')
+    await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
+    await page.waitForFunction(()=>document.querySelectorAll('#catalog-category-list [role="tab"]:not(.hidden)').length===4)
+    const manyTabs=catalog.getByRole('tablist',{name:'Danh mục khóa học'})
+    assert.equal(await manyTabs.getByRole('tab').count(),4);checks++
+    assert.deepEqual(await manyTabs.getByRole('tab').allTextContents(),['Tất cả danh mục','Nền tảng - Cơ bản','Nội tâm - triết lý nhân sinh','Sức khỏe - Thể chất']);checks++
+    assert.ok(await catalog.locator('article').first().evaluate(el=>el.getBoundingClientRect().top<window.innerHeight));checks++
+    assert.equal(await catalog.getByRole('region',{name:'Bộ lọc khóa học'}).count(),0);checks++
+    await catalog.getByRole('button',{name:'Thêm danh mục',exact:true}).click()
+    assert.equal(await manyTabs.getByRole('tab').count(),13);checks++
+    await manyTabs.getByRole('tab',{name:'Huyền học - Tâm linh',exact:true}).click()
+    await catalog.getByRole('button',{name:'Thu gọn danh mục',exact:true}).click()
+    assert.equal(await manyTabs.getByRole('tab').count(),4);checks++
+    assert.equal(await manyTabs.getByRole('tab',{name:'Huyền học - Tâm linh',exact:true}).getAttribute('aria-selected'),'true');checks++
+    await manyTabs.getByRole('tab',{name:'Huyền học - Tâm linh',exact:true}).press('ArrowRight')
+    assert.equal(await manyTabs.getByRole('tab',{name:'Tất cả danh mục',exact:true}).getAttribute('aria-selected'),'true');checks++
+    await noOverflow(page)
+    await page.setViewportSize({width:1440,height:1000})
+    assert.equal(await manyTabs.getByRole('tab').count(),13);checks++
+    assert.deepEqual(await manyTabs.getByRole('tab').allTextContents(),['Tất cả danh mục','Nền tảng - Cơ bản','Nội tâm - triết lý nhân sinh','Sức khỏe - Thể chất','Tài chính - kinh doanh - đầu tư','Marketing & Sales','AI - Công nghệ','Video - Livestream','Ngoại Ngữ','Dành Cho Con Yêu','Nâng cao - Coaching','Huyền học - Tâm linh','Khác']);checks++
+    assert.ok(await manyTabs.evaluate(el=>el.scrollWidth<=el.clientWidth+1));checks++
+    assert.equal(await catalog.getByRole('heading',{name:'Khám phá khóa học',exact:true}).count(),1);checks++
     assert.deepEqual(errors,[]);checks++
     console.log(JSON.stringify({result:'passed',checks,scope:'real home areas + wrapped navigation/category tabs + catalog + Tailwind + Next.js; Back/reload/profile/ref preservation; teacher/student/guest/visibility; 1440/390/360px; payment cards and secondary slots stubbed; fixtures only'}))
   }catch(error){console.error(logs.slice(-5000));if(page)console.error('UI state',await page.evaluate(()=>({ready:document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready'),count:document.querySelectorAll('#catalog article').length,status:document.querySelector('#catalog [role="status"]')?.textContent,scopes:[...document.querySelectorAll('[aria-label="Phạm vi khám phá"] button')].map(button=>[button.textContent,button.getAttribute('aria-pressed')])})));throw error}
