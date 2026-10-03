@@ -10,7 +10,7 @@ async function run() {
   const repo = path.resolve(__dirname,'..')
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(),'course-catalog-ui-'))
   const base = 'http://127.0.0.1:3108'
-  let browser, server, logs='', checks=0
+  let browser, server, page, logs='', checks=0
   const write = (file,content) => {
     const target=path.join(fixture,file)
     fs.mkdirSync(path.dirname(target),{recursive:true})
@@ -26,6 +26,8 @@ async function run() {
     write('package.json','{"name":"catalog-fixture","private":true}')
     write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2017',jsx:'preserve',module:'esnext',moduleResolution:'bundler',esModuleInterop:true,baseUrl:'.',paths:{'@/*':['./*']}}}))
     copy('postcss.config.mjs')
+    fs.mkdirSync(path.join(fixture,'public'),{recursive:true})
+    fs.copyFileSync(path.join(repo,'public/og-image.png'),path.join(fixture,'public/og-image.png'))
     copy('components/home/CourseCatalog.tsx')
     copy('components/home/HomeOverview.tsx')
     copy('components/home/PersonalCourses.tsx')
@@ -40,7 +42,7 @@ async function run() {
       category:index<2?'Công nghệ':'Kinh doanh',teacher:{id:index===0?10:20,name:index===0?'Hương Lucy':'Thầy Cường'},activeStudentCount:7,_count:{lessons:12},updatedAt:'2026-10-01',
     }))
     const enrollments={1:{status:'ACTIVE',startedAt:null,completedCount:4,totalLessons:12},2:{status:'PENDING',startedAt:null,completedCount:0,totalLessons:12},3:{status:'COMPLETED',startedAt:null,completedCount:12,totalLessons:12},4:{status:'ACTIVE',hiddenFromGifts:true,startedAt:null,completedCount:1,totalLessons:12}}
-    write('app/page.tsx',`'use client';import {useSearchParams} from 'next/navigation';import Catalog from '@/components/home/CourseCatalog';import Overview from '@/components/home/HomeOverview';import Personal from '@/components/home/PersonalCourses';import {splitHomeCourses} from '@/lib/course-catalog';const courses=${JSON.stringify(courses)};const enrollments=${JSON.stringify(enrollments)};export default function Page(){const params=useSearchParams();const guest=params.get('guest')==='1';const personal=splitHomeCourses(courses,enrollments,guest?null:10,params.get('role')==='student'?'STUDENT':'TEACHER');return <Overview title="Học tập và phát triển cùng nhau" courses={courses} activeCourses={[]} enrollments={enrollments} isLoggedIn={!guest} userName="Học viên" onOpenMembership={()=>{}} myCourses={guest?undefined:<Personal learning={personal.learning} teaching={personal.teaching} enrollments={enrollments} userPhone={null} userId={10}/>} roadmapTitle="Thiết kế lộ trình" roadmap={<p>Nội dung lộ trình</p>} community={<h2>Cộng đồng và chia sẻ</h2>} message={<p>Thông điệp của trang</p>} catalog={<Catalog title="Tất cả khóa học" courses={courses} discoveryCourses={guest?undefined:personal.discover} enrollmentsMap={guest?{}:enrollments} isLoggedIn={!guest} userPhone={null} userId={guest?null:10} featuredIds={[1]} latestIds={[2,3]}/>}/>}`)
+    write('app/page.tsx',`'use client';import {useEffect,useState} from 'react';import {useSearchParams} from 'next/navigation';import Catalog from '@/components/home/CourseCatalog';import Overview from '@/components/home/HomeOverview';import Personal from '@/components/home/PersonalCourses';import {splitHomeCourses} from '@/lib/course-catalog';const courses=${JSON.stringify(courses)};const enrollments=${JSON.stringify(enrollments)};export default function Page(){const [ready,setReady]=useState(false);useEffect(()=>setReady(true),[]);const params=useSearchParams();const guest=params.get('guest')==='1';const personal=splitHomeCourses(courses,enrollments,guest?null:10,params.get('role')==='student'?'STUDENT':'TEACHER');return <div data-testid="fixture" data-ready={ready}><Overview title="Học tập và phát triển cùng nhau" courses={courses} activeCourses={[]} enrollments={enrollments} isLoggedIn={!guest} userName="Học viên" onOpenMembership={()=>{}} myCourses={guest?undefined:<Personal learning={personal.learning} teaching={personal.teaching} enrollments={enrollments} userPhone={null} userId={10}/>} roadmapTitle="Thiết kế lộ trình" roadmap={<p>Nội dung lộ trình</p>} community={<h2>Cộng đồng và chia sẻ</h2>} message={<p>Thông điệp của trang</p>} catalog={<Catalog title="Tất cả khóa học" courses={courses} discoveryCourses={guest?undefined:personal.discover} enrollmentsMap={guest?{}:enrollments} isLoggedIn={!guest} userPhone={null} userId={guest?null:10} featuredIds={[1]} latestIds={[2,3]}/>}/></div>}`)
     server=spawn(process.execPath,[path.join(repo,'node_modules/next/dist/bin/next'),'dev','--webpack','-H','127.0.0.1','-p','3108'],{cwd:fixture,env:{...process.env,NODE_ENV:'development',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe']})
     server.stdout.on('data',chunk=>{logs+=chunk});server.stderr.on('data',chunk=>{logs+=chunk})
     let ready=false
@@ -52,9 +54,10 @@ async function run() {
     assert.ok(ready,'Fixture must start')
     browser=await chromium.launch({headless:true,args:['--no-sandbox']})
     const context=await browser.newContext({viewport:{width:1440,height:1000}})
-    const page=await context.newPage()
+    page=await context.newPage()
     const errors=[];page.on('pageerror',error=>errors.push(error.message))
     await page.goto(base)
+    await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
     const catalog=page.locator('#catalog')
     await catalog.getByRole('button',{name:'Tất cả khóa học (14)',exact:true}).waitFor()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===10);checks++
@@ -77,6 +80,7 @@ async function run() {
     await page.getByTestId('gallery-card').first().waitFor()
     assert.equal(await page.getByTestId('gallery-card').count(),1);checks++
     await page.reload()
+    await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
     await page.waitForFunction(()=>document.querySelector('#catalog button[aria-label="Thẻ"]').getAttribute('aria-pressed')==='true')
     checks++
     await catalog.getByRole('button',{name:'Danh sách',exact:true}).click()
@@ -145,7 +149,7 @@ async function run() {
     await noOverflow(page)
     assert.deepEqual(errors,[]);checks++
     console.log(JSON.stringify({result:'passed',checks,scope:'real homepage overview + catalog UI + Tailwind + Next.js; teacher/student/guest; personal tabs + shortcuts + discovery; 1440/390/360px; secondary slots and gallery stubbed; fixtures only'}))
-  }catch(error){console.error(logs.slice(-5000));throw error}
+  }catch(error){console.error(logs.slice(-5000));if(page)console.error('UI state',await page.evaluate(()=>({ready:document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready'),count:document.querySelectorAll('#catalog article').length,status:document.querySelector('#catalog [role="status"]')?.textContent,scopes:[...document.querySelectorAll('[aria-label="Phạm vi khám phá"] button')].map(button=>[button.textContent,button.getAttribute('aria-pressed')])})));throw error}
   finally{
     if(browser)await browser.close()
     if(server&&server.exitCode===null){const stopped=new Promise(resolve=>server.once('exit',resolve));server.kill('SIGTERM');await stopped}
