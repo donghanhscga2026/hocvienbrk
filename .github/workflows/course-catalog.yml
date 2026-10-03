@@ -4,6 +4,8 @@ on:
     branches: [master]
     paths:
       - components/home/**
+      - components/course/CourseDiscoveryCard.tsx
+      - components/course/CourseInstructor.tsx
       - lib/course-catalog.ts
       - app/actions/site-profile-actions.ts
       - scripts/test-course-catalog*.cjs
@@ -24,7 +26,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/test-course-catalog.cjs
-      - run: npx eslint components/home/HomeOverview.tsx components/home/PersonalCourses.tsx components/home/CourseCatalog.tsx lib/course-catalog.ts
+      - run: npx eslint components/home/HomeOverview.tsx components/home/HomeAreaLink.tsx components/home/CourseDiscoveryPreview.tsx components/home/PersonalCourses.tsx components/home/CourseCatalog.tsx components/course/CourseDiscoveryCard.tsx components/course/CourseInstructor.tsx lib/course-catalog.ts
       - name: Install isolated browser tools
         run: |
           npm install --prefix "$RUNNER_TEMP/catalog-browser" --no-package-lock playwright@1.62.1

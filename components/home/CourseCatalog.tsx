@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternal
 import Image from 'next/image'
 import Link from 'next/link'
 import { LayoutGrid, List, Search, X, BookOpen, ArrowRight } from 'lucide-react'
-import CourseCard from '@/components/course/CourseCard'
+import CourseDiscoveryCard from '@/components/course/CourseDiscoveryCard'
 import CourseInstructor from '@/components/course/CourseInstructor'
 import { isValidImageUrl } from '@/lib/image-validation'
 import {
@@ -17,6 +17,7 @@ interface Props {
   isLoggedIn: boolean; userPhone: string | null; userId: number | null; profileSlug?: string | null
   featuredIds?: number[]; latestIds?: number[]
   discoveryCourses?: CatalogCourse[]
+  initialCategory?: string; initialExpanded?: boolean
 }
 const fieldClass = 'mt-2 w-full min-w-0 rounded-xl border border-brk-outline bg-brk-surface px-3 py-3 text-sm text-brk-on-surface focus:outline-none focus:ring-2 focus:ring-brk-accent'
 const viewKey = 'mfc-course-catalog-view'
@@ -27,15 +28,15 @@ const subscribeWidth = (callback: () => void) => {
 }
 const previewSize = () => window.innerWidth >= 1024 ? 6 : window.innerWidth >= 640 ? 4 : 2
 
-export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, userPhone, userId, profileSlug, featuredIds = [], latestIds = [], discoveryCourses }: Props) {
+export default function CourseCatalog({ title, courses, enrollmentsMap, isLoggedIn, featuredIds = [], latestIds = [], discoveryCourses, initialCategory = '', initialExpanded = false }: Props) {
   const [scope, setScope] = useState<'discover' | 'all'>('discover')
   const sourceCourses = scope === 'discover' && discoveryCourses ? discoveryCourses : courses
   const categoryTabs = useRef<HTMLDivElement>(null)
   const [group, setGroup] = useState<'all' | 'featured' | 'latest'>('all')
-  const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS })
+  const [filters, setFilters] = useState<CatalogFilters>({ ...EMPTY_CATALOG_FILTERS, category: initialCategory })
   const [view, setView] = useState<'list' | 'gallery'>('gallery')
   const [limit, setLimit] = useState(12)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initialExpanded)
   const overview = useRef<{ filters: CatalogFilters; scroll: number } | null>(null)
   const categoryLimit = useSyncExternalStore(subscribeWidth, previewSize, () => 6)
   const deferredQuery = useDeferredValue(filters.query)
@@ -81,7 +82,7 @@ export default function CourseCatalog({ title, courses, enrollmentsMap, isLogged
   }
   const renderCourses = (items: CatalogCourse[]) => <div className={view === 'gallery' ? 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
     {items.map(course => view === 'gallery' ? <div key={course.id} className="min-w-0">
-      <CourseCard course={course} isLoggedIn={isLoggedIn} enrollment={enrollmentsMap[course.id] || null} userPhone={userPhone} userId={userId} profileSlug={profileSlug} />
+      <CourseDiscoveryCard course={course} enrollment={enrollmentsMap[course.id]} />
     </div> : <CourseListRow key={course.id} course={course} enrollment={enrollmentsMap[course.id]} />)}
   </div>
   const activeFilters = [

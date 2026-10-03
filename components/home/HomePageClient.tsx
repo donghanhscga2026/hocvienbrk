@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 import PersonalCourses from '@/components/home/PersonalCourses'
+import CourseDiscoveryPreview from '@/components/home/CourseDiscoveryPreview'
+import { catalogCategory } from '@/lib/course-catalog'
 import { splitHomeCourses } from '@/lib/course-catalog'
 import HomeOverview from '@/components/home/HomeOverview'
 import CourseCatalog from '@/components/home/CourseCatalog'
@@ -104,7 +106,7 @@ function HomePageContent({
   }, [courseToPay, enrollmentsMap])
 
   const showSurvey = survey && (survey.flow || (survey.questions && survey.questions.length > 0))
-  const showCommunity = profile.showCommunity !== false && posts.length > 0
+  const showCommunity = profile.showCommunity !== false
   const sessionUserId = session?.user?.id != null && Number.isInteger(Number(session.user.id)) ? Number(session.user.id) : null
   const personal = splitHomeCourses(courses, enrollmentsMap, session?.user ? (userId ?? sessionUserId) : null, session?.user?.role)
   const featuredIds = giftCourses.length ? giftCourses.map(course => course.id) : courses.filter(course => course.pin > 0).sort((a, b) => a.pin - b.pin).map(course => course.id)
@@ -118,15 +120,17 @@ function HomePageContent({
         heroImage={profile.heroImage}
         userName={session?.user?.name}
         courses={courses}
-        activeCourses={myActiveCourses}
+        activeCourses={myActiveCourses.filter(course => personal.learning.some(item => item.id === course.id))}
         enrollments={enrollmentsMap}
         isLoggedIn={!!session?.user}
         onOpenMembership={openMbw}
         message={message}
         roadmapTitle={customPath?.length ? (profile.roadmapTitle || 'Xem lộ trình của tôi') : (profile.surveyTitle || 'Thiết kế lộ trình')}
         myCourses={session?.user ? <PersonalCourses learning={personal.learning} teaching={personal.teaching} enrollments={enrollmentsMap} userPhone={userPhone} userId={userId ?? sessionUserId} profileSlug={profile.slug} canDiscover={profile.showAllCourses !== false} /> : undefined}
-        catalog={profile.showAllCourses !== false ? <div id="khoa-hoc" className="scroll-mt-24"><CourseCatalog title={profile.allCoursesTitle || 'Khám phá khóa học'} courses={courses} discoveryCourses={session?.user ? personal.discover : undefined} enrollmentsMap={enrollmentsMap} isLoggedIn={!!session?.user} userPhone={userPhone} userId={userId} profileSlug={profile.slug} featuredIds={featuredIds} latestIds={latestIds} /></div> : undefined}
+        discoveryPreview={profile.showAllCourses !== false ? <CourseDiscoveryPreview courses={session?.user ? personal.discover : courses} enrollments={enrollmentsMap} /> : undefined}
+        catalog={profile.showAllCourses !== false ? <div id="khoa-hoc" className="scroll-mt-24"><CourseCatalog key={searchParams.get('category') || ''} initialExpanded initialCategory={courses.some(course => catalogCategory(course) === searchParams.get('category')) ? searchParams.get('category') || '' : ''} title={profile.allCoursesTitle || 'Khám phá khóa học'} courses={courses} discoveryCourses={session?.user ? personal.discover : undefined} enrollmentsMap={enrollmentsMap} isLoggedIn={!!session?.user} userPhone={userPhone} userId={userId} profileSlug={profile.slug} featuredIds={featuredIds} latestIds={latestIds} /></div> : undefined}
         roadmap={showSurvey ? (!customPath?.length ? <Zero2HeroSurvey session={session} survey={survey} /> : <RealityMap customPath={customPath} enrollmentsMap={enrollmentsMap} allCourses={courses} userGoal={userGoal || 'Hoàn thiện kỹ năng'} targetPointId={targetPointId} roadmapPoints={roadmapPoints} onReset={resetSurveyAction} />) : undefined}
+        communityPreview={showCommunity && posts.length > 0 ? <CommunityBoard posts={posts.slice(0, 3)} isAdmin={session?.user?.role === 'ADMIN'} title={profile.communityTitle || 'Cộng đồng và chia sẻ'} /> : undefined}
         community={showCommunity ? <CommunityBoard posts={posts} isAdmin={session?.user?.role === 'ADMIN'} title={profile.communityTitle || 'Cộng đồng và chia sẻ'} /> : undefined}
       />
 
