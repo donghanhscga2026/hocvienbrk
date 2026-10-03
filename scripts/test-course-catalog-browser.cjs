@@ -57,12 +57,14 @@ async function run() {
     assert.equal(await page.getByRole('button',{name:'Danh sách',exact:true}).getAttribute('aria-pressed'),'true');checks++
     assert.equal(await page.locator('article').count(),12);checks++
     await page.getByRole('button',{name:'Xem thêm 2 khóa học'}).click()
+    await page.waitForFunction(()=>document.querySelectorAll('article').length===14)
     assert.equal(await page.locator('article').count(),14);checks++
     const search=page.getByRole('searchbox',{name:'Tìm khóa học'})
     await search.fill('huong')
     await page.waitForFunction(()=>document.querySelector('#catalog [role="status"]').textContent.startsWith('1 khóa'))
     assert.equal(await page.locator('article').count(),1);checks++
     await page.getByRole('button',{name:'Thẻ',exact:true}).click()
+    await page.getByTestId('gallery-card').first().waitFor()
     assert.equal(await page.getByTestId('gallery-card').count(),1);checks++
     await page.reload()
     await page.waitForFunction(()=>document.querySelector('button[aria-label="Thẻ"]').getAttribute('aria-pressed')==='true')
@@ -96,6 +98,7 @@ async function run() {
     await noOverflow(page)
     await page.getByRole('button',{name:'Lọc',exact:true}).click()
     await page.keyboard.press('Escape')
+    await dialog.waitFor({state:'hidden'})
     assert.equal(await dialog.isVisible(),false);checks++
     assert.deepEqual(errors,[]);checks++
     console.log(JSON.stringify({result:'passed',checks,scope:'real catalog UI + Tailwind + Next.js; 1440/390/360px; gallery card stubbed; fixtures only'}))
