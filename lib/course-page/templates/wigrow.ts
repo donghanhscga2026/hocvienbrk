@@ -58,38 +58,31 @@ export function createWiGrowCoursePage(slug: string): CoursePage {
       successMode: 'show_message',
     },
     sections: [
-      { id:'wg-hero', sectionKey:'hero', type:'hero', enabled:true, sortOrder:10, visibility:'all', variant:'section-light', anchorId:'gioi-thieu', content:{
-        eyebrow:'WI.GROW • WIPA', title:'Đồng hành cùng con', highlightedText:'Tuổi dậy thì',
+      { id:'wg-art-hero', sectionKey:'art-hero', type:'wigrow_artwork', enabled:true, sortOrder:10, visibility:'all', variant:'source', anchorId:'gioi-thieu', content:{ imageUrl:IMG.hero, imageAlt:'Đồng hành cùng con tuổi dậy thì', maxWidth:750, background:'#ffffff' }},
+      { id:'wg-intro', sectionKey:'intro', type:'rich_content', enabled:true, sortOrder:20, visibility:'all', variant:'section-light', anchorId:'gioi-thieu-du-an', content:{
+        eyebrow:'WI.GROW', title:'Kiến tạo môi trường trưởng thành bắt đầu từ gia đình',
         description:'WI.GROW là dự án thuộc hệ sinh thái WIPA, kiến tạo môi trường trưởng thành bắt đầu từ gia đình, nơi cha mẹ, trẻ và chuyên gia cùng học, cùng thực hành và cùng lan tỏa những giá trị tốt đẹp.',
-        imageUrl:IMG.hero, imageAlt:'Đồng hành cùng con tuổi dậy thì',
-        primaryCta:{label:'Đăng ký tham gia',action:'open_registration'}, secondaryCta:{label:'Tìm hiểu hành trình',action:'scroll',target:'tam-nhin'}
+        cta:{label:'Đăng ký tham gia',action:'open_registration'}
       }},
-      { id:'wg-seed', sectionKey:'seed', type:'rich_content', enabled:true, sortOrder:20, visibility:'all', variant:'section-light', anchorId:'yeu-thuong', content:{
-        eyebrow:'WI.GROW', title:'Đất lành nuôi hạt – Yêu thương nuôi người',
-        description:'Một hạt mầm cần đất tốt để bén rễ. Một đứa trẻ cũng cần một môi trường an toàn để được là chính mình, được lắng nghe và lớn lên trên hành trình yêu thương.',
-        imageUrl:IMG.seed, imageAlt:'Đất lành nuôi hạt, yêu thương nuôi người', imagePosition:'right'
-      }},
-      { id:'wg-vision', sectionKey:'vision', type:'rich_content', enabled:true, sortOrder:30, visibility:'all', variant:'section-soft', anchorId:'tam-nhin', content:{
+      { id:'wg-art-seed', sectionKey:'art-seed', type:'wigrow_artwork', enabled:true, sortOrder:30, visibility:'all', variant:'source', anchorId:'yeu-thuong', content:{ imageUrl:IMG.seed, imageAlt:'Đất lành nuôi hạt – Yêu thương nuôi người', maxWidth:750, background:'#ffffff' }},
+      { id:'wg-vision', sectionKey:'vision', type:'rich_content', enabled:true, sortOrder:40, visibility:'all', variant:'section-soft', anchorId:'tam-nhin', content:{
         eyebrow:'Tầm nhìn', title:'Gia đình là một môi trường trưởng thành',
-        paragraphs:['Mỗi gia đình có thể tự trở thành một môi trường trưởng thành: cha mẹ biết kiến tạo môi trường, trẻ từng bước biết tự dẫn dắt, các gia đình cùng nâng đỡ nhau và trao truyền những giá trị tốt đẹp cho thế hệ tiếp theo.'],
-        imageUrl:IMG.environment, imageAlt:'Kiến tạo môi trường cùng con trưởng thành', imagePosition:'left'
+        paragraphs:['Mỗi gia đình có thể tự trở thành một môi trường trưởng thành: cha mẹ biết kiến tạo môi trường, trẻ từng bước biết tự dẫn dắt, các gia đình cùng nâng đỡ nhau và trao truyền những giá trị tốt đẹp cho thế hệ tiếp theo.']
       }},
-      { id:'wg-mission', sectionKey:'mission', type:'rich_content', enabled:true, sortOrder:40, visibility:'all', variant:'section-light', anchorId:'su-menh', content:{
+      { id:'wg-mission', sectionKey:'mission', type:'rich_content', enabled:true, sortOrder:50, visibility:'all', variant:'section-light', anchorId:'su-menh', content:{
         eyebrow:'Sứ mệnh', title:'Kết nối cha mẹ, trẻ và chuyên gia',
         paragraphs:['Kết nối cha mẹ, trẻ và chuyên gia trên một nền tảng nhận thức chung; đưa tri thức vào đời sống gia đình thông qua thực hành, trải nghiệm và kiểm chứng.','Từ đó, nuôi dưỡng năng lực thấu hiểu, lựa chọn, chịu trách nhiệm và tự chủ của mỗi người; lan tỏa những cách làm hiệu quả đến cộng đồng.']
       }},
-      { id:'wg-experts', sectionKey:'experts', type:'instructor', enabled:true, sortOrder:50, visibility:'all', variant:'section-soft', anchorId:'chuyen-gia', content:{
+      { id:'wg-art-environment', sectionKey:'art-environment', type:'wigrow_artwork', enabled:true, sortOrder:60, visibility:'all', variant:'source', anchorId:'kien-tao-moi-truong', content:{ imageUrl:IMG.environment, imageAlt:'Kiến tạo môi trường – Cùng con trưởng thành', maxWidth:750, background:'#ffffff' }},
+      { id:'wg-experts', sectionKey:'experts', type:'instructor', enabled:true, sortOrder:70, visibility:'all', variant:'section-soft', anchorId:'chuyen-gia', content:{
         eyebrow:'CHUYÊN GIA', title:'Đồng hành cùng các chuyên gia', instructors:[
           {id:'ngo-manh-cuong',name:'Thầy Ngô Mạnh Cường',role:'Nhà đào tạo Tâm Thức và Năng Lượng • Cố vấn nâng tầm Nhân Hiệu & Thương Hiệu',imageUrl:IMG.experts,bio:[]},
           {id:'tran-ngoc-huong',name:'Cô Trần Ngọc Hương',role:'Thạc sĩ tâm lý học',bio:['“Đừng yêu con chỉ vì con trở thành người mà ba mẹ mong muốn. Hãy yêu con cả khi con đang học cách trở thành chính mình.”']}
         ]
       }},
-      { id:'wg-journey', sectionKey:'journey', type:'rich_content', enabled:true, sortOrder:60, visibility:'all', variant:'section-light', anchorId:'sau-hanh-trinh', content:{
-        eyebrow:'SAU HÀNH TRÌNH', title:'Cha mẹ có thể', imageUrl:IMG.journey, imageAlt:'Những thay đổi cha mẹ có thể đạt được sau hành trình', imagePosition:'top',
-        cta:{label:'Đăng ký tham gia',action:'open_registration'}
-      }},
-      { id:'wg-close', sectionKey:'closing', type:'closing_message', enabled:true, sortOrder:70, visibility:'all', variant:'section-success', anchorId:'dang-ky', content:{
-        title:'Đồng hành cùng con – bắt đầu từ gia đình', paragraphs:['Kiến tạo môi trường trưởng thành để cha mẹ và con cùng học, cùng thực hành và cùng lớn lên.'], signature:'WI.GROW'
+      { id:'wg-art-journey', sectionKey:'art-journey', type:'wigrow_artwork', enabled:true, sortOrder:80, visibility:'all', variant:'source', anchorId:'sau-hanh-trinh', content:{ imageUrl:IMG.journey, imageAlt:'Sau hành trình, cha mẹ có thể', maxWidth:700, background:'#ffffff' }},
+      { id:'wg-register', sectionKey:'register', type:'closing_message', enabled:true, sortOrder:90, visibility:'all', variant:'section-success', anchorId:'dang-ky', content:{
+        title:'Đăng ký tham gia', paragraphs:['Đồng hành cùng con tuổi dậy thì – bắt đầu từ gia đình.'], signature:'WI.GROW'
       }}
     ] as any
   }
