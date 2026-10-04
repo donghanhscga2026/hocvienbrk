@@ -35,6 +35,9 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
   const listItems: string[] = Array.isArray(source.listItems) ? source.listItems : []
   const cards: any[] = Array.isArray(source.cards) ? source.cards : []
   const images: any[] = Array.isArray(source.images) ? source.images : []
+  const displayImages = images.filter(image => image?.role !== 'decorative' && image?.role !== 'brand')
+  const brandImages = images.filter(image => image?.role === 'brand')
+  const visualImages = displayImages.length ? displayImages : images.filter(image => image?.role !== 'decorative')
   const actions: any[] = Array.isArray(source.actions) ? source.actions : []
   const faqItems: any[] = Array.isArray(source.faqItems) ? source.faqItems : []
   const formFields: any[] = Array.isArray(source.formFields) ? source.formFields : []
@@ -101,9 +104,12 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
     return (
       <section id={id} style={sectionStyle}>
         <div style={containerStyle} className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-3">
+            {(brandImages[0] || visualImages[0]) && <img src={(brandImages[0] || visualImages[0]).src} alt={(brandImages[0] || visualImages[0]).alt || ''} className="h-10 w-10 rounded-xl object-contain" />}
+            <div className="min-w-0">
             {heading && <div className="font-black" style={{ fontFamily: 'var(--course-heading-font)' }}>{heading}</div>}
             {paragraphs[0] && <div className="text-xs opacity-70">{paragraphs[0]}</div>}
+            </div>
           </div>
           {!!actions.length && <div className="flex flex-wrap gap-2">{actions.slice(0, 7).map(renderAction)}</div>}
         </div>
@@ -117,6 +123,7 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
         <div style={containerStyle}>
           {heading && <h2 style={{ ...headingStyle, fontSize: '1.25rem' }}>{heading}</h2>}
           {paragraphs.map((p, i) => <p key={i} style={paragraphStyle}>{p}</p>)}
+          {!!brandImages.length && <div className="my-4 flex flex-wrap justify-center gap-3">{brandImages.slice(0, 4).map((image, index) => <img key={index} src={image.src} alt={image.alt || ''} className="h-16 rounded-xl bg-white p-2 object-contain" />)}</div>}
           {!!actions.length && <div className="mt-3 flex flex-wrap justify-center gap-2">{actions.slice(0, 8).map(renderAction)}</div>}
         </div>
       </section>
@@ -124,7 +131,7 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
   }
 
   if (type === 'gallery') {
-    const activeImage = galleryIndex === null ? null : images[galleryIndex]
+    const activeImage = galleryIndex === null ? null : visualImages[galleryIndex]
     return (
       <>
         <section id={id} style={sectionStyle}>
@@ -132,7 +139,7 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
             {heading && <h2 style={headingStyle}>{heading}</h2>}
             {paragraphs[0] && <p style={paragraphStyle}>{paragraphs[0]}</p>}
             <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {images.slice(0, 16).map((image, index) => (
+              {visualImages.slice(0, 16).map((image, index) => (
                 <button
                   key={index}
                   type="button"
@@ -261,6 +268,13 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
               </article>
             ))}
           </div>
+          {!!visualImages.length && (
+            <div className="mt-6 grid grid-cols-3 gap-3">
+              {visualImages.slice(0, 6).map((image, index) => (
+                <img key={index} src={image.src} alt={image.alt || ''} className="aspect-square w-full rounded-2xl object-cover shadow-sm" loading="lazy" />
+              ))}
+            </div>
+          )}
           {!!actions.length && <div className="mt-6 flex flex-wrap justify-center gap-3">{actions.slice(0, 3).map(renderAction)}</div>}
         </div>
       </section>
@@ -268,7 +282,7 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
   }
 
   const isHero = type === 'hero'
-  const layout = design.suggestedLayout || (images.length ? 'split' : 'single')
+  const layout = design.suggestedLayout || (visualImages.length ? 'split' : 'single')
   return (
     <section id={id} style={sectionStyle}>
       <div style={containerStyle} className={layout === 'split' ? 'grid items-center gap-8 md:grid-cols-2' : ''}>
@@ -284,11 +298,11 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
           )}
           {!!actions.length && <div className={'mt-6 flex flex-wrap gap-3 ' + (design.alignment === 'center' ? 'justify-center' : '')}>{actions.slice(0, isHero ? 3 : 2).map(renderAction)}</div>}
         </div>
-        {!!images.length && (
-          <div className={(layout === 'split' ? '' : 'mt-7') + (isHero && images.length > 1 ? ' relative pb-10' : '')}>
-            <img src={images[0].src} alt={images[0].alt || heading || ''} className="mx-auto max-h-[560px] w-full rounded-3xl object-cover shadow-lg" loading={isHero ? 'eager' : 'lazy'} />
-            {isHero && images[1] && <img src={images[1].src} alt={images[1].alt || ''} className="absolute -bottom-1 left-0 aspect-square w-[32%] -rotate-3 rounded-2xl border-4 border-white object-cover shadow-lg" />}
-            {isHero && images[2] && <img src={images[2].src} alt={images[2].alt || ''} className="absolute -bottom-1 right-0 aspect-square w-[32%] rotate-3 rounded-2xl border-4 border-white object-cover shadow-lg" />}
+        {!!visualImages.length && (
+          <div className={(layout === 'split' ? '' : 'mt-7') + (isHero && visualImages.length > 1 ? ' relative pb-10' : '')}>
+            <img src={visualImages[0].src} alt={visualImages[0].alt || heading || ''} className="mx-auto max-h-[560px] w-full rounded-3xl object-cover shadow-lg" loading={isHero ? 'eager' : 'lazy'} />
+            {isHero && visualImages[1] && <img src={visualImages[1].src} alt={visualImages[1].alt || ''} className="absolute -bottom-1 left-0 aspect-square w-[32%] -rotate-3 rounded-2xl border-4 border-white object-cover shadow-lg" />}
+            {isHero && visualImages[2] && <img src={visualImages[2].src} alt={visualImages[2].alt || ''} className="absolute -bottom-1 right-0 aspect-square w-[32%] rotate-3 rounded-2xl border-4 border-white object-cover shadow-lg" />}
           </div>
         )}
       </div>
