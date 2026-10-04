@@ -79,9 +79,24 @@ function extractImages(html: string, baseUrl?: string): ImportedImage[] {
   const re = /<img\b([^>]*)>/gi
   let match: RegExpExecArray | null
   while ((match = re.exec(html)) && images.length < MAX_IMAGES_PER_SECTION) {
-    const src = resolveAssetUrl(attr(match[1], 'src') || attr(match[1], 'data-src'), baseUrl)
+    const attrs = match[1]
+    const src = resolveAssetUrl(attr(attrs, 'src') || attr(attrs, 'data-src'), baseUrl)
     if (!src) continue
-    images.push({ src, alt: attr(match[1], 'alt') })
+    const alt = attr(attrs, 'alt')
+    const className = attr(attrs, 'class')
+    const ariaHidden = attr(attrs, 'aria-hidden')
+    const decorative = ariaHidden === 'true'
+      || /(?:^|\s)(?:leaf-ic|deco|clover)(?:\s|$)/i.test(className || '')
+    const brand = !decorative && (
+      /(?:logo|brand)/i.test(className || '')
+      || /^(?:wipa|wi\s*grow|logo)/i.test(alt || '')
+    )
+    images.push({
+      src,
+      alt,
+      className,
+      role: decorative ? 'decorative' : brand ? 'brand' : 'content',
+    })
   }
   return images
 }
@@ -200,25 +215,59 @@ function inferSectionType(input: {
   formCount: number
   index: number
 }): { type: ImportedSectionType; confidence: number } {
-  const haystack = [input.id, input.className, input.heading, cleanText(input.html).slice(0, 400)]
+  const identity = [input.id, input.className].filter(Boolean).join(' ').toLowerCase()
+  const heading = (input.heading || '').toLowerCase()
+  const haystack = [identity, heading, cleanText(input.html).slice(0, 500)]
     .filter(Boolean).join(' ').toLowerCase()
 
   if (input.tag === 'header') return { type: 'header', confidence: 0.99 }
   if (input.tag === 'footer') return { type: 'footer', confidence: 0.99 }
   if (input.tag === 'nav' && /(sticky|fixed|bottom|bar|đăng ký|dang-ky|cta)/i.test(haystack)) return { type: 'sticky_cta', confidence: 0.94 }
-  if (input.formCount > 0 || /(đăng ký|dang-ky|registration|register|lead form|opt-?in)/i.test(haystack)) return { type: 'registration', confidence: 0.96 }
-  if (input.faqCount >= 2 || /(faq|hỏi đáp|hoi-dap|câu hỏi thường gặp)/i.test(haystack)) return { type: 'faq', confidence: 0.96 }
-  if (/(hero|banner|masthead|đầu trang)/i.test(haystack) || (input.index === 0 && /<h1\b/i.test(input.html))) return { type: 'hero', confidence: 0.94 }
-  if (/(học phí|hoc-phi|pricing|price|giá bán|giá trị|đầu tư)/i.test(haystack)) return { type: 'pricing', confidence: 0.9 }
-  if (/(quà tặng|qua-tang|bonus|gift)/i.test(haystack)) return { type: 'bonuses', confidence: 0.9 }
-  if (/(diễn giả|dien-gia|speaker|instructor|giảng viên|chuyên gia)/i.test(haystack)) return { type: 'instructor', confidence: 0.9 }
-  if (/(hành trình|hanh-trinh|roadmap|timeline|lộ trình|chương trình học)/i.test(haystack)) return { type: 'roadmap', confidence: 0.88 }
-  if (input.imageCount >= 4 || /(gallery|khoảnh khắc|khoanh-khac|hình ảnh|thu vien anh)/i.test(haystack)) return { type: 'gallery', confidence: 0.88 }
-  if (/(nỗi đau|noi-dau|pain|vấn đề|van-de|đang thấy|khó khăn)/i.test(haystack)) return { type: 'pain_points', confidence: 0.84 }
-  if (/(kết quả|ket-qua|outcome|sau .*ngày|nhận được|lợi ích)/i.test(haystack)) return { type: 'outcomes', confidence: 0.82 }
-  if (/(phù hợp|phu-hop|dành cho ai|không phù hợp|fit)/i.test(haystack)) return { type: 'fit', confidence: 0.88 }
-  if (/(lời kết|loi-ket|closing|kết thúc|bắt đầu hành trình)/i.test(haystack)) return { type: 'closing_message', confidence: 0.82 }
-  return { type: 'rich_content', confidence: 0.55 }
+
+  // Prefer explicit section identity/heading over broad text keywords.
+  // This prevents sections such as "Phù hợp" from being classified as a form
+  // merely because their body text mentions "đăng ký".
+  if (input.faqCount >= 2 || /(faq|hỏi đáp|hoi-dap|câu hỏi thường gặp)/i.test(identity + ' ' + heading)) {
+    return { type: 'faq', confidence: 0.98 }
+  }
+  if (/(hero|banner|masthead|đầu trang)/i.test(identity) || /<h1\b/i.test(input.html)) {
+    return { type: 'hero', confidence: 0.96 }
+  }
+  if (/(quà tặng|qua-tang|bonus|gift)/i.test(identity + ' ' + heading)) {
+    return { type: 'bonuses', confidence: 0.98 }
+  }
+  if (/(phù hợp|phu-hop|dành cho ai|không phù hợp|fit)/i.test(identity + ' ' + heading)) {
+    return { type: 'fit', confidence: 0.97 }
+  }
+  if (/(lời kết|loi-ket|closing|kết thúc)/i.test(identity + ' ' + heading)) {
+    return { type: 'closing_message', confidence: 0.96 }
+  }
+  if (
+    input.formCount > 0
+    || /(dang-ky|registration|register|lead[-_ ]?form|opt-?in)/i.test(identity)
+    || /^đăng ký\b/i.test(heading)
+  ) {
+    return { type: 'registration', confidence: 0.98 }
+  }
+  if (/(diễn giả|dien-gia|speaker|instructor|giảng viên|chuyên gia)/i.test(identity + ' ' + heading)) {
+    return { type: 'instructor', confidence: 0.96 }
+  }
+  if (/(sau[- ]?\d+[- ]?ngày|sau .*ngày|kết quả|ket-qua|outcome|nhận được|lợi ích)/i.test(identity + ' ' + heading)) {
+    return { type: 'outcomes', confidence: 0.94 }
+  }
+  if (/(hành trình|hanh-trinh|roadmap|timeline|lộ trình|chương trình học)/i.test(identity + ' ' + heading)) {
+    return { type: 'roadmap', confidence: 0.94 }
+  }
+  if (input.imageCount >= 4 || /(gallery|khoảnh khắc|khoanh-khac|hình ảnh|thu vien anh)/i.test(identity + ' ' + heading)) {
+    return { type: 'gallery', confidence: 0.92 }
+  }
+  if (/(nỗi đau|noi-dau|pain|vấn đề|van-de|đang thấy|khó khăn)/i.test(identity + ' ' + heading)) {
+    return { type: 'pain_points', confidence: 0.9 }
+  }
+  if (/(học phí|hoc-phi|pricing|price|giá bán|đầu tư)/i.test(identity + ' ' + heading)) {
+    return { type: 'pricing', confidence: 0.96 }
+  }
+  return { type: 'rich_content', confidence: 0.6 }
 }
 
 function pickSectionLabel(type: ImportedSectionType, heading: string | undefined, index: number): string {
@@ -258,14 +307,16 @@ function sectionContent(
 ): Record<string, unknown> {
   const description = paragraphs[0] || ''
   const primaryAction = actions[0]
+  const contentImages = images.filter(image => image.role !== 'decorative' && image.role !== 'brand')
+  const displayImages = contentImages.length ? contentImages : images.filter(image => image.role !== 'decorative')
 
   switch (type) {
     case 'hero':
       return {
         title: heading || 'Tiêu đề',
         description,
-        imageUrl: images[0]?.src,
-        imageAlt: images[0]?.alt,
+        imageUrl: displayImages[0]?.src,
+        imageAlt: displayImages[0]?.alt,
         primaryCta: primaryAction ? {
           label: primaryAction.label,
           action: primaryAction.href?.startsWith('#') ? 'scroll' : 'external_link',
@@ -312,7 +363,7 @@ function sectionContent(
           bio: card.text ? [card.text] : [],
         })),
         sourceText: [...paragraphs, ...listItems].slice(0, 30),
-        sourceImages: images,
+        sourceImages: displayImages,
       }
     case 'bonuses':
       return {
@@ -339,7 +390,7 @@ function sectionContent(
       }
     }
     case 'gallery':
-      return { title: heading || 'Hình ảnh', description, images }
+      return { title: heading || 'Hình ảnh', description, images: displayImages }
     case 'fit':
       return { title: heading || 'Chương trình phù hợp với ai?', description, items: listItems }
     case 'faq':
@@ -350,7 +401,7 @@ function sectionContent(
       return { title: heading, paragraphs: paragraphs.length ? paragraphs : listItems }
     case 'header':
     case 'footer':
-      return { title: heading, paragraphs, links: actions, images }
+      return { title: heading, paragraphs, links: actions, images: images.filter(image => image.role !== 'decorative') }
     case 'sticky_cta':
       return { title: heading, actions }
     default:
@@ -358,8 +409,8 @@ function sectionContent(
         title: heading,
         description,
         paragraphs: paragraphs.slice(1),
-        imageUrl: images[0]?.src,
-        imageAlt: images[0]?.alt,
+        imageUrl: displayImages[0]?.src,
+        imageAlt: displayImages[0]?.alt,
         cta: primaryAction ? { label: primaryAction.label, target: primaryAction.href } : undefined,
       }
   }
