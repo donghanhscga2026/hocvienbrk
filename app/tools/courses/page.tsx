@@ -19,6 +19,12 @@ export default function ToolsCoursesPage() {
             <MainHeader title="KHÓA HỌC" toolSlug="courses" />
 
             <div className="p-4 max-w-4xl mx-auto space-y-4 pb-20">
+                <div className="flex justify-end mt-4">
+                    <Link href="/tools/courses/templates" className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white shadow-sm hover:bg-purple-800">
+                        <Palette className="w-4 h-4" /> Thư viện mẫu Salespage
+                    </Link>
+                </div>
+
                 <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mt-4">
                     <button
                         onClick={() => setActiveTab('courses')}
