@@ -1733,6 +1733,23 @@ model CoursePageVersion {
   @@map("course_page_versions")
 }
 
+model CoursePageTemplate {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  name         String
+  description  String?
+  sourceUrl    String?  @map("source_url")
+  sourceType   String   @default("website") @map("source_type")
+  thumbnailUrl String?  @map("thumbnail_url")
+  snapshot     Json
+  analysis     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("course_page_templates")
+}
+
 // CRM phase 1: contacts are independent of login accounts and affiliate ownership.
 model CrmContact {
   requests CrmRequest[]
