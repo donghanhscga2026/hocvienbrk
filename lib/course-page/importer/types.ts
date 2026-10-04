@@ -33,6 +33,8 @@ export type ImportedDesign = {
 export type ImportedImage = {
   src: string
   alt?: string
+  className?: string
+  role?: 'content' | 'brand' | 'decorative'
 }
 
 export type ImportedCard = {
