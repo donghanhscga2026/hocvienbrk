@@ -111,7 +111,7 @@ Code fallback vào tài khoản chung #2689 được **giữ lại dạng commen
 ```
 TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 TELEGRAM_CHAT_ID_CHANGE=-1004458102417
-TELEGRAM_BOT_TOKEN=8630082731:AAENKynjPOEAK_ZKQE35hwbeEoBgx14TiQ0
+TELEGRAM_BOT_TOKEN=<configured in Vercel Environment Variables>
 ```
 
 ### Backup patches (trong `plan_temp/`)
