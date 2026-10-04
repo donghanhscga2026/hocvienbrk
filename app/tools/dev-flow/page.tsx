@@ -23,6 +23,7 @@ export default function DevFlowPage() {
   const [showLogs, setShowLogs] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', kind: 'feature' })
   const [fixNote, setFixNote] = useState('')
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
 
   const loadTasks = useCallback(async () => {
     const res = await fetch('/api/admin/dev-flow')
@@ -55,6 +56,16 @@ export default function DevFlowPage() {
 
   const prompt = useMemo(() => detail ? `Bạn đang tham gia phát triển dự án MFC trên GitHub.\n\nCông việc: ${detail.issue.title.replace(/^\[MFC Dev\]\s*/, '')}\nBranch duy nhất được phép làm việc: ${detail.meta.branch}\n\nBắt buộc:\n1. Đọc AGENTS.md trước khi thay đổi.\n2. Không sửa trực tiếp master.\n3. Chỉ commit/push vào branch trên.\n4. Đọc code thật trước khi sửa và tuân thủ backup/confirm trong AGENTS.md.\n5. Chạy các kiểm tra bắt buộc trước khi báo hoàn thành.\n6. Không tự ý ghi hoặc sửa dữ liệu Production.\n\nSau khi hoàn thành hãy commit và push vào branch trên. MFC Dev Flow sẽ tự theo dõi PR, CI và Vercel.` : '', [detail])
 
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setCopyState('copied')
+      window.setTimeout(() => setCopyState('idle'), 2500)
+    } catch {
+      setCopyState('error')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl">
@@ -82,9 +93,14 @@ export default function DevFlowPage() {
                 <Status name="CI" ok={detail.ci?.conclusion==='success'} text={detail.ci?.conclusion || detail.ci?.status || 'Chưa chạy'}/>
                 <Status name="Vercel" ok={detail.vercel?.state==='success'} text={detail.vercel?.state || 'Chưa chạy'}/>
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-5">
+                <label className="mb-2 block text-sm font-semibold text-gray-700">Thông tin giao cho AI</label>
+                <textarea readOnly value={prompt} className="min-h-56 w-full resize-y rounded-xl border bg-gray-50 p-3 text-sm text-gray-700" />
+                {copyState === 'error' && <p className="mt-2 text-sm text-red-600">Không thể copy tự động. Bạn có thể chọn nội dung trong ô phía trên và copy thủ công.</p>}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button disabled={busy} onClick={() => act('sync')} className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy?<Loader2 className="inline animate-spin" size={15}/>:<RefreshCw className="inline" size={15}/>} Đồng bộ</button>
-                <button onClick={() => navigator.clipboard.writeText(prompt)} className="rounded-xl border px-4 py-2 text-sm font-semibold"><Clipboard className="mr-1 inline" size={15}/> Copy thông tin giao AI</button>
+                <button onClick={copyPrompt} className="rounded-xl border px-4 py-2 text-sm font-semibold">{copyState === 'copied' ? <CheckCircle2 className="mr-1 inline text-emerald-600" size={15}/> : <Clipboard className="mr-1 inline" size={15}/>} {copyState === 'copied' ? 'Đã copy' : 'Copy thông tin giao AI'}</button>
                 <button onClick={() => setShowLogs(!showLogs)} className="rounded-xl border px-4 py-2 text-sm font-semibold"><Activity className="mr-1 inline" size={15}/> Xem log</button>
                 {detail.previewUrl && <a href={detail.previewUrl} target="_blank" className="rounded-xl border px-4 py-2 text-sm font-semibold">Mở Preview <ExternalLink className="inline" size={14}/></a>}
               </div>
