@@ -72,11 +72,18 @@ async function run() {
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
     const desktopMenu=page.getByRole('navigation',{name:'Điều hướng hệ sinh thái'})
     const mobileMenu=desktopMenu
+    // Kiểm chứng các URL cũ vẫn hoạt động sau khi rút gọn menu công khai.
+    const openLegacyArea = async section => page.evaluate(section => {
+      const params = new URLSearchParams(window.location.search)
+      params.set('section',section);params.delete('category')
+      window.history.pushState(null,'',window.location.pathname+'?'+params.toString())
+    },section)
     await page.locator('[data-home-area="discover"]').waitFor();checks++
-    assert.equal(await desktopMenu.getByRole('link').first().textContent(),'Khám phá');checks++
-    assert.equal(await desktopMenu.getByRole('link',{name:'Khám phá',exact:true}).getAttribute('aria-current'),'page');checks++
-    assert.equal(await desktopMenu.getByRole('link',{name:'Khám phá',exact:true}).getAttribute('href'),'/');checks++
-    assert.equal(await desktopMenu.getByRole('link',{name:'Tổng quan',exact:true}).getAttribute('href'),'/?section=home');checks++
+    assert.equal(await desktopMenu.getByRole('link').first().textContent(),'Khóa học');checks++
+    assert.equal(await desktopMenu.getByRole('link',{name:'Khóa học',exact:true}).getAttribute('aria-current'),'page');checks++
+    assert.equal(await desktopMenu.getByRole('link',{name:'Khóa học',exact:true}).getAttribute('href'),'/');checks++
+    assert.deepEqual(await desktopMenu.getByRole('link').allTextContents(),['Khóa học','Lộ trình','Cộng đồng','Không gian của tôi']);checks++
+    assert.equal(await desktopMenu.getByRole('link',{name:'Không gian của tôi',exact:true}).getAttribute('href'),'/my-space');checks++
     assert.ok(await page.locator('#catalog article').count()>0);checks++
     assert.equal(await page.locator('#home-shortcuts').count(),0);checks++
     assert.equal(await page.getByRole('region',{name:'Thông điệp',exact:true}).count(),1);checks++
@@ -94,12 +101,12 @@ async function run() {
     assert.equal(await page.locator('#discovery-continue-learning').count(),0);checks++
     await page.goto(base+'?section=invalid')
     await page.locator('[data-home-area="discover"]').waitFor();checks++
-    await desktopMenu.getByRole('link',{name:'Tổng quan',exact:true}).click()
+    await openLegacyArea('home')
     await page.locator('[data-home-area="home"]').waitFor()
     assert.equal(new URL(page.url()).searchParams.get('section'),'home');checks++
     await page.reload()
     await page.locator('[data-home-area="home"]').waitFor();checks++
-    assert.equal(await desktopMenu.getByRole('link').count(),6);checks++
+    assert.equal(await desktopMenu.getByRole('link').count(),4);checks++
     assert.equal(await page.locator('#catalog').count(),0);checks++
     assert.equal(await page.locator('#my-courses').count(),0);checks++
     assert.equal(await page.locator('#continue-learning article').count(),1);checks++
@@ -115,12 +122,12 @@ async function run() {
     await page.reload()
     await page.locator('#learning-path').waitFor();checks++
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
-    await desktopMenu.getByRole('link',{name:'Tổng quan',exact:true}).click()
+    await openLegacyArea('home')
     await page.locator('[data-home-area="home"]').waitFor()
     let navigations=0
     page.on('request',request=>{if(request.resourceType()==='document'||request.url().includes('_rsc='))navigations++})
     await page.evaluate(()=>window.__homeTestMarker='same-document')
-    await desktopMenu.getByRole('link',{name:'Học tập',exact:true}).click()
+    await openLegacyArea('learning')
     await page.locator('[data-home-area="learning"]').waitFor()
     assert.equal(new URL(page.url()).searchParams.get('section'),'learning');checks++
     assert.equal(await page.evaluate(()=>window.__homeTestMarker),'same-document');checks++
@@ -131,12 +138,12 @@ async function run() {
     await page.setViewportSize({width:390,height:844})
     assert.ok(await mobileMenu.isVisible());checks++
     assert.ok(await desktopMenu.isVisible());checks++
-    assert.ok(await desktopMenu.getByRole('link',{name:'Công cụ',exact:true}).evaluate(el=>el.getBoundingClientRect().top>el.parentElement.firstElementChild.getBoundingClientRect().top));checks++
+    assert.ok(await desktopMenu.getByRole('link',{name:'Không gian của tôi',exact:true}).evaluate(el=>el.getBoundingClientRect().top>el.parentElement.firstElementChild.getBoundingClientRect().top));checks++
     assert.equal(await page.locator('[data-home-mobile-navigation]').count(),0);checks++
     await noOverflow(page)
     await page.getByRole('link',{name:'Liên hệ',exact:true}).scrollIntoViewIfNeeded()
     assert.ok(await page.getByRole('link',{name:'Liên hệ',exact:true}).isVisible());checks++
-    await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).click()
+    await mobileMenu.getByRole('link',{name:'Khóa học',exact:true}).click()
     await page.locator('[data-home-area="discover"]').waitFor();checks++
     const wrappedTabs=page.getByRole('tablist',{name:'Danh mục khóa học'})
     assert.ok(await wrappedTabs.evaluate(el=>el.scrollWidth<=el.clientWidth+1));checks++
@@ -147,7 +154,7 @@ async function run() {
     assert.equal(await page.locator('#catalog article').count(),10);checks++
     await page.goBack()
     await page.locator('[data-home-area="home"]').waitFor();checks++
-    await mobileMenu.getByRole('link',{name:'Công cụ',exact:true}).click()
+    await openLegacyArea('tools')
     await page.locator('[data-home-area="tools"]').waitFor()
     assert.equal(await page.locator('#course-preview').count(),0);checks++
     assert.equal(await page.locator('#ecosystem a[href="/tools"]').count(),1);checks++
@@ -243,11 +250,11 @@ async function run() {
     await page.getByRole('button',{name:'Xem tất cả khóa học',exact:true}).click()
     await page.setViewportSize({width:360,height:780})
     await noOverflow(page)
-    await mobileMenu.getByRole('link',{name:'Tổng quan',exact:true}).click()
+    await openLegacyArea('home')
     await page.locator('[data-home-area="home"]').waitFor()
     assert.equal(await page.getByText('Nội dung lộ trình',{exact:true}).count(),0);checks++
     assert.equal(await page.locator('#catalog').count(),0);checks++
-    await mobileMenu.getByRole('link',{name:'Học tập',exact:true}).click()
+    await openLegacyArea('learning')
     await page.locator('[data-home-area="learning"]').waitFor()
     const personal=page.locator('#my-courses')
     assert.equal(await page.getByRole('heading',{name:'Không gian của tôi',exact:true}).count(),0);checks++
@@ -269,33 +276,34 @@ async function run() {
     await personal.getByRole('button',{name:'Đang học (1)',exact:true}).click()
     await personal.getByRole('button',{name:'Danh sách',exact:true}).click()
     await personal.getByRole('link',{name:'Tiếp tục học',exact:true}).waitFor()
-    await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).click()
+    await mobileMenu.getByRole('link',{name:'Khóa học',exact:true}).click()
     await page.locator('[data-home-area="discover"]').waitFor()
-    assert.equal(await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).getAttribute('aria-current'),'page');checks++
+    assert.equal(await mobileMenu.getByRole('link',{name:'Khóa học',exact:true}).getAttribute('aria-current'),'page');checks++
     await noOverflow(page)
     await page.goto(base+'?guest=1')
+    assert.equal(await desktopMenu.getByRole('link',{name:'Không gian của tôi',exact:true}).getAttribute('href'),'/login?callbackUrl=%2Fmy-space');checks++
     await page.getByText('Thông điệp của trang',{exact:true}).waitFor();checks++
     await page.locator('[data-home-area="discover"]').waitFor();checks++
     assert.ok(await page.locator('#catalog article').count()>0);checks++
     assert.equal(await page.locator('#discovery-continue-learning').count(),0);checks++
     assert.equal(await page.locator('#home-shortcuts').count(),0);checks++
-    await mobileMenu.getByRole('link',{name:'Tổng quan',exact:true}).click()
+    await openLegacyArea('home')
     await page.locator('[data-home-area="home"]').waitFor()
     assert.equal(await page.getByRole('region',{name:'Thông điệp',exact:true}).count(),0);checks++
     assert.equal(await page.locator('#my-courses').count(),0);checks++
     assert.equal(await page.locator('#continue-learning').count(),0);checks++
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
     assert.equal(await page.locator('#home-shortcuts a').count(),5);checks++
-    await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).click()
+    await mobileMenu.getByRole('link',{name:'Khóa học',exact:true}).click()
     await page.locator('[data-home-area="discover"]').waitFor()
     await catalog.getByRole('tab',{name:'Công nghệ',exact:true}).click()
     await page.waitForFunction(()=>document.querySelectorAll('#catalog article').length===2);checks++
     assert.equal(new URL(page.url()).searchParams.get('guest'),'1');checks++
     await page.setViewportSize({width:360,height:780})
-    await mobileMenu.getByRole('link',{name:'Học tập',exact:true}).click()
+    await openLegacyArea('learning')
     await page.getByRole('heading',{name:'Đăng nhập để xem khóa học của bạn'}).waitFor();checks++
     assert.equal(new URL(page.url()).searchParams.get('guest'),'1');checks++
-    await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).click()
+    await mobileMenu.getByRole('link',{name:'Khóa học',exact:true}).click()
     await page.getByRole('searchbox',{name:'Tìm khóa học'}).waitFor();checks++
     assert.equal(await catalog.getByRole('combobox',{name:'Trạng thái của tôi'}).count(),0);checks++
     await noOverflow(page)
@@ -305,7 +313,7 @@ async function run() {
     await noOverflow(page)
     await page.goto(base+'/page/huong-lucy?ref=123')
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
-    await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).click()
+    await mobileMenu.getByRole('link',{name:'Khóa học',exact:true}).click()
     await page.locator('[data-home-area="discover"]').waitFor()
     assert.equal(new URL(page.url()).pathname,'/page/huong-lucy');checks++
     assert.equal(new URL(page.url()).searchParams.get('ref'),'123');checks++
@@ -314,7 +322,7 @@ async function run() {
     assert.equal(new URL(page.url()).pathname,'/page/huong-lucy');checks++
     await page.goto(base+'?nocatalog=1&nocommunity=1&section=discover')
     await page.locator('[data-home-area="home"]').waitFor()
-    assert.equal(await mobileMenu.getByRole('link').count(),4);checks++
+    assert.equal(await mobileMenu.getByRole('link').count(),2);checks++
     assert.equal(await page.locator('#course-preview').count(),0);checks++
     assert.equal(await mobileMenu.getByRole('link',{name:'Cộng đồng',exact:true}).count(),0);checks++
     await noOverflow(page)
@@ -349,7 +357,8 @@ async function run() {
     assert.equal(await page.getByRole('link',{name:'Tiếp tục bài học',exact:true}).getAttribute('href'),'/courses/KH1/learn?lesson=last-lesson');checks++
     assert.equal(await page.getByRole('link',{name:'CRM & chăm sóc',exact:true}).getAttribute('href'),'/tools/crm');checks++
     const spaceMenu=page.getByRole('navigation',{name:'Menu không gian cá nhân',exact:true})
-    await spaceMenu.getByRole('link',{name:'Học tập',exact:true}).click()
+    assert.deepEqual(await spaceMenu.getByRole('link').allTextContents(),['Tổng quan của tôi','Khóa học của tôi','Công cụ của tôi','Yêu cầu hỗ trợ','Tài khoản & quyền lợi']);checks++
+    await spaceMenu.getByRole('link',{name:'Khóa học của tôi',exact:true}).click()
     await page.locator('#my-courses').waitFor();checks++
     assert.equal(new URL(page.url()).searchParams.get('tab'),'learning');checks++
     await page.goBack()
@@ -394,16 +403,19 @@ async function run() {
     await favoriteTools.getByRole('button',{name:'Bỏ yêu thích Công cụ công khai',exact:true}).click()
     assert.equal(await favoriteTools.count(),0);checks++
     assert.equal(await otherTools.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'false');checks++
-    await spaceMenu.getByRole('link',{name:'Hỗ trợ của tôi',exact:true}).click()
+    await spaceMenu.getByRole('link',{name:'Yêu cầu hỗ trợ',exact:true}).click()
     await page.getByText('Giáo viên đã phản hồi',{exact:true}).waitFor();checks++
-    await spaceMenu.getByRole('link',{name:'Tài khoản',exact:true}).click()
+    await spaceMenu.getByRole('link',{name:'Tài khoản & quyền lợi',exact:true}).click()
     assert.equal(await page.getByRole('link',{name:'Quản lý tài khoản',exact:true}).getAttribute('href'),'/account-settings');checks++
+    await page.getByRole('button',{name:'Mở ví & quyền lợi',exact:true}).click()
+    assert.equal(await page.evaluate(()=>window.__walletOpened),true);checks++
+
     await page.setViewportSize({width:390,height:844})
     await noOverflow(page)
     assert.ok(!await spaceMenu.isVisible());checks++
     await page.locator('details summary').click()
     const spaceMobile=page.getByRole('navigation',{name:'Menu cá nhân trên điện thoại',exact:true})
-    await spaceMobile.getByRole('link',{name:'Tổng quan',exact:true}).click()
+    await spaceMobile.getByRole('link',{name:'Tổng quan của tôi',exact:true}).click()
     assert.equal(await page.locator('details').getAttribute('open'),null);checks++
     await page.getByRole('button',{name:/^Ví & quyền lợi →/}).click()
     assert.equal(await page.evaluate(()=>window.__walletOpened),true);checks++

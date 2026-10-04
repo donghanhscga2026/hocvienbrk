@@ -18,11 +18,11 @@ type Notice = { id: string; title: string; href: string; readAt: string | null }
 type Tool = { id: number; slug: string; name: string; url: string; roles: string[]; isActive: boolean }
 type Tab = 'home' | 'learning' | 'tools' | 'support' | 'account'
 const tabs = [
-  { id: 'home' as const, label: 'Tổng quan', icon: LayoutDashboard },
-  { id: 'learning' as const, label: 'Học tập', icon: BookOpen },
+  { id: 'home' as const, label: 'Tổng quan của tôi', icon: LayoutDashboard },
+  { id: 'learning' as const, label: 'Khóa học của tôi', icon: BookOpen },
   { id: 'tools' as const, label: 'Công cụ của tôi', icon: Wrench },
-  { id: 'support' as const, label: 'Hỗ trợ của tôi', icon: LifeBuoy },
-  { id: 'account' as const, label: 'Tài khoản', icon: UserRound },
+  { id: 'support' as const, label: 'Yêu cầu hỗ trợ', icon: LifeBuoy },
+  { id: 'account' as const, label: 'Tài khoản & quyền lợi', icon: UserRound },
 ]
 // Phân nhóm bằng mã công cụ, không phụ thuộc tên hiển thị do quản trị viên chỉnh sửa.
 const toolCategories = [
@@ -129,9 +129,9 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
     requestAnimationFrame(() => document.getElementById('personal-space-title')?.focus({ preventScroll: true }))
   }} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-medium ${tab === id ? 'bg-brk-primary text-brk-on-primary' : 'text-brk-on-surface hover:bg-brk-background'}`}><Icon className="h-5 w-5 shrink-0" aria-hidden />{label}</a>)
   return <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
-    <Link href="/" className="mb-4 inline-flex min-h-11 items-center text-sm text-brk-primary">← Khám phá hệ sinh thái</Link>
+    <Link href="/" className="mb-4 inline-flex min-h-11 items-center text-sm text-brk-primary">← Khóa học</Link>
     <div className="grid min-w-0 gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
-      <aside className="hidden md:block"><nav aria-label="Menu không gian cá nhân" className={card}><p className="mb-3 text-sm font-semibold text-brk-muted">Không gian của tôi</p>{menu}<button type="button" onClick={openWallet} className="mt-3 flex min-h-12 w-full items-center gap-3 border-t border-brk-outline px-3 text-sm text-brk-on-surface"><Wallet className="h-5 w-5" aria-hidden />Ví & quyền lợi</button></nav></aside>
+      <aside className="hidden md:block"><nav aria-label="Menu không gian cá nhân" className={card}><p className="mb-3 text-sm font-semibold text-brk-muted">Không gian của tôi</p>{menu}</nav></aside>
       <div className="min-w-0 space-y-5">
         <details ref={mobileMenu} className={`md:hidden ${card}`}><summary className="cursor-pointer text-sm font-semibold text-brk-on-surface">Các mục của tôi · {tabs.find(item => item.id === tab)?.label}</summary><nav aria-label="Menu cá nhân trên điện thoại" className="mt-3">{menu}</nav></details>
         <h1 id="personal-space-title" tabIndex={-1} className="text-2xl font-semibold tracking-tight text-brk-on-surface outline-none sm:text-[28px]">{tab === 'home' ? 'Chào ' + (user.name || 'bạn') + '!' : tabs.find(item => item.id === tab)?.label}</h1>
@@ -146,10 +146,10 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
             {!!pending.length && <Link href={href('learning')} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brk-primary">{pending.length} khóa chờ kích hoạt →</Link>}
           </section>
           <section aria-label="Tiếp tục học" className={card}><h2 className="text-lg font-semibold text-brk-on-surface">Tiếp tục học</h2>
-            {active.length && continueHref ? <><p className="mt-2 text-brk-on-surface">{active[0].name_lop}</p><p className="mt-1 text-sm text-brk-muted">Đã hoàn thành {enrollments[active[0].id]?.completedCount || 0}/{enrollments[active[0].id]?.totalLessons || 0} bài</p><Link href={continueHref} className={`mt-4 ${action}`}>Tiếp tục bài học <ArrowRight className="h-4 w-4" aria-hidden /></Link></> : <p className="mt-3 text-sm text-brk-muted">Bạn chưa có khóa đang học. Mở Khám phá để chọn khóa phù hợp.</p>}
+            {active.length && continueHref ? <><p className="mt-2 text-brk-on-surface">{active[0].name_lop}</p><p className="mt-1 text-sm text-brk-muted">Đã hoàn thành {enrollments[active[0].id]?.completedCount || 0}/{enrollments[active[0].id]?.totalLessons || 0} bài</p><Link href={continueHref} className={`mt-4 ${action}`}>Tiếp tục bài học <ArrowRight className="h-4 w-4" aria-hidden /></Link></> : <p className="mt-3 text-sm text-brk-muted">Bạn chưa có khóa đang học. Mở mục Khóa học để chọn khóa phù hợp.</p>}
           </section>
           <section aria-label="Lối vào của tôi" className="grid gap-3 sm:grid-cols-2">
-            {[{ label: 'Học tập', detail: active.length + ' khóa đang học', url: href('learning'), icon: BookOpen }, { label: 'Hỗ trợ của tôi', detail: 'Theo dõi yêu cầu và phản hồi', url: href('support'), icon: LifeBuoy }, { label: 'Công cụ của tôi', detail: 'Công cụ được phép và yêu thích', url: href('tools'), icon: Wrench }, { label: 'Tài khoản của tôi', detail: 'Hồ sơ, bảo mật và cài đặt', url: '/account-settings', icon: UserRound }].map(({ label, detail, url, icon: Icon }) => <Link key={label} href={url} className={card}><Icon aria-hidden className="mb-3 h-5 w-5 text-brk-primary" /><h2 className="font-semibold text-brk-on-surface">{label} →</h2><p className="mt-1 text-sm text-brk-muted">{detail}</p></Link>)}
+            {[{ label: 'Khóa học của tôi', detail: active.length + ' khóa đang học', url: href('learning'), icon: BookOpen }, { label: 'Yêu cầu hỗ trợ', detail: 'Theo dõi yêu cầu và phản hồi', url: href('support'), icon: LifeBuoy }, { label: 'Công cụ của tôi', detail: 'Công cụ được phép và yêu thích', url: href('tools'), icon: Wrench }, { label: 'Tài khoản & quyền lợi', detail: 'Hồ sơ, bảo mật, ví và voucher', url: href('account'), icon: UserRound }].map(({ label, detail, url, icon: Icon }) => <Link key={label} href={url} className={card}><Icon aria-hidden className="mb-3 h-5 w-5 text-brk-primary" /><h2 className="font-semibold text-brk-on-surface">{label} →</h2><p className="mt-1 text-sm text-brk-muted">{detail}</p></Link>)}
             <button type="button" onClick={openWallet} className={`${card} text-left`}><Wallet aria-hidden className="mb-3 h-5 w-5 text-brk-primary" /><h2 className="font-semibold text-brk-on-surface">Ví & quyền lợi →</h2><p className="mt-1 text-sm text-brk-muted">Số dư, voucher và quyền lợi của bạn</p></button>
           </section>
           {(canCrm || canAffiliate) && <section aria-label="Khu làm việc" className={card}><h2 className="text-lg font-semibold text-brk-on-surface">Khu làm việc</h2><div className="mt-3 flex flex-wrap gap-3">{canCrm && <Link href="/tools/crm" className={action}><Users className="h-4 w-4" aria-hidden />CRM & chăm sóc</Link>}{canTeach && <Link href="/tools/courses" className={action}>Quản lý khóa học</Link>}{canAffiliate && <Link href="/tools/affiliate" className={action}><Share2 className="h-4 w-4" aria-hidden />Affiliate</Link>}</div></section>}
@@ -177,7 +177,7 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
           <p className="text-xs text-brk-muted">Công cụ yêu thích được lưu trên trình duyệt này.</p>
           <Link href="/tools" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Khám phá thêm công cụ →</Link>
         </div>}
-        {tab === 'account' && <section className={card}><h2 className="text-lg font-semibold text-brk-on-surface">Tài khoản của tôi</h2><p className="mt-2 text-sm text-brk-muted">Cập nhật hồ sơ, mật khẩu và tài khoản nhận thanh toán.</p><Link href="/account-settings" className={`mt-4 ${action}`}>Quản lý tài khoản</Link></section>}
+        {tab === 'account' && <section className={card}><h2 className="text-lg font-semibold text-brk-on-surface">Hồ sơ & bảo mật</h2><p className="mt-2 text-sm text-brk-muted">Cập nhật hồ sơ, mật khẩu và tài khoản nhận thanh toán.</p><Link href="/account-settings" className={`mt-4 ${action}`}>Quản lý tài khoản</Link><div className="mt-5 border-t border-brk-outline pt-5"><h2 className="text-lg font-semibold text-brk-on-surface">Ví & quyền lợi</h2><p className="mt-2 text-sm text-brk-muted">Xem số dư, voucher và quyền lợi của bạn.</p><button type="button" onClick={openWallet} className={`mt-4 ${action}`}><Wallet className="h-4 w-4" aria-hidden />Mở ví & quyền lợi</button></div></section>}
       </div>
     </div>
   </div>
