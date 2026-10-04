@@ -1,5 +1,6 @@
 import {
   ImportedAction,
+  ImportedCard,
   ImportedImage,
   ImportedSectionCandidate,
   ImportedSectionType,
@@ -83,6 +84,42 @@ function extractImages(html: string, baseUrl?: string): ImportedImage[] {
     images.push({ src, alt: attr(match[1], 'alt') })
   }
   return images
+}
+
+function extractCards(html: string, baseUrl?: string): ImportedCard[] {
+  const cards: ImportedCard[] = []
+  const re = /<article\b[^>]*>([\s\S]*?)<\/article>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html)) && cards.length < 30) {
+    const body = match[1]
+    const heading = body.match(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/i)
+    const subtitle = body.match(/<(?:small|span)\b[^>]*class\s*=\s*(?:"[^"]*(?:role|badge|tag|sub)[^"]*"|'[^']*(?:role|badge|tag|sub)[^']*')[^>]*>([\s\S]*?)<\/(?:small|span)>/i)
+    const paragraphs = extractTagTexts(body, 'p')
+    const image = extractImages(body, baseUrl)[0]
+    const title = heading ? cleanText(heading[1]) : undefined
+    const text = paragraphs.join('\n').trim() || undefined
+    if (title || text || image) {
+      cards.push({
+        title,
+        subtitle: subtitle ? cleanText(subtitle[1]) : undefined,
+        text,
+        image,
+      })
+    }
+  }
+  return cards
+}
+
+function extractTableRows(html: string): string[] {
+  const rows: string[] = []
+  const re = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html)) && rows.length < 40) {
+    const cells = extractTagTexts(match[1], 'th').concat(extractTagTexts(match[1], 'td'))
+    const text = cells.join(' — ').trim()
+    if (text) rows.push(text)
+  }
+  return rows
 }
 
 function extractActions(html: string, baseUrl?: string): ImportedAction[] {
@@ -192,6 +229,8 @@ function sectionContent(
   paragraphs: string[],
   listItems: string[],
   images: ImportedImage[],
+  cards: ImportedCard[],
+  tableRows: string[],
   actions: ImportedAction[],
   faqItems: Array<{ question: string; answer: string }>,
   formFields: Array<{ name?: string; type?: string; placeholder?: string }>,
@@ -222,7 +261,12 @@ function sectionContent(
       return {
         title: heading || 'Kết quả nhận được',
         description,
-        items: listItems.map((item, i) => ({ id: `outcome-${i + 1}`, description: item })),
+        items: (cards.length ? cards.map((card, i) => ({
+          id: `outcome-${i + 1}`,
+          title: card.title,
+          description: card.text || card.subtitle || '',
+          imageUrl: card.image?.src,
+        })) : listItems.map((item, i) => ({ id: `outcome-${i + 1}`, description: item }))),
       }
     case 'roadmap':
       return {
@@ -239,7 +283,13 @@ function sectionContent(
       return {
         title: heading || 'Người đồng hành',
         description,
-        instructors: [],
+        instructors: cards.map((card, i) => ({
+          id: `instructor-${i + 1}`,
+          name: card.title || `Chuyên gia ${i + 1}`,
+          role: card.subtitle || '',
+          imageUrl: card.image?.src,
+          bio: card.text ? [card.text] : [],
+        })),
         sourceText: [...paragraphs, ...listItems].slice(0, 30),
         sourceImages: images,
       }
@@ -247,7 +297,12 @@ function sectionContent(
       return {
         title: heading || 'Quà tặng',
         description,
-        items: listItems.map((item, i) => ({ id: `bonus-${i + 1}`, title: item })),
+        items: (cards.length ? cards.map((card, i) => ({
+          id: `bonus-${i + 1}`,
+          title: card.title || card.text || `Quà tặng ${i + 1}`,
+          description: card.text,
+          imageUrl: card.image?.src,
+        })) : listItems.map((item, i) => ({ id: `bonus-${i + 1}`, title: item }))),
         sourceImages: images,
       }
     case 'pricing': {
@@ -258,6 +313,7 @@ function sectionContent(
         description,
         detectedPrices: prices,
         plans: [],
+        valueRows: tableRows,
         actions,
       }
     }
@@ -298,11 +354,18 @@ function extractColors(css: string): string[] {
 
 function extractFonts(css: string): string[] {
   const fonts: string[] = []
-  const re = /font-family\s*:\s*([^;}{]+)/gi
+
+  const variableRe = /--(?:font|font-[a-z0-9_-]+)\s*:\s*([^;}{]+)/gi
   let match: RegExpExecArray | null
-  while ((match = re.exec(css))) {
+  while ((match = variableRe.exec(css))) {
     const first = match[1].split(',')[0].trim().replace(/^['"]|['"]$/g, '')
-    if (first && !/^(inherit|initial|system-ui)$/i.test(first)) fonts.push(first)
+    if (first && !first.startsWith('var(') && !/^(inherit|initial|system-ui)$/i.test(first)) fonts.push(first)
+  }
+
+  const familyRe = /font-family\s*:\s*([^;}{]+)/gi
+  while ((match = familyRe.exec(css))) {
+    const first = match[1].split(',')[0].trim().replace(/^['"]|['"]$/g, '')
+    if (first && !first.startsWith('var(') && !/^(inherit|initial|system-ui)$/i.test(first)) fonts.push(first)
   }
   return unique(fonts).slice(0, 8)
 }
@@ -391,6 +454,8 @@ export function analyzeWebsiteHtml(input: {
     const paragraphs = extractTagTexts(block.html, 'p').slice(0, MAX_TEXT_ITEMS)
     const listItems = extractTagTexts(block.html, 'li').slice(0, MAX_TEXT_ITEMS)
     const images = extractImages(block.html, baseUrl)
+    const cards = extractCards(block.html, baseUrl)
+    const tableRows = extractTableRows(block.html)
     const actions = extractActions(block.html, baseUrl)
     const faqItems = extractFaq(block.html)
     const formFields = extractFormFields(block.html)
@@ -419,10 +484,12 @@ export function analyzeWebsiteHtml(input: {
       paragraphs,
       listItems,
       images,
+      cards,
+      tableRows,
       actions,
       faqItems: faqItems.length ? faqItems : undefined,
       formFields: formFields.length ? formFields : undefined,
-      content: sectionContent(inferred.type, heading, paragraphs, listItems, images, actions, faqItems, formFields),
+      content: sectionContent(inferred.type, heading, paragraphs, listItems, images, cards, tableRows, actions, faqItems, formFields),
       design: inferDesign(block.html, inferred.type, listItems.length, images.length),
     }
   })
