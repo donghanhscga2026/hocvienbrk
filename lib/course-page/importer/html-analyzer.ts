@@ -71,7 +71,7 @@ function sanitizeFidelityCss(css: string, baseUrl?: string): string {
     const value = String(raw).trim()
     if (!value || value.startsWith('#') || value.startsWith('data:')) return all
     const resolved = resolveAssetUrl(value, baseUrl)
-    return resolved ? \`url("\${resolved.replace(/"/g, '%22')}")\` : 'none'
+    return resolved ? `url("${resolved.replace(/"/g, '%22')}")` : 'none'
   })
   return safe
 }
@@ -88,14 +88,14 @@ function sanitizeFidelityHtml(html: string, baseUrl?: string): string {
 
   safe = safe.replace(/(<(?:img|source)\b[^>]*?\s(?:src|data-src)\s*=\s*)(["'])(.*?)\2/gi, (all, prefix, quote, value) => {
     const resolved = resolveAssetUrl(value, baseUrl)
-    return resolved ? \`\${prefix}\${quote}\${resolved}\${quote}\` : ''
+    return resolved ? `${prefix}${quote}${resolved}${quote}` : ''
   })
   safe = safe.replace(/(<a\b[^>]*?\shref\s*=\s*)(["'])(.*?)\2/gi, (all, prefix, quote, value) => {
     const trimmed = String(value).trim()
-    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) return \`\${prefix}\${quote}#\${quote}\`
+    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) return `${prefix}${quote}#${quote}`
     if (trimmed.startsWith('#')) return all
     const resolved = resolveAssetUrl(trimmed, baseUrl)
-    return resolved ? \`\${prefix}\${quote}\${resolved}\${quote}\` : \`\${prefix}\${quote}#\${quote}\`
+    return resolved ? `${prefix}${quote}${resolved}${quote}` : `${prefix}${quote}#${quote}`
   })
   return safe
 }
@@ -617,7 +617,7 @@ export function analyzeWebsiteHtml(input: {
   const fonts = extractFonts(css)
 
   const blocks: Array<{ tag: string; attrs: string; html: string }> = []
-  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\x01>/gi
   let blockMatch: RegExpExecArray | null
   while ((blockMatch = blockRe.exec(html)) && blocks.length < MAX_SECTIONS) {
     blocks.push({ tag: blockMatch[1].toLowerCase(), attrs: blockMatch[2], html: blockMatch[0] })
