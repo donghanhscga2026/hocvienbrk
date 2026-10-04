@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
-import { updateCoursePage, saveCourseSections } from '@/app/actions/course-page-actions'
+import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion } from '@/app/actions/course-page-actions'
 
 interface EditCoursePageFormProps {
   initialPage: {
@@ -43,7 +43,10 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   // Sections state
   const [sections, setSections] = useState<any[]>(initialPage.sections || [])
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [versions, setVersions] = useState<any[]>([])
+  const [showVersions, setShowVersions] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleSavePage = async () => {
@@ -79,6 +82,39 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     } finally {
       setSaving(false)
     }
+  }
+
+  const handlePublish = async () => {
+    if (dirty) {
+      setMessage({ type: 'error', text: 'Hãy lưu thay đổi trước khi xuất bản.' })
+      return
+    }
+    if (!confirm('Xuất bản phiên bản hiện tại lên trang công khai?')) return
+    setPublishing(true)
+    const res = await publishCoursePage(initialPage.id)
+    setPublishing(false)
+    if (res.success) {
+      setStatus('published')
+      setMessage({ type: 'success', text: `Đã xuất bản phiên bản ${res.versionNumber}.` })
+      setPreviewKey(k => k + 1)
+      router.refresh()
+    } else setMessage({ type: 'error', text: res.error || 'Không thể xuất bản' })
+  }
+
+  const handleLoadVersions = async () => {
+    if (showVersions) { setShowVersions(false); return }
+    const res = await getCoursePageVersions(initialPage.id)
+    if (res.success) {
+      setVersions(res.versions || [])
+      setShowVersions(true)
+    } else setMessage({ type: 'error', text: res.error || 'Không thể tải lịch sử phiên bản' })
+  }
+
+  const handleRestoreVersion = async (versionNumber: number) => {
+    if (!confirm(`Khôi phục phiên bản ${versionNumber} vào bản đang chỉnh sửa? Trang công khai chưa thay đổi cho tới khi bạn bấm Xuất bản.`)) return
+    const res = await restoreCoursePageVersion(initialPage.id, versionNumber)
+    if (res.success) window.location.reload()
+    else setMessage({ type: 'error', text: res.error || 'Không thể khôi phục phiên bản' })
   }
 
   // Section manipulation
@@ -284,10 +320,27 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
           <div className="font-black text-sm text-gray-900 truncate">{name}</div>
           <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
         </div>
-        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
-          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu thay đổi'}
+        <button type="button" onClick={handleLoadVersions} className="rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-bold text-gray-600">Lịch sử</button>
+        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
+          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
+        </button>
+        <button type="button" onClick={handlePublish} disabled={publishing || dirty} className="rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
+          {publishing?'Đang xuất bản...':'Xuất bản'}
         </button>
       </div>
+      {showVersions && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-3"><h3 className="font-black text-sm">Lịch sử phiên bản</h3><button onClick={() => setShowVersions(false)} className="text-xs text-gray-500">Đóng</button></div>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {versions.length === 0 && <p className="text-xs text-gray-500">Chưa có phiên bản đã lưu.</p>}
+            {versions.map((version:any) => <div key={version.id} className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+              <div className="flex-1"><div className="text-xs font-black">Phiên bản {version.versionNumber} {(version.snapshot as any)?.kind === 'published' ? '• Đã xuất bản' : ''}</div><div className="text-[11px] text-gray-500">{new Date(version.createdAt).toLocaleString('vi-VN')}</div></div>
+              <button type="button" onClick={() => handleRestoreVersion(version.versionNumber)} className="rounded-lg border bg-white px-3 py-2 text-xs font-bold">Khôi phục</button>
+            </div>)}
+          </div>
+        </div>
+      )}
+
       {message && (
         <div
           className={`p-4 rounded-2xl border text-sm font-semibold ${
