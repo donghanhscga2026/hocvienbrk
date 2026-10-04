@@ -1949,6 +1949,7 @@ enum EnrollmentMemberRole {
 
 enum Role {
   ADMIN
+  DEVELOPER
   STUDENT
   INSTRUCTOR
   AFFILIATE
