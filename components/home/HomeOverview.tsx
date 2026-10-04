@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { BookOpen, Compass, Home, MessagesSquare, Route, Wrench, UserRound } from 'lucide-react'
 import HomeAreaLink, { type HomeArea } from './HomeAreaLink'
@@ -29,8 +29,13 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
     { area: 'tools' as const, label: 'Công cụ', icon: Wrench, description: 'Các tiện ích đồng hành cùng bạn.' },
     ...(community ? [{ area: 'community' as const, label: 'Cộng đồng', icon: MessagesSquare, description: 'Trao đổi và chia sẻ cùng mọi người.' }] : []),
   ]
+  const pathname = usePathname()
   const requested = params.get('section')
-  const area: HomeArea = links.find(link => link.area === requested)?.area || 'home'
+  // Trang chủ ưu tiên khám phá; trang nhân hiệu giữ phần giới thiệu khi chưa chọn mục.
+  const defaultArea: HomeArea = pathname === '/' && catalog ? 'discover' : 'home'
+  const area: HomeArea = links.find(link => link.area === requested)?.area || defaultArea
+  const resumeCourse = isLoggedIn ? activeCourses.find(course => enrollments[course.id]?.status === 'ACTIVE' && !enrollments[course.id]?.hiddenFromGifts && enrollments[course.id]?.totalLessons > 0) : undefined
+  const resumeEnrollment = resumeCourse ? enrollments[resumeCourse.id] : undefined
 
   useEffect(() => {
     const header = document.querySelector('header')
@@ -81,7 +86,20 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
       </>}
       {area === 'path' && <section id="learning-path"><div className="min-w-0">{roadmap}</div></section>}
       {area === 'learning' && (myCourses || <section className="rounded-2xl border border-brk-outline bg-brk-surface p-6"><h2 className="text-xl font-bold text-brk-on-surface">Đăng nhập để xem khóa học của bạn</h2><p className="mt-2 text-sm text-brk-muted">Theo dõi tiến độ và tiếp tục các khóa đã đăng ký.</p><Link href="/login" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-brk-primary px-5 font-semibold text-brk-on-primary">Đăng nhập</Link></section>)}
-      {area === 'discover' && catalog}
+      {area === 'discover' && <>
+        {resumeCourse && resumeEnrollment && <section id="discovery-continue-learning" aria-label="Tiếp tục học" className="flex min-w-0 flex-col gap-3 rounded-2xl border border-brk-primary/20 bg-brk-background p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-brk-primary">Tiếp tục học</p>
+            <h2 className="mt-1 break-words text-base font-semibold text-brk-on-surface">{resumeCourse.name_lop}</h2>
+            <p className="mt-1 text-xs text-brk-muted">Đã học {resumeEnrollment.completedCount}/{resumeEnrollment.totalLessons} bài</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Link href={`/courses/${encodeURIComponent(resumeCourse.id_khoa)}/learn`} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-brk-on-primary">Học tiếp →</Link>
+            <Link href="/my-space" className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-brk-primary">Không gian của tôi</Link>
+          </div>
+        </section>}
+        {catalog}
+      </>}
       {area === 'tools' && tools}
       {area === 'community' && <section id="community" aria-label="Cộng đồng" className="min-w-0">{community}</section>}
     </div>

@@ -10,7 +10,7 @@ export type HomeArea = 'home' | 'path' | 'learning' | 'discover' | 'tools' | 'co
 export default function HomeAreaLink({ area, category, children, onClick, ...props }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & { area: HomeArea; category?: string }) {
   const pathname = usePathname()
   const params = new URLSearchParams(useSearchParams().toString())
-  if (area === 'home') params.delete('section')
+  if (area === 'discover' && pathname === '/') params.delete('section')
   else params.set('section', area)
   if (area === 'discover' && category) params.set('category', category)
   else params.delete('category')
