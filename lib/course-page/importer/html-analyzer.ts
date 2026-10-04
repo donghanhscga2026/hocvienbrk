@@ -507,7 +507,11 @@ export function analyzeWebsiteHtml(input: {
   const { html, sourceType, sourceUrl, finalUrl } = input
   const warnings: string[] = []
   const savedFromUrl = inferSavedFromUrl(html)
-  const baseUrl = finalUrl || sourceUrl || savedFromUrl
+  const sourcePageUrl = finalUrl || sourceUrl || savedFromUrl
+  // A browser-exported HTML file usually rewrites images to a sibling *_files
+  // folder. Do not pretend those local paths exist on the original website.
+  // URL imports can safely resolve relative assets against the fetched URL.
+  const assetBaseUrl = sourceType === 'url' ? sourcePageUrl : (sourceUrl || undefined)
 
   const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)
   const title = titleMatch ? cleanText(titleMatch[1]) : 'Mẫu website đã nhập'
@@ -537,10 +541,10 @@ export function analyzeWebsiteHtml(input: {
     const heading = extractHeading(block.html)
     const paragraphs = extractTagTexts(block.html, 'p').slice(0, MAX_TEXT_ITEMS)
     const listItems = extractTagTexts(block.html, 'li').slice(0, MAX_TEXT_ITEMS)
-    const images = extractImages(block.html, baseUrl)
-    const cards = extractCards(block.html, baseUrl)
+    const images = extractImages(block.html, assetBaseUrl)
+    const cards = extractCards(block.html, assetBaseUrl)
     const tableRows = extractTableRows(block.html)
-    const actions = extractActions(block.html, baseUrl)
+    const actions = extractActions(block.html, sourcePageUrl)
     const faqItems = extractFaq(block.html)
     const formFields = extractFormFields(block.html)
     const inferred = inferSectionType({
