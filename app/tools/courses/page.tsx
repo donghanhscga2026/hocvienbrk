@@ -6,7 +6,8 @@ import { getTeachersAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
-import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
+import { getCoursePages, updateCoursePage, createCoursePage, applyCoursePageTemplate } from '@/app/actions/course-page-actions'
+import { COURSE_TEMPLATE_LIBRARY, CourseTemplateKey } from '@/lib/course-page/templates'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
 
@@ -18,6 +19,12 @@ export default function ToolsCoursesPage() {
             <MainHeader title="KHÓA HỌC" toolSlug="courses" />
 
             <div className="p-4 max-w-4xl mx-auto space-y-4 pb-20">
+                <div className="flex justify-end mt-4">
+                    <Link href="/tools/courses/templates" className="inline-flex items-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white shadow-sm hover:bg-purple-800">
+                        <Palette className="w-4 h-4" /> Thư viện mẫu Salespage
+                    </Link>
+                </div>
+
                 <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl mt-4">
                     <button
                         onClick={() => setActiveTab('courses')}
@@ -132,6 +139,24 @@ function CoursesTab() {
             } else {
                 alert(res.error || 'Có lỗi xảy ra khi khởi tạo cấu hình')
             }
+        }
+    }
+
+    const handleApplyTemplate = async (course: any, page: any, templateKey: CourseTemplateKey) => {
+        const template = COURSE_TEMPLATE_LIBRARY.find(t => t.key === templateKey)
+        if (!template) return
+        if (page && !confirm(`Áp dụng mẫu "${template.name}" sẽ thay thế bố cục trang hiện tại của khóa học này. Nội dung của các khóa học khác không bị ảnh hưởng. Tiếp tục?`)) return
+        setBatchLoading(true)
+        try {
+            const res = await applyCoursePageTemplate(course.id_khoa, course.name_lop || course.id_khoa, templateKey)
+            if (res.success) {
+                const pages = await getCoursePages()
+                setCoursePages(pages)
+            } else {
+                alert(res.error || 'Có lỗi xảy ra khi áp dụng mẫu')
+            }
+        } finally {
+            setBatchLoading(false)
         }
     }
 
@@ -475,11 +500,24 @@ function CoursesTab() {
                                                                         }`}
                                                                     />
                                                                 </button>
+                                                                {isTemplateApplied && (
+                                                                    <select
+                                                                        value={(page?.seo as any)?.templateKey || ''}
+                                                                        onChange={(e) => e.target.value && handleApplyTemplate(course, page, e.target.value as CourseTemplateKey)}
+                                                                        className="h-6 max-w-[105px] rounded-md border border-purple-200 bg-white px-1 text-[9px] font-bold text-purple-800"
+                                                                        title="Chọn mẫu giao diện"
+                                                                    >
+                                                                        <option value="">Tùy chỉnh</option>
+                                                                        {COURSE_TEMPLATE_LIBRARY.map(template => (
+                                                                            <option key={template.key} value={template.key}>{template.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
                                                                 {isTemplateApplied && page && (
                                                                     <Link
                                                                         href={`/tools/courses/pages/${page.id}`}
                                                                         className="inline-flex items-center justify-center w-5 h-5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full transition-all ml-1"
-                                                                        title="Thiết lập giao diện Template"
+                                                                        title="Chỉnh nội dung riêng của khóa học"
                                                                     >
                                                                         <Palette className="w-3 h-3" />
                                                                     </Link>
