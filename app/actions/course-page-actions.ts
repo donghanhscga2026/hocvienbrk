@@ -294,6 +294,20 @@ async function createCoursePageVersion(coursePageId: string, snapshot: CoursePag
   })
 }
 
+export async function createCoursePageCheckpoint(coursePageId: string) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+  try {
+    const snapshot = await buildCoursePageSnapshot(coursePageId, 'manual')
+    if (!snapshot) return { success: false, error: 'Không tìm thấy trang khóa học' }
+    const version = await createCoursePageVersion(coursePageId, snapshot)
+    return { success: true, versionNumber: version.versionNumber }
+  } catch (error: any) {
+    console.error('[CoursePage] Checkpoint error:', error)
+    return { success: false, error: error.message || 'Lỗi khi lưu phiên bản' }
+  }
+}
+
 export async function getCoursePageVersions(coursePageId: string) {
   const denied = await requireAdminAction()
   if (denied) return denied
@@ -333,6 +347,8 @@ export async function restoreCoursePageVersion(coursePageId: string, versionNumb
     })
     if (!version) return { success: false, error: 'Không tìm thấy phiên bản' }
     const snapshot = version.snapshot as any as CoursePageSnapshot
+    const currentSnapshot = await buildCoursePageSnapshot(coursePageId, 'manual')
+    if (currentSnapshot) await createCoursePageVersion(coursePageId, currentSnapshot)
     await prisma.$transaction(async tx => {
       await tx.coursePage.update({
         where: { id: coursePageId },
