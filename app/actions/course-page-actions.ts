@@ -41,12 +41,22 @@ export async function getPublishedCoursePageBySlug(slug: string) {
       where: { slug },
       include: {
         sections: { where: { enabled: true }, orderBy: { sortOrder: 'asc' } },
-        versions: { orderBy: { versionNumber: 'desc' }, take: 20 },
       },
     })
-    if (!page) return null
 
-    const publishedVersion = page.versions.find(version => (version.snapshot as any)?.kind === 'published')
+    // The current admin switches are authoritative. A historical published snapshot
+    // may preserve the page contents, but it must never re-enable a template that
+    // an admin has explicitly turned off or re-publish a page moved out of published.
+    if (!page || page.status !== 'published' || !page.useTemplate) return null
+
+    const publishedVersion = await prisma.coursePageVersion.findFirst({
+      where: {
+        coursePageId: page.id,
+        snapshot: { path: ['kind'], equals: 'published' },
+      },
+      orderBy: { versionNumber: 'desc' },
+    })
+
     if (publishedVersion) {
       const snapshot = publishedVersion.snapshot as any
       return {
@@ -56,7 +66,7 @@ export async function getPublishedCoursePageBySlug(slug: string) {
         theme: snapshot.theme || {},
         navigation: snapshot.navigation || {},
         checkoutConfig: snapshot.checkoutConfig || {},
-        useTemplate: snapshot.useTemplate !== false,
+        useTemplate: true,
         status: 'published',
         sections: (snapshot.sections || [])
           .filter((section: any) => section.enabled !== false)
@@ -72,7 +82,6 @@ export async function getPublishedCoursePageBySlug(slug: string) {
     }
 
     // Backward-compatible fallback for pages published before version snapshots existed.
-    if (page.status !== 'published') return null
     return page
   } catch (error) {
     console.error('[CoursePage] Get published page by slug error:', error)
@@ -157,11 +166,20 @@ export async function updateCoursePage(
   try {
     const current = await prisma.coursePage.findUnique({
       where: { id },
-      include: { versions: { orderBy: { versionNumber: 'desc' }, take: 20 } },
+      select: { status: true },
     })
-    if (current?.status === 'published' && !current.versions.some(version => (version.snapshot as any)?.kind === 'published')) {
-      const publishedSnapshot = await buildCoursePageSnapshot(id, 'published')
-      if (publishedSnapshot) await createCoursePageVersion(id, publishedSnapshot)
+    if (current?.status === 'published') {
+      const existingPublishedVersion = await prisma.coursePageVersion.findFirst({
+        where: {
+          coursePageId: id,
+          snapshot: { path: ['kind'], equals: 'published' },
+        },
+        select: { id: true },
+      })
+      if (!existingPublishedVersion) {
+        const publishedSnapshot = await buildCoursePageSnapshot(id, 'published')
+        if (publishedSnapshot) await createCoursePageVersion(id, publishedSnapshot)
+      }
     }
 
     const updated = await prisma.coursePage.update({
