@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { gunzipSync } from 'node:zlib'
 import { requireAdmin } from '@/lib/api-auth'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { fetchRemoteHtml } from '@/lib/course-page/importer/fetch-html'
@@ -14,6 +15,34 @@ export async function POST(request: NextRequest) {
 
   try {
     const contentType = request.headers.get('content-type') || ''
+
+    if (contentType.includes('application/gzip')) {
+      const compressed = Buffer.from(await request.arrayBuffer())
+      let htmlBuffer: Buffer
+      try {
+        htmlBuffer = gunzipSync(compressed)
+      } catch {
+        return NextResponse.json({ error: 'File HTML nén không hợp lệ' }, { status: 400 })
+      }
+
+      if (htmlBuffer.byteLength > MAX_HTML_BYTES) {
+        return NextResponse.json({ error: 'Nội dung HTML sau giải nén vượt quá giới hạn 5MB' }, { status: 400 })
+      }
+
+      const html = htmlBuffer.toString('utf8')
+      const encodedSourceUrl = request.headers.get('x-source-url') || ''
+      let sourceUrl: string | undefined
+      if (encodedSourceUrl) {
+        try { sourceUrl = decodeURIComponent(encodedSourceUrl) } catch { sourceUrl = undefined }
+      }
+
+      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html', sourceUrl })
+      const analysis = await mirrorAnalysisImages(rawAnalysis, {
+        dataOnly: true,
+        failOnEmbeddedData: true,
+      })
+      return NextResponse.json({ success: true, analysis })
+    }
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
