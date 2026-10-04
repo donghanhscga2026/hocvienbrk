@@ -22,10 +22,10 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
   const params = useSearchParams()
   const navigation = useRef<HTMLElement>(null)
   const links = [
+    ...(catalog ? [{ area: 'discover' as const, label: 'Khám phá', icon: Compass, description: 'Tìm khóa học theo danh mục, giáo viên và mức phí.' }] : []),
     { area: 'home' as const, label: 'Tổng quan', icon: Home, description: 'Thông điệp và các lối vào nhanh.' },
     ...(roadmap ? [{ area: 'path' as const, label: 'Lộ trình', icon: Route, description: 'Xác định mục tiêu và bước học tiếp theo.' }] : []),
     { area: 'learning' as const, label: 'Học tập', icon: BookOpen, description: 'Khóa đang học và khóa bạn giảng dạy.' },
-    ...(catalog ? [{ area: 'discover' as const, label: 'Khám phá', icon: Compass, description: 'Tìm khóa học theo danh mục, giáo viên và mức phí.' }] : []),
     { area: 'tools' as const, label: 'Công cụ', icon: Wrench, description: 'Các tiện ích đồng hành cùng bạn.' },
     ...(community ? [{ area: 'community' as const, label: 'Cộng đồng', icon: MessagesSquare, description: 'Trao đổi và chia sẻ cùng mọi người.' }] : []),
   ]
