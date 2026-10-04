@@ -63,11 +63,11 @@ function FidelityFrame({
       .replace(/</g, '\\u003c')
       .replace(/\u2028/g, '\\u2028')
       .replace(/\u2029/g, '\\u2029')
-    const bridge = \`
+    const bridge = `
 <script>
 (function(){
-  var frameId = \${JSON.stringify(frameId)};
-  var structured = \${structuredJson};
+  var frameId = ${JSON.stringify(frameId)};
+  var structured = ${structuredJson};
   function norm(v){return String(v==null?'':v).replace(/\\s+/g,' ').trim()}
   function patchText(selector,values){
     if(!Array.isArray(values))return;
@@ -135,8 +135,8 @@ function FidelityFrame({
   if(window.ResizeObserver)new ResizeObserver(sendHeight).observe(document.documentElement);
   setTimeout(sendHeight,50);setTimeout(sendHeight,400);setTimeout(sendHeight,1200);
 })();
-<\/script>\`
-    return \`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data: blob:; style-src 'unsafe-inline'; font-src https: data:; script-src 'unsafe-inline'; form-action 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'"><style>html,body{margin:0;padding:0;overflow:hidden}*,*:before,*:after{box-sizing:border-box}\${fidelity.css || ''}</style></head><body>\${fidelity.html || ''}\${bridge}</body></html>\`
+<\/script>`
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data: blob:; style-src 'unsafe-inline'; font-src https: data:; script-src 'unsafe-inline'; form-action 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'"><style>html,body{margin:0;padding:0;overflow:hidden}*,*:before,*:after{box-sizing:border-box}${fidelity.css || ''}</style></head><body>${fidelity.html || ''}${bridge}</body></html>`
   }, [fidelity.css, fidelity.html, frameId, structured])
 
   return (
