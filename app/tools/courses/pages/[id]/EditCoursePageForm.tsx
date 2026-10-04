@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
-import { updateCoursePage, saveCourseSections } from '@/app/actions/course-page-actions'
+import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion, createCoursePageCheckpoint } from '@/app/actions/course-page-actions'
 
 interface EditCoursePageFormProps {
   initialPage: {
@@ -43,7 +43,10 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   // Sections state
   const [sections, setSections] = useState<any[]>(initialPage.sections || [])
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [versions, setVersions] = useState<any[]>([])
+  const [showVersions, setShowVersions] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleSavePage = async () => {
@@ -64,7 +67,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         // Now save sections
         const secRes = await saveCourseSections(initialPage.id, sections)
         if (secRes.success) {
-          setMessage({ type: 'success', text: 'Đã lưu thay đổi thành công!' })
+          const checkpoint = await createCoursePageCheckpoint(initialPage.id)
+          setMessage({ type: 'success', text: checkpoint.success ? `Đã lưu bản nháp • Phiên bản ${checkpoint.versionNumber}` : 'Đã lưu bản nháp thành công!' })
           setDirty(false)
           setPreviewKey(k => k + 1)
           router.refresh()
@@ -79,6 +83,39 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     } finally {
       setSaving(false)
     }
+  }
+
+  const handlePublish = async () => {
+    if (dirty) {
+      setMessage({ type: 'error', text: 'Hãy lưu thay đổi trước khi xuất bản.' })
+      return
+    }
+    if (!confirm('Xuất bản phiên bản hiện tại lên trang công khai?')) return
+    setPublishing(true)
+    const res = await publishCoursePage(initialPage.id)
+    setPublishing(false)
+    if (res.success) {
+      setStatus('published')
+      setMessage({ type: 'success', text: `Đã xuất bản phiên bản ${res.versionNumber}.` })
+      setPreviewKey(k => k + 1)
+      router.refresh()
+    } else setMessage({ type: 'error', text: res.error || 'Không thể xuất bản' })
+  }
+
+  const handleLoadVersions = async () => {
+    if (showVersions) { setShowVersions(false); return }
+    const res = await getCoursePageVersions(initialPage.id)
+    if (res.success) {
+      setVersions(res.versions || [])
+      setShowVersions(true)
+    } else setMessage({ type: 'error', text: ('error' in res ? res.error : undefined) || 'Không thể tải lịch sử phiên bản' })
+  }
+
+  const handleRestoreVersion = async (versionNumber: number) => {
+    if (!confirm(`Khôi phục phiên bản ${versionNumber} vào bản đang chỉnh sửa? Trang công khai chưa thay đổi cho tới khi bạn bấm Xuất bản.`)) return
+    const res = await restoreCoursePageVersion(initialPage.id, versionNumber)
+    if (res.success) window.location.reload()
+    else setMessage({ type: 'error', text: res.error || 'Không thể khôi phục phiên bản' })
   }
 
   // Section manipulation
@@ -248,6 +285,27 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     </div>)}
   </div>
 
+  const roadmapEditor = (index:number) => <div className="space-y-3">
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Các chặng / giai đoạn</label><button type="button" onClick={()=>addNestedItem(index,'phases',{period:'',title:'',description:'',details:[]})} className="text-xs font-bold text-purple-700">+ Thêm chặng</button></div>
+    {(sections[index]?.content?.phases || []).map((phase:any,i:number)=><div key={phase.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
+      <div className="flex gap-2"><input value={phase.period||''} onChange={e=>updateNestedItem(index,'phases',i,{period:e.target.value})} placeholder="Thời gian / Giai đoạn" className="w-40 rounded-lg border px-3 py-2 text-sm bg-white"/><input value={phase.title||''} onChange={e=>updateNestedItem(index,'phases',i,{title:e.target.value})} placeholder="Tên chặng" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'phases',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
+      <textarea value={phase.description||''} onChange={e=>updateNestedItem(index,'phases',i,{description:e.target.value})} placeholder="Mô tả" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-16"/>
+      <textarea value={(phase.details||[]).join('\n')} onChange={e=>updateNestedItem(index,'phases',i,{details:e.target.value.split('\n').filter(Boolean)})} placeholder="Chi tiết, mỗi dòng một ý" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-16"/>
+    </div>)}
+  </div>
+
+  const ctaEditor = (index:number, key:'primaryCta'|'secondaryCta'|'cta', label:string) => {
+    const cta=sections[index]?.content?.[key] || {}
+    return <div className="rounded-xl border bg-gray-50 p-3 grid gap-2">
+      <label className="text-xs font-bold text-gray-600">{label}</label>
+      <input value={cta.label||''} onChange={e=>updateNestedContent(index,key,'label',e.target.value)} placeholder="Chữ trên nút" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      <div className="grid md:grid-cols-2 gap-2">
+        <select value={cta.action||'scroll'} onChange={e=>updateNestedContent(index,key,'action',e.target.value)} className="rounded-lg border px-3 py-2 text-sm bg-white"><option value="open_registration">Mở đăng ký</option><option value="scroll">Cuộn tới một phần</option><option value="external_link">Mở liên kết</option></select>
+        <input value={cta.target||''} onChange={e=>updateNestedContent(index,key,'target',e.target.value)} placeholder="Đích / link (nếu cần)" className="rounded-lg border px-3 py-2 text-sm bg-white"/>
+      </div>
+    </div>
+  }
+
   const imageUrlField = (index:number, key:string, label:string) => {
     const value=sections[index]?.content?.[key] || ''
     return <div>
@@ -267,11 +325,11 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     if (sec.sectionType === 'wigrow_artwork') return <div className="grid gap-3">{imageUrlField(index,'imageUrl','Hình ảnh')}{field(index,'imageAlt','Mô tả hình ảnh')}{field(index,'title','Tiêu đề trên ảnh')}{field(index,'accent','Dòng nhấn mạnh')}{field(index,'description','Nội dung',true)}</div>
     if (sec.sectionType === 'quote') return <div className="grid gap-3">{field(index,'quote','Câu trích dẫn',true)}{field(index,'author','Tác giả')}{field(index,'caption','Ghi chú')}</div>
     if (sec.sectionType === 'closing_message') return <div className="grid gap-3">{field(index,'title','Tiêu đề')}{paragraphsEditor(index)}{field(index,'signature','Chữ ký')}</div>
-    if (sec.sectionType === 'rich_content') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{paragraphsEditor(index)}{imageUrlField(index,'imageUrl','Hình ảnh minh họa')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút</label><input value={sec.content?.cta?.label||''} onChange={e=>updateNestedContent(index,'cta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"/></div></div>
-    if (sec.sectionType === 'roadmap') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'phases','Các chặng / giai đoạn')}</div>
+    if (sec.sectionType === 'rich_content') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{paragraphsEditor(index)}{imageUrlField(index,'imageUrl','Hình ảnh minh họa')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Vị trí ảnh</label><select value={sec.content?.imagePosition||'right'} onChange={e=>updateContent(index,'imagePosition',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white"><option value="left">Bên trái</option><option value="right">Bên phải</option><option value="top">Phía trên</option></select></div>{ctaEditor(index,'cta','Nút hành động')}</div>
+    if (sec.sectionType === 'roadmap') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{roadmapEditor(index)}</div>
     if (sec.sectionType === 'instructor') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{instructorsEditor(index)}</div>
     if (sec.sectionType === 'pricing') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{pricingEditor(index)}{field(index,'paymentNote','Ghi chú thanh toán',true)}</div>
-    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{imageUrlField(index,'imageUrl','Ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút chính</label><input value={sec.content?.primaryCta?.label||''} onChange={e=>updateNestedContent(index,'primaryCta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></div></div>
+    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{imageUrlField(index,'imageUrl','Ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}{ctaEditor(index,'primaryCta','Nút chính')}{ctaEditor(index,'secondaryCta','Nút phụ (không bắt buộc)')}</div>
     if (sec.sectionType === 'benefits' || sec.sectionType === 'outcomes' || sec.sectionType === 'pain_points') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'items','Các mục nội dung')}</div>
     return common
   }
@@ -284,10 +342,27 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
           <div className="font-black text-sm text-gray-900 truncate">{name}</div>
           <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
         </div>
-        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
-          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu thay đổi'}
+        <button type="button" onClick={handleLoadVersions} className="rounded-xl border border-gray-200 px-3 py-2.5 text-xs font-bold text-gray-600">Lịch sử</button>
+        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl border border-gray-900 px-4 py-2.5 text-xs font-black text-gray-900 disabled:opacity-40">
+          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu bản nháp'}
+        </button>
+        <button type="button" onClick={handlePublish} disabled={publishing || dirty} className="rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
+          {publishing?'Đang xuất bản...':'Xuất bản'}
         </button>
       </div>
+      {showVersions && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-3"><h3 className="font-black text-sm">Lịch sử phiên bản</h3><button onClick={() => setShowVersions(false)} className="text-xs text-gray-500">Đóng</button></div>
+          <div className="space-y-2 max-h-64 overflow-auto">
+            {versions.length === 0 && <p className="text-xs text-gray-500">Chưa có phiên bản đã lưu.</p>}
+            {versions.map((version:any) => <div key={version.id} className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+              <div className="flex-1"><div className="text-xs font-black">Phiên bản {version.versionNumber} {(version.snapshot as any)?.kind === 'published' ? '• Đã xuất bản' : ''}</div><div className="text-[11px] text-gray-500">{new Date(version.createdAt).toLocaleString('vi-VN')}</div></div>
+              <button type="button" onClick={() => handleRestoreVersion(version.versionNumber)} className="rounded-lg border bg-white px-3 py-2 text-xs font-bold">Khôi phục</button>
+            </div>)}
+          </div>
+        </div>
+      )}
+
       {message && (
         <div
           className={`p-4 rounded-2xl border text-sm font-semibold ${
@@ -337,7 +412,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); setDirty(true) }}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm"
               />
             </div>
@@ -345,7 +420,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Trạng thái trang</label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => { setStatus(e.target.value as any); setDirty(true) }}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm bg-white"
               >
                 <option value="draft">Bản nháp (Draft)</option>
@@ -361,7 +436,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cổng thanh toán</label>
                 <select
                   value={checkoutConfig.provider || 'vietqr'}
-                  onChange={(e) => setCheckoutConfig({ ...checkoutConfig, provider: e.target.value })}
+                  onChange={(e) => { setCheckoutConfig({ ...checkoutConfig, provider: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs bg-white"
                 >
                   <option value="vietqr">VietQR Auto</option>
@@ -374,7 +449,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={checkoutConfig.paymentDescriptionPrefix || 'CK'}
-                  onChange={(e) => setCheckoutConfig({ ...checkoutConfig, paymentDescriptionPrefix: e.target.value })}
+                  onChange={(e) => { setCheckoutConfig({ ...checkoutConfig, paymentDescriptionPrefix: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
                 />
               </div>
@@ -383,7 +458,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="number"
                   value={checkoutConfig.orderExpirationMinutes || 15}
-                  onChange={(e) => setCheckoutConfig({ ...checkoutConfig, orderExpirationMinutes: parseInt(e.target.value) })}
+                  onChange={(e) => { setCheckoutConfig({ ...checkoutConfig, orderExpirationMinutes: parseInt(e.target.value) }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
                 />
               </div>
@@ -403,7 +478,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.primaryColor || '#C9683C'}
-                  onChange={(e) => setTheme({ ...theme, primaryColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, primaryColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -412,7 +487,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.secondaryColor || '#E8C468'}
-                  onChange={(e) => setTheme({ ...theme, secondaryColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, secondaryColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -421,7 +496,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.backgroundColor || '#1A1B26'}
-                  onChange={(e) => setTheme({ ...theme, backgroundColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, backgroundColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -430,7 +505,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.textColor || '#F2E8D5'}
-                  onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, textColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -445,7 +520,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={seo.title || ''}
-                  onChange={(e) => setSeo({ ...seo, title: e.target.value })}
+                  onChange={(e) => { setSeo({ ...seo, title: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
                 />
               </div>
@@ -453,7 +528,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mô tả SEO (Meta Description)</label>
                 <textarea
                   value={seo.description || ''}
-                  onChange={(e) => setSeo({ ...seo, description: e.target.value })}
+                  onChange={(e) => { setSeo({ ...seo, description: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs h-20"
                 />
               </div>

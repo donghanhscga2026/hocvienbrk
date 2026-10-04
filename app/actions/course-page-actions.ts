@@ -37,22 +37,46 @@ export async function getCoursePage(id: string) {
 
 export async function getPublishedCoursePageBySlug(slug: string) {
   try {
-    const page = await prisma.coursePage.findFirst({
-      where: {
-        slug,
-        status: 'published'
-      },
+    const page = await prisma.coursePage.findUnique({
+      where: { slug },
       include: {
-        sections: {
-          where: { enabled: true },
-          orderBy: { sortOrder: 'asc' }
-        }
+        sections: { where: { enabled: true }, orderBy: { sortOrder: 'asc' } },
+        versions: { orderBy: { versionNumber: 'desc' }, take: 20 },
+      },
+    })
+    if (!page) return null
+
+    const publishedVersion = page.versions.find(version => (version.snapshot as any)?.kind === 'published')
+    if (publishedVersion) {
+      const snapshot = publishedVersion.snapshot as any
+      return {
+        ...page,
+        name: snapshot.name || page.name,
+        seo: snapshot.seo || {},
+        theme: snapshot.theme || {},
+        navigation: snapshot.navigation || {},
+        checkoutConfig: snapshot.checkoutConfig || {},
+        useTemplate: snapshot.useTemplate !== false,
+        status: 'published',
+        sections: (snapshot.sections || [])
+          .filter((section: any) => section.enabled !== false)
+          .sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0))
+          .map((section: any) => ({
+            ...section,
+            id: section.id || section.sectionKey,
+            coursePageId: page.id,
+            createdAt: page.createdAt,
+            updatedAt: page.updatedAt,
+          })),
       }
-    });
-    return page;
+    }
+
+    // Backward-compatible fallback for pages published before version snapshots existed.
+    if (page.status !== 'published') return null
+    return page
   } catch (error) {
-    console.error('[CoursePage] Get published page by slug error:', error);
-    return null;
+    console.error('[CoursePage] Get published page by slug error:', error)
+    return null
   }
 }
 
@@ -131,6 +155,15 @@ export async function updateCoursePage(
   if (denied) return denied
 
   try {
+    const current = await prisma.coursePage.findUnique({
+      where: { id },
+      include: { versions: { orderBy: { versionNumber: 'desc' }, take: 20 } },
+    })
+    if (current?.status === 'published' && !current.versions.some(version => (version.snapshot as any)?.kind === 'published')) {
+      const publishedSnapshot = await buildCoursePageSnapshot(id, 'published')
+      if (publishedSnapshot) await createCoursePageVersion(id, publishedSnapshot)
+    }
+
     const updated = await prisma.coursePage.update({
       where: { id },
       data: {
@@ -208,6 +241,145 @@ export async function saveCourseSections(
   } catch (error: any) {
     console.error('[CoursePage] Save sections error:', error);
     return { success: false, error: error.message || 'Lỗi khi lưu các phần giao diện' };
+  }
+}
+
+
+type CoursePageSnapshot = {
+  name: string
+  seo: Record<string, any>
+  theme: Record<string, any>
+  navigation: Record<string, any>
+  checkoutConfig: Record<string, any>
+  useTemplate: boolean
+  sections: Array<Record<string, any>>
+  kind?: 'published' | 'manual'
+}
+
+async function buildCoursePageSnapshot(coursePageId: string, kind: 'published' | 'manual' = 'manual') {
+  const page = await prisma.coursePage.findUnique({
+    where: { id: coursePageId },
+    include: { sections: { orderBy: { sortOrder: 'asc' } } },
+  })
+  if (!page) return null
+  return {
+    name: page.name,
+    seo: page.seo as Record<string, any>,
+    theme: page.theme as Record<string, any>,
+    navigation: page.navigation as Record<string, any>,
+    checkoutConfig: page.checkoutConfig as Record<string, any>,
+    useTemplate: page.useTemplate,
+    sections: page.sections.map(section => ({
+      sectionKey: section.sectionKey,
+      sectionType: section.sectionType,
+      variant: section.variant,
+      anchorId: section.anchorId,
+      enabled: section.enabled,
+      sortOrder: section.sortOrder,
+      visibility: section.visibility,
+      content: section.content,
+    })),
+    kind,
+  } satisfies CoursePageSnapshot
+}
+
+async function createCoursePageVersion(coursePageId: string, snapshot: CoursePageSnapshot) {
+  const latest = await prisma.coursePageVersion.findFirst({
+    where: { coursePageId },
+    orderBy: { versionNumber: 'desc' },
+    select: { versionNumber: true },
+  })
+  return prisma.coursePageVersion.create({
+    data: { coursePageId, versionNumber: (latest?.versionNumber || 0) + 1, snapshot: snapshot as any },
+  })
+}
+
+export async function createCoursePageCheckpoint(coursePageId: string) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+  try {
+    const snapshot = await buildCoursePageSnapshot(coursePageId, 'manual')
+    if (!snapshot) return { success: false, error: 'Không tìm thấy trang khóa học' }
+    const version = await createCoursePageVersion(coursePageId, snapshot)
+    return { success: true, versionNumber: version.versionNumber }
+  } catch (error: any) {
+    console.error('[CoursePage] Checkpoint error:', error)
+    return { success: false, error: error.message || 'Lỗi khi lưu phiên bản' }
+  }
+}
+
+export async function getCoursePageVersions(coursePageId: string) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+  const versions = await prisma.coursePageVersion.findMany({
+    where: { coursePageId },
+    orderBy: { versionNumber: 'desc' },
+    take: 20,
+  })
+  return { success: true, versions }
+}
+
+export async function publishCoursePage(coursePageId: string) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+  try {
+    const snapshot = await buildCoursePageSnapshot(coursePageId, 'published')
+    if (!snapshot) return { success: false, error: 'Không tìm thấy trang khóa học' }
+    const version = await createCoursePageVersion(coursePageId, snapshot)
+    const page = await prisma.coursePage.update({
+      where: { id: coursePageId },
+      data: { status: 'published', publishedAt: new Date() },
+    })
+    revalidatePath(`/khoa-hoc/${page.slug}`)
+    return { success: true, versionNumber: version.versionNumber }
+  } catch (error: any) {
+    console.error('[CoursePage] Publish error:', error)
+    return { success: false, error: error.message || 'Lỗi khi xuất bản trang' }
+  }
+}
+
+export async function restoreCoursePageVersion(coursePageId: string, versionNumber: number) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+  try {
+    const version = await prisma.coursePageVersion.findUnique({
+      where: { coursePageId_versionNumber: { coursePageId, versionNumber } },
+    })
+    if (!version) return { success: false, error: 'Không tìm thấy phiên bản' }
+    const snapshot = version.snapshot as any as CoursePageSnapshot
+    const currentSnapshot = await buildCoursePageSnapshot(coursePageId, 'manual')
+    if (currentSnapshot) await createCoursePageVersion(coursePageId, currentSnapshot)
+    await prisma.$transaction(async tx => {
+      await tx.coursePage.update({
+        where: { id: coursePageId },
+        data: {
+          name: snapshot.name,
+          seo: snapshot.seo as any,
+          theme: snapshot.theme as any,
+          navigation: snapshot.navigation as any,
+          checkoutConfig: snapshot.checkoutConfig as any,
+          useTemplate: snapshot.useTemplate,
+        },
+      })
+      await tx.courseSection.deleteMany({ where: { coursePageId } })
+      await tx.courseSection.createMany({
+        data: (snapshot.sections || []).map((section: any) => ({
+          coursePageId,
+          sectionKey: section.sectionKey,
+          sectionType: section.sectionType,
+          variant: section.variant || null,
+          anchorId: section.anchorId || null,
+          enabled: section.enabled !== false,
+          sortOrder: section.sortOrder || 0,
+          visibility: section.visibility || 'all',
+          content: section.content || {},
+        })),
+      })
+    })
+    return { success: true }
+  } catch (error: any) {
+    console.error('[CoursePage] Restore version error:', error)
+    return { success: false, error: error.message || 'Lỗi khi khôi phục phiên bản' }
   }
 }
 
