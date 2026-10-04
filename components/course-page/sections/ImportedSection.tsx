@@ -25,6 +25,80 @@ function actionFor(href?: string) {
   return { type: 'external_link', target: href }
 }
 
+
+function FidelityFrame({
+  id,
+  fidelity,
+  onAction,
+}: {
+  id?: string
+  fidelity: { html: string; css: string }
+  onAction?: (actionType: string, target?: string) => void
+}) {
+  const frameRef = React.useRef<HTMLIFrameElement | null>(null)
+  const [height, setHeight] = React.useState(500)
+  const frameId = React.useId().replace(/:/g, '-')
+
+  React.useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.source !== frameRef.current?.contentWindow) return
+      const data = event.data
+      if (!data || data.frameId !== frameId) return
+      if (data.type === 'mfc-fidelity-height' && Number.isFinite(data.height)) {
+        setHeight(Math.max(40, Math.min(5000, Math.ceil(data.height))))
+      }
+      if (data.type === 'mfc-fidelity-action') {
+        const resolved = actionFor(typeof data.href === 'string' ? data.href : undefined)
+        onAction?.(resolved.type, resolved.target)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [frameId, onAction])
+
+  const srcDoc = React.useMemo(() => {
+    const bridge = \`
+<script>
+(function(){
+  var frameId = \${JSON.stringify(frameId)};
+  function sendHeight(){
+    var b=document.body,d=document.documentElement;
+    var h=Math.max(b?b.scrollHeight:0,d?d.scrollHeight:0,b?b.offsetHeight:0,d?d.offsetHeight:0);
+    parent.postMessage({type:'mfc-fidelity-height',frameId:frameId,height:h},'*');
+  }
+  document.addEventListener('click',function(e){
+    var el=e.target&&e.target.closest?e.target.closest('a,button'):null;
+    if(!el)return;
+    e.preventDefault();
+    parent.postMessage({type:'mfc-fidelity-action',frameId:frameId,href:el.getAttribute('href')||'',label:(el.textContent||'').trim()},'*');
+  },true);
+  document.addEventListener('submit',function(e){
+    e.preventDefault();
+    parent.postMessage({type:'mfc-fidelity-action',frameId:frameId,href:'',label:'Đăng ký'},'*');
+  },true);
+  addEventListener('load',sendHeight);
+  addEventListener('resize',sendHeight);
+  if(window.ResizeObserver)new ResizeObserver(sendHeight).observe(document.documentElement);
+  setTimeout(sendHeight,50);setTimeout(sendHeight,400);setTimeout(sendHeight,1200);
+})();
+<\/script>\`
+    return \`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data: blob:; style-src 'unsafe-inline'; font-src https: data:; script-src 'unsafe-inline'; form-action 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'"><style>html,body{margin:0;padding:0;overflow:hidden}*,*:before,*:after{box-sizing:border-box}\${fidelity.css || ''}</style></head><body>\${fidelity.html || ''}\${bridge}</body></html>\`
+  }, [fidelity.css, fidelity.html, frameId])
+
+  return (
+    <iframe
+      ref={frameRef}
+      id={id}
+      title="Imported website section"
+      srcDoc={srcDoc}
+      sandbox="allow-scripts"
+      scrolling="no"
+      className="block w-full border-0"
+      style={{ height }}
+    />
+  )
+}
+
 export default function ImportedSection({ id, content, onAction }: ImportedSectionProps) {
   const [galleryIndex, setGalleryIndex] = React.useState<number | null>(null)
   const source = content?.importedSource || {}
@@ -42,6 +116,13 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
   const faqItems: any[] = Array.isArray(source.faqItems) ? source.faqItems : []
   const formFields: any[] = Array.isArray(source.formFields) ? source.formFields : []
   const tableRows: string[] = Array.isArray(source.tableRows) ? source.tableRows : []
+  const fidelity = source.fidelity && typeof source.fidelity.html === 'string' && typeof source.fidelity.css === 'string'
+    ? source.fidelity
+    : null
+
+  if (fidelity && type !== 'sticky_cta') {
+    return <FidelityFrame id={id} fidelity={fidelity} onAction={onAction} />
+  }
 
   const sectionStyle: React.CSSProperties = {
     background: design.backgroundColor || undefined,
