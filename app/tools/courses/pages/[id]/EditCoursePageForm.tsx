@@ -390,7 +390,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => { setName(e.target.value); setDirty(true) }}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm"
               />
             </div>
@@ -398,7 +398,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Trạng thái trang</label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => { setStatus(e.target.value as any); setDirty(true) }}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-black text-sm bg-white"
               >
                 <option value="draft">Bản nháp (Draft)</option>
@@ -414,7 +414,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Cổng thanh toán</label>
                 <select
                   value={checkoutConfig.provider || 'vietqr'}
-                  onChange={(e) => setCheckoutConfig({ ...checkoutConfig, provider: e.target.value })}
+                  onChange={(e) => { setCheckoutConfig({ ...checkoutConfig, provider: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs bg-white"
                 >
                   <option value="vietqr">VietQR Auto</option>
@@ -427,7 +427,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={checkoutConfig.paymentDescriptionPrefix || 'CK'}
-                  onChange={(e) => setCheckoutConfig({ ...checkoutConfig, paymentDescriptionPrefix: e.target.value })}
+                  onChange={(e) => { setCheckoutConfig({ ...checkoutConfig, paymentDescriptionPrefix: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
                 />
               </div>
@@ -436,7 +436,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="number"
                   value={checkoutConfig.orderExpirationMinutes || 15}
-                  onChange={(e) => setCheckoutConfig({ ...checkoutConfig, orderExpirationMinutes: parseInt(e.target.value) })}
+                  onChange={(e) => { setCheckoutConfig({ ...checkoutConfig, orderExpirationMinutes: parseInt(e.target.value) }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
                 />
               </div>
@@ -456,7 +456,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.primaryColor || '#C9683C'}
-                  onChange={(e) => setTheme({ ...theme, primaryColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, primaryColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -465,7 +465,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.secondaryColor || '#E8C468'}
-                  onChange={(e) => setTheme({ ...theme, secondaryColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, secondaryColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -474,7 +474,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.backgroundColor || '#1A1B26'}
-                  onChange={(e) => setTheme({ ...theme, backgroundColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, backgroundColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -483,7 +483,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={theme.textColor || '#F2E8D5'}
-                  onChange={(e) => setTheme({ ...theme, textColor: e.target.value })}
+                  onChange={(e) => { setTheme({ ...theme, textColor: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono"
                 />
               </div>
@@ -498,7 +498,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <input
                   type="text"
                   value={seo.title || ''}
-                  onChange={(e) => setSeo({ ...seo, title: e.target.value })}
+                  onChange={(e) => { setSeo({ ...seo, title: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs"
                 />
               </div>
@@ -506,7 +506,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mô tả SEO (Meta Description)</label>
                 <textarea
                   value={seo.description || ''}
-                  onChange={(e) => setSeo({ ...seo, description: e.target.value })}
+                  onChange={(e) => { setSeo({ ...seo, description: e.target.value }); setDirty(true) }}
                   className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs h-20"
                 />
               </div>
