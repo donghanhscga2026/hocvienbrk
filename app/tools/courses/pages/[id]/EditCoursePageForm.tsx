@@ -137,6 +137,10 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     setSections(prev => prev.map((sec, i) => i === index ? { ...sec, content: { ...(sec.content || {}), [field]: value } } : sec))
   }
 
+  const updateNestedContent = (index:number, key:string, fieldName:string, value:any) => {
+    setSections(prev => prev.map((sec,i) => i===index ? { ...sec, content:{ ...(sec.content||{}), [key]:{ ...(sec.content?.[key]||{}), [fieldName]:value } } } : sec))
+  }
+
   const duplicateSection = (index: number) => {
     const source = sections[index]
     const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${Date.now()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
@@ -241,7 +245,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     if (sec.sectionType === 'closing_message') return <div className="grid gap-3">{field(index,'title','Tiêu đề')}{field(index,'signature','Chữ ký')}</div>
     if (sec.sectionType === 'instructor') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{instructorsEditor(index)}</div>
     if (sec.sectionType === 'pricing') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{pricingEditor(index)}{field(index,'paymentNote','Ghi chú thanh toán',true)}</div>
-    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{field(index,'imageUrl','Link ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}{field(index,'primaryCta.label','Nút chính')}</div>
+    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{field(index,'imageUrl','Link ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút chính</label><input value={sec.content?.primaryCta?.label||''} onChange={e=>updateNestedContent(index,'primaryCta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></div></div>
     if (sec.sectionType === 'benefits' || sec.sectionType === 'outcomes' || sec.sectionType === 'pain_points') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'items','Các mục nội dung')}</div>
     return common
   }
