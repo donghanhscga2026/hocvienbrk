@@ -43,6 +43,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   // Sections state
   const [sections, setSections] = useState<any[]>(initialPage.sections || [])
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleSavePage = async () => {
@@ -63,7 +64,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         // Now save sections
         const secRes = await saveCourseSections(initialPage.id, sections)
         if (secRes.success) {
-          setMessage({ type: 'success', text: 'Đã lưu cấu hình trang thành công!' })
+          setMessage({ type: 'success', text: 'Đã lưu thay đổi thành công!' })
+          setDirty(false)
           setPreviewKey(k => k + 1)
           router.refresh()
         } else {
@@ -89,6 +91,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       visibility: 'all',
       content: {}
     }
+    setDirty(true)
     setSections([...sections, newSec])
     setExpandedSection(sections.length)
   }
@@ -98,6 +101,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     const newSecs = sections.filter((_, i) => i !== index)
     // Update sort order
     const updated = newSecs.map((sec, i) => ({ ...sec, sortOrder: i + 1 }))
+    setDirty(true)
     setSections(updated)
   }
 
@@ -106,6 +110,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     const next = [...sections]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
+    setDirty(true)
     setSections(next.map((sec, i) => ({ ...sec, sortOrder: i + 1 })))
     setExpandedSection(to)
   }
@@ -124,24 +129,29 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
 
     // Re-assign sort orders
     const updated = newSecs.map((sec, i) => ({ ...sec, sortOrder: i + 1 }))
+    setDirty(true)
     setSections(updated)
   }
 
   const handleUpdateSectionContent = (index: number, field: string, value: any) => {
+    setDirty(true)
     const newSecs = [...sections]
     newSecs[index] = { ...newSecs[index], [field]: value }
     setSections(newSecs)
   }
 
   const updateContent = (index: number, field: string, value: any) => {
+    setDirty(true)
     setSections(prev => prev.map((sec, i) => i === index ? { ...sec, content: { ...(sec.content || {}), [field]: value } } : sec))
   }
 
   const updateNestedContent = (index:number, key:string, fieldName:string, value:any) => {
+    setDirty(true)
     setSections(prev => prev.map((sec,i) => i===index ? { ...sec, content:{ ...(sec.content||{}), [key]:{ ...(sec.content?.[key]||{}), [fieldName]:value } } } : sec))
   }
 
   const duplicateSection = (index: number) => {
+    setDirty(true)
     const source = sections[index]
     const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${Date.now()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
     const next = [...sections]
@@ -269,6 +279,15 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
 
   return (
     <div className="space-y-6">
+      <div className="sticky top-2 z-40 flex items-center gap-3 rounded-2xl border bg-white/95 backdrop-blur px-4 py-3 shadow-sm">
+        <div className="flex-1 min-w-0">
+          <div className="font-black text-sm text-gray-900 truncate">{name}</div>
+          <div className={`text-xs ${dirty?'text-amber-600':'text-green-600'}`}>{dirty?'Có thay đổi chưa lưu':'Mọi thay đổi đã được lưu'}</div>
+        </div>
+        <button type="button" onClick={handleSavePage} disabled={saving || !dirty} className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-xs font-black text-yellow-400 disabled:opacity-40">
+          <Save className="w-4 h-4"/>{saving?'Đang lưu...':'Lưu thay đổi'}
+        </button>
+      </div>
       {message && (
         <div
           className={`p-4 rounded-2xl border text-sm font-semibold ${
