@@ -378,6 +378,45 @@ function extractCss(html: string): string {
   return chunks.join('\n')
 }
 
+function extractCssVariables(css: string): Record<string, string> {
+  const vars: Record<string, string> = {}
+  const re = /(--[a-z0-9_-]+)\s*:\s*([^;}{]+)/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(css))) {
+    vars[match[1]] = match[2].trim()
+  }
+  return vars
+}
+
+function resolveCssValue(value: string | undefined, vars: Record<string, string>): string | undefined {
+  if (!value) return undefined
+  return value.replace(/var\((--[a-z0-9_-]+)(?:,\s*[^)]+)?\)/gi, (_, name) => vars[name] || '').trim() || undefined
+}
+
+function findSectionDeclarations(
+  css: string,
+  sourceId: string | undefined,
+  sourceClass: string | undefined,
+): Record<string, string> {
+  const selectors = [
+    sourceId ? `#${sourceId}` : '',
+    ...(sourceClass || '').split(/\s+/).filter(Boolean).map(name => `.${name}`),
+  ].filter(Boolean)
+  if (!selectors.length) return {}
+
+  const out: Record<string, string> = {}
+  const ruleRe = /([^{}]+)\{([^{}]+)\}/g
+  let match: RegExpExecArray | null
+  while ((match = ruleRe.exec(css))) {
+    const selector = match[1]
+    if (!selectors.some(token => selector.split(',').some(part => part.trim() === token || part.trim().startsWith(token + ':')))) continue
+    const declRe = /([a-z-]+)\s*:\s*([^;]+)/gi
+    let decl: RegExpExecArray | null
+    while ((decl = declRe.exec(match[2]))) out[decl[1].toLowerCase()] = decl[2].trim()
+  }
+  return out
+}
+
 function extractMeta(html: string, name: string): string | undefined {
   const metaRe = /<meta\b([^>]*)>/gi
   let match: RegExpExecArray | null
@@ -394,24 +433,45 @@ function inferSavedFromUrl(html: string): string | undefined {
   return match?.[1]
 }
 
-function inferDesign(html: string, type: ImportedSectionType, listCount: number, imageCount: number) {
-  const style = attr((html.match(/^<\w+\b([^>]*)>/i)?.[1] || ''), 'style') || ''
-  const bg = style.match(/background(?:-color)?\s*:\s*([^;]+)/i)?.[1]?.trim()
-  const color = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)?.[1]?.trim()
-  const center = /text-align\s*:\s*center/i.test(style)
+function inferDesign(input: {
+  html: string
+  type: ImportedSectionType
+  listCount: number
+  imageCount: number
+  css: string
+  cssVars: Record<string, string>
+  sourceId?: string
+  sourceClass?: string
+}) {
+  const style = attr((input.html.match(/^<\w+\b([^>]*)>/i)?.[1] || ''), 'style') || ''
+  const inlineBg = style.match(/background(?:-color)?\s*:\s*([^;]+)/i)?.[1]?.trim()
+  const inlineColor = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)?.[1]?.trim()
+  const inlinePadding = style.match(/padding\s*:\s*([^;]+)/i)?.[1]?.trim()
+  const declarations = findSectionDeclarations(input.css, input.sourceId, input.sourceClass)
+
+  const backgroundColor = resolveCssValue(
+    inlineBg || declarations['background-color'] || declarations.background,
+    input.cssVars,
+  )
+  const textColor = resolveCssValue(inlineColor || declarations.color, input.cssVars)
+  const padding = resolveCssValue(inlinePadding || declarations.padding, input.cssVars)
+  const borderRadius = resolveCssValue(declarations['border-radius'], input.cssVars)
+  const center = /text-align\s*:\s*center/i.test(style) || declarations['text-align'] === 'center'
 
   let suggestedLayout: 'single' | 'split' | 'grid' | 'timeline' | 'gallery' = 'single'
-  if (type === 'roadmap') suggestedLayout = 'timeline'
-  else if (type === 'gallery') suggestedLayout = 'gallery'
-  else if (imageCount && (listCount || type === 'hero')) suggestedLayout = 'split'
-  else if (listCount >= 3) suggestedLayout = 'grid'
+  if (input.type === 'roadmap') suggestedLayout = 'timeline'
+  else if (input.type === 'gallery') suggestedLayout = 'gallery'
+  else if (input.imageCount && (input.listCount || input.type === 'hero')) suggestedLayout = 'split'
+  else if (input.listCount >= 3) suggestedLayout = 'grid'
 
   return {
-    backgroundColor: bg,
-    textColor: color,
+    backgroundColor,
+    textColor,
     alignment: center ? 'center' as const : undefined,
     suggestedLayout,
-    columns: suggestedLayout === 'grid' ? Math.min(3, Math.max(2, listCount)) : undefined,
+    columns: suggestedLayout === 'grid' ? Math.min(3, Math.max(2, input.listCount)) : undefined,
+    borderRadius,
+    padding,
   }
 }
 
@@ -431,6 +491,7 @@ export function analyzeWebsiteHtml(input: {
   const description = extractMeta(html, 'description')
   const language = attr(html.match(/<html\b([^>]*)>/i)?.[1] || '', 'lang')
   const css = extractCss(html)
+  const cssVars = extractCssVariables(css)
   const colors = extractColors(css)
   const fonts = extractFonts(css)
 
@@ -490,7 +551,16 @@ export function analyzeWebsiteHtml(input: {
       faqItems: faqItems.length ? faqItems : undefined,
       formFields: formFields.length ? formFields : undefined,
       content: sectionContent(inferred.type, heading, paragraphs, listItems, images, cards, tableRows, actions, faqItems, formFields),
-      design: inferDesign(block.html, inferred.type, listItems.length, images.length),
+      design: inferDesign({
+        html: block.html,
+        type: inferred.type,
+        listCount: listItems.length || cards.length,
+        imageCount: images.length,
+        css,
+        cssVars,
+        sourceId,
+        sourceClass,
+      }),
     }
   })
 
@@ -518,12 +588,16 @@ export function analyzeWebsiteHtml(input: {
     colors,
     fonts,
     theme: {
-      primaryColor: colors[0],
-      secondaryColor: colors[1],
-      backgroundColor: colors.find(color => /#(?:fff|ffffff|fbf|f[0-9a-f]{5})/i.test(color)) || colors[2],
-      textColor: colors.find(color => /#(?:1|2|3)[0-9a-f]{5}/i.test(color)) || colors[3],
+      primaryColor: resolveCssValue(cssVars['--green'] || cssVars['--primary'] || cssVars['--accent'], cssVars) || colors[0],
+      secondaryColor: resolveCssValue(cssVars['--gold'] || cssVars['--secondary'], cssVars) || colors[1],
+      backgroundColor: resolveCssValue(cssVars['--bg'] || cssVars['--background'], cssVars)
+        || colors.find(color => /#(?:fff|ffffff|fbf|f[0-9a-f]{5})/i.test(color)) || colors[2],
+      textColor: resolveCssValue(cssVars['--text'] || cssVars['--foreground'], cssVars)
+        || colors.find(color => /#(?:1|2|3)[0-9a-f]{5}/i.test(color)) || colors[3],
       headingFont: fonts[0],
       bodyFont: fonts[1] || fonts[0],
+      borderRadius: resolveCssValue(cssVars['--radius'], cssVars),
+      containerWidth: resolveCssValue(cssVars['--maxw'] || cssVars['--container'], cssVars),
     },
     sections,
     stats: {
