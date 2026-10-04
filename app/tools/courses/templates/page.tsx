@@ -60,6 +60,108 @@ const SECTION_NAMES: Record<string, string> = {
   rich_content: 'Nội dung',
 }
 
+
+const MAX_INLINE_UPLOAD_BYTES = 1.8 * 1024 * 1024
+const DATA_IMAGE_RE = /data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi
+
+function extensionForMime(mime: string) {
+  if (mime === 'image/jpeg') return 'jpg'
+  if (mime === 'image/png') return 'png'
+  if (mime === 'image/webp') return 'webp'
+  if (mime === 'image/gif') return 'gif'
+  return 'webp'
+}
+
+async function rasterizeDataImage(dataUrl: string): Promise<Blob> {
+  const image = new Image()
+  image.decoding = 'async'
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('Không thể đọc một ảnh nhúng trong file HTML'))
+    image.src = dataUrl
+  })
+
+  let width = image.naturalWidth || image.width
+  let height = image.naturalHeight || image.height
+  const maxDimension = 1800
+  const scale = Math.min(1, maxDimension / Math.max(width, height))
+  width = Math.max(1, Math.round(width * scale))
+  height = Math.max(1, Math.round(height * scale))
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh')
+    context.drawImage(image, 0, 0, width, height)
+    const quality = Math.max(0.62, 0.9 - attempt * 0.07)
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality))
+    if (blob && blob.size <= MAX_INLINE_UPLOAD_BYTES) return blob
+    width = Math.max(1, Math.round(width * 0.82))
+    height = Math.max(1, Math.round(height * 0.82))
+  }
+  throw new Error('Có ảnh nhúng quá lớn để tối ưu tự động. Hãy giảm dung lượng ảnh rồi thử lại.')
+}
+
+async function dataImageToUploadBlob(dataUrl: string): Promise<Blob> {
+  const source = await fetch(dataUrl).then(response => response.blob())
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (allowed.includes(source.type) && source.size <= MAX_INLINE_UPLOAD_BYTES) return source
+  return rasterizeDataImage(dataUrl)
+}
+
+async function uploadEmbeddedImage(dataUrl: string, index: number): Promise<string> {
+  const blob = await dataImageToUploadBlob(dataUrl)
+  const form = new FormData()
+  const filename = 'website-template-' + index + '.' + extensionForMime(blob.type)
+  form.append('file', new File([blob], filename, { type: blob.type }))
+  const response = await fetch('/api/upload/course', { method: 'POST', body: form })
+  const raw = await response.text()
+  let data: any = {}
+  try { data = raw ? JSON.parse(raw) : {} } catch {}
+  if (!response.ok || !data.url) {
+    throw new Error(data.error || ('Không thể lưu ảnh ' + (index + 1) + ' từ file HTML'))
+  }
+  return data.url as string
+}
+
+async function externalizeEmbeddedImages(
+  html: string,
+  onProgress: (done: number, total: number) => void,
+): Promise<string> {
+  const images = Array.from(new Set(html.match(DATA_IMAGE_RE) || []))
+  if (!images.length) return html
+
+  const replacements = new Map<string, string>()
+  let done = 0
+  for (let start = 0; start < images.length; start += 3) {
+    const batch = images.slice(start, start + 3)
+    const urls = await Promise.all(batch.map((dataUrl, offset) => uploadEmbeddedImage(dataUrl, start + offset)))
+    batch.forEach((dataUrl, offset) => {
+      replacements.set(dataUrl, urls[offset])
+      done += 1
+      onProgress(done, images.length)
+    })
+  }
+
+  let compactHtml = html
+  for (const [dataUrl, url] of replacements) compactHtml = compactHtml.split(dataUrl).join(url)
+  return compactHtml
+}
+
+async function readJsonResponse(response: Response) {
+  const raw = await response.text()
+  try {
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    if (response.status === 413) {
+      throw new Error('Dữ liệu vẫn vượt giới hạn máy chủ. Hệ thống đã dừng an toàn trước khi tạo mẫu.')
+    }
+    throw new Error('Máy chủ trả về dữ liệu không hợp lệ (' + response.status + ').')
+  }
+}
+
 export default function CourseTemplateLibraryPage() {
   const [storedTemplates, setStoredTemplates] = useState<StoredTemplate[]>([])
   const [loadingLibrary, setLoadingLibrary] = useState(true)
@@ -67,6 +169,7 @@ export default function CourseTemplateLibraryPage() {
   const [sourceUrl, setSourceUrl] = useState('')
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeProgress, setAnalyzeProgress] = useState('')
   const [analysis, setAnalysis] = useState<WebsiteTemplateAnalysis | null>(null)
   const [sectionOrder, setSectionOrder] = useState<string[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -116,18 +219,34 @@ export default function CourseTemplateLibraryPage() {
     }
 
     setAnalyzing(true)
+    setAnalyzeProgress('')
     setMessage(null)
     try {
       let response: Response
       if (sourceFile) {
-        const form = new FormData()
-        form.append('file', sourceFile)
-        if (sourceUrl.trim()) form.append('sourceUrl', sourceUrl.trim())
+        setAnalyzeProgress('Đang đọc file HTML...')
+        const originalHtml = await sourceFile.text()
+        const html = await externalizeEmbeddedImages(originalHtml, (done, total) => {
+          setAnalyzeProgress('Đang lưu ảnh ' + done + '/' + total + '...')
+        })
+
+        const compactBytes = new Blob([html]).size
+        if (compactBytes > 3.5 * 1024 * 1024) {
+          throw new Error('Sau khi tách ảnh, file HTML vẫn còn quá lớn. Vui lòng dùng URL website nguồn hoặc liên hệ quản trị.')
+        }
+
+        setAnalyzeProgress('Đang phân tích bố cục và nội dung...')
         response = await fetch('/api/admin/course-page-templates/analyze', {
           method: 'POST',
-          body: form,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            html,
+            sourceUrl: sourceUrl.trim() || undefined,
+            fileName: sourceFile.name,
+          }),
         })
       } else {
+        setAnalyzeProgress('Đang tải và phân tích website...')
         response = await fetch('/api/admin/course-page-templates/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -135,7 +254,7 @@ export default function CourseTemplateLibraryPage() {
         })
       }
 
-      const data = await response.json()
+      const data = await readJsonResponse(response)
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Không thể phân tích website')
       }
@@ -148,13 +267,14 @@ export default function CourseTemplateLibraryPage() {
       setTemplateName(result.title || 'Mẫu website mới')
       setTemplateDescription(
         result.sourceUrl || result.finalUrl
-          ? `Nhập từ ${result.finalUrl || result.sourceUrl}`
+          ? 'Nhập từ ' + (result.finalUrl || result.sourceUrl)
           : 'Nhập từ file HTML',
       )
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Không thể phân tích website' })
     } finally {
       setAnalyzing(false)
+      setAnalyzeProgress('')
     }
   }
 
@@ -318,7 +438,7 @@ export default function CourseTemplateLibraryPage() {
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-black px-5 py-3 text-xs font-black text-yellow-400 disabled:opacity-50"
                   >
                     {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
-                    {analyzing ? 'Đang phân tích...' : 'Phân tích trang'}
+                    {analyzing ? (analyzeProgress || 'Đang phân tích...') : 'Phân tích trang'}
                   </button>
                 </div>
               </div>

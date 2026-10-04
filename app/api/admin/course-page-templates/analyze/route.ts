@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const url = typeof body?.url === 'string' ? body.url.trim() : ''
     const html = typeof body?.html === 'string' ? body.html : ''
+    const sourceUrl = typeof body?.sourceUrl === 'string' ? body.sourceUrl.trim() : ''
 
     if (url) {
       const remote = await fetchRemoteHtml(url)
@@ -62,7 +63,11 @@ export async function POST(request: NextRequest) {
       if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
         return NextResponse.json({ error: 'Nội dung HTML vượt quá giới hạn 5MB' }, { status: 400 })
       }
-      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html' })
+      const rawAnalysis = analyzeWebsiteHtml({
+        html,
+        sourceType: 'html',
+        sourceUrl: sourceUrl || undefined,
+      })
       const analysis = await mirrorAnalysisImages(rawAnalysis, {
         dataOnly: true,
         failOnEmbeddedData: true,
