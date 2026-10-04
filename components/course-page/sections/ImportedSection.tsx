@@ -16,7 +16,12 @@ function actionFor(href?: string) {
     if (url.hash && url.origin === (typeof window !== 'undefined' ? window.location.origin : url.origin)) {
       return { type: 'scroll', target: url.hash.slice(1) }
     }
-  } catch {}
+    if (!['http:', 'https:', 'tel:', 'mailto:'].includes(url.protocol)) {
+      return { type: 'open_registration', target: undefined }
+    }
+  } catch {
+    return { type: 'open_registration', target: undefined }
+  }
   return { type: 'external_link', target: href }
 }
 
