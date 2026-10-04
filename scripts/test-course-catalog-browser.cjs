@@ -79,6 +79,8 @@ async function run() {
     assert.equal(await desktopMenu.getByRole('link',{name:'Tổng quan',exact:true}).getAttribute('href'),'/?section=home');checks++
     assert.ok(await page.locator('#catalog article').count()>0);checks++
     assert.equal(await page.locator('#home-shortcuts').count(),0);checks++
+    assert.equal(await page.getByRole('region',{name:'Thông điệp',exact:true}).count(),1);checks++
+    assert.ok(await page.evaluate(()=>document.querySelector('[aria-label="Thông điệp"]').compareDocumentPosition(document.querySelector('[aria-label="Điều hướng hệ sinh thái"]')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
     const resume=page.locator('#discovery-continue-learning')
     assert.equal(await resume.getByRole('heading').count(),1);checks++
     assert.equal(await resume.getByRole('link',{name:'Học tiếp →',exact:true}).getAttribute('href'),'/courses/KH1/learn');checks++
@@ -106,7 +108,7 @@ async function run() {
     assert.equal(await page.locator('#ecosystem').count(),0);checks++
     assert.equal(await page.locator('#community-preview').count(),0);checks++
     assert.equal(await page.locator('#home-shortcuts a').count(),5);checks++
-    assert.ok(await page.evaluate(()=>document.querySelector('[aria-label="Thông điệp"]').compareDocumentPosition(document.querySelector('#home-shortcuts')) & Node.DOCUMENT_POSITION_FOLLOWING));checks++
+    assert.equal(await page.getByRole('region',{name:'Thông điệp',exact:true}).count(),0);checks++
     await desktopMenu.getByRole('link',{name:'Lộ trình',exact:true}).click()
     await page.locator('#learning-path').waitFor();checks++
     assert.equal(await page.locator('#home-shortcuts').count(),0);checks++
@@ -272,12 +274,14 @@ async function run() {
     assert.equal(await mobileMenu.getByRole('link',{name:'Khám phá',exact:true}).getAttribute('aria-current'),'page');checks++
     await noOverflow(page)
     await page.goto(base+'?guest=1')
+    await page.getByText('Thông điệp của trang',{exact:true}).waitFor();checks++
     await page.locator('[data-home-area="discover"]').waitFor();checks++
     assert.ok(await page.locator('#catalog article').count()>0);checks++
     assert.equal(await page.locator('#discovery-continue-learning').count(),0);checks++
     assert.equal(await page.locator('#home-shortcuts').count(),0);checks++
     await mobileMenu.getByRole('link',{name:'Tổng quan',exact:true}).click()
-    await page.getByText('Thông điệp của trang',{exact:true}).waitFor()
+    await page.locator('[data-home-area="home"]').waitFor()
+    assert.equal(await page.getByRole('region',{name:'Thông điệp',exact:true}).count(),0);checks++
     assert.equal(await page.locator('#my-courses').count(),0);checks++
     assert.equal(await page.locator('#continue-learning').count(),0);checks++
     await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')

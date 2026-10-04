@@ -23,7 +23,7 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
   const navigation = useRef<HTMLElement>(null)
   const links = [
     ...(catalog ? [{ area: 'discover' as const, label: 'Khám phá', icon: Compass, description: 'Tìm khóa học theo danh mục, giáo viên và mức phí.' }] : []),
-    { area: 'home' as const, label: 'Tổng quan', icon: Home, description: 'Thông điệp và các lối vào nhanh.' },
+    { area: 'home' as const, label: 'Tổng quan', icon: Home, description: 'Các lối vào nhanh trong hệ sinh thái.' },
     ...(roadmap ? [{ area: 'path' as const, label: 'Lộ trình', icon: Route, description: 'Xác định mục tiêu và bước học tiếp theo.' }] : []),
     { area: 'learning' as const, label: 'Học tập', icon: BookOpen, description: 'Khóa đang học và khóa bạn giảng dạy.' },
     { area: 'tools' as const, label: 'Công cụ', icon: Wrench, description: 'Các tiện ích đồng hành cùng bạn.' },
@@ -57,7 +57,7 @@ export default function HomeOverview({ title, activeCourses, enrollments, catalo
   </section>
 
   return <>
-    {area === 'home' && (message ? <section aria-label="Thông điệp">{message}</section> : <h1 className="mx-auto max-w-7xl px-4 py-6 text-2xl font-semibold text-brk-on-surface sm:text-[28px]">{title}</h1>)}
+    {area === 'discover' && (message ? <section aria-label="Thông điệp">{message}</section> : <h1 className="mx-auto max-w-7xl px-4 py-6 text-2xl font-semibold text-brk-on-surface sm:text-[28px]">{title}</h1>)}
     <nav ref={navigation} aria-label="Điều hướng hệ sinh thái" className="sticky top-14 z-40 border-y border-brk-outline bg-brk-surface shadow-sm">
       <div className="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-3 py-3 sm:flex sm:flex-wrap sm:px-6">
         {links.map(({ area: next, label, icon: Icon }) => <HomeAreaLink key={next} area={next} aria-current={area === next ? 'page' : undefined} className={`flex min-h-12 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-sm font-bold sm:gap-2 sm:px-5 ${area === next ? 'border-brk-primary bg-brk-primary text-brk-on-primary' : 'border-brk-outline text-brk-on-surface hover:border-brk-primary hover:bg-brk-background'}`}>
