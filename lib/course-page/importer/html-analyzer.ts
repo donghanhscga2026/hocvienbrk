@@ -97,7 +97,12 @@ function extractCards(html: string, baseUrl?: string): ImportedCard[] {
     const paragraphs = extractTagTexts(body, 'p')
     const image = extractImages(body, baseUrl)[0]
     const title = heading ? cleanText(heading[1]) : undefined
-    const text = paragraphs.join('\n').trim() || undefined
+    let residual = body
+    if (heading?.[0]) residual = residual.replace(heading[0], ' ')
+    if (subtitle?.[0]) residual = residual.replace(subtitle[0], ' ')
+    residual = residual.replace(/<img\b[^>]*>/gi, ' ').replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ')
+    const residualText = cleanText(residual)
+    const text = paragraphs.join('\n').trim() || residualText || undefined
     if (title || text || image) {
       cards.push({
         title,
