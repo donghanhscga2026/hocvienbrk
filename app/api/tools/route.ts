@@ -18,7 +18,7 @@ export async function GET() {
     if (!tools.some(tool => tool.slug === 'dev-flow')) tools.push({
       id: -2, slug: 'dev-flow', name: 'MFC Dev Flow',
       description: 'Quản lý quy trình phát triển với AI', icon: 'Settings',
-      url: '/tools/dev-flow', roles: ['ADMIN'], order: 101,
+      url: '/tools/dev-flow', roles: ['ADMIN', 'DEVELOPER'], order: 101,
       isActive: true, createdAt: new Date(), updatedAt: new Date(),
     })
     return NextResponse.json({ tools })
