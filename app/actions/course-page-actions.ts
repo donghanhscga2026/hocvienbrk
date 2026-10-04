@@ -155,6 +155,15 @@ export async function updateCoursePage(
   if (denied) return denied
 
   try {
+    const current = await prisma.coursePage.findUnique({
+      where: { id },
+      include: { versions: { orderBy: { versionNumber: 'desc' }, take: 20 } },
+    })
+    if (current?.status === 'published' && !current.versions.some(version => (version.snapshot as any)?.kind === 'published')) {
+      const publishedSnapshot = await buildCoursePageSnapshot(id, 'published')
+      if (publishedSnapshot) await createCoursePageVersion(id, publishedSnapshot)
+    }
+
     const updated = await prisma.coursePage.update({
       where: { id },
       data: {
