@@ -129,9 +129,23 @@ function extractActions(html: string, baseUrl?: string): ImportedAction[] {
   while ((match = linkRe.exec(html)) && actions.length < 30) {
     const label = cleanText(match[2])
     if (!label) continue
+    const rawHref = attr(match[1], 'href')
+    let href = rawHref
+    if (rawHref && !rawHref.startsWith('#')) {
+      const resolved = resolveAssetUrl(rawHref, baseUrl)
+      try {
+        const resolvedUrl = resolved ? new URL(resolved) : null
+        const base = baseUrl ? new URL(baseUrl) : null
+        href = resolvedUrl && base && resolvedUrl.origin === base.origin && resolvedUrl.pathname === base.pathname && resolvedUrl.hash
+          ? resolvedUrl.hash
+          : resolved
+      } catch {
+        href = resolved
+      }
+    }
     actions.push({
       label,
-      href: resolveAssetUrl(attr(match[1], 'href'), baseUrl),
+      href,
       kind: 'link',
     })
   }
@@ -595,7 +609,7 @@ export function analyzeWebsiteHtml(input: {
       textColor: resolveCssValue(cssVars['--text'] || cssVars['--foreground'], cssVars)
         || colors.find(color => /#(?:1|2|3)[0-9a-f]{5}/i.test(color)) || colors[3],
       headingFont: fonts[0],
-      bodyFont: fonts[1] || fonts[0],
+      bodyFont: fonts[0],
       borderRadius: resolveCssValue(cssVars['--radius'], cssVars),
       containerWidth: resolveCssValue(cssVars['--maxw'] || cssVars['--container'], cssVars),
     },
