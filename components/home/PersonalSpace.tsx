@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { BookOpen, LayoutDashboard, Wrench, LifeBuoy, UserRound, Wallet, ArrowRight, Star, Bell, Users, Share2 } from 'lucide-react'
+import { BookOpen, LayoutDashboard, Wrench, LifeBuoy, UserRound, Wallet, ArrowRight, Star, Bell, Users, Share2, Globe, Settings } from 'lucide-react'
 import PersonalCourses from './PersonalCourses'
 import MyRequests from '@/components/crm/MyRequests'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
@@ -15,7 +15,7 @@ interface Props {
   continueHref: string | null; limited?: boolean
 }
 type Notice = { id: string; title: string; href: string; readAt: string | null }
-type Tool = { id: number; name: string; url: string; roles: string[]; isActive: boolean }
+type Tool = { id: number; slug: string; name: string; url: string; roles: string[]; isActive: boolean }
 type Tab = 'home' | 'learning' | 'tools' | 'support' | 'account'
 const tabs = [
   { id: 'home' as const, label: 'Tổng quan', icon: LayoutDashboard },
@@ -24,6 +24,20 @@ const tabs = [
   { id: 'support' as const, label: 'Hỗ trợ của tôi', icon: LifeBuoy },
   { id: 'account' as const, label: 'Tài khoản', icon: UserRound },
 ]
+// Phân nhóm bằng mã công cụ, không phụ thuộc tên hiển thị do quản trị viên chỉnh sửa.
+const toolCategories = [
+  { id: 'training', label: 'Đào tạo & học viên', icon: BookOpen, slugs: ['courses', 'students', 'roadmap'] },
+  { id: 'marketing', label: 'Khách hàng & marketing', icon: Users, slugs: ['crm', 'affiliate', 'email-mkt', 'genealogy'] },
+  { id: 'content', label: 'Website & nội dung', icon: Globe, slugs: ['my-site', 'pages', 'page', 'site-profiles', 'landings', 'posts', 'youtube-tools'] },
+  { id: 'payments', label: 'Thanh toán & quyền lợi', icon: Wallet, slugs: ['payments', 'bank-accounts', 'vouchers', 'brk', 'reserved-ids'] },
+  { id: 'system', label: 'Hỗ trợ & hệ thống', icon: Settings, slugs: ['account-assistant', 'assistant-guide', 'ho-tro', 'settings', 'email-settings', 'backup', 'system-admin', 'tca-sync'] },
+  { id: 'other', label: 'Công cụ khác', icon: Wrench, slugs: [] },
+]
+function toolCategory(tool: Tool) {
+  // URL nội bộ là dự phòng cho các công cụ cũ có slug khác mã đường dẫn.
+  const route = tool.url.startsWith('/tools/') ? tool.url.split(/[?#]/)[0].split('/')[2] : ''
+  return toolCategories.find(category => category.slugs.includes(tool.slug) || category.slugs.includes(route))?.id || 'other'
+}
 const card = 'min-w-0 rounded-2xl border border-brk-outline bg-brk-surface p-4 sm:p-5'
 const action = 'inline-flex min-h-11 items-center gap-2 rounded-xl bg-brk-primary px-4 text-sm font-semibold text-brk-on-primary'
 
@@ -88,6 +102,12 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
     setFavorites(next)
     try { localStorage.setItem(favoriteKey, JSON.stringify(next)) } catch { /* Không chặn thao tác nếu trình duyệt khóa lưu trữ. */ }
   }
+  // Công cụ yêu thích nằm ở đầu trang; nhóm chức năng vẫn giữ đủ công cụ.
+  const favoriteTools = tools.filter(tool => favorites.includes(tool.id))
+  const toolGroups = [
+    { id: 'favorites', label: 'Yêu thích', icon: Star, tools: favoriteTools },
+    ...toolCategories.map(category => ({ ...category, tools: tools.filter(tool => toolCategory(tool) === category.id) })),
+  ].filter(group => group.tools.length > 0)
   const active = learning.filter(course => enrollments[course.id]?.status === 'ACTIVE')
   const pending = learning.filter(course => enrollments[course.id]?.status === 'PENDING')
   const canTeach = ['ADMIN', 'TEACHER'].includes(user.role)
@@ -130,11 +150,26 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
         </>}
         {tab === 'learning' && <PersonalCourses learning={learning} teaching={teaching} enrollments={enrollments} userPhone={user.phone} userId={user.id} />}
         {tab === 'support' && <div className={card}><p className="mb-3 text-sm text-brk-muted">Gửi yêu cầu mới từ nút “Hỏi giáo viên” trong khóa học. Các yêu cầu của bạn được theo dõi ở đây.</p><MyRequests /></div>}
-        {tab === 'tools' && <section className={card}><p className="mb-4 text-sm text-brk-muted">Các công cụ bạn có quyền dùng. Dấu sao lưu yêu thích trên trình duyệt này.</p>
-          {toolsLoading ? <p role="status">Đang tải công cụ…</p> : toolsError ? <p role="alert">{toolsError}</p> : <div className="grid gap-3 sm:grid-cols-2">{[...tools].sort((a, b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id))).map(tool => <article key={tool.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-brk-outline p-3"><Link href={safeHref(tool.url)!} className="min-w-0 flex-1 break-words text-sm font-semibold text-brk-on-surface">{tool.name} →</Link><button type="button" aria-label={`Yêu thích ${tool.name}`} aria-pressed={favorites.includes(tool.id)} onClick={() => toggleFavorite(tool.id)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brk-primary"><Star aria-hidden className={`h-5 w-5 ${favorites.includes(tool.id) ? 'fill-current' : ''}`} /></button></article>)}</div>}
-          {!toolsLoading && !toolsError && !tools.length && <p className="text-sm text-brk-muted">Chưa có công cụ phù hợp với quyền của bạn.</p>}
-          <Link href="/tools" className="mt-4 inline-flex min-h-11 items-center text-sm text-brk-primary">Khám phá thêm công cụ →</Link>
-        </section>}
+        {tab === 'tools' && <div className="space-y-5">
+          <p className="text-sm text-brk-muted">Các công cụ bạn có quyền dùng, sắp xếp theo chức năng. Đánh dấu sao để truy cập nhanh ở mục Yêu thích.</p>
+          {toolsLoading ? <p role="status" className={card}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={card}>{toolsError}</p> : tools.length ? toolGroups.map(({ id, label, icon: Icon, tools: groupTools }) => (
+            <section key={id} aria-labelledby={`tool-group-${id}`} className={card}>
+              <div className="mb-4 flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brk-background text-brk-primary"><Icon className="h-5 w-5" aria-hidden /></span>
+                <h2 id={`tool-group-${id}`} className="min-w-0 flex-1 text-lg font-semibold text-brk-on-surface">{label}</h2>
+                <span aria-label={`${groupTools.length} công cụ`} className="shrink-0 rounded-full bg-brk-background px-2.5 py-1 text-xs font-semibold text-brk-muted">{groupTools.length}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {groupTools.map(tool => <article key={tool.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-brk-outline p-3 transition-colors hover:bg-brk-background">
+                  <Link href={safeHref(tool.url)!} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-brk-on-surface"><span className="min-w-0 flex-1 break-words">{tool.name}</span><ArrowRight className="h-4 w-4 shrink-0 text-brk-primary" aria-hidden /></Link>
+                  <button type="button" aria-label={`${favorites.includes(tool.id) ? 'Bỏ yêu thích' : 'Yêu thích'} ${tool.name}`} aria-pressed={favorites.includes(tool.id)} onClick={() => toggleFavorite(tool.id)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brk-primary hover:bg-brk-background"><Star aria-hidden className={`h-5 w-5 ${favorites.includes(tool.id) ? 'fill-current' : ''}`} /></button>
+                </article>)}
+              </div>
+            </section>
+          )) : <p className={`${card} text-sm text-brk-muted`}>Chưa có công cụ phù hợp với quyền của bạn.</p>}
+          <p className="text-xs text-brk-muted">Công cụ yêu thích được lưu trên trình duyệt này.</p>
+          <Link href="/tools" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Khám phá thêm công cụ →</Link>
+        </div>}
         {tab === 'account' && <section className={card}><h2 className="text-lg font-semibold text-brk-on-surface">Tài khoản của tôi</h2><p className="mt-2 text-sm text-brk-muted">Cập nhật hồ sơ, mật khẩu và tài khoản nhận thanh toán.</p><Link href="/account-settings" className={`mt-4 ${action}`}>Quản lý tài khoản</Link></section>}
       </div>
     </div>

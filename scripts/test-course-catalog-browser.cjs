@@ -321,14 +321,33 @@ async function run() {
     await page.goBack()
     await page.getByRole('heading',{name:'Chào Học viên!',exact:true}).waitFor();checks++
     await spaceMenu.getByRole('link',{name:'Công cụ của tôi',exact:true}).click()
-    await page.getByRole('link',{name:'Công cụ công khai →',exact:true}).waitFor()
-    assert.equal(await page.getByRole('link',{name:'Quản trị hệ thống →',exact:true}).count(),0);checks++
-    assert.equal(await page.getByRole('link',{name:'URL không an toàn →',exact:true}).count(),0);checks++
-    await page.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).click()
-    assert.equal(await page.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'true');checks++
+    await page.getByRole('link',{name:'Công cụ công khai',exact:true}).waitFor()
+    assert.equal(await page.getByRole('link',{name:'Quản trị hệ thống',exact:true}).count(),0);checks++
+    assert.equal(await page.getByRole('link',{name:'URL không an toàn',exact:true}).count(),0);checks++
+    const otherTools=page.getByRole('region',{name:'Công cụ khác',exact:true})
+    assert.equal(await otherTools.getByRole('link',{name:'Công cụ công khai',exact:true}).count(),1);checks++
+    const marketingTools=page.getByRole('region',{name:'Khách hàng & marketing',exact:true})
+    assert.equal(await marketingTools.getByRole('link',{name:'CRM của tôi',exact:true}).getAttribute('href'),'/tools/crm');checks++
+    assert.equal(await page.getByRole('region',{name:'Hỗ trợ & hệ thống',exact:true}).count(),0);checks++
+    assert.equal(await page.getByRole('region',{name:'Yêu thích',exact:true}).count(),0);checks++
+    await otherTools.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).click()
+    const favoriteTools=page.getByRole('region',{name:'Yêu thích',exact:true})
+    await favoriteTools.waitFor()
+    assert.equal(await favoriteTools.getByRole('button',{name:'Bỏ yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'true');checks++
+    assert.equal(await otherTools.getByRole('link').count(),1);checks++
     await page.reload()
-    await page.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).waitFor()
-    assert.equal(await page.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'true');checks++
+    await favoriteTools.waitFor()
+    assert.equal(await favoriteTools.getByRole('button',{name:'Bỏ yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'true');checks++
+    for(const width of [390,360]){
+      await page.setViewportSize({width,height:844})
+      await noOverflow(page)
+      assert.equal(await otherTools.locator('.grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),1);checks++
+    }
+    await page.setViewportSize({width:1440,height:1000})
+    assert.equal(await otherTools.locator('.grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);checks++
+    await favoriteTools.getByRole('button',{name:'Bỏ yêu thích Công cụ công khai',exact:true}).click()
+    assert.equal(await favoriteTools.count(),0);checks++
+    assert.equal(await otherTools.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'false');checks++
     await spaceMenu.getByRole('link',{name:'Hỗ trợ của tôi',exact:true}).click()
     await page.getByText('Giáo viên đã phản hồi',{exact:true}).waitFor();checks++
     await spaceMenu.getByRole('link',{name:'Tài khoản',exact:true}).click()
