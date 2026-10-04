@@ -271,7 +271,7 @@ export default function CourseTemplateLibraryPage() {
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-purple-600">Website → Template</div>
                   <h2 className="mt-1 text-xl font-black text-gray-900">Phân tích và tạo mẫu</h2>
-                  <p className="mt-1 text-sm text-gray-600">Dán URL hoặc tải file HTML. Hệ thống không chạy script/form của website nguồn.</p>
+                  <p className="mt-1 text-sm text-gray-600">Dán URL hoặc tải file HTML. Fidelity Mode giữ bố cục/CSS nguồn trong vùng cô lập; script nguồn bị loại bỏ và form được nối về hệ thống MFC.</p>
                 </div>
                 {analysis && (
                   <button type="button" onClick={resetAnalysis} className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold text-gray-600">
@@ -462,6 +462,7 @@ export default function CourseTemplateLibraryPage() {
                               actions: section.actions,
                               faqItems: section.faqItems,
                               formFields: section.formFields,
+                              fidelity: section.fidelity,
                             },
                           }}
                         />
