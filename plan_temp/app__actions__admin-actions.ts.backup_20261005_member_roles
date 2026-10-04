@@ -621,24 +621,6 @@ export async function getUserSystemsAction() {
     } catch { return { success: false, error: "Lỗi DB" } }
 }
 
-export async function updateUserRoleAction(userId: number, role: Role) {
-    try {
-        await checkAdmin()
-        if (!Number.isInteger(userId)) throw new Error("Mã thành viên không hợp lệ")
-        if (!Object.values(Role).includes(role)) throw new Error("Quyền không hợp lệ")
-
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, role: true } })
-        if (!user) throw new Error("Không tìm thấy thành viên")
-        if (user.role === role) return { success: true, role }
-
-        await prisma.user.update({ where: { id: userId }, data: { role } })
-        revalidatePath('/tools/students')
-        return { success: true, role }
-    } catch (error: any) {
-        return { success: false, error: error.message || "Không thể cập nhật quyền" }
-    }
-}
-
 export async function getStudentsAction(query?: string, role?: Role | 'ALL' | 'COURSE_86_DAYS' | 'UNVERIFIED', page: number = 0, limit: number = 20, sortBy: 'createdAt' | 'id' = 'createdAt', sortOrder: 'asc' | 'desc' = 'desc', courseId?: number) {
     try {
         const session = await auth()
