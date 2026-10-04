@@ -44,6 +44,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   const [sections, setSections] = useState<any[]>(initialPage.sections || [])
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [versions, setVersions] = useState<any[]>([])
   const [showVersions, setShowVersions] = useState(false)
@@ -306,11 +307,38 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     </div>
   }
 
+  const uploadSectionImage = async (index:number, key:string, file:File) => {
+    const token=`${index}:${key}`
+    setUploadingImage(token)
+    setMessage(null)
+    try {
+      const formData=new FormData()
+      formData.append('file',file)
+      const response=await fetch('/api/upload/course',{method:'POST',body:formData})
+      const data=await response.json()
+      if(!response.ok || !data.url) throw new Error(data.error || 'Không thể tải ảnh lên')
+      updateContent(index,key,data.url)
+      setMessage({type:'success',text:'Đã tải ảnh lên thư viện thành công.'})
+    } catch(error:any) {
+      setMessage({type:'error',text:error.message || 'Tải ảnh thất bại'})
+    } finally {
+      setUploadingImage(null)
+    }
+  }
+
   const imageUrlField = (index:number, key:string, label:string) => {
     const value=sections[index]?.content?.[key] || ''
+    const token=`${index}:${key}`
     return <div>
       <label className="block text-xs font-bold text-gray-600 mb-1">{label}</label>
-      <input value={value} onChange={e=>updateContent(index,key,e.target.value)} placeholder="Dán link hình ảnh..." className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"/>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <label className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-purple-700 px-4 py-2 text-xs font-black text-white hover:bg-purple-800">
+          {uploadingImage===token?'Đang tải ảnh...':'Tải ảnh lên'}
+          <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={uploadingImage===token} onChange={e=>{const file=e.target.files?.[0]; if(file) void uploadSectionImage(index,key,file); e.currentTarget.value=''}} className="hidden"/>
+        </label>
+        <input value={value} onChange={e=>updateContent(index,key,e.target.value)} placeholder="Hoặc dán link hình ảnh..." className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"/>
+      </div>
+      <p className="mt-1 text-[10px] text-gray-400">JPG, PNG, WEBP hoặc GIF • tối đa 2MB</p>
       {value && <div className="mt-2 rounded-xl border bg-gray-50 p-2"><img src={value} alt="" className="max-h-40 max-w-full rounded-lg object-contain mx-auto"/></div>}
     </div>
   }
