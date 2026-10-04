@@ -64,7 +64,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         const secRes = await saveCourseSections(initialPage.id, sections)
         if (secRes.success) {
           setMessage({ type: 'success', text: 'Đã lưu cấu hình trang thành công!' })
-          router.push('/tools/courses')
+          setPreviewKey(k => k + 1)
+          router.refresh()
         } else {
           setMessage({ type: 'error', text: secRes.error || 'Lỗi khi lưu các phần giao diện' })
         }
@@ -89,6 +90,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       content: {}
     }
     setSections([...sections, newSec])
+    setExpandedSection(sections.length)
   }
 
   const handleDeleteSection = (index: number) => {
@@ -161,11 +163,47 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     </div>
   }
 
+  const updateListItem = (sectionIndex: number, key: string, itemIndex: number, fieldName: string, value: string) => {
+    const items = [...(sections[sectionIndex]?.content?.[key] || [])]
+    items[itemIndex] = { ...(items[itemIndex] || {}), [fieldName]: value }
+    updateContent(sectionIndex, key, items)
+  }
+
+  const addListItem = (sectionIndex: number, key: string) => {
+    const items = [...(sections[sectionIndex]?.content?.[key] || [])]
+    items.push({ id: `item_${Date.now()}`, title: '', description: '' })
+    updateContent(sectionIndex, key, items)
+  }
+
+  const removeListItem = (sectionIndex: number, key: string, itemIndex: number) => {
+    const items = (sections[sectionIndex]?.content?.[key] || []).filter((_: any, i: number) => i !== itemIndex)
+    updateContent(sectionIndex, key, items)
+  }
+
+  const listEditor = (index: number, key: string, label: string) => {
+    const items = sections[index]?.content?.[key] || []
+    return <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-bold text-gray-600">{label}</label>
+        <button type="button" onClick={() => addListItem(index,key)} className="text-xs font-bold text-purple-700">+ Thêm mục</button>
+      </div>
+      {items.map((item:any,itemIndex:number) => <div key={item.id || itemIndex} className="rounded-xl border border-gray-200 p-3 space-y-2 bg-gray-50">
+        <div className="flex gap-2">
+          <input value={item.title || ''} onChange={e => updateListItem(index,key,itemIndex,'title',e.target.value)} placeholder="Tiêu đề" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/>
+          <button type="button" onClick={() => removeListItem(index,key,itemIndex)} className="p-2 text-red-500" title="Xóa mục"><Trash2 className="w-4 h-4"/></button>
+        </div>
+        <textarea value={item.description || ''} onChange={e => updateListItem(index,key,itemIndex,'description',e.target.value)} placeholder="Nội dung" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-16"/>
+      </div>)}
+      {!items.length && <button type="button" onClick={() => addListItem(index,key)} className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-xs font-bold text-gray-500">+ Thêm mục đầu tiên</button>}
+    </div>
+  }
+
   const simpleEditor = (sec: any, index: number) => {
     const common = <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Nội dung mô tả',true)}</div>
     if (sec.sectionType === 'wigrow_artwork') return <div className="grid gap-3">{field(index,'imageUrl','Địa chỉ hình ảnh')}{field(index,'imageAlt','Mô tả hình ảnh')}{field(index,'title','Tiêu đề trên ảnh')}{field(index,'accent','Dòng nhấn mạnh')}{field(index,'description','Nội dung',true)}</div>
     if (sec.sectionType === 'quote') return <div className="grid gap-3">{field(index,'quote','Câu trích dẫn',true)}{field(index,'author','Tác giả')}{field(index,'caption','Ghi chú')}</div>
     if (sec.sectionType === 'closing_message') return <div className="grid gap-3">{field(index,'title','Tiêu đề')}{field(index,'signature','Chữ ký')}</div>
+    if (sec.sectionType === 'benefits' || sec.sectionType === 'outcomes' || sec.sectionType === 'pain_points') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'items','Các mục nội dung')}</div>
     return common
   }
 
