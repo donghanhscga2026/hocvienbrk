@@ -31,6 +31,13 @@ export type ImportedImage = {
   alt?: string
 }
 
+export type ImportedCard = {
+  title?: string
+  subtitle?: string
+  text?: string
+  image?: ImportedImage
+}
+
 export type ImportedAction = {
   label: string
   href?: string
@@ -50,6 +57,8 @@ export type ImportedSectionCandidate = {
   paragraphs: string[]
   listItems: string[]
   images: ImportedImage[]
+  cards: ImportedCard[]
+  tableRows: string[]
   actions: ImportedAction[]
   faqItems?: Array<{ question: string; answer: string }>
   formFields?: Array<{ name?: string; type?: string; placeholder?: string }>
