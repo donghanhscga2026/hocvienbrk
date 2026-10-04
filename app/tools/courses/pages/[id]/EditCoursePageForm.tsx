@@ -470,9 +470,9 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
               <div className="space-y-3">
                 {sections.map((sec,index) => {
               const open=expandedSection===index
-              return <div key={sec.sectionKey} draggable onDragStart={() => setDragIndex(index)} onDragOver={e => e.preventDefault()} onDrop={() => { if (dragIndex !== null) reorderSections(dragIndex,index); setDragIndex(null) }} onDragEnd={() => setDragIndex(null)} className={`rounded-2xl border bg-white overflow-hidden transition-opacity ${dragIndex===index?'opacity-50':''} ${open?'border-purple-300 shadow-sm':'border-gray-200'}`}>
+              return <div key={sec.sectionKey} onDragOver={e => e.preventDefault()} onDrop={() => { if (dragIndex !== null) reorderSections(dragIndex,index); setDragIndex(null) }} className={`rounded-2xl border bg-white overflow-hidden transition-opacity ${dragIndex===index?'opacity-50':''} ${open?'border-purple-300 shadow-sm':'border-gray-200'}`}>
                 <button type="button" onClick={() => setExpandedSection(open?null:index)} className="w-full p-4 flex items-center gap-3 text-left">
-                  <GripVertical className="w-4 h-4 text-gray-300 shrink-0" /><span className="w-7 h-7 rounded-full bg-gray-900 text-yellow-400 flex items-center justify-center text-xs font-black">{index+1}</span>
+                  <span draggable onDragStart={e => { e.stopPropagation(); setDragIndex(index) }} onDragEnd={() => setDragIndex(null)} onClick={e => e.stopPropagation()} title="Giữ và kéo để đổi vị trí" className="cursor-grab active:cursor-grabbing p-1 -m-1"><GripVertical className="w-4 h-4 text-gray-400 shrink-0" /></span><span className="w-7 h-7 rounded-full bg-gray-900 text-yellow-400 flex items-center justify-center text-xs font-black">{index+1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-black text-sm text-gray-900">{sectionName(sec.sectionType)}</div>
                     <div className="text-xs text-gray-400 truncate">{sec.content?.title || sec.content?.description || 'Bấm để thêm nội dung'}</div>
