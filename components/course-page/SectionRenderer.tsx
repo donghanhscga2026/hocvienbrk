@@ -77,6 +77,7 @@ export default function SectionRenderer({
     <>
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
+        const sectionContent = (section as any).content || {}
         const Component = sectionRegistry[type as CourseSectionType]
         if (!Component) {
           console.warn(`Unsupported course section type: ${type}`)
@@ -90,9 +91,9 @@ export default function SectionRenderer({
             variant={section.variant}
             content={section.content}
             isEnrolled={isEnrolled}
-            lessons={lessons}
-            testimonials={testimonials}
-            totalHours={totalHours}
+            lessons={sectionContent.lessons ?? lessons}
+            testimonials={sectionContent.testimonials ?? testimonials}
+            totalHours={sectionContent.totalHours ?? totalHours}
             activeStudentCount={activeStudentCount}
             course={course}
             session={session}
