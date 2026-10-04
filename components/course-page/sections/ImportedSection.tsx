@@ -29,10 +29,12 @@ function actionFor(href?: string) {
 function FidelityFrame({
   id,
   fidelity,
+  structured,
   onAction,
 }: {
   id?: string
   fidelity: { html: string; css: string }
+  structured: any
   onAction?: (actionType: string, target?: string) => void
 }) {
   const frameRef = React.useRef<HTMLIFrameElement | null>(null)
@@ -76,14 +78,14 @@ function FidelityFrame({
     e.preventDefault();
     parent.postMessage({type:'mfc-fidelity-action',frameId:frameId,href:'',label:'Đăng ký'},'*');
   },true);
-  addEventListener('load',sendHeight);
+  addEventListener('load',function(){patchStructured();sendHeight()});
   addEventListener('resize',sendHeight);
   if(window.ResizeObserver)new ResizeObserver(sendHeight).observe(document.documentElement);
   setTimeout(sendHeight,50);setTimeout(sendHeight,400);setTimeout(sendHeight,1200);
 })();
 <\/script>\`
     return \`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data: blob:; style-src 'unsafe-inline'; font-src https: data:; script-src 'unsafe-inline'; form-action 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'"><style>html,body{margin:0;padding:0;overflow:hidden}*,*:before,*:after{box-sizing:border-box}\${fidelity.css || ''}</style></head><body>\${fidelity.html || ''}\${bridge}</body></html>\`
-  }, [fidelity.css, fidelity.html, frameId])
+  }, [fidelity.css, fidelity.html, frameId, structured])
 
   return (
     <iframe
@@ -121,7 +123,7 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
     : null
 
   if (fidelity && type !== 'sticky_cta') {
-    return <FidelityFrame id={id} fidelity={fidelity} onAction={onAction} />
+    return <FidelityFrame id={id} fidelity={fidelity} structured={source} onAction={onAction} />
   }
 
   const sectionStyle: React.CSSProperties = {
