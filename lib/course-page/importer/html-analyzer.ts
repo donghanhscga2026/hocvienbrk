@@ -1,0 +1,470 @@
+import {
+  ImportedAction,
+  ImportedImage,
+  ImportedSectionCandidate,
+  ImportedSectionType,
+  WebsiteTemplateAnalysis,
+} from './types'
+
+const MAX_SECTIONS = 80
+const MAX_TEXT_ITEMS = 120
+const MAX_IMAGES_PER_SECTION = 40
+
+function decodeHtml(value: string): string {
+  const named: Record<string, string> = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    ndash: '–', mdash: '—', hellip: '…',
+  }
+  return value
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&([a-z]+);/gi, (all, name) => named[name.toLowerCase()] ?? all)
+}
+
+function cleanText(html: string): string {
+  return decodeHtml(
+    html
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<!--([\s\S]*?)-->/g, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+  )
+    .replace(/[\t\r ]+/g, ' ')
+    .replace(/\n\s*/g, '\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+function attr(attrs: string, name: string): string | undefined {
+  const match = attrs.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'=<>]+))`, 'i'))
+  return decodeHtml(match?.[1] ?? match?.[2] ?? match?.[3] ?? '').trim() || undefined
+}
+
+function unique<T>(items: T[]): T[] {
+  return Array.from(new Set(items))
+}
+
+function resolveAssetUrl(value: string | undefined, baseUrl?: string): string | undefined {
+  if (!value) return undefined
+  const v = value.trim()
+  if (!v || v.startsWith('javascript:')) return undefined
+  if (v.startsWith('data:image/')) return v
+  if (/^(https?:)?\/\//i.test(v)) {
+    try { return new URL(v, baseUrl).toString() } catch { return v }
+  }
+  if (!baseUrl) return v
+  try { return new URL(v, baseUrl).toString() } catch { return v }
+}
+
+function extractTagTexts(html: string, tag: string): string[] {
+  const out: string[] = []
+  const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html)) && out.length < MAX_TEXT_ITEMS) {
+    const text = cleanText(match[1])
+    if (text) out.push(text)
+  }
+  return out
+}
+
+function extractHeading(html: string): string | undefined {
+  const match = html.match(/<h[1-3]\b[^>]*>([\s\S]*?)<\/h[1-3]>/i)
+  return match ? cleanText(match[1]) || undefined : undefined
+}
+
+function extractImages(html: string, baseUrl?: string): ImportedImage[] {
+  const images: ImportedImage[] = []
+  const re = /<img\b([^>]*)>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html)) && images.length < MAX_IMAGES_PER_SECTION) {
+    const src = resolveAssetUrl(attr(match[1], 'src') || attr(match[1], 'data-src'), baseUrl)
+    if (!src) continue
+    images.push({ src, alt: attr(match[1], 'alt') })
+  }
+  return images
+}
+
+function extractActions(html: string, baseUrl?: string): ImportedAction[] {
+  const actions: ImportedAction[] = []
+  const linkRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi
+  let match: RegExpExecArray | null
+  while ((match = linkRe.exec(html)) && actions.length < 30) {
+    const label = cleanText(match[2])
+    if (!label) continue
+    actions.push({
+      label,
+      href: resolveAssetUrl(attr(match[1], 'href'), baseUrl),
+      kind: 'link',
+    })
+  }
+  const buttonRe = /<button\b[^>]*>([\s\S]*?)<\/button>/gi
+  while ((match = buttonRe.exec(html)) && actions.length < 30) {
+    const label = cleanText(match[1])
+    if (label) actions.push({ label, kind: 'button' })
+  }
+  return actions
+}
+
+function extractFaq(html: string) {
+  const items: Array<{ question: string; answer: string }> = []
+  const re = /<details\b[^>]*>([\s\S]*?)<\/details>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html)) && items.length < 40) {
+    const summary = match[1].match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i)
+    const question = summary ? cleanText(summary[1]) : ''
+    const body = summary ? match[1].replace(summary[0], '') : match[1]
+    const answer = cleanText(body)
+    if (question || answer) items.push({ question, answer })
+  }
+  return items
+}
+
+function extractFormFields(html: string) {
+  const fields: Array<{ name?: string; type?: string; placeholder?: string }> = []
+  const re = /<(input|textarea|select)\b([^>]*)>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html)) && fields.length < 40) {
+    const attrs = match[2]
+    const type = match[1].toLowerCase() === 'input' ? attr(attrs, 'type') || 'text' : match[1].toLowerCase()
+    if (type === 'hidden' || type === 'submit') continue
+    fields.push({ name: attr(attrs, 'name'), type, placeholder: attr(attrs, 'placeholder') })
+  }
+  return fields
+}
+
+function inferSectionType(input: {
+  tag: string
+  id?: string
+  className?: string
+  heading?: string
+  html: string
+  imageCount: number
+  faqCount: number
+  formCount: number
+  index: number
+}): { type: ImportedSectionType; confidence: number } {
+  const haystack = [input.id, input.className, input.heading, cleanText(input.html).slice(0, 400)]
+    .filter(Boolean).join(' ').toLowerCase()
+
+  if (input.tag === 'header') return { type: 'header', confidence: 0.99 }
+  if (input.tag === 'footer') return { type: 'footer', confidence: 0.99 }
+  if (input.formCount > 0 || /(đăng ký|dang-ky|registration|register|lead form|opt-?in)/i.test(haystack)) return { type: 'registration', confidence: 0.96 }
+  if (input.faqCount >= 2 || /(faq|hỏi đáp|hoi-dap|câu hỏi thường gặp)/i.test(haystack)) return { type: 'faq', confidence: 0.96 }
+  if (/(hero|banner|masthead|đầu trang)/i.test(haystack) || (input.index === 0 && /<h1\b/i.test(input.html))) return { type: 'hero', confidence: 0.94 }
+  if (/(học phí|hoc-phi|pricing|price|giá bán|giá trị|đầu tư)/i.test(haystack)) return { type: 'pricing', confidence: 0.9 }
+  if (/(quà tặng|qua-tang|bonus|gift)/i.test(haystack)) return { type: 'bonuses', confidence: 0.9 }
+  if (/(diễn giả|dien-gia|speaker|instructor|giảng viên|chuyên gia)/i.test(haystack)) return { type: 'instructor', confidence: 0.9 }
+  if (/(hành trình|hanh-trinh|roadmap|timeline|lộ trình|chương trình học)/i.test(haystack)) return { type: 'roadmap', confidence: 0.88 }
+  if (input.imageCount >= 4 || /(gallery|khoảnh khắc|khoanh-khac|hình ảnh|thu vien anh)/i.test(haystack)) return { type: 'gallery', confidence: 0.88 }
+  if (/(nỗi đau|noi-dau|pain|vấn đề|van-de|đang thấy|khó khăn)/i.test(haystack)) return { type: 'pain_points', confidence: 0.84 }
+  if (/(kết quả|ket-qua|outcome|sau .*ngày|nhận được|lợi ích)/i.test(haystack)) return { type: 'outcomes', confidence: 0.82 }
+  if (/(phù hợp|phu-hop|dành cho ai|không phù hợp|fit)/i.test(haystack)) return { type: 'fit', confidence: 0.88 }
+  if (/(lời kết|loi-ket|closing|kết thúc|bắt đầu hành trình)/i.test(haystack)) return { type: 'closing_message', confidence: 0.82 }
+  return { type: 'rich_content', confidence: 0.55 }
+}
+
+function pickSectionLabel(type: ImportedSectionType, heading: string | undefined, index: number): string {
+  if (heading) return heading.slice(0, 90)
+  const names: Record<ImportedSectionType, string> = {
+    header: 'Header / Điều hướng',
+    hero: 'Hero',
+    pain_points: 'Vấn đề / Nỗi đau',
+    outcomes: 'Kết quả / Lợi ích',
+    roadmap: 'Hành trình / Lộ trình',
+    gallery: 'Thư viện hình ảnh',
+    instructor: 'Diễn giả / Chuyên gia',
+    bonuses: 'Quà tặng',
+    pricing: 'Học phí / Giá',
+    fit: 'Phù hợp / Không phù hợp',
+    faq: 'Câu hỏi thường gặp',
+    registration: 'Form đăng ký',
+    closing_message: 'Lời kết',
+    footer: 'Footer',
+    rich_content: 'Nội dung',
+  }
+  return `${names[type]} ${index + 1}`
+}
+
+function sectionContent(
+  type: ImportedSectionType,
+  heading: string | undefined,
+  paragraphs: string[],
+  listItems: string[],
+  images: ImportedImage[],
+  actions: ImportedAction[],
+  faqItems: Array<{ question: string; answer: string }>,
+  formFields: Array<{ name?: string; type?: string; placeholder?: string }>,
+): Record<string, unknown> {
+  const description = paragraphs[0] || ''
+  const primaryAction = actions[0]
+
+  switch (type) {
+    case 'hero':
+      return {
+        title: heading || 'Tiêu đề',
+        description,
+        imageUrl: images[0]?.src,
+        imageAlt: images[0]?.alt,
+        primaryCta: primaryAction ? {
+          label: primaryAction.label,
+          action: primaryAction.href?.startsWith('#') ? 'scroll' : 'external_link',
+          target: primaryAction.href,
+        } : { label: 'Đăng ký ngay', action: 'open_registration' },
+      }
+    case 'pain_points':
+      return {
+        title: heading || 'Vấn đề khách hàng đang gặp',
+        description,
+        items: listItems.map((item, i) => ({ id: `pain-${i + 1}`, title: '', description: item })),
+      }
+    case 'outcomes':
+      return {
+        title: heading || 'Kết quả nhận được',
+        description,
+        items: listItems.map((item, i) => ({ id: `outcome-${i + 1}`, description: item })),
+      }
+    case 'roadmap':
+      return {
+        title: heading || 'Hành trình',
+        description,
+        phases: listItems.map((item, i) => ({
+          id: `phase-${i + 1}`,
+          period: `Bước ${i + 1}`,
+          title: item.slice(0, 100),
+          description: item,
+        })),
+      }
+    case 'instructor':
+      return {
+        title: heading || 'Người đồng hành',
+        description,
+        instructors: [],
+        sourceText: [...paragraphs, ...listItems].slice(0, 30),
+        sourceImages: images,
+      }
+    case 'bonuses':
+      return {
+        title: heading || 'Quà tặng',
+        description,
+        items: listItems.map((item, i) => ({ id: `bonus-${i + 1}`, title: item })),
+        sourceImages: images,
+      }
+    case 'pricing': {
+      const text = [heading, ...paragraphs, ...listItems].filter(Boolean).join(' ')
+      const prices = unique((text.match(/\b\d{1,3}(?:[\.\s]\d{3})+(?:đ|\s*vnđ)?\b/gi) || []).map(v => v.trim()))
+      return {
+        title: heading || 'Học phí',
+        description,
+        detectedPrices: prices,
+        plans: [],
+        actions,
+      }
+    }
+    case 'gallery':
+      return { title: heading || 'Hình ảnh', description, images }
+    case 'fit':
+      return { title: heading || 'Chương trình phù hợp với ai?', description, items: listItems }
+    case 'faq':
+      return { title: heading || 'Câu hỏi thường gặp', description, items: faqItems }
+    case 'registration':
+      return { title: heading || 'Đăng ký', description, fields: formFields, actions }
+    case 'closing_message':
+      return { title: heading, paragraphs: paragraphs.length ? paragraphs : listItems }
+    case 'header':
+    case 'footer':
+      return { title: heading, paragraphs, links: actions, images }
+    default:
+      return {
+        title: heading,
+        description,
+        paragraphs: paragraphs.slice(1),
+        imageUrl: images[0]?.src,
+        imageAlt: images[0]?.alt,
+        cta: primaryAction ? { label: primaryAction.label, target: primaryAction.href } : undefined,
+      }
+  }
+}
+
+function extractColors(css: string): string[] {
+  const raw = css.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/gi) || []
+  const counts = new Map<string, number>()
+  raw.forEach(value => {
+    const normalized = value.toLowerCase().replace(/\s+/g, '')
+    counts.set(normalized, (counts.get(normalized) || 0) + 1)
+  })
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([value]) => value)
+}
+
+function extractFonts(css: string): string[] {
+  const fonts: string[] = []
+  const re = /font-family\s*:\s*([^;}{]+)/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(css))) {
+    const first = match[1].split(',')[0].trim().replace(/^['"]|['"]$/g, '')
+    if (first && !/^(inherit|initial|system-ui)$/i.test(first)) fonts.push(first)
+  }
+  return unique(fonts).slice(0, 8)
+}
+
+function extractCss(html: string): string {
+  const chunks: string[] = []
+  const re = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
+  let match: RegExpExecArray | null
+  while ((match = re.exec(html))) chunks.push(match[1])
+  return chunks.join('\n')
+}
+
+function extractMeta(html: string, name: string): string | undefined {
+  const metaRe = /<meta\b([^>]*)>/gi
+  let match: RegExpExecArray | null
+  while ((match = metaRe.exec(html))) {
+    const attrs = match[1]
+    const key = attr(attrs, 'name') || attr(attrs, 'property')
+    if (key?.toLowerCase() === name.toLowerCase()) return attr(attrs, 'content')
+  }
+  return undefined
+}
+
+function inferSavedFromUrl(html: string): string | undefined {
+  const match = html.match(/<!--\s*saved from url=\([^)]*\)(https?:\/\/[^\s]+)\s*-->/i)
+  return match?.[1]
+}
+
+function inferDesign(html: string, type: ImportedSectionType, listCount: number, imageCount: number) {
+  const style = attr((html.match(/^<\w+\b([^>]*)>/i)?.[1] || ''), 'style') || ''
+  const bg = style.match(/background(?:-color)?\s*:\s*([^;]+)/i)?.[1]?.trim()
+  const color = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)?.[1]?.trim()
+  const center = /text-align\s*:\s*center/i.test(style)
+
+  let suggestedLayout: 'single' | 'split' | 'grid' | 'timeline' | 'gallery' = 'single'
+  if (type === 'roadmap') suggestedLayout = 'timeline'
+  else if (type === 'gallery') suggestedLayout = 'gallery'
+  else if (imageCount && (listCount || type === 'hero')) suggestedLayout = 'split'
+  else if (listCount >= 3) suggestedLayout = 'grid'
+
+  return {
+    backgroundColor: bg,
+    textColor: color,
+    alignment: center ? 'center' as const : undefined,
+    suggestedLayout,
+    columns: suggestedLayout === 'grid' ? Math.min(3, Math.max(2, listCount)) : undefined,
+  }
+}
+
+export function analyzeWebsiteHtml(input: {
+  html: string
+  sourceType: 'url' | 'html'
+  sourceUrl?: string
+  finalUrl?: string
+}): WebsiteTemplateAnalysis {
+  const { html, sourceType, sourceUrl, finalUrl } = input
+  const warnings: string[] = []
+  const savedFromUrl = inferSavedFromUrl(html)
+  const baseUrl = finalUrl || sourceUrl || savedFromUrl
+
+  const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)
+  const title = titleMatch ? cleanText(titleMatch[1]) : 'Mẫu website đã nhập'
+  const description = extractMeta(html, 'description')
+  const language = attr(html.match(/<html\b([^>]*)>/i)?.[1] || '', 'lang')
+  const css = extractCss(html)
+  const colors = extractColors(css)
+  const fonts = extractFonts(css)
+
+  const blocks: Array<{ tag: string; attrs: string; html: string }> = []
+  const blockRe = /<(header|section|footer)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  let blockMatch: RegExpExecArray | null
+  while ((blockMatch = blockRe.exec(html)) && blocks.length < MAX_SECTIONS) {
+    blocks.push({ tag: blockMatch[1].toLowerCase(), attrs: blockMatch[2], html: blockMatch[0] })
+  }
+
+  if (!blocks.length) {
+    const mainMatch = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)
+    blocks.push({ tag: 'section', attrs: '', html: mainMatch?.[0] || html })
+    warnings.push('Trang không có thẻ section rõ ràng; hệ thống đã gom nội dung thành một khối tổng.')
+  }
+
+  const sections: ImportedSectionCandidate[] = blocks.map((block, index) => {
+    const sourceId = attr(block.attrs, 'id')
+    const sourceClass = attr(block.attrs, 'class')
+    const heading = extractHeading(block.html)
+    const paragraphs = extractTagTexts(block.html, 'p').slice(0, MAX_TEXT_ITEMS)
+    const listItems = extractTagTexts(block.html, 'li').slice(0, MAX_TEXT_ITEMS)
+    const images = extractImages(block.html, baseUrl)
+    const actions = extractActions(block.html, baseUrl)
+    const faqItems = extractFaq(block.html)
+    const formFields = extractFormFields(block.html)
+    const inferred = inferSectionType({
+      tag: block.tag,
+      id: sourceId,
+      className: sourceClass,
+      heading,
+      html: block.html,
+      imageCount: images.length,
+      faqCount: faqItems.length,
+      formCount: formFields.length,
+      index,
+    })
+
+    return {
+      id: `imported-${index + 1}`,
+      sourceId,
+      sourceClass,
+      label: pickSectionLabel(inferred.type, heading, index),
+      sectionType: inferred.type,
+      enabled: true,
+      sortOrder: index,
+      confidence: inferred.confidence,
+      heading,
+      paragraphs,
+      listItems,
+      images,
+      actions,
+      faqItems: faqItems.length ? faqItems : undefined,
+      formFields: formFields.length ? formFields : undefined,
+      content: sectionContent(inferred.type, heading, paragraphs, listItems, images, actions, faqItems, formFields),
+      design: inferDesign(block.html, inferred.type, listItems.length, images.length),
+    }
+  })
+
+  const unresolvedLocalAssets = sections
+    .flatMap(section => section.images)
+    .filter(image => !/^(https?:\/\/|data:image\/)/i.test(image.src)).length
+  if (unresolvedLocalAssets) {
+    warnings.push(`${unresolvedLocalAssets} ảnh đang dùng đường dẫn file cục bộ/tương đối. Hãy nhập bằng URL gốc hoặc tải lại ảnh trong Builder để template không phụ thuộc file trên máy.`)
+  }
+  if (sourceType === 'url' && /<(script)[\s>]/i.test(html)) {
+    warnings.push('JavaScript của website nguồn không được sao chép; chỉ cấu trúc, nội dung và thiết kế an toàn được phân tích.')
+  }
+
+  const totalImages = sections.reduce((sum, section) => sum + section.images.length, 0)
+  const totalLinks = sections.reduce((sum, section) => sum + section.actions.filter(action => action.kind === 'link').length, 0)
+  const totalForms = sections.reduce((sum, section) => sum + (section.formFields?.length ? 1 : 0), 0)
+
+  return {
+    sourceType,
+    sourceUrl,
+    finalUrl,
+    title,
+    description,
+    language,
+    colors,
+    fonts,
+    theme: {
+      primaryColor: colors[0],
+      secondaryColor: colors[1],
+      backgroundColor: colors.find(color => /#(?:fff|ffffff|fbf|f[0-9a-f]{5})/i.test(color)) || colors[2],
+      textColor: colors.find(color => /#(?:1|2|3)[0-9a-f]{5}/i.test(color)) || colors[3],
+      headingFont: fonts[0],
+      bodyFont: fonts[1] || fonts[0],
+    },
+    sections,
+    stats: {
+      sections: sections.length,
+      images: totalImages,
+      links: totalLinks,
+      forms: totalForms,
+    },
+    warnings,
+  }
+}
