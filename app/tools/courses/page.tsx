@@ -6,7 +6,8 @@ import { getTeachersAction } from '@/app/actions/course-actions'
 import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, CheckSquare, X, Search, Tag, Trash2, Save, Edit2, Palette } from 'lucide-react'
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
-import { getCoursePages, updateCoursePage, createCoursePage } from '@/app/actions/course-page-actions'
+import { getCoursePages, updateCoursePage, createCoursePage, applyCoursePageTemplate } from '@/app/actions/course-page-actions'
+import { COURSE_TEMPLATE_LIBRARY, CourseTemplateKey } from '@/lib/course-page/templates'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
 
@@ -132,6 +133,24 @@ function CoursesTab() {
             } else {
                 alert(res.error || 'Có lỗi xảy ra khi khởi tạo cấu hình')
             }
+        }
+    }
+
+    const handleApplyTemplate = async (course: any, page: any, templateKey: CourseTemplateKey) => {
+        const template = COURSE_TEMPLATE_LIBRARY.find(t => t.key === templateKey)
+        if (!template) return
+        if (page?.sections?.length && !confirm(`Áp dụng mẫu "${template.name}" sẽ thay thế bố cục trang hiện tại của khóa học này. Tiếp tục?`)) return
+        setBatchLoading(true)
+        try {
+            const res = await applyCoursePageTemplate(course.id_khoa, course.name_lop || course.id_khoa, templateKey)
+            if (res.success) {
+                const pages = await getCoursePages()
+                setCoursePages(pages)
+            } else {
+                alert(res.error || 'Có lỗi xảy ra khi áp dụng mẫu')
+            }
+        } finally {
+            setBatchLoading(false)
         }
     }
 
@@ -475,11 +494,24 @@ function CoursesTab() {
                                                                         }`}
                                                                     />
                                                                 </button>
+                                                                {isTemplateApplied && (
+                                                                    <select
+                                                                        value={(page?.seo as any)?.templateKey || ''}
+                                                                        onChange={(e) => e.target.value && handleApplyTemplate(course, page, e.target.value as CourseTemplateKey)}
+                                                                        className="h-6 max-w-[105px] rounded-md border border-purple-200 bg-white px-1 text-[9px] font-bold text-purple-800"
+                                                                        title="Chọn mẫu giao diện"
+                                                                    >
+                                                                        <option value="">Tùy chỉnh</option>
+                                                                        {COURSE_TEMPLATE_LIBRARY.map(template => (
+                                                                            <option key={template.key} value={template.key}>{template.name}</option>
+                                                                        ))}
+                                                                    </select>
+                                                                )}
                                                                 {isTemplateApplied && page && (
                                                                     <Link
                                                                         href={`/tools/courses/pages/${page.id}`}
                                                                         className="inline-flex items-center justify-center w-5 h-5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-full transition-all ml-1"
-                                                                        title="Thiết lập giao diện Template"
+                                                                        title="Chỉnh nội dung riêng của khóa học"
                                                                     >
                                                                         <Palette className="w-3 h-3" />
                                                                     </Link>
