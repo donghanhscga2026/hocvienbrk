@@ -1,0 +1,269 @@
+'use server'
+
+import prisma from '@/lib/prisma'
+import { revalidatePath } from 'next/cache'
+import { requireAdminAction } from '@/lib/api-auth'
+import {
+  ImportedSectionCandidate,
+  StoredTemplateSnapshot,
+  WebsiteTemplateAnalysis,
+} from '@/lib/course-page/importer/types'
+
+function jsonSafe<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function slugify(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'website-template'
+}
+
+function mapImportedSection(section: ImportedSectionCandidate, sortOrder: number) {
+  return {
+    sectionKey: section.sourceId || `imported-${sortOrder + 1}`,
+    sectionType: section.sectionType,
+    variant: 'imported-v1',
+    anchorId: section.sourceId || null,
+    enabled: true,
+    sortOrder,
+    visibility: 'all' as const,
+    content: jsonSafe({
+      ...section.content,
+      design: section.design,
+      importedMeta: {
+        label: section.label,
+        sourceClass: section.sourceClass,
+        confidence: section.confidence,
+      },
+    }),
+  }
+}
+
+function buildSnapshot(
+  name: string,
+  analysis: WebsiteTemplateAnalysis,
+  selectedSectionIds: string[],
+): StoredTemplateSnapshot {
+  const byId = new Map(analysis.sections.map(section => [section.id, section]))
+  const selected = selectedSectionIds
+    .map(id => byId.get(id))
+    .filter((section): section is ImportedSectionCandidate => Boolean(section))
+
+  if (!selected.length) throw new Error('Hãy chọn ít nhất một phần trước khi tạo mẫu')
+
+  const primaryColor = analysis.theme.primaryColor || '#6D28D9'
+  const secondaryColor = analysis.theme.secondaryColor || '#F4C430'
+  const backgroundColor = analysis.theme.backgroundColor || '#FFFFFF'
+  const textColor = analysis.theme.textColor || '#1F2937'
+
+  return {
+    name,
+    seo: {
+      title: analysis.title || name,
+      description: analysis.description || '',
+      importedFrom: analysis.finalUrl || analysis.sourceUrl || null,
+    },
+    theme: {
+      primaryColor,
+      secondaryColor,
+      backgroundColor,
+      textColor,
+      headingFont: analysis.theme.headingFont,
+      bodyFont: analysis.theme.bodyFont,
+      borderRadius: analysis.theme.borderRadius || '18px',
+      containerWidth: analysis.theme.containerWidth || '1120px',
+    },
+    navigation: {
+      shortName: name,
+      ctaText: 'Đăng ký ngay',
+      sticky: true,
+    },
+    checkoutConfig: {
+      enabled: true,
+      provider: 'vietqr',
+      currency: 'VND',
+      paymentDescriptionPrefix: 'CK',
+      orderExpirationMinutes: 15,
+      registrationFields: [
+        { name: 'fullName', label: 'Họ và tên', type: 'text', required: true },
+        { name: 'phone', label: 'Số điện thoại', type: 'tel', required: true },
+      ],
+      successMode: 'show_message',
+    },
+    useTemplate: true,
+    sections: selected.map((section, index) => mapImportedSection(section, index)),
+  }
+}
+
+export async function getStoredCoursePageTemplates() {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
+  try {
+    const templates = await prisma.coursePageTemplate.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+        description: true,
+        sourceUrl: true,
+        sourceType: true,
+        thumbnailUrl: true,
+        analysis: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+    return { success: true, templates }
+  } catch (error: any) {
+    console.error('[CoursePageTemplate] List error:', error)
+    return { success: false, error: error.message || 'Không thể tải thư viện mẫu', templates: [] }
+  }
+}
+
+export async function createStoredCoursePageTemplate(input: {
+  name: string
+  description?: string
+  analysis: WebsiteTemplateAnalysis
+  selectedSectionIds: string[]
+}) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
+  try {
+    const name = input.name?.trim()
+    if (!name) return { success: false, error: 'Vui lòng đặt tên cho mẫu' }
+    if (!input.analysis?.sections?.length) return { success: false, error: 'Chưa có kết quả phân tích website' }
+
+    const snapshot = buildSnapshot(name, input.analysis, input.selectedSectionIds)
+    const key = `custom-${slugify(name)}-${Date.now().toString(36)}`
+    const firstImage = input.analysis.sections
+      .filter(section => input.selectedSectionIds.includes(section.id))
+      .flatMap(section => section.images || [])
+      .find(image => /^https?:\/\//i.test(image.src))
+
+    const template = await prisma.coursePageTemplate.create({
+      data: {
+        key,
+        name,
+        description: input.description?.trim() || null,
+        sourceUrl: input.analysis.finalUrl || input.analysis.sourceUrl || null,
+        sourceType: input.analysis.sourceType,
+        thumbnailUrl: firstImage?.src || null,
+        snapshot: jsonSafe(snapshot) as any,
+        analysis: jsonSafe({
+          ...input.analysis,
+          sections: input.analysis.sections.map(section => ({
+            ...section,
+            enabled: input.selectedSectionIds.includes(section.id),
+          })),
+        }) as any,
+      },
+    })
+
+    revalidatePath('/tools/courses/templates')
+    return { success: true, template: { id: template.id, key: template.key, name: template.name } }
+  } catch (error: any) {
+    console.error('[CoursePageTemplate] Create error:', error)
+    return { success: false, error: error.message || 'Không thể tạo mẫu từ website' }
+  }
+}
+
+export async function deleteStoredCoursePageTemplate(templateId: string) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
+  try {
+    await prisma.coursePageTemplate.delete({ where: { id: templateId } })
+    revalidatePath('/tools/courses/templates')
+    return { success: true }
+  } catch (error: any) {
+    console.error('[CoursePageTemplate] Delete error:', error)
+    return { success: false, error: error.message || 'Không thể xóa mẫu' }
+  }
+}
+
+export async function applyStoredCoursePageTemplate(
+  templateId: string,
+  courseSlug: string,
+  courseName: string,
+) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
+  try {
+    const template = await prisma.coursePageTemplate.findUnique({ where: { id: templateId } })
+    if (!template) return { success: false, error: 'Không tìm thấy mẫu' }
+
+    const snapshot = template.snapshot as any as StoredTemplateSnapshot
+    if (!Array.isArray(snapshot.sections) || !snapshot.sections.length) {
+      return { success: false, error: 'Mẫu không có nội dung để áp dụng' }
+    }
+
+    const result = await prisma.$transaction(async tx => {
+      const existing = await tx.coursePage.findUnique({ where: { slug: courseSlug } })
+      const seo = {
+        ...(snapshot.seo || {}),
+        templateKey: `custom:${template.id}`,
+        storedTemplateId: template.id,
+      }
+
+      const page = existing
+        ? await tx.coursePage.update({
+            where: { id: existing.id },
+            data: {
+              name: courseName || snapshot.name || template.name,
+              seo: seo as any,
+              theme: snapshot.theme as any,
+              navigation: snapshot.navigation as any,
+              checkoutConfig: snapshot.checkoutConfig as any,
+              useTemplate: true,
+            },
+          })
+        : await tx.coursePage.create({
+            data: {
+              slug: courseSlug,
+              name: courseName || snapshot.name || template.name,
+              status: 'draft',
+              seo: seo as any,
+              theme: snapshot.theme as any,
+              navigation: snapshot.navigation as any,
+              checkoutConfig: snapshot.checkoutConfig as any,
+              useTemplate: true,
+            },
+          })
+
+      await tx.courseSection.deleteMany({ where: { coursePageId: page.id } })
+      await tx.courseSection.createMany({
+        data: snapshot.sections.map(section => ({
+          coursePageId: page.id,
+          sectionKey: section.sectionKey,
+          sectionType: section.sectionType,
+          variant: section.variant || null,
+          anchorId: section.anchorId || null,
+          enabled: section.enabled !== false,
+          sortOrder: section.sortOrder,
+          visibility: section.visibility || 'all',
+          content: section.content as any,
+        })),
+      })
+
+      return page
+    })
+
+    revalidatePath(`/khoa-hoc/${courseSlug}`)
+    revalidatePath('/tools/courses')
+    revalidatePath('/tools/courses/templates')
+    return { success: true, page: result }
+  } catch (error: any) {
+    console.error('[CoursePageTemplate] Apply error:', error)
+    return { success: false, error: error.message || 'Không thể áp dụng mẫu' }
+  }
+}
