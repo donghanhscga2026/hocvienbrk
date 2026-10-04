@@ -24,6 +24,9 @@ export type ImportedDesign = {
   alignment?: 'left' | 'center' | 'right'
   suggestedLayout?: 'single' | 'split' | 'grid' | 'timeline' | 'gallery'
   columns?: number
+  borderRadius?: string
+  padding?: string
+  maxWidth?: string
 }
 
 export type ImportedImage = {
