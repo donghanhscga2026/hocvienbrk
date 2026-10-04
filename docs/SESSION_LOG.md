@@ -41,7 +41,7 @@ API /api/auth/report-failed-login
 
 ### Telegram Group mới
 - **Chat ID**: `-1004466932240`
-- **Bot token**: `8630082731:AAENKynjPOEAK_ZKQE35hwbeEoBgx14TiQ0`
+- **Bot token**: `<REVOKED_TELEGRAM_BOT_TOKEN>`
 - **Mục đích**: Gửi cảnh báo khi có đăng nhập thất bại (kèm chi tiết user)
 
 ### Các file đã thay đổi
@@ -100,7 +100,7 @@ TELEGRAM_CHAT_ID_FAILED_LOGIN=-1004466932240
 - ✅ API test email → `{ identifierType: "email", errorType: "NOT_FOUND" }`
 
 ### Công việc còn lại
-- [ ] Add bot `8630082731:AAENKynjPOEAK_ZKQE35hwbeEoBgx14TiQ0` vào group `-1004466932240`
+- [ ] Add bot `<REVOKED_TELEGRAM_BOT_TOKEN>` vào group `-1004466932240`
 - [ ] Deploy lên Vercel (kèm env `TELEGRAM_CHAT_ID_FAILED_LOGIN`)
 - [ ] Test đăng nhập sai trên production → kiểm tra Telegram
 
