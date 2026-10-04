@@ -133,9 +133,9 @@ export default function CoursePageView({
       <nav
         className="fixed top-0 left-0 right-0 z-50 px-2 py-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] flex justify-between items-center gap-1 sm:gap-3 sm:px-4"
         style={{
-          background: 'rgba(23,24,35,0.92)',
+          background: 'color-mix(in srgb, var(--course-surface) 92%, transparent)',
           backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid var(--border-dark)',
+          borderBottom: '1px solid var(--course-border)',
         }}
       >
         <div className="min-w-0 flex-1 truncate" style={{
@@ -188,9 +188,9 @@ export default function CoursePageView({
       <footer
         className="py-10 text-center text-sm"
         style={{
-          background: 'var(--bg-dark)',
-          color: 'var(--text-muted)',
-          borderTop: '1px solid var(--border-dark)',
+          background: 'var(--course-surface)',
+          color: 'var(--course-muted)',
+          borderTop: '1px solid var(--course-border)',
           fontFamily: 'Inter, sans-serif',
         }}
       >
