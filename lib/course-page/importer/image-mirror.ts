@@ -26,14 +26,23 @@ export async function mirrorAnalysisImages(
   options: MirrorOptions = {},
 ): Promise<WebsiteTemplateAnalysis> {
   const selected = options.sectionIds ? new Set(options.sectionIds) : null
-  const candidates = analysis.sections
-    .filter(section => !selected || selected.has(section.id))
+  const selectedSections = analysis.sections.filter(section => !selected || selected.has(section.id))
+  const imageCandidates = selectedSections
     .flatMap(section => section.images || [])
     .map(image => image.src)
     .filter(Boolean)
+
+  const fidelityCandidates = selectedSections.flatMap(section => {
+    const source = [section.fidelity?.html || '', section.fidelity?.css || ''].join('\n')
+    const dataImages = source.match(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+/gi) || []
+    const remoteAssets = source.match(/https?:\/\/[^"'()\\\s<>]+/gi) || []
+    return [...dataImages, ...remoteAssets.filter(url => /\.(?:png|jpe?g|webp|gif|avif|svg)(?:[?#]|$)/i.test(url))]
+  })
+
+  const candidates = [...imageCandidates, ...fidelityCandidates]
     .filter(src => options.dataOnly ? /^data:image\//i.test(src) : /^(?:https?:\/\/|data:image\/)/i.test(src))
 
-  const urls = Array.from(new Set(candidates)).slice(0, 60)
+  const urls = Array.from(new Set(candidates)).slice(0, 80)
   if (!urls.length) return JSON.parse(JSON.stringify(analysis))
 
   const replacements = new Map<string, string>()
