@@ -287,6 +287,58 @@ export async function applyStoredCoursePageTemplate(
 
     const result = await prisma.$transaction(async tx => {
       const existing = await tx.coursePage.findUnique({ where: { slug: courseSlug } })
+
+      // Applying a new template is a draft edit. If this is an older published
+      // page that predates published snapshots, preserve its current live state
+      // before replacing sections so the public page does not change early.
+      if (existing?.status === 'published') {
+        const publishedVersion = await tx.coursePageVersion.findFirst({
+          where: {
+            coursePageId: existing.id,
+            snapshot: { path: ['kind'], equals: 'published' },
+          },
+          select: { id: true },
+        })
+        if (!publishedVersion) {
+          const [currentSections, latestVersion] = await Promise.all([
+            tx.courseSection.findMany({
+              where: { coursePageId: existing.id },
+              orderBy: { sortOrder: 'asc' },
+            }),
+            tx.coursePageVersion.findFirst({
+              where: { coursePageId: existing.id },
+              orderBy: { versionNumber: 'desc' },
+              select: { versionNumber: true },
+            }),
+          ])
+          await tx.coursePageVersion.create({
+            data: {
+              coursePageId: existing.id,
+              versionNumber: (latestVersion?.versionNumber || 0) + 1,
+              snapshot: {
+                name: existing.name,
+                seo: existing.seo,
+                theme: existing.theme,
+                navigation: existing.navigation,
+                checkoutConfig: existing.checkoutConfig,
+                useTemplate: existing.useTemplate,
+                sections: currentSections.map(section => ({
+                  sectionKey: section.sectionKey,
+                  sectionType: section.sectionType,
+                  variant: section.variant,
+                  anchorId: section.anchorId,
+                  enabled: section.enabled,
+                  sortOrder: section.sortOrder,
+                  visibility: section.visibility,
+                  content: section.content,
+                })),
+                kind: 'published',
+              } as any,
+            },
+          })
+        }
+      }
+
       const seo = {
         ...(snapshot.seo || {}),
         templateKey: `custom:${template.id}`,
