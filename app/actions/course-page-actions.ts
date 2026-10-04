@@ -37,22 +37,46 @@ export async function getCoursePage(id: string) {
 
 export async function getPublishedCoursePageBySlug(slug: string) {
   try {
-    const page = await prisma.coursePage.findFirst({
-      where: {
-        slug,
-        status: 'published'
-      },
+    const page = await prisma.coursePage.findUnique({
+      where: { slug },
       include: {
-        sections: {
-          where: { enabled: true },
-          orderBy: { sortOrder: 'asc' }
-        }
+        sections: { where: { enabled: true }, orderBy: { sortOrder: 'asc' } },
+        versions: { orderBy: { versionNumber: 'desc' }, take: 20 },
+      },
+    })
+    if (!page) return null
+
+    const publishedVersion = page.versions.find(version => (version.snapshot as any)?.kind === 'published')
+    if (publishedVersion) {
+      const snapshot = publishedVersion.snapshot as any
+      return {
+        ...page,
+        name: snapshot.name || page.name,
+        seo: snapshot.seo || {},
+        theme: snapshot.theme || {},
+        navigation: snapshot.navigation || {},
+        checkoutConfig: snapshot.checkoutConfig || {},
+        useTemplate: snapshot.useTemplate !== false,
+        status: 'published',
+        sections: (snapshot.sections || [])
+          .filter((section: any) => section.enabled !== false)
+          .sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0))
+          .map((section: any) => ({
+            ...section,
+            id: section.id || section.sectionKey,
+            coursePageId: page.id,
+            createdAt: page.createdAt,
+            updatedAt: page.updatedAt,
+          })),
       }
-    });
-    return page;
+    }
+
+    // Backward-compatible fallback for pages published before version snapshots existed.
+    if (page.status !== 'published') return null
+    return page
   } catch (error) {
-    console.error('[CoursePage] Get published page by slug error:', error);
-    return null;
+    console.error('[CoursePage] Get published page by slug error:', error)
+    return null
   }
 }
 
