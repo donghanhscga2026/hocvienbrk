@@ -137,6 +137,10 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     setSections(prev => prev.map((sec, i) => i === index ? { ...sec, content: { ...(sec.content || {}), [field]: value } } : sec))
   }
 
+  const updateNestedContent = (index:number, key:string, fieldName:string, value:any) => {
+    setSections(prev => prev.map((sec,i) => i===index ? { ...sec, content:{ ...(sec.content||{}), [key]:{ ...(sec.content?.[key]||{}), [fieldName]:value } } } : sec))
+  }
+
   const duplicateSection = (index: number) => {
     const source = sections[index]
     const copy = { ...source, id: undefined, sectionKey: `${source.sectionKey}_copy_${Date.now()}`, content: JSON.parse(JSON.stringify(source.content || {})) }
@@ -198,11 +202,50 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     </div>
   }
 
+  const updateNestedItem = (sectionIndex:number, key:string, itemIndex:number, patch:any) => {
+    const items=[...(sections[sectionIndex]?.content?.[key] || [])]
+    items[itemIndex]={...(items[itemIndex] || {}),...patch}
+    updateContent(sectionIndex,key,items)
+  }
+
+  const addNestedItem = (sectionIndex:number, key:string, seed:any) => {
+    updateContent(sectionIndex,key,[...(sections[sectionIndex]?.content?.[key] || []),{id:`item_${Date.now()}`,...seed}])
+  }
+
+  const removeNestedItem = (sectionIndex:number,key:string,itemIndex:number) => {
+    updateContent(sectionIndex,key,(sections[sectionIndex]?.content?.[key] || []).filter((_:any,i:number)=>i!==itemIndex))
+  }
+
+  const instructorsEditor = (index:number) => <div className="space-y-3">
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Danh sách chuyên gia</label><button type="button" onClick={()=>addNestedItem(index,'instructors',{name:'',role:'',imageUrl:'',imageAlt:'',bio:[]})} className="text-xs font-bold text-purple-700">+ Thêm chuyên gia</button></div>
+    {(sections[index]?.content?.instructors || []).map((ins:any,i:number)=><div key={ins.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
+      <div className="flex gap-2"><input value={ins.name||''} onChange={e=>updateNestedItem(index,'instructors',i,{name:e.target.value})} placeholder="Tên chuyên gia" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'instructors',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
+      <input value={ins.role||''} onChange={e=>updateNestedItem(index,'instructors',i,{role:e.target.value})} placeholder="Vai trò / chức danh" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      <input value={ins.imageUrl||''} onChange={e=>updateNestedItem(index,'instructors',i,{imageUrl:e.target.value})} placeholder="Link ảnh chuyên gia" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      {ins.imageUrl && <img src={ins.imageUrl} alt="" className="h-28 max-w-full rounded-lg object-contain bg-white border"/>}
+      <textarea value={(ins.bio||[]).join('\n')} onChange={e=>updateNestedItem(index,'instructors',i,{bio:e.target.value.split('\n')})} placeholder="Giới thiệu. Mỗi đoạn một dòng." className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-20"/>
+    </div>)}
+  </div>
+
+  const pricingEditor = (index:number) => <div className="space-y-3">
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Gói giá</label><button type="button" onClick={()=>addNestedItem(index,'plans',{name:'Gói mới',price:0,currency:'VND',ctaText:'Đăng ký ngay',features:[]})} className="text-xs font-bold text-purple-700">+ Thêm gói</button></div>
+    {(sections[index]?.content?.plans || []).map((plan:any,i:number)=><div key={plan.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
+      <div className="flex gap-2"><input value={plan.name||''} onChange={e=>updateNestedItem(index,'plans',i,{name:e.target.value})} placeholder="Tên gói" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'plans',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
+      <div className="grid grid-cols-2 gap-2"><input type="number" value={plan.price??0} onChange={e=>updateNestedItem(index,'plans',i,{price:Number(e.target.value)})} placeholder="Giá bán" className="rounded-lg border px-3 py-2 text-sm bg-white"/><input type="number" value={plan.originalPrice??''} onChange={e=>updateNestedItem(index,'plans',i,{originalPrice:e.target.value?Number(e.target.value):undefined})} placeholder="Giá gốc" className="rounded-lg border px-3 py-2 text-sm bg-white"/></div>
+      <input value={plan.ctaText||''} onChange={e=>updateNestedItem(index,'plans',i,{ctaText:e.target.value})} placeholder="Chữ trên nút đăng ký" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      <textarea value={(plan.features||[]).join('\n')} onChange={e=>updateNestedItem(index,'plans',i,{features:e.target.value.split('\n').filter(Boolean)})} placeholder="Quyền lợi, mỗi dòng một mục" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-20"/>
+      <label className="flex gap-2 items-center text-xs font-bold"><input type="checkbox" checked={!!plan.featured} onChange={e=>updateNestedItem(index,'plans',i,{featured:e.target.checked})}/> Làm nổi bật gói này</label>
+    </div>)}
+  </div>
+
   const simpleEditor = (sec: any, index: number) => {
     const common = <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Nội dung mô tả',true)}</div>
     if (sec.sectionType === 'wigrow_artwork') return <div className="grid gap-3">{field(index,'imageUrl','Địa chỉ hình ảnh')}{field(index,'imageAlt','Mô tả hình ảnh')}{field(index,'title','Tiêu đề trên ảnh')}{field(index,'accent','Dòng nhấn mạnh')}{field(index,'description','Nội dung',true)}</div>
     if (sec.sectionType === 'quote') return <div className="grid gap-3">{field(index,'quote','Câu trích dẫn',true)}{field(index,'author','Tác giả')}{field(index,'caption','Ghi chú')}</div>
     if (sec.sectionType === 'closing_message') return <div className="grid gap-3">{field(index,'title','Tiêu đề')}{field(index,'signature','Chữ ký')}</div>
+    if (sec.sectionType === 'instructor') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{instructorsEditor(index)}</div>
+    if (sec.sectionType === 'pricing') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{pricingEditor(index)}{field(index,'paymentNote','Ghi chú thanh toán',true)}</div>
+    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{field(index,'imageUrl','Link ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút chính</label><input value={sec.content?.primaryCta?.label||''} onChange={e=>updateNestedContent(index,'primaryCta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></div></div>
     if (sec.sectionType === 'benefits' || sec.sectionType === 'outcomes' || sec.sectionType === 'pain_points') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'items','Các mục nội dung')}</div>
     return common
   }
