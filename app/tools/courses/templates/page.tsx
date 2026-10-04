@@ -120,13 +120,30 @@ export default function CourseTemplateLibraryPage() {
     try {
       let response: Response
       if (sourceFile) {
-        const form = new FormData()
-        form.append('file', sourceFile)
-        if (sourceUrl.trim()) form.append('sourceUrl', sourceUrl.trim())
-        response = await fetch('/api/admin/course-page-templates/analyze', {
-          method: 'POST',
-          body: form,
-        })
+        // Browser-exported HTML often embeds images as base64 and can exceed
+        // Vercel's request-body limit before our API route is reached.
+        // Gzip is especially effective for base64 HTML, so compress it client-side.
+        if (typeof CompressionStream !== 'undefined') {
+          const compressedStream = sourceFile.stream().pipeThrough(new CompressionStream('gzip'))
+          const compressed = await new Response(compressedStream).arrayBuffer()
+          response = await fetch('/api/admin/course-page-templates/analyze', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/gzip',
+              'X-HTML-Filename': encodeURIComponent(sourceFile.name),
+              ...(sourceUrl.trim() ? { 'X-Source-URL': encodeURIComponent(sourceUrl.trim()) } : {}),
+            },
+            body: compressed,
+          })
+        } else {
+          const form = new FormData()
+          form.append('file', sourceFile)
+          if (sourceUrl.trim()) form.append('sourceUrl', sourceUrl.trim())
+          response = await fetch('/api/admin/course-page-templates/analyze', {
+            method: 'POST',
+            body: form,
+          })
+        }
       } else {
         response = await fetch('/api/admin/course-page-templates/analyze', {
           method: 'POST',
@@ -135,9 +152,20 @@ export default function CourseTemplateLibraryPage() {
         })
       }
 
-      const data = await response.json()
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Không thể phân tích website')
+      const responseText = await response.text()
+      let data: any = null
+      try {
+        data = responseText ? JSON.parse(responseText) : null
+      } catch {
+        const tooLarge = response.status === 413 || /request entity too large|body exceeded/i.test(responseText)
+        throw new Error(
+          tooLarge
+            ? 'File HTML quá lớn để gửi trực tiếp. Hệ thống đã thử nén file nhưng vẫn vượt giới hạn máy chủ.'
+            : `Máy chủ trả về phản hồi không hợp lệ (HTTP ${response.status}). Vui lòng thử lại.`,
+        )
+      }
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || `Không thể phân tích website (HTTP ${response.status})`)
       }
 
       const result = data.analysis as WebsiteTemplateAnalysis
