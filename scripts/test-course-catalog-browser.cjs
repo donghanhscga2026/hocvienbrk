@@ -73,11 +73,14 @@ async function run() {
     const desktopMenu=page.getByRole('navigation',{name:'Điều hướng hệ sinh thái'})
     const mobileMenu=desktopMenu
     // Kiểm chứng các URL cũ vẫn hoạt động sau khi rút gọn menu công khai.
-    const openLegacyArea = async section => page.evaluate(section => {
+    const openLegacyArea = async section => {
+      await page.waitForFunction(()=>document.querySelector('[data-testid="fixture"]')?.getAttribute('data-ready')==='true')
+      await page.evaluate(section => {
       const params = new URLSearchParams(window.location.search)
       params.set('section',section);params.delete('category')
       window.history.pushState(null,'',window.location.pathname+'?'+params.toString())
-    },section)
+      },section)
+    }
     await page.locator('[data-home-area="discover"]').waitFor();checks++
     assert.equal(await desktopMenu.getByRole('link').first().textContent(),'Khóa học');checks++
     assert.equal(await desktopMenu.getByRole('link',{name:'Khóa học',exact:true}).getAttribute('aria-current'),'page');checks++
