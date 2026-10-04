@@ -108,7 +108,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     if (res.success) {
       setVersions(res.versions || [])
       setShowVersions(true)
-    } else setMessage({ type: 'error', text: res.error || 'Không thể tải lịch sử phiên bản' })
+    } else setMessage({ type: 'error', text: ('error' in res ? res.error : undefined) || 'Không thể tải lịch sử phiên bản' })
   }
 
   const handleRestoreVersion = async (versionNumber: number) => {
