@@ -288,9 +288,17 @@ export async function applyStoredCoursePageTemplate(
     const result = await prisma.$transaction(async tx => {
       const existing = await tx.coursePage.findUnique({ where: { slug: courseSlug } })
 
-      // Applying a new template is a draft edit. If this is an older published
-      // page that predates published snapshots, preserve its current live state
-      // before replacing sections so the public page does not change early.
+      const latestVersion = existing
+        ? await tx.coursePageVersion.findFirst({
+            where: { coursePageId: existing.id },
+            orderBy: { versionNumber: 'desc' },
+            select: { versionNumber: true },
+          })
+        : null
+      let nextVersionNumber = (latestVersion?.versionNumber || 0) + 1
+
+      // Keep the previous live page in history when an older published page
+      // predates our published-snapshot mechanism.
       if (existing?.status === 'published') {
         const publishedVersion = await tx.coursePageVersion.findFirst({
           where: {
@@ -299,22 +307,16 @@ export async function applyStoredCoursePageTemplate(
           },
           select: { id: true },
         })
+
         if (!publishedVersion) {
-          const [currentSections, latestVersion] = await Promise.all([
-            tx.courseSection.findMany({
-              where: { coursePageId: existing.id },
-              orderBy: { sortOrder: 'asc' },
-            }),
-            tx.coursePageVersion.findFirst({
-              where: { coursePageId: existing.id },
-              orderBy: { versionNumber: 'desc' },
-              select: { versionNumber: true },
-            }),
-          ])
+          const currentSections = await tx.courseSection.findMany({
+            where: { coursePageId: existing.id },
+            orderBy: { sortOrder: 'asc' },
+          })
           await tx.coursePageVersion.create({
             data: {
               coursePageId: existing.id,
-              versionNumber: (latestVersion?.versionNumber || 0) + 1,
+              versionNumber: nextVersionNumber++,
               snapshot: {
                 name: existing.name,
                 seo: existing.seo,
@@ -344,12 +346,18 @@ export async function applyStoredCoursePageTemplate(
         templateKey: `custom:${template.id}`,
         storedTemplateId: template.id,
       }
+      const publishedAt = new Date()
 
+      // Choosing a template from the course list is an explicit "apply" action,
+      // matching the built-in template flow: the selected template becomes live.
+      // Later Builder edits remain protected by the published snapshot below.
       const page = existing
         ? await tx.coursePage.update({
             where: { id: existing.id },
             data: {
               name: courseName || snapshot.name || template.name,
+              status: 'published',
+              publishedAt,
               seo: seo as any,
               theme: snapshot.theme as any,
               navigation: snapshot.navigation as any,
@@ -361,7 +369,8 @@ export async function applyStoredCoursePageTemplate(
             data: {
               slug: courseSlug,
               name: courseName || snapshot.name || template.name,
-              status: 'draft',
+              status: 'published',
+              publishedAt,
               seo: seo as any,
               theme: snapshot.theme as any,
               navigation: snapshot.navigation as any,
@@ -383,6 +392,32 @@ export async function applyStoredCoursePageTemplate(
           visibility: section.visibility || 'all',
           content: section.content as any,
         })),
+      })
+
+      await tx.coursePageVersion.create({
+        data: {
+          coursePageId: page.id,
+          versionNumber: nextVersionNumber,
+          snapshot: {
+            name: page.name,
+            seo,
+            theme: snapshot.theme,
+            navigation: snapshot.navigation,
+            checkoutConfig: snapshot.checkoutConfig,
+            useTemplate: true,
+            sections: snapshot.sections.map(section => ({
+              sectionKey: section.sectionKey,
+              sectionType: section.sectionType,
+              variant: section.variant || null,
+              anchorId: section.anchorId || null,
+              enabled: section.enabled !== false,
+              sortOrder: section.sortOrder,
+              visibility: section.visibility || 'all',
+              content: section.content,
+            })),
+            kind: 'published',
+          } as any,
+        },
       })
 
       return page
