@@ -55,6 +55,25 @@ async function run() {
   const errorPage=await failed.render()
   assert.equal(find(errorPage,node=>node.type===Space),null);checks++
   assert.ok(find(errorPage,node=>node.props?.role==='alert'));checks++
+  const toolsSource = fs.readFileSync(path.join(__dirname, '../app/tools/page.tsx'), 'utf8')
+  const toolsCompiled = ts.transpileModule(toolsSource, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText
+  function Public() {}
+  async function toolsFixture(session, params) {
+    const exports={}
+    vm.runInNewContext(toolsCompiled,{exports,URLSearchParams,require(name){
+      if(name==='@/auth')return {auth:async()=>session}
+      if(name==='next/navigation')return {redirect:url=>{throw Error('REDIRECT:'+url)}}
+      if(name==='@/components/layout/MainHeader')return {__esModule:true,default:Header}
+      if(name==='@/components/tools/PublicTools')return {__esModule:true,default:Public}
+      return require(name)
+    }})
+    return exports.default({searchParams:Promise.resolve(params)})
+  }
+  const publicPage=await toolsFixture(null,{ref:'old'})
+  const loginHref=find(publicPage,node=>node.type===Public).props.loginHref
+  assert.equal(new URL(loginHref,'https://example.test').searchParams.get('callbackUrl'),'/tools?ref=old');checks++
+  await assert.rejects(toolsFixture({user:{id:0}},{tab:'account',logged_in:'true',ref:'old'}),error=>error.message==='REDIRECT:/my-space?ref=old&tab=tools');checks++
+  await assert.rejects(toolsFixture({user:{id:'7'}},{ref:['a','b']}),error=>error.message==='REDIRECT:/my-space?ref=a&ref=b&tab=tools');checks++
   console.log(JSON.stringify({result:'passed',checks,scope:'real server page, mocked database; session ownership, current role, completion and failure; no database writes'}))
 }
 run().catch(error=>{console.error(error);process.exitCode=1})

@@ -38,6 +38,11 @@ async function run() {
     copy('components/home/HomeOverview.tsx')
     copy('components/home/PersonalCourses.tsx')
     copy('components/home/PersonalSpace.tsx')
+    copy('components/tools/ToolShare.tsx')
+    copy('components/tools/PublicTools.tsx')
+    copy('app/tools/page.tsx')
+    write('components/layout/MainHeader.tsx',`export default function Header({title}:{title:string}){return <header>{title}</header>}`)
+    write('auth.ts',`import {cookies} from 'next/headers';export async function auth(){return (await cookies()).get('tools-session')?.value==='1'?{user:{id:'10'}}:null}`)
     copy('components/crm/MyRequests.tsx')
     copy('lib/crm/shared.ts')
     write('components/mbw/MbwDashboardContext.tsx', `'use client';export function useMbwDashboard(){return {open:()=>{window.__walletOpened=true}}}`)
@@ -160,7 +165,7 @@ async function run() {
     await openLegacyArea('tools')
     await page.locator('[data-home-area="tools"]').waitFor()
     assert.equal(await page.locator('#course-preview').count(),0);checks++
-    assert.equal(await page.locator('#ecosystem a[href="/tools"]').count(),1);checks++
+    assert.equal(await page.locator('#ecosystem a[href="/my-space?tab=tools"]').count(),1);checks++
     await mobileMenu.getByRole('link',{name:'Cộng đồng',exact:true}).click()
     await page.locator('#community').waitFor();checks++
     await page.setViewportSize({width:1440,height:1000})
@@ -383,6 +388,23 @@ async function run() {
     assert.deepEqual(await marketingTools.getByRole('link').allTextContents(),['CRM của tôi','Email Marketing']);checks++
     assert.equal(await page.getByRole('region',{name:'Hỗ trợ & cài đặt',exact:true}).count(),0);checks++
     assert.equal(await page.getByRole('region',{name:'Yêu thích',exact:true}).count(),0);checks++
+    assert.equal(await page.getByRole('link',{name:'Khám phá thêm công cụ →',exact:true}).count(),0);checks++
+    assert.equal(await marketingTools.getByRole('button',{name:/^Chia sẻ /}).count(),0);checks++
+    await context.grantPermissions(['clipboard-read','clipboard-write'])
+    await page.route('**/api/track/click?*',route=>route.fulfill({json:{ok:true}}))
+    await otherTools.getByRole('button',{name:'Chia sẻ Công cụ công khai',exact:true}).click()
+    const shareDialog=page.getByRole('dialog',{name:'Chia sẻ Công cụ công khai',exact:true})
+    await shareDialog.waitFor()
+    const personalShare=await shareDialog.getByRole('textbox',{name:'Liên kết chia sẻ'}).inputValue()
+    assert.equal(personalShare,base+'/tools/public?ref=10');checks++
+    await shareDialog.getByRole('button',{name:'Sao chép liên kết',exact:true}).click()
+    await shareDialog.getByText('Đã sao chép liên kết.',{exact:true}).waitFor();checks++
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),personalShare);checks++
+    await page.setViewportSize({width:360,height:780})
+    await noOverflow(page)
+    await page.keyboard.press('Escape')
+    assert.equal(await shareDialog.isVisible(),false);checks++
+    await page.setViewportSize({width:1440,height:1000})
     await otherTools.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).click()
     const favoriteTools=page.getByRole('region',{name:'Yêu thích',exact:true})
     await favoriteTools.waitFor()
@@ -426,6 +448,28 @@ async function run() {
     await page.goto(base+'/my-space?role=student')
     await page.getByRole('heading',{name:'Chào Học viên!',exact:true}).waitFor()
     assert.equal(await page.getByRole('region',{name:'Khu làm việc',exact:true}).count(),0);checks++
+    await noOverflow(page)
+    // Trang công cụ cũ: khách chỉ thấy tiện ích công khai; người đăng nhập chuyển về danh sách chính.
+    await page.goto(base+'/tools?ref=old')
+    await page.getByRole('link',{name:'YouTube Tools',exact:true}).waitFor()
+    assert.equal(await page.getByRole('link',{name:'CRM của tôi',exact:true}).count(),0);checks++
+    assert.equal(await page.getByRole('link',{name:'Quản trị hệ thống',exact:true}).count(),0);checks++
+    assert.equal(await page.getByRole('link',{name:'URL không an toàn',exact:true}).count(),0);checks++
+    const loginUrl=new URL(await page.getByRole('link',{name:'Đăng nhập để mở công cụ của tôi',exact:true}).getAttribute('href'),base)
+    assert.equal(loginUrl.searchParams.get('callbackUrl'),'/tools?ref=old');checks++
+    await page.getByRole('button',{name:'Chia sẻ YouTube Tools',exact:true}).click()
+    const guestDialog=page.getByRole('dialog',{name:'Chia sẻ YouTube Tools',exact:true})
+    assert.equal(await guestDialog.getByRole('textbox',{name:'Liên kết chia sẻ'}).inputValue(),base+'/tools/youtube-tools');checks++
+    await noOverflow(page)
+    await guestDialog.getByRole('button',{name:'Đóng chia sẻ',exact:true}).click()
+    await context.addCookies([{name:'tools-session',value:'1',url:base}])
+    await page.goto(base+'/tools?ref=old&logged_in=true&tab=account')
+    await page.getByRole('heading',{name:'Công cụ của tôi',exact:true}).waitFor()
+    const toolsUrl=new URL(page.url())
+    assert.equal(toolsUrl.pathname,'/my-space');checks++
+    assert.equal(toolsUrl.searchParams.get('tab'),'tools');checks++
+    assert.equal(toolsUrl.searchParams.get('ref'),'old');checks++
+    assert.equal(toolsUrl.searchParams.has('logged_in'),false);checks++
     await noOverflow(page)
     assert.deepEqual(errors,[]);checks++
     console.log(JSON.stringify({result:'passed',checks,scope:'real personal space + role menus + support + favorite tools + home areas + wrapped navigation/category tabs + catalog + Tailwind + Next.js; Back/reload/profile/ref preservation; teacher/student/guest/visibility; 1440/390/360px; payment cards and secondary slots stubbed; fixtures only'}))

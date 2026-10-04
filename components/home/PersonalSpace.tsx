@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { BookOpen, LayoutDashboard, Wrench, LifeBuoy, UserRound, Wallet, ArrowRight, Star, Bell, Users, Share2, Globe, Settings } from 'lucide-react'
 import PersonalCourses from './PersonalCourses'
+import ToolShare from '@/components/tools/ToolShare'
 import MyRequests from '@/components/crm/MyRequests'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 import type { CatalogCourse, CatalogEnrollment } from '@/lib/course-catalog'
@@ -169,13 +170,13 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {groupTools.map(tool => <article key={tool.id} className="flex min-w-0 items-center gap-2 rounded-xl border border-brk-outline p-3 transition-colors hover:bg-brk-background">
                   <Link href={safeHref(tool.url)!} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm font-semibold text-brk-on-surface"><span className="min-w-0 flex-1 break-words">{tool.name}</span><ArrowRight className="h-4 w-4 shrink-0 text-brk-primary" aria-hidden /></Link>
+                  {tool.roles.length === 0 && tool.id !== -2 && <ToolShare name={tool.name} url={tool.url} userId={user.id} />}
                   <button type="button" aria-label={`${favorites.includes(tool.id) ? 'Bỏ yêu thích' : 'Yêu thích'} ${tool.name}`} aria-pressed={favorites.includes(tool.id)} onClick={() => toggleFavorite(tool.id)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-brk-primary hover:bg-brk-background"><Star aria-hidden className={`h-5 w-5 ${favorites.includes(tool.id) ? 'fill-current' : ''}`} /></button>
                 </article>)}
               </div>
             </section>
           )) : <p className={`${card} text-sm text-brk-muted`}>Chưa có công cụ phù hợp với quyền của bạn.</p>}
           <p className="text-xs text-brk-muted">Công cụ yêu thích được lưu trên trình duyệt này.</p>
-          <Link href="/tools" className="inline-flex min-h-11 items-center text-sm text-brk-primary">Khám phá thêm công cụ →</Link>
         </div>}
         {tab === 'account' && <section className={card}><h2 className="text-lg font-semibold text-brk-on-surface">Hồ sơ & bảo mật</h2><p className="mt-2 text-sm text-brk-muted">Cập nhật hồ sơ, mật khẩu và tài khoản nhận thanh toán.</p><Link href="/account-settings" className={`mt-4 ${action}`}>Quản lý tài khoản</Link><div className="mt-5 border-t border-brk-outline pt-5"><h2 className="text-lg font-semibold text-brk-on-surface">Ví & quyền lợi</h2><p className="mt-2 text-sm text-brk-muted">Xem số dư, voucher và quyền lợi của bạn.</p><button type="button" onClick={openWallet} className={`mt-4 ${action}`}><Wallet className="h-4 w-4" aria-hidden />Mở ví & quyền lợi</button></div></section>}
       </div>
