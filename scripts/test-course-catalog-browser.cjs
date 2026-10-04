@@ -307,7 +307,7 @@ async function run() {
     assert.ok(await manyTabs.evaluate(el=>el.scrollWidth<=el.clientWidth+1));checks++
     assert.equal(await catalog.getByRole('heading',{name:'Khám phá khóa học',exact:true}).count(),1);checks++
     await page.route('**/api/notifications?page=1',route=>route.fulfill({json:{notifications:[{id:'1',title:'Giáo viên đã trả lời yêu cầu của bạn',href:'/my-requests?request=1',readAt:null},{id:'2',title:'Khóa học đã kích hoạt',href:'/khoa-hoc/KH1',readAt:'2026-10-01'}],unread:1,total:2}}))
-    await page.route('**/api/tools',route=>route.fulfill({json:{tools:[{id:1,name:'Công cụ công khai',url:'/tools/public',roles:[],isActive:true},{id:2,name:'CRM của tôi',url:'/tools/crm',roles:['TEACHER'],isActive:true},{id:3,name:'Quản trị hệ thống',url:'/tools/settings',roles:['ADMIN'],isActive:true},{id:4,name:'URL không an toàn',url:'javascript:alert(1)',roles:[],isActive:true}]}}))
+    await page.route('**/api/tools',route=>route.fulfill({json:{tools:[{id:1,name:'Công cụ công khai',url:'/tools/public',roles:[],isActive:true},{id:2,name:'CRM của tôi',url:'/tools/crm',roles:['TEACHER'],isActive:true},{id:3,name:'Quản trị hệ thống',url:'/tools/settings',roles:['ADMIN'],isActive:true},{id:4,name:'URL không an toàn',url:'javascript:alert(1)',roles:[],isActive:true},{id:5,slug:'affiliate',name:'Affiliate',url:'/tools/affiliate',roles:['TEACHER'],isActive:true},{id:6,slug:'students',name:'Thành viên',url:'/tools/students',roles:['TEACHER'],isActive:true},{id:7,slug:'genealogy',name:'Nhân mạch',url:'/tools/genealogy',roles:['TEACHER'],isActive:true},{id:8,slug:'youtube-tools',name:'YouTube Tools',url:'/tools/youtube-tools',roles:[],isActive:true},{id:9,slug:'email-mkt',name:'Email Marketing',url:'/tools/email-mkt',roles:['TEACHER'],isActive:true},{id:10,slug:'courses',name:'Khóa học',url:'/tools/courses',roles:['TEACHER'],isActive:true}]}}))
     await page.route('**/api/my-requests?*',route=>route.fulfill({json:{requests:[{id:'r1',content:'Tôi cần hỗ trợ bài học',publicReply:'Giáo viên đã phản hồi',category:'LEARNING',status:'RESOLVED',version:1,createdAt:'2026-10-01',updatedAt:'2026-10-02',lessonId:null,course:{name_lop:'Thiết kế website',id_khoa:'KH1'}}],total:1}}))
     await page.goto(base+'/my-space')
     await page.getByRole('heading',{name:'Chào Học viên!',exact:true}).waitFor()
@@ -324,11 +324,18 @@ async function run() {
     await page.getByRole('link',{name:'Công cụ công khai',exact:true}).waitFor()
     assert.equal(await page.getByRole('link',{name:'Quản trị hệ thống',exact:true}).count(),0);checks++
     assert.equal(await page.getByRole('link',{name:'URL không an toàn',exact:true}).count(),0);checks++
+    const trainingTools=page.getByRole('region',{name:'Đào tạo & khóa học',exact:true})
+    assert.equal(await trainingTools.getByRole('link',{name:'Khóa học của tôi',exact:true}).getAttribute('href'),'/my-space?tab=learning');checks++
+    assert.equal(await trainingTools.getByRole('link',{name:'Quản lý khóa học',exact:true}).getAttribute('href'),'/tools/courses');checks++
+    const memberTools=page.getByRole('region',{name:'Hệ thống & thành viên',exact:true})
+    assert.deepEqual(await memberTools.getByRole('link').allTextContents(),['Affiliate','Thành viên','Nhân mạch']);checks++
+    assert.deepEqual(await page.getByRole('region',{name:'Công cụ tiện ích',exact:true}).getByRole('link').allTextContents(),['YouTube Tools']);checks++
     const otherTools=page.getByRole('region',{name:'Công cụ khác',exact:true})
     assert.equal(await otherTools.getByRole('link',{name:'Công cụ công khai',exact:true}).count(),1);checks++
     const marketingTools=page.getByRole('region',{name:'Khách hàng & marketing',exact:true})
     assert.equal(await marketingTools.getByRole('link',{name:'CRM của tôi',exact:true}).getAttribute('href'),'/tools/crm');checks++
-    assert.equal(await page.getByRole('region',{name:'Hỗ trợ & hệ thống',exact:true}).count(),0);checks++
+    assert.deepEqual(await marketingTools.getByRole('link').allTextContents(),['CRM của tôi','Email Marketing']);checks++
+    assert.equal(await page.getByRole('region',{name:'Hỗ trợ & cài đặt',exact:true}).count(),0);checks++
     assert.equal(await page.getByRole('region',{name:'Yêu thích',exact:true}).count(),0);checks++
     await otherTools.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).click()
     const favoriteTools=page.getByRole('region',{name:'Yêu thích',exact:true})
@@ -345,6 +352,11 @@ async function run() {
     }
     await page.setViewportSize({width:1440,height:1000})
     assert.equal(await otherTools.locator('.grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);checks++
+    await trainingTools.getByRole('link',{name:'Khóa học của tôi',exact:true}).click()
+    await page.locator('#my-courses').waitFor();checks++
+    assert.equal(new URL(page.url()).searchParams.get('tab'),'learning');checks++
+    await page.goBack()
+    await favoriteTools.waitFor()
     await favoriteTools.getByRole('button',{name:'Bỏ yêu thích Công cụ công khai',exact:true}).click()
     assert.equal(await favoriteTools.count(),0);checks++
     assert.equal(await otherTools.getByRole('button',{name:'Yêu thích Công cụ công khai',exact:true}).getAttribute('aria-pressed'),'false');checks++

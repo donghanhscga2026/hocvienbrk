@@ -26,11 +26,13 @@ const tabs = [
 ]
 // Phân nhóm bằng mã công cụ, không phụ thuộc tên hiển thị do quản trị viên chỉnh sửa.
 const toolCategories = [
-  { id: 'training', label: 'Đào tạo & học viên', icon: BookOpen, slugs: ['courses', 'students', 'roadmap'] },
-  { id: 'marketing', label: 'Khách hàng & marketing', icon: Users, slugs: ['crm', 'affiliate', 'email-mkt', 'genealogy'] },
-  { id: 'content', label: 'Website & nội dung', icon: Globe, slugs: ['my-site', 'pages', 'page', 'site-profiles', 'landings', 'posts', 'youtube-tools'] },
+  { id: 'training', label: 'Đào tạo & khóa học', icon: BookOpen, slugs: ['my-learning', 'courses', 'roadmap'] },
+  { id: 'marketing', label: 'Khách hàng & marketing', icon: Users, slugs: ['crm', 'email-mkt'] },
+  { id: 'members', label: 'Hệ thống & thành viên', icon: Share2, slugs: ['affiliate', 'students', 'genealogy'] },
+  { id: 'content', label: 'Website & nội dung', icon: Globe, slugs: ['my-site', 'pages', 'page', 'site-profiles', 'landings', 'posts'] },
+  { id: 'utilities', label: 'Công cụ tiện ích', icon: Wrench, slugs: ['youtube-tools'] },
   { id: 'payments', label: 'Thanh toán & quyền lợi', icon: Wallet, slugs: ['payments', 'bank-accounts', 'vouchers', 'brk', 'reserved-ids'] },
-  { id: 'system', label: 'Hỗ trợ & hệ thống', icon: Settings, slugs: ['account-assistant', 'assistant-guide', 'ho-tro', 'settings', 'email-settings', 'backup', 'system-admin', 'tca-sync'] },
+  { id: 'system', label: 'Hỗ trợ & cài đặt', icon: Settings, slugs: ['account-assistant', 'assistant-guide', 'ho-tro', 'settings', 'email-settings', 'backup', 'system-admin', 'tca-sync'] },
   { id: 'other', label: 'Công cụ khác', icon: Wrench, slugs: [] },
 ]
 function toolCategory(tool: Tool) {
@@ -102,11 +104,16 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
     setFavorites(next)
     try { localStorage.setItem(favoriteKey, JSON.stringify(next)) } catch { /* Không chặn thao tác nếu trình duyệt khóa lưu trữ. */ }
   }
+  // Lối vào học tập luôn có cho người dùng; mã âm tách khỏi công cụ trong database.
+  const personalTools: Tool[] = [
+    { id: -2, slug: 'my-learning', name: 'Khóa học của tôi', url: '/my-space?tab=learning', roles: [], isActive: true },
+    ...tools.map(tool => tool.slug === 'courses' || tool.url.split(/[?#]/)[0] === '/tools/courses' ? { ...tool, name: 'Quản lý khóa học' } : tool),
+  ]
   // Công cụ yêu thích nằm ở đầu trang; nhóm chức năng vẫn giữ đủ công cụ.
-  const favoriteTools = tools.filter(tool => favorites.includes(tool.id))
+  const favoriteTools = personalTools.filter(tool => favorites.includes(tool.id))
   const toolGroups = [
     { id: 'favorites', label: 'Yêu thích', icon: Star, tools: favoriteTools },
-    ...toolCategories.map(category => ({ ...category, tools: tools.filter(tool => toolCategory(tool) === category.id) })),
+    ...toolCategories.map(category => ({ ...category, tools: personalTools.filter(tool => toolCategory(tool) === category.id) })),
   ].filter(group => group.tools.length > 0)
   const active = learning.filter(course => enrollments[course.id]?.status === 'ACTIVE')
   const pending = learning.filter(course => enrollments[course.id]?.status === 'PENDING')
@@ -152,7 +159,7 @@ export default function PersonalSpace({ user, learning, teaching, enrollments, c
         {tab === 'support' && <div className={card}><p className="mb-3 text-sm text-brk-muted">Gửi yêu cầu mới từ nút “Hỏi giáo viên” trong khóa học. Các yêu cầu của bạn được theo dõi ở đây.</p><MyRequests /></div>}
         {tab === 'tools' && <div className="space-y-5">
           <p className="text-sm text-brk-muted">Các công cụ bạn có quyền dùng, sắp xếp theo chức năng. Đánh dấu sao để truy cập nhanh ở mục Yêu thích.</p>
-          {toolsLoading ? <p role="status" className={card}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={card}>{toolsError}</p> : tools.length ? toolGroups.map(({ id, label, icon: Icon, tools: groupTools }) => (
+          {toolsLoading ? <p role="status" className={card}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={card}>{toolsError}</p> : personalTools.length ? toolGroups.map(({ id, label, icon: Icon, tools: groupTools }) => (
             <section key={id} aria-labelledby={`tool-group-${id}`} className={card}>
               <div className="mb-4 flex items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brk-background text-brk-primary"><Icon className="h-5 w-5" aria-hidden /></span>
