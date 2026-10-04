@@ -139,7 +139,7 @@ function CoursesTab() {
     const handleApplyTemplate = async (course: any, page: any, templateKey: CourseTemplateKey) => {
         const template = COURSE_TEMPLATE_LIBRARY.find(t => t.key === templateKey)
         if (!template) return
-        if (page?.sections?.length && !confirm(`Áp dụng mẫu "${template.name}" sẽ thay thế bố cục trang hiện tại của khóa học này. Tiếp tục?`)) return
+        if (page && !confirm(`Áp dụng mẫu "${template.name}" sẽ thay thế bố cục trang hiện tại của khóa học này. Nội dung của các khóa học khác không bị ảnh hưởng. Tiếp tục?`)) return
         setBatchLoading(true)
         try {
             const res = await applyCoursePageTemplate(course.id_khoa, course.name_lop || course.id_khoa, templateKey)
