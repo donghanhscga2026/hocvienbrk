@@ -181,16 +181,11 @@ export async function saveCourseSections(
       return { success: false, error: 'Không tìm thấy trang khóa học' };
     }
 
-    // Delete existing sections to override them, or do upsert.
-    // Overriding is simpler for bulk save.
-    await prisma.courseSection.deleteMany({
-      where: { coursePageId }
-    });
-
-    // Create many
-    const createdSections = await Promise.all(
-      sections.map((sec) =>
-        prisma.courseSection.create({
+    const createdSections = await prisma.$transaction(async (tx) => {
+      await tx.courseSection.deleteMany({ where: { coursePageId } })
+      const created = []
+      for (const sec of sections) {
+        created.push(await tx.courseSection.create({
           data: {
             id: sec.id,
             coursePageId,
@@ -203,9 +198,10 @@ export async function saveCourseSections(
             visibility: sec.visibility || 'all',
             content: sec.content || {}
           }
-        })
-      )
-    );
+        }))
+      }
+      return created
+    });
 
     revalidatePath(`/khoa-hoc/${page.slug}`);
     return { success: true, sections: createdSections };
@@ -280,19 +276,21 @@ export async function applyCoursePageTemplate(slug: string, courseName: string, 
           },
         })
 
-    await prisma.courseSection.deleteMany({ where: { coursePageId: page.id } })
-    await prisma.courseSection.createMany({
-      data: preset.sections.map((section: any) => ({
-        coursePageId: page.id,
-        sectionKey: section.sectionKey,
-        sectionType: section.type,
-        variant: section.variant || null,
-        anchorId: section.anchorId || null,
-        enabled: section.enabled !== false,
-        sortOrder: section.sortOrder,
-        visibility: section.visibility || 'all',
-        content: section.content || {},
-      })),
+    await prisma.$transaction(async (tx) => {
+      await tx.courseSection.deleteMany({ where: { coursePageId: page.id } })
+      await tx.courseSection.createMany({
+        data: preset.sections.map((section: any) => ({
+          coursePageId: page.id,
+          sectionKey: section.sectionKey,
+          sectionType: section.type,
+          variant: section.variant || null,
+          anchorId: section.anchorId || null,
+          enabled: section.enabled !== false,
+          sortOrder: section.sortOrder,
+          visibility: section.visibility || 'all',
+          content: section.content || {},
+        })),
+      })
     })
 
     revalidatePath(`/khoa-hoc/${slug}`)
