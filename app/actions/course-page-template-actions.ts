@@ -3,7 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/api-auth'
-import { resolveImageUrl } from '@/lib/image-utils'
+import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
 import {
   ImportedSectionCandidate,
   StoredTemplateSnapshot,
@@ -23,50 +23,6 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'website-template'
-}
-
-function replaceStrings(value: unknown, replacements: Map<string, string>): unknown {
-  if (typeof value === 'string') return replacements.get(value) || value
-  if (Array.isArray(value)) return value.map(item => replaceStrings(item, replacements))
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-        key,
-        replaceStrings(item, replacements),
-      ]),
-    )
-  }
-  return value
-}
-
-async function mirrorSelectedImages(
-  analysis: WebsiteTemplateAnalysis,
-  selectedSectionIds: string[],
-): Promise<WebsiteTemplateAnalysis> {
-  const selected = new Set(selectedSectionIds)
-  const urls = Array.from(new Set(
-    analysis.sections
-      .filter(section => selected.has(section.id))
-      .flatMap(section => section.images || [])
-      .map(image => image.src)
-      .filter(src => /^(?:https?:\/\/|data:image\/)/i.test(src)),
-  )).slice(0, 50)
-
-  if (!urls.length) return jsonSafe(analysis)
-
-  const replacements = new Map<string, string>()
-  for (let i = 0; i < urls.length; i += 4) {
-    const batch = urls.slice(i, i + 4)
-    const resolved = await Promise.all(
-      batch.map(url => resolveImageUrl(url, 'course-templates')),
-    )
-    batch.forEach((url, index) => {
-      const stored = resolved[index]
-      if (stored) replacements.set(url, stored)
-    })
-  }
-
-  return replaceStrings(jsonSafe(analysis), replacements) as WebsiteTemplateAnalysis
 }
 
 function mapImportedSection(section: ImportedSectionCandidate, sortOrder: number) {
@@ -232,7 +188,9 @@ export async function createStoredCoursePageTemplate(input: {
     // Mirror external/base64 images into our own storage before persisting the template.
     // If a remote image cannot be downloaded, resolveImageUrl safely keeps the
     // original URL so template creation is not blocked.
-    const storedAnalysis = await mirrorSelectedImages(input.analysis, input.selectedSectionIds)
+    const storedAnalysis = await mirrorAnalysisImages(input.analysis, {
+      sectionIds: input.selectedSectionIds,
+    })
     const snapshot = buildSnapshot(name, storedAnalysis, input.selectedSectionIds)
     const key = `custom-${slugify(name)}-${Date.now().toString(36)}`
     const firstImage = storedAnalysis.sections
