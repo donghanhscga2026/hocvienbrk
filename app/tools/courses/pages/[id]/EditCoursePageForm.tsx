@@ -227,6 +227,30 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     </div>)}
   </div>
 
+  const curriculumEditor = (index:number) => <div className="space-y-3">
+    <div>
+      <label className="block text-xs font-bold text-gray-600 mb-1">Tổng thời lượng (giờ)</label>
+      <input type="number" min="0" step="0.5" value={sections[index]?.content?.totalHours ?? 0} onChange={e=>updateContent(index,'totalHours',Number(e.target.value))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"/>
+    </div>
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Danh sách bài học</label><button type="button" onClick={()=>addNestedItem(index,'lessons',{title:''})} className="text-xs font-bold text-purple-700">+ Thêm bài học</button></div>
+    {(sections[index]?.content?.lessons || []).map((lesson:any,i:number)=><div key={lesson.id||i} className="rounded-xl border bg-gray-50 p-3">
+      <div className="flex gap-2"><input value={lesson.title||''} onChange={e=>updateNestedItem(index,'lessons',i,{title:e.target.value})} placeholder={`Tên bài học ${i+1}`} className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'lessons',i)} className="p-2 text-red-500" title="Xóa bài học"><Trash2 className="w-4 h-4"/></button></div>
+    </div>)}
+    {!(sections[index]?.content?.lessons || []).length && <button type="button" onClick={()=>addNestedItem(index,'lessons',{title:''})} className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-xs font-bold text-gray-500">+ Thêm bài học đầu tiên</button>}
+  </div>
+
+  const testimonialsEditor = (index:number) => <div className="space-y-3">
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Cảm nhận học viên</label><button type="button" onClick={()=>addNestedItem(index,'testimonials',{name:'',role:'',avatar:'',content:'',rating:5})} className="text-xs font-bold text-purple-700">+ Thêm cảm nhận</button></div>
+    {(sections[index]?.content?.testimonials || []).map((testimonial:any,i:number)=><div key={testimonial.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
+      <div className="flex gap-2"><input value={testimonial.name||''} onChange={e=>updateNestedItem(index,'testimonials',i,{name:e.target.value})} placeholder="Tên học viên" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'testimonials',i)} className="p-2 text-red-500" title="Xóa cảm nhận"><Trash2 className="w-4 h-4"/></button></div>
+      <input value={testimonial.role||''} onChange={e=>updateNestedItem(index,'testimonials',i,{role:e.target.value})} placeholder="Vai trò / nghề nghiệp (không bắt buộc)" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      <input value={testimonial.avatar||''} onChange={e=>updateNestedItem(index,'testimonials',i,{avatar:e.target.value})} placeholder="Link ảnh đại diện (không bắt buộc)" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      <textarea value={testimonial.content||''} onChange={e=>updateNestedItem(index,'testimonials',i,{content:e.target.value})} placeholder="Nội dung cảm nhận" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-20"/>
+      <div><label className="block text-xs font-bold text-gray-600 mb-1">Số sao</label><select value={testimonial.rating??5} onChange={e=>updateNestedItem(index,'testimonials',i,{rating:Number(e.target.value)})} className="w-full rounded-lg border px-3 py-2 text-sm bg-white">{[5,4,3,2,1].map(star=><option key={star} value={star}>{star} sao</option>)}</select></div>
+    </div>)}
+    {!(sections[index]?.content?.testimonials || []).length && <button type="button" onClick={()=>addNestedItem(index,'testimonials',{name:'',role:'',avatar:'',content:'',rating:5})} className="w-full rounded-xl border border-dashed border-gray-300 p-3 text-xs font-bold text-gray-500">+ Thêm cảm nhận đầu tiên</button>}
+  </div>
+
   const pricingEditor = (index:number) => <div className="space-y-3">
     <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Gói giá</label><button type="button" onClick={()=>addNestedItem(index,'plans',{name:'Gói mới',price:0,currency:'VND',ctaText:'Đăng ký ngay',features:[]})} className="text-xs font-bold text-purple-700">+ Thêm gói</button></div>
     {(sections[index]?.content?.plans || []).map((plan:any,i:number)=><div key={plan.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
@@ -261,6 +285,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     if (sec.sectionType === 'roadmap') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'phases','Các chặng / giai đoạn')}</div>
     if (sec.sectionType === 'instructor') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{instructorsEditor(index)}</div>
     if (sec.sectionType === 'pricing') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{pricingEditor(index)}{field(index,'paymentNote','Ghi chú thanh toán',true)}</div>
+    if (sec.sectionType === 'curriculum') return <div className="grid gap-3">{curriculumEditor(index)}</div>
+    if (sec.sectionType === 'testimonials') return <div className="grid gap-3">{testimonialsEditor(index)}</div>
     if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{imageUrlField(index,'imageUrl','Ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút chính</label><input value={sec.content?.primaryCta?.label||''} onChange={e=>updateNestedContent(index,'primaryCta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></div></div>
     if (sec.sectionType === 'benefits' || sec.sectionType === 'outcomes' || sec.sectionType === 'pain_points') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'items','Các mục nội dung')}</div>
     return common
@@ -460,7 +486,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 <span className="text-xs font-bold text-gray-500 self-center">+ Thêm:</span>
-            {['hero','rich_content','benefits','instructor','testimonials','pricing','closing_message'].map(type => (
+            {['hero','rich_content','benefits','instructor','curriculum','testimonials','pricing','closing_message'].map(type => (
               <button key={type} onClick={() => handleAddSection(type)} className="rounded-xl bg-gray-100 hover:bg-purple-50 px-3 py-2 text-xs font-bold text-gray-700">
                 <Plus className="inline w-3 h-3 mr-1" />{sectionName(type)}
               </button>
