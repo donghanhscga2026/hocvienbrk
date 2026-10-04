@@ -7,7 +7,7 @@ import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, Chec
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCoursePages, updateCoursePage, createCoursePage, applyCoursePageTemplate } from '@/app/actions/course-page-actions'
-import { applyStoredCoursePageTemplate, getStoredCoursePageTemplates } from '@/app/actions/course-page-template-actions'
+import { applyStoredCoursePageTemplate, getStoredCoursePageTemplateOptions } from '@/app/actions/course-page-template-actions'
 import { COURSE_TEMPLATE_LIBRARY, CourseTemplateKey } from '@/lib/course-page/templates'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
@@ -104,7 +104,7 @@ function CoursesTab() {
 
     useEffect(() => {
         getCoursePages().then(setCoursePages)
-        getStoredCoursePageTemplates().then(res => {
+        getStoredCoursePageTemplateOptions().then(res => {
             if (res.success) setStoredTemplates(res.templates || [])
         }).catch(() => {})
         fetch('/api/vouchers').then(r => r.json()).then(data => setAllVouchers(data.vouchers || [])).catch(() => {})
