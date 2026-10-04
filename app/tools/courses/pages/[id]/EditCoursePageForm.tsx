@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
 import { updateCoursePage, saveCourseSections } from '@/app/actions/course-page-actions'
 
 interface EditCoursePageFormProps {
@@ -26,6 +26,9 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
   const [activeTab, setActiveTab] = useState<'info' | 'theme' | 'sections'>('sections')
   const [expandedSection, setExpandedSection] = useState<number | null>(0)
   const [advanced, setAdvanced] = useState(false)
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('mobile')
+  const [previewKey, setPreviewKey] = useState(0)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
   
   // Page state
   const [name, setName] = useState(initialPage.name)
@@ -94,6 +97,15 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     // Update sort order
     const updated = newSecs.map((sec, i) => ({ ...sec, sortOrder: i + 1 }))
     setSections(updated)
+  }
+
+  const reorderSections = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= sections.length || to >= sections.length) return
+    const next = [...sections]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setSections(next.map((sec, i) => ({ ...sec, sortOrder: i + 1 })))
+    setExpandedSection(to)
   }
 
   const handleMoveSection = (index: number, direction: 'up' | 'down') => {
@@ -347,21 +359,23 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
             </a>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <span className="text-xs font-bold text-gray-500 self-center">+ Thêm:</span>
+          <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(360px,46%)] gap-4 items-start">
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-bold text-gray-500 self-center">+ Thêm:</span>
             {['hero','rich_content','benefits','instructor','testimonials','pricing','closing_message'].map(type => (
               <button key={type} onClick={() => handleAddSection(type)} className="rounded-xl bg-gray-100 hover:bg-purple-50 px-3 py-2 text-xs font-bold text-gray-700">
                 <Plus className="inline w-3 h-3 mr-1" />{sectionName(type)}
               </button>
             ))}
-          </div>
+              </div>
 
-          <div className="space-y-3">
-            {sections.map((sec,index) => {
+              <div className="space-y-3">
+                {sections.map((sec,index) => {
               const open=expandedSection===index
-              return <div key={sec.sectionKey} className={`rounded-2xl border bg-white overflow-hidden ${open?'border-purple-300 shadow-sm':'border-gray-200'}`}>
+              return <div key={sec.sectionKey} draggable onDragStart={() => setDragIndex(index)} onDragOver={e => e.preventDefault()} onDrop={() => { if (dragIndex !== null) reorderSections(dragIndex,index); setDragIndex(null) }} onDragEnd={() => setDragIndex(null)} className={`rounded-2xl border bg-white overflow-hidden transition-opacity ${dragIndex===index?'opacity-50':''} ${open?'border-purple-300 shadow-sm':'border-gray-200'}`}>
                 <button type="button" onClick={() => setExpandedSection(open?null:index)} className="w-full p-4 flex items-center gap-3 text-left">
-                  <span className="w-7 h-7 rounded-full bg-gray-900 text-yellow-400 flex items-center justify-center text-xs font-black">{index+1}</span>
+                  <GripVertical className="w-4 h-4 text-gray-300 shrink-0" /><span className="w-7 h-7 rounded-full bg-gray-900 text-yellow-400 flex items-center justify-center text-xs font-black">{index+1}</span>
                   <div className="flex-1 min-w-0">
                     <div className="font-black text-sm text-gray-900">{sectionName(sec.sectionType)}</div>
                     <div className="text-xs text-gray-400 truncate">{sec.content?.title || sec.content?.description || 'Bấm để thêm nội dung'}</div>
@@ -386,7 +400,22 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                   </div>}
                 </div>}
               </div>
-            })}
+                })}
+              </div>
+            </div>
+
+            <aside className="xl:sticky xl:top-4 rounded-2xl border border-gray-200 bg-gray-100 p-3">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="font-black text-xs text-gray-700 flex-1">XEM TRƯỚC TRANG ĐANG XUẤT BẢN</div>
+                <button type="button" onClick={() => setPreviewMode('mobile')} className={`p-2 rounded-lg ${previewMode==='mobile'?'bg-black text-yellow-400':'bg-white text-gray-500'}`} title="Điện thoại"><Smartphone className="w-4 h-4"/></button>
+                <button type="button" onClick={() => setPreviewMode('desktop')} className={`p-2 rounded-lg ${previewMode==='desktop'?'bg-black text-yellow-400':'bg-white text-gray-500'}`} title="Máy tính"><Monitor className="w-4 h-4"/></button>
+                <button type="button" onClick={() => setPreviewKey(k=>k+1)} className="p-2 rounded-lg bg-white text-gray-500" title="Tải lại"><RefreshCw className="w-4 h-4"/></button>
+              </div>
+              <div className="overflow-auto rounded-xl bg-gray-300 p-2 min-h-[650px] flex justify-center">
+                <iframe key={previewKey} title="Xem trước salespage" src={`/khoa-hoc/${initialPage.slug}`} className="bg-white rounded-lg border-0 shadow-sm transition-all duration-300" style={{width: previewMode==='mobile'?390:'100%', height:720}} />
+              </div>
+              <p className="mt-2 text-[10px] leading-4 text-gray-500">Preview hiển thị bản đang xuất bản. Sau khi lưu thay đổi, bấm ↻ để kiểm tra bản mới.</p>
+            </aside>
           </div>
         </div>
       )}
