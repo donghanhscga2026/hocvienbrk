@@ -64,7 +64,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         const secRes = await saveCourseSections(initialPage.id, sections)
         if (secRes.success) {
           setMessage({ type: 'success', text: 'Đã lưu cấu hình trang thành công!' })
-          router.push('/tools/courses')
+          setPreviewKey(k => k + 1)
+          router.refresh()
         } else {
           setMessage({ type: 'error', text: secRes.error || 'Lỗi khi lưu các phần giao diện' })
         }
@@ -89,6 +90,7 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       content: {}
     }
     setSections([...sections, newSec])
+    setExpandedSection(sections.length)
   }
 
   const handleDeleteSection = (index: number) => {
