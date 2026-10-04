@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
           method: 'POST',
           body: JSON.stringify({ title: issue.title.replace(/^\[MFC Dev\]\s*/, ''), head: meta.branch, base: 'master', body: `Tạo tự động bởi MFC Dev Flow.\n\nTheo dõi: #${issueNumber}` }),
         })
-        pr = { number: created.number, url: created.html_url, state: created.state, merged: false }
+        pr = { number: created.number, url: created.html_url, state: created.state, merged: false, mergeable: created.mergeable ?? null }
         await comment(issueNumber, `🔀 Phát hiện code mới và tự tạo Pull Request #${created.number}.`)
       }
       const refreshed = await snapshot(issue, meta)
