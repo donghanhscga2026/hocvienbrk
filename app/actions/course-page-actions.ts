@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { CourseStatus, CourseSection, SectionVisibility } from '@/lib/course-page/types'
 import { requireAdminAction } from '@/lib/api-auth'
+import { createCoursePageFromTemplate, CourseTemplateKey } from '@/lib/course-page/templates'
 
 export async function getCoursePages() {
   try {
@@ -238,5 +239,68 @@ export async function deleteCoursePage(id: string) {
   } catch (error: any) {
     console.error('[CoursePage] Delete error:', error);
     return { success: false, error: error.message || 'Lỗi khi xóa trang khóa học' };
+  }
+}
+
+
+export async function applyCoursePageTemplate(slug: string, courseName: string, templateKey: CourseTemplateKey) {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
+  try {
+    const preset = createCoursePageFromTemplate(templateKey, slug)
+    const existing = await prisma.coursePage.findUnique({ where: { slug } })
+
+    const seo = { ...(preset.seo as any), templateKey }
+    const page = existing
+      ? await prisma.coursePage.update({
+          where: { id: existing.id },
+          data: {
+            name: courseName || preset.name,
+            status: 'published',
+            seo,
+            theme: preset.theme as any,
+            navigation: preset.navigation as any,
+            checkoutConfig: preset.checkoutConfig as any,
+            useTemplate: true,
+            publishedAt: new Date(),
+          },
+        })
+      : await prisma.coursePage.create({
+          data: {
+            slug,
+            name: courseName || preset.name,
+            status: 'published',
+            seo,
+            theme: preset.theme as any,
+            navigation: preset.navigation as any,
+            checkoutConfig: preset.checkoutConfig as any,
+            useTemplate: true,
+            publishedAt: new Date(),
+          },
+        })
+
+    await prisma.courseSection.deleteMany({ where: { coursePageId: page.id } })
+    await prisma.courseSection.createMany({
+      data: preset.sections.map((section: any) => ({
+        coursePageId: page.id,
+        sectionKey: section.sectionKey,
+        sectionType: section.type,
+        variant: section.variant || null,
+        anchorId: section.anchorId || null,
+        enabled: section.enabled !== false,
+        sortOrder: section.sortOrder,
+        visibility: section.visibility || 'all',
+        content: section.content || {},
+      })),
+    })
+
+    revalidatePath(`/khoa-hoc/${slug}`)
+    revalidatePath('/tools/courses')
+    revalidatePath('/tools/pages')
+    return { success: true, page: { ...page, seo } }
+  } catch (error: any) {
+    console.error('[CoursePage] Apply template error:', error)
+    return { success: false, error: error.message || 'Lỗi khi áp dụng mẫu giao diện' }
   }
 }

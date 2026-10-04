@@ -308,9 +308,12 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
       {activeTab === 'sections' && (
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 items-center justify-between mb-2">
-            <h3 className="font-bold text-sm text-gray-800">Cấu trúc các khối giao diện</h3>
+            <div>
+              <h3 className="font-bold text-sm text-gray-800">Cấu trúc các khối giao diện</h3>
+              <p className="text-[11px] text-gray-500 mt-1">Đây là bản nội dung riêng của trang <b>{initialPage.slug}</b>. Chỉnh sửa ở đây không thay đổi mẫu gốc hoặc các khóa học khác.</p>
+            </div>
             <div className="flex flex-wrap gap-1.5">
-              {['hero', 'quote', 'pain_points', 'benefits', 'pricing', 'curriculum', 'testimonials'].map((type) => (
+              {['hero', 'quote', 'pain_points', 'benefits', 'outcomes', 'instructor', 'rich_content', 'wigrow_artwork', 'roadmap', 'pricing', 'curriculum', 'testimonials', 'closing_message'].map((type) => (
                 <button
                   key={type}
                   onClick={() => handleAddSection(type)}
