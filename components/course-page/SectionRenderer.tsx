@@ -78,9 +78,18 @@ export default function SectionRenderer({
     <>
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
-        const Component = section.variant === 'imported-v1'
-          ? ImportedSection
-          : sectionRegistry[type as CourseSectionType]
+        if (section.variant === 'imported-v1') {
+          return (
+            <ImportedSection
+              key={section.id}
+              id={section.anchorId || section.sectionKey}
+              content={section.content}
+              onAction={onAction}
+            />
+          )
+        }
+
+        const Component = sectionRegistry[type as CourseSectionType]
         if (!Component) {
           console.warn(`Unsupported course section type: ${type}`)
           return null
