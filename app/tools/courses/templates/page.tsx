@@ -56,6 +56,7 @@ const SECTION_NAMES: Record<string, string> = {
   registration: 'Form đăng ký',
   closing_message: 'Lời kết',
   footer: 'Footer',
+  sticky_cta: 'Thanh hành động cố định',
   rich_content: 'Nội dung',
 }
 
