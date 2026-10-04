@@ -1,0 +1,2177 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                           Int                   @id @default(autoincrement())
+  name                         String?
+  email                        String                @unique
+  emailVerified                DateTime?
+  image                        String?
+  password                     String?
+  phone                        String?               @unique
+  role                         Role                  @default(STUDENT)
+  referrerId                   Int?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+  passwordChanged              Boolean               @default(false)
+  mfaEnabled                   Boolean               @default(false)
+  mfaSecret                    String?
+  affiliateCode                String?               @unique
+  telegramChatId               BigInt?
+  telegramConnectedAt          DateTime?
+  telegramUserId               BigInt?
+  telegramUsername             String?
+  accounts                     Account[]
+  commissions                  AffiliateCommission[]
+  affiliateLinks               AffiliateLink[]
+  affiliatePayouts             AffiliatePayout[]
+  affiliateRefs                AffiliateRef[]
+  wallet                       AffiliateWallet?
+  courses                      Course[]
+  emailCampaigns               EmailCampaign[]       @relation("UserToEmailCampaign")
+  emailLogs                    EmailLog[]
+  enrollmentReferrals          Enrollment[]          @relation("EnrollmentReferrer")
+  enrollments                  Enrollment[]          @relation("StudentEnrollment")
+  lessonComments               LessonComment[]       @relation("UserToLessonComment")
+  posts                        Post[]                @relation("UserToPost")
+  postComments                 PostComment[]         @relation("UserToPostComment")
+  registrationPointsAsReferee  RegistrationPoint[]   @relation("RefereeRegistration")
+  registrationPointsAsReferrer RegistrationPoint[]   @relation("ReferrerRegistration")
+  sessions                     Session[]
+  siteProfile                  SiteProfile?
+  profileMemberships           SiteProfileMember[]
+  referrer                     User?                 @relation("ReferrerToReferee", fields: [referrerId], references: [id])
+  referrals                    User[]                @relation("ReferrerToReferee")
+  bankAccounts                 UserBankAccount[]
+  roadmap                      UserRoadmap?
+  brkTimelineRecords           BrkTimelineRecord[]
+  brkWallet                    BrkWallet?
+  systems                      System[]
+  brkSystemsCreated            SystemTree[]
+  tcaMembers                   TCAMember[]
+  closureAsAncestor            UserClosure[]         @relation("ClosureAncestor")
+  closureAsDescendant          UserClosure[]         @relation("ClosureDescendant")
+  userVouchers                 UserVoucher[]
+  appNotifications             AppNotification[]
+  pushSubscriptions            WebPushSubscription[]
+  crmContacts                  CrmContact[]
+  crmIdentityContact           CrmContact? @relation("CrmIdentity")
+  crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
+
+  @@index([email])
+  @@index([phone])
+  @@index([referrerId])
+  @@index([affiliateCode])
+}
+
+model UserClosure {
+  ancestorId   Int  @map("ancestor_id")
+  descendantId Int  @map("descendant_id")
+  depth        Int  @default(0)
+  ancestor     User @relation("ClosureAncestor", fields: [ancestorId], references: [id])
+  descendant   User @relation("ClosureDescendant", fields: [descendantId], references: [id])
+
+  @@id([ancestorId, descendantId])
+  @@index([ancestorId])
+  @@index([descendantId])
+  @@index([depth])
+  @@map("user_closure")
+}
+
+model EmailSender {
+  id               Int                   @id @default(autoincrement())
+  label            String
+  email            String
+  isMain           Boolean               @default(false)
+  provider         String                @default("gmail")
+  clientId         String?
+  clientSecret     String?
+  refreshToken     String?
+  apiKeyEncrypted  String?
+  apiKeyEnvVar     String?
+  senderName       String?
+  dailyLimit       Int                   @default(480)
+  sentToday        Int                   @default(0)
+  lastResetAt      DateTime              @default(now())
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  cooldownUntil    DateTime?
+  lastUsedAt       DateTime?
+  maxPerBatch      Int                   @default(20)
+  pauseDurationMax Int                   @default(30)
+  pauseDurationMin Int                   @default(10)
+  staggerDelayMax  Int                   @default(15)
+  staggerDelayMin  Int                   @default(5)
+  warmupPhase      Int                   @default(0)
+  campaigns        EmailCampaignSender[]
+  senderLogs       EmailSenderLog[]
+}
+
+model EmailCampaign {
+  crmReceipt       CrmCampaignReceipt?
+  id               Int                   @id @default(autoincrement())
+  title            String
+  status           CampaignStatus        @default(DRAFT)
+  notificationType String
+  linkedEntityId   String?
+  recipientSource  String
+  recipientFilter  Json?
+  recipientCsvData String?
+  subject          String
+  htmlContent      String
+  totalRecipients  Int                   @default(0)
+  sentCount        Int                   @default(0)
+  failedCount      Int                   @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  createdBy        Int
+  creator          User                  @relation("UserToEmailCampaign", fields: [createdBy], references: [id])
+  logs             EmailCampaignLog[]
+  senders          EmailCampaignSender[]
+}
+
+model EmailCampaignSender {
+  id            Int           @id @default(autoincrement())
+  campaignId    Int
+  senderId      Int
+  assignedCount Int           @default(0)
+  sentCount     Int           @default(0)
+  campaign      EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sender        EmailSender   @relation(fields: [senderId], references: [id])
+}
+
+model EmailCampaignLog {
+  id         Int           @id @default(autoincrement())
+  campaignId Int
+  senderId   Int?
+  toEmail    String
+  status     String
+  errorCode  String?
+  errorType  String?
+  sentAt     DateTime      @default(now())
+  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model EmailLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  email     String
+  type      String
+  provider  String
+  status    String
+  messageId String?
+  error     String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model EmailSenderLog {
+  id              Int         @id @default(autoincrement())
+  senderId        Int
+  date            DateTime    @default(now())
+  sentCount       Int         @default(0)
+  failedCount     Int         @default(0)
+  bounceCount     Int         @default(0)
+  cooldownCount   Int         @default(0)
+  cooldownMinutes Int         @default(0)
+  sender          EmailSender @relation(fields: [senderId], references: [id])
+
+  @@unique([senderId, date])
+}
+
+model EmailBlacklist {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  reason     String
+  campaignId Int?
+  createdAt  DateTime @default(now())
+}
+
+model UserRoadmap {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  targetPointId Int      @default(1)
+  customPath    Json?
+  goal          Json?
+  surveyResults Json?
+  updatedAt     DateTime @updatedAt
+  history       Json?
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model RoadmapPoint {
+  id        Int      @id @default(autoincrement())
+  pointId   Int      @unique
+  name      String
+  courseIds String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id         String        @id @default(cuid())
+  title      String
+  content    String
+  image      String?
+  published  Boolean       @default(true)
+  pin        Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  authorId   Int
+  categoryId Int?
+  author     User          @relation("UserToPost", fields: [authorId], references: [id], onDelete: Cascade)
+  category   PostCategory? @relation(fields: [categoryId], references: [id])
+  comments   PostComment[]
+
+  @@index([authorId])
+  @@index([categoryId])
+}
+
+model PostComment {
+  id        Int      @id @default(autoincrement())
+  postId    String
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserToPostComment", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+}
+
+model PostCategory {
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String?  @unique
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  posts       Post[]
+
+  @@index([order])
+}
+
+model Account {
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model PasswordReset {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model SystemConfig {
+  key   String @id
+  value Json
+}
+
+model Survey {
+  id          Int          @id @default(autoincrement())
+  name        String
+  description String?
+  flow        Json
+  isActive    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  profileId   Int?
+  profile     SiteProfile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model ReservedId {
+  id        Int      @id
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model CourseCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  order     Int      @default(0)
+  color     String   @default("#6366f1")
+  icon      String?
+  createdAt DateTime @default(now())
+  courses   Course[]
+}
+
+model Course {
+  crmRequests CrmRequest[]
+  crmOpportunities CrmOpportunity[]
+  id                          Int                     @id @default(autoincrement())
+  id_khoa                     String                  @unique
+  name_lop                    String
+  name_khoa                   String?
+  date_join                   String?
+  status                      Boolean                 @default(true)
+  mo_ta_ngan                  String?
+  mo_ta_dai                   String?
+  link_anh_bia                String?                 @map("link_anh_bia_khoa")
+  link_zalo                   String?
+  phi_coc                     Int                     @default(0)
+  noidung_stk                 String?
+  file_email                  String?
+  noidung_email               String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  type                        CourseType              @default(NORMAL)
+  pin                         Int                     @default(0)
+  category                    String                  @default("Khác")
+  teacherId                   Int?
+  categoryId                  Int?
+  teacherBankAccountId        Int?
+  vipExempt                   Boolean                 @default(false)
+  feeType                     FeeType                 @default(MIEN_PHI)
+  voucherConfig               String                  @default("WALLET")
+  allowMbvDeduction           Boolean                 @default(true)
+  requiresReferralActivation  Boolean                 @default(false)
+  referralActivationThreshold Int                     @default(0)
+  memberLabels                Json                    @default("{}")
+  courseCategory              CourseCategory?         @relation(fields: [categoryId], references: [id])
+  teacherBankAccount          UserBankAccount?        @relation("CourseTeacherBank", fields: [teacherBankAccountId], references: [id])
+  teacher                     User?                   @relation(fields: [teacherId], references: [id])
+  libAccesses                 CourseLibAccess[]
+  testimonials                CourseTestimonial[]
+  enrollments                 Enrollment[]
+  landingPages                LandingPage[]
+  lessons                     Lesson[]
+  autoVerifyConfig            AutoVerifyConfig?
+  acceptedVouchers            CourseAcceptedVoucher[]
+  voucherAwards               CourseVoucherAward[]
+  systemTree                  SystemTree?
+
+  @@index([teacherId])
+}
+
+model AutoVerifyConfig {
+  id               Int      @id @default(autoincrement())
+  courseId         Int      @unique
+  emailFrom        String
+  bankName         String
+  emailQuery       String
+  onSystem         Int?
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  alternativeCodes String?
+  course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([enabled])
+  @@map("auto_verify_config")
+}
+
+model Lesson {
+  id               String           @id @default(cuid())
+  courseId         Int
+  title            String
+  videoUrl         String?
+  content          String?
+  imageUrl         String?
+  order            Int
+  isDailyChallenge Boolean          @default(false)
+  type             LessonType       @default(VIDEO)
+  course           Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  comments         LessonComment[]
+  progress         LessonProgress[]
+
+  @@unique([courseId, order])
+}
+
+model Enrollment {
+  crmAutomationEvent CrmAutomationEvent?
+  id             Int              @id @default(autoincrement())
+  userId         Int
+  courseId       Int
+  status         EnrollmentStatus @default(PENDING)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  link_anh_coc   String?
+  phi_coc        Int              @default(0)
+  startedAt      DateTime?
+  challengeDays  Int?
+  resetAt        DateTime?
+  lastLessonId   String?
+  referrerId     Int?
+  activatedAt    DateTime?
+  studyMode      EnrollmentMode   @default(ACTIVE)
+  memberRole     EnrollmentMemberRole @default(TV)
+  team           Int              @default(1)
+  group          Int              @default(1)
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  referrer       User?            @relation("EnrollmentReferrer", fields: [referrerId], references: [id])
+   user           User             @relation("StudentEnrollment", fields: [userId], references: [id], onDelete: Cascade)
+   lessonProgress LessonProgress[]
+   payment        Payment?
+   hiddenFromGifts Boolean @default(false)
+
+   @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([referrerId])
+}
+
+model LessonProgress {
+  id           Int        @id @default(autoincrement())
+  enrollmentId Int
+  lessonId     String
+  scores       Json?
+  totalScore   Int        @default(0)
+  assignment   Json?
+  status       String     @default("IN_PROGRESS")
+  maxTime      Float      @default(0)
+  submittedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  duration     Float      @default(0)
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+  @@index([enrollmentId])
+  @@index([lessonId])
+  @@index([status])
+}
+
+model LessonComment {
+  id        Int      @id @default(autoincrement())
+  lessonId  String
+  userId    Int
+  content   String
+  imageUrl  String?
+  parentId  Int?
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  user      User           @relation("UserToLessonComment", fields: [userId], references: [id], onDelete: Cascade)
+  parent    LessonComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   LessonComment[] @relation("CommentReplies")
+
+  @@index([lessonId, createdAt])
+  @@index([lessonId, userId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String
+  detail    String
+  imageUrl  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model BulkImportLog {
+  id         String    @id @default(uuid())
+  courseId   Int
+  userId     Int
+  summary    Json
+  createdAt  DateTime  @default(now())
+  revertedAt DateTime?
+
+  @@index([courseId])
+  @@index([createdAt])
+}
+
+model CourseLibAccess {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  email     String
+  createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, email])
+  @@index([courseId])
+  @@index([email])
+}
+
+model Payment {
+  crmAutomationEvent CrmAutomationEvent?
+  id              Int           @id @default(autoincrement())
+  enrollmentId    Int           @unique
+  amount          Int
+  bankName        String?
+  accountNumber   String?
+  transferTime    DateTime?
+  content         String?
+  phone           String?
+  courseCode      String?
+  proofImage      String?
+  status          PaymentStatus @default(PENDING)
+  verifiedAt      DateTime?
+  verifyMethod    String?
+  note            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  qrCodeUrl       String?
+  transferContent String?
+  enrollment      Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+model YouTubeToken {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  channelId    String?
+  channelTitle String?
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SystemTree {
+  id                       Int                     @id @default(autoincrement())
+  onSystem                 Int                     @unique
+  createdAt                DateTime                @default(now())
+  nameSystem               String                  @map("name_system")
+  courseId                 Int?                    @unique
+  creatorId                Int?
+  fee                      Decimal                 @default(1) @db.Decimal(12, 2)
+  durationDays             Int                     @default(30)
+  graceDays                Int                     @default(3)
+  returnPct                Decimal                 @default(21.0) @db.Decimal(5, 2)
+  revenueSharePct          Decimal                 @default(2.0) @db.Decimal(5, 2)
+  revenueShareIntervalDays Int                     @default(3)
+  pointsPerDollar          Decimal                 @default(17) @db.Decimal(10, 2)
+  gracePeriodHours         Int                     @default(24)
+  brkLevelConfigs          BrkLevelConfig[]
+  brkRevenuePools          BrkRevenuePool[]
+  systems                  System[]
+  planApplications         SystemPlanApplication[]
+  course                   Course?                 @relation(fields: [courseId], references: [id])
+  creator                  User?                   @relation(fields: [creatorId], references: [id])
+
+  @@index([courseId])
+  @@index([creatorId])
+  @@map("system_tree")
+}
+
+model BusinessPlan {
+  id               Int                     @id @default(autoincrement())
+  code             String                  @unique
+  name             String
+  shortDescription String?
+  logicVersion     Int                     @default(1)
+  importantRules   Json?
+  status           String                  @default("ACTIVE")
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  applications     SystemPlanApplication[]
+
+  @@map("business_plan")
+}
+
+model SystemPlanApplication {
+  id                    Int                            @id @default(autoincrement())
+  applicationCode       String                         @unique
+  onSystem              Int
+  businessPlanId        Int
+  startsAt              DateTime
+  endsAt                DateTime?
+  status                String                         @default("ACTIVE")
+  configurationSnapshot Json?
+  createdAt             DateTime                       @default(now())
+  updatedAt             DateTime                       @updatedAt
+  levelUpRecords        BrkLevelUpRecord[]
+  referralBonuses       BrkReferralBonus[]
+  revenueAwards         BrkRevenueAward[]
+  revenuePools          BrkRevenuePool[]
+  timelineRecords       BrkTimelineRecord[]
+  transactions          BrkTransaction[]
+  commissionSnapshots   MbtcaCommissionLevelSnapshot[]
+  workflowRuns          MbtcaWorkflowRun[]
+  systems               System[]
+  closures              SystemClosure[]
+  businessPlan          BusinessPlan                   @relation(fields: [businessPlanId], references: [id])
+  systemTree            SystemTree                     @relation(fields: [onSystem], references: [onSystem])
+
+  @@index([onSystem, startsAt, endsAt])
+  @@index([businessPlanId])
+  @@map("system_plan_application")
+}
+
+model MbtcaWorkflowRun {
+  id              Int                   @id @default(autoincrement())
+  applicationId   Int
+  cycleNumber     Int
+  scheduledAt     DateTime
+  status          String                @default("PENDING")
+  currentPhase    String?
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  planApplication SystemPlanApplication @relation(fields: [applicationId], references: [id])
+  steps           MbtcaWorkflowStep[]
+
+  @@unique([applicationId, cycleNumber])
+  @@index([applicationId, scheduledAt])
+  @@map("mbtca_workflow_run")
+}
+
+model MbtcaWorkflowStep {
+  id               Int              @id @default(autoincrement())
+  runId            Int
+  phaseCode        String
+  status           String           @default("PENDING")
+  recordsExpected  Int              @default(0)
+  recordsProcessed Int              @default(0)
+  result           Json?
+  errorMessage     String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  run              MbtcaWorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, phaseCode])
+  @@index([runId, status])
+  @@map("mbtca_workflow_step")
+}
+
+model MbtcaCommissionLevelSnapshot {
+  id              Int                   @id @default(autoincrement())
+  applicationId   Int
+  cycleNumber     Int
+  userId          Int
+  level           Int
+  effectiveAt     DateTime
+  createdAt       DateTime              @default(now())
+  planApplication SystemPlanApplication @relation(fields: [applicationId], references: [id])
+
+  @@unique([applicationId, cycleNumber, userId], map: "mbtca_commission_snapshot_cycle_user_key")
+  @@index([applicationId, userId, cycleNumber], map: "mbtca_commission_snapshot_user_cycle_idx")
+  @@map("mbtca_commission_level_snapshot")
+}
+
+model System {
+  autoId               Int                    @id @default(autoincrement())
+  userId               Int
+  onSystem             Int
+  refSysId             Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  status               BrkMemberStatus        @default(PENDING)
+  activatedAt          DateTime?
+  expiresAt            DateTime?
+  gracePeriodEnd       DateTime?
+  level                Int                    @default(1)
+  totalPoints          Decimal                @default(0) @db.Decimal(14, 2)
+  giftClaimed          Boolean                @default(false)
+  inDongChia           Boolean                @default(false)
+  officialTeamSize     Int                    @default(0)
+  totalMbdtVolume      Decimal                @default(0) @db.Decimal(20, 2)
+  totalCashVolume      Decimal                @default(0) @db.Decimal(14, 2)
+  applicationId        Int?
+  brkLevelUpRecords    BrkLevelUpRecord[]
+  brkReferralBonuses   BrkReferralBonus[]
+  planApplication      SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  systemTree           SystemTree             @relation(fields: [onSystem], references: [onSystem])
+  user                 User                   @relation(fields: [userId], references: [id])
+  closuresAsAncestor   SystemClosure[]        @relation("SystemClosureAncestor")
+  closuresAsDescendant SystemClosure[]        @relation("SystemClosureDescendant")
+
+  @@unique([userId, onSystem])
+  @@index([userId])
+  @@index([onSystem])
+  @@index([refSysId])
+  @@index([onSystem, status, inDongChia])
+  @@index([applicationId])
+  @@map("system")
+}
+
+model SystemClosure {
+  ancestorId      Int
+  descendantId    Int
+  depth           Int                    @default(0)
+  systemId        Int
+  applicationId   Int?
+  ancestor        System                 @relation("SystemClosureAncestor", fields: [ancestorId], references: [autoId])
+  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  descendant      System                 @relation("SystemClosureDescendant", fields: [descendantId], references: [autoId])
+
+  @@id([ancestorId, descendantId, systemId])
+  @@index([ancestorId])
+  @@index([descendantId])
+  @@index([systemId])
+  @@index([depth])
+  @@index([applicationId])
+  @@map("system_closure")
+}
+
+model BrkLevelConfig {
+  id             Int                 @id @default(autoincrement())
+  systemId       Int
+  level          Int
+  pointsRequired Decimal             @db.Decimal(14, 2)
+  personalFeePct Decimal             @db.Decimal(5, 2)
+  giftValue      Int                 @default(0)
+  timeLimitDays  Int?
+  branchReqs     BrkLevelBranchReq[]
+  systemTree     SystemTree          @relation(fields: [systemId], references: [onSystem])
+
+  @@unique([systemId, level])
+  @@index([systemId])
+  @@map("brk_level_config")
+}
+
+model BrkLevelBranchReq {
+  id          Int            @id @default(autoincrement())
+  configId    Int
+  branchLevel Int
+  count       Int
+  config      BrkLevelConfig @relation(fields: [configId], references: [id])
+
+  @@index([configId])
+  @@map("brk_level_branch_req")
+}
+
+model BrkWallet {
+  id             Int              @id @default(autoincrement())
+  userId         Int              @unique
+  balance        Decimal          @default(0) @db.Decimal(14, 2)
+  totalEarned    Decimal          @default(0) @db.Decimal(14, 2)
+  totalWithdrawn Decimal          @default(0) @db.Decimal(14, 2)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  brkd           Decimal          @default(0) @db.Decimal(14, 2)
+  voucherBalance Decimal          @default(0) @db.Decimal(14, 2)
+  mbvBalance     Decimal          @default(0) @db.Decimal(14, 2)
+  transactions   BrkTransaction[]
+  user           User             @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("brk_wallet")
+}
+
+model BrkTransaction {
+  id              Int                    @id @default(autoincrement())
+  walletId        Int
+  amount          Decimal                @db.Decimal(14, 2)
+  type            BrkTransactionType
+  description     String
+  refId           String?
+  balanceBefore   Decimal                @db.Decimal(14, 2)
+  balanceAfter    Decimal                @db.Decimal(14, 2)
+  createdAt       DateTime               @default(now())
+  balanceType     BalanceType            @default(CASH)
+  sourceMemberId  Int?
+  applicationId   Int?
+  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  wallet          BrkWallet              @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, createdAt])
+  @@index([type])
+  @@index([walletId, type, balanceType, refId])
+  @@index([sourceMemberId])
+  @@index([applicationId, createdAt])
+  @@map("brk_transaction")
+}
+
+model BrkRevenuePool {
+  id              Int                    @id @default(autoincrement())
+  systemId        Int
+  roundNumber     Int
+  periodStart     DateTime
+  periodEnd       DateTime
+  totalRevenue    Decimal                @db.Decimal(14, 2)
+  poolAmount      Decimal                @db.Decimal(14, 2)
+  qualifiedCount  Int                    @default(0)
+  status          BrkRevenuePoolStatus   @default(PENDING)
+  distributedAt   DateTime?
+  createdAt       DateTime               @default(now())
+  applicationId   Int?
+  awards          BrkRevenueAward[]
+  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  systemTree      SystemTree             @relation(fields: [systemId], references: [onSystem])
+
+  @@index([systemId])
+  @@index([applicationId, roundNumber])
+  @@map("brk_revenue_pool")
+}
+
+model BrkRevenueAward {
+  id              Int                    @id @default(autoincrement())
+  poolId          Int
+  userId          Int
+  amount          Decimal                @db.Decimal(14, 2)
+  paid            Boolean                @default(false)
+  sourceMemberId  Int?
+  applicationId   Int?
+  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  pool            BrkRevenuePool         @relation(fields: [poolId], references: [id])
+
+  @@index([poolId])
+  @@index([userId])
+  @@index([sourceMemberId])
+  @@index([applicationId])
+  @@map("brk_revenue_award")
+}
+
+model BrkLevelUpRecord {
+  id              Int                    @id @default(autoincrement())
+  userId          Int
+  onSystem        Int
+  fromLevel       Int
+  toLevel         Int
+  promotedAt      DateTime               @default(now())
+  giftClaimed     Boolean                @default(false)
+  giftClaimedAt   DateTime?
+  sourceMemberId  Int?
+  applicationId   Int?
+  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  system          System                 @relation(fields: [userId, onSystem], references: [userId, onSystem])
+
+  @@index([userId, onSystem])
+  @@index([applicationId, userId, toLevel])
+  @@map("brk_level_up_record")
+}
+
+model BrkReferralBonus {
+  id              Int                    @id @default(autoincrement())
+  userId          Int
+  onSystem        Int
+  f1Count         Int                    @default(2)
+  courseId        Int?
+  claimed         Boolean                @default(false)
+  claimedAt       DateTime?
+  sourceMemberId  Int?
+  applicationId   Int?
+  planApplication SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  system          System                 @relation(fields: [userId, onSystem], references: [userId, onSystem])
+
+  @@index([userId, onSystem])
+  @@index([applicationId, userId])
+  @@map("brk_referral_bonus")
+}
+
+model BrkSystemLog {
+  id            Int      @id @default(autoincrement())
+  action        String
+  onSystem      Int
+  sourceUserId  Int
+  oldRefSysId   Int
+  newRefSysId   Int
+  oldChain      Json?
+  newChain      Json?
+  subtree       Json?
+  affectedCount Int      @default(0)
+  reason        String?
+  adminId       Int
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([action])
+  @@index([sourceUserId])
+  @@index([createdAt])
+  @@map("brk_system_log")
+}
+
+model BrkActivationLog {
+  id              Int      @id @default(autoincrement())
+  sourceUserId    Int
+  onSystem        Int
+  enrollmentId    Int?
+  eventType       String
+  feeAmount       Decimal  @db.Decimal(14, 2)
+  affectedUserIds Json
+  walletSnapshots Json
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([sourceUserId, onSystem])
+  @@index([onSystem])
+  @@map("brk_activation_log")
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String
+  detail    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_log")
+}
+
+model TCAMember {
+  id            Int       @id @default(autoincrement())
+  tcaId         Int       @unique
+  userId        Int
+  type          String
+  groupName     String?
+  name          String
+  personalScore Decimal?  @db.Decimal(10, 3)
+  totalScore    Decimal?  @db.Decimal(10, 3)
+  level         Int?
+  location      String?
+  personalRate  String?
+  teamRate      String?
+  hasBH         Boolean   @default(false)
+  hasTD         Boolean   @default(false)
+  phone         String?
+  email         String?
+  address       String?
+  joinDate      DateTime?
+  contractDate  DateTime?
+  promotionDate DateTime?
+  parentTcaId   Int?
+  parentName    String?
+  teamSize      Int       @default(0)
+  lastSyncedAt  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  chuc_danh     String?
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@index([tcaId])
+  @@index([userId])
+  @@index([parentTcaId])
+  @@map("tca_member")
+}
+
+model TCASyncHistory {
+  id           Int      @id @default(autoincrement())
+  syncId       String
+  action       String
+  tableName    String
+  recordId     Int?
+  beforeData   Json?
+  afterData    Json?
+  tcaId        Int?
+  totalRecords Int
+  status       String   @default("PENDING")
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([syncId])
+  @@index([tcaId])
+  @@index([tableName])
+  @@index([createdAt])
+  @@map("tca_sync_history")
+}
+
+model UserTest {
+  id                  Int               @id @default(autoincrement())
+  name                String?
+  email               String            @unique
+  emailVerified       DateTime?
+  image               String?
+  password            String?
+  passwordChanged     Boolean           @default(false)
+  phone               String?           @unique
+  role                Role              @default(STUDENT)
+  referrerId          Int?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  closureAsAncestor   UserClosureTest[] @relation("TestClosureAncestor")
+  closureAsDescendant UserClosureTest[] @relation("TestClosureDescendant")
+
+  @@index([email])
+  @@index([phone])
+  @@index([referrerId])
+  @@map("user_test")
+}
+
+model UserClosureTest {
+  ancestorId   Int      @map("ancestor_id")
+  descendantId Int      @map("descendant_id")
+  depth        Int      @default(0)
+  ancestor     UserTest @relation("TestClosureAncestor", fields: [ancestorId], references: [id])
+  descendant   UserTest @relation("TestClosureDescendant", fields: [descendantId], references: [id])
+
+  @@id([ancestorId, descendantId])
+  @@index([ancestorId])
+  @@index([descendantId])
+  @@index([depth])
+  @@map("user_closure_test")
+}
+
+model SystemTest {
+  autoId    Int      @id @default(autoincrement())
+  userId    Int
+  onSystem  Int
+  refSysId  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, onSystem])
+  @@index([userId])
+  @@index([onSystem])
+  @@index([refSysId])
+  @@map("system_test")
+}
+
+model SystemClosureTest {
+  ancestorId   Int
+  descendantId Int
+  depth        Int @default(0)
+  systemId     Int
+
+  @@id([ancestorId, descendantId, systemId])
+  @@index([ancestorId])
+  @@index([descendantId])
+  @@index([systemId])
+  @@index([depth])
+  @@map("system_closure_test")
+}
+
+model TCAMemberTest {
+  id            Int       @id @default(autoincrement())
+  tcaId         Int       @unique
+  userId        Int
+  type          String    @default("item")
+  groupName     String?
+  name          String
+  personalScore Decimal?  @db.Decimal(10, 3)
+  totalScore    Decimal?  @db.Decimal(10, 3)
+  level         Int?
+  location      String?
+  personalRate  String?
+  teamRate      String?
+  hasBH         Boolean   @default(false)
+  hasTD         Boolean   @default(false)
+  phone         String?
+  email         String?
+  address       String?
+  joinDate      DateTime?
+  contractDate  DateTime?
+  promotionDate DateTime?
+  parentTcaId   Int?
+  parentName    String?
+  teamSize      Int       @default(0)
+  lastSyncedAt  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tcaId])
+  @@index([userId])
+  @@index([parentTcaId])
+  @@map("tca_member_test")
+}
+
+model Theme {
+  id           String        @id
+  name         String
+  description  String?
+  colors       Json
+  typography   Json
+  layout       Json
+  animations   Json?
+  effects      Json?
+  isLocked     Boolean       @default(false)
+  isActive     Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  siteProfiles SiteProfile[]
+  siteSettings SiteSettings?
+
+  @@index([id])
+}
+
+model LandingPage {
+  crmSubmissions   CrmSubmission[]
+  id               Int                   @id @default(autoincrement())
+  slug             String                @unique
+  title            String
+  subtitle         String?
+  description      String?
+  heroImage        String?
+  ctaText          String                @default("Đăng ký ngay")
+  ctaLink          String?
+  template         String                @default("hero-cta")
+  config           Json?
+  customCommission Json?
+  courseId         Int?
+  viewCount        Int                   @default(0)
+  clickCount       Int                   @default(0)
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  profileId        Int?
+  clicks           AffiliateClick[]
+  conversions      AffiliateConversion[]
+  course           Course?               @relation(fields: [courseId], references: [id])
+  profile          SiteProfile?          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  registrations    RegistrationPoint[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([courseId])
+}
+
+model AffiliateCampaign {
+  id                    Int                   @id @default(autoincrement())
+  name                  String
+  slug                  String                @unique
+  description           String?
+  isActive              Boolean               @default(true)
+  maxLevels             Int                   @default(3)
+  pendingDays           Int                   @default(30)
+  minPayout             Float                 @default(200000)
+  taxRate               Float                 @default(0)
+  feeAmount             Float                 @default(3300)
+  pointsPerRegistration Float                 @default(1.0)
+  pointsRequired        Float                 @default(10.0)
+  pointRedemptionValue  Float                 @default(386868)
+  autoRedeem            Boolean               @default(false)
+  redemptionCourseId    Int?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  isDefault             Boolean               @default(false)
+  landingOverrides      Json?
+  profileId             Int?                  @unique
+  profile               SiteProfile?          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  conversions           AffiliateConversion[]
+  levels                AffiliateLevel[]
+  links                 AffiliateLink[]
+  registrations         RegistrationPoint[]
+
+  @@index([isActive])
+}
+
+model AffiliateLevel {
+  id         Int               @id @default(autoincrement())
+  campaignId Int
+  level      Int
+  percentage Float
+  minOrder   Float?
+  campaign   AffiliateCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, level])
+  @@index([campaignId])
+}
+
+model AffiliateLink {
+  id          Int                   @id @default(autoincrement())
+  userId      Int
+  campaignId  Int
+  code        String                @unique
+  name        String?
+  source      String?
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  clicks      AffiliateClick[]
+  conversions AffiliateConversion[]
+  campaign    AffiliateCampaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user        User                  @relation(fields: [userId], references: [id])
+
+  @@unique([userId, campaignId, name])
+  @@index([userId])
+  @@index([campaignId])
+}
+
+model AffiliateClick {
+  id          Int           @id @default(autoincrement())
+  linkId      Int
+  ipAddress   String?
+  userAgent   String?
+  referer     String?
+  url         String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  deviceType  String?
+  country     String?
+  city        String?
+  createdAt   DateTime      @default(now())
+  landingId   Int?
+  landingSlug String?
+  landing     LandingPage?  @relation(fields: [landingId], references: [id])
+  link        AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, createdAt])
+  @@index([ipAddress, createdAt])
+  @@index([landingSlug])
+  @@index([landingId])
+}
+
+model AffiliateRef {
+  id          Int      @id @default(autoincrement())
+  refKey      String   @unique
+  userId      Int
+  type        RefType  @default(USER_ID)
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model AffiliateConversion {
+  id           Int                   @id @default(autoincrement())
+  linkId       Int
+  campaignId   Int
+  customerId   Int
+  enrollmentId Int?
+  orderId      String?
+  orderAmount  Float
+  productType  ProductType           @default(COURSE)
+  status       ConversionStatus      @default(PENDING)
+  fraudFlags   String[]
+  pendingUntil DateTime
+  approvedAt   DateTime?
+  createdAt    DateTime              @default(now())
+  landingId    Int?
+  landingSlug  String?
+  commissions  AffiliateCommission[]
+  campaign     AffiliateCampaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  landing      LandingPage?          @relation(fields: [landingId], references: [id])
+  link         AffiliateLink         @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, status])
+  @@index([customerId])
+  @@index([pendingUntil])
+  @@index([landingSlug])
+  @@index([landingId])
+}
+
+model RegistrationPoint {
+  id          Int               @id @default(autoincrement())
+  referrerId  Int
+  refereeId   Int
+  campaignId  Int
+  points      Float             @default(1.0)
+  status      PointStatus       @default(PENDING)
+  earnedAt    DateTime          @default(now())
+  confirmedAt DateTime?
+  landingId   Int?
+  landingSlug String?
+  campaign    AffiliateCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  landing     LandingPage?      @relation(fields: [landingId], references: [id])
+  referee     User              @relation("RefereeRegistration", fields: [refereeId], references: [id])
+  referrer    User              @relation("ReferrerRegistration", fields: [referrerId], references: [id])
+
+  @@index([referrerId])
+  @@index([refereeId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([landingSlug])
+}
+
+model AffiliateCommission {
+  id           Int                 @id @default(autoincrement())
+  conversionId Int
+  affiliateId  Int
+  level        Int
+  percentage   Float
+  grossAmount  Float
+  taxAmount    Float               @default(0)
+  feeAmount    Float               @default(0)
+  netAmount    Float
+  status       CommissionStatus    @default(PENDING)
+  availableAt  DateTime?
+  paidAt       DateTime?
+  createdAt    DateTime            @default(now())
+  affiliate    User                @relation(fields: [affiliateId], references: [id])
+  conversion   AffiliateConversion @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId, status])
+  @@index([availableAt])
+}
+
+model AffiliateWallet {
+  id             Int                    @id @default(autoincrement())
+  userId         Int                    @unique
+  points         Float                  @default(0)
+  balance        Float                  @default(0)
+  pendingBalance Float                  @default(0)
+  totalEarned    Float                  @default(0)
+  totalPaid      Float                  @default(0)
+  updatedAt      DateTime               @updatedAt
+  transactions   AffiliateTransaction[]
+  user           User                   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model AffiliateTransaction {
+  id            Int               @id @default(autoincrement())
+  walletId      Int
+  amount        Float
+  type          TransactionType
+  description   String
+  refId         String?
+  balanceBefore Float
+  balanceAfter  Float
+  status        TransactionStatus @default(COMPLETED)
+  createdAt     DateTime          @default(now())
+  wallet        AffiliateWallet   @relation(fields: [walletId], references: [id])
+
+  @@index([walletId, createdAt])
+  @@index([type])
+}
+
+model AffiliatePayout {
+  id            Int          @id @default(autoincrement())
+  userId        Int
+  amount        Float
+  taxAmount     Float        @default(0)
+  feeAmount     Float        @default(0)
+  netAmount     Float
+  bankName      String
+  bankAccount   String
+  accountHolder String
+  qrCodeUrl     String?
+  status        PayoutStatus @default(PENDING)
+  notes         String?
+  processedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([userId, status])
+}
+
+model SiteSettings {
+  id        String   @id @default("global")
+  themeId   String   @unique @default("classic")
+  language  String   @default("vi")
+  updatedAt DateTime @updatedAt
+  theme     Theme    @relation(fields: [themeId], references: [id])
+}
+
+model CourseTestimonial {
+  id         Int      @id @default(autoincrement())
+  courseId   Int
+  name       String
+  role       String?
+  avatar     String?
+  content    String
+  rating     Int      @default(5)
+  courseName String?
+  isFeatured Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, isActive])
+  @@index([isFeatured])
+}
+
+model Tool {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  description String?
+  icon        String?
+  url         String
+  roles       Role[]
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+model SiteProfile {
+  id                   Int                 @id @default(autoincrement())
+  userId               Int?                @unique
+  slug                 String              @unique
+  isActive             Boolean             @default(false)
+  isDefault            Boolean             @default(false)
+  heroImage            String?
+  heroOverlay          Float?              @default(0.3)
+  title                String?
+  subtitle             String?
+  messageContent       String?
+  messageDetail        String?
+  messageImage         String?
+  surveyTitle          String?
+  customRoadmap        Json?
+  roadmapTitle         String?
+  courseIds            Json?
+  coursesTitle         String?
+  allCoursesTitle      String?
+  showAllCourses       Boolean             @default(true)
+  showCommunity        Boolean             @default(true)
+  communityTitle       String?
+  footerText           String?
+  footerLinks          Json?
+  metaTitle            String?
+  metaDescription      String?
+  metaImage            String?
+  themeId              String?
+  accentColor          String?
+  backgroundColor      String?
+  textColor            String?
+  viewCount            Int                 @default(0)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  selectedSurveyId     Int?
+  communityCategoryId  Int?
+  communityLimit       Int                 @default(10)
+  courseCategoryFilter Json?
+  greetingMessages     Json?
+  affiliateCampaign    AffiliateCampaign?
+  landingPages         LandingPage[]
+  theme                Theme?              @relation(fields: [themeId], references: [id])
+  user                 User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  members              SiteProfileMember[]
+  surveys              Survey[]
+
+  @@index([slug])
+  @@index([userId])
+  @@index([isActive])
+}
+
+model SiteProfileMember {
+  id        Int         @id @default(autoincrement())
+  profileId Int
+  userId    Int
+  role      String      @default("ASSOCIATE")
+  createdAt DateTime    @default(now())
+  profile   SiteProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, userId])
+  @@index([profileId])
+  @@index([userId])
+}
+
+model SyncLog {
+  id        Int      @id @default(autoincrement())
+  syncId    String
+  tableName String   @db.VarChar(50)
+  recordId  Int
+  action    String   @db.VarChar(20)
+  oldData   String?
+  newData   String?
+  createdAt DateTime @default(now())
+
+  @@unique([syncId, tableName, recordId])
+  @@index([syncId])
+}
+
+model AccountAssistantStep {
+  id            Int      @id @default(autoincrement())
+  stepKey       String   @unique
+  question      String?
+  agentVideoUrl String?
+  guideVideoUrl String?
+  guideTitle    String?
+  options       Json?
+  order         Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AssistantGuide {
+  id            Int      @id @default(autoincrement())
+  pagePath      String?
+  title         String
+  script        String?
+  textContent   String?
+  videoUrl      String?
+  agentVideoUrl String?
+  toolSlug      String?
+  sections      Json?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([pagePath])
+  @@index([toolSlug])
+}
+
+model UserBankAccount {
+  id            Int             @id @default(autoincrement())
+  userId        Int
+  accountType   BankAccountType @default(BANK)
+  accountHolder String
+  accountNumber String
+  bankName      String?
+  qrCodeUrl     String?
+  isDefault     Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  courses       Course[]        @relation("CourseTeacherBank")
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Voucher {
+  id              Int                     @id @default(autoincrement())
+  code            String                  @unique
+  name            String
+  type            VoucherType
+  value           Int                     @default(0)
+  durationDays    Int?
+  description     String?
+  isActive        Boolean                 @default(true)
+  createdAt       DateTime                @default(now())
+  acceptedCourses CourseAcceptedVoucher[]
+  awardedCourses  CourseVoucherAward[]
+  userVouchers    UserVoucher[]
+
+  @@index([type])
+  @@index([code])
+}
+
+model UserVoucher {
+  id                  Int               @id @default(autoincrement())
+  userId              Int
+  voucherId           Int
+  status              UserVoucherStatus @default(ACTIVE)
+  awardedFromCourseId Int?
+  expiresAt           DateTime?
+  usedAt              DateTime?
+  usedForCourseId     Int?
+  createdAt           DateTime          @default(now())
+  user                User              @relation(fields: [userId], references: [id])
+  voucher             Voucher           @relation(fields: [voucherId], references: [id])
+
+  @@unique([userId, voucherId, awardedFromCourseId])
+  @@index([userId, status])
+  @@index([voucherId])
+  @@map("user_voucher")
+}
+
+model CourseVoucherAward {
+  id        Int     @id @default(autoincrement())
+  courseId  Int
+  voucherId Int
+  course    Course  @relation(fields: [courseId], references: [id])
+  voucher   Voucher @relation(fields: [voucherId], references: [id])
+
+  @@unique([courseId, voucherId])
+  @@map("course_voucher_award")
+}
+
+model CourseAcceptedVoucher {
+  id        Int     @id @default(autoincrement())
+  courseId  Int
+  voucherId Int
+  course    Course  @relation(fields: [courseId], references: [id])
+  voucher   Voucher @relation(fields: [voucherId], references: [id])
+
+  @@unique([courseId, voucherId])
+  @@map("course_accepted_voucher")
+}
+
+model CronRun {
+  id          Int       @id @default(autoincrement())
+  jobName     String
+  status      String    @default("RUNNING")
+  details     Json?
+  error       String?
+  triggeredBy String    @default("CRON")
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  durationMs  Int?
+
+  @@index([jobName, startedAt])
+  @@map("cron_run")
+}
+
+model BrkTimelineRecord {
+  id                    Int                    @id @default(autoincrement())
+  userId                Int
+  onSystem              Int
+  type                  String
+  time                  DateTime
+  title                 String
+  description           String
+  accumulatedCash       Decimal                @default(0) @db.Decimal(12, 2)
+  accumulatedBrkd       Decimal                @default(0) @db.Decimal(20, 2)
+  accumulatedBrkp       Decimal                @default(0) @db.Decimal(12, 3)
+  accumulatedTeamSize   Int                    @default(1)
+  accumulatedBrkdVolume Decimal                @default(0) @db.Decimal(20, 2)
+  accumulatedCashVolume Decimal                @default(0) @db.Decimal(12, 2)
+  amountCash            Decimal                @default(0) @db.Decimal(12, 2)
+  amountBrkd            Decimal                @default(0) @db.Decimal(20, 2)
+  amountVoucher         Decimal                @default(0) @db.Decimal(12, 2)
+  txType                String?
+  targetMemberId        Int?
+  targetMemberName      String?
+  pathStr               String?
+  fromLevel             Int?
+  toLevel               Int?
+  createdAt             DateTime               @default(now())
+  sourceMemberId        Int?
+  eventStatus           String?
+  eventMbp              Decimal                @default(0) @db.Decimal(12, 3)
+  eventMbdtVolume       Decimal                @default(0) @db.Decimal(20, 2)
+  eventCashVolume       Decimal                @default(0) @db.Decimal(14, 2)
+  applicationId         Int?
+  planApplication       SystemPlanApplication? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  user                  User                   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([onSystem])
+  @@index([time])
+  @@index([userId, onSystem, time])
+  @@index([userId, onSystem, type, time])
+  @@index([onSystem, eventStatus, time])
+  @@index([applicationId, time])
+  @@map("brk_timeline_record")
+}
+
+model TelegramLinkToken {
+  id        String    @id @default(uuid())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@map("telegram_link_tokens")
+}
+
+model CoursePage {
+  id             String              @id @default(uuid())
+  slug           String              @unique
+  name           String
+  status         String              @default("draft")
+  seo            Json                @default("{}")
+  theme          Json                @default("{}")
+  navigation     Json                @default("{}")
+  checkoutConfig Json                @default("{}") @map("checkout_config")
+  publishedAt    DateTime?           @map("published_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  useTemplate    Boolean             @default(true) @map("use_template")
+  versions       CoursePageVersion[]
+  sections       CourseSection[]
+
+  @@map("course_pages")
+}
+
+model CourseSection {
+  id           String     @id @default(uuid())
+  coursePageId String     @map("course_page_id")
+  sectionKey   String     @map("section_key")
+  sectionType  String     @map("section_type")
+  variant      String?
+  anchorId     String?    @map("anchor_id")
+  enabled      Boolean    @default(true)
+  sortOrder    Int        @default(0) @map("sort_order")
+  content      Json       @default("{}")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  visibility   String     @default("all")
+  coursePage   CoursePage @relation(fields: [coursePageId], references: [id], onDelete: Cascade)
+
+  @@unique([coursePageId, sectionKey])
+  @@index([coursePageId, sortOrder])
+  @@map("course_sections")
+}
+
+model CoursePageVersion {
+  id            String     @id @default(uuid())
+  coursePageId  String     @map("course_page_id")
+  versionNumber Int        @map("version_number")
+  snapshot      Json
+  createdAt     DateTime   @default(now()) @map("created_at")
+  coursePage    CoursePage @relation(fields: [coursePageId], references: [id], onDelete: Cascade)
+
+  @@unique([coursePageId, versionNumber])
+  @@map("course_page_versions")
+}
+
+// CRM phase 1: contacts are independent of login accounts and affiliate ownership.
+model CrmContact {
+  requests CrmRequest[]
+  studentProfile Boolean @default(false)
+  studentUserId Int?
+  studentUser User? @relation("CrmStudentProfile", fields: [studentUserId], references: [id], onDelete: SetNull)
+  marketingEmailAllowed Boolean @default(false)
+  automationEvents CrmAutomationEvent[]
+  linkedUserId  Int? @unique
+  linkedUser    User? @relation("CrmIdentity", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  submissions   CrmSubmission[]
+  id            Int              @id @default(autoincrement())
+  name          String
+  email         String?          @unique
+  phone         String?          @unique
+  source        String           @default("Nhập tay")
+  needs         String           @default("")
+  tags          String[]         @default([])
+  ownerId       Int?
+  owner         User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdBy     Int
+  archived      Boolean          @default(false)
+  version       Int              @default(1)
+  lastContactAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  opportunities CrmOpportunity[]
+  activities    CrmActivity[]
+  tasks         CrmTask[]
+
+  @@index([ownerId, archived, updatedAt])
+  @@unique([ownerId, studentUserId])
+  @@index([studentUserId])
+}
+
+// Explicit support/consultation only; ordinary lesson interactions remain in LMS.
+model CrmRequest {
+  id String @id @default(uuid())
+  key String @unique
+  contactId Int?
+  contact CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  ownerId Int?
+  courseId Int?
+  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  userId Int?
+  lessonId String?
+  commentId Int?
+  category String
+  status String @default("NEW")
+  content String
+  name String
+  email String?
+  phone String?
+  source String
+  ipHash String
+  publicReply String @default("")
+  resolution String @default("")
+  history Json @default("[]")
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, status, createdAt])
+  @@index([contactId, status])
+  @@index([ipHash, createdAt])
+  @@index([courseId])
+  @@index([createdAt])
+}
+
+model CrmOpportunity {
+  courseId  Int?
+  course    Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  id        Int          @id @default(autoincrement())
+  contactId Int
+  title     String
+  stage     CrmStage     @default(NEW)
+  amount    Int          @default(0)
+  lostReason String      @default("")
+  version   Int          @default(1)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  contact   CrmContact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, stage])
+}
+
+model CrmActivity {
+  id         Int        @id @default(autoincrement())
+  contactId  Int
+  type       String
+  content    String
+  authorId   Int
+  authorName String
+  createdAt  DateTime   @default(now())
+  contact    CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, createdAt])
+}
+
+model CrmTask {
+  id          Int        @id @default(autoincrement())
+  contactId   Int
+  title       String
+  dueAt       DateTime
+  completedAt DateTime?
+  createdBy   Int
+  createdAt   DateTime   @default(now())
+  contact     CrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId, completedAt, dueAt])
+  @@index([completedAt, dueAt])
+}
+
+enum CrmStage {
+  NEW
+  CONTACTING
+  QUALIFIED
+  PROPOSAL
+  PAYMENT_PENDING
+  WON
+  LOST
+}
+
+// Public intake is auditable and never rewrites an existing customer's identity.
+model CrmSubmission {
+  crmAutomationEvent CrmAutomationEvent?
+  id         Int @id @default(autoincrement())
+  key        String @unique
+  landingId  Int
+  landing    LandingPage @relation(fields: [landingId], references: [id], onDelete: Restrict)
+  contactId  Int?
+  contact    CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  data       Json
+  status     String @default("RECEIVED")
+  ipHash     String
+  createdAt  DateTime @default(now())
+
+  @@index([ipHash, createdAt])
+  @@index([status, createdAt])
+}
+
+// Mặc định tắt; mỗi quy tắc chỉ xét sự kiện phát sinh từ lần bật gần nhất.
+model CrmAutomationSettings {
+  studentSyncEnabled Boolean @default(false)
+  id Int @id @default(1)
+  version Int @default(1)
+  leadSince DateTime?
+  enrollmentSince DateTime?
+  paymentSince DateTime?
+  updatedAt DateTime @updatedAt
+}
+
+// Một nguồn chỉ được xử lý một lần, kể cả khi cron hoặc người dùng gọi lại.
+model CrmAutomationEvent {
+  id Int @id @default(autoincrement())
+  sourceKey String @unique
+  kind String
+  contactId Int
+  contact CrmContact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  submissionId Int? @unique
+  submission CrmSubmission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  enrollmentId Int? @unique
+  enrollment Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  paymentId Int? @unique
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  taskId Int?
+  createdAt DateTime @default(now())
+  @@index([contactId, createdAt])
+}
+
+// Lưu biên nhận để gửi lại request không tạo nhiều chiến dịch nháp.
+model CrmCampaignReceipt {
+  id Int @id @default(autoincrement())
+  previewKey String @unique
+  campaignId Int @unique
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  actorId Int
+  createdAt DateTime @default(now())
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum LessonType {
+  VIDEO
+  DOCS
+  TEXT
+  ALL
+}
+
+enum EnrollmentStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  CANCELLED
+}
+
+enum EnrollmentMode {
+  ACTIVE
+  AUDITOR
+  FREE
+  COMPANION
+}
+
+enum EnrollmentMemberRole {
+  TV
+  PS
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+  INSTRUCTOR
+  AFFILIATE
+  TEACHER
+}
+
+enum CourseType {
+  NORMAL
+  CHALLENGE
+  LIB
+  SYS
+}
+
+enum FeeType {
+  MIEN_PHI
+  PHI_TUY_TINH
+  PHI_CAM_KET
+  PHI_DONG_HANH
+  PHI_TOI_THIEU
+}
+
+enum AffiliateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum RefType {
+  USER_ID
+  AFFILIATE_CODE
+  CUSTOM_ALIAS
+  CAMPAIGN
+}
+
+enum ConversionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum CommissionStatus {
+  PENDING
+  AVAILABLE
+  WITHDRAWN
+  CANCELLED
+}
+
+enum PointStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum TransactionType {
+  COMMISSION
+  WITHDRAWAL
+  REFUND
+  ADJUSTMENT
+  POINT_EARNED
+  POINT_REDEEMED
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  FREE
+  PAID
+  POINT_REDEMPTION
+  SYSTEM_GRANT
+}
+
+enum ProductType {
+  COURSE
+  POINT_REDEMPTION
+}
+
+enum SystemType {
+  TCA
+  KTC
+}
+
+enum BrkMemberStatus {
+  PENDING
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+enum BrkTransactionType {
+  RETURN_FEE
+  REVENUE_SHARE
+  COMMISSION
+  LEVEL_BONUS
+  REFERRAL_BONUS
+  WITHDRAWAL
+  ADJUSTMENT
+  BRKD_CREDIT
+  VOUCHER_CREDIT
+  MBV_CREDIT
+  BRKD_RETURN
+}
+
+enum BalanceType {
+  CASH
+  BRKD
+  VOUCHER
+  MBV
+}
+
+enum BrkRevenuePoolStatus {
+  PENDING
+  DISTRIBUTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  CANCELLED
+}
+
+enum BankAccountType {
+  BANK
+  MOMO
+  ZALOPAY
+  OTHER
+}
+
+enum VoucherType {
+  VIP
+  ALL
+  CASH
+}
+
+enum UserVoucherStatus {
+  ACTIVE
+  USED
+  EXPIRED
+}
+
+// Thông báo riêng tư; chỉ API NextAuth đọc/đánh dấu, không mở Data API.
+model AppNotification {
+  id String @id @default(uuid())
+  eventKey String @unique
+  recipientId Int
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  kind String
+  title String
+  courseId Int?
+  requestId String?
+  taskId Int?
+  enrollmentId Int?
+  commentId Int?
+  lessonId String?
+  notBefore DateTime @default(now())
+  readAt DateTime?
+  createdAt DateTime @default(now())
+
+  pushDeliveries WebPushDelivery[]
+  @@index([recipientId, notBefore, createdAt])
+  @@index([recipientId, readAt])
+}
+
+model LessonAnnouncement {
+  id String @id
+  lessonId String
+  courseId Int
+  senderId Int
+  title String
+  recipientCount Int
+  createdAt DateTime @default(now())
+  @@index([lessonId, courseId, createdAt])
+}
+
+model WebPushSubscription {
+  id String @id
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  origin String
+  endpoint String
+  p256dh String
+  auth String
+  vapidPublicKey String
+  version String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  deliveries WebPushDelivery[]
+  @@index([userId, origin])
+}
+
+model WebPushDelivery {
+  id String @id @default(uuid())
+  notificationId String
+  notification AppNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription WebPushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscriptionVersion String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  leaseToken String?
+  sentAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  @@unique([notificationId, subscriptionId])
+  @@index([subscriptionId])
+  @@index([status, nextAttemptAt])
+}
