@@ -15,6 +15,7 @@ export type ImportedSectionType =
   | 'registration'
   | 'closing_message'
   | 'footer'
+  | 'sticky_cta'
   | 'rich_content'
 
 export type ImportedDesign = {

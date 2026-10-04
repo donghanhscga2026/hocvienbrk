@@ -320,7 +320,103 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     <textarea value={(sections[index]?.content?.[key] || []).join('\n\n')} onChange={e=>updateContent(index,key,e.target.value.split(/\n\s*\n/).filter(Boolean))} placeholder="Mỗi đoạn cách nhau một dòng trống" className="w-full min-h-32 rounded-xl border border-gray-200 px-3 py-2 text-sm"/>
   </div>
 
+  const updateImportedSource = (index:number, fieldName:string, value:any) => {
+    setDirty(true)
+    setSections(prev => prev.map((sec,i) => i===index ? {
+      ...sec,
+      content: {
+        ...(sec.content || {}),
+        importedSource: {
+          ...(sec.content?.importedSource || {}),
+          [fieldName]: value,
+        },
+      },
+    } : sec))
+  }
+
+  const updateImportedDesign = (index:number, fieldName:string, value:any) => {
+    setDirty(true)
+    setSections(prev => prev.map((sec,i) => i===index ? {
+      ...sec,
+      content: {
+        ...(sec.content || {}),
+        design: {
+          ...(sec.content?.design || {}),
+          [fieldName]: value,
+        },
+      },
+    } : sec))
+  }
+
+  const updateImportedArrayItem = (index:number, key:string, itemIndex:number, patch:any) => {
+    const items = [...(sections[index]?.content?.importedSource?.[key] || [])]
+    items[itemIndex] = { ...(items[itemIndex] || {}), ...patch }
+    updateImportedSource(index, key, items)
+  }
+
+  const removeImportedArrayItem = (index:number, key:string, itemIndex:number) => {
+    const items = (sections[index]?.content?.importedSource?.[key] || []).filter((_:any,i:number) => i !== itemIndex)
+    updateImportedSource(index, key, items)
+  }
+
+  const importedEditor = (sec:any, index:number) => {
+    const source = sec.content?.importedSource || {}
+    const design = sec.content?.design || {}
+    const cards = Array.isArray(source.cards) ? source.cards : []
+    const images = Array.isArray(source.images) ? source.images : []
+    const actions = Array.isArray(source.actions) ? source.actions : []
+    return <div className="grid gap-4">
+      <div className="rounded-xl border border-purple-100 bg-purple-50 p-3">
+        <div className="text-[10px] font-black uppercase tracking-widest text-purple-600">Nội dung nhập từ website</div>
+        <p className="mt-1 text-xs text-purple-800">Sửa trực tiếp các nội dung bên dưới. Không cần chỉnh HTML.</p>
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-gray-600 mb-1">Tiêu đề</label>
+        <input value={source.heading || ''} onChange={e=>updateImportedSource(index,'heading',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"/>
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-gray-600 mb-1">Các đoạn nội dung</label>
+        <textarea value={(source.paragraphs || []).join('\n\n')} onChange={e=>updateImportedSource(index,'paragraphs',e.target.value.split(/\n\s*\n/).filter(Boolean))} className="w-full min-h-28 rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="Mỗi đoạn cách nhau một dòng trống"/>
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-gray-600 mb-1">Danh sách nội dung</label>
+        <textarea value={(source.listItems || []).join('\n')} onChange={e=>updateImportedSource(index,'listItems',e.target.value.split('\n').filter(Boolean))} className="w-full min-h-24 rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="Mỗi mục một dòng"/>
+      </div>
+      {cards.length > 0 && <div className="space-y-2">
+        <label className="text-xs font-bold text-gray-600">Các thẻ / nội dung lặp</label>
+        {cards.map((card:any,i:number)=><div key={i} className="space-y-2 rounded-xl border bg-gray-50 p-3">
+          <div className="flex gap-2">
+            <input value={card.title || ''} onChange={e=>updateImportedArrayItem(index,'cards',i,{title:e.target.value})} placeholder="Tiêu đề" className="flex-1 rounded-lg border bg-white px-3 py-2 text-sm"/>
+            <button type="button" onClick={()=>removeImportedArrayItem(index,'cards',i)} className="rounded-lg p-2 text-red-500" title="Xóa"><Trash2 className="w-4 h-4"/></button>
+          </div>
+          <input value={card.subtitle || ''} onChange={e=>updateImportedArrayItem(index,'cards',i,{subtitle:e.target.value})} placeholder="Dòng phụ / vai trò" className="w-full rounded-lg border bg-white px-3 py-2 text-sm"/>
+          <textarea value={card.text || ''} onChange={e=>updateImportedArrayItem(index,'cards',i,{text:e.target.value})} placeholder="Nội dung" className="w-full min-h-16 rounded-lg border bg-white px-3 py-2 text-sm"/>
+          {card.image?.src !== undefined && <input value={card.image?.src || ''} onChange={e=>updateImportedArrayItem(index,'cards',i,{image:{...(card.image || {}),src:e.target.value}})} placeholder="Link ảnh" className="w-full rounded-lg border bg-white px-3 py-2 text-sm"/>}
+        </div>)}
+      </div>}
+      {images.length > 0 && <div className="space-y-2">
+        <label className="text-xs font-bold text-gray-600">Hình ảnh</label>
+        {images.map((image:any,i:number)=><div key={i} className="flex gap-2 rounded-xl border bg-gray-50 p-2">
+          <input value={image.src || ''} onChange={e=>updateImportedArrayItem(index,'images',i,{src:e.target.value})} placeholder="Link ảnh" className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm"/>
+          <button type="button" onClick={()=>removeImportedArrayItem(index,'images',i)} className="rounded-lg p-2 text-red-500"><Trash2 className="w-4 h-4"/></button>
+        </div>)}
+      </div>}
+      {actions.length > 0 && <div className="space-y-2">
+        <label className="text-xs font-bold text-gray-600">Nút / liên kết</label>
+        {actions.map((action:any,i:number)=><div key={i} className="grid gap-2 rounded-xl border bg-gray-50 p-3 md:grid-cols-2">
+          <input value={action.label || ''} onChange={e=>updateImportedArrayItem(index,'actions',i,{label:e.target.value})} placeholder="Chữ trên nút" className="rounded-lg border bg-white px-3 py-2 text-sm"/>
+          <input value={action.href || ''} onChange={e=>updateImportedArrayItem(index,'actions',i,{href:e.target.value})} placeholder="#section hoặc https://..." className="rounded-lg border bg-white px-3 py-2 text-sm"/>
+        </div>)}
+      </div>}
+      <div className="grid gap-2 rounded-xl border bg-gray-50 p-3 md:grid-cols-2">
+        <div><label className="mb-1 block text-[10px] font-black uppercase text-gray-500">Màu nền khối</label><input value={design.backgroundColor || ''} onChange={e=>updateImportedDesign(index,'backgroundColor',e.target.value)} placeholder="#FFFFFF" className="w-full rounded-lg border bg-white px-3 py-2 text-sm"/></div>
+        <div><label className="mb-1 block text-[10px] font-black uppercase text-gray-500">Màu chữ</label><input value={design.textColor || ''} onChange={e=>updateImportedDesign(index,'textColor',e.target.value)} placeholder="#1F2937" className="w-full rounded-lg border bg-white px-3 py-2 text-sm"/></div>
+      </div>
+    </div>
+  }
+
   const simpleEditor = (sec: any, index: number) => {
+    if (sec.variant === 'imported-v1') return importedEditor(sec, index)
     const common = <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Nội dung mô tả',true)}</div>
     if (sec.sectionType === 'wigrow_artwork') return <div className="grid gap-3">{imageUrlField(index,'imageUrl','Hình ảnh')}{field(index,'imageAlt','Mô tả hình ảnh')}{field(index,'title','Tiêu đề trên ảnh')}{field(index,'accent','Dòng nhấn mạnh')}{field(index,'description','Nội dung',true)}</div>
     if (sec.sectionType === 'quote') return <div className="grid gap-3">{field(index,'quote','Câu trích dẫn',true)}{field(index,'author','Tác giả')}{field(index,'caption','Ghi chú')}</div>
@@ -568,8 +664,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
                 <button type="button" onClick={() => setExpandedSection(open?null:index)} className="w-full p-4 flex items-center gap-3 text-left">
                   <span draggable onDragStart={e => { e.stopPropagation(); setDragIndex(index) }} onDragEnd={() => setDragIndex(null)} onClick={e => e.stopPropagation()} title="Giữ và kéo để đổi vị trí" className="cursor-grab active:cursor-grabbing p-1 -m-1"><GripVertical className="w-4 h-4 text-gray-400 shrink-0" /></span><span className="w-7 h-7 rounded-full bg-gray-900 text-yellow-400 flex items-center justify-center text-xs font-black">{index+1}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="font-black text-sm text-gray-900">{sectionName(sec.sectionType)}</div>
-                    <div className="text-xs text-gray-400 truncate">{sec.content?.title || sec.content?.description || 'Bấm để thêm nội dung'}</div>
+                    <div className="font-black text-sm text-gray-900">{sec.variant === 'imported-v1' ? (sec.content?.importedMeta?.label || sectionName(sec.sectionType)) : sectionName(sec.sectionType)}</div>
+                    <div className="text-xs text-gray-400 truncate">{sec.variant === 'imported-v1' ? (sec.content?.importedSource?.heading || 'Nội dung nhập từ website') : (sec.content?.title || sec.content?.description || 'Bấm để thêm nội dung')}</div>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${sec.enabled?'bg-green-50 text-green-700':'bg-gray-100 text-gray-400'}`}>{sec.enabled?'Đang hiện':'Đang ẩn'}</span>
                   {open?<ChevronUp className="w-4 h-4"/>:<ChevronDown className="w-4 h-4"/>}

@@ -27,6 +27,7 @@ export interface CourseThemeConfig {
   containerWidth?: string;
   backgroundImage?: string;
   backgroundOverlay?: string;
+  importedLayout?: boolean;
 }
 
 export interface CourseNavigationConfig {

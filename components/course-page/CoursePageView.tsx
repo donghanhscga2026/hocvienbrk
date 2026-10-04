@@ -103,13 +103,14 @@ export default function CoursePageView({
     }
   }
 
+  const importedLayout = coursePage.theme?.importedLayout === true
   const totalDays = 100
   const currentDay = Math.min(totalDays, Math.round((scrollProgress / 100) * totalDays))
 
   return (
     <CourseThemeProvider theme={coursePage.theme}>
       {/* Scroll progress bar */}
-      {coursePage.navigation.showProgress && (
+      {!importedLayout && coursePage.navigation.showProgress && (
         <div className="fixed right-[18px] top-0 bottom-0 z-40 hidden md:flex items-center pointer-events-none">
           <div className="relative w-[2px] h-[70vh] bg-white/10 mx-auto">
             <div
@@ -130,7 +131,7 @@ export default function CoursePageView({
       )}
 
       {/* Navigation */}
-      <nav
+      {!importedLayout && <nav
         className="fixed top-0 left-0 right-0 z-50 px-2 py-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] flex justify-between items-center gap-1 sm:gap-3 sm:px-4"
         style={{
           background: 'color-mix(in srgb, var(--course-surface) 92%, transparent)',
@@ -167,10 +168,10 @@ export default function CoursePageView({
         </button>
         <div className="flex items-center justify-end gap-1"><NotificationBell /><CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} compact /></div>
         </div>
-      </nav>
+      </nav>}
 
       {/* Page sections */}
-      <div className="pt-[calc(80px_+_env(safe-area-inset-top))]">
+      <div className={importedLayout ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}>
         <SectionRenderer
           sections={coursePage.sections}
           isEnrolled={isEnrolled}
@@ -185,7 +186,7 @@ export default function CoursePageView({
       </div>
 
       {/* Footer */}
-      <footer
+      {!importedLayout && <footer
         className="py-10 text-center text-sm"
         style={{
           background: 'var(--course-surface)',
@@ -195,7 +196,7 @@ export default function CoursePageView({
         }}
       >
         <p>© 2026 {coursePage.name}. All rights reserved.</p>
-      </footer>
+      </footer>}
 
       {/* ── Share Link Modal ─────────────────────────────────────────────── */}
       {showShare && (

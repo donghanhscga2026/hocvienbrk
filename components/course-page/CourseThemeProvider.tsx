@@ -48,7 +48,13 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
 
       '--radius-card':   theme.borderRadius  || '16px',
       '--radius-button': theme.buttonRadius  || '8px',
-      '--container':     '1180px',
+      '--container':     theme.containerWidth || '1180px',
+      '--course-heading-font': theme.headingFont
+        ? `"${theme.headingFont}", var(--font-course-serif), Georgia, serif`
+        : 'var(--font-course-serif), Georgia, serif',
+      '--course-body-font': theme.bodyFont
+        ? `"${theme.bodyFont}", var(--font-course-sans), system-ui, sans-serif`
+        : 'var(--font-course-sans), system-ui, sans-serif',
       '--section-space': '120px',
       '--transition':    '.3s ease',
 
@@ -63,7 +69,7 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
       '--course-border':    'rgba(255,255,255,.08)',
       '--course-radius':    theme.borderRadius   || '16px',
       '--course-btn-radius':theme.buttonRadius   || '8px',
-      '--course-container-max': '1180px',
+      '--course-container-max': theme.containerWidth || '1180px',
     } as React.CSSProperties
   }, [theme])
 
@@ -75,7 +81,7 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
           box-sizing: border-box;
         }
         .course-page {
-          font-family: var(--font-course-sans), system-ui, sans-serif;
+          font-family: var(--course-body-font);
           font-size: 18px;
           line-height: 1.75;
         }
@@ -84,7 +90,7 @@ export default function CourseThemeProvider({ theme, children }: CourseThemeProv
         .course-page h3,
         .course-page h4,
         .course-page .font-serif {
-          font-family: var(--font-course-serif), Georgia, serif !important;
+          font-family: var(--course-heading-font) !important;
           letter-spacing: -0.02em;
           line-height: 1.15;
         }

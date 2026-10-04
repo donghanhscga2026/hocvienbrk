@@ -7,6 +7,7 @@ import { BookOpen, Users, DollarSign, Settings, Loader2, Plus, Eye, EyeOff, Chec
 import Link from 'next/link'
 import MainHeader from '@/components/layout/MainHeader'
 import { getCoursePages, updateCoursePage, createCoursePage, applyCoursePageTemplate } from '@/app/actions/course-page-actions'
+import { applyStoredCoursePageTemplate, getStoredCoursePageTemplateOptions } from '@/app/actions/course-page-template-actions'
 import { COURSE_TEMPLATE_LIBRARY, CourseTemplateKey } from '@/lib/course-page/templates'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
 import AdminMemberRosterTab from '@/components/course/AdminMemberRosterTab'
@@ -49,6 +50,7 @@ export default function ToolsCoursesPage() {
 function CoursesTab() {
     const [courses, setCourses] = useState<any[]>([])
     const [coursePages, setCoursePages] = useState<any[]>([])
+    const [storedTemplates, setStoredTemplates] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
@@ -102,6 +104,9 @@ function CoursesTab() {
 
     useEffect(() => {
         getCoursePages().then(setCoursePages)
+        getStoredCoursePageTemplateOptions().then(res => {
+            if (res.success) setStoredTemplates(res.templates || [])
+        }).catch(() => {})
         fetch('/api/vouchers').then(r => r.json()).then(data => setAllVouchers(data.vouchers || [])).catch(() => {})
         // ✅ Danh sách GV cho dropdown lọc — tải riêng, độc lập với phạm vi khoá học
         // đang xem, để ADMIN luôn chọn được bất kỳ GV nào (kể cả khi đang chỉ xem
@@ -142,13 +147,18 @@ function CoursesTab() {
         }
     }
 
-    const handleApplyTemplate = async (course: any, page: any, templateKey: CourseTemplateKey) => {
-        const template = COURSE_TEMPLATE_LIBRARY.find(t => t.key === templateKey)
+    const handleApplyTemplate = async (course: any, page: any, templateKey: string) => {
+        const customId = templateKey.startsWith('custom:') ? templateKey.slice('custom:'.length) : null
+        const template = customId
+            ? storedTemplates.find(t => t.id === customId)
+            : COURSE_TEMPLATE_LIBRARY.find(t => t.key === templateKey)
         if (!template) return
         if (page && !confirm(`Áp dụng mẫu "${template.name}" sẽ thay thế bố cục trang hiện tại của khóa học này. Nội dung của các khóa học khác không bị ảnh hưởng. Tiếp tục?`)) return
         setBatchLoading(true)
         try {
-            const res = await applyCoursePageTemplate(course.id_khoa, course.name_lop || course.id_khoa, templateKey)
+            const res = customId
+                ? await applyStoredCoursePageTemplate(customId, course.id_khoa, course.name_lop || course.id_khoa)
+                : await applyCoursePageTemplate(course.id_khoa, course.name_lop || course.id_khoa, templateKey as CourseTemplateKey)
             if (res.success) {
                 const pages = await getCoursePages()
                 setCoursePages(pages)
@@ -503,14 +513,23 @@ function CoursesTab() {
                                                                 {isTemplateApplied && (
                                                                     <select
                                                                         value={(page?.seo as any)?.templateKey || ''}
-                                                                        onChange={(e) => e.target.value && handleApplyTemplate(course, page, e.target.value as CourseTemplateKey)}
-                                                                        className="h-6 max-w-[105px] rounded-md border border-purple-200 bg-white px-1 text-[9px] font-bold text-purple-800"
+                                                                        onChange={(e) => e.target.value && handleApplyTemplate(course, page, e.target.value)}
+                                                                        className="h-6 max-w-[125px] rounded-md border border-purple-200 bg-white px-1 text-[9px] font-bold text-purple-800"
                                                                         title="Chọn mẫu giao diện"
                                                                     >
                                                                         <option value="">Tùy chỉnh</option>
-                                                                        {COURSE_TEMPLATE_LIBRARY.map(template => (
-                                                                            <option key={template.key} value={template.key}>{template.name}</option>
-                                                                        ))}
+                                                                        <optgroup label="Mẫu hệ thống">
+                                                                            {COURSE_TEMPLATE_LIBRARY.map(template => (
+                                                                                <option key={template.key} value={template.key}>{template.name}</option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                        {storedTemplates.length > 0 && (
+                                                                            <optgroup label="Mẫu của tôi">
+                                                                                {storedTemplates.map(template => (
+                                                                                    <option key={template.id} value={`custom:${template.id}`}>{template.name}</option>
+                                                                                ))}
+                                                                            </optgroup>
+                                                                        )}
                                                                     </select>
                                                                 )}
                                                                 {isTemplateApplied && page && (

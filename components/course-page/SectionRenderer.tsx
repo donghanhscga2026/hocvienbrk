@@ -18,6 +18,7 @@ import CurriculumSection from './sections/CurriculumSection'
 import TestimonialsSection from './sections/TestimonialsSection'
 import RichContentSection from './sections/RichContentSection'
 import WiGrowArtworkSection from './sections/WiGrowArtworkSection'
+import ImportedSection from './sections/ImportedSection'
 
 const sectionRegistry: Record<CourseSectionType, React.ComponentType<any>> = {
   hero: HeroSection,
@@ -77,6 +78,17 @@ export default function SectionRenderer({
     <>
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
+        if (section.variant === 'imported-v1') {
+          return (
+            <ImportedSection
+              key={section.id}
+              id={section.anchorId || section.sectionKey}
+              content={section.content}
+              onAction={onAction}
+            />
+          )
+        }
+
         const Component = sectionRegistry[type as CourseSectionType]
         if (!Component) {
           console.warn(`Unsupported course section type: ${type}`)

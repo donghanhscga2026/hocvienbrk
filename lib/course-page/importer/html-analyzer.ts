@@ -97,7 +97,12 @@ function extractCards(html: string, baseUrl?: string): ImportedCard[] {
     const paragraphs = extractTagTexts(body, 'p')
     const image = extractImages(body, baseUrl)[0]
     const title = heading ? cleanText(heading[1]) : undefined
-    const text = paragraphs.join('\n').trim() || undefined
+    let residual = body
+    if (heading?.[0]) residual = residual.replace(heading[0], ' ')
+    if (subtitle?.[0]) residual = residual.replace(subtitle[0], ' ')
+    residual = residual.replace(/<img\b[^>]*>/gi, ' ').replace(/<svg\b[\s\S]*?<\/svg>/gi, ' ')
+    const residualText = cleanText(residual)
+    const text = paragraphs.join('\n').trim() || residualText || undefined
     if (title || text || image) {
       cards.push({
         title,
@@ -129,9 +134,23 @@ function extractActions(html: string, baseUrl?: string): ImportedAction[] {
   while ((match = linkRe.exec(html)) && actions.length < 30) {
     const label = cleanText(match[2])
     if (!label) continue
+    const rawHref = attr(match[1], 'href')
+    let href = rawHref
+    if (rawHref && !rawHref.startsWith('#')) {
+      const resolved = resolveAssetUrl(rawHref, baseUrl)
+      try {
+        const resolvedUrl = resolved ? new URL(resolved) : null
+        const base = baseUrl ? new URL(baseUrl) : null
+        href = resolvedUrl && base && resolvedUrl.origin === base.origin && resolvedUrl.pathname === base.pathname && resolvedUrl.hash
+          ? resolvedUrl.hash
+          : resolved
+      } catch {
+        href = resolved
+      }
+    }
     actions.push({
       label,
-      href: resolveAssetUrl(attr(match[1], 'href'), baseUrl),
+      href,
       kind: 'link',
     })
   }
@@ -186,6 +205,7 @@ function inferSectionType(input: {
 
   if (input.tag === 'header') return { type: 'header', confidence: 0.99 }
   if (input.tag === 'footer') return { type: 'footer', confidence: 0.99 }
+  if (input.tag === 'nav' && /(sticky|fixed|bottom|bar|đăng ký|dang-ky|cta)/i.test(haystack)) return { type: 'sticky_cta', confidence: 0.94 }
   if (input.formCount > 0 || /(đăng ký|dang-ky|registration|register|lead form|opt-?in)/i.test(haystack)) return { type: 'registration', confidence: 0.96 }
   if (input.faqCount >= 2 || /(faq|hỏi đáp|hoi-dap|câu hỏi thường gặp)/i.test(haystack)) return { type: 'faq', confidence: 0.96 }
   if (/(hero|banner|masthead|đầu trang)/i.test(haystack) || (input.index === 0 && /<h1\b/i.test(input.html))) return { type: 'hero', confidence: 0.94 }
@@ -218,6 +238,7 @@ function pickSectionLabel(type: ImportedSectionType, heading: string | undefined
     registration: 'Form đăng ký',
     closing_message: 'Lời kết',
     footer: 'Footer',
+    sticky_cta: 'Thanh hành động cố định',
     rich_content: 'Nội dung',
   }
   return `${names[type]} ${index + 1}`
@@ -330,6 +351,8 @@ function sectionContent(
     case 'header':
     case 'footer':
       return { title: heading, paragraphs, links: actions, images }
+    case 'sticky_cta':
+      return { title: heading, actions }
     default:
       return {
         title: heading,
@@ -484,7 +507,11 @@ export function analyzeWebsiteHtml(input: {
   const { html, sourceType, sourceUrl, finalUrl } = input
   const warnings: string[] = []
   const savedFromUrl = inferSavedFromUrl(html)
-  const baseUrl = finalUrl || sourceUrl || savedFromUrl
+  const sourcePageUrl = finalUrl || sourceUrl || savedFromUrl
+  // A browser-exported HTML file usually rewrites images to a sibling *_files
+  // folder. Do not pretend those local paths exist on the original website.
+  // URL imports can safely resolve relative assets against the fetched URL.
+  const assetBaseUrl = sourceType === 'url' ? sourcePageUrl : (sourceUrl || undefined)
 
   const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)
   const title = titleMatch ? cleanText(titleMatch[1]) : 'Mẫu website đã nhập'
@@ -496,7 +523,7 @@ export function analyzeWebsiteHtml(input: {
   const fonts = extractFonts(css)
 
   const blocks: Array<{ tag: string; attrs: string; html: string }> = []
-  const blockRe = /<(header|section|footer)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\1>/gi
   let blockMatch: RegExpExecArray | null
   while ((blockMatch = blockRe.exec(html)) && blocks.length < MAX_SECTIONS) {
     blocks.push({ tag: blockMatch[1].toLowerCase(), attrs: blockMatch[2], html: blockMatch[0] })
@@ -514,10 +541,10 @@ export function analyzeWebsiteHtml(input: {
     const heading = extractHeading(block.html)
     const paragraphs = extractTagTexts(block.html, 'p').slice(0, MAX_TEXT_ITEMS)
     const listItems = extractTagTexts(block.html, 'li').slice(0, MAX_TEXT_ITEMS)
-    const images = extractImages(block.html, baseUrl)
-    const cards = extractCards(block.html, baseUrl)
+    const images = extractImages(block.html, assetBaseUrl)
+    const cards = extractCards(block.html, assetBaseUrl)
     const tableRows = extractTableRows(block.html)
-    const actions = extractActions(block.html, baseUrl)
+    const actions = extractActions(block.html, sourcePageUrl)
     const faqItems = extractFaq(block.html)
     const formFields = extractFormFields(block.html)
     const inferred = inferSectionType({
@@ -595,7 +622,7 @@ export function analyzeWebsiteHtml(input: {
       textColor: resolveCssValue(cssVars['--text'] || cssVars['--foreground'], cssVars)
         || colors.find(color => /#(?:1|2|3)[0-9a-f]{5}/i.test(color)) || colors[3],
       headingFont: fonts[0],
-      bodyFont: fonts[1] || fonts[0],
+      bodyFont: fonts[0],
       borderRadius: resolveCssValue(cssVars['--radius'], cssVars),
       containerWidth: resolveCssValue(cssVars['--maxw'] || cssVars['--container'], cssVars),
     },
