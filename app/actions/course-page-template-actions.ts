@@ -86,6 +86,18 @@ function mapImportedSection(section: ImportedSectionCandidate, sortOrder: number
         sourceClass: section.sourceClass,
         confidence: section.confidence,
       },
+      importedSource: {
+        sectionType: section.sectionType,
+        heading: section.heading,
+        paragraphs: section.paragraphs,
+        listItems: section.listItems,
+        cards: section.cards,
+        tableRows: section.tableRows,
+        images: section.images,
+        actions: section.actions,
+        faqItems: section.faqItems,
+        formFields: section.formFields,
+      },
     }),
   }
 }
