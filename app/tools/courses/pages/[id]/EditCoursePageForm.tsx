@@ -284,6 +284,27 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     </div>)}
   </div>
 
+  const roadmapEditor = (index:number) => <div className="space-y-3">
+    <div className="flex justify-between items-center"><label className="text-xs font-bold text-gray-600">Các chặng / giai đoạn</label><button type="button" onClick={()=>addNestedItem(index,'phases',{period:'',title:'',description:'',details:[]})} className="text-xs font-bold text-purple-700">+ Thêm chặng</button></div>
+    {(sections[index]?.content?.phases || []).map((phase:any,i:number)=><div key={phase.id||i} className="rounded-xl border bg-gray-50 p-3 space-y-2">
+      <div className="flex gap-2"><input value={phase.period||''} onChange={e=>updateNestedItem(index,'phases',i,{period:e.target.value})} placeholder="Thời gian / Giai đoạn" className="w-40 rounded-lg border px-3 py-2 text-sm bg-white"/><input value={phase.title||''} onChange={e=>updateNestedItem(index,'phases',i,{title:e.target.value})} placeholder="Tên chặng" className="flex-1 rounded-lg border px-3 py-2 text-sm bg-white"/><button type="button" onClick={()=>removeNestedItem(index,'phases',i)} className="p-2 text-red-500"><Trash2 className="w-4 h-4"/></button></div>
+      <textarea value={phase.description||''} onChange={e=>updateNestedItem(index,'phases',i,{description:e.target.value})} placeholder="Mô tả" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-16"/>
+      <textarea value={(phase.details||[]).join('\n')} onChange={e=>updateNestedItem(index,'phases',i,{details:e.target.value.split('\n').filter(Boolean)})} placeholder="Chi tiết, mỗi dòng một ý" className="w-full rounded-lg border px-3 py-2 text-sm bg-white min-h-16"/>
+    </div>)}
+  </div>
+
+  const ctaEditor = (index:number, key:'primaryCta'|'secondaryCta'|'cta', label:string) => {
+    const cta=sections[index]?.content?.[key] || {}
+    return <div className="rounded-xl border bg-gray-50 p-3 grid gap-2">
+      <label className="text-xs font-bold text-gray-600">{label}</label>
+      <input value={cta.label||''} onChange={e=>updateNestedContent(index,key,'label',e.target.value)} placeholder="Chữ trên nút" className="w-full rounded-lg border px-3 py-2 text-sm bg-white"/>
+      <div className="grid md:grid-cols-2 gap-2">
+        <select value={cta.action||'scroll'} onChange={e=>updateNestedContent(index,key,'action',e.target.value)} className="rounded-lg border px-3 py-2 text-sm bg-white"><option value="open_registration">Mở đăng ký</option><option value="scroll">Cuộn tới một phần</option><option value="external_link">Mở liên kết</option></select>
+        <input value={cta.target||''} onChange={e=>updateNestedContent(index,key,'target',e.target.value)} placeholder="Đích / link (nếu cần)" className="rounded-lg border px-3 py-2 text-sm bg-white"/>
+      </div>
+    </div>
+  }
+
   const imageUrlField = (index:number, key:string, label:string) => {
     const value=sections[index]?.content?.[key] || ''
     return <div>
@@ -303,11 +324,11 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
     if (sec.sectionType === 'wigrow_artwork') return <div className="grid gap-3">{imageUrlField(index,'imageUrl','Hình ảnh')}{field(index,'imageAlt','Mô tả hình ảnh')}{field(index,'title','Tiêu đề trên ảnh')}{field(index,'accent','Dòng nhấn mạnh')}{field(index,'description','Nội dung',true)}</div>
     if (sec.sectionType === 'quote') return <div className="grid gap-3">{field(index,'quote','Câu trích dẫn',true)}{field(index,'author','Tác giả')}{field(index,'caption','Ghi chú')}</div>
     if (sec.sectionType === 'closing_message') return <div className="grid gap-3">{field(index,'title','Tiêu đề')}{paragraphsEditor(index)}{field(index,'signature','Chữ ký')}</div>
-    if (sec.sectionType === 'rich_content') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{paragraphsEditor(index)}{imageUrlField(index,'imageUrl','Hình ảnh minh họa')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút</label><input value={sec.content?.cta?.label||''} onChange={e=>updateNestedContent(index,'cta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"/></div></div>
-    if (sec.sectionType === 'roadmap') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'phases','Các chặng / giai đoạn')}</div>
+    if (sec.sectionType === 'rich_content') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{paragraphsEditor(index)}{imageUrlField(index,'imageUrl','Hình ảnh minh họa')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Vị trí ảnh</label><select value={sec.content?.imagePosition||'right'} onChange={e=>updateContent(index,'imagePosition',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white"><option value="left">Bên trái</option><option value="right">Bên phải</option><option value="top">Phía trên</option></select></div>{ctaEditor(index,'cta','Nút hành động')}</div>
+    if (sec.sectionType === 'roadmap') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{roadmapEditor(index)}</div>
     if (sec.sectionType === 'instructor') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{instructorsEditor(index)}</div>
     if (sec.sectionType === 'pricing') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{pricingEditor(index)}{field(index,'paymentNote','Ghi chú thanh toán',true)}</div>
-    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{imageUrlField(index,'imageUrl','Ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}<div><label className="block text-xs font-bold text-gray-600 mb-1">Chữ trên nút chính</label><input value={sec.content?.primaryCta?.label||''} onChange={e=>updateNestedContent(index,'primaryCta','label',e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></div></div>
+    if (sec.sectionType === 'hero') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề chính')}{field(index,'highlightedText','Dòng nhấn mạnh')}{field(index,'description','Mô tả',true)}{imageUrlField(index,'imageUrl','Ảnh chính')}{field(index,'imageAlt','Mô tả ảnh')}{ctaEditor(index,'primaryCta','Nút chính')}{ctaEditor(index,'secondaryCta','Nút phụ (không bắt buộc)')}</div>
     if (sec.sectionType === 'benefits' || sec.sectionType === 'outcomes' || sec.sectionType === 'pain_points') return <div className="grid gap-3">{field(index,'eyebrow','Dòng chữ nhỏ')}{field(index,'title','Tiêu đề')}{field(index,'description','Mô tả',true)}{listEditor(index,'items','Các mục nội dung')}</div>
     return common
   }
