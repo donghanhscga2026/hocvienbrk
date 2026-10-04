@@ -8,7 +8,15 @@ type MirrorOptions = {
 }
 
 function replaceStrings(value: unknown, replacements: Map<string, string>): unknown {
-  if (typeof value === 'string') return replacements.get(value) || value
+  if (typeof value === 'string') {
+    const exact = replacements.get(value)
+    if (exact) return exact
+    let next = value
+    replacements.forEach((replacement, source) => {
+      if (next.includes(source)) next = next.split(source).join(replacement)
+    })
+    return next
+  }
   if (Array.isArray(value)) return value.map(item => replaceStrings(item, replacements))
   if (value && typeof value === 'object') {
     return Object.fromEntries(
@@ -63,10 +71,13 @@ export async function mirrorAnalysisImages(
   ) as WebsiteTemplateAnalysis
 
   if (options.failOnEmbeddedData) {
-    const unresolved = mirrored.sections
+    const unresolvedImages = mirrored.sections
       .flatMap(section => section.images || [])
       .filter(image => /^data:image\//i.test(image.src))
-    if (unresolved.length) {
+    const unresolvedFidelity = mirrored.sections.some(section =>
+      /data:image\//i.test(section.fidelity?.html || '') || /data:image\//i.test(section.fidelity?.css || ''),
+    )
+    if (unresolvedImages.length || unresolvedFidelity) {
       throw new Error('Không thể lưu một số ảnh nhúng vào kho ảnh. Vui lòng thử lại hoặc kiểm tra cấu hình Supabase Storage.')
     }
   }
