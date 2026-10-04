@@ -26,6 +26,7 @@ function actionFor(href?: string) {
 }
 
 export default function ImportedSection({ id, content, onAction }: ImportedSectionProps) {
+  const [galleryIndex, setGalleryIndex] = React.useState<number | null>(null)
   const source = content?.importedSource || {}
   const design = content?.design || {}
   const type = source.sectionType || 'rich_content'
@@ -86,6 +87,16 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
     )
   }
 
+  if (type === 'sticky_cta') {
+    return (
+      <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-black/10 bg-white/95 p-2 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+        <div className="mx-auto grid max-w-xl gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(actions.length, 2))}, minmax(0, 1fr))` }}>
+          {(actions.length ? actions : [{ label: 'Đăng ký', kind: 'button' }]).slice(0, 2).map(renderAction)}
+        </div>
+      </div>
+    )
+  }
+
   if (type === 'header') {
     return (
       <section id={id} style={sectionStyle}>
@@ -113,20 +124,39 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
   }
 
   if (type === 'gallery') {
+    const activeImage = galleryIndex === null ? null : images[galleryIndex]
     return (
-      <section id={id} style={sectionStyle}>
-        <div style={containerStyle}>
-          {heading && <h2 style={headingStyle}>{heading}</h2>}
-          {paragraphs[0] && <p style={paragraphStyle}>{paragraphs[0]}</p>}
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {images.slice(0, 16).map((image, index) => (
-              <figure key={index} className={(index % 5 === 0 ? 'md:col-span-2 ' : '') + 'overflow-hidden rounded-2xl bg-black/5'}>
-                <img src={image.src} alt={image.alt || ''} className="h-full min-h-40 w-full object-cover" loading="lazy" />
-              </figure>
-            ))}
+      <>
+        <section id={id} style={sectionStyle}>
+          <div style={containerStyle}>
+            {heading && <h2 style={headingStyle}>{heading}</h2>}
+            {paragraphs[0] && <p style={paragraphStyle}>{paragraphs[0]}</p>}
+            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {images.slice(0, 16).map((image, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setGalleryIndex(index)}
+                  className={(index % 5 === 0 ? 'md:col-span-2 ' : '') + 'min-h-40 overflow-hidden rounded-2xl bg-black/5'}
+                >
+                  <img src={image.src} alt={image.alt || ''} className="h-full min-h-40 w-full object-cover transition hover:scale-105" loading="lazy" />
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+        {activeImage && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setGalleryIndex(null)}
+          >
+            <button type="button" className="absolute right-4 top-4 h-11 w-11 rounded-full bg-white text-xl font-black text-gray-900" onClick={() => setGalleryIndex(null)} aria-label="Đóng ảnh">×</button>
+            <img src={activeImage.src} alt={activeImage.alt || ''} className="max-h-[88vh] max-w-full rounded-xl object-contain" onClick={e => e.stopPropagation()} />
+          </div>
+        )}
+      </>
     )
   }
 
@@ -172,6 +202,25 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
             {actions.find(action => action.kind === 'button')?.label || actions[0]?.label || 'Đăng ký ngay'}
           </button>
           <p className="mt-3 text-center text-xs text-gray-500">Thông tin đăng ký được xử lý bằng hệ thống MFC, không gửi về form của website nguồn.</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (type === 'roadmap' && listItems.length) {
+    return (
+      <section id={id} style={sectionStyle}>
+        <div style={{ ...containerStyle, maxWidth: '820px' }}>
+          {heading && <h2 style={headingStyle}>{heading}</h2>}
+          {paragraphs[0] && <p style={paragraphStyle}>{paragraphs[0]}</p>}
+          <ol className="mt-7 space-y-4 text-left">
+            {listItems.map((item, index) => (
+              <li key={index} className="grid grid-cols-[44px_1fr] items-start gap-3">
+                <span className="grid h-11 w-11 place-items-center rounded-full font-black text-white" style={{ background: 'var(--course-primary)' }}>{index + 1}</span>
+                <div className="rounded-2xl border border-black/10 bg-white/85 px-4 py-3 text-gray-800 shadow-sm">{item}</div>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
     )
@@ -236,8 +285,10 @@ export default function ImportedSection({ id, content, onAction }: ImportedSecti
           {!!actions.length && <div className={'mt-6 flex flex-wrap gap-3 ' + (design.alignment === 'center' ? 'justify-center' : '')}>{actions.slice(0, isHero ? 3 : 2).map(renderAction)}</div>}
         </div>
         {!!images.length && (
-          <div className={layout === 'split' ? '' : 'mt-7'}>
+          <div className={(layout === 'split' ? '' : 'mt-7') + (isHero && images.length > 1 ? ' relative pb-10' : '')}>
             <img src={images[0].src} alt={images[0].alt || heading || ''} className="mx-auto max-h-[560px] w-full rounded-3xl object-cover shadow-lg" loading={isHero ? 'eager' : 'lazy'} />
+            {isHero && images[1] && <img src={images[1].src} alt={images[1].alt || ''} className="absolute -bottom-1 left-0 aspect-square w-[32%] -rotate-3 rounded-2xl border-4 border-white object-cover shadow-lg" />}
+            {isHero && images[2] && <img src={images[2].src} alt={images[2].alt || ''} className="absolute -bottom-1 right-0 aspect-square w-[32%] rotate-3 rounded-2xl border-4 border-white object-cover shadow-lg" />}
           </div>
         )}
       </div>
