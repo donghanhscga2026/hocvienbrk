@@ -135,6 +135,7 @@ function buildSnapshot(
       bodyFont: analysis.theme.bodyFont,
       borderRadius: analysis.theme.borderRadius || '18px',
       containerWidth: analysis.theme.containerWidth || '1120px',
+      importedLayout: true,
     },
     navigation: {
       shortName: name,
