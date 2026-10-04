@@ -58,6 +58,48 @@ function resolveAssetUrl(value: string | undefined, baseUrl?: string): string | 
   try { return new URL(v, baseUrl).toString() } catch { return v }
 }
 
+
+function sanitizeFidelityCss(css: string, baseUrl?: string): string {
+  let safe = css
+    .replace(/@import\s+(?:url\()?[^;]+;?/gi, '')
+    .replace(/expression\s*\([^)]*\)/gi, '')
+    .replace(/behavior\s*:[^;}{]+;?/gi, '')
+    .replace(/-moz-binding\s*:[^;}{]+;?/gi, '')
+    .replace(/url\s*\(\s*(['"]?)\s*javascript:[^)]*\)/gi, 'none')
+
+  safe = safe.replace(/url\s*\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (all, quote, raw) => {
+    const value = String(raw).trim()
+    if (!value || value.startsWith('#') || value.startsWith('data:')) return all
+    const resolved = resolveAssetUrl(value, baseUrl)
+    return resolved ? `url("${resolved.replace(/"/g, '%22')}")` : 'none'
+  })
+  return safe
+}
+
+function sanitizeFidelityHtml(html: string, baseUrl?: string): string {
+  let safe = html
+    .replace(/<!--([\s\S]*?)-->/g, '')
+    .replace(/<(script|style|iframe|object|embed|applet|base|meta|link)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(script|style|iframe|object|embed|applet|base|meta|link)\b[^>]*\/?>/gi, '')
+    .replace(/\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s+srcdoc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s+(?:action|formaction)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s+target\s*=\s*(?:"_top"|"_parent"|'_top'|'_parent'|_top|_parent)/gi, '')
+
+  safe = safe.replace(/(<(?:img|source)\b[^>]*?\s(?:src|data-src)\s*=\s*)(["'])(.*?)\2/gi, (all, prefix, quote, value) => {
+    const resolved = resolveAssetUrl(value, baseUrl)
+    return resolved ? `${prefix}${quote}${resolved}${quote}` : ''
+  })
+  safe = safe.replace(/(<a\b[^>]*?\shref\s*=\s*)(["'])(.*?)\2/gi, (all, prefix, quote, value) => {
+    const trimmed = String(value).trim()
+    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) return `${prefix}${quote}#${quote}`
+    if (trimmed.startsWith('#')) return all
+    const resolved = resolveAssetUrl(trimmed, baseUrl)
+    return resolved ? `${prefix}${quote}${resolved}${quote}` : `${prefix}${quote}#${quote}`
+  })
+  return safe
+}
+
 function extractTagTexts(html: string, tag: string): string[] {
   const out: string[] = []
   const re = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi')
@@ -569,12 +611,13 @@ export function analyzeWebsiteHtml(input: {
   const description = extractMeta(html, 'description')
   const language = attr(html.match(/<html\b([^>]*)>/i)?.[1] || '', 'lang')
   const css = extractCss(html)
+  const fidelityCss = sanitizeFidelityCss(css, assetBaseUrl)
   const cssVars = extractCssVariables(css)
   const colors = extractColors(css)
   const fonts = extractFonts(css)
 
   const blocks: Array<{ tag: string; attrs: string; html: string }> = []
-  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\x01>/gi
   let blockMatch: RegExpExecArray | null
   while ((blockMatch = blockRe.exec(html)) && blocks.length < MAX_SECTIONS) {
     blocks.push({ tag: blockMatch[1].toLowerCase(), attrs: blockMatch[2], html: blockMatch[0] })
@@ -629,6 +672,11 @@ export function analyzeWebsiteHtml(input: {
       faqItems: faqItems.length ? faqItems : undefined,
       formFields: formFields.length ? formFields : undefined,
       content: sectionContent(inferred.type, heading, paragraphs, listItems, images, cards, tableRows, actions, faqItems, formFields),
+      fidelity: {
+        html: sanitizeFidelityHtml(block.html, assetBaseUrl),
+        css: fidelityCss,
+        mode: 'isolated',
+      },
       design: inferDesign({
         html: block.html,
         type: inferred.type,

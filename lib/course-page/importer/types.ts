@@ -70,6 +70,11 @@ export type ImportedSectionCandidate = {
   formFields?: Array<{ name?: string; type?: string; placeholder?: string }>
   content: Record<string, unknown>
   design: ImportedDesign
+  fidelity?: {
+    html: string
+    css: string
+    mode: 'isolated'
+  }
 }
 
 export type WebsiteTemplateAnalysis = {

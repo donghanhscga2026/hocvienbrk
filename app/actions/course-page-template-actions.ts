@@ -53,6 +53,7 @@ function mapImportedSection(section: ImportedSectionCandidate, sortOrder: number
         actions: section.actions,
         faqItems: section.faqItems,
         formFields: section.formFields,
+        fidelity: section.fidelity,
       },
     }),
   }
