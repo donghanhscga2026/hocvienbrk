@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/api-auth'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { fetchRemoteHtml } from '@/lib/course-page/importer/fetch-html'
+import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024
 
@@ -30,7 +31,11 @@ export async function POST(request: NextRequest) {
       }
 
       const html = await file.text()
-      const analysis = analyzeWebsiteHtml({ html, sourceType: 'html', sourceUrl })
+      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html', sourceUrl })
+      const analysis = await mirrorAnalysisImages(rawAnalysis, {
+        dataOnly: true,
+        failOnEmbeddedData: true,
+      })
       return NextResponse.json({ success: true, analysis })
     }
 
@@ -40,11 +45,15 @@ export async function POST(request: NextRequest) {
 
     if (url) {
       const remote = await fetchRemoteHtml(url)
-      const analysis = analyzeWebsiteHtml({
+      const rawAnalysis = analyzeWebsiteHtml({
         html: remote.html,
         sourceType: 'url',
         sourceUrl: url,
         finalUrl: remote.finalUrl,
+      })
+      const analysis = await mirrorAnalysisImages(rawAnalysis, {
+        dataOnly: true,
+        failOnEmbeddedData: true,
       })
       return NextResponse.json({ success: true, analysis })
     }
@@ -53,7 +62,11 @@ export async function POST(request: NextRequest) {
       if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
         return NextResponse.json({ error: 'Nội dung HTML vượt quá giới hạn 5MB' }, { status: 400 })
       }
-      const analysis = analyzeWebsiteHtml({ html, sourceType: 'html' })
+      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html' })
+      const analysis = await mirrorAnalysisImages(rawAnalysis, {
+        dataOnly: true,
+        failOnEmbeddedData: true,
+      })
       return NextResponse.json({ success: true, analysis })
     }
 
