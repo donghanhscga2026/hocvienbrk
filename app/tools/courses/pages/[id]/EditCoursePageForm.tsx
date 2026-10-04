@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Save, Plus, Trash2, ArrowUp, ArrowDown, Settings, FileText, Palette, Copy, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, GripVertical, RefreshCw } from 'lucide-react'
-import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion } from '@/app/actions/course-page-actions'
+import { updateCoursePage, saveCourseSections, publishCoursePage, getCoursePageVersions, restoreCoursePageVersion, createCoursePageCheckpoint } from '@/app/actions/course-page-actions'
 
 interface EditCoursePageFormProps {
   initialPage: {
@@ -67,7 +67,8 @@ export default function EditCoursePageForm({ initialPage }: EditCoursePageFormPr
         // Now save sections
         const secRes = await saveCourseSections(initialPage.id, sections)
         if (secRes.success) {
-          setMessage({ type: 'success', text: 'Đã lưu thay đổi thành công!' })
+          const checkpoint = await createCoursePageCheckpoint(initialPage.id)
+          setMessage({ type: 'success', text: checkpoint.success ? `Đã lưu bản nháp • Phiên bản ${checkpoint.versionNumber}` : 'Đã lưu bản nháp thành công!' })
           setDirty(false)
           setPreviewKey(k => k + 1)
           router.refresh()
