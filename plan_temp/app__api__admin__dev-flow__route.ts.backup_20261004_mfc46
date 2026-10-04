@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { github, marker, parseMeta, replaceMeta, repoPath, slugify, type DevFlowMeta } from '@/lib/github-dev-flow'
 
-async function requireDevFlowAccess() {
+async function requireAdmin() {
   const session = await auth()
-  if (!session?.user || !['ADMIN', 'DEVELOPER'].includes(session.user.role)) return null
+  if (!session?.user || session.user.role !== 'ADMIN') return null
   return session.user
 }
 
@@ -52,7 +52,7 @@ async function snapshot(issue: any, meta: DevFlowMeta) {
 }
 
 export async function GET(request: NextRequest) {
-  const user = await requireDevFlowAccess()
+  const user = await requireAdmin()
   if (!user) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   try {
     const issueNumber = Number(request.nextUrl.searchParams.get('issue'))
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await requireDevFlowAccess()
+  const user = await requireAdmin()
   if (!user) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   try {
     const input = await request.json()
