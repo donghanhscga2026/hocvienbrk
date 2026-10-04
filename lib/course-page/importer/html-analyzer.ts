@@ -200,6 +200,7 @@ function inferSectionType(input: {
 
   if (input.tag === 'header') return { type: 'header', confidence: 0.99 }
   if (input.tag === 'footer') return { type: 'footer', confidence: 0.99 }
+  if (input.tag === 'nav' && /(sticky|fixed|bottom|bar|đăng ký|dang-ky|cta)/i.test(haystack)) return { type: 'sticky_cta', confidence: 0.94 }
   if (input.formCount > 0 || /(đăng ký|dang-ky|registration|register|lead form|opt-?in)/i.test(haystack)) return { type: 'registration', confidence: 0.96 }
   if (input.faqCount >= 2 || /(faq|hỏi đáp|hoi-dap|câu hỏi thường gặp)/i.test(haystack)) return { type: 'faq', confidence: 0.96 }
   if (/(hero|banner|masthead|đầu trang)/i.test(haystack) || (input.index === 0 && /<h1\b/i.test(input.html))) return { type: 'hero', confidence: 0.94 }
@@ -232,6 +233,7 @@ function pickSectionLabel(type: ImportedSectionType, heading: string | undefined
     registration: 'Form đăng ký',
     closing_message: 'Lời kết',
     footer: 'Footer',
+    sticky_cta: 'Thanh hành động cố định',
     rich_content: 'Nội dung',
   }
   return `${names[type]} ${index + 1}`
@@ -344,6 +346,8 @@ function sectionContent(
     case 'header':
     case 'footer':
       return { title: heading, paragraphs, links: actions, images }
+    case 'sticky_cta':
+      return { title: heading, actions }
     default:
       return {
         title: heading,
@@ -510,7 +514,7 @@ export function analyzeWebsiteHtml(input: {
   const fonts = extractFonts(css)
 
   const blocks: Array<{ tag: string; attrs: string; html: string }> = []
-  const blockRe = /<(header|section|footer)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\1>/gi
   let blockMatch: RegExpExecArray | null
   while ((blockMatch = blockRe.exec(html)) && blocks.length < MAX_SECTIONS) {
     blocks.push({ tag: blockMatch[1].toLowerCase(), attrs: blockMatch[2], html: blockMatch[0] })
