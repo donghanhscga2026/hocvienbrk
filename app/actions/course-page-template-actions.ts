@@ -186,6 +186,22 @@ export async function getStoredCoursePageTemplates() {
   }
 }
 
+export async function getStoredCoursePageTemplateOptions() {
+  const denied = await requireAdminAction()
+  if (denied) return denied
+
+  try {
+    const templates = await prisma.coursePageTemplate.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, key: true, name: true },
+    })
+    return { success: true, templates }
+  } catch (error: any) {
+    console.error('[CoursePageTemplate] Options error:', error)
+    return { success: false, error: error.message || 'Không thể tải danh sách mẫu', templates: [] }
+  }
+}
+
 export async function createStoredCoursePageTemplate(input: {
   name: string
   description?: string
