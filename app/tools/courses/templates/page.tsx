@@ -210,11 +210,12 @@ export default function CourseTemplateLibraryPage() {
     })
     if (res.success) {
       await loadLibrary()
-      setMessage({ type: 'success', text: `Đã tạo mẫu “${res.template?.name || templateName}”. Mẫu đã sẵn sàng để áp dụng cho khóa học.` })
+      const createdName = res.template?.name || templateName
       setShowImporter(false)
       resetAnalysis()
       setSourceUrl('')
       setSourceFile(null)
+      setMessage({ type: 'success', text: `Đã tạo mẫu “${createdName}”. Mẫu đã sẵn sàng để áp dụng cho khóa học.` })
     } else {
       setMessage({ type: 'error', text: res.error || 'Không thể tạo mẫu' })
     }
