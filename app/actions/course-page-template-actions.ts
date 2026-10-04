@@ -49,7 +49,7 @@ async function mirrorSelectedImages(
       .filter(section => selected.has(section.id))
       .flatMap(section => section.images || [])
       .map(image => image.src)
-      .filter(src => /^https?:\/\//i.test(src)),
+      .filter(src => /^(?:https?:\/\/|data:image\/)/i.test(src)),
   )).slice(0, 50)
 
   if (!urls.length) return jsonSafe(analysis)
@@ -216,7 +216,20 @@ export async function createStoredCoursePageTemplate(input: {
     if (!name) return { success: false, error: 'Vui lòng đặt tên cho mẫu' }
     if (!input.analysis?.sections?.length) return { success: false, error: 'Chưa có kết quả phân tích website' }
 
-    // Mirror external images into our own storage before persisting the template.
+    const selectedSet = new Set(input.selectedSectionIds)
+    const unresolvedLocalImages = input.analysis.sections
+      .filter(section => selectedSet.has(section.id))
+      .flatMap(section => section.images || [])
+      .filter(image => image.src && !/^(?:https?:\/\/|data:image\/|\/uploads\/)/i.test(image.src))
+
+    if (unresolvedLocalImages.length) {
+      return {
+        success: false,
+        error: `Có ${unresolvedLocalImages.length} ảnh đang trỏ tới thư mục cục bộ (ví dụ *_files/...). Hãy dùng file HTML tự chứa ảnh hoặc nhập URL website gốc để hệ thống có thể lưu ảnh vĩnh viễn.`,
+      }
+    }
+
+    // Mirror external/base64 images into our own storage before persisting the template.
     // If a remote image cannot be downloaded, resolveImageUrl safely keeps the
     // original URL so template creation is not blocked.
     const storedAnalysis = await mirrorSelectedImages(input.analysis, input.selectedSectionIds)
