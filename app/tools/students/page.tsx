@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession } from 'next-auth/react'
-import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction } from '@/app/actions/admin-actions'
+import { getStudentsAction, getAdminCoursesAction, resendVerificationAction, resendAllVerificationAction, adminResetStudentPasswordAction, updateUserRoleAction } from '@/app/actions/admin-actions'
 import { Search, User, Mail, Phone, Loader2, ArrowUpDown, ArrowLeft, Users, Shield, GraduationCap, Handshake, Trophy, ChevronLeft, ChevronRight, X, Upload, ScrollText, KeyRound } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import DeleteByUserSection from '@/components/admin/students/DeleteByUserSection'
@@ -33,6 +33,8 @@ const roleConfig: Record<string, { label: string; icon: any; color: string; bgCo
   ALL: { label: 'Tất cả', icon: Users, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
   STUDENT: { label: 'Thành viên', icon: GraduationCap, color: 'text-gray-600', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
   ADMIN: { label: 'Quản trị', icon: Shield, color: 'text-red-600', bgColor: 'bg-red-100', textColor: 'text-red-700' },
+  DEVELOPER: { label: 'Phát triển', icon: Shield, color: 'text-indigo-600', bgColor: 'bg-indigo-100', textColor: 'text-indigo-700' },
+  TEACHER: { label: 'Giáo viên', icon: Users, color: 'text-cyan-600', bgColor: 'bg-cyan-100', textColor: 'text-cyan-700' },
   INSTRUCTOR: { label: 'Giảng viên', icon: Users, color: 'text-blue-600', bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
   AFFILIATE: { label: 'Đối tác', icon: Handshake, color: 'text-green-600', bgColor: 'bg-green-100', textColor: 'text-green-700' },
   COURSE_86_DAYS: { label: 'Coach 1:1', icon: Trophy, color: 'text-purple-600', bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
@@ -41,6 +43,8 @@ const roleConfig: Record<string, { label: string; icon: any; color: string; bgCo
 
 const roleCardColors: Record<string, string> = {
   ADMIN: 'bg-red-100',
+  DEVELOPER: 'bg-indigo-100',
+  TEACHER: 'bg-cyan-100',
   COURSE_86_DAYS: 'bg-gray-100',
   INSTRUCTOR: 'bg-blue-100',
   AFFILIATE: 'bg-green-100',
@@ -50,6 +54,8 @@ const roleCardColors: Record<string, string> = {
 
 const roleTextColors: Record<string, string> = {
   ADMIN: 'text-red-600',
+  DEVELOPER: 'text-indigo-600',
+  TEACHER: 'text-cyan-600',
   COURSE_86_DAYS: 'text-purple-600',
   INSTRUCTOR: 'text-blue-600',
   AFFILIATE: 'text-green-600',
@@ -87,6 +93,53 @@ function ResendVerifyBtn({ studentId }: { studentId: number }) {
     >
       {status === 'loading' ? 'Đang gửi...' : 'Gửi lại'}
     </button>
+  )
+}
+
+const assignableRoles = [
+  ['STUDENT', 'Thành viên'],
+  ['TEACHER', 'Giáo viên'],
+  ['INSTRUCTOR', 'Giảng viên'],
+  ['AFFILIATE', 'Đối tác'],
+  ['DEVELOPER', 'Phát triển'],
+  ['ADMIN', 'Quản trị'],
+] as const
+
+function RoleSelect({ student, onUpdated }: { student: StudentData; onUpdated: () => void }) {
+  const [saving, setSaving] = useState(false)
+
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const nextRole = e.target.value
+    if (nextRole === student.role) return
+    const label = assignableRoles.find(([value]) => value === nextRole)?.[1] || nextRole
+    if (!window.confirm(`Đổi quyền của "${student.name || student.email}" thành "${label}"?`)) {
+      e.target.value = student.role
+      return
+    }
+    setSaving(true)
+    const res = await updateUserRoleAction(student.id, nextRole as any)
+    setSaving(false)
+    if (!res.success) {
+      alert(res.error || 'Không thể cập nhật quyền')
+      e.target.value = student.role
+      return
+    }
+    onUpdated()
+  }
+
+  return (
+    <select
+      defaultValue={student.role}
+      disabled={saving}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+      onChange={handleChange}
+      className="text-[11px] font-bold border border-gray-200 bg-white rounded-lg px-2 py-1.5 disabled:opacity-50"
+      title="Phân quyền thành viên"
+    >
+      {assignableRoles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+    </select>
   )
 }
 
@@ -471,6 +524,9 @@ export default function ToolsStudentsPage() {
                         >
                           <ScrollText className="w-4 h-4 text-blue-400 hover:text-blue-600" />
                         </button>
+                      )}
+                      {isAdmin && (
+                        <RoleSelect student={student} onUpdated={() => fetchStudents(page)} />
                       )}
                       {isSuperAdmin && (
                         <ResetPasswordBtn studentId={student.id} studentName={student.name || 'Chưa có tên'} />
