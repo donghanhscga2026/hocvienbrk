@@ -71,6 +71,11 @@ export default async function Home() {
   const profile = await getCurrentSiteProfile()
   const safeProfile = profile || FALLBACK_PROFILE
   const runtimeConfig = getSiteRuntimeConfig(safeProfile as any)
+  const displayProfile = {
+    ...safeProfile,
+    showCommunity: runtimeConfig.modules.community,
+    showAllCourses: runtimeConfig.modules.courses,
+  }
 
   if (profile && runtimeConfig.homepage.type === 'website') {
     const website = await publishedWebsite(profile.id)
@@ -140,7 +145,7 @@ export default async function Home() {
           }
         }), [])
       : [],
-    safeQuery(getRoadmapPoints(), [])
+    runtimeConfig.modules.roadmap ? safeQuery(getRoadmapPoints(), []) : []
   ])
 
   // Xử lý enrollments map an toàn
@@ -233,7 +238,7 @@ export default async function Home() {
       <MainHeader title={safeProfile.title || 'TRANG CHỦ'} profile={profile} />
       
       <MessageCard
-        profile={safeProfile as any}
+        profile={displayProfile as any}
         session={session}
         userName={userRecord?.name || ''}
         userId={userRecord?.id !== undefined ? String(userRecord.id) : ''}
@@ -244,7 +249,7 @@ export default async function Home() {
       
       <Suspense fallback={<div className="flex justify-center p-8">⏳ Đang tải...</div>}>
         <HomePageClient
-          profile={safeProfile as any}
+          profile={displayProfile as any}
           courses={safeCourses}
           myActiveCourses={myActiveCourses}
           myCompletedCourses={myCompletedCourses}
@@ -265,7 +270,7 @@ export default async function Home() {
         />
       </Suspense>
       
-      <FooterSection profile={safeProfile as any} />
+      <FooterSection profile={displayProfile as any} />
     </main>
   )
 }
