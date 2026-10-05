@@ -9,10 +9,6 @@ import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
 import { canProfileAccessCourse, getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 
-const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
-const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
-const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
-
 interface PageProps {
     params: Promise<{ id: string }>
     searchParams?: Promise<{ notificationLesson?: string | string[] }>
@@ -40,6 +36,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         return { title: 'Không tìm thấy khóa học' }
     }
 
+    const defaultDescription = siteProfile?.metaDescription || siteProfile?.subtitle || undefined
+    const defaultImage = siteProfile?.metaImage || siteProfile?.heroImage || '/og-image.png'
     const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
     
     // Check if dynamic course page exists
@@ -51,34 +49,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         const seo = (coursePage.seo as any) || {}
         return {
             title: seo.title || course.name_lop,
-            description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+            description: seo.description || course.mo_ta_ngan || defaultDescription,
             openGraph: {
                 title: seo.title || course.name_lop,
-                description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-                images: seo.image ? [seo.image] : [courseImg || DEFAULT_OG_IMAGE],
+                description: seo.description || course.mo_ta_ngan || defaultDescription,
+                images: seo.image ? [seo.image] : [courseImg || defaultImage],
             },
             twitter: {
                 card: 'summary_large_image',
                 title: seo.title || course.name_lop,
-                description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-                images: seo.image ? [seo.image] : [courseImg || DEFAULT_OG_IMAGE],
+                description: seo.description || course.mo_ta_ngan || defaultDescription,
+                images: seo.image ? [seo.image] : [courseImg || defaultImage],
             }
         }
     }
 
     return {
         title: course.name_lop,
-        description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+        description: course.mo_ta_ngan || defaultDescription,
         openGraph: {
             title: course.name_lop,
-            description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-            images: courseImg ? [courseImg] : [DEFAULT_OG_IMAGE],
+            description: course.mo_ta_ngan || defaultDescription,
+            images: courseImg ? [courseImg] : [defaultImage],
         },
         twitter: {
             card: 'summary_large_image',
             title: course.name_lop,
-            description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-            images: courseImg ? [courseImg] : [DEFAULT_OG_IMAGE],
+            description: course.mo_ta_ngan || defaultDescription,
+            images: courseImg ? [courseImg] : [defaultImage],
         },
     }
 }
