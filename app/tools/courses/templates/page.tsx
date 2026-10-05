@@ -8,6 +8,7 @@ import {
   ArrowUp,
   CheckSquare,
   ExternalLink,
+  FileArchive,
   FileCode2,
   GripVertical,
   LayoutTemplate,
@@ -21,8 +22,10 @@ import {
 } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import ImportedSection from '@/components/course-page/sections/ImportedSection'
+import ZipSourceSection from '@/components/course-page/sections/ZipSourceSection'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
 import { WebsiteTemplateAnalysis } from '@/lib/course-page/importer/types'
+import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
 import {
   createStoredCoursePageTemplate,
   deleteStoredCoursePageTemplate,
@@ -66,6 +69,7 @@ export default function CourseTemplateLibraryPage() {
   const [showImporter, setShowImporter] = useState(false)
   const [sourceUrl, setSourceUrl] = useState('')
   const [sourceFile, setSourceFile] = useState<File | null>(null)
+  const [sourceZip, setSourceZip] = useState<File | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<WebsiteTemplateAnalysis | null>(null)
   const [sectionOrder, setSectionOrder] = useState<string[]>([])
@@ -99,6 +103,7 @@ export default function CourseTemplateLibraryPage() {
     () => orderedSections.filter(section => selected.has(section.id)),
     [orderedSections, selected],
   )
+  const isZipAnalysis = analysis?.sourceType === 'zip'
 
   const resetAnalysis = () => {
     setAnalysis(null)
@@ -110,8 +115,8 @@ export default function CourseTemplateLibraryPage() {
   }
 
   const handleAnalyze = async () => {
-    if (!sourceFile && !sourceUrl.trim()) {
-      setMessage({ type: 'error', text: 'Hãy dán URL website hoặc chọn file HTML.' })
+    if (!sourceZip && !sourceFile && !sourceUrl.trim()) {
+      setMessage({ type: 'error', text: 'Hãy dán URL website, chọn file HTML hoặc chọn ZIP mã nguồn.' })
       return
     }
 
@@ -119,7 +124,30 @@ export default function CourseTemplateLibraryPage() {
     setMessage(null)
     try {
       let response: Response
-      if (sourceFile) {
+      let clientWarnings: string[] = []
+      if (sourceZip) {
+        if (typeof CompressionStream === 'undefined') {
+          throw new Error('Trình duyệt chưa hỗ trợ nén dữ liệu. Hãy dùng Chrome/Edge phiên bản mới.')
+        }
+        const prepared = await prepareWebsiteZip(sourceZip)
+        clientWarnings = prepared.warnings
+        const compressedStream = new Blob([prepared.html], { type: 'text/html' })
+          .stream()
+          .pipeThrough(new CompressionStream('gzip'))
+        const compressed = await new Response(compressedStream).arrayBuffer()
+        response = await fetch('/api/admin/course-page-templates/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/gzip',
+            'X-Source-Type': 'zip',
+            'X-ZIP-Filename': encodeURIComponent(sourceZip.name),
+            'X-ZIP-Entry': encodeURIComponent(prepared.entryPath),
+            'X-ZIP-File-Count': String(prepared.fileCount),
+            'X-ZIP-Inlined-Count': String(prepared.inlinedAssetCount),
+          },
+          body: compressed,
+        })
+      } else if (sourceFile) {
         // Browser-exported HTML often embeds images as base64 and can exceed
         // Vercel's request-body limit before our API route is reached.
         // Gzip is especially effective for base64 HTML, so compress it client-side.
@@ -169,15 +197,18 @@ export default function CourseTemplateLibraryPage() {
       }
 
       const result = data.analysis as WebsiteTemplateAnalysis
+      if (clientWarnings.length) result.warnings = Array.from(new Set([...(result.warnings || []), ...clientWarnings]))
       setAnalysis(result)
       const ids = result.sections.map(section => section.id)
       setSectionOrder(ids)
       setSelected(new Set(ids))
       setTemplateName(result.title || 'Mẫu website mới')
       setTemplateDescription(
-        result.sourceUrl || result.finalUrl
-          ? `Nhập từ ${result.finalUrl || result.sourceUrl}`
-          : 'Nhập từ file HTML',
+        result.sourceType === 'zip'
+          ? `Nhập nguyên bản từ ZIP ${result.exactSource?.zipFileName || sourceZip?.name || ''}`.trim()
+          : result.sourceUrl || result.finalUrl
+            ? `Nhập từ ${result.finalUrl || result.sourceUrl}`
+            : 'Nhập từ file HTML',
       )
     } catch (error: any) {
       setMessage({ type: 'error', text: error?.message || 'Không thể phân tích website' })
@@ -244,6 +275,7 @@ export default function CourseTemplateLibraryPage() {
       resetAnalysis()
       setSourceUrl('')
       setSourceFile(null)
+      setSourceZip(null)
       setMessage({ type: 'success', text: `Đã tạo mẫu “${createdName}”. Mẫu đã sẵn sàng để áp dụng cho khóa học.` })
     } else {
       setMessage({ type: 'error', text: res.error || 'Không thể tạo mẫu' })
@@ -299,7 +331,7 @@ export default function CourseTemplateLibraryPage() {
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-purple-600">Website → Template</div>
                   <h2 className="mt-1 text-xl font-black text-gray-900">Phân tích và tạo mẫu</h2>
-                  <p className="mt-1 text-sm text-gray-600">Dán URL hoặc tải file HTML. Fidelity Mode giữ bố cục/CSS nguồn trong vùng cô lập; script nguồn bị loại bỏ và form được nối về hệ thống MFC.</p>
+                  <p className="mt-1 text-sm text-gray-600">Chọn 1 trong 3 nguồn: URL, file HTML hoặc ZIP mã nguồn. URL/HTML dùng Fidelity Mode để phân tích dần; ZIP dùng Exact ZIP Mode để giữ nguyên bố cục/asset/script nội bộ trong sandbox và nối form về MFC.</p>
                 </div>
                 {analysis && (
                   <button type="button" onClick={resetAnalysis} className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold text-gray-600">
@@ -310,14 +342,14 @@ export default function CourseTemplateLibraryPage() {
             </div>
 
             {!analysis ? (
-              <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto_1fr] lg:items-end">
+              <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto_1fr_auto_1fr] lg:items-end">
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-xs font-black uppercase text-gray-500">
                     <Link2 className="h-4 w-4" /> URL website
                   </label>
                   <input
                     value={sourceUrl}
-                    onChange={e => setSourceUrl(e.target.value)}
+                    onChange={e => { setSourceUrl(e.target.value); if (sourceZip) setSourceZip(null) }}
                     placeholder="https://..."
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-purple-500"
                   />
@@ -334,11 +366,35 @@ export default function CourseTemplateLibraryPage() {
                       type="file"
                       accept=".html,.htm,text/html"
                       className="hidden"
-                      onChange={e => setSourceFile(e.target.files?.[0] || null)}
+                      onChange={e => { setSourceFile(e.target.files?.[0] || null); setSourceZip(null) }}
                     />
                   </label>
                 </div>
-                <div className="lg:col-span-3 flex justify-end">
+                <div className="hidden pb-3 text-xs font-black text-gray-300 lg:block">HOẶC</div>
+                <div>
+                  <label className="mb-2 flex items-center gap-2 text-xs font-black uppercase text-gray-500">
+                    <FileArchive className="h-4 w-4" /> ZIP mã nguồn
+                  </label>
+                  <label className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/60 px-4 py-3 text-sm text-gray-700 hover:border-emerald-500">
+                    <span className="min-w-0 truncate">{sourceZip?.name || 'Chọn file .zip chứa website'}</span>
+                    <Upload className="h-4 w-4 shrink-0 text-emerald-700" />
+                    <input
+                      type="file"
+                      accept=".zip,application/zip"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0] || null
+                        setSourceZip(file)
+                        if (file) {
+                          setSourceFile(null)
+                          setSourceUrl('')
+                        }
+                      }}
+                    />
+                  </label>
+                  <p className="mt-1 text-[10px] leading-4 text-gray-400">Tự tìm trang chính, nhúng asset cục bộ và giữ nguyên giao diện.</p>
+                </div>
+                <div className="lg:col-span-5 flex justify-end">
                   <button
                     type="button"
                     onClick={handleAnalyze}
@@ -346,7 +402,7 @@ export default function CourseTemplateLibraryPage() {
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-black px-5 py-3 text-xs font-black text-yellow-400 disabled:opacity-50"
                   >
                     {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
-                    {analyzing ? 'Đang phân tích...' : 'Phân tích trang'}
+                    {analyzing ? (sourceZip ? 'Đang giải nén & phân tích...' : 'Đang phân tích...') : 'Phân tích trang'}
                   </button>
                 </div>
               </div>
@@ -378,8 +434,8 @@ export default function CourseTemplateLibraryPage() {
                   )}
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-sm font-black text-gray-900">Chọn phần đưa vào mẫu</div>
-                    <div className="flex gap-2">
+                    <div className="text-sm font-black text-gray-900">{isZipAnalysis ? 'Các phần phát hiện trong ZIP' : 'Chọn phần đưa vào mẫu'}</div>
+                    <div className={isZipAnalysis ? "hidden" : "flex gap-2"}>
                       <button type="button" onClick={() => setSelected(new Set(sectionOrder))} className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-2 text-[10px] font-black text-green-700">
                         <CheckSquare className="h-3.5 w-3.5" /> Chọn tất cả
                       </button>
@@ -401,8 +457,8 @@ export default function CourseTemplateLibraryPage() {
                         >
                           <button
                             type="button"
-                            draggable
-                            onDragStart={() => setDraggingId(section.id)}
+                            draggable={!isZipAnalysis}
+                            onDragStart={() => { if (!isZipAnalysis) setDraggingId(section.id) }}
                             onDragEnd={() => setDraggingId(null)}
                             className="mt-0.5 cursor-grab rounded p-1 text-gray-400 active:cursor-grabbing"
                             title="Kéo để đổi vị trí"
@@ -412,16 +468,17 @@ export default function CourseTemplateLibraryPage() {
                           <input
                             type="checkbox"
                             checked={checked}
-                            onChange={() => toggleSection(section.id)}
+                            disabled={isZipAnalysis}
+                            onChange={() => { if (!isZipAnalysis) toggleSection(section.id) }}
                             className="mt-1 h-4 w-4 accent-purple-700"
                           />
-                          <button type="button" onClick={() => toggleSection(section.id)} className="min-w-0 flex-1 text-left">
+                          <button type="button" disabled={isZipAnalysis} onClick={() => toggleSection(section.id)} className="min-w-0 flex-1 text-left disabled:cursor-default">
                             <div className="truncate text-xs font-black text-gray-900">{section.label}</div>
                             <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-purple-600">
                               {SECTION_NAMES[section.sectionType] || section.sectionType} · {Math.round(section.confidence * 100)}%
                             </div>
                           </button>
-                          <div className="flex shrink-0">
+                          <div className={isZipAnalysis ? "hidden" : "flex shrink-0"}>
                             <button type="button" onClick={() => moveSection(section.id, -1)} disabled={index === 0} className="rounded p-1 text-gray-400 disabled:opacity-20" title="Đưa lên"><ArrowUp className="h-3.5 w-3.5" /></button>
                             <button type="button" onClick={() => moveSection(section.id, 1)} disabled={index === orderedSections.length - 1} className="rounded p-1 text-gray-400 disabled:opacity-20" title="Đưa xuống"><ArrowDown className="h-3.5 w-3.5" /></button>
                           </div>
@@ -446,7 +503,7 @@ export default function CourseTemplateLibraryPage() {
                       className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 font-black text-white disabled:opacity-40"
                     >
                       {savingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
-                      {savingTemplate ? 'Đang tạo mẫu...' : `Tạo mẫu từ ${selected.size} phần đã chọn`}
+                      {savingTemplate ? 'Đang tạo mẫu...' : isZipAnalysis ? 'Tạo mẫu ZIP nguyên bản' : `Tạo mẫu từ ${selected.size} phần đã chọn`}
                     </button>
                   </div>
                 </div>
@@ -455,9 +512,9 @@ export default function CourseTemplateLibraryPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-black uppercase tracking-widest text-gray-500">Preview</div>
-                      <div className="text-[11px] text-gray-400">Bỏ chọn hoặc đổi thứ tự bên trái, bản xem trước cập nhật ngay.</div>
+                      <div className="text-[11px] text-gray-400">{isZipAnalysis ? "Exact ZIP Mode: xem nguyên trang đã đóng gói." : "Bỏ chọn hoặc đổi thứ tự bên trái, bản xem trước cập nhật ngay."}</div>
                     </div>
-                    <div className="rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-gray-600">{selectedSections.length} phần</div>
+                    <div className="rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-gray-600">{isZipAnalysis ? "ZIP nguyên bản" : `${selectedSections.length} phần`}</div>
                   </div>
                   <div
                     className="max-h-[760px] overflow-y-auto rounded-2xl border bg-white shadow-sm"
@@ -471,6 +528,11 @@ export default function CourseTemplateLibraryPage() {
                       ['--course-body-font' as any]: analysis.theme.bodyFont || 'system-ui',
                     }}
                   >
+                    {isZipAnalysis && analysis.exactSource?.url ? (
+                      <div className="pointer-events-none">
+                        <ZipSourceSection content={{ exactSource: analysis.exactSource }} />
+                      </div>
+                    ) : (
                     <div className="pointer-events-none origin-top scale-[0.82]" style={{ width: '121.95%' }}>
                       {selectedSections.map(section => (
                         <ImportedSection
@@ -499,6 +561,7 @@ export default function CourseTemplateLibraryPage() {
                         <div className="p-12 text-center text-sm font-bold text-gray-400">Chưa chọn phần nào để xem trước.</div>
                       )}
                     </div>
+                    )}
                   </div>
                 </div>
               </div>
