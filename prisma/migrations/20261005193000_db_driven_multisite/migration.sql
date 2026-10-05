@@ -12,6 +12,7 @@ CREATE TABLE "SiteProfileDomain" (
 );
 
 CREATE INDEX "SiteProfileDomain_profileId_idx" ON "SiteProfileDomain"("profileId");
+CREATE UNIQUE INDEX "SiteProfileDomain_one_primary_per_profile_idx" ON "SiteProfileDomain"("profileId") WHERE "isPrimary" = true;
 CREATE INDEX "SiteProfileDomain_isActive_idx" ON "SiteProfileDomain"("isActive");
 
 ALTER TABLE "SiteProfileDomain" ENABLE ROW LEVEL SECURITY;
