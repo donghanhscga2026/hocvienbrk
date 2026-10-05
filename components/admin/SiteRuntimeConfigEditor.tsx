@@ -41,6 +41,7 @@ function listText(value: unknown) {
 export default function SiteRuntimeConfigEditor({ profile, onSaved }: Props) {
   const initial = useMemo(() => {
     const config = record(profile.siteConfig)
+    const branding = record(config.branding)
     const homepage = record(config.homepage)
     const modules = record(config.modules)
     const courseScope = record(config.courseScope)
@@ -51,6 +52,9 @@ export default function SiteRuntimeConfigEditor({ profile, onSaved }: Props) {
     return {
       primaryDomain: primary?.hostname || '',
       additionalDomains: additional.map(item => item.hostname).join(', '),
+      brandName: String(branding.name || ''),
+      logoUrl: String(branding.logoUrl || ''),
+      faviconUrl: String(branding.faviconUrl || ''),
       homepageType: String(homepage.type || 'community'),
       landingSlug: String(homepage.landingSlug || ''),
       courseScopeMode: String(courseScope.mode || (profile.userId != null && profile.userId !== 0 ? 'profile' : 'all')),
@@ -72,6 +76,9 @@ export default function SiteRuntimeConfigEditor({ profile, onSaved }: Props) {
 
   const [primaryDomain, setPrimaryDomain] = useState(initial.primaryDomain)
   const [additionalDomains, setAdditionalDomains] = useState(initial.additionalDomains)
+  const [brandName, setBrandName] = useState(initial.brandName)
+  const [logoUrl, setLogoUrl] = useState(initial.logoUrl)
+  const [faviconUrl, setFaviconUrl] = useState(initial.faviconUrl)
   const [homepageType, setHomepageType] = useState(initial.homepageType)
   const [landingSlug, setLandingSlug] = useState(initial.landingSlug)
   const [courseScopeMode, setCourseScopeMode] = useState(initial.courseScopeMode)
@@ -100,6 +107,11 @@ export default function SiteRuntimeConfigEditor({ profile, onSaved }: Props) {
       additionalDomains: additionalDomains.split(',').map(item => item.trim()).filter(Boolean),
       themeId: themeId || null,
       siteConfig: {
+        branding: {
+          ...(brandName.trim() ? { name: brandName.trim() } : {}),
+          ...(logoUrl.trim() ? { logoUrl: logoUrl.trim() } : {}),
+          ...(faviconUrl.trim() ? { faviconUrl: faviconUrl.trim() } : {}),
+        },
         homepage: {
           type: homepageType,
           ...(landingSlug.trim() ? { landingSlug: landingSlug.trim() } : {}),
@@ -159,6 +171,21 @@ export default function SiteRuntimeConfigEditor({ profile, onSaved }: Props) {
         <label className="text-sm font-medium text-gray-700">
           Domain phụ
           <input value={additionalDomains} onChange={e => setAdditionalDomains(e.target.value)} placeholder="www.example.com, alias.example.com" className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-3 font-mono text-sm" />
+        </label>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <label className="text-sm font-medium text-gray-700">
+          Tên thương hiệu
+          <input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Tên hiển thị của website" className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm" />
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          Logo URL
+          <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-3 font-mono text-sm" />
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          Favicon URL
+          <input value={faviconUrl} onChange={e => setFaviconUrl(e.target.value)} placeholder="https://..." className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-3 font-mono text-sm" />
         </label>
       </div>
 
