@@ -5,8 +5,10 @@ import {moduleKeys,moduleLabels,moduleScopes,noModules,type WebsiteAccess} from 
 import {applicationKeys,applications,allApplications,noApplications,type ApplicationFlags} from '@/lib/website/applications'
 import type {DomainModules} from '@/lib/website/domain-shared'
 
+type Presentation={mode:'template'|'custom';revision:number;customPublished:boolean}
 type Snapshot={access:WebsiteAccess;basic:DomainModules;basicApplications:ApplicationFlags;admin:boolean;name:string;slug:string;configured:boolean;domains:{hostname:string;enabled:boolean}[]}
 export default function WebsiteManager() {
+  const [presentation,setPresentation]=useState<Presentation|null>(null)
   const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
   const [basic,setBasic]=useState<DomainModules>(noModules),[extra,setExtra]=useState<DomainModules>(noModules),[enabled,setEnabled]=useState<DomainModules>(noModules)
   const [basicApps,setBasicApps]=useState<ApplicationFlags>(noApplications),[extraApps,setExtraApps]=useState<ApplicationFlags>(noApplications),[enabledApps,setEnabledApps]=useState<ApplicationFlags>(noApplications)
@@ -17,6 +19,7 @@ export default function WebsiteManager() {
   useEffect(()=>{
     const abort=new AbortController()
     fetch('/api/websites/access',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);receive(value)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
+    fetch('/api/websites/presentation',{signal:abort.signal}).then(async r=>{const value=await r.json();if(!r.ok)throw new Error(value.error);setPresentation(value)}).catch(e=>{if(!abort.signal.aborted)setError(e.message)})
     return()=>abort.abort()
   },[])
   async function save(body:object) {
@@ -25,6 +28,14 @@ export default function WebsiteManager() {
       const r=await fetch('/api/websites/access',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       const value=await r.json();if(!r.ok)throw new Error(value.error);receive(value);setMessage('Đã lưu. Tải lại website riêng để xem kết nối mới.')
     } catch(e) {setError(e instanceof Error ? e.message : 'Không thể lưu.')} finally {setBusy(false)}
+  }
+  async function chooseMode(mode:Presentation['mode']) {
+    if(!presentation)return
+    setBusy(true);setError('');setMessage('')
+    try {
+      const r=await fetch('/api/websites/presentation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,revision:presentation.revision})})
+      const value=await r.json();if(!r.ok)throw new Error(value.error);setPresentation(value);setMessage('Đã chọn giao diện. Nội dung cả hai mẫu được giữ nguyên; tải lại website để xem.')
+    } catch(e){setError(e instanceof Error?e.message:'Không thể đổi giao diện.')} finally{setBusy(false)}
   }
   function websiteCommand(applyBasic=false) {
     return {action:'save',revision:data!.access.revision,enabled,applications:enabledApps,...(data!.admin ? {extra,applicationExtra:extraApps,...(applyBasic ? {applyBasic:true} : {})} : {})}
@@ -38,13 +49,26 @@ export default function WebsiteManager() {
   const view=data?.domains.find(d=>d.enabled)
   return <main className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-5xl mx-auto grid gap-6">
     <a href="/tools/pages?tab=my-site" className="text-sm text-violet-700">← Trang của tôi</a>
-    <header><p className="text-sm text-violet-700 mb-2">Không gian quản lý</p><h1 className="text-3xl font-bold">Website của tôi</h1><p className="text-slate-600 mt-2">{data?.name || 'Quản lý nội dung, tên miền và ứng dụng ở một nơi.'}</p></header>
+    <header><p className="text-sm text-violet-700 mb-2">Không gian quản lý</p><h1 className="text-3xl font-bold">Quản lý website của tôi</h1><p className="text-slate-600 mt-2">{data?.name || 'Quản lý nội dung, tên miền và ứng dụng ở một nơi.'}</p></header>
     <nav aria-label="Quản lý website" className="grid gap-3 sm:grid-cols-3">
-      {[['/tools/my-site/design','Trang & giao diện','Thiết kế trang và nội dung.'],['/tools/my-site/domains','Tên miền','Kết nối và xác minh tên miền riêng.'],['/tools/my-site/edit','Dữ liệu & giáo viên','Chọn khóa học, liên kết giáo viên và thông tin website.']].map(([href,title,description])=><a key={href} href={href} className="rounded-2xl border bg-white p-5 hover:border-violet-400"><h2 className="font-bold mb-2">{title} →</h2><p className="text-sm text-slate-600">{description}</p></a>)}
+      {[['#website-design','Trang & giao diện','Chọn mẫu đang dùng và chỉnh sửa nội dung.'],['/tools/my-site/domains','Tên miền','Kết nối và xác minh tên miền riêng.'],['/tools/my-site/data','Dữ liệu & giáo viên','Nguồn khóa học dùng chung và giáo viên liên kết.']].map(([href,title,description])=><a key={href} href={href} className="rounded-2xl border bg-white p-5 hover:border-violet-400"><h2 className="font-bold mb-2">{title} →</h2><p className="text-sm text-slate-600">{description}</p></a>)}
     </nav>
     {error && <p role="alert" className="p-4 rounded-xl bg-red-50 text-red-700">{error}</p>}
     {message && <p role="status" className="p-4 rounded-xl bg-green-50 text-green-800">{message}</p>}
     {!data && !error && <p role="status">Đang tải cấu hình…</p>}
+    <section id="website-design" className="rounded-2xl border bg-white p-4 sm:p-6 grid gap-4">
+      <h2 className="text-xl font-bold">Trang & giao diện</h2>
+      <p className="text-sm text-slate-600">Một website, một mẫu đang hiển thị. Cả hai mẫu dùng cùng tên miền, nguồn khóa học và kết nối ứng dụng.</p>
+      {!presentation ? <p>Đang tải mẫu đang dùng…</p> : <>
+        <p className="font-semibold text-violet-800">Đang dùng: {presentation.mode==='template'?'Mẫu có sẵn':'Thiết kế tự do'}</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <article className="rounded-xl border p-4 grid gap-3"><h3 className="font-bold">Mẫu có sẵn</h3><p className="text-sm text-slate-600">Giữ trang cá nhân cũ: ảnh bìa, thông điệp, danh sách khóa học và bảng tin.</p><a href="/tools/my-site/edit" className="underline text-violet-700">Chỉnh sửa mẫu có sẵn →</a><button disabled={busy} aria-pressed={presentation.mode==='template'} className="rounded-lg border px-4 py-3 text-left disabled:opacity-50" onClick={()=>void chooseMode('template')}>Dùng mẫu có sẵn</button></article>
+          <article className="rounded-xl border p-4 grid gap-3"><h3 className="font-bold">Thiết kế tự do</h3><p className="text-sm text-slate-600">Kéo thả, chọn mẫu thiết kế, thêm trang con và HTML/CSS.</p><a href="/tools/my-site/design" className="underline text-violet-700">Chỉnh sửa thiết kế tự do →</a>{!presentation.customPublished && <p className="text-sm text-amber-800">Cần xuất bản thiết kế trước khi chọn sử dụng.</p>}<button disabled={busy || !presentation.customPublished} aria-pressed={presentation.mode==='custom'} className="rounded-lg border px-4 py-3 text-left disabled:opacity-50" onClick={()=>void chooseMode('custom')}>Dùng thiết kế tự do</button></article>
+        </div>
+        <a className="justify-self-start rounded-lg bg-violet-700 text-white px-5 py-3" href={presentation.mode==='template'?'/tools/my-site/edit':'/tools/my-site/design'}>Chỉnh sửa giao diện đang dùng →</a>
+        <p className="text-sm text-slate-500">Đổi mẫu không xóa dữ liệu hoặc ngắt tên miền. Khảo sát và lộ trình của mẫu cũ hiện dùng trên hệ thống chính.</p>
+      </>}
+    </section>
     {data && <>
       <div className="flex flex-wrap gap-3">{view && <a className="rounded-lg bg-violet-700 text-white px-4 py-3" href={'https://'+view.hostname} target="_blank" rel="noreferrer">Xem {view.hostname} ↗</a>}<a className="rounded-lg border px-4 py-3" href={'/page/'+data.slug} target="_blank" rel="noreferrer">Xem trang trên hệ thống ↗</a></div>
       <fieldset disabled={busy} className="bg-white border rounded-2xl p-4 sm:p-6 grid gap-5">

@@ -6,7 +6,7 @@ import {usePathname} from 'next/navigation'
 import {websiteTheme} from '@/lib/website/theme'
 import type {DomainModules} from '@/lib/website/domain-shared'
 
-type Brand=DomainModules & {name:string;color:string;background:string;ownerId:number|null}
+type Brand=DomainModules & {name:string;color:string;background:string;ownerId:number|null;footerText?:string|null}
 type Page={title:string;slug:string}
 const pathIsLearning=(path:string)=>/^\/(?:courses|khoa-hoc)\/[^/]+\/learn$/.test(path)
 const Context=createContext<Brand|null>(null)
@@ -39,6 +39,6 @@ export default function DomainShell({brand,pages=[],path:initialPath='/',childre
     </header>
     {path!=='/' && <nav aria-label="Đường dẫn trang" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 text-sm text-brk-muted"><ol className="flex flex-wrap gap-2"><li><a href="/" className="hover:underline">Trang chủ</a></li>{course && <li><span aria-hidden="true">/ </span><a href="/khoa-hoc" className="hover:underline">Khóa học</a></li>}<li><span aria-hidden="true">/ </span><span aria-current="page" className="text-brk-on-surface">{label}</span></li></ol></nav>}
     <div id="website-content" className={`flex-1 min-w-0 ${learning ? 'min-h-0 overflow-hidden' : ''}`}>{children}</div>
-    {!learning && <footer className="border-t border-brk-outline mt-10 bg-brk-surface text-brk-muted"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap justify-between gap-4 text-sm"><p>© {brand.name}</p><nav aria-label="Liên kết chân trang" className="flex flex-wrap gap-4"><a href="/">Trang chủ</a><a href="/tai-khoan">Tài khoản</a></nav></div></footer>}
+    {!learning && <footer className="border-t border-brk-outline mt-10 bg-brk-surface text-brk-muted"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap justify-between gap-4 text-sm"><p>{brand.footerText || '© '+brand.name}</p><nav aria-label="Liên kết chân trang" className="flex flex-wrap gap-4"><a href="/">Trang chủ</a><a href="/tai-khoan">Tài khoản</a></nav></div></footer>}
   </div></Context.Provider>
 }

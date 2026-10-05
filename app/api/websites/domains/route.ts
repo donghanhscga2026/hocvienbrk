@@ -2,7 +2,8 @@ import { accessKey, accessSchema, effectiveModules } from '@/lib/website/access'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
-import { ownedProfile, publishedWebsite } from '@/lib/website/server'
+import {domainWebsite} from '@/lib/website/presentation-server'
+import { ownedProfile } from '@/lib/website/server'
 import { normalizeHostname, isPlatformHost, requestHostname } from '@/lib/website/domain-shared'
 import { verifyDomain } from '@/lib/website/domain-verification'
 import { crmBody, crmResponse } from '@/lib/crm/http'
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     let hostname: string
     try { hostname=normalizeHostname(input.hostname) } catch(e) { throw new CrmError(e instanceof Error ? e.message : 'Tên miền không hợp lệ.') }
     if(input.action==='add') {
-      if(!profile.isActive || !await publishedWebsite(profile.id)) throw new CrmError('Kích hoạt trang và xuất bản thiết kế trước khi nối tên miền.',409)
+      if(!profile.isActive || !await domainWebsite(profile)) throw new CrmError('Kích hoạt website và chọn giao diện hợp lệ trước khi nối tên miền.',409)
       await prisma.$transaction(async tx=>{
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420304)`
         if(await tx.siteDomain.count({where:{profileId:profile.id}})>=3) throw new CrmError('Mỗi website thử nghiệm được tối đa 3 tên miền.',409)
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
         await prisma.siteDomain.updateMany({where,data:{courses:input.courses,crm:input.crm,affiliate:input.affiliate}})
       }
       if(input.action==='check') {
-        if(!profile.isActive || !await publishedWebsite(profile.id)) throw new CrmError('Website chưa xuất bản hoặc đang bị khóa.',409)
+        if(!profile.isActive || !await domainWebsite(profile)) throw new CrmError('Giao diện đang chọn chưa sẵn sàng hoặc website đang bị khóa.',409)
         const checkedAt=new Date()
         const checking='Đang kiểm tra DNS và HTTPS'
         const reserved=await prisma.siteDomain.updateMany({where:{...where,OR:[{checkedAt:null},{checkedAt:{lt:new Date(Date.now()-30000)}}]},data:{checkedAt,message:checking}})

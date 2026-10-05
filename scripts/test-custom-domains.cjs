@@ -233,6 +233,69 @@ async function run(){
   ok(studentHub.includes('/ung-dung/brk') && !studentHub.includes('/ung-dung/teaching') && !studentHub.includes('href="/tools/crm"'),'Learner hub contains personal apps without teaching or CRM')
   const teacherHub=renderToStaticMarkup(React.createElement(AppView,{domain:{...on,applications:apps.allApplications,profile:profiles[0]},user:{id:3,role:'TEACHER'},name:'Brand'}))
   ok(teacherHub.includes('/ung-dung/teaching') && teacherHub.includes('href="/tools/crm"'),'Linked teacher hub contains teaching and own CRM')
+
+  // Chuyển mẫu chỉ lưu lựa chọn, giữ nguyên cả nội dung cũ và thiết kế đã xuất bản.
+  let customDocument={name:'Saved custom',pages:[{slug:''}]}
+  const owned=async()=>{if(sessionId==null)throw new CrmError('Login',401);return profiles.find(p=>p.userId===sessionId)}
+  const modeDb={...fake,siteWebsite:{findUnique:async()=>({published:customDocument})}}
+  const modeLoad=loader({'@/lib/website/server':{ownedProfile:owned,publishedWebsite:async()=>customDocument},'@/lib/prisma':{__esModule:true,default:{...modeDb,$transaction:async fn=>fn(modeDb)}}})
+  const presentation=modeLoad('lib/website/presentation-server'),modeApi=modeLoad('app/api/websites/presentation/route')
+  const modePost=(body,hostname='giautoandien.io.vn',origin='https://'+hostname)=>modeApi.POST(req(body,hostname,origin))
+  sessionId=1
+  ok((await presentation.presentationState(7)).mode==='custom','Existing published website retains custom mode')
+  ok((await modePost({mode:'template',revision:0},'brk.io.vn')).status===403,'Domain cannot administer presentation')
+  ok((await modePost({mode:'template',revision:0},'giautoandien.io.vn','https://evil.invalid')).status===403,'Mode change rejects foreign origin')
+  ok((await modePost({mode:'template',revision:0})).status===200,'Owner can select existing template')
+  ok((await presentation.activeCustomWebsite(7))===null && customDocument.name==='Saved custom','Template mode preserves published design without rendering it')
+  const templateDoc=await presentation.domainWebsite({...profiles[0],title:'Lucy',subtitle:'Intro',accentColor:'#123456',backgroundColor:'#f8fafc'})
+  ok(templateDoc.name==='Lucy' && templateDoc.color==='#123456','Template works on domain with profile branding')
+  ok((await modePost({mode:'custom',revision:0})).status===409,'Stale mode revision cannot overwrite current selection')
+  customDocument=null
+  ok((await modePost({mode:'custom',revision:1})).status===409,'Unpublished custom design cannot be selected')
+  ok((await presentation.domainWebsite({...profiles[0],title:'Lucy'})).name==='Lucy','Template domain does not require a published custom design')
+  customDocument={name:'Preserved design',pages:[{slug:''}]}
+  ok((await modePost({mode:'custom',revision:1})).status===200,'Switch back restores preserved custom design')
+  ok((await presentation.activeCustomWebsite(7)).name==='Preserved design','Public route uses selected custom document')
+  customDocument=null
+  ok((await presentation.presentationState(7)).mode==='template','Unpublishing falls back to existing template instead of breaking domain')
+  sessionId=null
+  ok((await modeApi.GET(new Request('https://giautoandien.io.vn/api/websites/presentation',{headers:{host:'giautoandien.io.vn'}}))).status===401,'Presentation requires an authenticated owner')
+  sessionId=1;configs.delete('website-presentation:7:v1')
+
+  const testProfile={...profiles[0],title:'Lucy',courseIds:[]}
+  const courseRows=courses.map(c=>({...c,name_lop:c.id_khoa,pin:0,_count:{enrollments:0,lessons:1}}))
+  const allowedCourse=(c,where)=>!where || (!where.id?.in || where.id.in.includes(c.id)) && (!where.status || c.status) && (!where.OR || where.OR.some(w=>w.id?.in?.includes(c.id) || w.teacherId?.in?.includes(c.teacherId))) && (!where.teacherId?.in || where.teacherId.in.includes(c.teacherId))
+  const scopedDb={...fake,
+    course:{...fake.course,findMany:async({where})=>courseRows.filter(c=>allowedCourse(c,where))},
+    siteProfile:{...fake.siteProfile,findFirst:async()=>testProfile,update:async({data})=>Object.assign(testProfile,data)},
+    siteProfileMember:{findMany:async()=>[]},
+    enrollment:{...fake.enrollment,findMany:async({where})=>{ok(where.userId===1 && !!where.course,'Template enrollment query is restricted to user and tenant');return []}},
+    post:{findMany:async({where})=>{ok(where.authorId.in.includes(1) && !where.authorId.in.includes(2),'Template posts restrict author scope');return []}},
+  }
+  const dataLoad=loader({'@/lib/prisma':{__esModule:true,default:{...scopedDb,$transaction:async fn=>fn(scopedDb)}},'@/lib/website/server':{ownedProfile:async()=>testProfile},'next/cache':{revalidateTag:()=>{}}})
+  const dataApi=dataLoad('app/api/websites/data/route')
+  const dataPost=body=>dataApi.POST(req(body))
+  ok((await dataPost({courseIds:[2]})).status===403,'Owner cannot add foreign teacher course')
+  ok((await dataPost({courseIds:[1,3]})).status===200,'Owner can select own and linked teacher courses')
+  ok(testProfile.courseIds.join(',')==='1,3','Shared course source stores selection')
+  ok((await dataPost({courseIds:[]})).status===200 && !testProfile.courseIds.length,'Automatic mode restores teacher-based course scope')
+  let templateProps
+  const templateLoad=loader({
+    '@/lib/prisma':{__esModule:true,default:scopedDb},'@/lib/get-session':{getSession:async()=>({user:{id:'1',name:'Learner'}})},
+    '@/components/home/HomePageClient':{__esModule:true,default:props=>{templateProps=props;return null}},
+    '@/components/home/MessageCard':{__esModule:true,default:()=>null},
+    '@/components/layout/MainHeader':{__esModule:true,default:()=>null},
+    '@/components/home/FooterSection':{__esModule:true,default:()=>null},
+    '@/components/home/SetHomeSlug':{__esModule:true,default:()=>null},
+    '@/app/actions/site-profile-actions':{getCoursesForProfile:()=>{throw Error('No fallback data on domain')},getPostsForProfile:()=>{throw Error('No fallback posts on domain')}},
+    '@/app/actions/message-actions':{},'@/app/actions/roadmap-actions':{},'@/app/actions/survey-actions':{resetSurveyAction:async()=>({})},
+  })
+  const TemplateHome=templateLoad('components/website/ProfileHome').default
+  renderToStaticMarkup(await TemplateHome({profile:testProfile,customDomain:true,modules:on}))
+  ok(templateProps.courses.every(c=>[1,3].includes(c.teacherId)) && templateProps.courses.length===2,'Template domain renders only tenant courses, without fallback')
+  renderToStaticMarkup(await TemplateHome({profile:testProfile,customDomain:true,modules:off}))
+  ok(!templateProps.courses.length && !templateProps.survey && !templateProps.roadmapPoints.length,'Disabled courses stay hidden and platform survey is not exposed')
+
   await authChecks();await verificationChecks()
   host='giautoandien.io.vn';await post({action:'disable',hostname:'brk.io.vn'});host='brk.io.vn';await rejects(()=>context.domainContext(),'Disabled domain closes immediately')
   ok((await proxy(routeRequest('/login'),{})).status===503,'Disabled domain cannot still serve login')

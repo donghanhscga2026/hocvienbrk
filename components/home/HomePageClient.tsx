@@ -1,5 +1,6 @@
 'use client'
 
+import {useDomainBrand} from '@/components/website/DomainShell'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 import dynamic from 'next/dynamic'
@@ -59,6 +60,7 @@ function HomePageContent({
   giftCourses = [],
   latestCourses = []
 }: HomePageClientProps) {
+  const website=useDomainBrand()
   const searchParams = useSearchParams()
   const paymentCourseId = searchParams.get('paymentCourseId')
   const [courseToPay, setCourseToPay] = useState<any>(null)
@@ -66,7 +68,7 @@ function HomePageContent({
   const { open: openMbw } = useMbwDashboard()
 
   useEffect(() => {
-    if (!session?.user) return
+    if (!session?.user || website) return
 
     if (typeof window === 'undefined') return
 
@@ -78,7 +80,7 @@ function HomePageContent({
     const timer = window.setTimeout(() => openMbw(), 500)
 
     return () => window.clearTimeout(timer)
-  }, [session?.user, openMbw])
+  }, [session?.user, openMbw, website])
 
   useEffect(() => {
     if (paymentCourseId) {
@@ -90,7 +92,7 @@ function HomePageContent({
   const handleClosePayment = () => {
     setCourseToPay(null)
     setShowActivatedToast(false)
-    window.history.replaceState({}, '', `/page/${profile.slug || ''}`)
+    window.history.replaceState({}, '', website ? '/' : `/page/${profile.slug || ''}`)
   }
 
   useEffect(() => {
@@ -177,11 +179,13 @@ function HomePageContent({
       {/* Community Section - Auto-hide khi không có bài đăng */}
       {showCommunity && (
         <section className="container mx-auto px-4 py-8">
-          <CommunityBoard
-            posts={posts}
-            isAdmin={session?.user?.role === 'ADMIN'}
-            title={communityTitle}
-          />
+          {website ? <div className="grid gap-4">
+            <h2 className="text-2xl font-bold text-brk-on-surface">{communityTitle}</h2>
+            {posts.map(post=><details key={post.id} className="rounded-xl border border-brk-outline bg-brk-surface text-brk-on-surface p-5">
+              <summary className="font-semibold cursor-pointer">{post.title}</summary>
+              <p className="mt-4 whitespace-pre-wrap leading-relaxed">{post.content.replace(/<[^>]*>/g,'')}</p>
+            </details>)}
+          </div> : <CommunityBoard posts={posts} isAdmin={session?.user?.role === 'ADMIN'} title={communityTitle} />}
         </section>
       )}
 

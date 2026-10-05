@@ -13,7 +13,7 @@ import { getSession } from "@/lib/get-session";
 import { getAttentionHighlightSettings } from "@/app/actions/attention-highlight-actions";
 import { headers } from 'next/headers'
 import { domainContext } from '@/lib/website/domain-context'
-import { publishedWebsite } from '@/lib/website/server'
+import { domainWebsite } from '@/lib/website/presentation-server'
 import DomainShell from '@/components/website/DomainShell'
 import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
 import { websiteTheme } from '@/lib/website/theme'
@@ -66,7 +66,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, view
 export async function generateMetadata():Promise<Metadata> {
   const domain=await domainContext()
   if(!domain) return platformMetadata
-  const doc=await publishedWebsite(domain.profileId)
+  const doc=await domainWebsite(domain.profile)
   const name=doc?.name || domain.profile.title || domain.hostname
   return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'},twitter:{card:'summary',title:name,description:doc?.description || ''}}
 }
@@ -97,9 +97,9 @@ export default async function RootLayout({
 }>) {
   const domain=await domainContext()
   if(domain) {
-    const [doc,session]=await Promise.all([publishedWebsite(domain.profileId),getSession()])
+    const [doc,session]=await Promise.all([domainWebsite(domain.profile),getSession()])
     const path=(await headers()).get('x-website-path') || '/'
-    const brand={name:doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
+    const brand={name:doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
     const theme=websiteTheme(brand.color,brand.background)
     return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }

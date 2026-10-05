@@ -44,7 +44,7 @@ export default function MySiteTab() {
   return (
     <div className="p-4 max-w-lg mx-auto">
       <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-6 text-white mb-6">
-        <h1 className="text-xl font-bold mb-1">Trang chủ cá nhân</h1>
+        <h1 className="text-xl font-bold mb-1">Website của tôi</h1>
         <p className="text-white/80 text-sm">Tùy chỉnh trang chủ riêng của bạn với URL <span className="font-mono">/page/{profile?.slug || 'your-slug'}</span></p>
       </div>
 
@@ -77,18 +77,12 @@ export default function MySiteTab() {
           <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
             <Link href="/tools/my-site/manage" className="flex items-center gap-4 p-5 bg-violet-50 hover:bg-violet-100">
               <Edit className="w-6 h-6 text-violet-600" />
-              <div><h3 className="font-bold text-violet-900">Quản lý website riêng</h3><p className="text-sm text-violet-700">Trang, giao diện, tên miền và quyền chức năng</p></div>
+              <div><h3 className="font-bold text-violet-900">Quản lý website của tôi</h3><p className="text-sm text-violet-700">Trang, giao diện, tên miền và quyền chức năng</p></div>
             </Link>
             <Link href={`/page/${profile.slug}`} className="flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors" target="_blank">
               <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center"><Eye className="w-6 h-6 text-blue-600" /></div>
               <div className="flex-1"><h3 className="font-bold text-gray-800">Xem trang của bạn</h3><p className="text-sm text-gray-500">Mở trang chủ trong tab mới</p></div>
               <ExternalLink className="w-5 h-5 text-gray-400" />
-            </Link>
-            <div className="h-px bg-gray-100" />
-            <Link href="/tools/my-site/edit" className="flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center"><Edit className="w-6 h-6 text-green-600" /></div>
-              <div className="flex-1"><h3 className="font-bold text-gray-800">Chỉnh sửa trang</h3><p className="text-sm text-gray-500">Cập nhật nội dung và giao diện</p></div>
-              <Edit className="w-5 h-5 text-gray-400" />
             </Link>
           </div>
 
