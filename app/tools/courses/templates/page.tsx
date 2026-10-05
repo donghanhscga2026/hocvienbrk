@@ -155,6 +155,7 @@ export default function CourseTemplateLibraryPage() {
         const description =
           doc.querySelector('meta[name="description"]')?.getAttribute('content')?.trim() || ''
         const language = doc.documentElement.lang?.trim() || 'vi'
+        const themeColor = doc.querySelector('meta[name="theme-color"]')?.getAttribute('content')?.trim()
         const sectionId = 'zip-exact-source'
 
         result = {
@@ -165,12 +166,10 @@ export default function CourseTemplateLibraryPage() {
           colors: [],
           fonts: [],
           theme: {
-            primaryColor: '#228741',
-            secondaryColor: '#FDC236',
-            backgroundColor: '#FBFDF6',
-            textColor: '#18291D',
-            headingFont: 'Be Vietnam Pro',
-            bodyFont: 'Be Vietnam Pro',
+            primaryColor: themeColor || '#2563EB',
+            secondaryColor: themeColor || '#2563EB',
+            backgroundColor: '#FFFFFF',
+            textColor: '#111827',
             borderRadius: '18px',
             containerWidth: '1120px',
           },
