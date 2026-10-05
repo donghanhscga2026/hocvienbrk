@@ -593,7 +593,7 @@ function inferDesign(input: {
 
 export function analyzeWebsiteHtml(input: {
   html: string
-  sourceType: 'url' | 'html'
+  sourceType: 'url' | 'html' | 'zip'
   sourceUrl?: string
   finalUrl?: string
 }): WebsiteTemplateAnalysis {
