@@ -140,6 +140,7 @@ export const getDefaultProfile = unstable_cache(
             include: { user: { select: { id: true, name: true, image: true } } }
           },
           theme: true,
+          domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
           surveys: true,
           landingPages: {
             where: { isActive: true },
@@ -435,8 +436,16 @@ export async function updateSiteProfileRuntime(
   const domains = [primaryDomain, ...additionalDomains].filter(Boolean)
 
   try {
-    const profile = await prisma.siteProfile.findUnique({ where: { id }, select: { id: true, slug: true } })
+    const profile = await prisma.siteProfile.findUnique({ where: { id }, select: { id: true, slug: true, siteConfig: true } })
     if (!profile) return { error: 'Không tìm thấy profile' }
+
+    const existingConfig = profile.siteConfig && typeof profile.siteConfig === 'object' && !Array.isArray(profile.siteConfig)
+      ? profile.siteConfig as Record<string, unknown>
+      : {}
+    const mergedConfig = {
+      ...existingConfig,
+      ...(input.siteConfig || {}),
+    }
 
     if (domains.length) {
       const conflicts = await prisma.siteProfileDomain.findMany({
@@ -452,7 +461,7 @@ export async function updateSiteProfileRuntime(
       await tx.siteProfile.update({
         where: { id },
         data: {
-          siteConfig: (input.siteConfig || {}) as any,
+          siteConfig: mergedConfig as any,
           ...(input.themeId !== undefined ? { themeId: input.themeId || null } : {}),
         },
       })
