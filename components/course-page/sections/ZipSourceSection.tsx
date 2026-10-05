@@ -92,7 +92,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       id={id}
       title={content?.exactSource?.entryPath || 'ZIP website template'}
       src={sourceUrl}
-      sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+      sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       scrolling="no"
       className="block w-full border-0 bg-white"
