@@ -198,6 +198,7 @@ const getCoursesForProfileCached = unstable_cache(
         where: { id: { in: profile.courseIds }, status: true },
         include: {
           courseCategory: true,
+          teacher: { select: { id: true, name: true } },
           teacherBankAccount: true,
           _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
         },
@@ -215,6 +216,7 @@ const getCoursesForProfileCached = unstable_cache(
         where: { teacherId: { in: allTeacherIds }, status: true },
         include: {
           courseCategory: true,
+          teacher: { select: { id: true, name: true } },
           teacherBankAccount: true,
           _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
         },
@@ -228,6 +230,7 @@ const getCoursesForProfileCached = unstable_cache(
       where: { status: true },
       include: {
         courseCategory: true,
+        teacher: { select: { id: true, name: true } },
         teacherBankAccount: true,
         _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
       },

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { signOutPushCleanup } from '@/lib/web-push-client'
 import { signOut, useSession } from 'next-auth/react'
-import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet } from 'lucide-react'
+import { Settings, LogOut, ChevronDown, LogIn, Check, Wallet, LayoutDashboard } from 'lucide-react'
 import { presetThemes, ThemeId, getThemeById, generateThemeCSS, getTextColorForBg, isDarkTheme } from '@/app/contexts/theme-config'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
@@ -136,6 +136,14 @@ export default function UserMenu() {
                     </div>
 
                     <div className="border-t border-brk-outline pt-2 mt-2" />
+                    <Link
+                        href="/my-space"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-sm text-brk-on-surface hover:bg-brk-background"
+                    >
+                        <LayoutDashboard className="h-4 w-4 text-brk-primary" />
+                        Không gian của tôi
+                    </Link>
                     <Link
                         href="/account-settings"
                         onClick={() => setIsUserMenuOpen(false)}

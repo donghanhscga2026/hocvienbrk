@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const session = await getSession()
-  
+
   // Lấy MFC Profile mặc định - Đã có try-catch fallback bên trong action
   const profile = await getDefaultProfile()
   const safeProfile = profile || FALLBACK_PROFILE
@@ -192,19 +192,21 @@ export default async function Home() {
       backgroundColor: safeProfile.backgroundColor || undefined
     }}>
       <MainHeader title={safeProfile.title || 'TRANG CHỦ'} profile={profile} />
-      
-      <MessageCard
-        profile={safeProfile as any}
-        session={session}
-        userName={userRecord?.name || ''}
-        userId={userRecord?.id !== undefined ? String(userRecord.id) : ''}
-        isDefault={profile?.isDefault || false}
-        messageImageUrl={message?.imageUrl || null}
-        messageContent={(message as any)?.content || null}
-      />
+
       
       <Suspense fallback={<div className="flex justify-center p-8">⏳ Đang tải...</div>}>
         <HomePageClient
+          message={
+            <MessageCard
+              profile={safeProfile as any}
+              session={session}
+              userName={userRecord?.name || ''}
+              userId={userRecord?.id !== undefined ? String(userRecord.id) : ''}
+              isDefault={profile?.isDefault || false}
+              messageImageUrl={message?.imageUrl || null}
+              messageContent={(message as any)?.content || null}
+            />
+          }
           profile={safeProfile as any}
           courses={safeCourses}
           myActiveCourses={myActiveCourses}
@@ -225,7 +227,7 @@ export default async function Home() {
           resetSurveyAction={resetSurveyAction}
         />
       </Suspense>
-      
+
       <FooterSection profile={safeProfile as any} />
     </main>
   )

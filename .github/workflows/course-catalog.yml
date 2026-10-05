@@ -1,0 +1,42 @@
+name: Course catalog
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - components/home/**
+      - components/tools/PublicTools.tsx
+      - components/tools/ToolShare.tsx
+      - app/tools/page.tsx
+      - app/my-space/**
+      - components/layout/UserMenu.tsx
+      - components/course/CourseDiscoveryCard.tsx
+      - components/course/CourseInstructor.tsx
+      - lib/course-catalog.ts
+      - app/actions/site-profile-actions.ts
+      - scripts/test-course-catalog*.cjs
+      - scripts/test-personal-space.cjs
+      - .github/workflows/course-catalog.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  catalog:
+    name: Course filters and mobile catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/test-course-catalog.cjs
+      - run: node scripts/test-personal-space.cjs
+      - run: npx eslint app/tools/page.tsx components/tools/PublicTools.tsx components/tools/ToolShare.tsx components/home/HomeOverview.tsx components/home/PersonalSpace.tsx app/my-space/page.tsx components/home/HomeAreaLink.tsx components/home/CourseDiscoveryPreview.tsx components/home/PersonalCourses.tsx components/home/CourseCatalog.tsx components/course/CourseDiscoveryCard.tsx components/course/CourseInstructor.tsx lib/course-catalog.ts
+      - name: Install isolated browser tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/catalog-browser" --no-package-lock playwright@1.62.1
+          "$RUNNER_TEMP/catalog-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Verify desktop and phone catalog
+        run: NODE_PATH="$RUNNER_TEMP/catalog-browser/node_modules" node scripts/test-course-catalog-browser.cjs

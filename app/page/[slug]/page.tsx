@@ -198,17 +198,18 @@ export default async function PageSlugPage({ params }: PageProps) {
                 profile={profile}
             />
 
-            <MessageCard
-                profile={profile}
-                session={session}
-                userName={userName || ''}
-                userId={userId !== null ? String(userId) : ''}
-                isDefault={profile.isDefault || false}
-                messageImageUrl={message?.imageUrl || null}
-                messageContent={(message as any)?.content || null}
-            />
-
             <HomePageClient
+                message={
+                  <MessageCard
+                    profile={profile}
+                    session={session}
+                    userName={userName || ''}
+                    userId={userId !== null ? String(userId) : ''}
+                    isDefault={profile.isDefault || false}
+                    messageImageUrl={message?.imageUrl || null}
+                    messageContent={(message as any)?.content || null}
+                  />
+                }
                 profile={profile}
                 courses={courses}
                 myActiveCourses={myActiveCourses}
