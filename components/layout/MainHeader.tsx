@@ -36,6 +36,11 @@ export default function MainHeader({ title, profile }: MainHeaderProps) {
     const rawBranding = rawSiteConfig.branding && typeof rawSiteConfig.branding === 'object' && !Array.isArray(rawSiteConfig.branding)
         ? rawSiteConfig.branding as Record<string, unknown>
         : {}
+    const rawModules = rawSiteConfig.modules && typeof rawSiteConfig.modules === 'object' && !Array.isArray(rawSiteConfig.modules)
+        ? rawSiteConfig.modules as Record<string, unknown>
+        : {}
+    const showTools = rawModules.tools !== false
+    const showAffiliate = rawModules.affiliate !== false
     const brandName = typeof rawBranding.name === 'string' && rawBranding.name.trim()
         ? rawBranding.name.trim()
         : profile?.title || 'MFC'
@@ -84,8 +89,8 @@ export default function MainHeader({ title, profile }: MainHeaderProps) {
         { id: 'home', tooltip: homeAttn.tooltip, visible: homeAttn.enabled },
         { id: 'back', tooltip: backAttn.tooltip, visible: showBackButton && backAttn.enabled },
         { id: 'help', tooltip: helpAttn.tooltip, visible: helpAttn.enabled },
-        { id: 'tools', tooltip: toolsAttn.tooltip, visible: toolsAttn.enabled },
-        { id: 'share', tooltip: shareAttn.tooltip, visible: !!userId && shareAttn.enabled },
+        { id: 'tools', tooltip: toolsAttn.tooltip, visible: showTools && toolsAttn.enabled },
+        { id: 'share', tooltip: shareAttn.tooltip, visible: showAffiliate && !!userId && shareAttn.enabled },
         { id: 'avatar', tooltip: avatarAttn.tooltip, visible: avatarAttn.enabled }
     ], { idleDelayMs: attnConfig.idleDelayMs, cycleIntervalMs: attnConfig.cycleIntervalMs })
 
@@ -150,17 +155,19 @@ export default function MainHeader({ title, profile }: MainHeaderProps) {
                             <AssistantHeaderIcon />
                         </AttentionHighlight>
 
-                        <AttentionHighlight {...getStatus('tools')}>
-                            <button
-                                onClick={() => router.push('/tools')}
-                                className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10 text-brk-primary flex items-center justify-center"
-                                title="Công cụ & Tiện ích"
-                            >
-                                <Wrench className="w-[22px] h-[22px]" />
-                            </button>
-                        </AttentionHighlight>
+                        {showTools && (
+                            <AttentionHighlight {...getStatus('tools')}>
+                                <button
+                                    onClick={() => router.push('/tools')}
+                                    className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10 text-brk-primary flex items-center justify-center"
+                                    title="Công cụ & Tiện ích"
+                                >
+                                    <Wrench className="w-[22px] h-[22px]" />
+                                </button>
+                            </AttentionHighlight>
+                        )}
 
-                        {userId && (
+                        {showAffiliate && userId && (
                             <AttentionHighlight {...getStatus('share')}>
                                 <button
                                     onClick={() => setShowShare(true)}
