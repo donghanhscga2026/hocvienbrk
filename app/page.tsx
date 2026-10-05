@@ -8,45 +8,84 @@ import HomePageClient from '@/components/home/HomePageClient'
 import FooterSection from '@/components/home/FooterSection'
 
 import prisma from '@/lib/prisma'
-import { getDefaultProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
+import { getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
+import { getCurrentSiteProfile, getSiteRuntimeConfig } from '@/lib/site-profile/runtime'
+import { publishedWebsite, websiteData } from '@/lib/website/server'
+import WebsiteView from '@/components/website/WebsiteView'
+import { LandingPageClient } from '@/components/landing/LandingPageClient'
 import { getRandomMessage } from './actions/message-actions'
 import { resetSurveyAction } from './actions/survey-actions'
 import { getRoadmapPoints } from './actions/roadmap-actions'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
 
-export const metadata: Metadata = {
-  title: 'MFC - Dòng chảy Phước Báu',
-  description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
-  openGraph: {
-    title: 'MFC - Dòng chảy Phước Báu',
-    description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
-    type: 'website',
-    locale: 'vi_VN',
-    url: 'https://giautoandien.io.vn',
-    siteName: 'MFC - Dòng chảy Phước Báu',
-    images: [
-      {
-        url: 'https://giautoandien.io.vn/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'MFC - Dòng chảy Phước Báu',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'MFC - Dòng chảy Phước Báu',
-    description: 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả',
-    images: ['https://giautoandien.io.vn/og-image.png'],
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const profile = await getCurrentSiteProfile()
+  if (!profile) return { title: 'MFC' }
+
+  const config = getSiteRuntimeConfig(profile)
+  if (config.homepage.type === 'website') {
+    const website = await publishedWebsite(profile.id)
+    if (website) {
+      return {
+        title: { absolute: website.name },
+        description: website.description,
+        openGraph: { title: website.name, description: website.description },
+        twitter: { title: website.name, description: website.description },
+      }
+    }
+  }
+
+  if (config.homepage.type === 'landing') {
+    const landing = profile.landingPages.find(item =>
+      (config.homepage.landingId && item.id === config.homepage.landingId)
+      || (config.homepage.landingSlug && item.slug === config.homepage.landingSlug),
+    )
+    if (landing) {
+      return {
+        title: landing.title,
+        description: landing.subtitle || landing.description || profile.metaDescription || undefined,
+        openGraph: {
+          title: landing.title,
+          description: landing.subtitle || landing.description || profile.metaDescription || undefined,
+          images: landing.heroImage ? [landing.heroImage] : undefined,
+        },
+      }
+    }
+  }
+
+  const title = profile.metaTitle || profile.title || 'MFC - Dòng chảy Phước Báu'
+  const description = profile.metaDescription || profile.subtitle || undefined
+  const image = profile.metaImage || profile.heroImage || undefined
+  return {
+    title,
+    description,
+    openGraph: { title, description, images: image ? [image] : undefined },
+    twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
+  }
 }
 
 export default async function Home() {
   const session = await getSession()
   
-  // Lấy MFC Profile mặc định - Đã có try-catch fallback bên trong action
-  const profile = await getDefaultProfile()
+  // Resolve Site Profile theo hostname; localhost/host chưa khai báo fallback profile mặc định.
+  const profile = await getCurrentSiteProfile()
   const safeProfile = profile || FALLBACK_PROFILE
+  const runtimeConfig = getSiteRuntimeConfig(safeProfile as any)
+
+  if (profile && runtimeConfig.homepage.type === 'website') {
+    const website = await publishedWebsite(profile.id)
+    if (website) {
+      return <WebsiteView document={website} data={await websiteData(profile)} slug={profile.slug} />
+    }
+  }
+
+  if (profile && runtimeConfig.homepage.type === 'landing') {
+    const landing = profile.landingPages.find(item =>
+      (runtimeConfig.homepage.landingId && item.id === runtimeConfig.homepage.landingId)
+      || (runtimeConfig.homepage.landingSlug && item.slug === runtimeConfig.homepage.landingSlug),
+    )
+    if (landing) return <LandingPageClient landing={landing as any} />
+  }
 
   // Tăng view count (async)
   if (profile?.slug) {
