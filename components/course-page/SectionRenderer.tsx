@@ -19,6 +19,7 @@ import TestimonialsSection from './sections/TestimonialsSection'
 import RichContentSection from './sections/RichContentSection'
 import WiGrowArtworkSection from './sections/WiGrowArtworkSection'
 import ImportedSection from './sections/ImportedSection'
+import ZipSourceSection from './sections/ZipSourceSection'
 
 const sectionRegistry: Record<CourseSectionType, React.ComponentType<any>> = {
   hero: HeroSection,
@@ -78,6 +79,17 @@ export default function SectionRenderer({
     <>
       {visibleSections.map((section) => {
         const type = (section as any).sectionType || (section as any).type
+        if (section.variant === 'zip-source-v1') {
+          return (
+            <ZipSourceSection
+              key={section.id}
+              id={section.anchorId || section.sectionKey}
+              content={section.content}
+              onAction={onAction}
+            />
+          )
+        }
+
         if (section.variant === 'imported-v1') {
           return (
             <ImportedSection
