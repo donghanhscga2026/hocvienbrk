@@ -42,6 +42,14 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
         return
       }
 
+      if (data.source === 'mfc-zip-source' && data.type === 'scroll' && Number.isFinite(data.top)) {
+        const rect = frameRef.current?.getBoundingClientRect()
+        if (!rect) return
+        const absoluteTop = window.scrollY + rect.top + Number(data.top) - 72
+        window.scrollTo({ top: Math.max(0, absoluteTop), behavior: 'smooth' })
+        return
+      }
+
       if (data.source === 'mfc-zip-source' && data.type === 'action') {
         const actionType = typeof data.actionType === 'string' ? data.actionType : 'open_registration'
         if (actionType === 'external_link') {
