@@ -33,6 +33,20 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
     const frame = frameRef.current
     if (!frame) return
 
+    const sendAnchorToFrame = () => {
+      const rawHash = window.location.hash
+      if (!rawHash || rawHash === '#') return
+      let anchor = rawHash.slice(1)
+      try { anchor = decodeURIComponent(anchor) } catch {}
+      try {
+        frame.contentWindow?.postMessage({
+          source: 'mfc-zip-parent',
+          type: 'navigate_anchor',
+          anchor,
+        }, '*')
+      } catch {}
+    }
+
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== frame.contentWindow) return
       const data = event.data || {}
@@ -45,6 +59,16 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       if (data.source === 'mfc-zip-source' && data.type === 'scroll' && Number.isFinite(data.top)) {
         const rect = frameRef.current?.getBoundingClientRect()
         if (!rect) return
+
+        if (data.updateHash !== false && typeof data.anchor === 'string' && data.anchor) {
+          const url = new URL(window.location.href)
+          const previousHash = url.hash
+          url.hash = data.anchor
+          if (url.hash !== previousHash) {
+            window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+          }
+        }
+
         const absoluteTop = window.scrollY + rect.top + Number(data.top) - 72
         window.scrollTo({ top: Math.max(0, absoluteTop), behavior: 'smooth' })
         return
@@ -93,15 +117,20 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
     window.addEventListener('message', handleMessage)
     window.addEventListener('scroll', sendViewport, { passive: true })
     window.addEventListener('resize', sendViewport)
+    window.addEventListener('hashchange', sendAnchorToFrame)
+    window.addEventListener('popstate', sendAnchorToFrame)
     const timer = window.setTimeout(() => {
       sendConfiguration()
       sendViewport()
+      sendAnchorToFrame()
     }, 250)
 
     return () => {
       window.removeEventListener('message', handleMessage)
       window.removeEventListener('scroll', sendViewport)
       window.removeEventListener('resize', sendViewport)
+      window.removeEventListener('hashchange', sendAnchorToFrame)
+      window.removeEventListener('popstate', sendAnchorToFrame)
       window.clearTimeout(timer)
     }
   }, [onAction, sourceUrl, selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
@@ -133,6 +162,16 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
             selectedBlockKeys,
             registrationBlockKeys,
           }, '*')
+          const rawHash = window.location.hash
+          if (rawHash && rawHash !== '#') {
+            let anchor = rawHash.slice(1)
+            try { anchor = decodeURIComponent(anchor) } catch {}
+            frameRef.current?.contentWindow?.postMessage({
+              source: 'mfc-zip-parent',
+              type: 'navigate_anchor',
+              anchor,
+            }, '*')
+          }
         } catch {}
       }}
     />

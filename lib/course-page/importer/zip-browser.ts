@@ -196,12 +196,37 @@ const BRIDGE = `
     });
     sendHeight();
   }
+  function isRegistrationAnchor(anchor){
+    return /dang[-_ ]?ky|register|registration|signup|sign[-_ ]?up|enroll/i.test(anchor||'');
+  }
+  function targetForAnchor(anchor){
+    var decoded=anchor||'';
+    try{decoded=decodeURIComponent(decoded);}catch(err){}
+    return document.getElementById(decoded) || document.getElementById(anchor||'');
+  }
+  function navigateAnchor(anchor,updateHash){
+    if(!anchor)return;
+    if(isRegistrationAnchor(anchor)){
+      post({type:'action',actionType:'open_registration'});
+      return;
+    }
+    var target=targetForAnchor(anchor);
+    if(!target || target.hidden || target.closest('[data-mfc-hidden="true"]'))return;
+    var top=target.getBoundingClientRect().top + window.scrollY;
+    post({type:'scroll',top:Math.max(0,top),anchor:anchor,updateHash:updateHash!==false});
+  }
   addEventListener('message',function(e){
     var data=e.data||{};
-    if(data.source!=='mfc-zip-parent' || data.type!=='configure') return;
-    cfg.selectedBlockKeys=Array.isArray(data.selectedBlockKeys)?data.selectedBlockKeys:null;
-    cfg.registrationBlockKeys=Array.isArray(data.registrationBlockKeys)?data.registrationBlockKeys:[];
-    applyConfig();
+    if(data.source!=='mfc-zip-parent') return;
+    if(data.type==='configure'){
+      cfg.selectedBlockKeys=Array.isArray(data.selectedBlockKeys)?data.selectedBlockKeys:null;
+      cfg.registrationBlockKeys=Array.isArray(data.registrationBlockKeys)?data.registrationBlockKeys:[];
+      applyConfig();
+      return;
+    }
+    if(data.type==='navigate_anchor' && typeof data.anchor==='string'){
+      navigateAnchor(data.anchor,false);
+    }
   });
   document.addEventListener('submit', function(e){
     e.preventDefault();
@@ -221,17 +246,8 @@ const BRIDGE = `
     var href=el.getAttribute && (el.getAttribute('href')||'');
     if(!href)return;
     if(href.charAt(0)==='#'){
-      var target=null;
-      try{target=document.getElementById(decodeURIComponent(href.slice(1)));}catch(err){target=document.getElementById(href.slice(1));}
-      var hiddenTarget=target && (target.hidden || target.closest('[data-mfc-hidden="true"]'));
-      var registrationHash=/dang[-_ ]?ky|register|registration|signup|sign[-_ ]?up|enroll/i.test(href);
       e.preventDefault();e.stopImmediatePropagation();
-      if(hiddenTarget || registrationHash){
-        post({type:'action',actionType:'open_registration'});
-      } else if(target) {
-        var top=target.getBoundingClientRect().top + window.scrollY;
-        post({type:'scroll',top:Math.max(0,top),anchor:href.slice(1)});
-      }
+      navigateAnchor(href.slice(1),true);
       return;
     }
     if(/^javascript:/i.test(href)){
@@ -239,6 +255,12 @@ const BRIDGE = `
     }
     try{
       var u=new URL(href,location.href);
+      var sameDocument=u.origin===location.origin && u.pathname===location.pathname && u.search===location.search;
+      if(sameDocument && u.hash){
+        e.preventDefault();e.stopImmediatePropagation();
+        navigateAnchor(u.hash.slice(1),true);
+        return;
+      }
       if(['http:','https:','tel:','mailto:'].indexOf(u.protocol)>=0){
         e.preventDefault();e.stopImmediatePropagation();
         post({type:'action',actionType:'external_link',target:u.href});
