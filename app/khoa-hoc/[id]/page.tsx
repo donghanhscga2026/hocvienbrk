@@ -7,11 +7,7 @@ import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
-import { createWiGrowCoursePage, WIGROW_COURSE_SLUG } from '@/lib/course-page/templates/wigrow'
-
-const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
-const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
-const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
+import { canProfileAccessCourse, getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -35,6 +31,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     if (!course) return { title: 'Không tìm thấy khóa học' }
 
+    const siteProfile = await getCurrentSiteProfile()
+    if (siteProfile && !(await canProfileAccessCourse(siteProfile, course.id))) {
+        return { title: 'Không tìm thấy khóa học' }
+    }
+
+    const defaultDescription = siteProfile?.metaDescription || siteProfile?.subtitle || undefined
+    const defaultImage = siteProfile?.metaImage || siteProfile?.heroImage || '/og-image.png'
     const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
     
     // Check if dynamic course page exists
@@ -46,34 +49,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         const seo = (coursePage.seo as any) || {}
         return {
             title: seo.title || course.name_lop,
-            description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+            description: seo.description || course.mo_ta_ngan || defaultDescription,
             openGraph: {
                 title: seo.title || course.name_lop,
-                description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-                images: seo.image ? [seo.image] : [courseImg || DEFAULT_OG_IMAGE],
+                description: seo.description || course.mo_ta_ngan || defaultDescription,
+                images: seo.image ? [seo.image] : [courseImg || defaultImage],
             },
             twitter: {
                 card: 'summary_large_image',
                 title: seo.title || course.name_lop,
-                description: seo.description || course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-                images: seo.image ? [seo.image] : [courseImg || DEFAULT_OG_IMAGE],
+                description: seo.description || course.mo_ta_ngan || defaultDescription,
+                images: seo.image ? [seo.image] : [courseImg || defaultImage],
             }
         }
     }
 
     return {
         title: course.name_lop,
-        description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
+        description: course.mo_ta_ngan || defaultDescription,
         openGraph: {
             title: course.name_lop,
-            description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-            images: courseImg ? [courseImg] : [DEFAULT_OG_IMAGE],
+            description: course.mo_ta_ngan || defaultDescription,
+            images: courseImg ? [courseImg] : [defaultImage],
         },
         twitter: {
             card: 'summary_large_image',
             title: course.name_lop,
-            description: course.mo_ta_ngan || DEFAULT_OG_DESCRIPTION,
-            images: courseImg ? [courseImg] : [DEFAULT_OG_IMAGE],
+            description: course.mo_ta_ngan || defaultDescription,
+            images: courseImg ? [courseImg] : [defaultImage],
         },
     }
 }
@@ -87,6 +90,9 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     const course = await getCourseByIdKhoa(id)
 
     if (!course) notFound()
+
+    const siteProfile = await getCurrentSiteProfile()
+    if (siteProfile && !(await canProfileAccessCourse(siteProfile, course.id))) notFound()
 
     const courseId = course.id
     const userId = session?.user?.id ? parseInt(session.user.id) : null
@@ -184,10 +190,8 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
         ? <NotificationLessonEntry courseSlug={course.id_khoa} lessonId={requestedLesson} />
         : null
 
-    // WI.GROW: nếu khóa mục tiêu chưa có CoursePage đã publish trong DB, dùng preset
-    // an toàn ở code để có thể preview trước. Khi admin đã publish cấu hình trong DB,
-    // dữ liệu DB luôn được ưu tiên và có thể chỉnh sửa bằng công cụ quản trị hiện tại.
-    const effectiveCoursePage = coursePage || (id === WIGROW_COURSE_SLUG ? createWiGrowCoursePage(id) : null)
+    // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
+    const effectiveCoursePage = coursePage
 
     // coursePage đã được lấy song song ở trên cùng các query khác
     if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {

@@ -5,6 +5,7 @@ import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } f
 import { auth } from '@/auth'
 import { requireAdminAction } from '@/lib/api-auth'
 import { unstable_cache, revalidateTag } from 'next/cache'
+import { getCourseWhereForProfile, getSiteRuntimeConfig, normalizeSiteHostname } from '@/lib/site-profile/runtime'
 
 // ─────────────────────────────────────────────────────────
 // GET ACTIONS
@@ -23,6 +24,7 @@ export async function getSiteProfile(slug: string) {
           include: { user: { select: { id: true, name: true, image: true } } }
         },
         theme: true,
+        domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
         surveys: true,
         landingPages: {
           where: { isActive: true },
@@ -52,6 +54,7 @@ export async function getSiteProfileAdmin(slug: string) {
           include: { user: { select: { id: true, name: true, email: true, image: true } } }
         },
         theme: true,
+        domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
         surveys: true,
         landingPages: true,
         affiliateCampaign: {
@@ -78,6 +81,7 @@ export async function getSiteProfileAdminById(id: number) {
           include: { user: { select: { id: true, name: true, email: true, image: true } } }
         },
         theme: true,
+        domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
         surveys: true,
         landingPages: true,
         affiliateCampaign: {
@@ -104,6 +108,7 @@ export async function getMySiteProfile(userId: number) {
           include: { user: { select: { id: true, name: true, email: true, image: true } } }
         },
         theme: true,
+        domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
         surveys: true,
         landingPages: true,
         affiliateCampaign: {
@@ -135,6 +140,7 @@ export const getDefaultProfile = unstable_cache(
             include: { user: { select: { id: true, name: true, image: true } } }
           },
           theme: true,
+          domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
           surveys: true,
           landingPages: {
             where: { isActive: true },
@@ -167,6 +173,7 @@ export async function getAllSiteProfiles() {
       ],
       include: {
         user: { select: { name: true, image: true } },
+        domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
       }
     })
   } catch (error) {
@@ -192,40 +199,8 @@ function stripVolatileProfileFields(profile: any) {
  */
 const getCoursesForProfileCached = unstable_cache(
   async (profile: any) => {
-    // Nếu có courseIds cụ thể
-    if (profile.courseIds && Array.isArray(profile.courseIds) && profile.courseIds.length > 0) {
-      const courses = await prisma.course.findMany({
-        where: { id: { in: profile.courseIds }, status: true },
-        include: {
-          courseCategory: true,
-          teacherBankAccount: true,
-          _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
-        },
-        orderBy: [{ pin: 'asc' }, { id: 'asc' }]
-      })
-      return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
-    }
-
-    // Nếu là Teacher → khóa của teacher đó và các cộng sự
-    if (profile.userId && profile.userId !== 0) {
-      const associateIds = profile.members?.map((m: any) => m.userId) || []
-      const allTeacherIds = [profile.userId, ...associateIds]
-
-      const courses = await prisma.course.findMany({
-        where: { teacherId: { in: allTeacherIds }, status: true },
-        include: {
-          courseCategory: true,
-          teacherBankAccount: true,
-          _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
-        },
-        orderBy: [{ pin: 'asc' }, { id: 'asc' }]
-      })
-      return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
-    }
-
-    // BRK gốc → tất cả khóa học
     const courses = await prisma.course.findMany({
-      where: { status: true },
+      where: getCourseWhereForProfile(profile as any),
       include: {
         courseCategory: true,
         teacherBankAccount: true,
@@ -254,6 +229,8 @@ export async function getCoursesForProfile(profile: any) {
  */
 const getSurveyForProfileCached = unstable_cache(
   async (profile: any) => {
+    if (!getSiteRuntimeConfig(profile).modules.surveys) return null
+
     // Ưu tiên 1: selectedSurveyId cụ thể
     if (profile.selectedSurveyId) {
       return await prisma.survey.findUnique({
@@ -292,6 +269,8 @@ export async function getSurveyForProfile(profile: any) {
  */
 const getPostsForProfileCached = unstable_cache(
   async (profile: any) => {
+    if (!getSiteRuntimeConfig(profile).modules.community) return []
+
     const where: any = { published: true }
 
     if (profile.communityCategoryId) {
@@ -353,7 +332,7 @@ export async function getPostCategories() {
 /**
  * Tạo profile mới cho Teacher (Admin chọn teacher để gán profile)
  */
-export async function createSiteProfile(userId: number, slug: string) {
+export async function createSiteProfile(userId: number | null, slug: string) {
   const denied = await requireAdminAction()
   if (denied) return { error: denied.error }
 
@@ -364,11 +343,13 @@ export async function createSiteProfile(userId: number, slug: string) {
         const existingLanding = await prisma.landingPage.findUnique({ where: { slug } })
         if (existingLanding) return { error: 'Slug đã được sử dụng bởi Landing Page' }
 
-        const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
-    if (existingUser) return { error: 'User này đã có profile' }
+        if (userId != null) {
+          const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
+          if (existingUser) return { error: 'User này đã có profile' }
+        }
 
     const profile = await prisma.siteProfile.create({
-      data: { userId, slug, isActive: false }
+      data: { userId: userId ?? null, slug, isActive: false }
     })
 
     return { success: true, profile }
@@ -396,6 +377,7 @@ export async function updateSiteProfile(id: number, data: any) {
         if (!isAdmin) {
             delete data.isDefault
             delete data.userId
+            delete data.siteConfig
         }
 
         if (data.slug) {
@@ -423,11 +405,98 @@ export async function updateSiteProfile(id: number, data: any) {
     const { revalidatePath } = await import('next/cache')
     revalidatePath(`/tools/site-profiles/${id}/edit`)
     revalidatePath(`/page/${profile.slug}`)
+    revalidatePath('/')
     revalidateTag('site-profile', { expire: 0 })
 
     return { success: true, profile }
   } catch (error) {
     return { error: 'Lỗi cập nhật database' }
+  }
+}
+
+export async function updateSiteProfileRuntime(
+  id: number,
+  input: {
+    primaryDomain?: string
+    additionalDomains?: string[]
+    siteConfig?: Record<string, unknown>
+    themeId?: string | null
+  },
+) {
+  const denied = await requireAdminAction()
+  if (denied) return { error: denied.error }
+
+  const primaryDomain = normalizeSiteHostname(input.primaryDomain)
+  const additionalDomains = Array.from(new Set(
+    (input.additionalDomains || [])
+      .map(normalizeSiteHostname)
+      .filter(Boolean)
+      .filter(hostname => hostname !== primaryDomain),
+  ))
+  const domains = [primaryDomain, ...additionalDomains].filter(Boolean)
+
+  try {
+    const profile = await prisma.siteProfile.findUnique({ where: { id }, select: { id: true, slug: true, siteConfig: true } })
+    if (!profile) return { error: 'Không tìm thấy profile' }
+
+    const existingConfig = profile.siteConfig && typeof profile.siteConfig === 'object' && !Array.isArray(profile.siteConfig)
+      ? profile.siteConfig as Record<string, unknown>
+      : {}
+    const mergedConfig = {
+      ...existingConfig,
+      ...(input.siteConfig || {}),
+    }
+
+    if (domains.length) {
+      const conflicts = await prisma.siteProfileDomain.findMany({
+        where: { hostname: { in: domains }, NOT: { profileId: id } },
+        select: { hostname: true },
+      })
+      if (conflicts.length) {
+        return { error: `Domain đã được sử dụng: ${conflicts.map(item => item.hostname).join(', ')}` }
+      }
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.siteProfile.update({
+        where: { id },
+        data: {
+          siteConfig: mergedConfig as any,
+          ...(input.themeId !== undefined ? { themeId: input.themeId || null } : {}),
+        },
+      })
+
+      await tx.siteProfileDomain.deleteMany({
+        where: { profileId: id, hostname: { notIn: domains.length ? domains : ['__none__'] } },
+      })
+
+      for (let index = 0; index < domains.length; index += 1) {
+        await tx.siteProfileDomain.upsert({
+          where: { hostname: domains[index] },
+          create: {
+            profileId: id,
+            hostname: domains[index],
+            isPrimary: index === 0,
+            isActive: true,
+          },
+          update: {
+            profileId: id,
+            isPrimary: index === 0,
+            isActive: true,
+          },
+        })
+      }
+    })
+
+    const { revalidatePath } = await import('next/cache')
+    revalidatePath('/')
+    revalidatePath(`/page/${profile.slug}`)
+    revalidatePath(`/tools/site-profiles/${id}/edit`)
+    revalidateTag('site-profile', { expire: 0 })
+    return { success: true }
+  } catch (error) {
+    console.error('[DB ERROR] updateSiteProfileRuntime:', error)
+    return { error: 'Lỗi cập nhật cấu hình website' }
   }
 }
 
