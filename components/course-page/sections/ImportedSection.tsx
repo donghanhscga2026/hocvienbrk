@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { isRegistrationAnchor } from '@/lib/course-page/importer/registration'
 
 type ImportedSectionProps = {
   id?: string
@@ -11,7 +12,10 @@ type ImportedSectionProps = {
 function actionFor(href?: string) {
   if (!href) return { type: 'open_registration', target: undefined }
   try {
-    if (href.startsWith('#')) return { type: 'scroll', target: href.slice(1) }
+    if (href.startsWith('#')) {
+      if (isRegistrationAnchor(href)) return { type: 'open_registration', target: undefined }
+      return { type: 'scroll', target: href.slice(1) }
+    }
     const url = new URL(href, typeof window !== 'undefined' ? window.location.href : 'https://example.com')
     if (url.hash && url.origin === (typeof window !== 'undefined' ? window.location.origin : url.origin)) {
       return { type: 'scroll', target: url.hash.slice(1) }
