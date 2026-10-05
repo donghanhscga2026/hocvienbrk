@@ -157,11 +157,11 @@ export default async function RootLayout({
         <Providers session={session} attentionHighlight={attentionHighlight}>
           <PwaInstallProvider>
           {children}
-          <AffiliateTracker />
+          {runtimeConfig?.modules.affiliate !== false && <AffiliateTracker />}
           <AccountAssistantTrigger />
           </PwaInstallProvider>
         </Providers>
-        <PendingSurveyHandler />
+        {runtimeConfig?.modules.surveys !== false && <PendingSurveyHandler />}
       </body>
     </html>
   );
