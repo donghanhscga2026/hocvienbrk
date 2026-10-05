@@ -21,7 +21,8 @@ const domains={
   updateMany:async({where,data})=>{const selected=records.filter(r=>matches(r,where));selected.forEach(r=>Object.assign(r,data));return {count:selected.length}},
   deleteMany:async({where})=>{records=records.filter(r=>!matches(r,where));return {count:1}},
 }
-const fake={siteDomain:domains,siteWebsite:{findUnique:async()=>({published:{name:'Brand',version:1}})},siteProfile:{findUnique:async({where})=>profiles.find(p=>where.userId!=null ? p.userId===where.userId : p.slug===where.slug) || null},user:{findUnique:async({where})=>({id:where.id,role,name:'Owner'})},course:{findUnique:async({where})=>courses.find(c=>where.id!=null ? c.id===where.id : c.id_khoa===where.id_khoa)},lesson:{findUnique:async({where})=>where.id==='own-lesson' ? {courseId:1} : {courseId:2}},enrollment:{findUnique:async({where})=>({userId:where.id===1 ? 1 : 2,courseId:where.id===1 ? 1 : 2})},$executeRaw:async()=>1}
+const configs=new Map()
+const fake={systemConfig:{findUnique:async({where})=>configs.has(where.key) ? {key:where.key,value:configs.get(where.key)} : null,upsert:async({where,create,update})=>{const value=configs.has(where.key) ? update.value : create.value;configs.set(where.key,value);return {key:where.key,value}}},siteDomain:domains,siteWebsite:{findUnique:async()=>({published:{name:'Brand',version:1}})},siteProfile:{findUnique:async({where})=>profiles.find(p=>where.userId!=null ? p.userId===where.userId : p.slug===where.slug) || null},user:{findUnique:async({where})=>({id:where.id,role,name:'Owner'})},course:{findUnique:async({where})=>courses.find(c=>where.id!=null ? c.id===where.id : c.id_khoa===where.id_khoa)},lesson:{findUnique:async({where})=>where.id==='own-lesson' ? {courseId:1} : {courseId:2}},enrollment:{findUnique:async({where})=>({userId:where.id===1 ? 1 : 2,courseId:where.id===1 ? 1 : 2})},$executeRaw:async()=>1}
 fake.$transaction=async action=>action(fake)
 function loader(overrides={}) {
   const cache=new Map()
@@ -143,10 +144,37 @@ async function run(){
   const View=load('components/website/WebsiteView').default,doc=document.blankDocument('Brand')
   doc.pages[0].nodes=['courses','form','affiliate'].map(kind=>document.makeNode(kind))
   const markup=renderToStaticMarkup(React.createElement(View,{document:doc,data:{courses:[],posts:[],testimonials:[]},slug:'huong-lucy',customDomain:true,modules:off}))
-  ok(!markup.includes('<form') && !markup.includes('id="courses"') && markup.includes('href="/"'),'Disabled components stay hidden and home link remains branded')
+  ok(!markup.includes('<form') && !markup.includes('id="courses"') && !markup.includes('<header'),'Disabled components stay hidden and shared shell owns navigation')
   const lead=load('app/api/websites/lead/route')
   const leadResponse=await lead.POST(req({slug:'other',page:'',node:'fake',name:'Customer',email:'customer@example.com',phone:'',message:'Hello',consent:true,website:''},'brk.io.vn'))
   ok(leadResponse.status===403,'Brand lead cannot target another owner slug')
+  const Shell=loader({'next/navigation':{usePathname:()=>null},'next-auth/react':{useSession:()=>({data:null}),signOut:()=>{}}})('components/website/DomainShell').default
+  const shellProps={brand:{...on,name:'Brand',color:'#7c3aed',background:'#fff',ownerId:1},pages:[{title:'Giới thiệu',slug:'gioi-thieu'}]}
+  const home=renderToStaticMarkup(React.createElement(Shell,{...shellProps,path:'/'},markup))
+  const detail=renderToStaticMarkup(React.createElement(Shell,{...shellProps,path:'/khoa-hoc/OWN'},'Course'))
+  ok(home.includes('href="/khoa-hoc"') && home.includes('href="/gioi-thieu"') && home.includes('href="/login"'),'Home has shared course, custom page and login navigation')
+  ok(detail.includes('aria-label="Đường dẫn trang"') && !home.includes('aria-label="Đường dẫn trang"'),'Breadcrumb appears on internal pages only')
+  ok(home.includes('aria-expanded="false"') && home.includes('aria-controls="website-menu"'),'Mobile navigation exposes accessible toggle')
+  const accessApi=load('app/api/websites/access/route')
+  const accessPost=async(body,hostname='giautoandien.io.vn',origin='https://'+hostname)=>accessApi.POST(req(body,hostname,origin))
+  ok((await accessPost({action:'basic',modules:off},'brk.io.vn')).status===403,'Brand session cannot administer package')
+  ok((await accessPost({action:'basic',modules:off},'giautoandien.io.vn','https://evil.invalid')).status===403,'Package rejects cross-origin writes')
+  profiles[0].user.role='TEACHER'
+  ok((await accessPost({action:'basic',modules:on})).status===403,'Owner cannot change basic package')
+  ok((await accessPost({action:'save',revision:0,enabled:on,extra:on})).status===403,'Owner cannot inject grants')
+  profiles[0].user.role='ADMIN'
+  ok((await accessPost({action:'basic',modules:{...off,courses:true}})).status===200,'Admin saves basic template')
+  ok(records[0].crm,'Saving template does not mutate live websites')
+  ok((await accessPost({action:'save',revision:0,enabled:on,extra:off,applyBasic:true})).status===200,'Admin applies base snapshot to website')
+  ok(records[0].courses && !records[0].crm && !records[0].affiliate,'Effective permissions intersect grants and enabled flags')
+  ok((await accessPost({action:'save',revision:0,enabled:on,extra:on})).status===409,'Stale revision cannot overwrite access')
+  await rejects(()=>context.requireDomainModule('crm'),'Server rejects revoked module despite direct access')
+  ok((await post({action:'modules',hostname:'brk.io.vn',...on})).status===409,'Old domain form cannot bypass website policy')
+  profiles[0].user.role='TEACHER'
+  ok((await accessPost({action:'save',revision:1,enabled:on})).status===403,'Owner cannot activate ungranted module')
+  ok((await accessPost({action:'save',revision:1,enabled:off})).status===200,'Owner can disable granted modules')
+  profiles[0].user.role='ADMIN'
+  await accessPost({action:'save',revision:2,enabled:on,extra:on})
   await authChecks();await verificationChecks()
   host='giautoandien.io.vn';await post({action:'disable',hostname:'brk.io.vn'});host='brk.io.vn';await rejects(()=>context.domainContext(),'Disabled domain closes immediately')
   ok((await proxy(routeRequest('/login'),{})).status===503,'Disabled domain cannot still serve login')

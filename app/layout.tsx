@@ -98,9 +98,8 @@ export default async function RootLayout({
   if(domain) {
     const [doc,session]=await Promise.all([publishedWebsite(domain.profileId),getSession()])
     const path=(await headers()).get('x-website-path') || '/'
-    const functional=path==='/tai-khoan' || path==='/khoa-hoc' || /^\/(?:login|register|forgot-password|reset-password|complete-profile|account-settings|courses|khoa-hoc|tools)(?:\/|$)/.test(path)
     const brand={name:doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
-    return <html lang="vi"><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} showNavigation={functional}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+    return <html lang="vi"><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }
   const siteThemeId = await getSiteTheme()
   const session = await getSession()

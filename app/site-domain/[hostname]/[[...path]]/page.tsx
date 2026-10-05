@@ -21,11 +21,21 @@ async function context(props:Props) {
 export async function generateMetadata(props:Props):Promise<Metadata> {
   const {domain,document,path}=await context(props)
   const page=document.pages.find(p=>p.slug===path.join('/'))
-  const title=path.length ? (page?.title || (path[0]==='tai-khoan' ? 'Tài khoản' : 'Khóa học'))+' | '+document.name : document.name
+  const title=path.length ? (page?.title || (path[0]==='tai-khoan' ? 'Tài khoản' : path[0]==='cong-cu' ? 'Công cụ' : 'Khóa học'))+' | '+document.name : document.name
   return {title:{absolute:title},description:document.description,alternates:{canonical:'https://'+domain.hostname+'/'+path.map(encodeURIComponent).join('/')},openGraph:{title,description:document.description,url:'https://'+domain.hostname+'/'+path.join('/'),siteName:document.name}}
 }
 export default async function DomainPage(props:Props) {
   const {domain,document,path}=await context(props)
+  if(path.join('/')==='cong-cu') {
+    const session=await getSession()
+    const owner=!!session?.user && Number(session.user.id)===domain.profile.userId
+    const items=[
+      ...(domain.courses ? [{href:'/khoa-hoc',title:'Khóa học',description:'Khám phá các khóa học của website.'}] : []),
+      ...(domain.affiliate ? [{href:'/tools/affiliate',title:'Affiliate',description:'Liên kết giới thiệu và hoa hồng của bạn.'}] : []),
+      ...(domain.crm && owner ? [{href:'/tools/crm',title:'CRM',description:'Quản lý và chăm sóc khách hàng của bạn.'}] : [])
+    ]
+    return <section className="max-w-5xl mx-auto p-4 sm:p-6"><h1 className="text-3xl font-bold">Công cụ & tiện ích</h1><p className="text-slate-600 mt-3 mb-8">Các chức năng đang mở tại {document.name}.</p><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map(item=><a key={item.href} href={item.href} className="border rounded-2xl p-6 bg-white hover:border-violet-400"><h2 className="font-bold text-xl mb-3">{item.title}</h2><p className="text-slate-600 text-sm">{item.description}</p><span className="inline-block mt-5 font-semibold">Mở công cụ →</span></a>)}</div>{!items.length && <p className="border rounded-2xl p-6">Chưa có công cụ được bật cho tài khoản của bạn.</p>}</section>
+  }
   if(path.join('/')==='tai-khoan') {
     const session=await getSession()
     if(!session?.user?.id) return <section className="max-w-3xl mx-auto p-6"><h1 className="text-2xl font-bold">Tài khoản của bạn</h1><a className="inline-block py-4 underline" href="/login?callbackUrl=%2Ftai-khoan">Đăng nhập để xem khóa học</a></section>

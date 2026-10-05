@@ -1,6 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
 import prisma from '@/lib/prisma'
+import { accessKey, accessSchema, effectiveModules } from './access'
 import { Prisma } from '@prisma/client'
 import { requestHostname, isPlatformHost } from './domain-shared'
 
@@ -12,5 +13,7 @@ export const findDomain=cache(async (hostname: string) => {
 })
 export async function activeDomain(rawHost: string) {
   const domain=await findDomain(requestHostname(rawHost))
-  return domain?.enabled && domain.verifiedAt && domain.profile.isActive ? domain : null
+  if(!domain?.enabled || !domain.verifiedAt || !domain.profile.isActive) return null
+  const config=await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
+  return config ? {...domain,...effectiveModules(accessSchema.parse(config.value))} : domain
 }

@@ -28,6 +28,7 @@ export function safeReturnPath(raw: string|null) { return raw && raw.startsWith(
 export function domainRoute(path: string, modules: DomainModules): 'page' | 'account' | 'catalog' | 'system' | 'deny' {
   if(path==='/login' || path==='/register' || path==='/forgot-password' || path==='/complete-profile' || path==='/account-settings' || /^\/reset-password\/[a-zA-Z0-9_-]+$/.test(path) || path.startsWith('/api/auth/')) return 'system'
   if(path==='/api/upload/url') return 'system' // Ảnh đại diện của tài khoản đã đăng nhập.
+  if(path==='/cong-cu') return 'page'
   if(path==='/tai-khoan') return 'account'
   if(path==='/khoa-hoc') return modules.courses ? 'catalog' : 'deny'
   if(/^\/(?:khoa-hoc\/[^/]+|courses\/[^/]+(?:\/learn)?)$/.test(path)) return modules.courses ? 'system' : 'deny'

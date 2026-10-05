@@ -63,8 +63,8 @@ export default function WebsiteView({ document: doc, data, slug, pageSlug = '', 
   }
   return <div style={{ background: doc.background, color: '#172033', minHeight: '100%', fontFamily: doc.layout.fontFamily }}>
     {!mobile && <style>{'@media(max-width:640px){' + page.nodes.map(mobileRules).join('') + '}'}</style>}
-    {doc.layout.showHeader && <header className="px-6 py-5 border-b flex flex-wrap gap-5 items-center justify-between"><a href={href('/page/' + slug)} className="text-xl font-bold" style={{ color: doc.color }} onClick={e => { if(preview) e.preventDefault() }}>{doc.name}</a><nav className="flex flex-wrap gap-4">{doc.pages.map(p => <a key={p.id} href={href('/page/' + slug + (p.slug ? '/' + p.slug : ''))} onClick={e => { if(preview) e.preventDefault() }} aria-current={p.id === page.id ? 'page' : undefined}>{p.title}</a>)}</nav></header>}
+    {!customDomain && doc.layout.showHeader && <header className="px-6 py-5 border-b flex flex-wrap gap-5 items-center justify-between"><a href={href('/page/' + slug)} className="text-xl font-bold" style={{ color: doc.color }} onClick={e => { if(preview) e.preventDefault() }}>{doc.name}</a><nav className="flex flex-wrap gap-4">{doc.pages.map(p => <a key={p.id} href={href('/page/' + slug + (p.slug ? '/' + p.slug : ''))} onClick={e => { if(preview) e.preventDefault() }} aria-current={p.id === page.id ? 'page' : undefined}>{p.title}</a>)}</nav></header>}
     <main className="mx-auto grid" style={{ maxWidth: doc.layout.maxWidth, padding: doc.layout.padding, gap: doc.layout.gap }}>{page.nodes.map(render)}{preview && !page.nodes.length && <div className="border-2 border-dashed p-16 text-center text-gray-500">Trang trống. Chọn thành phần để bắt đầu thiết kế.</div>}</main>
-    {doc.layout.showFooter && <footer className="p-6 text-center text-sm opacity-70">© {doc.name}</footer>}
+    {!customDomain && doc.layout.showFooter && <footer className="p-6 text-center text-sm opacity-70">© {doc.name}</footer>}
   </div>
 }

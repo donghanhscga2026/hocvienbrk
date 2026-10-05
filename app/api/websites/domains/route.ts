@@ -1,3 +1,4 @@
+import { accessKey, accessSchema, effectiveModules } from '@/lib/website/access'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
@@ -36,7 +37,9 @@ export async function POST(request: Request) {
       await prisma.$transaction(async tx=>{
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420304)`
         if(await tx.siteDomain.count({where:{profileId:profile.id}})>=3) throw new CrmError('Mỗi website thử nghiệm được tối đa 3 tên miền.',409)
-        await tx.siteDomain.create({data:{hostname,profileId:profile.id,token:randomBytes(24).toString('hex')}})
+        const config=await tx.systemConfig.findUnique({where:{key:accessKey(profile.id)}})
+        const modules=config ? effectiveModules(accessSchema.parse(config.value)) : {}
+        await tx.siteDomain.create({data:{hostname,profileId:profile.id,token:randomBytes(24).toString('hex'),...modules}})
       })
     } else {
       const where={hostname,profileId:profile.id}
@@ -44,7 +47,11 @@ export async function POST(request: Request) {
       if(!domain) throw new CrmError('Không tìm thấy tên miền của bạn.',404)
       if(input.action==='remove') await prisma.siteDomain.deleteMany({where})
       if(input.action==='disable') await prisma.siteDomain.updateMany({where,data:{enabled:false,checkedAt:new Date(),message:'Đã tạm dừng tên miền'}})
-      if(input.action==='modules') await prisma.siteDomain.updateMany({where,data:{courses:input.courses,crm:input.crm,affiliate:input.affiliate}})
+      if(input.action==='modules') {
+        const config=await prisma.systemConfig.findUnique({where:{key:accessKey(profile.id)}})
+        if(config) throw new CrmError('Hãy chỉnh chức năng trong Quản lý website.',409)
+        await prisma.siteDomain.updateMany({where,data:{courses:input.courses,crm:input.crm,affiliate:input.affiliate}})
+      }
       if(input.action==='check') {
         if(!profile.isActive || !await publishedWebsite(profile.id)) throw new CrmError('Website chưa xuất bản hoặc đang bị khóa.',409)
         const checkedAt=new Date()
