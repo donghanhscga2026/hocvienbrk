@@ -6,7 +6,6 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Wrench } from 'lucide-react'
-import { useHomeSlug } from '@/hooks/useHomeSlug'
 import { useAttentionCycle } from '@/hooks/useAttentionCycle'
 import { AttentionHighlight } from '@/components/ui/attention-highlight'
 import { useAttentionHighlightSettings } from '@/app/contexts/AttentionHighlightContext'
@@ -24,18 +23,16 @@ interface MainHeaderProps {
     profile?: any
 }
 
-export default function MainHeader({ title }: MainHeaderProps) {
+export default function MainHeader({ title, profile }: MainHeaderProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { data: session } = useSession()
     const [showShare, setShowShare] = useState(false)
-    const { homeSlug, isReady } = useHomeSlug()
 
     const userId = session?.user?.id != null ? String(session.user.id) : null
 
     const isHomePage = pathname === '/'
     const isToolsRoot = pathname === '/tools'
-    const hasCustomHome = isReady && homeSlug
 
     const getBackPath = () => {
         const paths = pathname.split('/').filter(Boolean)
@@ -101,9 +98,9 @@ export default function MainHeader({ title }: MainHeaderProps) {
 
                         <AttentionHighlight {...getStatus('home')}>
                             <button
-                                onClick={() => router.push(hasCustomHome ? `/page/${homeSlug}` : '/page/brk')}
+                                onClick={() => router.push('/')}
                                 className="shrink-0 transition-opacity hover:opacity-80"
-                                title={`Trang chủ: ${hasCustomHome ? homeSlug : 'brk'}`}
+                                title={`Trang chủ${profile?.title ? `: ${profile.title}` : ''}`}
                             >
                                 <Image
                                     src="/icon_home_3d.png"
@@ -186,7 +183,7 @@ export default function MainHeader({ title }: MainHeaderProps) {
                     onClose={() => setShowShare(false)}
                     course={{ id_khoa: '', name_lop: 'Trang cá nhân - Cộng đồng MFC' }}
                     affiliateCode={userId}
-                    profileSlug={isHomePage ? null : (hasCustomHome ? homeSlug : null)}
+                    profileSlug={profile?.slug || null}
                     shareType="header"
                 />
             )}
