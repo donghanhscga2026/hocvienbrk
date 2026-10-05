@@ -1,7 +1,7 @@
 ALTER TABLE "SiteProfile"
-ADD COLUMN "siteConfig" JSONB;
+ADD COLUMN IF NOT EXISTS "siteConfig" JSONB;
 
-CREATE TABLE "SiteProfileDomain" (
+CREATE TABLE IF NOT EXISTS "SiteProfileDomain" (
   "id" SERIAL PRIMARY KEY,
   "profileId" INTEGER NOT NULL REFERENCES "SiteProfile"("id") ON DELETE CASCADE,
   "hostname" TEXT NOT NULL UNIQUE,
@@ -11,9 +11,9 @@ CREATE TABLE "SiteProfileDomain" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX "SiteProfileDomain_profileId_idx" ON "SiteProfileDomain"("profileId");
-CREATE UNIQUE INDEX "SiteProfileDomain_one_primary_per_profile_idx" ON "SiteProfileDomain"("profileId") WHERE "isPrimary" = true;
-CREATE INDEX "SiteProfileDomain_isActive_idx" ON "SiteProfileDomain"("isActive");
+CREATE INDEX IF NOT EXISTS "SiteProfileDomain_profileId_idx" ON "SiteProfileDomain"("profileId");
+CREATE UNIQUE INDEX IF NOT EXISTS "SiteProfileDomain_one_primary_per_profile_idx" ON "SiteProfileDomain"("profileId") WHERE "isPrimary" = true;
+CREATE INDEX IF NOT EXISTS "SiteProfileDomain_isActive_idx" ON "SiteProfileDomain"("isActive");
 
 ALTER TABLE "SiteProfileDomain" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "SiteProfileDomain" FROM PUBLIC;
