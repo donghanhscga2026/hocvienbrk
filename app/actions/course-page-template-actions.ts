@@ -9,6 +9,7 @@ import {
   StoredTemplateSnapshot,
   WebsiteTemplateAnalysis,
 } from '@/lib/course-page/importer/types'
+import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
 
 function jsonSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -68,8 +69,9 @@ function buildSnapshot(
   const selected = selectedSectionIds
     .map(id => byId.get(id))
     .filter((section): section is ImportedSectionCandidate => Boolean(section))
+    .filter(section => !isImportedRegistrationSection(section))
 
-  if (!selected.length) throw new Error('Hãy chọn ít nhất một phần trước khi tạo mẫu')
+  if (!selected.length) throw new Error('Hãy chọn ít nhất một phần nội dung (form đăng ký nguồn luôn được thay bằng quy trình MFC)')
 
   if (analysis.sourceType === 'zip' && analysis.exactSource?.url) {
     return {
@@ -119,6 +121,10 @@ function buildSnapshot(
         visibility: 'all' as const,
         content: jsonSafe({
           exactSource: analysis.exactSource,
+          selectedBlockKeys: selected.map(section => section.id),
+          registrationBlockKeys: analysis.sections
+            .filter(isImportedRegistrationSection)
+            .map(section => section.id),
           importedMeta: {
             label: 'ZIP Exact Mode',
             sourceClass: analysis.exactSource.entryPath,
@@ -232,10 +238,12 @@ export async function createStoredCoursePageTemplate(input: {
     if (!input.analysis?.sections?.length) return { success: false, error: 'Chưa có kết quả phân tích website' }
 
     const selectedSet = new Set(input.selectedSectionIds)
-    const unresolvedLocalImages = input.analysis.sections
-      .filter(section => selectedSet.has(section.id))
-      .flatMap(section => section.images || [])
-      .filter(image => image.src && !/^(?:https?:\/\/|data:image\/|\/uploads\/)/i.test(image.src))
+    const unresolvedLocalImages = input.analysis.sourceType === 'zip'
+      ? []
+      : input.analysis.sections
+          .filter(section => selectedSet.has(section.id) && !isImportedRegistrationSection(section))
+          .flatMap(section => section.images || [])
+          .filter(image => image.src && !/^(?:https?:\/\/|data:image\/|\/uploads\/)/i.test(image.src))
 
     if (unresolvedLocalImages.length) {
       return {
@@ -247,13 +255,19 @@ export async function createStoredCoursePageTemplate(input: {
     // Mirror external/base64 images into our own storage before persisting the template.
     // If a remote image cannot be downloaded, resolveImageUrl safely keeps the
     // original URL so template creation is not blocked.
-    const storedAnalysis = await mirrorAnalysisImages(input.analysis, {
-      sectionIds: input.selectedSectionIds,
+    const safeSelectedIds = input.selectedSectionIds.filter(id => {
+      const section = input.analysis.sections.find(item => item.id === id)
+      return section ? !isImportedRegistrationSection(section) : false
     })
-    const snapshot = buildSnapshot(name, storedAnalysis, input.selectedSectionIds)
+    const storedAnalysis = input.analysis.sourceType === 'zip'
+      ? jsonSafe(input.analysis)
+      : await mirrorAnalysisImages(input.analysis, {
+          sectionIds: safeSelectedIds,
+        })
+    const snapshot = buildSnapshot(name, storedAnalysis, safeSelectedIds)
     const key = `custom-${slugify(name)}-${Date.now().toString(36)}`
     const firstImage = storedAnalysis.sections
-      .filter(section => input.selectedSectionIds.includes(section.id))
+      .filter(section => safeSelectedIds.includes(section.id))
       .flatMap(section => section.images || [])
       .find(image => /^https?:\/\//i.test(image.src))
 
@@ -270,7 +284,7 @@ export async function createStoredCoursePageTemplate(input: {
           ...storedAnalysis,
           sections: storedAnalysis.sections.map(section => ({
             ...section,
-            enabled: input.selectedSectionIds.includes(section.id),
+            enabled: safeSelectedIds.includes(section.id) && !isImportedRegistrationSection(section),
           })),
         }) as any,
       },

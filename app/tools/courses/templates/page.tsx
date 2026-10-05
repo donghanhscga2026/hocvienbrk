@@ -26,6 +26,8 @@ import ZipSourceSection from '@/components/course-page/sections/ZipSourceSection
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
 import { WebsiteTemplateAnalysis } from '@/lib/course-page/importer/types'
 import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
+import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
+import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
 import { supabase } from '@/lib/supabase'
 import {
   createStoredCoursePageTemplate,
@@ -105,6 +107,14 @@ export default function CourseTemplateLibraryPage() {
     [orderedSections, selected],
   )
   const isZipAnalysis = analysis?.sourceType === 'zip'
+  const selectableSectionIds = useMemo(
+    () => orderedSections.filter(section => !isImportedRegistrationSection(section)).map(section => section.id),
+    [orderedSections],
+  )
+  const registrationSectionIds = useMemo(
+    () => orderedSections.filter(isImportedRegistrationSection).map(section => section.id),
+    [orderedSections],
+  )
 
   const resetAnalysis = () => {
     setAnalysis(null)
@@ -150,67 +160,23 @@ export default function CourseTemplateLibraryPage() {
         const { data: publicData } = supabase.storage.from('uploads').getPublicUrl(storagePath)
         if (!publicData?.publicUrl) throw new Error('Không lấy được URL công khai của trang ZIP đã lưu.')
 
-        const doc = new DOMParser().parseFromString(prepared.html, 'text/html')
-        const title = doc.title?.trim() || sourceZip.name.replace(/\.zip$/i, '')
-        const description =
-          doc.querySelector('meta[name="description"]')?.getAttribute('content')?.trim() || ''
-        const language = doc.documentElement.lang?.trim() || 'vi'
-        const themeColor = doc.querySelector('meta[name="theme-color"]')?.getAttribute('content')?.trim()
-        const sectionId = 'zip-exact-source'
-
-        result = {
+        result = analyzeWebsiteHtml({
+          html: prepared.analysisHtml,
           sourceType: 'zip',
-          title,
-          description,
-          language,
-          colors: [],
-          fonts: [],
-          theme: {
-            primaryColor: themeColor || '#2563EB',
-            secondaryColor: themeColor || '#2563EB',
-            backgroundColor: '#FFFFFF',
-            textColor: '#111827',
-            borderRadius: '18px',
-            containerWidth: '1120px',
-          },
-          sections: [{
-            id: sectionId,
-            sourceId: sectionId,
-            label: 'ZIP Exact Mode',
-            sectionType: 'rich_content',
-            enabled: true,
-            sortOrder: 0,
-            confidence: 1,
-            heading: title,
-            paragraphs: description ? [description] : [],
-            listItems: [],
-            images: [],
-            cards: [],
-            tableRows: [],
-            actions: [],
-            faqItems: [],
-            formFields: [],
-            content: { title, description },
-            design: {},
-          }],
-          stats: {
-            sections: 1,
-            images: prepared.inlinedAssetCount,
-            links: 0,
-            forms: 0,
-          },
-          warnings: Array.from(new Set([
-            'ZIP Exact Mode: giao diện gốc được lưu nguyên trang trong sandbox; form nguồn được chuyển sang luồng đăng ký MFC.',
-            ...prepared.warnings,
-          ])),
-          exactSource: {
-            url: publicData.publicUrl,
-            zipFileName: sourceZip.name,
-            entryPath: prepared.entryPath,
-            fileCount: prepared.fileCount,
-            inlinedAssetCount: prepared.inlinedAssetCount,
-          },
+          sourceUrl: publicData.publicUrl,
+        })
+        result.exactSource = {
+          url: publicData.publicUrl,
+          zipFileName: sourceZip.name,
+          entryPath: prepared.entryPath,
+          fileCount: prepared.fileCount,
+          inlinedAssetCount: prepared.inlinedAssetCount,
         }
+        result.warnings = Array.from(new Set([
+          ...result.warnings.filter(warning => !/đường dẫn file cục bộ|tương đối/i.test(warning)),
+          'ZIP Exact Mode: chọn/bỏ từng khối nhưng vẫn giữ nguyên CSS/bố cục nguồn. Form đăng ký nguồn luôn bị loại và CTA đăng ký chuyển sang MFC.',
+          ...prepared.warnings,
+        ]))
       } else {
         let response: Response
         if (sourceFile) {
@@ -266,8 +232,11 @@ export default function CourseTemplateLibraryPage() {
 
       setAnalysis(result)
       const ids = result.sections.map(section => section.id)
+      const defaultSelectedIds = result.sections
+        .filter(section => !isImportedRegistrationSection(section))
+        .map(section => section.id)
       setSectionOrder(ids)
-      setSelected(new Set(ids))
+      setSelected(new Set(defaultSelectedIds))
       setTemplateName(result.title || 'Mẫu website mới')
       setTemplateDescription(
         result.sourceType === 'zip'
@@ -284,6 +253,8 @@ export default function CourseTemplateLibraryPage() {
   }
 
   const toggleSection = (id: string) => {
+    const section = analysis?.sections.find(item => item.id === id)
+    if (section && isImportedRegistrationSection(section)) return
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -501,8 +472,8 @@ export default function CourseTemplateLibraryPage() {
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm font-black text-gray-900">{isZipAnalysis ? 'Các phần phát hiện trong ZIP' : 'Chọn phần đưa vào mẫu'}</div>
-                    <div className={isZipAnalysis ? "hidden" : "flex gap-2"}>
-                      <button type="button" onClick={() => setSelected(new Set(sectionOrder))} className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-2 text-[10px] font-black text-green-700">
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setSelected(new Set(selectableSectionIds))} className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-2 text-[10px] font-black text-green-700">
                         <CheckSquare className="h-3.5 w-3.5" /> Chọn tất cả
                       </button>
                       <button type="button" onClick={() => setSelected(new Set())} className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2.5 py-2 text-[10px] font-black text-gray-600">
@@ -523,8 +494,8 @@ export default function CourseTemplateLibraryPage() {
                         >
                           <button
                             type="button"
-                            draggable={!isZipAnalysis}
-                            onDragStart={() => { if (!isZipAnalysis) setDraggingId(section.id) }}
+                            draggable={!isZipAnalysis && !isImportedRegistrationSection(section)}
+                            onDragStart={() => { if (!isZipAnalysis && !isImportedRegistrationSection(section)) setDraggingId(section.id) }}
                             onDragEnd={() => setDraggingId(null)}
                             className="mt-0.5 cursor-grab rounded p-1 text-gray-400 active:cursor-grabbing"
                             title="Kéo để đổi vị trí"
@@ -534,14 +505,15 @@ export default function CourseTemplateLibraryPage() {
                           <input
                             type="checkbox"
                             checked={checked}
-                            disabled={isZipAnalysis}
-                            onChange={() => { if (!isZipAnalysis) toggleSection(section.id) }}
+                            disabled={isImportedRegistrationSection(section)}
+                            onChange={() => toggleSection(section.id)}
                             className="mt-1 h-4 w-4 accent-purple-700"
                           />
-                          <button type="button" disabled={isZipAnalysis} onClick={() => toggleSection(section.id)} className="min-w-0 flex-1 text-left disabled:cursor-default">
+                          <button type="button" disabled={isImportedRegistrationSection(section)} onClick={() => toggleSection(section.id)} className="min-w-0 flex-1 text-left disabled:cursor-default">
                             <div className="truncate text-xs font-black text-gray-900">{section.label}</div>
                             <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-purple-600">
                               {SECTION_NAMES[section.sectionType] || section.sectionType} · {Math.round(section.confidence * 100)}%
+                              {isImportedRegistrationSection(section) ? ' · LOẠI BỎ — dùng đăng ký MFC' : ''}
                             </div>
                           </button>
                           <div className={isZipAnalysis ? "hidden" : "flex shrink-0"}>
@@ -596,7 +568,13 @@ export default function CourseTemplateLibraryPage() {
                   >
                     {isZipAnalysis && analysis.exactSource?.url ? (
                       <div className="pointer-events-none">
-                        <ZipSourceSection content={{ exactSource: analysis.exactSource }} />
+                        <ZipSourceSection
+                          content={{
+                            exactSource: analysis.exactSource,
+                            selectedBlockKeys: selectedSections.map(section => section.id),
+                            registrationBlockKeys: registrationSectionIds,
+                          }}
+                        />
                       </div>
                     ) : (
                     <div className="pointer-events-none origin-top scale-[0.82]" style={{ width: '121.95%' }}>

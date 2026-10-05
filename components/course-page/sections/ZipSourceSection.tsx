@@ -22,6 +22,12 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   const frameRef = React.useRef<HTMLIFrameElement | null>(null)
   const [height, setHeight] = React.useState(900)
   const sourceUrl = content?.exactSource?.url || content?.importedSource?.exactSource?.url || ''
+  const selectedBlockKeys: string[] | null = Array.isArray(content?.selectedBlockKeys)
+    ? content.selectedBlockKeys.filter((value: unknown): value is string => typeof value === 'string')
+    : null
+  const registrationBlockKeys: string[] = Array.isArray(content?.registrationBlockKeys)
+    ? content.registrationBlockKeys.filter((value: unknown): value is string => typeof value === 'string')
+    : []
 
   React.useEffect(() => {
     const frame = frameRef.current
@@ -54,6 +60,17 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       }
     }
 
+    const sendConfiguration = () => {
+      try {
+        frame.contentWindow?.postMessage({
+          source: 'mfc-zip-parent',
+          type: 'configure',
+          selectedBlockKeys,
+          registrationBlockKeys,
+        }, '*')
+      } catch {}
+    }
+
     const sendViewport = () => {
       const rect = frame.getBoundingClientRect()
       const top = Math.max(0, -rect.top)
@@ -68,7 +85,10 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
     window.addEventListener('message', handleMessage)
     window.addEventListener('scroll', sendViewport, { passive: true })
     window.addEventListener('resize', sendViewport)
-    const timer = window.setTimeout(sendViewport, 250)
+    const timer = window.setTimeout(() => {
+      sendConfiguration()
+      sendViewport()
+    }, 250)
 
     return () => {
       window.removeEventListener('message', handleMessage)
@@ -76,7 +96,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       window.removeEventListener('resize', sendViewport)
       window.clearTimeout(timer)
     }
-  }, [onAction, sourceUrl])
+  }, [onAction, sourceUrl, selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
 
   if (!sourceUrl) {
     return (
@@ -97,6 +117,16 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       scrolling="no"
       className="block w-full border-0 bg-white"
       style={{ height }}
+      onLoad={() => {
+        try {
+          frameRef.current?.contentWindow?.postMessage({
+            source: 'mfc-zip-parent',
+            type: 'configure',
+            selectedBlockKeys,
+            registrationBlockKeys,
+          }, '*')
+        } catch {}
+      }}
     />
   )
 }
