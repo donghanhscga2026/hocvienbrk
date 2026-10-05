@@ -96,14 +96,11 @@ export default function MainHeader({ title, profile }: MainHeaderProps) {
                     <div className="flex items-center gap-2 shrink-0">
                         <AttentionHighlight {...getStatus('logo')}>
                             <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
-                                <Image
+                                <img
                                     src={logoUrl}
                                     alt={`${brandName} Logo`}
-                                    width={120}
-                                    height={40}
-                                    priority
                                     className="object-contain"
-                                    style={{ height: '36px', width: 'auto' }}
+                                    style={{ height: '36px', width: 'auto', maxWidth: '160px' }}
                                 />
                             </Link>
                         </AttentionHighlight>
