@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { Suspense } from 'react'
+import { cache, Suspense } from 'react'
 import { getSession } from '@/lib/get-session'
 
 import MainHeader from '@/components/layout/MainHeader'
@@ -17,6 +17,17 @@ import { getRandomMessage } from './actions/message-actions'
 import { resetSurveyAction } from './actions/survey-actions'
 import { getRoadmapPoints } from './actions/roadmap-actions'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
+
+const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string) => {
+  if (!landingId && !landingSlug) return null
+  return prisma.landingPage.findFirst({
+    where: {
+      isActive: true,
+      ...(landingId ? { id: landingId } : { slug: landingSlug }),
+    },
+    include: { course: true },
+  })
+})
 
 export async function generateMetadata(): Promise<Metadata> {
   const profile = await getCurrentSiteProfile()
@@ -36,10 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   if (config.homepage.type === 'landing') {
-    const landing = profile.landingPages.find(item =>
-      (config.homepage.landingId && item.id === config.homepage.landingId)
-      || (config.homepage.landingSlug && item.slug === config.homepage.landingSlug),
-    )
+    const landing = await getHomepageLanding(config.homepage.landingId, config.homepage.landingSlug)
     if (landing) {
       return {
         title: landing.title,
@@ -85,10 +93,7 @@ export default async function Home() {
   }
 
   if (profile && runtimeConfig.homepage.type === 'landing') {
-    const landing = profile.landingPages.find(item =>
-      (runtimeConfig.homepage.landingId && item.id === runtimeConfig.homepage.landingId)
-      || (runtimeConfig.homepage.landingSlug && item.slug === runtimeConfig.homepage.landingSlug),
-    )
+    const landing = await getHomepageLanding(runtimeConfig.homepage.landingId, runtimeConfig.homepage.landingSlug)
     if (landing) return <LandingPageClient landing={landing as any} />
   }
 
