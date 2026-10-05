@@ -8,6 +8,7 @@ import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
 import { createWiGrowCoursePage, WIGROW_COURSE_SLUG } from '@/lib/course-page/templates/wigrow'
+import { canProfileAccessCourse, getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 
 const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
@@ -34,6 +35,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const course = await getCourseByIdKhoa(id)
 
     if (!course) return { title: 'Không tìm thấy khóa học' }
+
+    const siteProfile = await getCurrentSiteProfile()
+    if (siteProfile && !(await canProfileAccessCourse(siteProfile, course.id))) {
+        return { title: 'Không tìm thấy khóa học' }
+    }
 
     const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
     
@@ -87,6 +93,9 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     const course = await getCourseByIdKhoa(id)
 
     if (!course) notFound()
+
+    const siteProfile = await getCurrentSiteProfile()
+    if (siteProfile && !(await canProfileAccessCourse(siteProfile, course.id))) notFound()
 
     const courseId = course.id
     const userId = session?.user?.id ? parseInt(session.user.id) : null
