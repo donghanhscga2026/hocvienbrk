@@ -1,5 +1,6 @@
 export type PreparedZipWebsite = {
   html: string
+  analysisHtml: string
   entryPath: string
   fileCount: number
   inlinedAssetCount: number
@@ -168,12 +169,40 @@ const BRIDGE = `
 (function(){
   if (window.__MFC_ZIP_BRIDGE__) return;
   window.__MFC_ZIP_BRIDGE__ = true;
+  var cfg = { selectedBlockKeys: null, registrationBlockKeys: [] };
   function post(payload){ try { parent.postMessage(Object.assign({source:'mfc-zip-source'}, payload), '*'); } catch(e){} }
+  function blocks(){ return Array.from(document.querySelectorAll('[data-mfc-block]')); }
+  function keyOf(el){ return el && el.getAttribute ? (el.getAttribute('data-mfc-block') || '') : ''; }
+  function autoRegistration(el){
+    if(!el || !el.querySelector) return false;
+    if(el.querySelector('form')) return true;
+    var text=((el.id||'')+' '+(el.className||'')+' '+((el.querySelector('h1,h2,h3')||{}).textContent||'')).toLowerCase();
+    return /dang[-_ ]?ky|đăng\\s*ký|register|registration|signup|sign[-_ ]?up|enroll/.test(text);
+  }
   function sendHeight(){
     var b=document.body,d=document.documentElement;
     var h=Math.max(b?b.scrollHeight:0,d?d.scrollHeight:0,b?b.offsetHeight:0,d?d.offsetHeight:0);
     post({type:'height',height:h});
   }
+  function applyConfig(){
+    var selected = Array.isArray(cfg.selectedBlockKeys) ? cfg.selectedBlockKeys : null;
+    var registrations = Array.isArray(cfg.registrationBlockKeys) ? cfg.registrationBlockKeys : [];
+    blocks().forEach(function(el){
+      var key=keyOf(el);
+      var isReg=registrations.indexOf(key)>=0 || autoRegistration(el);
+      var visible=!isReg && (!selected || selected.indexOf(key)>=0);
+      el.hidden=!visible;
+      if(!visible) el.setAttribute('data-mfc-hidden','true'); else el.removeAttribute('data-mfc-hidden');
+    });
+    sendHeight();
+  }
+  addEventListener('message',function(e){
+    var data=e.data||{};
+    if(data.source!=='mfc-zip-parent' || data.type!=='configure') return;
+    cfg.selectedBlockKeys=Array.isArray(data.selectedBlockKeys)?data.selectedBlockKeys:null;
+    cfg.registrationBlockKeys=Array.isArray(data.registrationBlockKeys)?data.registrationBlockKeys:[];
+    applyConfig();
+  });
   document.addEventListener('submit', function(e){
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -187,14 +216,22 @@ const BRIDGE = `
     var el=e.target && e.target.closest ? e.target.closest('a[href],button[data-mfc-register],[data-mfc-action="register"]') : null;
     if(!el)return;
     if(el.matches && el.matches('button[data-mfc-register],[data-mfc-action="register"]')){
-      e.preventDefault();e.stopImmediatePropagation();
-      post({type:'action',actionType:'open_registration'});return;
+      e.preventDefault();e.stopImmediatePropagation();post({type:'action',actionType:'open_registration'});return;
     }
     var href=el.getAttribute && (el.getAttribute('href')||'');
-    if(!href || href.charAt(0)==='#') return;
+    if(!href)return;
+    if(href.charAt(0)==='#'){
+      var target=null;
+      try{target=document.getElementById(decodeURIComponent(href.slice(1)));}catch(err){target=document.getElementById(href.slice(1));}
+      var hiddenTarget=target && (target.hidden || target.closest('[data-mfc-hidden="true"]'));
+      var registrationHash=/dang[-_ ]?ky|register|registration|signup|sign[-_ ]?up|enroll/i.test(href);
+      if(hiddenTarget || registrationHash){
+        e.preventDefault();e.stopImmediatePropagation();post({type:'action',actionType:'open_registration'});
+      }
+      return;
+    }
     if(/^javascript:/i.test(href)){
-      e.preventDefault();e.stopImmediatePropagation();
-      post({type:'action',actionType:'open_registration'});return;
+      e.preventDefault();e.stopImmediatePropagation();post({type:'action',actionType:'open_registration'});return;
     }
     try{
       var u=new URL(href,location.href);
@@ -204,7 +241,7 @@ const BRIDGE = `
       }
     }catch(err){}
   }, true);
-  addEventListener('load',function(){sendHeight();setTimeout(sendHeight,100);setTimeout(sendHeight,800);});
+  addEventListener('load',function(){applyConfig();setTimeout(applyConfig,100);setTimeout(applyConfig,800);});
   addEventListener('resize',sendHeight);
   if(window.ResizeObserver){ try { new ResizeObserver(sendHeight).observe(document.documentElement); } catch(e){} }
 })();
@@ -224,6 +261,21 @@ export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite>
   const doc = parser.parseFromString(rawHtml, 'text/html')
   const warnings: string[] = []
   let inlinedAssetCount = 0
+
+  const structuralSelector = 'header,section,footer,nav'
+  const structuralBlocks = Array.from(doc.querySelectorAll<HTMLElement>(structuralSelector))
+    .filter(el => !el.parentElement?.closest(structuralSelector))
+  const usedBlockKeys = new Set<string>()
+  structuralBlocks.forEach((el, index) => {
+    const preferred = (el.id || '').trim()
+    const base = preferred && !usedBlockKeys.has(preferred) ? preferred : `mfc-block-${index + 1}`
+    let key = base
+    let suffix = 2
+    while (usedBlockKeys.has(key)) key = `${base}-${suffix++}`
+    usedBlockKeys.add(key)
+    el.setAttribute('data-mfc-block', key)
+  })
+  const analysisHtml = '<!doctype html>\n' + doc.documentElement.outerHTML
 
   const loadAsset = async (baseFile: string, ref: string) => {
     const resolved = resolveZipPath(baseFile, ref)
@@ -323,6 +375,7 @@ export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite>
 
   return {
     html,
+    analysisHtml,
     entryPath: main.name,
     fileCount: zip.entries.size,
     inlinedAssetCount,
