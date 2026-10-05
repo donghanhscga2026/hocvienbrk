@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { onEmailVerified } from "@/lib/affiliate/points-manager";
+import { domainContext } from '@/lib/website/domain-context'
 
 export async function GET(request: NextRequest) {
+  const website=await domainContext()
+  const returnUrl=website ? 'https://'+website.hostname : request.url
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
   if (!token) {
-    return NextResponse.redirect(new URL("/login?error=Mã xác minh không hợp lệ", request.url));
+    return NextResponse.redirect(new URL("/login?error=Mã xác minh không hợp lệ", returnUrl));
   }
 
   try {
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!verificationToken) {
-      return NextResponse.redirect(new URL("/login?error=Mã xác minh đã hết hạn hoặc không tồn tại", request.url));
+      return NextResponse.redirect(new URL("/login?error=Mã xác minh đã hết hạn hoặc không tồn tại", returnUrl));
     }
 
     // 2. Tìm user trước khi cập nhật
@@ -51,10 +54,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 6. Chuyển hướng về trang đăng nhập với thông báo thành công
-    return NextResponse.redirect(new URL("/login?success=Xác minh email thành công! Bây giờ bạn có thể đăng nhập.", request.url));
+    return NextResponse.redirect(new URL("/login?success=Xác minh email thành công! Bây giờ bạn có thể đăng nhập.", returnUrl));
 
   } catch (error) {
     console.error("Verification Error:", error);
-    return NextResponse.redirect(new URL("/login?error=Có lỗi xảy ra trong quá trình xác minh", request.url));
+    return NextResponse.redirect(new URL("/login?error=Có lỗi xảy ra trong quá trình xác minh", returnUrl));
   }
 }

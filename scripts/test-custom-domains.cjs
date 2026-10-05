@@ -102,6 +102,7 @@ async function run(){
   for(const route of ['/khoa-hoc','/courses/OWN/learn','/tools/crm','/api/websites/lead','/tools/affiliate','/api/affiliate/withdraw'])ok(shared.domainRoute(route,off)==='deny','Closed module '+route)
   for(const route of ['/admin','/api/admin/x','/tools/my-site/design','/site-domain/other','/page/other','/api/new-module'])ok(shared.domainRoute(route,on)==='deny','Do not implicitly enable platform route '+route)
   ok(shared.domainRoute('/contact',off)==='page' && shared.domainRoute('/login',off)==='system','Custom pages and shared login available')
+  for(const route of ['/complete-profile','/account-settings','/reset-password/ABC_123'])ok(shared.domainRoute(route,off)==='system','Account flow remains on brand domain '+route)
   const pg=new PGlite();await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE TABLE "SiteProfile" (id INTEGER PRIMARY KEY); INSERT INTO "SiteProfile" VALUES (7);')
   await pg.exec(fs.readFileSync(root+'/prisma/migrations/20261005063000_site_domains/migration.sql','utf8'))
   await pg.exec('INSERT INTO "SiteDomain" (hostname,"profileId",token) VALUES (\'brk.io.vn\',7,\'test\')')

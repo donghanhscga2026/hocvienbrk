@@ -182,9 +182,8 @@ export async function registerUser(prevState: any, formData: FormData) {
         revalidatePath('/admin/genealogy')
 
         // Gui email xac minh
-        await sendVerificationEmail(normalizedEmail, name, otpCode, user.id)
-
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+        const appUrl = websiteDomain ? 'https://'+websiteDomain.hostname : process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn'
+        await sendVerificationEmail(normalizedEmail, name, otpCode, user.id, appUrl)
         const refLink = rawRefCode ? `${appUrl}/?ref=${rawRefCode}` : ''
         let referrerName = ''
         if (refId) {
