@@ -184,11 +184,25 @@ const BRIDGE = `
     post({type:'action',actionType:'open_registration',formData:data});
   }, true);
   document.addEventListener('click', function(e){
-    var el=e.target && e.target.closest ? e.target.closest('a[href^="javascript:"],button[data-mfc-register],[data-mfc-action="register"]') : null;
+    var el=e.target && e.target.closest ? e.target.closest('a[href],button[data-mfc-register],[data-mfc-action="register"]') : null;
     if(!el)return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    post({type:'action',actionType:'open_registration'});
+    if(el.matches && el.matches('button[data-mfc-register],[data-mfc-action="register"]')){
+      e.preventDefault();e.stopImmediatePropagation();
+      post({type:'action',actionType:'open_registration'});return;
+    }
+    var href=el.getAttribute && (el.getAttribute('href')||'');
+    if(!href || href.charAt(0)==='#') return;
+    if(/^javascript:/i.test(href)){
+      e.preventDefault();e.stopImmediatePropagation();
+      post({type:'action',actionType:'open_registration'});return;
+    }
+    try{
+      var u=new URL(href,location.href);
+      if(['http:','https:','tel:','mailto:'].indexOf(u.protocol)>=0){
+        e.preventDefault();e.stopImmediatePropagation();
+        post({type:'action',actionType:'external_link',target:u.href});
+      }
+    }catch(err){}
   }, true);
   addEventListener('load',function(){sendHeight();setTimeout(sendHeight,100);setTimeout(sendHeight,800);});
   addEventListener('resize',sendHeight);
