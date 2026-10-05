@@ -197,6 +197,18 @@ const getDefaultRuntimeProfileCached = unstable_cache(
   { tags: ['site-profile'], revalidate: 300 },
 )
 
+const getRuntimeProfileBySlugCached = unstable_cache(
+  async (slug: string): Promise<RuntimeSiteProfile | null> => {
+    if (!slug) return null
+    return prisma.siteProfile.findUnique({
+      where: { slug, isActive: true },
+      include: SITE_PROFILE_INCLUDE,
+    })
+  },
+  ['runtime-site-profile-by-slug'],
+  { tags: ['site-profile'], revalidate: 300 },
+)
+
 export async function getSiteProfileForHostname(hostname: string) {
   return getProfileForHostnameCached(normalizeSiteHostname(hostname))
 }
@@ -206,7 +218,16 @@ export async function getCurrentSiteProfile() {
   const hostname = normalizeSiteHostname(
     requestHeaders.get('x-forwarded-host') || requestHeaders.get('host'),
   )
-  return (await getProfileForHostnameCached(hostname)) || getDefaultRuntimeProfileCached()
+  const hostnameProfile = await getProfileForHostnameCached(hostname)
+  if (hostnameProfile) return hostnameProfile
+
+  const configuredSlug = process.env.SITE_PROFILE_KEY?.trim()
+  if (configuredSlug) {
+    const configuredProfile = await getRuntimeProfileBySlugCached(configuredSlug)
+    if (configuredProfile) return configuredProfile
+  }
+
+  return getDefaultRuntimeProfileCached()
 }
 
 export function getCourseWhereForProfile(profile: RuntimeSiteProfile): Prisma.CourseWhereInput {
