@@ -1425,6 +1425,7 @@ model Tool {
 }
 
 model SiteProfile {
+  website              SiteWebsite?
   id                   Int                 @id @default(autoincrement())
   userId               Int?                @unique
   slug                 String              @unique
@@ -1473,6 +1474,17 @@ model SiteProfile {
   @@index([slug])
   @@index([userId])
   @@index([isActive])
+}
+
+model SiteWebsite {
+  profileId Int @id
+  profile SiteProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  draft Json
+  published Json?
+  revision Int @default(0)
+  history Json @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SiteProfileMember {
