@@ -5,6 +5,8 @@ import { ThemeId, getThemeById, generateThemeCSS, presetThemes, isDarkTheme } fr
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    // Bảng màu đã được khởi tạo từ cấu hình website trên máy chủ.
+    if(document.documentElement.hasAttribute('data-site-profile'))return;
     const savedTheme = (localStorage.getItem('site-theme') as ThemeId) || 'default';
     const savedCustom = localStorage.getItem('site-custom-colors');
     

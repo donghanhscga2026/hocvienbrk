@@ -1,3 +1,4 @@
+import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import {z} from 'zod'
 import prisma from '@/lib/prisma'
 import {ownedProfile} from '@/lib/website/server'
@@ -12,18 +13,20 @@ async function manager(request:Request) {
   if(!isPlatformHost(requestHostname(request.headers.get('host') || ''))) throw new CrmError('Quản lý website tại hệ thống chính.',403)
   return ownedProfile()
 }
-async function snapshot(profileId:number) {
-  const [row,basic,domains]=await Promise.all([
+async function snapshot(profile:Awaited<ReturnType<typeof ownedProfile>>) {
+  const profileId=profile.id
+  const [row,basic,domains,managed]=await Promise.all([
     prisma.systemConfig.findUnique({where:{key:accessKey(profileId)}}),
     prisma.systemConfig.findUnique({where:{key:basicKey}}),
-    prisma.siteDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'},select:{hostname:true,courses:true,crm:true,affiliate:true,enabled:true}})
+    prisma.siteDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'},select:{hostname:true,courses:true,crm:true,affiliate:true,enabled:true}}),
+    prisma.siteProfileDomain.findMany({where:{profileId},orderBy:{id:'asc'}})
   ])
-  const access=row ? accessSchema.parse(row.value) : initialAccess(domains[0] || noModules)
+  const access=row ? accessSchema.parse(row.value) : initialAccess(domains[0] || (managed.length ? {courses:getSiteRuntimeConfig(profile).modules.courses,crm:false,affiliate:getSiteRuntimeConfig(profile).modules.affiliate} : noModules))
   const template=basic ? basicSchema.parse(basic.value) : {modules:{courses:true,crm:true,affiliate:true},applications:allApplications}
-  return {access,basic:template.modules,basicApplications:template.applications,domains,configured:!!row}
+  return {access,basic:template.modules,basicApplications:template.applications,domains:[...domains,...managed.filter(d=>!domains.some(v=>v.hostname===d.hostname)).map(d=>({hostname:d.hostname,enabled:d.isActive}))],configured:!!row}
 }
 export async function GET(request:Request) {
-  try {const profile=await manager(request);return crmResponse({...await snapshot(profile.id),admin:profile.user?.role==='ADMIN',name:profile.title,slug:profile.slug})} catch(e) {return websiteFailure(e)}
+  try {const profile=await manager(request);return crmResponse({...await snapshot(profile),profileId:profile.id,admin:profile.user?.role==='ADMIN',name:profile.title,slug:profile.slug})} catch(e) {return websiteFailure(e)}
 }
 const command=z.discriminatedUnion('action',[
   z.object({action:z.literal('basic'),modules:modulesSchema,applications:applicationsSchema.optional()}).strict(),
@@ -44,7 +47,9 @@ export async function POST(request:Request) {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420305, ${profile.id}::integer)`
         const row=await tx.systemConfig.findUnique({where:{key:accessKey(profile.id)}})
         const legacy=await tx.siteDomain.findFirst({where:{profileId:profile.id},orderBy:{createdAt:'asc'}})
-        const current=row ? accessSchema.parse(row.value) : initialAccess(legacy || noModules)
+        const managed=await tx.siteProfileDomain.findFirst({where:{profileId:profile.id}})
+        const runtime=getSiteRuntimeConfig(profile)
+        const current=row ? accessSchema.parse(row.value) : initialAccess(legacy || (managed ? {courses:runtime.modules.courses,crm:false,affiliate:runtime.modules.affiliate}:noModules))
         if(current.revision!==input.revision) throw new CrmError('Cấu hình đã đổi. Tải lại trước khi lưu.',409)
         const basic=await tx.systemConfig.findUnique({where:{key:basicKey}})
         const template=basic ? basicSchema.parse(basic.value) : {modules:{courses:true,crm:true,affiliate:true},applications:allApplications}
@@ -55,6 +60,6 @@ export async function POST(request:Request) {
         await tx.siteDomain.updateMany({where:{profileId:profile.id},data:effectiveModules(next)})
       })
     }
-    return crmResponse({...await snapshot(profile.id),admin,name:profile.title,slug:profile.slug})
+    return crmResponse({...await snapshot(profile),profileId:profile.id,admin,name:profile.title,slug:profile.slug})
   } catch(e) {return websiteFailure(e)}
 }

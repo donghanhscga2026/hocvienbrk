@@ -6,8 +6,8 @@ import {applicationKeys,applications,allApplications,noApplications,type Applica
 import type {DomainModules} from '@/lib/website/domain-shared'
 
 type Section='design'|'data'|'domains'|'apps'|'package'
-type Presentation={mode:'template'|'custom';revision:number;customPublished:boolean}
-type Snapshot={access:WebsiteAccess;basic:DomainModules;basicApplications:ApplicationFlags;admin:boolean;name:string;slug:string;configured:boolean;domains:{hostname:string;enabled:boolean}[]}
+type Presentation={homepageType?:string;mode:'template'|'custom';revision:number;customPublished:boolean}
+type Snapshot={profileId?:number;access:WebsiteAccess;basic:DomainModules;basicApplications:ApplicationFlags;admin:boolean;name:string;slug:string;configured:boolean;domains:{hostname:string;enabled:boolean}[]}
 export default function WebsiteManager() {
   const [presentation,setPresentation]=useState<Presentation|null>(null)
   const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
@@ -68,7 +68,8 @@ export default function WebsiteManager() {
   const current=items.find(item=>item.id===section)!
   const button='inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-violet-600 disabled:opacity-50'
   const primary=button.replace('border-slate-200 bg-white','border-violet-700 bg-violet-700').replace('hover:bg-slate-50','hover:bg-violet-800')+' text-white'
-  const editHref=presentation?.mode==='custom'?'/tools/my-site/design':'/tools/my-site/edit'
+  const landing=presentation?.homepageType==='landing'
+  const editHref=landing && data?.profileId?'/tools/site-profiles/'+data.profileId+'/edit':presentation?.mode==='custom'?'/tools/my-site/design':'/tools/my-site/edit'
   function applicationRow(id:string,name:string,audience:string,scope:string,base:boolean,extraFlag:boolean,connected:boolean,onExtra:(value:boolean)=>void,onConnected:(value:boolean)=>void) {
     const granted=base || extraFlag
     return <article key={id} className="rounded-xl border border-slate-200 px-4 py-3">
@@ -82,7 +83,7 @@ export default function WebsiteManager() {
   return <main className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-8"><div className="mx-auto max-w-6xl space-y-6">
     <nav aria-label="Breadcrumb" className="flex flex-wrap gap-2 text-sm text-slate-500"><a href="/tools/pages?tab=my-site" className="text-violet-700 hover:underline">Trang của tôi</a><span aria-hidden="true">/</span><span>Quản lý website</span></nav>
     <header className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-      <div className="min-w-0"><p className="mb-2 text-sm text-violet-700">Quản lý website của tôi</p><h1 className="break-words text-2xl font-bold sm:text-3xl">{data?.name || 'Website của tôi'}</h1><div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span className="rounded-full bg-violet-50 px-3 py-1 text-violet-800">{presentation?presentation.mode==='template'?'Mẫu có sẵn':'Thiết kế tự do':'Đang tải giao diện…'}</span>{data && <span className="break-all text-slate-500">{view?.hostname || 'Chưa kết nối tên miền riêng'}</span>}</div></div>
+      <div className="min-w-0"><p className="mb-2 text-sm text-violet-700">Quản lý website của tôi</p><h1 className="break-words text-2xl font-bold sm:text-3xl">{data?.name || 'Website của tôi'}</h1><div className="mt-3 flex flex-wrap items-center gap-2 text-sm"><span className="rounded-full bg-violet-50 px-3 py-1 text-violet-800">{presentation?landing?'Trang landing':presentation.mode==='template'?'Mẫu có sẵn':'Thiết kế tự do':'Đang tải giao diện…'}</span>{data && <span className="break-all text-slate-500">{view?.hostname || 'Chưa kết nối tên miền riêng'}</span>}</div></div>
       <div className="flex flex-wrap gap-2">{data && <a className={button} href={view?'https://'+view.hostname:'/page/'+data.slug} target="_blank" rel="noreferrer">Xem website ↗</a>}{presentation && <a className={primary} href={editHref}>Chỉnh sửa →</a>}</div>
     </header>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}
@@ -97,9 +98,9 @@ export default function WebsiteManager() {
         <h2 className="text-xl font-bold">{current.label}</h2><p className="mb-6 mt-1 text-sm text-slate-500">{current.description}</p>
         {section==='design' && <div className="space-y-5">
           {!presentation?<p>Đang tải mẫu đang dùng…</p>:<>
-            <div className="rounded-xl bg-slate-50 p-5"><p className="mb-2 text-sm text-slate-500">Giao diện đang hiển thị</p><h3 className="text-lg font-semibold">{presentation.mode==='template'?'Mẫu có sẵn':'Thiết kế tự do'}</h3><p className="mb-4 mt-2 text-sm text-slate-600">{presentation.mode==='template'?'Ảnh bìa, thông điệp, khóa học và bảng tin của bạn.':'Thiết kế kéo thả, các trang con và nội dung tùy chỉnh của bạn.'}</p><a className={primary} href={editHref}>Chỉnh sửa giao diện đang dùng →</a></div>
+            <div className="rounded-xl bg-slate-50 p-5"><p className="mb-2 text-sm text-slate-500">Giao diện đang hiển thị</p>{landing && <p className="mb-3 text-sm text-violet-700">Trang chủ đang dùng landing được chọn trong cấu hình quản trị. Đổi mẫu dưới đây sẽ thay lựa chọn đó.</p>}<h3 className="text-lg font-semibold">{landing?'Trang landing':presentation.mode==='template'?'Mẫu có sẵn':'Thiết kế tự do'}</h3><p className="mb-4 mt-2 text-sm text-slate-600">{presentation.mode==='template'?'Ảnh bìa, thông điệp, khóa học và bảng tin của bạn.':'Thiết kế kéo thả, các trang con và nội dung tùy chỉnh của bạn.'}</p><a className={primary} href={editHref}>Chỉnh sửa giao diện đang dùng →</a></div>
             <details className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer font-medium text-violet-700">Đổi giao diện</summary><p className="my-4 text-sm text-slate-600">Cả hai mẫu dùng chung tên miền, nguồn khóa học và kết nối ứng dụng. Đổi mẫu giữ nguyên nội dung đã tạo.</p><div className="grid gap-4 sm:grid-cols-2">
-              <article className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Mẫu có sẵn</h3><a href="/tools/my-site/edit" className="block text-sm text-violet-700 underline">Chỉnh sửa mẫu</a><button className={button} disabled={busy || presentation.mode==='template'} onClick={()=>void chooseMode('template')}>{presentation.mode==='template'?'Đang sử dụng':'Dùng mẫu có sẵn'}</button></article>
+              <article className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Mẫu có sẵn</h3><a href="/tools/my-site/edit" className="block text-sm text-violet-700 underline">Chỉnh sửa mẫu</a><button className={button} disabled={busy || !landing && presentation.mode==='template'} onClick={()=>void chooseMode('template')}>{!landing && presentation.mode==='template'?'Đang sử dụng':'Dùng mẫu có sẵn'}</button></article>
               <article className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Thiết kế tự do</h3><a href="/tools/my-site/design" className="block text-sm text-violet-700 underline">Mở trình thiết kế</a>{!presentation.customPublished && <p className="text-sm text-amber-800">Cần xuất bản thiết kế trước khi sử dụng.</p>}<button className={button} disabled={busy || !presentation.customPublished || presentation.mode==='custom'} onClick={()=>void chooseMode('custom')}>{presentation.mode==='custom'?'Đang sử dụng':'Dùng thiết kế tự do'}</button></article>
             </div></details>
             <p className="text-sm text-slate-500">Khảo sát và lộ trình của mẫu cũ hiện dùng trên hệ thống chính.</p>

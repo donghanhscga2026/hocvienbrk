@@ -8,6 +8,7 @@ import { Shield, AlertCircle, ArrowLeft } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { getSiteProfileAdminById, updateSiteProfile } from '@/app/actions/site-profile-actions'
 import ProfileMemberManager from '@/components/admin/ProfileMemberManager'
+import SiteRuntimeConfigEditor from '@/components/admin/SiteRuntimeConfigEditor'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -567,6 +568,8 @@ export default function EditSiteProfilePage({ params }: PageProps) {
               />
             </div>
           </section>
+
+          <SiteRuntimeConfigEditor profile={profile} onSaved={loadProfile} />
 
           {/* Actions */}
           <div className="flex gap-4">

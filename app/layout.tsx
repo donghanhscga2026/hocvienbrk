@@ -17,6 +17,7 @@ import { domainWebsite } from '@/lib/website/presentation-server'
 import DomainShell from '@/components/website/DomainShell'
 import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
 import { websiteTheme } from '@/lib/website/theme'
+import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/runtime";
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -29,66 +30,90 @@ const beVietnamPro = Be_Vietnam_Pro({
   variable: "--font-be-vietnam-pro",
 });
 
-const platformMetadata: Metadata = {
-  title: {
-    default: "MFC - Dòng chảy Phước Báu",
-    template: "%s | MFC - Dòng chảy Phước Báu",
-  },
-  applicationName: "MFC",
-  appleWebApp: { capable: true, title: "MFC", statusBarStyle: "default" },
-  icons: { apple: "/pwa/apple-touch-icon.png" },
-  description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
-  openGraph: {
-    title: "MFC - Dòng chảy Phước Báu",
-    description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
-    type: "website",
-    locale: "vi_VN",
-    url: "https://giautoandien.io.vn",
-    siteName: "MFC - Dòng chảy Phước Báu",
-    images: [
-      {
-        url: "https://giautoandien.io.vn/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "MFC - Dòng chảy Phước Báu",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "MFC - Dòng chảy Phước Báu",
-    description: "Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate",
-    images: ["https://giautoandien.io.vn/og-image.png"],
-  },
-};
-
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#047857" };
-export async function generateMetadata():Promise<Metadata> {
+export async function generateMetadata(): Promise<Metadata> {
   const domain=await domainContext()
-  if(!domain) return platformMetadata
-  const doc=await domainWebsite(domain.profile)
-  const name=doc?.name || domain.profile.title || domain.hostname
-  return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'},twitter:{card:'summary',title:name,description:doc?.description || ''}}
+  if(domain){
+    const doc=await domainWebsite(domain.profile)
+    const config=getSiteRuntimeConfig(domain.profile)
+    const name=config.branding.name || doc?.name || domain.profile.title || domain.hostname
+    return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,icons:config.branding.faviconUrl?{icon:config.branding.faviconUrl,apple:config.branding.faviconUrl}:undefined,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'}}
+  }
+  const profile = await getCurrentSiteProfile()
+  const runtimeConfig = profile ? getSiteRuntimeConfig(profile) : null
+  const brandName = runtimeConfig?.branding.name || profile?.title || 'MFC'
+  const title = profile?.metaTitle || brandName || 'MFC - Dòng chảy Phước Báu'
+  const description = profile?.metaDescription || profile?.subtitle
+    || 'Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate'
+  const image = profile?.metaImage || profile?.heroImage || '/og-image.png'
+  const primaryDomain = profile?.domains.find(domain => domain.isPrimary)?.hostname
+    || profile?.domains[0]?.hostname
+  const url = primaryDomain ? `https://${primaryDomain}` : undefined
+
+  return {
+    title: { default: title, template: `%s | ${title}` },
+    applicationName: brandName,
+    appleWebApp: { capable: true, title: brandName, statusBarStyle: 'default' },
+    icons: runtimeConfig?.branding.faviconUrl
+      ? { icon: runtimeConfig.branding.faviconUrl, apple: runtimeConfig.branding.faviconUrl }
+      : { apple: '/pwa/apple-touch-icon.png' },
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      locale: 'vi_VN',
+      url,
+      siteName: brandName || title,
+      images: [{ url: image, width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [image],
+    },
+  }
 }
 
-// [OPTIMIZE] Theme gần như không đổi (chỉ khi admin chỉnh trong /tools/settings/theme)
-// nhưng RootLayout bọc MỌI trang — cache 1 giờ, làm mới ngay lập tức khi admin lưu
-// theme mới (xem revalidateTag('site-theme') trong app/api/admin/theme/route.ts).
-const getSiteTheme = unstable_cache(
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#047857" };
+
+const getThemePaletteMap = unstable_cache(
   async () => {
     try {
-      const siteSettings = await prisma.siteSettings.findFirst({
-        include: { theme: true },
-      })
-      return siteSettings?.themeId || 'classic'
+      const themes = await prisma.theme.findMany({ select: { id: true, colors: true } })
+      return Object.fromEntries(themes.map(theme => [theme.id, theme.colors]))
     } catch (error) {
-      console.error('Error fetching site theme:', error)
-      return 'classic'
+      console.error('Error fetching theme palettes:', error)
+      return {}
     }
   },
-  ['site-theme'],
-  { tags: ['site-theme'], revalidate: 3600 }
+  ['site-theme-palettes'],
+  { tags: ['site-theme', 'site-profile'], revalidate: 3600 },
 )
+
+function compactThemePalette(colors: unknown) {
+  const value = colors && typeof colors === 'object' && !Array.isArray(colors)
+    ? colors as Record<string, unknown>
+    : {}
+  const pick = (key: string, fallback: string) => {
+    const candidate = value[key]
+    return typeof candidate === 'string' && candidate.length <= 100 && !candidate.includes('</')
+      ? candidate
+      : fallback
+  }
+  return {
+    p: pick('primary', '#4EB09B'),
+    op: pick('primaryForeground', '#ffffff'),
+    s: pick('card', pick('backgroundSecondary', '#ffffff')),
+    b: pick('background', '#FAE0C7'),
+    os: pick('foreground', '#333333'),
+    m: pick('foregroundSecondary', pick('mutedForeground', '#765F5C')),
+    a: pick('accent', '#F28076'),
+    o: pick('border', '#FBC193'),
+    d: false,
+  }
+}
+
 
 export default async function RootLayout({
   children,
@@ -99,29 +124,46 @@ export default async function RootLayout({
   if(domain) {
     const [doc,session]=await Promise.all([domainWebsite(domain.profile),getSession()])
     const path=(await headers()).get('x-website-path') || '/'
-    const brand={name:doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
+    const config=getSiteRuntimeConfig(domain.profile)
+    const brand={logoUrl:config.branding.logoUrl,tools:config.modules.tools,name:config.branding.name || doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
     const theme=websiteTheme(brand.color,brand.background)
     return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }
-  const siteThemeId = await getSiteTheme()
+  const [siteProfile, themeRows] = await Promise.all([
+    getCurrentSiteProfile(),
+    getThemePaletteMap(),
+  ])
+  const runtimeConfig = siteProfile ? getSiteRuntimeConfig(siteProfile) : null
+  const siteThemeId = siteProfile?.themeId || 'classic'
+  const palettes = Object.fromEntries(
+    Object.entries(themeRows).map(([id, colors]) => [id, compactThemePalette(colors)]),
+  )
+  const profilePalette = compactThemePalette(siteProfile?.theme?.colors)
   const session = await getSession()
   const attentionHighlight = await getAttentionHighlightSettings()
 
   const INITIAL_SCRIPT = `
 (function(){
-  var T={"default":{p:"#4EB09B",op:"#FFF",s:"#FFF",b:"#FAE0C7",os:"#333",m:"#765F5C",a:"#F28076",o:"#FBC193",d:false},"light":{p:"#41B3A3",op:"#FFF",s:"#FFF",b:"#85DCB0",os:"#2D3142",m:"#E8A87C",a:"#E27D60",o:"#C38D9E",d:false},"dark":{p:"#8B5CF6",op:"#FFF",s:"#1E1E1E",b:"#121212",os:"#F3F4F6",m:"#9CA3AF",a:"#10B981",o:"#333",d:true},"highend":{p:"#EC4899",op:"#FFF",s:"#FFF",b:"#FAF5FF",os:"#4C1D95",m:"#6B7280",a:"#06B6D4",o:"#E9D5FF",d:false},"ocean":{p:"#059669",op:"#FFF",s:"#FFF",b:"#F0FDF4",os:"#064E3B",m:"#475569",a:"#FB923C",o:"#D1FAE5",d:false},"classic":{p:"#4EB09B",op:"#FFF",s:"#FFF",b:"#FAE0C7",os:"#333",m:"#765F5C",a:"#F28076",o:"#FBC193",d:false}};
-  var r=function(h,a){var x=h.replace("#","");return"rgba("+parseInt(x.substr(0,2),16)+","+parseInt(x.substr(2,2),16)+","+parseInt(x.substr(4,2),16)+","+a+")"};
-  var g=function(c){return".bg-brk-surface,.bg-brk-section{background-color:"+c.s+"!important}.bg-brk-background,.bg-brk-bg,.bg-brk-section-alt,body{background-color:"+c.b+"!important}.text-brk-on-surface,.text-brk-section{color:"+c.os+"!important}.text-brk-muted,.text-brk-section-secondary{color:"+c.m+"!important}.text-brk-primary{color:"+c.p+"!important;text-shadow:0 0 10px "+r(c.p,.25)+",0 0 20px "+r(c.p,.25)+"!important}.bg-brk-primary,.bg-brk-secondary{background-color:"+c.p+"!important}.bg-brk-primary:hover{filter:brightness(.9)}.text-brk-on-primary{color:"+c.op+"!important}.text-brk-accent{color:"+c.a+"!important}.bg-brk-accent{background-color:"+c.a+"!important}.border-brk-outline,.border-brk-section{border-color:"+c.o+"!important}.bg-brk-accent-10{background-color:"+r(c.a,.1)+"!important}.bg-brk-accent-20{background-color:"+r(c.a,.2)+"!important}.bg-brk-accent-30{background-color:"+r(c.a,.3)+"!important}.text-brk-bg{color:"+c.b+"!important}.bg-brk-bg{background-color:"+c.b+"!important}.ring-brk-section,.ring-brk-outline{--tw-ring-color:"+c.o+"!important}.border-brk-primary{border-color:"+c.p+"!important}.shadow-brk-primary\\\\/10{box-shadow:0 10px 15px -3px "+r(c.p,.1)+"!important}.shadow-brk-primary\\\\/20{box-shadow:0 10px 15px -3px "+r(c.p,.2)+"!important}.ring-brk-primary{--tw-ring-color:"+r(c.p,.2)+"!important}footer{background-color:"+(c.d?c.b:"#f3f4f6")+"!important}footer p,footer span{color:"+c.m+"!important}"};
-  var saved=localStorage.getItem("site-theme")||"${siteThemeId}";
-  var custom=localStorage.getItem("site-custom-colors");
-  var theme=T[saved]||T["${siteThemeId}"];
-  if(saved==="custom"&&custom){try{var cu=JSON.parse(custom);for(var k in cu)theme[k]=cu[k]}catch(e){}}
+  var T=${JSON.stringify(palettes)};
+  var PROFILE=${JSON.stringify(profilePalette)};
+  var PROFILE_ID=${JSON.stringify(siteThemeId)};
+  var ALLOW_OVERRIDE=${runtimeConfig?.theme.allowUserOverride === true ? 'true' : 'false'};
+  var r=function(h,a){if(typeof h!=="string"||!/^#[0-9a-f]{6}$/i.test(h))return h;var x=h.replace("#","");return"rgba("+parseInt(x.substr(0,2),16)+","+parseInt(x.substr(2,2),16)+","+parseInt(x.substr(4,2),16)+","+a+")"};
+  var g=function(c){return".bg-brk-surface,.bg-brk-section{background-color:"+c.s+"!important}.bg-brk-background,.bg-brk-bg,.bg-brk-section-alt,body{background-color:"+c.b+"!important}.text-brk-on-surface,.text-brk-section{color:"+c.os+"!important}.text-brk-muted,.text-brk-section-secondary{color:"+c.m+"!important}.text-brk-primary{color:"+c.p+"!important;text-shadow:0 0 10px "+r(c.p,.25)+",0 0 20px "+r(c.p,.25)+"!important}.bg-brk-primary,.bg-brk-secondary{background-color:"+c.p+"!important}.bg-brk-primary:hover{filter:brightness(.9)}.text-brk-on-primary{color:"+c.op+"!important}.text-brk-accent{color:"+c.a+"!important}.bg-brk-accent{background-color:"+c.a+"!important}.border-brk-outline,.border-brk-section{border-color:"+c.o+"!important}.bg-brk-accent-10{background-color:"+r(c.a,.1)+"!important}.bg-brk-accent-20{background-color:"+r(c.a,.2)+"!important}.bg-brk-accent-30{background-color:"+r(c.a,.3)+"!important}.text-brk-bg{color:"+c.b+"!important}.bg-brk-bg{background-color:"+c.b+"!important}.ring-brk-section,.ring-brk-outline{--tw-ring-color:"+c.o+"!important}.border-brk-primary{border-color:"+c.p+"!important}.shadow-brk-primary\\\\/10{box-shadow:0 10px 15px -3px "+r(c.p,.1)+"!important}.shadow-brk-primary\\\\/20{box-shadow:0 10px 15px -3px "+r(c.p,.2)+"!important}.ring-brk-primary{--tw-ring-color:"+r(c.p,.2)+"!important}footer{background-color:"+c.b+"!important}footer p,footer span{color:"+c.m+"!important}"};
+  var saved=ALLOW_OVERRIDE?(localStorage.getItem("site-theme")||PROFILE_ID):PROFILE_ID;
+  var theme=T[saved]||PROFILE;
+  if(ALLOW_OVERRIDE&&saved==="custom"){
+    var custom=localStorage.getItem("site-custom-colors");
+    if(custom){try{var cu=JSON.parse(custom);for(var k in cu){if(k in theme)theme[k]=cu[k]}}catch(e){}}
+  }
   var el=document.getElementById("theme-base-css");
   if(!el){el=document.createElement("style");el.id="theme-base-css";document.head.appendChild(el)}
   el.textContent=g(theme);
   document.documentElement.setAttribute("data-theme",saved);
+  document.documentElement.setAttribute("data-site-profile",${JSON.stringify(siteProfile?.slug || 'default')});
 })();
 `;
+
 
   return (
     <html lang="vi" suppressHydrationWarning>
@@ -137,11 +179,11 @@ export default async function RootLayout({
         <Providers session={session} attentionHighlight={attentionHighlight}>
           <PwaInstallProvider>
           {children}
-          <AffiliateTracker />
+          {runtimeConfig?.modules.affiliate !== false && <AffiliateTracker />}
           <AccountAssistantTrigger />
           </PwaInstallProvider>
         </Providers>
-        <PendingSurveyHandler />
+        {runtimeConfig?.modules.surveys !== false && <PendingSurveyHandler />}
       </body>
     </html>
   );

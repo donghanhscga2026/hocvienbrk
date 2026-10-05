@@ -1,0 +1,32 @@
+name: Sync deployment branches
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-deployment-branches
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Mirror master to deployment branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout master history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward deployment branches
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git push origin "${TARGET_SHA}:refs/heads/deploy/wigrow"
+          git push origin "${TARGET_SHA}:refs/heads/deploy/witech"

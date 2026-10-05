@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { Prisma } from '@prisma/client'
 import { CrmError } from '@/lib/crm/service'
 import { getCoursesForProfile, getPostsForProfile } from '@/app/actions/site-profile-actions'
+import {getCourseWhereForProfile} from '@/lib/site-profile/config'
 import { parseDocument } from './document'
 
 export async function ownedProfile() {
@@ -21,11 +22,10 @@ export async function publishedWebsite(profileId: number) {
   catch(error) { if(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return null; throw error }
 }
 export async function websiteData(profile: Parameters<typeof getCoursesForProfile>[0], options: {strict?:boolean;courses?:boolean} = {}) {
-  const selected=Array.isArray(profile.courseIds) ? profile.courseIds.filter((v:unknown):v is number=>typeof v==='number') : []
   const teachers=[profile.userId,...(profile.members || []).map((m:{userId:number})=>m.userId)].filter((v):v is number=>typeof v==='number')
   // Domain riêng không hiển thị khóa/bài toàn hệ thống khi DB lỗi.
   const [courses, posts] = await Promise.all([
-    options.courses===false ? [] : options.strict ? prisma.course.findMany({where:{status:true,...(selected.length ? {id:{in:selected}} : {teacherId:{in:teachers}})},orderBy:[{pin:'asc'},{id:'asc'}],select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,link_anh_bia:true,mo_ta_ngan:true}}) : getCoursesForProfile(profile),
+    options.courses===false ? [] : options.strict ? prisma.course.findMany({where:getCourseWhereForProfile(profile),orderBy:[{pin:'asc'},{id:'asc'}],select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,link_anh_bia:true,mo_ta_ngan:true}}) : getCoursesForProfile(profile),
     options.strict ? prisma.post.findMany({where:{published:true,authorId:{in:teachers},...(profile.communityCategoryId ? {categoryId:profile.communityCategoryId} : {})},take:Math.min(60,profile.communityLimit || 10),orderBy:[{pin:'desc'},{createdAt:'desc'}],select:{id:true,title:true,content:true}}) : getPostsForProfile(profile)
   ])
   const testimonials = await prisma.courseTestimonial.findMany({ where: { courseId: { in: courses.map((c: { id: number }) => c.id) }, isActive: true }, take: 60, orderBy: { createdAt: 'desc' }, select: { id: true, courseId: true, name: true, role: true, content: true, rating: true } })

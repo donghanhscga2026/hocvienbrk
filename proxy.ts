@@ -5,6 +5,7 @@ import type { NextRequest, NextFetchEvent, NextMiddleware } from "next/server"
 import { activeDomain } from '@/lib/website/domains'
 import { domainRoute, requestHostname, isPlatformHost } from '@/lib/website/domain-shared'
 import prisma from '@/lib/prisma'
+import {courseBelongsToProfile} from '@/lib/site-profile/config'
 import { applicationKeys, type ApplicationKey } from '@/lib/website/applications'
 
 const { auth } = NextAuth(authConfig)
@@ -100,9 +101,8 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(coursePath) {
         let slug: string
         try { slug=decodeURIComponent(coursePath[1]).replace(/\$+$/,'') } catch { return new NextResponse('Not found',{status:404}) }
-        const course=await prisma.course.findUnique({where:{id_khoa:slug},select:{id:true,teacherId:true,status:true}})
-        const ids=Array.isArray(domain.profile.courseIds) ? domain.profile.courseIds : []
-        const permitted=course?.status && (ids.length ? ids.includes(course.id) : domain.profile.userId!=null && [domain.profile.userId,...domain.profile.members.map(m=>m.userId)].includes(course.teacherId ?? -1))
+        const course=await prisma.course.findUnique({where:{id_khoa:slug},select:{id:true,teacherId:true,categoryId:true,status:true}})
+        const permitted=courseBelongsToProfile(domain.profile,course)
         if(!permitted) return new NextResponse('Khóa học không thuộc website này.',{status:404})
     }
     const requestHeaders=new Headers(request.headers)

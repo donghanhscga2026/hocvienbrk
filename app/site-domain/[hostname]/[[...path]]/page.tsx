@@ -1,3 +1,5 @@
+import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
+import {LandingPageClient} from '@/components/landing/LandingPageClient'
 import { CrmError } from '@/lib/crm/service'
 import { connectedApplication, websiteApplicationUser } from '@/lib/website/application-context'
 import { PLATFORM_ORIGIN } from '@/lib/website/domain-shared'
@@ -49,6 +51,12 @@ export default async function DomainPage(props:Props) {
     const data=domain.courses ? await websiteData(domain.profile,{strict:true}) : {courses:[]}
     const enrollments=await prisma.enrollment.findMany({where:{userId:Number(session.user.id),courseId:{in:data.courses.map(c=>c.id)}},select:{status:true,course:{select:{id_khoa:true,name_lop:true}}}})
     return <section className="max-w-3xl mx-auto p-6 grid gap-4"><h1 className="text-2xl font-bold">Xin chào {session.user.name}</h1><h2 className="font-bold">Khóa học của bạn tại {document.name}</h2>{enrollments.map(e=><a className="border rounded-xl p-4" key={e.course.id_khoa} href={(e.status==='ACTIVE' ? '/courses/'+encodeURIComponent(e.course.id_khoa)+'/learn' : '/khoa-hoc/'+encodeURIComponent(e.course.id_khoa))}>{e.course.name_lop} · {e.status}</a>)}{!enrollments.length && <p>Bạn chưa có khóa học tại website này.</p>}</section>
+  }
+  if(!path.length && getSiteRuntimeConfig(domain.profile).homepage.type==='landing'){
+    const homepage=getSiteRuntimeConfig(domain.profile).homepage
+    const landing=await prisma.landingPage.findFirst({where:{isActive:true,...(homepage.landingId?{id:homepage.landingId}:{slug:homepage.landingSlug || '__none__'})},include:{course:true}})
+    if(!landing)notFound()
+    return <LandingPageClient landing={landing as any}/>
   }
   if(!path.length && (await presentationState(domain.profileId)).mode==='template') return <ProfileHome profile={domain.profile} customDomain modules={{courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}} />
   const catalog=path.join('/')==='khoa-hoc'

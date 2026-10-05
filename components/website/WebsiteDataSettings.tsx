@@ -3,7 +3,7 @@ import {useEffect,useState} from 'react'
 import Link from 'next/link'
 import ProfileMemberManager from '@/components/admin/ProfileMemberManager'
 
-type Snapshot={profileId:number;selected:number[];members:Parameters<typeof ProfileMemberManager>[0]['initialMembers'];courses:{id:number;name_lop:string;teacherId:number|null}[]}
+type Snapshot={scopeMode?:string;profileId:number;selected:number[];members:Parameters<typeof ProfileMemberManager>[0]['initialMembers'];courses:{id:number;name_lop:string;teacherId:number|null}[]}
 export default function WebsiteDataSettings() {
   const [data,setData]=useState<Snapshot|null>(null),[selected,setSelected]=useState<number[]>([]),[automatic,setAutomatic]=useState(true)
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('')
@@ -26,6 +26,7 @@ export default function WebsiteDataSettings() {
     {!data && !error && <p>Đang tải…</p>}
     {data && <><ProfileMemberManager profileId={data.profileId} initialMembers={data.members} onUpdate={()=>void refresh()} />
       <fieldset disabled={busy} className="grid gap-4 bg-white border rounded-2xl p-5"><legend className="font-bold text-xl px-2">Khóa học hiển thị</legend>
+        {data.scopeMode && !['profile','ids'].includes(data.scopeMode) && <p className="rounded-xl bg-violet-50 p-3 text-sm text-violet-800">Đang dùng bộ lọc quản trị: {({all:'Tất cả khóa học',teacher:'Theo giáo viên',category:'Theo danh mục'} as Record<string,string>)[data.scopeMode]}. Lưu tại đây sẽ chuyển sang nguồn tự động hoặc các khóa bạn chọn.</p>}
         <label className="flex items-start gap-3"><input type="checkbox" checked={automatic} onChange={e=>setAutomatic(e.target.checked)} className="mt-1"/>Tự động lấy khóa học của chủ website và giáo viên liên kết</label>
         {!automatic && data.courses.map(c=><label key={c.id} className="flex items-start gap-3"><input type="checkbox" checked={selected.includes(c.id)} onChange={e=>setSelected(e.target.checked?[...selected,c.id]:selected.filter(id=>id!==c.id))} className="mt-1"/>{c.name_lop}</label>)}
         {!automatic && !data.courses.length && <p>Chưa có khóa học. Thêm giáo viên liên kết hoặc tạo khóa học trước.</p>}

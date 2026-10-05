@@ -13,7 +13,7 @@ async function manager(request:Request) {
   return ownedProfile()
 }
 function response(state:Awaited<ReturnType<typeof presentationState>>) {
-  return {mode:state.mode,revision:state.revision,customPublished:state.customPublished}
+  return {mode:state.mode,revision:state.revision,customPublished:state.customPublished,homepageType:state.homepageType}
 }
 export async function GET(request:Request) {
   try {const profile=await manager(request);return crmResponse(response(await presentationState(profile.id)))} catch(e){return websiteFailure(e)}
@@ -30,6 +30,9 @@ export async function POST(request:Request) {
       if(state.revision!==input.revision) throw new CrmError('Mẫu đang dùng đã đổi ở cửa sổ khác. Hãy tải lại.',409)
       if(input.mode==='custom' && !row?.published) throw new CrmError('Hãy xuất bản thiết kế tự do trước khi chọn sử dụng.',409)
       const value={mode:input.mode,revision:state.revision+1}
+      const fresh=await tx.siteProfile.findUnique({where:{id:profile.id}})
+      const raw=fresh?.siteConfig && typeof fresh.siteConfig==='object' && !Array.isArray(fresh.siteConfig)?fresh.siteConfig:{}
+      await tx.siteProfile.update({where:{id:profile.id},data:{siteConfig:{...raw,homepage:{type:input.mode==='custom'?'website':'profile'}}}})
       await tx.systemConfig.upsert({where:{key:presentationKey(profile.id)},create:{key:presentationKey(profile.id),value},update:{value}})
     })
     return crmResponse(response(await presentationState(profile.id)))

@@ -61,12 +61,6 @@ export default function NewSiteProfilePage() {
       return
     }
 
-    if (!teacherId) {
-      setError('Vui lòng chọn Teacher')
-      setLoading(false)
-      return
-    }
-
     const result = await createSiteProfile(teacherId, slug)
     
     if (result.error) {
@@ -134,7 +128,7 @@ export default function NewSiteProfilePage() {
           
           <div>
             <label className="block text-sm font-black text-gray-500 uppercase mb-2">
-              Teacher <span className="text-red-500">*</span>
+              Teacher (tùy chọn)
             </label>
             {loadingTeachers ? (
               <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
@@ -156,14 +150,14 @@ export default function NewSiteProfilePage() {
                 className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
                 required
               >
-                <option value="">-- Chọn Teacher --</option>
+                <option value="">-- Không gắn Teacher / Website thương hiệu --</option>
                 {teachers.map(t => (
                   <option key={t.id} value={t.id}>{t.name || t.email}</option>
                 ))}
               </select>
             )}
             <p className="text-gray-400 text-xs mt-2">
-              Chỉ user có role TEACHER mới hiển thị ở đây
+              Có thể để trống cho website thương hiệu/cộng đồng; nếu chọn Teacher thì profile có thể lọc khóa học theo Teacher đó.
             </p>
           </div>
 
@@ -172,7 +166,6 @@ export default function NewSiteProfilePage() {
               Slug (URL) <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 shrink-0">giautoandien.io.vn/</span>
               <input
                 type="text"
                 value={slug}
@@ -183,7 +176,7 @@ export default function NewSiteProfilePage() {
               />
             </div>
             <p className="text-gray-400 text-xs mt-2">
-              URL: giautoandien.io.vn/{slug || 'ten-slug'}
+              Slug nội bộ: /page/{slug || 'ten-slug'}. Domain riêng được gán ở bước cấu hình website sau khi tạo.
             </p>
           </div>
 
@@ -198,7 +191,7 @@ export default function NewSiteProfilePage() {
 
           <button
             type="submit"
-            disabled={loading || !teacherId || !slug}
+            disabled={loading || !slug}
             className="w-full bg-orange-500 text-white py-4 rounded-xl font-black uppercase disabled:opacity-50 hover:brightness-110 transition-all"
           >
             {loading ? 'Đang tạo...' : 'Tạo Profile'}

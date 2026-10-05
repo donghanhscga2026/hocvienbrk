@@ -4,6 +4,7 @@ import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { activeDomain } from './domains'
 import { isPlatformHost, requestHostname } from './domain-shared'
+import {courseBelongsToProfile} from '@/lib/site-profile/config'
 import { CrmError } from '@/lib/crm/service'
 
 /** Đọc Host thực, không tin header tenant do trình duyệt tự gửi. */
@@ -23,10 +24,8 @@ export async function requireDomainModule(module: 'courses'|'crm'|'affiliate') {
 export async function requireDomainCourse(id: number|string) {
   const domain=await requireDomainModule('courses')
   if(!domain) return
-  const course=await prisma.course.findUnique({where:typeof id==='number' ? {id} : {id_khoa:id},select:{id:true,teacherId:true,status:true}})
-  const profile=domain.profile
-  const selected=Array.isArray(profile.courseIds) ? profile.courseIds.filter((v):v is number=>typeof v==='number') : []
-  const allowed=course?.status && (selected.length ? selected.includes(course.id) : profile.userId!=null && [profile.userId,...profile.members.map(m=>m.userId)].includes(course.teacherId ?? -1))
+  const course=await prisma.course.findUnique({where:typeof id==='number' ? {id} : {id_khoa:id},select:{id:true,teacherId:true,categoryId:true,status:true}})
+  const allowed=courseBelongsToProfile(domain.profile,course)
   if(!allowed) throw new CrmError('Khóa học không thuộc website này.',404)
 }
 export async function requireDomainEnrollment(enrollmentId: number, userId: number, lessonId?: string) {

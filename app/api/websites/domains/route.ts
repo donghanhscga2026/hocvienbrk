@@ -23,8 +23,15 @@ const command=z.discriminatedUnion('action',[
   z.object({action:z.literal('remove'),hostname:z.string().max(253)}).strict(),
   z.object({action:z.literal('modules'),hostname:z.string().max(253),courses:z.boolean(),crm:z.boolean(),affiliate:z.boolean()}).strict(),
 ])
+async function listedDomains(profileId:number){
+  const [verified,managed]=await Promise.all([
+    prisma.siteDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'}}),
+    prisma.siteProfileDomain.findMany({where:{profileId},orderBy:{id:'asc'}}),
+  ])
+  return [...verified,...managed.filter(d=>!verified.some(v=>v.hostname===d.hostname)).map(d=>({hostname:d.hostname,token:'',enabled:d.isActive,verifiedAt:d.createdAt,message:'Tên miền do quản trị viên cấp',managed:true,profileId}))]
+}
 export async function GET(request: Request) {
-  try { const profile=await manager(request); return crmResponse({slug:profile.slug,domains:await prisma.siteDomain.findMany({where:{profileId:profile.id},orderBy:{createdAt:'asc'}})}) }
+  try { const profile=await manager(request); return crmResponse({slug:profile.slug,domains:await listedDomains(profile.id)}) }
   catch(e) { return websiteFailure(e) }
 }
 export async function POST(request: Request) {
@@ -37,6 +44,7 @@ export async function POST(request: Request) {
       if(!profile.isActive || !await domainWebsite(profile)) throw new CrmError('Kích hoạt website và chọn giao diện hợp lệ trước khi nối tên miền.',409)
       await prisma.$transaction(async tx=>{
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420304)`
+        if(await tx.siteProfileDomain.findUnique({where:{hostname}}))throw new CrmError('Tên miền đã được quản trị viên cấp. Hãy chỉnh trong cấu hình website quản trị.',409)
         if(await tx.siteDomain.count({where:{profileId:profile.id}})>=3) throw new CrmError('Mỗi website thử nghiệm được tối đa 3 tên miền.',409)
         const config=await tx.systemConfig.findUnique({where:{key:accessKey(profile.id)}})
         const modules=config ? effectiveModules(accessSchema.parse(config.value)) : {}
@@ -64,6 +72,6 @@ export async function POST(request: Request) {
         await prisma.siteDomain.updateMany({where:{...where,token:domain.token,checkedAt,message:checking},data:{message:result.message,...(result.valid ? {verifiedAt:new Date(),enabled:true} : {})}})
       }
     }
-    return crmResponse({domains:await prisma.siteDomain.findMany({where:{profileId:profile.id},orderBy:{createdAt:'asc'}})})
+    return crmResponse({domains:await listedDomains(profile.id)})
   } catch(e) { return websiteFailure(e) }
 }

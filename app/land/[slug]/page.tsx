@@ -3,10 +3,7 @@ import { cache } from 'react'
 import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { LandingPageClient } from '@/components/landing/LandingPageClient'
-
-const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
-const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
-const DEFAULT_OG_IMAGE = 'https://giautoandien.io.vn/og-image.png'
+import { getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 
 interface PageProps {
     params: Promise<{ slug: string }>
@@ -24,23 +21,29 @@ const getActiveLandingBySlug = cache((slug: string) =>
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     const { slug } = await params
 
-    const landing = await getActiveLandingBySlug(slug)
+    const [landing, siteProfile] = await Promise.all([
+        getActiveLandingBySlug(slug),
+        getCurrentSiteProfile(),
+    ])
 
     if (!landing) return { title: 'Không tìm thấy' }
 
+    const defaultDescription = siteProfile?.metaDescription || siteProfile?.subtitle || undefined
+    const defaultImage = siteProfile?.metaImage || siteProfile?.heroImage || '/og-image.png'
+
     return {
         title: landing.title,
-        description: landing.subtitle || landing.description || DEFAULT_OG_DESCRIPTION,
+        description: landing.subtitle || landing.description || defaultDescription,
         openGraph: {
             title: landing.title,
-            description: landing.subtitle || landing.description || DEFAULT_OG_DESCRIPTION,
-            images: landing.heroImage ? [landing.heroImage] : [DEFAULT_OG_IMAGE],
+            description: landing.subtitle || landing.description || defaultDescription,
+            images: landing.heroImage ? [landing.heroImage] : [defaultImage],
         },
         twitter: {
             card: 'summary_large_image',
             title: landing.title,
-            description: landing.subtitle || landing.description || DEFAULT_OG_DESCRIPTION,
-            images: landing.heroImage ? [landing.heroImage] : [DEFAULT_OG_IMAGE],
+            description: landing.subtitle || landing.description || defaultDescription,
+            images: landing.heroImage ? [landing.heroImage] : [defaultImage],
         },
     }
 }

@@ -22,7 +22,7 @@ const domains={
   deleteMany:async({where})=>{records=records.filter(r=>!matches(r,where));return {count:1}},
 }
 const configs=new Map()
-const fake={systemConfig:{findUnique:async({where})=>configs.has(where.key) ? {key:where.key,value:configs.get(where.key)} : null,upsert:async({where,create,update})=>{const value=configs.has(where.key) ? update.value : create.value;configs.set(where.key,value);return {key:where.key,value}}},siteDomain:domains,siteWebsite:{findUnique:async()=>({published:{name:'Brand',version:1}})},siteProfile:{findUnique:async({where})=>profiles.find(p=>where.userId!=null ? p.userId===where.userId : p.slug===where.slug) || null},user:{findUnique:async({where})=>({id:where.id,role,name:'Owner'})},course:{findUnique:async({where})=>courses.find(c=>where.id!=null ? c.id===where.id : c.id_khoa===where.id_khoa)},lesson:{findUnique:async({where})=>where.id==='own-lesson' ? {courseId:1} : {courseId:2}},enrollment:{findUnique:async({where})=>({userId:where.id===1 ? 1 : 2,courseId:where.id===1 ? 1 : 2})},$executeRaw:async()=>1}
+const fake={siteProfileDomain:{findUnique:async()=>null,findMany:async()=>[],findFirst:async()=>null},systemConfig:{findUnique:async({where})=>configs.has(where.key) ? {key:where.key,value:configs.get(where.key)} : null,upsert:async({where,create,update})=>{const value=configs.has(where.key) ? update.value : create.value;configs.set(where.key,value);return {key:where.key,value}}},siteDomain:domains,siteWebsite:{findUnique:async()=>({published:{name:'Brand',version:1}})},siteProfile:{update:async({where,data})=>Object.assign(profiles.find(p=>p.id===where.id),data),findUnique:async({where})=>profiles.find(p=>where.userId!=null ? p.userId===where.userId : where.id!=null ? p.id===where.id : p.slug===where.slug) || null},user:{findUnique:async({where})=>({id:where.id,role,name:'Owner'})},course:{findUnique:async({where})=>courses.find(c=>where.id!=null ? c.id===where.id : c.id_khoa===where.id_khoa)},lesson:{findUnique:async({where})=>where.id==='own-lesson' ? {courseId:1} : {courseId:2}},enrollment:{findUnique:async({where})=>({userId:where.id===1 ? 1 : 2,courseId:where.id===1 ? 1 : 2})},$executeRaw:async()=>1}
 fake.$transaction=async action=>action(fake)
 function loader(overrides={}) {
   const cache=new Map()
@@ -36,6 +36,7 @@ function loader(overrides={}) {
     new Function('require','exports','module',js)(name=>{
       if(name in overrides)return overrides[name]
       if(name==='server-only')return {}
+      if(name==='next/cache')return {unstable_cache:fn=>fn,revalidateTag:()=>{}}
       if(name==='next/headers')return {headers:async()=>new Headers({host})}
       if(name==='@/lib/prisma')return {__esModule:true,default:fake}
       if(name==='@/lib/crm/service')return {CrmError}

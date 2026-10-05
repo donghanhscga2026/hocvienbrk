@@ -6,7 +6,6 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Wrench } from 'lucide-react'
-import { useHomeSlug } from '@/hooks/useHomeSlug'
 import { useAttentionCycle } from '@/hooks/useAttentionCycle'
 import { AttentionHighlight } from '@/components/ui/attention-highlight'
 import { useAttentionHighlightSettings } from '@/app/contexts/AttentionHighlightContext'
@@ -29,18 +28,33 @@ export default function MainHeader(props: MainHeaderProps) {
     const brand=useDomainBrand()
     return brand ? null : <PlatformMainHeader {...props} />
 }
-function PlatformMainHeader({ title }: MainHeaderProps) {
+function PlatformMainHeader({ title, profile }: MainHeaderProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { data: session } = useSession()
     const [showShare, setShowShare] = useState(false)
-    const { homeSlug, isReady } = useHomeSlug()
 
     const userId = session?.user?.id != null ? String(session.user.id) : null
+    const rawSiteConfig = profile?.siteConfig && typeof profile.siteConfig === 'object' && !Array.isArray(profile.siteConfig)
+        ? profile.siteConfig as Record<string, unknown>
+        : {}
+    const rawBranding = rawSiteConfig.branding && typeof rawSiteConfig.branding === 'object' && !Array.isArray(rawSiteConfig.branding)
+        ? rawSiteConfig.branding as Record<string, unknown>
+        : {}
+    const rawModules = rawSiteConfig.modules && typeof rawSiteConfig.modules === 'object' && !Array.isArray(rawSiteConfig.modules)
+        ? rawSiteConfig.modules as Record<string, unknown>
+        : {}
+    const showTools = rawModules.tools !== false
+    const showAffiliate = rawModules.affiliate !== false
+    const brandName = typeof rawBranding.name === 'string' && rawBranding.name.trim()
+        ? rawBranding.name.trim()
+        : profile?.title || 'MFC'
+    const logoUrl = typeof rawBranding.logoUrl === 'string' && rawBranding.logoUrl.trim()
+        ? rawBranding.logoUrl.trim()
+        : '/logobrk-50px.png'
 
     const isHomePage = pathname === '/'
     const isToolsRoot = pathname === '/tools'
-    const hasCustomHome = isReady && homeSlug
 
     const getBackPath = () => {
         const paths = pathname.split('/').filter(Boolean)
@@ -80,8 +94,8 @@ function PlatformMainHeader({ title }: MainHeaderProps) {
         { id: 'home', tooltip: homeAttn.tooltip, visible: homeAttn.enabled },
         { id: 'back', tooltip: backAttn.tooltip, visible: showBackButton && backAttn.enabled },
         { id: 'help', tooltip: helpAttn.tooltip, visible: helpAttn.enabled },
-        { id: 'tools', tooltip: toolsAttn.tooltip, visible: toolsAttn.enabled },
-        { id: 'share', tooltip: shareAttn.tooltip, visible: !!userId && shareAttn.enabled },
+        { id: 'tools', tooltip: toolsAttn.tooltip, visible: showTools && toolsAttn.enabled },
+        { id: 'share', tooltip: shareAttn.tooltip, visible: showAffiliate && !!userId && shareAttn.enabled },
         { id: 'avatar', tooltip: avatarAttn.tooltip, visible: avatarAttn.enabled }
     ], { idleDelayMs: attnConfig.idleDelayMs, cycleIntervalMs: attnConfig.cycleIntervalMs })
 
@@ -92,23 +106,20 @@ function PlatformMainHeader({ title }: MainHeaderProps) {
                     <div className="flex items-center gap-2 shrink-0">
                         <AttentionHighlight {...getStatus('logo')}>
                             <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
-                                <Image
-                                    src="/logobrk-50px.png"
-                                    alt="MFC Logo"
-                                    width={120}
-                                    height={40}
-                                    priority
+                                <img
+                                    src={logoUrl}
+                                    alt={`${brandName} Logo`}
                                     className="object-contain"
-                                    style={{ height: '36px', width: 'auto' }}
+                                    style={{ height: '36px', width: 'auto', maxWidth: '160px' }}
                                 />
                             </Link>
                         </AttentionHighlight>
 
                         <AttentionHighlight {...getStatus('home')}>
                             <button
-                                onClick={() => router.push(hasCustomHome ? `/page/${homeSlug}` : '/page/brk')}
+                                onClick={() => router.push('/')}
                                 className="shrink-0 transition-opacity hover:opacity-80"
-                                title={`Trang chủ: ${hasCustomHome ? homeSlug : 'brk'}`}
+                                title={`Trang chủ${profile?.title ? `: ${profile.title}` : ''}`}
                             >
                                 <Image
                                     src="/icon_home_3d.png"
@@ -149,17 +160,19 @@ function PlatformMainHeader({ title }: MainHeaderProps) {
                             <AssistantHeaderIcon />
                         </AttentionHighlight>
 
-                        <AttentionHighlight {...getStatus('tools')}>
-                            <button
-                                onClick={() => router.push('/tools')}
-                                className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10 text-brk-primary flex items-center justify-center"
-                                title="Công cụ & Tiện ích"
-                            >
-                                <Wrench className="w-[22px] h-[22px]" />
-                            </button>
-                        </AttentionHighlight>
+                        {showTools && (
+                            <AttentionHighlight {...getStatus('tools')}>
+                                <button
+                                    onClick={() => router.push('/tools')}
+                                    className="shrink-0 transition-opacity hover:opacity-80 p-1.5 rounded-lg hover:bg-white/10 text-brk-primary flex items-center justify-center"
+                                    title="Công cụ & Tiện ích"
+                                >
+                                    <Wrench className="w-[22px] h-[22px]" />
+                                </button>
+                            </AttentionHighlight>
+                        )}
 
-                        {userId && (
+                        {showAffiliate && userId && (
                             <AttentionHighlight {...getStatus('share')}>
                                 <button
                                     onClick={() => setShowShare(true)}
@@ -191,7 +204,7 @@ function PlatformMainHeader({ title }: MainHeaderProps) {
                     onClose={() => setShowShare(false)}
                     course={{ id_khoa: '', name_lop: 'Trang cá nhân - Cộng đồng MFC' }}
                     affiliateCode={userId}
-                    profileSlug={isHomePage ? null : (hasCustomHome ? homeSlug : null)}
+                    profileSlug={profile?.slug || null}
                     shareType="header"
                 />
             )}

@@ -8,13 +8,15 @@ import SetHomeSlug from '@/components/home/SetHomeSlug'
 import {getCoursesForProfile,getSurveyForProfile,getPostsForProfile} from '@/app/actions/site-profile-actions'
 import {getHeroMessageForProfile} from '@/app/actions/message-actions'
 import {getRoadmapPoints} from '@/app/actions/roadmap-actions'
+import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import type {DomainModules} from '@/lib/website/domain-shared'
 
 /** Giữ mẫu trang cá nhân hiện có; domain chỉ đọc dữ liệu thuộc website, không dùng dữ liệu dự phòng. */
 export default async function ProfileHome({profile,customDomain=false,modules}:{profile:any;customDomain?:boolean;modules?:DomainModules}) {
+    const config=getSiteRuntimeConfig(profile)
+    const courseWhere=getCourseWhereForProfile(profile)
     const slug=profile.slug
     const session=await getSession()
-    const selected=Array.isArray(profile.courseIds) ? profile.courseIds.filter((v:unknown):v is number=>typeof v==='number') : []
     const teachers=[profile.userId,...(profile.members || []).map((m:{userId:number})=>m.userId)].filter((v):v is number=>typeof v==='number')
     const [
         courses,
@@ -25,7 +27,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
         posts
     ] = await Promise.all([
         customDomain ? (modules?.courses===false ? [] : prisma.course.findMany({
-            where:{status:true,...(selected.length ? {id:{in:selected}} : {teacherId:{in:teachers}})},
+            where:courseWhere,
             include:{courseCategory:true,teacherBankAccount:true,_count:{select:{enrollments:{where:{status:'ACTIVE'}},lessons:true}}},
             orderBy:[{pin:'asc'},{id:'asc'}]
         }).then(rows=>rows.map(c=>({...c,activeStudentCount:c._count.enrollments})))) : getCoursesForProfile(profile),
@@ -41,7 +43,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
             : null,
         session?.user?.id
             ? prisma.enrollment.findMany({
-                where: { userId: parseInt(session.user.id), ...(customDomain ? {courseId:{in:modules?.courses===false ? [] : selected.length ? selected : undefined},course:{status:true,...(selected.length ? {} : {teacherId:{in:teachers}})}} : {}) },
+                where: { userId: parseInt(session.user.id), ...(customDomain ? {courseId:{in:modules?.courses===false ? [] : undefined},course:courseWhere} : {}) },
                 select: {
                     id: true,
                     courseId: true,
@@ -54,7 +56,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
                 }
             })
             : [],
-        customDomain ? prisma.post.findMany({where:{published:true,authorId:{in:teachers},...(profile.communityCategoryId ? {categoryId:profile.communityCategoryId} : {})},take:Math.min(60,profile.communityLimit || 10),orderBy:[{pin:'desc'},{createdAt:'desc'}],include:{author:{select:{name:true,image:true}},_count:{select:{comments:true}}}}) : getPostsForProfile(profile)
+        customDomain ? (!config.modules.community ? [] : prisma.post.findMany({where:{published:true,authorId:{in:teachers},...(profile.communityCategoryId ? {categoryId:profile.communityCategoryId} : {})},take:Math.min(60,profile.communityLimit || 10),orderBy:[{pin:'desc'},{createdAt:'desc'}],include:{author:{select:{name:true,image:true}},_count:{select:{comments:true}}}})) : getPostsForProfile(profile)
     ])
 
     const myCourseIds = new Set<number>()

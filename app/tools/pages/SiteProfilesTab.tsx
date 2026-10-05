@@ -69,6 +69,7 @@ export default function SiteProfilesTab() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-5 py-3 text-left text-[10px] font-black uppercase text-gray-400">Slug</th>
+                  <th className="px-5 py-3 text-left text-[10px] font-black uppercase text-gray-400">Domain</th>
                   <th className="px-5 py-3 text-left text-[10px] font-black uppercase text-gray-400">Tiêu đề</th>
                   <th className="px-5 py-3 text-left text-[10px] font-black uppercase text-gray-400">Teacher</th>
                   <th className="px-5 py-3 text-center text-[10px] font-black uppercase text-gray-400">Lượt xem</th>
@@ -84,6 +85,17 @@ export default function SiteProfilesTab() {
                         {profile.isDefault && <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-500 rounded text-[10px] font-bold">MFC</span>}
                         <Link href={`/page/${profile.slug}`} className="text-orange-500 hover:underline font-mono text-sm" target="_blank">/page/{profile.slug}</Link>
                       </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      {profile.domains?.length ? (
+                        <div className="space-y-0.5">
+                          {profile.domains.slice(0, 2).map((domain: any) => (
+                            <div key={domain.id} className="font-mono text-xs text-gray-700">
+                              {domain.isPrimary ? '★ ' : ''}{domain.hostname}
+                            </div>
+                          ))}
+                        </div>
+                      ) : <span className="text-gray-300">Chưa gán</span>}
                     </td>
                     <td className="px-5 py-3"><span className="font-medium text-gray-800">{profile.title || '-'}</span></td>
                     <td className="px-5 py-3">
