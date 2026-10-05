@@ -1,4 +1,5 @@
 'use server'
+import { requireDomainLesson } from '@/lib/website/domain-context'
 
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
@@ -48,6 +49,7 @@ function mapComment(comment: any) {
  * `loadedTopLevel` để client tính số còn lại.
  */
 export async function getCommentsByLesson(lessonId: string, options?: { limit?: number; offset?: number }) {
+    await requireDomainLesson(lessonId)
     const limit = options?.limit ?? 20
     const offset = options?.offset ?? 0
 
@@ -78,6 +80,7 @@ export async function getCommentsByLesson(lessonId: string, options?: { limit?: 
 }
 
 export async function hasUserCommentedOnLesson(lessonId: string) {
+    await requireDomainLesson(lessonId)
     const __t0 = Date.now() // [PERF-TEST] tạm đo, sẽ xoá sau khi có số liệu
     console.log(`[PERF-TEST] COMMENT_CHECK_START t=${__t0}`)
     const session = await auth()
@@ -94,6 +97,7 @@ export async function hasUserCommentedOnLesson(lessonId: string) {
 }
 
 export async function createComment(lessonId: string, content: string, parentId?: number | null, imageUrl?: string | null) {
+    await requireDomainLesson(lessonId)
     const session = await auth()
     if (!session?.user?.id) {
         return { success: false, message: "Vui lòng đăng nhập để bình luận" }
@@ -172,6 +176,8 @@ export async function createComment(lessonId: string, content: string, parentId?
 }
 
 export async function updateComment(commentId: number, content: string, imageUrl?: string | null) {
+    const domainComment=await prisma.lessonComment.findUnique({where:{id:commentId},select:{lessonId:true}})
+    if(domainComment) await requireDomainLesson(domainComment.lessonId)
     const session = await auth()
     if (!session?.user?.id) {
         return { success: false, message: "Vui lòng đăng nhập" }

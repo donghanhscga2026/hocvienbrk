@@ -49,6 +49,7 @@ function load(relative) {
     if(name === '@/auth') return { auth: async () => sessionId == null ? null : { user: { id: String(sessionId) } } }
     if(name === '@/lib/prisma') return { __esModule: true, default: fake }
     if(name === '@/lib/crm/service') return { CrmError }
+    if(name === '@/lib/website/domains') return { activeDomain:async()=>null }
     if(name === '@/app/actions/site-profile-actions') return { getCoursesForProfile: async () => [{ id: 7,id_khoa: 'COURSE-7',name_lop: 'Course',name_khoa: null,link_anh_bia: null,mo_ta_ngan: null,teacherBankAccount: { accountNumber: 'private' } }],getPostsForProfile: async () => [{ id: 'post',title:'Post',content:'<p>Public text</p>' }] }
     if(name.startsWith('@/')) return load(name.slice(2))
     if(name.startsWith('.')) return load(path.relative(root,path.resolve(path.dirname(file),name)))
@@ -60,7 +61,7 @@ const document = load('lib/website/document')
 const api = load('app/api/websites/route')
 const lead = load('app/api/websites/lead/route')
 const server = load('lib/website/server')
-function request(body, origin = 'https://test.invalid') { return new Request('https://test.invalid/api/websites',{ method: 'POST',headers: { origin,host:'test.invalid','Content-Type':'application/json' },body:JSON.stringify(body) }) }
+function request(body, origin = 'https://giautoandien.io.vn') { return new Request('https://giautoandien.io.vn/api/websites',{ method: 'POST',headers: { origin,host:'giautoandien.io.vn','Content-Type':'application/json' },body:JSON.stringify(body) }) }
 async function post(body) { const response = await api.POST(request(body)); return { status: response.status, body: await response.json() } }
 async function uiChecks() {
   const React = require('react')

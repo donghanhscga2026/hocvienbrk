@@ -14,6 +14,7 @@ import { auth } from "@/auth"
 import { normalizePhone, getAllPhoneVariants } from "@/lib/phone-utils"
 import { toTitleCase } from "@/lib/utils/text-format"
 import { validatePasswordStrength } from "@/lib/password-policy"
+import { domainContext } from '@/lib/website/domain-context'
 
 const registerSchema = z.object({
     name: z.string().min(2, "Họ tên phải có ít nhất 2 ký tự"),
@@ -28,6 +29,7 @@ const registerSchema = z.object({
 })
 
 export async function registerUser(prevState: any, formData: FormData) {
+    const websiteDomain=await domainContext()
     const data = Object.fromEntries(formData.entries())
 
     const validatedFields = registerSchema.safeParse(data)
@@ -107,6 +109,7 @@ export async function registerUser(prevState: any, formData: FormData) {
             refId = isNaN(parsedRef) ? 0 : parsedRef;
         }
 
+        if(websiteDomain && !websiteDomain.affiliate) { refId=0;rawRefCode='' }
         // Tao user
         const user = await prisma.user.create({
             data: {

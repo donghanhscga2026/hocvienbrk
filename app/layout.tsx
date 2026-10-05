@@ -11,6 +11,11 @@ import AffiliateTracker from "@/components/AffiliateTracker";
 import AccountAssistantTrigger from "@/components/auth/AccountAssistantTrigger";
 import { getSession } from "@/lib/get-session";
 import { getAttentionHighlightSettings } from "@/app/actions/attention-highlight-actions";
+import { headers } from 'next/headers'
+import { domainContext } from '@/lib/website/domain-context'
+import { publishedWebsite } from '@/lib/website/server'
+import DomainShell from '@/components/website/DomainShell'
+import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -23,7 +28,7 @@ const beVietnamPro = Be_Vietnam_Pro({
   variable: "--font-be-vietnam-pro",
 });
 
-export const metadata: Metadata = {
+const platformMetadata: Metadata = {
   title: {
     default: "MFC - Dòng chảy Phước Báu",
     template: "%s | MFC - Dòng chảy Phước Báu",
@@ -57,6 +62,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#047857" };
+export async function generateMetadata():Promise<Metadata> {
+  const domain=await domainContext()
+  if(!domain) return platformMetadata
+  const doc=await publishedWebsite(domain.profileId)
+  const name=doc?.name || domain.profile.title || domain.hostname
+  return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'},twitter:{card:'summary',title:name,description:doc?.description || ''}}
+}
 
 // [OPTIMIZE] Theme gần như không đổi (chỉ khi admin chỉnh trong /tools/settings/theme)
 // nhưng RootLayout bọc MỌI trang — cache 1 giờ, làm mới ngay lập tức khi admin lưu
@@ -82,6 +94,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const domain=await domainContext()
+  if(domain) {
+    const [doc,session]=await Promise.all([publishedWebsite(domain.profileId),getSession()])
+    const path=(await headers()).get('x-website-path') || '/'
+    const functional=path==='/tai-khoan' || path==='/khoa-hoc' || /^\/(?:login|register|forgot-password|courses|khoa-hoc|tools)(?:\/|$)/.test(path)
+    const brand={name:doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
+    return <html lang="vi"><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} showNavigation={functional}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+  }
   const siteThemeId = await getSiteTheme()
   const session = await getSession()
   const attentionHighlight = await getAttentionHighlightSettings()

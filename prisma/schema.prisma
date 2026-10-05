@@ -1425,6 +1425,7 @@ model Tool {
 }
 
 model SiteProfile {
+  domains              SiteDomain[]
   website              SiteWebsite?
   id                   Int                 @id @default(autoincrement())
   userId               Int?                @unique
@@ -1485,6 +1486,23 @@ model SiteWebsite {
   history Json @default("[]")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model SiteDomain {
+  hostname String @id
+  profileId Int
+  profile SiteProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  token String @unique
+  enabled Boolean @default(false)
+  courses Boolean @default(false)
+  crm Boolean @default(false)
+  affiliate Boolean @default(false)
+  verifiedAt DateTime?
+  checkedAt DateTime?
+  message String @default("Chờ cấu hình DNS và Vercel")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([profileId])
 }
 
 model SiteProfileMember {

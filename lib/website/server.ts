@@ -20,8 +20,14 @@ export async function publishedWebsite(profileId: number) {
   try { const row = await prisma.siteWebsite.findUnique({ where: { profileId }, select: { published: true } }); return row?.published ? parseDocument(row.published) : null }
   catch(error) { if(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return null; throw error }
 }
-export async function websiteData(profile: Parameters<typeof getCoursesForProfile>[0]) {
-  const [courses, posts] = await Promise.all([getCoursesForProfile(profile), getPostsForProfile(profile)])
+export async function websiteData(profile: Parameters<typeof getCoursesForProfile>[0], options: {strict?:boolean;courses?:boolean} = {}) {
+  const selected=Array.isArray(profile.courseIds) ? profile.courseIds.filter((v:unknown):v is number=>typeof v==='number') : []
+  const teachers=[profile.userId,...(profile.members || []).map((m:{userId:number})=>m.userId)].filter((v):v is number=>typeof v==='number')
+  // Domain riêng không hiển thị khóa/bài toàn hệ thống khi DB lỗi.
+  const [courses, posts] = await Promise.all([
+    options.courses===false ? [] : options.strict ? prisma.course.findMany({where:{status:true,...(selected.length ? {id:{in:selected}} : {teacherId:{in:teachers}})},orderBy:[{pin:'asc'},{id:'asc'}],select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,link_anh_bia:true,mo_ta_ngan:true}}) : getCoursesForProfile(profile),
+    options.strict ? prisma.post.findMany({where:{published:true,authorId:{in:teachers},...(profile.communityCategoryId ? {categoryId:profile.communityCategoryId} : {})},take:Math.min(60,profile.communityLimit || 10),orderBy:[{pin:'desc'},{createdAt:'desc'}],select:{id:true,title:true,content:true}}) : getPostsForProfile(profile)
+  ])
   const testimonials = await prisma.courseTestimonial.findMany({ where: { courseId: { in: courses.map((c: { id: number }) => c.id) }, isActive: true }, take: 60, orderBy: { createdAt: 'desc' }, select: { id: true, courseId: true, name: true, role: true, content: true, rating: true } })
   return {
     courses: courses.map((c: { id: number; id_khoa: string; name_khoa: string | null; name_lop: string; link_anh_bia: string | null; mo_ta_ngan: string | null }) => ({ id: c.id, title: c.name_khoa || c.name_lop, image: c.link_anh_bia || '', description: c.mo_ta_ngan || '', href: '/khoa-hoc/' + encodeURIComponent(c.id_khoa) })),

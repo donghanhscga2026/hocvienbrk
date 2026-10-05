@@ -9,11 +9,15 @@ import { intakeInput } from '@/lib/crm/intake'
 import { contactFields } from '@/lib/crm/validation'
 import { parseDocument, walkNodes } from '@/lib/website/document'
 import { canUseCrm } from '@/lib/crm/shared'
+import { activeDomain } from '@/lib/website/domains'
+import { requestHostname, isPlatformHost } from '@/lib/website/domain-shared'
 
 const schema = intakeInput.extend({ page: z.string().max(80), node: z.string().max(80) })
 export async function POST(request: Request) {
   try {
     const input = schema.parse(await crmBody(request, 14000))
+    const hostname=requestHostname(request.headers.get('host') || '')
+    if(!isPlatformHost(hostname)) { const domain=await activeDomain(hostname); if(!domain?.crm || domain.profile.slug!==input.slug) throw new CrmError('Form không thuộc website này.',403) }
     if(input.website) return crmResponse({ received: true })
     const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
     if(!secret) throw new CrmError('Form chưa được cấu hình.',503)

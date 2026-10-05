@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageCircle, X } from 'lucide-react'
 import CrmRequestForm from './CrmRequestForm'
+import { useDomainBrand } from '@/components/website/DomainShell'
 
 export default function CrmRequestButton({ courseId, courseTitle, lessonId, lessonTitle, signedIn, learning = false, compact = false }: {
   courseId: number; courseTitle: string; lessonId?: string; lessonTitle?: string; signedIn: boolean; learning?: boolean; compact?: boolean;
 }) {
   const [open, setOpen] = useState(false)
+  const brand=useDomainBrand()
   const dialog = useRef<HTMLDialogElement>(null)
   const title = learning ? 'Hỏi giáo viên / Hỗ trợ' : 'Hỏi về khóa học này'
   useEffect(() => {
@@ -15,6 +17,7 @@ export default function CrmRequestButton({ courseId, courseTitle, lessonId, less
     if (open && !node?.open) node?.showModal()
     if (!open && node?.open) node.close()
   }, [open])
+  if(brand && !brand.crm) return null
   return <>
     <button type="button" aria-haspopup="dialog" aria-label={title} title={title} onClick={() => setOpen(true)} className={'inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ' + (learning ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'border border-emerald-500 bg-white text-emerald-800 hover:bg-emerald-50')}>
       <MessageCircle size={16} aria-hidden="true" />{learning ? <span className={compact ? 'hidden sm:inline' : ''}>Hỏi giáo viên<span className="hidden sm:inline"> / Hỗ trợ</span></span> : <span className={compact ? 'hidden sm:inline' : ''}>{title}</span>}

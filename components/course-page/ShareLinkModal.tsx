@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { Link2, Copy, Check, Share2, X } from 'lucide-react'
+import { useDomainBrand } from '@/components/website/DomainShell'
 
 interface ShareLinkModalProps {
   course: any
@@ -12,9 +13,10 @@ interface ShareLinkModalProps {
 
 export default function ShareLinkModal({ course, userId, isEnrolled, onClose }: ShareLinkModalProps) {
   const [copied, setCopied] = useState(false)
+  const brand=useDomainBrand()
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-  const shareLink = `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}${userId ? `?ref=${userId}` : ''}`
+  const shareLink = `${baseUrl}/khoa-hoc/${encodeURIComponent(course.id_khoa)}${userId && brand?.affiliate!==false ? `?ref=${userId}` : ''}`
   const commission = isEnrolled ? '100%' : '50%'
 
   const handleCopy = async () => {
@@ -52,6 +54,7 @@ export default function ShareLinkModal({ course, userId, isEnrolled, onClose }: 
     if (e.target === e.currentTarget) onClose()
   }
 
+  if(brand && !brand.affiliate) return null
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4"

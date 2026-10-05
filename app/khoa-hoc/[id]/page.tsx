@@ -8,6 +8,7 @@ import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
 import { createWiGrowCoursePage, WIGROW_COURSE_SLUG } from '@/lib/course-page/templates/wigrow'
+import { requireDomainCourse } from '@/lib/website/domain-context'
 
 const DEFAULT_OG_TITLE = 'MFC - Dòng chảy Phước Báu'
 const DEFAULT_OG_DESCRIPTION = 'Môi trường chia sẻ cùng nhau học tập nâng cao nhận thức và năng lực tạo lập giá trị từ gốc, tích tạo phước báu thuận theo nhân quả'
@@ -30,6 +31,7 @@ const getCourseByIdKhoa = cache((idKhoa: string) =>
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     let { id } = await params
     id = id.replace(/\$+$/, '')
+    await requireDomainCourse(id)
 
     const course = await getCourseByIdKhoa(id)
 
@@ -81,6 +83,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     let { id } = await params
     const session = await getSession()
+
+    await requireDomainCourse(id.replace(/\$+$/, ''))
 
     id = id.replace(/\$+$/, '')
 

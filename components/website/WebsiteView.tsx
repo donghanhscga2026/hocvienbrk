@@ -2,6 +2,7 @@
 
 import { CSSProperties, FormEvent, useState, useSyncExternalStore } from 'react'
 import { NodeStyle, WebsiteDocument, WebsiteNode } from '@/lib/website/document'
+import { websiteHref, DomainModules } from '@/lib/website/domain-shared'
 
 export interface WebsiteData {
   courses: { id: number; title: string; image: string; description: string; href: string }[]
@@ -30,12 +31,13 @@ function LeadForm({ node, slug, page, preview }: { node: WebsiteNode; slug: stri
   return <form onSubmit={submit} className="grid gap-3 p-6 border rounded-2xl bg-white text-gray-900"><h2 className="text-2xl font-bold">{node.text}</h2><label>Họ tên<input className="w-full border rounded-lg p-3" name="name" required maxLength={150} autoComplete="name" /></label><label>Email<input className="w-full border rounded-lg p-3" name="email" type="email" maxLength={254} autoComplete="email" /></label><label>Điện thoại<input className="w-full border rounded-lg p-3" name="phone" type="tel" maxLength={40} autoComplete="tel" /></label><label>Nội dung<textarea className="w-full border rounded-lg p-3" name="message" maxLength={4000} /></label><input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" defaultValue="" /><label className="text-sm"><input type="checkbox" name="consent" required /> Tôi đồng ý để đơn vị này nhận thông tin và liên hệ tư vấn.</label><button disabled={busy} className="rounded-lg bg-violet-600 text-white p-3">{busy ? 'Đang gửi…' : 'Gửi đăng ký'}</button><p aria-live="polite">{status}</p></form>
 }
 function subscribeLocation(callback: () => void) { window.addEventListener('popstate',callback); return () => window.removeEventListener('popstate',callback) }
-export default function WebsiteView({ document: doc, data, slug, pageSlug = '', preview = false, mobile = false, selected, onSelect }: { document: WebsiteDocument; data: WebsiteData; slug: string; pageSlug?: string; preview?: boolean; mobile?: boolean; selected?: string; onSelect?: (id: string) => void }) {
+export default function WebsiteView({ document: doc, data, slug, pageSlug = '', preview = false, mobile = false, selected, onSelect, customDomain = false, modules }: { document: WebsiteDocument; data: WebsiteData; slug: string; pageSlug?: string; preview?: boolean; mobile?: boolean; selected?: string; onSelect?: (id: string) => void; customDomain?: boolean; modules?: DomainModules }) {
   const referral = useSyncExternalStore(subscribeLocation, () => new URLSearchParams(window.location.search).get('ref') || '', () => '')
   const page = doc.pages.find(p => p.slug === pageSlug) || doc.pages[0]
-  function href(url: string) { if(!url || !referral || !url.startsWith('/')) return url || '#'; const parsed = new URL(url,'https://website.local'); if(!parsed.searchParams.has('ref')) parsed.searchParams.set('ref',referral); return parsed.pathname + parsed.search + parsed.hash }
+  function href(url: string) { return websiteHref(url,slug,modules?.affiliate === false ? '' : referral,customDomain) }
   const card = 'p-5 rounded-xl border bg-white text-gray-900 grid gap-3'
   function render(n: WebsiteNode) {
+    if(modules && ((['courses','testimonials'].includes(n.kind) && !modules.courses) || (n.kind === 'form' && !modules.crm) || (n.kind === 'affiliate' && !modules.affiliate))) return null
     const courses = n.courseIds.length ? data.courses.filter(c => n.courseIds.includes(c.id)) : data.courses
     const style = cssStyle({ ...(n.kind === 'heading' ? { fontSize: 30 } : n.kind === 'html' ? { minHeight: 400 } : {}), ...n.style, ...(mobile ? { ...(n.kind === 'container' ? { columns: 1 } : {}), ...n.mobile } : {}) },n.kind)
     let body

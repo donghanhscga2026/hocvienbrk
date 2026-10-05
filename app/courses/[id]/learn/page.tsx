@@ -2,6 +2,7 @@ import { getSession } from "@/lib/get-session"
 import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
+import { requireDomainCourse } from '@/lib/website/domain-context'
 
 type PlaylistItem = {
   type: 'video' | 'doc'
@@ -38,6 +39,7 @@ export default async function CourseLearnPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  await requireDomainCourse(id)
   const session = await getSession()
   if (!session?.user?.id) redirect("/login")
 

@@ -44,6 +44,11 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
+      - name: Website and custom domain isolation tests
+        run: |
+          npm run test:website-builder
+          npm run test:custom-domains
+
       - name: TypeScript check
         run: npx tsc --noEmit
 

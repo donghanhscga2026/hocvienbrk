@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { Role } from '@prisma/client'
+import { domainContext } from '@/lib/website/domain-context'
 
 export type CourseAuthContext = {
     userId: number
@@ -10,6 +11,7 @@ export type CourseAuthContext = {
 
 /** Lấy thông tin phân quyền của session hiện tại. Trả về null nếu chưa đăng nhập. */
 export async function getCourseAuthContext(): Promise<CourseAuthContext | null> {
+    if(await domainContext()) return null // Quản lý khóa học chỉ trên hệ thống chính.
     const session = await auth()
     if (!session?.user?.id) return null
     return {
