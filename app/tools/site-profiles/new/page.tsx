@@ -166,7 +166,6 @@ export default function NewSiteProfilePage() {
               Slug (URL) <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 shrink-0">giautoandien.io.vn/</span>
               <input
                 type="text"
                 value={slug}
@@ -177,7 +176,7 @@ export default function NewSiteProfilePage() {
               />
             </div>
             <p className="text-gray-400 text-xs mt-2">
-              URL: giautoandien.io.vn/{slug || 'ten-slug'}
+              Slug nội bộ: /page/{slug || 'ten-slug'}. Domain riêng được gán ở bước cấu hình website sau khi tạo.
             </p>
           </div>
 
