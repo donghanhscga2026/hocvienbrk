@@ -5,6 +5,7 @@ import type { NextRequest, NextFetchEvent, NextMiddleware } from "next/server"
 import { activeDomain } from '@/lib/website/domains'
 import { domainRoute, requestHostname, isPlatformHost } from '@/lib/website/domain-shared'
 import prisma from '@/lib/prisma'
+import { applicationKeys, type ApplicationKey } from '@/lib/website/applications'
 
 const { auth } = NextAuth(authConfig)
 
@@ -88,6 +89,11 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
     const domain=await activeDomain(hostname)
     if(!domain) return new NextResponse('Tên miền chưa được xác minh hoặc đang tạm dừng.',{status:503,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
+    if(path.startsWith('/ung-dung/')) {
+        const key=path.slice('/ung-dung/'.length)
+        if(!(applicationKeys as readonly string[]).includes(key)) return new NextResponse('Not found',{status:404})
+        if(!domain.applications[key as ApplicationKey]) return NextResponse.json({error:'Ứng dụng đã ngắt kết nối hoặc chưa được cấp.'},{status:403,headers:{'Cache-Control':'no-store'}})
+    }
     const route=domainRoute(path,domain)
     if(route==='deny') return NextResponse.json({error:'Trang hoặc chức năng chưa được cấp cho website này.'},{status:403,headers:{'Cache-Control':'no-store'}})
     const coursePath=path.match(/^\/(?:khoa-hoc|courses)\/([^/]+)/)

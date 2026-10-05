@@ -1,3 +1,7 @@
+import { CrmError } from '@/lib/crm/service'
+import { connectedApplication, websiteApplicationUser } from '@/lib/website/application-context'
+import { PLATFORM_ORIGIN } from '@/lib/website/domain-shared'
+import WebsiteApplications from '@/components/website/WebsiteApplications'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
@@ -21,21 +25,22 @@ async function context(props:Props) {
 export async function generateMetadata(props:Props):Promise<Metadata> {
   const {domain,document,path}=await context(props)
   const page=document.pages.find(p=>p.slug===path.join('/'))
-  const title=path.length ? (page?.title || (path[0]==='tai-khoan' ? 'Tài khoản' : path[0]==='cong-cu' ? 'Công cụ' : 'Khóa học'))+' | '+document.name : document.name
+  const title=path.length ? (page?.title || (path[0]==='tai-khoan' ? 'Tài khoản' : path[0]==='cong-cu' ? 'Không gian của tôi' : path[0]==='ung-dung' ? 'Kết nối ứng dụng' : 'Khóa học'))+' | '+document.name : document.name
   return {title:{absolute:title},description:document.description,alternates:{canonical:'https://'+domain.hostname+'/'+path.map(encodeURIComponent).join('/')},openGraph:{title,description:document.description,url:'https://'+domain.hostname+'/'+path.join('/'),siteName:document.name}}
 }
 export default async function DomainPage(props:Props) {
   const {domain,document,path}=await context(props)
-  if(path.join('/')==='cong-cu') {
-    const session=await getSession()
-    const owner=!!session?.user && Number(session.user.id)===domain.profile.userId
-    const items=[
-      ...(domain.courses ? [{href:'/khoa-hoc',title:'Khóa học',description:'Khám phá các khóa học của website.'}] : []),
-      ...(domain.affiliate ? [{href:'/tools/affiliate',title:'Affiliate',description:'Liên kết giới thiệu và hoa hồng của bạn.'}] : []),
-      ...(domain.crm && owner ? [{href:'/tools/crm',title:'CRM',description:'Quản lý và chăm sóc khách hàng của bạn.'}] : [])
-    ]
-    return <section className="max-w-5xl mx-auto p-4 sm:p-6"><h1 className="text-3xl font-bold">Công cụ & tiện ích</h1><p className="text-slate-600 mt-3 mb-8">Các chức năng đang mở tại {document.name}.</p><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map(item=><a key={item.href} href={item.href} className="border rounded-2xl p-6 bg-white hover:border-violet-400"><h2 className="font-bold text-xl mb-3">{item.title}</h2><p className="text-slate-600 text-sm">{item.description}</p><span className="inline-block mt-5 font-semibold">Mở công cụ →</span></a>)}</div>{!items.length && <p className="border rounded-2xl p-6">Chưa có công cụ được bật cho tài khoản của bạn.</p>}</section>
+  if(path[0]==='ung-dung' && path.length===2) {
+    try {
+      const connection=await connectedApplication(path[1])
+      return <section className="max-w-2xl mx-auto p-4 sm:p-6"><a href="/cong-cu" className="text-violet-700 underline">← Không gian của tôi</a><h1 className="text-3xl font-bold mt-6">{connection.app.name}</h1><p className="mt-4 text-slate-600">{connection.app.scope}</p><p className="mt-4 text-sm text-slate-600">Ứng dụng mở trên Giautoandien trong tab mới. Phiên đăng nhập độc lập: hãy đăng nhập đúng tài khoản của bạn tại đó. Quyền trên hệ thống chính có thể bao gồm dữ liệu ngoài website này.</p><a href={PLATFORM_ORIGIN+connection.app.path} target="_blank" rel="noreferrer" className="inline-block mt-6 rounded-xl bg-violet-700 text-white px-5 py-3">Mở trên hệ thống chính ↗</a></section>
+    } catch(e) {
+      if(!(e instanceof CrmError)) throw e
+      if(e.status===404) notFound()
+      return <section className="max-w-2xl mx-auto p-6"><h1 className="text-2xl font-bold">Kết nối ứng dụng</h1><p className="mt-4" role="alert">{e.message}</p>{e.status===401 ? <a className="inline-block mt-4 underline" href={'/login?callbackUrl='+encodeURIComponent('/ung-dung/'+path[1])}>Đăng nhập</a> : <a className="inline-block mt-4 underline" href="/cong-cu">Về Không gian của tôi</a>}</section>
+    }
   }
+  if(path.join('/')==='cong-cu') return <WebsiteApplications domain={domain} user={await websiteApplicationUser()} name={document.name} />
   if(path.join('/')==='tai-khoan') {
     const session=await getSession()
     if(!session?.user?.id) return <section className="max-w-3xl mx-auto p-6"><h1 className="text-2xl font-bold">Tài khoản của bạn</h1><a className="inline-block py-4 underline" href="/login?callbackUrl=%2Ftai-khoan">Đăng nhập để xem khóa học</a></section>

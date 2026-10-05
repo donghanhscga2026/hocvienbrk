@@ -127,7 +127,12 @@ async function run(){
   await rejects(()=>context.requireDomainCourse('OTHER'),'Cannot read another website course');await rejects(()=>context.requireDomainCourse('CLOSED'),'Inactive course rejected')
   profiles[0].courseIds=[2];await context.requireDomainCourse('OTHER');checks++;await rejects(()=>context.requireDomainCourse('OWN'),'Explicit selection narrows catalog');profiles[0].courseIds=[]
   await context.requireDomainEnrollment(1,1,'own-lesson');checks++;await rejects(()=>context.requireDomainEnrollment(2,1),'Do not modify another student result');await rejects(()=>context.requireDomainEnrollment(1,1,'other-lesson'),'Lesson must belong to enrollment course')
-  const actor=load('lib/crm/auth');ok((await actor.getCrmActor()).role==='TEACHER','Website admin cannot use global CRM admin scope');sessionId=2;await rejects(()=>actor.getCrmActor(),'Another user cannot view owner CRM');sessionId=1
+  const actor=load('lib/crm/auth');ok((await actor.getCrmActor()).role==='TEACHER','Website admin cannot use global CRM admin scope');sessionId=2;await rejects(()=>actor.getCrmActor(),'Another user cannot view owner CRM');sessionId=3;role='TEACHER';const teacherActor=await actor.getCrmActor()
+  ok(teacherActor.id===3 && teacherActor.role==='TEACHER','Linked teacher uses own CRM identity, not owner identity')
+  const crmShared=load('lib/crm/shared')
+  ok(!crmShared.canAccessContact(teacherActor,1),'Linked teacher cannot access owner CRM contacts')
+  role='STUDENT';await rejects(()=>actor.getCrmActor(),'Linked student cannot gain CRM access from membership')
+  sessionId=1;role='ADMIN'
   const affiliate=load('app/actions/affiliate-actions');ok(!(await affiliate.getAffiliateWallet(2)).success,'Cannot read another user affiliate wallet through a server action')
   const challenge=load('app/.well-known/giautoandien-domain/[token]/route');ok((await challenge.GET(new Request('https://brk.io.vn/proof',{headers:{host:'brk.io.vn'}}),{params:Promise.resolve({token:records[0].token})})).status===200,'Matching host proves token')
   ok((await challenge.GET(new Request('https://other.io.vn/proof',{headers:{host:'other.io.vn'}}),{params:Promise.resolve({token:records[0].token})})).status===404,'Token cannot prove another host')
@@ -163,7 +168,8 @@ async function run(){
   ok((await accessPost({action:'basic',modules:on})).status===403,'Owner cannot change basic package')
   ok((await accessPost({action:'save',revision:0,enabled:on,extra:on})).status===403,'Owner cannot inject grants')
   profiles[0].user.role='ADMIN'
-  ok((await accessPost({action:'basic',modules:{...off,courses:true}})).status===200,'Admin saves basic template')
+  const savedBasic=await accessPost({action:'basic',modules:{...off,courses:true}})
+  ok(savedBasic.status===200,'Admin saves basic template: '+await savedBasic.text())
   ok(records[0].crm,'Saving template does not mutate live websites')
   ok((await accessPost({action:'save',revision:0,enabled:on,extra:off,applyBasic:true})).status===200,'Admin applies base snapshot to website')
   ok(records[0].courses && !records[0].crm && !records[0].affiliate,'Effective permissions intersect grants and enabled flags')
@@ -175,6 +181,44 @@ async function run(){
   ok((await accessPost({action:'save',revision:1,enabled:off})).status===200,'Owner can disable granted modules')
   profiles[0].user.role='ADMIN'
   await accessPost({action:'save',revision:2,enabled:on,extra:on})
+  const apps=load('lib/website/applications'),appContext=load('lib/website/application-context')
+  ok(Object.values(apps.noApplications).every(v=>v===false),'New application flags default closed for old website settings')
+  const oldAccess=load('lib/website/access').accessSchema.parse({version:1,revision:0,base:on,extra:off,enabled:on})
+  ok(Object.values(oldAccess.applications.base).every(v=>!v),'Parsing old configuration cannot grant new applications')
+  ok(!apps.canUseApplication('teaching',profiles[0],{id:3,role:'STUDENT'}),'Learner cannot open teaching application')
+  ok(!apps.canUseApplication('teaching',profiles[0],{id:2,role:'TEACHER'}),'Unlinked teacher cannot open management application')
+  ok(!apps.canUseApplication('students',profiles[0],{id:2,role:'ADMIN'}),'Foreign platform administrator cannot enter website management apps')
+  ok(apps.canUseApplication('teaching',profiles[0],{id:3,role:'TEACHER'}),'Linked teacher can open own teaching application')
+  ok(apps.canUseApplication('brk',profiles[0],{id:2,role:'STUDENT'}),'Learner can use connected personal wallet')
+  ok(!apps.canUseApplication('brk',profiles[0],null),'Guest cannot enter private wallet')
+  await rejects(()=>appContext.connectedApplication('brk'),'Direct application URL blocked before connection')
+  await rejects(()=>appContext.connectedApplication('backup'),'Unknown application slug cannot launch platform admin')
+  ok(shared.domainRoute('/tools/courses',{...on,teaching:true})==='deny','Connector does not expose unscoped native management pages')
+  ok((await proxy(routeRequest('/ung-dung/brk'),{})).status===403,'Disconnected application rejected before page renders')
+  profiles[0].user.role='TEACHER'
+  ok((await accessPost({action:'save',revision:3,enabled:on,applications:apps.allApplications})).status===403,'Owner cannot connect ungranted application')
+  ok((await accessPost({action:'save',revision:3,enabled:on,applicationExtra:apps.allApplications})).status===403,'Owner cannot forge application grants')
+  profiles[0].user.role='ADMIN'
+  ok((await accessPost({action:'basic',modules:on,applications:apps.allApplications})).status===200,'Full basic package stores supported application grants')
+  ok((await accessPost({action:'save',revision:3,enabled:on,applications:apps.allApplications,applyBasic:true})).status===200,'Apply package and connect available apps')
+  const launch=await appContext.connectedApplication('teaching')
+  ok((await proxy(routeRequest('/ung-dung/brk'),{})).headers.get('x-middleware-rewrite').endsWith('/site-domain/brk.io.vn/ung-dung/brk'),'Connected application entry stays on expert domain')
+  ok(launch.app.path==='/tools/courses' && !launch.app.path.includes('http'),'Launch destination is fixed registry path')
+  sessionId=3;role='TEACHER';await appContext.connectedApplication('teaching');checks++
+  sessionId=2;await rejects(()=>appContext.connectedApplication('teaching'),'Direct URL checks live staff membership')
+  role='STUDENT';await appContext.connectedApplication('brk');checks++
+  sessionId=null;await rejects(()=>appContext.connectedApplication('brk'),'Direct URL requires authenticated identity')
+  sessionId=1;role='ADMIN'
+  const disconnected={...apps.allApplications,brk:false}
+  ok((await accessPost({action:'save',revision:4,enabled:on,applications:disconnected})).status===200,'Disconnect app without deleting account data')
+  await rejects(()=>appContext.connectedApplication('brk'),'Disconnected app cannot be launched by stale URL')
+  ok((await appContext.connectedApplication('teaching')).key==='teaching','Disconnecting one app preserves other connections')
+  ok(records[0].enabled,'Disconnecting apps does not disable custom domain')
+  const AppView=load('components/website/WebsiteApplications').default
+  const studentHub=renderToStaticMarkup(React.createElement(AppView,{domain:{...on,applications:apps.allApplications,profile:profiles[0]},user:{id:3,role:'STUDENT'},name:'Brand'}))
+  ok(studentHub.includes('/ung-dung/brk') && !studentHub.includes('/ung-dung/teaching') && !studentHub.includes('href="/tools/crm"'),'Learner hub contains personal apps without teaching or CRM')
+  const teacherHub=renderToStaticMarkup(React.createElement(AppView,{domain:{...on,applications:apps.allApplications,profile:profiles[0]},user:{id:3,role:'TEACHER'},name:'Brand'}))
+  ok(teacherHub.includes('/ung-dung/teaching') && teacherHub.includes('href="/tools/crm"'),'Linked teacher hub contains teaching and own CRM')
   await authChecks();await verificationChecks()
   host='giautoandien.io.vn';await post({action:'disable',hostname:'brk.io.vn'});host='brk.io.vn';await rejects(()=>context.domainContext(),'Disabled domain closes immediately')
   ok((await proxy(routeRequest('/login'),{})).status===503,'Disabled domain cannot still serve login')

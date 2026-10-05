@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { canUseCrm, CrmActor } from './shared'
 import { CrmError } from './service'
 import { requireDomainModule } from '@/lib/website/domain-context'
+import { isWebsiteStaff } from '@/lib/website/applications'
 
 export async function getCrmActor(): Promise<CrmActor> {
   const domain=await requireDomainModule('crm')
@@ -13,7 +14,7 @@ export async function getCrmActor(): Promise<CrmActor> {
   // Read current role from DB rather than relying on a stale JWT after role revocation.
   const user = await prisma.user.findUnique({ where: { id }, select: { id: true, name: true, role: true } })
   if (!user || !canUseCrm(user.role)) throw new CrmError('Bạn không có quyền sử dụng CRM.', 403)
-  if(domain && domain.profile.userId!==user.id) throw new CrmError('CRM riêng chỉ dành cho chủ website.',403)
+  if(domain && !isWebsiteStaff(domain.profile,user)) throw new CrmError('CRM chỉ dành cho chủ website và giáo viên được liên kết.',403)
   // ADMIN trên hệ thống không được xem toàn bộ CRM khi đang ở domain chuyên gia.
   return { id: user.id, name: user.name || 'Thành viên #' + user.id, role: domain ? 'TEACHER' : user.role }
 }

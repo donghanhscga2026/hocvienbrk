@@ -16,7 +16,7 @@ export default function DomainShell({brand,pages=[],path:initialPath='/',childre
   const pathname=usePathname()
   const path=pathname ? pathname.replace(/^\/site-domain\/[^/]+/, '') || '/' : initialPath
   const [open,setOpen]=useState(false)
-  const links=[{href:'/',title:'Trang chủ'},...pages.filter(p=>p.slug && !['khoa-hoc','cong-cu','tai-khoan'].includes(p.slug)).map(p=>({href:'/'+p.slug,title:p.title})),...(brand.courses ? [{href:'/khoa-hoc',title:'Khóa học'}] : []),{href:'/cong-cu',title:'Công cụ'}]
+  const links=[{href:'/',title:'Trang chủ'},...pages.filter(p=>p.slug && !['khoa-hoc','cong-cu','tai-khoan','ung-dung'].includes(p.slug)).map(p=>({href:'/'+p.slug,title:p.title})),...(brand.courses ? [{href:'/khoa-hoc',title:'Khóa học'}] : []),{href:'/cong-cu',title:session?.user ? 'Không gian của tôi' : 'Công cụ'}]
   const course=/^\/(khoa-hoc|courses)\//.test(path)
   const label=links.find(l=>l.href===path)?.title || ({'/login':'Đăng nhập','/register':'Đăng ký','/tai-khoan':'Tài khoản','/account-settings':'Thông tin tài khoản','/forgot-password':'Quên mật khẩu','/tools/crm':'CRM','/tools/affiliate':'Affiliate'} as Record<string,string>)[path] || (course ? (path.endsWith('/learn') ? 'Học tập' : 'Chi tiết khóa học') : 'Trang nội dung')
   return <Context.Provider value={brand}><div style={{background:brand.background,color:'#172033',minHeight:'100vh'}} className="flex flex-col">
