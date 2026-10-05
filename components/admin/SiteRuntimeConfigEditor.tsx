@@ -6,6 +6,7 @@ import { updateSiteProfileRuntime } from '@/app/actions/site-profile-actions'
 
 type ProfileLike = {
   id: number
+  userId?: number | null
   themeId?: string | null
   siteConfig?: unknown
   domains?: Array<{ hostname: string; isPrimary: boolean; isActive: boolean }>
@@ -52,7 +53,7 @@ export default function SiteRuntimeConfigEditor({ profile, onSaved }: Props) {
       additionalDomains: additional.map(item => item.hostname).join(', '),
       homepageType: String(homepage.type || 'community'),
       landingSlug: String(homepage.landingSlug || ''),
-      courseScopeMode: String(courseScope.mode || (profile.id === 1 ? 'all' : 'profile')),
+      courseScopeMode: String(courseScope.mode || (profile.userId != null && profile.userId !== 0 ? 'profile' : 'all')),
       teacherIds: listText(courseScope.teacherIds),
       courseIds: listText(courseScope.courseIds),
       categoryIds: listText(courseScope.categoryIds),
