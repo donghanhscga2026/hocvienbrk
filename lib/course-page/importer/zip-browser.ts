@@ -225,8 +225,12 @@ const BRIDGE = `
       try{target=document.getElementById(decodeURIComponent(href.slice(1)));}catch(err){target=document.getElementById(href.slice(1));}
       var hiddenTarget=target && (target.hidden || target.closest('[data-mfc-hidden="true"]'));
       var registrationHash=/dang[-_ ]?ky|register|registration|signup|sign[-_ ]?up|enroll/i.test(href);
+      e.preventDefault();e.stopImmediatePropagation();
       if(hiddenTarget || registrationHash){
-        e.preventDefault();e.stopImmediatePropagation();post({type:'action',actionType:'open_registration'});
+        post({type:'action',actionType:'open_registration'});
+      } else if(target) {
+        var top=target.getBoundingClientRect().top + window.scrollY;
+        post({type:'scroll',top:Math.max(0,top),anchor:href.slice(1)});
       }
       return;
     }
