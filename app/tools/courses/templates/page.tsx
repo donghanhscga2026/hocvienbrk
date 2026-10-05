@@ -26,6 +26,7 @@ import ZipSourceSection from '@/components/course-page/sections/ZipSourceSection
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
 import { WebsiteTemplateAnalysis } from '@/lib/course-page/importer/types'
 import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
+import { supabase } from '@/lib/supabase'
 import {
   createStoredCoursePageTemplate,
   deleteStoredCoursePageTemplate,
@@ -123,81 +124,147 @@ export default function CourseTemplateLibraryPage() {
     setAnalyzing(true)
     setMessage(null)
     try {
-      let response: Response
-      let clientWarnings: string[] = []
+      let result: WebsiteTemplateAnalysis
+
       if (sourceZip) {
-        if (typeof CompressionStream === 'undefined') {
-          throw new Error('Trình duyệt chưa hỗ trợ nén dữ liệu. Hãy dùng Chrome/Edge phiên bản mới.')
-        }
         const prepared = await prepareWebsiteZip(sourceZip)
-        clientWarnings = prepared.warnings
-        const compressedStream = new Blob([prepared.html], { type: 'text/html' })
-          .stream()
-          .pipeThrough(new CompressionStream('gzip'))
-        const compressed = await new Response(compressedStream).arrayBuffer()
-        response = await fetch('/api/admin/course-page-templates/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/gzip',
-            'X-Source-Type': 'zip',
-            'X-ZIP-Filename': encodeURIComponent(sourceZip.name),
-            'X-ZIP-Entry': encodeURIComponent(prepared.entryPath),
-            'X-ZIP-File-Count': String(prepared.fileCount),
-            'X-ZIP-Inlined-Count': String(prepared.inlinedAssetCount),
+        const safeBase = sourceZip.name
+          .replace(/\.zip$/i, '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9_-]+/gi, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 60) || 'website'
+        const storagePath = `course-template-sources/${safeBase}-${Date.now().toString(36)}.html`
+        const exactFile = new Blob([prepared.html], { type: 'text/html;charset=utf-8' })
+        const { error: uploadError } = await supabase.storage
+          .from('uploads')
+          .upload(storagePath, exactFile, {
+            contentType: 'text/html;charset=utf-8',
+            upsert: false,
+          })
+        if (uploadError) {
+          throw new Error(`Không thể lưu trang ZIP vào kho dữ liệu: ${uploadError.message}`)
+        }
+
+        const { data: publicData } = supabase.storage.from('uploads').getPublicUrl(storagePath)
+        if (!publicData?.publicUrl) throw new Error('Không lấy được URL công khai của trang ZIP đã lưu.')
+
+        const doc = new DOMParser().parseFromString(prepared.html, 'text/html')
+        const title = doc.title?.trim() || sourceZip.name.replace(/\.zip$/i, '')
+        const description =
+          doc.querySelector('meta[name="description"]')?.getAttribute('content')?.trim() || ''
+        const language = doc.documentElement.lang?.trim() || 'vi'
+        const sectionId = 'zip-exact-source'
+
+        result = {
+          sourceType: 'zip',
+          title,
+          description,
+          language,
+          colors: [],
+          fonts: [],
+          theme: {
+            primaryColor: '#228741',
+            secondaryColor: '#FDC236',
+            backgroundColor: '#FBFDF6',
+            textColor: '#18291D',
+            headingFont: 'Be Vietnam Pro',
+            bodyFont: 'Be Vietnam Pro',
+            borderRadius: '18px',
+            containerWidth: '1120px',
           },
-          body: compressed,
-        })
-      } else if (sourceFile) {
-        // Browser-exported HTML often embeds images as base64 and can exceed
-        // Vercel's request-body limit before our API route is reached.
-        // Gzip is especially effective for base64 HTML, so compress it client-side.
-        if (typeof CompressionStream !== 'undefined') {
-          const compressedStream = sourceFile.stream().pipeThrough(new CompressionStream('gzip'))
-          const compressed = await new Response(compressedStream).arrayBuffer()
-          response = await fetch('/api/admin/course-page-templates/analyze', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/gzip',
-              'X-HTML-Filename': encodeURIComponent(sourceFile.name),
-              ...(sourceUrl.trim() ? { 'X-Source-URL': encodeURIComponent(sourceUrl.trim()) } : {}),
-            },
-            body: compressed,
-          })
-        } else {
-          const form = new FormData()
-          form.append('file', sourceFile)
-          if (sourceUrl.trim()) form.append('sourceUrl', sourceUrl.trim())
-          response = await fetch('/api/admin/course-page-templates/analyze', {
-            method: 'POST',
-            body: form,
-          })
+          sections: [{
+            id: sectionId,
+            sourceId: sectionId,
+            label: 'ZIP Exact Mode',
+            sectionType: 'rich_content',
+            enabled: true,
+            sortOrder: 0,
+            confidence: 1,
+            heading: title,
+            paragraphs: description ? [description] : [],
+            listItems: [],
+            images: [],
+            cards: [],
+            tableRows: [],
+            actions: [],
+            faqItems: [],
+            formFields: [],
+            content: { title, description },
+            design: {},
+          }],
+          stats: {
+            sections: 1,
+            images: prepared.inlinedAssetCount,
+            links: 0,
+            forms: 0,
+          },
+          warnings: Array.from(new Set([
+            'ZIP Exact Mode: giao diện gốc được lưu nguyên trang trong sandbox; form nguồn được chuyển sang luồng đăng ký MFC.',
+            ...prepared.warnings,
+          ])),
+          exactSource: {
+            url: publicData.publicUrl,
+            zipFileName: sourceZip.name,
+            entryPath: prepared.entryPath,
+            fileCount: prepared.fileCount,
+            inlinedAssetCount: prepared.inlinedAssetCount,
+          },
         }
       } else {
-        response = await fetch('/api/admin/course-page-templates/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: sourceUrl.trim() }),
-        })
+        let response: Response
+        if (sourceFile) {
+          // Browser-exported HTML often embeds images as base64 and can exceed
+          // Vercel's request-body limit before our API route is reached.
+          // Gzip is especially effective for base64 HTML, so compress it client-side.
+          if (typeof CompressionStream !== 'undefined') {
+            const compressedStream = sourceFile.stream().pipeThrough(new CompressionStream('gzip'))
+            const compressed = await new Response(compressedStream).arrayBuffer()
+            response = await fetch('/api/admin/course-page-templates/analyze', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/gzip',
+                'X-HTML-Filename': encodeURIComponent(sourceFile.name),
+                ...(sourceUrl.trim() ? { 'X-Source-URL': encodeURIComponent(sourceUrl.trim()) } : {}),
+              },
+              body: compressed,
+            })
+          } else {
+            const form = new FormData()
+            form.append('file', sourceFile)
+            if (sourceUrl.trim()) form.append('sourceUrl', sourceUrl.trim())
+            response = await fetch('/api/admin/course-page-templates/analyze', {
+              method: 'POST',
+              body: form,
+            })
+          }
+        } else {
+          response = await fetch('/api/admin/course-page-templates/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: sourceUrl.trim() }),
+          })
+        }
+
+        const responseText = await response.text()
+        let data: any = null
+        try {
+          data = responseText ? JSON.parse(responseText) : null
+        } catch {
+          const tooLarge = response.status === 413 || /request entity too large|body exceeded/i.test(responseText)
+          throw new Error(
+            tooLarge
+              ? 'File HTML quá lớn để gửi trực tiếp. Hệ thống đã thử nén file nhưng vẫn vượt giới hạn máy chủ.'
+              : `Máy chủ trả về phản hồi không hợp lệ (HTTP ${response.status}). Vui lòng thử lại.`,
+          )
+        }
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.error || `Không thể phân tích website (HTTP ${response.status})`)
+        }
+        result = data.analysis as WebsiteTemplateAnalysis
       }
 
-      const responseText = await response.text()
-      let data: any = null
-      try {
-        data = responseText ? JSON.parse(responseText) : null
-      } catch {
-        const tooLarge = response.status === 413 || /request entity too large|body exceeded/i.test(responseText)
-        throw new Error(
-          tooLarge
-            ? 'File HTML quá lớn để gửi trực tiếp. Hệ thống đã thử nén file nhưng vẫn vượt giới hạn máy chủ.'
-            : `Máy chủ trả về phản hồi không hợp lệ (HTTP ${response.status}). Vui lòng thử lại.`,
-        )
-      }
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.error || `Không thể phân tích website (HTTP ${response.status})`)
-      }
-
-      const result = data.analysis as WebsiteTemplateAnalysis
-      if (clientWarnings.length) result.warnings = Array.from(new Set([...(result.warnings || []), ...clientWarnings]))
       setAnalysis(result)
       const ids = result.sections.map(section => section.id)
       setSectionOrder(ids)
