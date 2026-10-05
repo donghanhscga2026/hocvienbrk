@@ -71,6 +71,64 @@ function buildSnapshot(
 
   if (!selected.length) throw new Error('Hãy chọn ít nhất một phần trước khi tạo mẫu')
 
+  if (analysis.sourceType === 'zip' && analysis.exactSource?.url) {
+    return {
+      name,
+      seo: {
+        title: analysis.title || name,
+        description: analysis.description || '',
+        importedFrom: analysis.exactSource.zipFileName || 'ZIP mã nguồn',
+      },
+      theme: {
+        primaryColor: analysis.theme.primaryColor || '#6D28D9',
+        secondaryColor: analysis.theme.secondaryColor || '#F4C430',
+        backgroundColor: analysis.theme.backgroundColor || '#FFFFFF',
+        textColor: analysis.theme.textColor || '#1F2937',
+        headingFont: analysis.theme.headingFont,
+        bodyFont: analysis.theme.bodyFont,
+        borderRadius: analysis.theme.borderRadius || '18px',
+        containerWidth: analysis.theme.containerWidth || '1120px',
+        importedLayout: true,
+        exactZipLayout: true,
+      },
+      navigation: {
+        shortName: name,
+        ctaText: 'Đăng ký ngay',
+        sticky: false,
+      },
+      checkoutConfig: {
+        enabled: true,
+        provider: 'vietqr',
+        currency: 'VND',
+        paymentDescriptionPrefix: 'CK',
+        orderExpirationMinutes: 15,
+        registrationFields: [
+          { name: 'fullName', label: 'Họ và tên', type: 'text', required: true },
+          { name: 'phone', label: 'Số điện thoại', type: 'tel', required: true },
+        ],
+        successMode: 'show_message',
+      },
+      useTemplate: true,
+      sections: [{
+        sectionKey: 'zip-exact-source',
+        sectionType: 'rich_content',
+        variant: 'zip-source-v1',
+        anchorId: null,
+        enabled: true,
+        sortOrder: 0,
+        visibility: 'all' as const,
+        content: jsonSafe({
+          exactSource: analysis.exactSource,
+          importedMeta: {
+            label: 'ZIP Exact Mode',
+            sourceClass: analysis.exactSource.entryPath,
+            confidence: 1,
+          },
+        }),
+      }],
+    }
+  }
+
   const primaryColor = analysis.theme.primaryColor || '#6D28D9'
   const secondaryColor = analysis.theme.secondaryColor || '#F4C430'
   const backgroundColor = analysis.theme.backgroundColor || '#FFFFFF'
@@ -204,7 +262,7 @@ export async function createStoredCoursePageTemplate(input: {
         key,
         name,
         description: input.description?.trim() || null,
-        sourceUrl: storedAnalysis.finalUrl || storedAnalysis.sourceUrl || null,
+        sourceUrl: storedAnalysis.exactSource?.url || storedAnalysis.finalUrl || storedAnalysis.sourceUrl || null,
         sourceType: storedAnalysis.sourceType,
         thumbnailUrl: firstImage?.src || null,
         snapshot: jsonSafe(snapshot) as any,
