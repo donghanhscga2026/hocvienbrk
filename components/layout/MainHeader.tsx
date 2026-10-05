@@ -30,6 +30,18 @@ export default function MainHeader({ title, profile }: MainHeaderProps) {
     const [showShare, setShowShare] = useState(false)
 
     const userId = session?.user?.id != null ? String(session.user.id) : null
+    const rawSiteConfig = profile?.siteConfig && typeof profile.siteConfig === 'object' && !Array.isArray(profile.siteConfig)
+        ? profile.siteConfig as Record<string, unknown>
+        : {}
+    const rawBranding = rawSiteConfig.branding && typeof rawSiteConfig.branding === 'object' && !Array.isArray(rawSiteConfig.branding)
+        ? rawSiteConfig.branding as Record<string, unknown>
+        : {}
+    const brandName = typeof rawBranding.name === 'string' && rawBranding.name.trim()
+        ? rawBranding.name.trim()
+        : profile?.title || 'MFC'
+    const logoUrl = typeof rawBranding.logoUrl === 'string' && rawBranding.logoUrl.trim()
+        ? rawBranding.logoUrl.trim()
+        : '/logobrk-50px.png'
 
     const isHomePage = pathname === '/'
     const isToolsRoot = pathname === '/tools'
@@ -85,8 +97,8 @@ export default function MainHeader({ title, profile }: MainHeaderProps) {
                         <AttentionHighlight {...getStatus('logo')}>
                             <Link href="/" className="shrink-0 transition-opacity hover:opacity-80">
                                 <Image
-                                    src="/logobrk-50px.png"
-                                    alt="MFC Logo"
+                                    src={logoUrl}
+                                    alt={`${brandName} Logo`}
                                     width={120}
                                     height={40}
                                     priority
