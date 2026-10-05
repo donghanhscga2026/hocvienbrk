@@ -1,4 +1,4 @@
-export type ImportedSourceType = 'url' | 'html'
+export type ImportedSourceType = 'url' | 'html' | 'zip'
 
 export type ImportedSectionType =
   | 'header'
@@ -104,6 +104,13 @@ export type WebsiteTemplateAnalysis = {
     forms: number
   }
   warnings: string[]
+  exactSource?: {
+    url: string
+    zipFileName?: string
+    entryPath?: string
+    fileCount?: number
+    inlinedAssetCount?: number
+  }
 }
 
 export type StoredTemplateSnapshot = {
