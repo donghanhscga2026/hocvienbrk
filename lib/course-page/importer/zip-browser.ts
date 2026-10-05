@@ -303,8 +303,8 @@ export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite>
   head.insertAdjacentHTML('beforeend', BRIDGE)
 
   const html = '<!doctype html>\n' + doc.documentElement.outerHTML
-  if (new Blob([html]).size > 6 * 1024 * 1024) {
-    throw new Error('Trang sau khi đóng gói vượt 6MB. Hãy bỏ bớt video/file lớn khỏi ZIP hoặc dùng bản HTML nhẹ hơn.')
+  if (new Blob([html]).size > 8 * 1024 * 1024) {
+    throw new Error('Trang sau khi đóng gói vượt 8MB. Hãy bỏ bớt video/file lớn khỏi ZIP hoặc dùng bản HTML nhẹ hơn.')
   }
 
   return {
