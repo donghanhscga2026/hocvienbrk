@@ -632,6 +632,7 @@ export function analyzeWebsiteHtml(input: {
   const sections: ImportedSectionCandidate[] = blocks.map((block, index) => {
     const sourceId = attr(block.attrs, 'id')
     const sourceClass = attr(block.attrs, 'class')
+    const sourceBlockKey = attr(block.attrs, 'data-mfc-block')
     const heading = extractHeading(block.html)
     const paragraphs = extractTagTexts(block.html, 'p').slice(0, MAX_TEXT_ITEMS)
     const listItems = extractTagTexts(block.html, 'li').slice(0, MAX_TEXT_ITEMS)
@@ -654,7 +655,7 @@ export function analyzeWebsiteHtml(input: {
     })
 
     return {
-      id: `imported-${index + 1}`,
+      id: sourceBlockKey || `imported-${index + 1}`,
       sourceId,
       sourceClass,
       label: pickSectionLabel(inferred.type, heading, index),
