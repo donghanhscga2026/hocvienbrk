@@ -6,7 +6,7 @@ import { fetchRemoteHtml } from '@/lib/course-page/importer/fetch-html'
 import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
 import { saveUploadedFile } from '@/lib/image-utils'
 
-const MAX_HTML_BYTES = 6 * 1024 * 1024
+const MAX_HTML_BYTES = 8 * 1024 * 1024
 
 export const runtime = 'nodejs'
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (htmlBuffer.byteLength > MAX_HTML_BYTES) {
-        return NextResponse.json({ error: 'Nội dung HTML sau giải nén vượt quá giới hạn 6MB' }, { status: 400 })
+        return NextResponse.json({ error: 'Nội dung HTML sau giải nén vượt quá giới hạn 8MB' }, { status: 400 })
       }
 
       const html = htmlBuffer.toString('utf8')
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Vui lòng chọn file HTML' }, { status: 400 })
       }
       if (file.size > MAX_HTML_BYTES) {
-        return NextResponse.json({ error: 'File HTML vượt quá giới hạn 6MB' }, { status: 400 })
+        return NextResponse.json({ error: 'File HTML vượt quá giới hạn 8MB' }, { status: 400 })
       }
       if (!file.name.toLowerCase().endsWith('.html') && !file.name.toLowerCase().endsWith('.htm') && file.type && !file.type.includes('html')) {
         return NextResponse.json({ error: 'Chỉ hỗ trợ file .html hoặc .htm' }, { status: 400 })
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     if (html) {
       if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
-        return NextResponse.json({ error: 'Nội dung HTML vượt quá giới hạn 6MB' }, { status: 400 })
+        return NextResponse.json({ error: 'Nội dung HTML vượt quá giới hạn 8MB' }, { status: 400 })
       }
       const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html' })
       const analysis = await mirrorAnalysisImages(rawAnalysis, {
