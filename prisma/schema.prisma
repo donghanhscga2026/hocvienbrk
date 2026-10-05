@@ -1426,6 +1426,7 @@ model Tool {
 
 model SiteProfile {
   website              SiteWebsite?
+  domains              SiteProfileDomain[]
   id                   Int                 @id @default(autoincrement())
   userId               Int?                @unique
   slug                 String              @unique
@@ -1464,6 +1465,7 @@ model SiteProfile {
   communityLimit       Int                 @default(10)
   courseCategoryFilter Json?
   greetingMessages     Json?
+  siteConfig           Json?
   affiliateCampaign    AffiliateCampaign?
   landingPages         LandingPage[]
   theme                Theme?              @relation(fields: [themeId], references: [id])
@@ -1473,6 +1475,20 @@ model SiteProfile {
 
   @@index([slug])
   @@index([userId])
+  @@index([isActive])
+}
+
+model SiteProfileDomain {
+  id        Int         @id @default(autoincrement())
+  profileId Int
+  hostname  String      @unique
+  isPrimary Boolean     @default(false)
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  profile   SiteProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
   @@index([isActive])
 }
 
