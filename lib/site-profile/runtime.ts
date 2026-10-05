@@ -9,6 +9,11 @@ export type SiteHomepageType = 'community' | 'profile' | 'landing' | 'website'
 export type SiteCourseScopeMode = 'all' | 'profile' | 'teacher' | 'ids' | 'category'
 
 export interface SiteRuntimeConfig {
+  branding: {
+    name?: string
+    logoUrl?: string
+    faviconUrl?: string
+  }
   homepage: {
     type: SiteHomepageType
     landingId?: number
@@ -86,6 +91,10 @@ export function getSiteRuntimeConfig(profile: {
     ? profile.siteConfig as Record<string, unknown>
     : {}
 
+  const rawBranding = raw.branding && typeof raw.branding === 'object' && !Array.isArray(raw.branding)
+    ? raw.branding as Record<string, unknown>
+    : {}
+
   const rawHomepage = raw.homepage && typeof raw.homepage === 'object' && !Array.isArray(raw.homepage)
     ? raw.homepage as Record<string, unknown>
     : {}
@@ -116,7 +125,16 @@ export function getSiteRuntimeConfig(profile: {
     ? raw.theme as Record<string, unknown>
     : {}
 
+  const shortText = (value: unknown) => typeof value === 'string' && value.trim() && value.length <= 500
+    ? value.trim()
+    : undefined
+
   return {
+    branding: {
+      name: shortText(rawBranding.name),
+      logoUrl: shortText(rawBranding.logoUrl),
+      faviconUrl: shortText(rawBranding.faviconUrl),
+    },
     homepage: {
       type: homepageType,
       landingId: Number.isInteger(Number(rawHomepage.landingId)) && Number(rawHomepage.landingId) > 0
