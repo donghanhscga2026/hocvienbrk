@@ -12,6 +12,8 @@ import SetHomeSlug from '@/components/home/SetHomeSlug'
 import { getSiteProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getHeroMessageForProfile } from '@/app/actions/message-actions'
 import { getRoadmapPoints } from '@/app/actions/roadmap-actions'
+import { publishedWebsite, websiteData } from '@/lib/website/server'
+import WebsiteView from '@/components/website/WebsiteView'
 
 // [OPTIMIZE] cache() giúp generateMetadata và component trang dùng chung 1
 // lần query slug thay vì mỗi bên tự query lại (được gọi 2 lần/request) —
@@ -32,6 +34,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const profile = await getCachedSiteProfile(slug)
 
     if (!profile) return { title: 'Không tìm thấy' }
+
+    const website = profile.isActive ? await publishedWebsite(profile.id) : null
+    if (website) return { title: { absolute: website.name }, description: website.description, openGraph: { title: website.name, description: website.description }, twitter: { title: website.name, description: website.description } }
 
     const ogTitle = profile.metaTitle || profile.title || DEFAULT_OG_TITLE
     const ogDescription = profile.metaDescription || profile.subtitle || DEFAULT_OG_DESCRIPTION
@@ -63,6 +68,9 @@ export default async function PageSlugPage({ params }: PageProps) {
     if (!profile) notFound()
 
     incrementProfileView(slug).catch(console.error)
+
+    const website = profile.isActive ? await publishedWebsite(profile.id) : null
+    if (website) return <WebsiteView document={website} data={await websiteData(profile)} slug={slug} />
 
     const [
         courses,

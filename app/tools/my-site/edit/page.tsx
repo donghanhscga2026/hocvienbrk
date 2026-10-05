@@ -175,6 +175,9 @@ export default function MySiteEditPage() {
       <MainHeader title="CHỈNH SỬA TRANG" toolSlug="my-site" />
 
       <div className="p-4 max-w-lg mx-auto pb-20">
+        <Link href="/tools/my-site/design" className="block mb-4 rounded-xl bg-violet-600 text-white p-4 font-bold">
+          Mở trình thiết kế website: mẫu, kéo thả, trang con và HTML/CSS →
+        </Link>
         <form onSubmit={handleSubmit}>
           {saved && (
             <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-700">

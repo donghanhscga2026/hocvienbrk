@@ -75,6 +75,10 @@ export default function MySiteTab() {
           </div>
 
           <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
+            <Link href="/tools/my-site/design" className="flex items-center gap-4 p-5 bg-violet-50 hover:bg-violet-100">
+              <Edit className="w-6 h-6 text-violet-600" />
+              <div><h3 className="font-bold text-violet-900">Thiết kế website riêng</h3><p className="text-sm text-violet-700">Chọn mẫu, kéo thả, thêm trang và xuất bản</p></div>
+            </Link>
             <Link href={`/page/${profile.slug}`} className="flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors" target="_blank">
               <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center"><Eye className="w-6 h-6 text-blue-600" /></div>
               <div className="flex-1"><h3 className="font-bold text-gray-800">Xem trang của bạn</h3><p className="text-sm text-gray-500">Mở trang chủ trong tab mới</p></div>
