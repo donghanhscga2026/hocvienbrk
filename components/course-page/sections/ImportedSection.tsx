@@ -18,6 +18,7 @@ function actionFor(href?: string) {
     }
     const url = new URL(href, typeof window !== 'undefined' ? window.location.href : 'https://example.com')
     if (url.hash && url.origin === (typeof window !== 'undefined' ? window.location.origin : url.origin)) {
+      if (isRegistrationAnchor(url.hash)) return { type: 'open_registration', target: undefined }
       return { type: 'scroll', target: url.hash.slice(1) }
     }
     if (!['http:', 'https:', 'tel:', 'mailto:'].includes(url.protocol)) {
