@@ -331,7 +331,7 @@ export async function getPostCategories() {
 /**
  * Tạo profile mới cho Teacher (Admin chọn teacher để gán profile)
  */
-export async function createSiteProfile(userId: number, slug: string) {
+export async function createSiteProfile(userId: number | null, slug: string) {
   const denied = await requireAdminAction()
   if (denied) return { error: denied.error }
 
@@ -342,11 +342,13 @@ export async function createSiteProfile(userId: number, slug: string) {
         const existingLanding = await prisma.landingPage.findUnique({ where: { slug } })
         if (existingLanding) return { error: 'Slug đã được sử dụng bởi Landing Page' }
 
-        const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
-    if (existingUser) return { error: 'User này đã có profile' }
+        if (userId != null) {
+          const existingUser = await prisma.siteProfile.findUnique({ where: { userId } })
+          if (existingUser) return { error: 'User này đã có profile' }
+        }
 
     const profile = await prisma.siteProfile.create({
-      data: { userId, slug, isActive: false }
+      data: { userId: userId ?? null, slug, isActive: false }
     })
 
     return { success: true, profile }
