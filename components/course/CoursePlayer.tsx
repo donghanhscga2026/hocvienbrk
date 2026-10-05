@@ -13,6 +13,7 @@ import { useAttentionCycle } from "@/hooks/useAttentionCycle"
 import { AttentionHighlight } from "@/components/ui/attention-highlight"
 import { useAttentionHighlightSettings } from "@/app/contexts/AttentionHighlightContext"
 
+import { useDomainBrand } from '@/components/website/DomainShell'
 import LessonSidebar from "./LessonSidebar"
 import VideoPlayer, { VideoPlayerHandle } from "./VideoPlayer"
 import AssignmentForm from "./AssignmentForm"
@@ -41,6 +42,7 @@ type MobileTab = 'list' | 'content' | 'record'
 
 export default function CoursePlayer({ course, enrollment: initialEnrollment, session }: CoursePlayerProps) {
     const router = useRouter()
+    const website = useDomainBrand()
     const [enrollment, setEnrollment] = useState(initialEnrollment)
     const isSubmittingRef = useRef(false)
     const [isMounted, setIsMounted] = useState(false)
@@ -303,23 +305,23 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
     // chiều cao ngay lúc chuyển từ khung loading sang layout thật, gây cảm
     // giác trang "nhảy" và bị cuộn dở khi vừa tải xong.
     if (!isMounted) {
-        return <div className="h-screen h-dvh w-full bg-black flex items-center justify-center text-zinc-700 font-mono text-xs">Đang tải ứng dụng...</div>
+        return <div className="h-full w-full bg-black website:bg-brk-background flex items-center justify-center text-zinc-700 font-mono text-xs">Đang tải ứng dụng...</div>
     }
 
     return (
-        <div className="flex flex-col h-full bg-black text-zinc-300">
+        <div className="flex flex-col h-full bg-black website:bg-brk-background text-zinc-300 website:text-brk-on-surface">
             {/* Header */}
             {/* [FIX] z-[60] (thay vì z-50 trước đây) — cao hơn mọi overlay NỘI DUNG
                 trong trang (danh sách học phần, ô soạn thảo mở rộng, các modal nhỏ...
                 đều đang z-50), để tooltip lóe sáng của nút trên header/nav không còn
                 bị các overlay đó đè lên. Vẫn thấp hơn các modal xác nhận thật sự
                 (z-[100] trở lên) — những modal đó vẫn cần che cả header khi hiện. */}
-            <header className="h-14 shrink-0 border-b border-zinc-800 flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 z-[60] fixed top-[env(safe-area-inset-top)] left-0 right-0">
+            <header className={`h-14 shrink-0 border-b border-zinc-800 website:border-brk-outline flex items-center justify-between gap-1 px-2 sm:gap-3 sm:px-4 bg-zinc-900 website:bg-brk-surface z-[60] ${website ? 'relative' : 'fixed top-[env(safe-area-inset-top)] left-0 right-0'}`}>
                 <AttentionHighlight {...getBackAttention('back')} tooltipPosition="bottom" className="shrink-0">
                     <button
                         onClick={() => router.replace(`/khoa-hoc/${encodeURIComponent(course.id_khoa)}`)}
                         aria-label="Về khóa học"
-                        className="shrink-0 flex items-center gap-1.5 pl-2.5 pr-3.5 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all"
+                        className="shrink-0 flex items-center gap-1.5 pl-2.5 pr-3.5 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white website:text-brk-on-surface transition-all"
                     >
                         <ArrowLeft className="w-5 h-5" strokeWidth={2.75} />
                         <span className="hidden text-xs font-black tracking-wide sm:inline">Về khóa học</span>
@@ -335,12 +337,12 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     </div>
                 )}
 
-                <h1 className="min-w-0 flex-1 font-bold text-white truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
+                <h1 className="min-w-0 flex-1 font-bold text-white website:text-brk-on-surface truncate text-sm sm:text-base text-right">{course.name_lop}</h1>
                 <NotificationBell />
                 <CrmRequestButton key={currentLessonId} courseId={course.id} courseTitle={course.name_lop} lessonId={currentLessonId} lessonTitle={currentLesson?.title} signedIn={!!session?.user} learning compact />
             </header>
 
-            <div className={`flex flex-1 min-h-0 pt-[calc(3.5rem_+_env(safe-area-inset-top))] ${isMobile ? 'pb-[calc(3.5rem_+_env(safe-area-inset-bottom))]' : ''}`}>
+            <div className={`flex flex-1 min-h-0 ${website ? '' : 'pt-[calc(3.5rem_+_env(safe-area-inset-top))]'} ${isMobile ? 'pb-[calc(3.5rem_+_env(safe-area-inset-bottom))]' : ''}`}>
                 {!isMobile && (
                     <LessonSidebar
                         lessons={course.lessons}
@@ -361,7 +363,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                     dưới (mô tả/Tương tác) co lại thay vì thực sự "đẩy xuống" — nhìn
                     như panel đè phủ lên chứ không đẩy nội dung xuống đúng nghĩa. Cho
                     phép cuộn thì phần bị đẩy xuống vẫn xem được bằng cách cuộn main. */}
-                <main className="flex-1 flex flex-col min-h-0 overflow-y-auto items-center bg-zinc-950">
+                <main className="flex-1 flex flex-col min-h-0 overflow-y-auto items-center bg-zinc-950 website:bg-brk-background">
                     {/* Thông báo ở trong vùng đã chừa header; chỉ mở chi tiết khi cần. */}
                     {isAuditor && (
                         <details className="w-full shrink-0 border-b border-amber-500/20 bg-amber-500/10 px-4 text-amber-200">
@@ -420,7 +422,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                         <div className="p-5 flex-1 flex flex-col gap-4 min-h-[300px] w-full max-w-5xl">
                             <div className="shrink-0 flex flex-col gap-1">
                                 <div className="flex items-center justify-between gap-3">
-                                    <h2 className="text-lg font-bold text-white truncate">{currentLesson?.title}</h2>
+                                    <h2 className="text-lg font-bold text-white website:text-brk-on-surface truncate">{currentLesson?.title}</h2>
                                     <button
                                         onClick={() => setVideoHidden(v => !v)}
                                         className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
@@ -435,7 +437,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 </div>
                                 {/* [FIX] Ẩn HOÀN TOÀN mô tả bên dưới khi là bài TEXT (đã hiển thị trong Player) */}
                                 {currentLesson?.type === 'ALL' ? (
-                                    <div className="text-zinc-300 text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
+                                    <div className="text-zinc-300 website:text-brk-on-surface text-sm leading-relaxed transition-all italic">Xem hết các học phần của bài học</div>
                                 ) : currentLesson?.type !== 'TEXT' && currentLesson?.videoUrl
                                     && !(currentLesson?.content || '').includes('docs.google.com')
                                     && (currentLesson?.content || canEditLessonContent) && (
@@ -450,7 +452,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 )}
                             </div>
                             <div
-                                className="flex-1 min-h-0 border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden"
+                                className="flex-1 min-h-0 border border-zinc-800 website:border-brk-outline rounded-xl bg-zinc-900/30 website:bg-brk-surface/30 overflow-hidden"
                                 onMouseEnter={() => setChatHovered(true)}
                                 onMouseLeave={() => setChatHovered(false)}
                             >
@@ -479,9 +481,9 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 )}
                                 {mobileTab === 'content' && (
                                     <div className="flex-1 flex flex-col min-h-0">
-                                        <div className="px-4 py-2 bg-zinc-900 border-b border-zinc-800 shrink-0">
+                                        <div className="px-4 py-2 bg-zinc-900 website:bg-brk-surface border-b border-zinc-800 website:border-brk-outline shrink-0">
                                             <div className="flex items-center justify-between gap-2">
-                                                <p title={currentLesson?.title} className="min-w-0 truncate text-sm font-bold text-white">{currentLesson?.title}</p>
+                                                <p title={currentLesson?.title} className="min-w-0 truncate text-sm font-bold text-white website:text-brk-on-surface">{currentLesson?.title}</p>
                                                 <button type="button" aria-expanded={!videoHidden} onClick={() => setVideoHidden(value => !value)} className="min-h-11 shrink-0 rounded-lg px-2 text-xs font-semibold text-orange-400 hover:bg-white/5">
                                                     {videoHidden ? 'Hiện bài học' : 'Thu gọn bài học'}
                                                 </button>
@@ -490,7 +492,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                                 <button onClick={() => setShowContentModal(true)} className="text-xs text-orange-400 mt-2">Xem chi tiết nội dung &rarr;</button>
                                             )}
                                             {currentLesson?.type === 'ALL' && (
-                                                <p className="text-xs text-zinc-300 mt-2 italic">H&atilde;y xem c&aacute;c ph&acirc;̀n trong playlist b&agrave;i h&ocirc;̣c.</p>
+                                                <p className="text-xs text-zinc-300 website:text-brk-on-surface mt-2 italic">H&atilde;y xem c&aacute;c ph&acirc;̀n trong playlist b&agrave;i h&ocirc;̣c.</p>
                                             )}
                                         </div>
                                         <div className="flex-1 min-h-0">
@@ -516,7 +518,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                 )}
                             </div>
 
-                            <nav className="h-[calc(3.5rem_+_env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-zinc-900 border-t border-zinc-800 flex fixed bottom-0 left-0 right-0 z-[60]">
+                            <nav className="h-[calc(3.5rem_+_env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-zinc-900 website:bg-brk-surface border-t border-zinc-800 website:border-brk-outline flex fixed bottom-0 left-0 right-0 z-[60]">
                                 {[
                                     { id: 'list', icon: ListVideo, label: 'Danh sách' },
                                     { id: 'content', icon: FileText, label: 'Nội dung' },
@@ -527,7 +529,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                                         <AttentionHighlight key={tab.id} {...getMobileTabAttention(tab.id)} tooltipPosition="top" className="flex-1 h-full">
                                             <button
                                                 onClick={() => setMobileTab(tab.id as MobileTab)}
-                                                className={`w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${isActive ? 'text-orange-400 bg-orange-400/5 border-t-2 border-orange-400' : 'text-white/90'}`}
+                                                className={`w-full h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors ${isActive ? 'text-orange-400 website:text-brk-accent bg-orange-400/5 website:bg-brk-primary/10 border-t-2 border-orange-400 website:border-brk-accent' : 'text-white/90 website:text-brk-on-surface/90'}`}
                                             >
                                                 <tab.icon className="w-5 h-5" />
                                                 {tab.label}
@@ -541,7 +543,7 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
                 </main>
 
                 {!isMobile && course.type !== 'LIB' && (
-                    <div className="w-[400px] shrink-0 border-l border-zinc-800 flex flex-col">
+                    <div className="w-[400px] shrink-0 border-l border-zinc-800 website:border-brk-outline flex flex-col">
                         <AssignmentForm
                             key={currentLessonId}
                             lessonId={currentLessonId!}
@@ -561,10 +563,10 @@ export default function CoursePlayer({ course, enrollment: initialEnrollment, se
             {/* Content Modal */}
             {showContentModal && (
                 <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={() => setShowContentModal(false)}>
-                    <div className="bg-zinc-900 rounded-2xl border border-zinc-700 max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-                            <h2 className="text-white font-bold text-sm truncate pr-4">{currentLesson?.title}</h2>
-                            <button onClick={() => setShowContentModal(false)}><X className="w-5 h-5 text-zinc-300" /></button>
+                    <div className="bg-zinc-900 website:bg-brk-surface rounded-2xl border border-zinc-700 website:border-brk-outline max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 website:border-brk-outline">
+                            <h2 className="text-white website:text-brk-on-surface font-bold text-sm truncate pr-4">{currentLesson?.title}</h2>
+                            <button onClick={() => setShowContentModal(false)}><X className="w-5 h-5 text-zinc-300 website:text-brk-on-surface" /></button>
                         </div>
                         {/* [FIX] Ẩn content trong modal khi là TEXT (đã hiển thị trong Player) */}
                         {currentLesson?.type !== 'TEXT' && (
@@ -676,15 +678,15 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
     }
 
     return (
-        <div className="flex flex-col h-full w-full bg-zinc-900 overflow-hidden">
+        <div className="flex flex-col h-full w-full bg-zinc-900 website:bg-brk-surface overflow-hidden">
             {/* ─ Cố định: ngày bắt đầu ─ */}
-            <div className="shrink-0 bg-zinc-900 border-b border-zinc-800 p-4 space-y-3">
+            <div className="shrink-0 bg-zinc-900 website:bg-brk-surface border-b border-zinc-800 website:border-brk-outline p-4 space-y-3">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                         <CalendarDays className="w-4 h-4 text-orange-400 shrink-0" />
                         <div>
-                            <p className="text-[10px] text-zinc-300 uppercase tracking-wider font-bold">Ngày bắt đầu</p>
-                            <p className="text-sm font-bold text-white leading-tight">
+                            <p className="text-[10px] text-zinc-300 website:text-brk-on-surface uppercase tracking-wider font-bold">Ngày bắt đầu</p>
+                            <p className="text-sm font-bold text-white website:text-brk-on-surface leading-tight">
                                 {startedAt ? new Date(startedAt).toLocaleDateString('vi-VN') : '-- / -- / ----'}
                             </p>
                         </div>
@@ -698,14 +700,14 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                 </div>
 
                 {showDatePicker && (
-                    <div className="bg-zinc-800 rounded-xl p-3 space-y-2.5 border border-zinc-700 shadow-xl">
-                        <p className="text-[10px] text-zinc-300 font-medium">Chọn ngày mới (từ hôm nay trở đi):</p>
+                    <div className="bg-zinc-800 website:bg-brk-surface rounded-xl p-3 space-y-2.5 border border-zinc-700 website:border-brk-outline shadow-xl">
+                        <p className="text-[10px] text-zinc-300 website:text-brk-on-surface font-medium">Chọn ngày mới (từ hôm nay trở đi):</p>
                         <input
                             type="date"
                             value={dateInput}
                             min={today}
                             onChange={e => setDateInput(e.target.value)}
-                            className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            className="w-full bg-zinc-700 website:bg-brk-surface text-white website:text-brk-on-surface text-sm rounded-lg px-3 py-2 border border-zinc-600 website:border-brk-outline focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                         {isPastDate && dateInput && (
                             <p className="text-[10px] text-red-400 font-semibold flex items-center gap-1">
@@ -722,7 +724,7 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                             </button>
                             <button
                                 onClick={() => { setShowDatePicker(false); setShowWarning(false) }}
-                                className="flex-1 text-xs font-bold text-zinc-100 border border-zinc-700 rounded-lg py-2"
+                                className="flex-1 text-xs font-bold text-zinc-100 website:text-brk-on-surface border border-zinc-700 website:border-brk-outline rounded-lg py-2"
                             >
                                 Hủy
                             </button>
@@ -733,12 +735,12 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
 
             {/* ─ Tiêu đề danh sách ─ */}
             <div className="shrink-0 px-4 py-3 border-b border-brk-outline flex items-center justify-between bg-brk-background/50">
-                <span className="text-[10px] font-black text-white/90 uppercase tracking-widest">Lộ trình học tập</span>
+                <span className="text-[10px] font-black text-white/90 website:text-brk-on-surface/90 uppercase tracking-widest">Lộ trình học tập</span>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setSortDesc(v => !v)}
                         title={sortDesc ? 'Đang sắp xếp: Cuối → Đầu' : 'Đang sắp xếp: Đầu → Cuối'}
-                        className="flex items-center gap-1 text-[10px] font-bold text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-2 py-1 transition-colors"
+                        className="flex items-center gap-1 text-[10px] font-bold text-white/80 website:text-brk-on-surface/80 hover:text-white website:hover:text-brk-on-surface bg-white/5 hover:bg-white/10 border border-white/10 rounded-full px-2 py-1 transition-colors"
                     >
                         <ArrowUpDown className="w-3 h-3" />
                         {sortDesc ? 'Cuối → Đầu' : 'Đầu → Cuối'}
@@ -764,15 +766,15 @@ function LessonSidebarMobile({ lessons, currentLessonId, onLessonSelect, progres
                             className={cn(
                                 'w-full flex items-center gap-3 px-4 py-4 text-left border-b transition-all',
                                 'border-brk-outline/50',
-                                isActive ? 'bg-white border-l-4 border-l-orange-500' : 'active:bg-white/5',
+                                isActive ? 'bg-white website:bg-brk-primary/10 border-l-4 border-l-orange-500' : 'active:bg-white/5',
                                 !unlocked && 'opacity-40 grayscale'
                             )}
                         >
                             <div className="shrink-0">
-                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className={cn('w-5 h-5', isActive ? 'text-emerald-600' : 'text-emerald-500')} /> : isActive ? <PlayCircle className="w-5 h-5 text-orange-500 animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-zinc-400" /> : <div className="w-4 h-4 rounded-full border border-zinc-500 flex items-center justify-center text-[8px] text-zinc-200">{lesson.order}</div>}
+                                {prog?.status === 'COMPLETED' ? <CheckCircle2 className={cn('w-5 h-5', isActive ? 'text-emerald-600' : 'text-emerald-500')} /> : isActive ? <PlayCircle className="w-5 h-5 text-orange-500 animate-pulse" /> : !unlocked ? <Lock className="w-4 h-4 text-zinc-400 website:text-brk-muted" /> : <div className="w-4 h-4 rounded-full border border-zinc-500 flex items-center justify-center text-[8px] text-zinc-200 website:text-brk-on-surface">{lesson.order}</div>}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={cn('text-sm leading-snug', isActive ? 'text-black font-black' : 'text-white font-medium')}>{lesson.title}
+                                <p className={cn('text-sm leading-snug', isActive ? 'text-black website:text-brk-on-surface font-black' : 'text-white website:text-brk-on-surface font-medium')}>{lesson.title}
                                     {lesson.isDailyChallenge && (
                                         <span className="ml-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full align-middle">📝 Bài tập</span>
                                     )}

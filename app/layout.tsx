@@ -16,6 +16,7 @@ import { domainContext } from '@/lib/website/domain-context'
 import { publishedWebsite } from '@/lib/website/server'
 import DomainShell from '@/components/website/DomainShell'
 import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
+import { websiteTheme } from '@/lib/website/theme'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -99,7 +100,8 @@ export default async function RootLayout({
     const [doc,session]=await Promise.all([publishedWebsite(domain.profileId),getSession()])
     const path=(await headers()).get('x-website-path') || '/'
     const brand={name:doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
-    return <html lang="vi"><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+    const theme=websiteTheme(brand.color,brand.background)
+    return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }
   const siteThemeId = await getSiteTheme()
   const session = await getSession()

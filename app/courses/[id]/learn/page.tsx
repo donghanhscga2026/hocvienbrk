@@ -124,7 +124,7 @@ export default async function CourseLearnPage({
   }
 
   return (
-    <div className="h-screen h-dvh bg-black overflow-hidden flex flex-col">
+    <div className="h-screen h-dvh website:h-full website:min-h-0 bg-black website:bg-brk-background overflow-hidden flex flex-col">
       <CoursePlayer
         course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, teacherId: course.teacherId, lessons }}
         enrollment={enrollment}

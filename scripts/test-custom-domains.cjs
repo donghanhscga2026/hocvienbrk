@@ -160,6 +160,20 @@ async function run(){
   ok(home.includes('href="/khoa-hoc"') && home.includes('href="/gioi-thieu"') && home.includes('href="/login"'),'Home has shared course, custom page and login navigation')
   ok(detail.includes('aria-label="Đường dẫn trang"') && !home.includes('aria-label="Đường dẫn trang"'),'Breadcrumb appears on internal pages only')
   ok(home.includes('aria-expanded="false"') && home.includes('aria-controls="website-menu"'),'Mobile navigation exposes accessible toggle')
+
+  const {websiteTheme,contrastRatio}=load('lib/website/theme')
+  for (const background of ['#ffffff','#f8fafc','#808080','#777777','#121212','#2d3142','#fae0c7','#0000','transparent']) {
+    for (const color of ['#ffcc00','#ffffff','#000000','#7c3aed','#4eb09b','#fff0','#abc','#abcd']) {
+      const theme=websiteTheme(color,background)
+      ok(contrastRatio(theme.text,theme.surface)>=4.5 && contrastRatio(theme.text,theme.background)>=4.5,'Website text stays readable on surface and canvas')
+      ok(contrastRatio(theme.muted,theme.surface)>=4.5 && contrastRatio(theme.muted,theme.background)>=4.5,'Secondary text remains readable')
+      ok(contrastRatio(theme.primary,theme.onPrimary)>=4.5 && contrastRatio(theme.accent,theme.surface)>=4.5,'Buttons and accent labels adapt to selected brand color')
+      ok(/^#[a-f0-9]{6}$/i.test(theme.surface),'Modal surface is opaque even for transparent saved colors')
+    }
+  }
+  const learningShell=renderToStaticMarkup(React.createElement(Shell,{...shellProps,path:'/courses/1/learn'},'Player'))
+  ok(learningShell.includes('data-website-learning="true"') && !learningShell.includes('<footer'),'Learning shell reserves viewport for navigation and player')
+
   const accessApi=load('app/api/websites/access/route')
   const accessPost=async(body,hostname='giautoandien.io.vn',origin='https://'+hostname)=>accessApi.POST(req(body,hostname,origin))
   ok((await accessPost({action:'basic',modules:off},'brk.io.vn')).status===403,'Brand session cannot administer package')
