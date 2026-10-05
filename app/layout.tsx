@@ -26,7 +26,9 @@ const beVietnamPro = Be_Vietnam_Pro({
 
 export async function generateMetadata(): Promise<Metadata> {
   const profile = await getCurrentSiteProfile()
-  const title = profile?.metaTitle || profile?.title || 'MFC - Dòng chảy Phước Báu'
+  const runtimeConfig = profile ? getSiteRuntimeConfig(profile) : null
+  const brandName = runtimeConfig?.branding.name || profile?.title || 'MFC'
+  const title = profile?.metaTitle || brandName || 'MFC - Dòng chảy Phước Báu'
   const description = profile?.metaDescription || profile?.subtitle
     || 'Chia sẻ, đào tạo, chuyển hiện thực về Nội tâm, Sức khỏe, Mối quan hệ, Tài chính kinh doanh đầu tư và Công nghệ AI, Xây dựng Nhân hiệu, Affiliate'
   const image = profile?.metaImage || profile?.heroImage || '/og-image.png'
@@ -36,9 +38,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: { default: title, template: `%s | ${title}` },
-    applicationName: profile?.title || 'MFC',
-    appleWebApp: { capable: true, title: profile?.title || 'MFC', statusBarStyle: 'default' },
-    icons: { apple: '/pwa/apple-touch-icon.png' },
+    applicationName: brandName,
+    appleWebApp: { capable: true, title: brandName, statusBarStyle: 'default' },
+    icons: runtimeConfig?.branding.faviconUrl
+      ? { icon: runtimeConfig.branding.faviconUrl, apple: runtimeConfig.branding.faviconUrl }
+      : { apple: '/pwa/apple-touch-icon.png' },
     description,
     openGraph: {
       title,
@@ -46,7 +50,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
       locale: 'vi_VN',
       url,
-      siteName: profile?.title || title,
+      siteName: brandName || title,
       images: [{ url: image, width: 1200, height: 630, alt: title }],
     },
     twitter: {
