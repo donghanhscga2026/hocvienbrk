@@ -16,7 +16,7 @@ async function snapshot(profileId:number) {
   const [row,basic,domains]=await Promise.all([
     prisma.systemConfig.findUnique({where:{key:accessKey(profileId)}}),
     prisma.systemConfig.findUnique({where:{key:basicKey}}),
-    prisma.siteDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'},select:{hostname:true,courses:true,crm:true,affiliate:true,enabled:true}})
+    prisma.siteProfileDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'},select:{hostname:true,courses:true,crm:true,affiliate:true,enabled:true}})
   ])
   const access=row ? accessSchema.parse(row.value) : initialAccess(domains[0] || noModules)
   const template=basic ? basicSchema.parse(basic.value) : {modules:{courses:true,crm:true,affiliate:true},applications:allApplications}
@@ -43,7 +43,7 @@ export async function POST(request:Request) {
         // Khóa theo website để không ghi đè thay đổi ở cửa sổ khác.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420305, ${profile.id}::integer)`
         const row=await tx.systemConfig.findUnique({where:{key:accessKey(profile.id)}})
-        const legacy=await tx.siteDomain.findFirst({where:{profileId:profile.id},orderBy:{createdAt:'asc'}})
+        const legacy=await tx.siteProfileDomain.findFirst({where:{profileId:profile.id},orderBy:{createdAt:'asc'}})
         const current=row ? accessSchema.parse(row.value) : initialAccess(legacy || noModules)
         if(current.revision!==input.revision) throw new CrmError('Cấu hình đã đổi. Tải lại trước khi lưu.',409)
         const basic=await tx.systemConfig.findUnique({where:{key:basicKey}})
@@ -52,7 +52,7 @@ export async function POST(request:Request) {
         if(!admin && (['courses','crm','affiliate'] as const).some(key=>next.enabled[key] && !next.base[key] && !next.extra[key])) throw new CrmError('Chức năng chưa được cấp.',403)
         if(!admin && applicationKeys.some(key=>next.applications.enabled[key] && !next.applications.base[key] && !next.applications.extra[key])) throw new CrmError('Ứng dụng chưa được cấp cho website.',403)
         await tx.systemConfig.upsert({where:{key:accessKey(profile.id)},create:{key:accessKey(profile.id),value:next},update:{value:next}})
-        await tx.siteDomain.updateMany({where:{profileId:profile.id},data:effectiveModules(next)})
+        await tx.siteProfileDomain.updateMany({where:{profileId:profile.id},data:effectiveModules(next)})
       })
     }
     return crmResponse({...await snapshot(profile.id),admin,name:profile.title,slug:profile.slug})
