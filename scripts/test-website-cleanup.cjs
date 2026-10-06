@@ -76,7 +76,7 @@ async function run(){
  ok(document.querySelectorAll('select').length===0,'Duplicate homepage, theme and data selectors are removed')
  ok(!control('Công cụ') && !control('Hiển thị bảng tin'),'No ineffective tools or missing community block controls')
  ok(document.body.textContent.includes('Sales page đã chọn'),'Existing landing homepage is shown without changing it')
- ok(document.querySelector('details summary').textContent==='Tên miền do Admin cấp' && !document.querySelector('details').open,'Manual domains are collapsed')
+ ok(!control('Tên miền chính') && !control('Tên miền phụ') && !document.body.textContent.includes('Tên miền do Admin cấp'),'Duplicate manual domain controls are removed')
  ok(document.querySelector('a[href="/page/owner"]'),'View link targets the edited profile')
  await click([...document.querySelectorAll('button')].find(el=>el.textContent.includes('Lưu thông tin')))
  ok(!('homepage' in saved.siteConfig) && !('courseScope' in saved.siteConfig) && !('theme' in saved.siteConfig) && !('themeId' in saved),'Save does not overwrite hidden homepage, course source or palette')

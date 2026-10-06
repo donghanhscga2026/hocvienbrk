@@ -1,10 +1,10 @@
 'use client'
 import Link from 'next/link'
-import {useMemo,useState} from 'react'
+import {useState} from 'react'
 import {Globe2,Save} from 'lucide-react'
 import {updateSiteProfileRuntime} from '@/app/actions/site-profile-actions'
 
-type ProfileLike={id:number;slug?:string;siteConfig?:unknown;communityAvailable?:boolean;domains?:Array<{hostname:string;isPrimary:boolean;isActive:boolean}>}
+type ProfileLike={id:number;slug?:string;siteConfig?:unknown;communityAvailable?:boolean}
 type Props={profile:ProfileLike;onSaved?:()=>void|Promise<void>}
 function record(value:unknown) {
   return value && typeof value==='object' && !Array.isArray(value)?value as Record<string,unknown>:{}
@@ -13,13 +13,6 @@ function record(value:unknown) {
 /** Chỉ gửi thông tin được chỉnh tại đây; giữ các thiết lập ở khu vực khác. */
 export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
   const config=record(profile.siteConfig),branding=record(config.branding),homepage=record(config.homepage),modules=record(config.modules)
-  const initial=useMemo(()=>{
-    const active=(profile.domains || []).filter(item=>item.isActive)
-    const primary=active.find(item=>item.isPrimary) || active[0]
-    return {primary:primary?.hostname || '',additional:active.filter(item=>item.hostname!==primary?.hostname).map(item=>item.hostname).join(', ')}
-  },[profile])
-  const [primaryDomain,setPrimaryDomain]=useState(initial.primary)
-  const [additionalDomains,setAdditionalDomains]=useState(initial.additional)
   const [brandName,setBrandName]=useState(String(branding.name || ''))
   const [logoUrl,setLogoUrl]=useState(String(branding.logoUrl || ''))
   const [faviconUrl,setFaviconUrl]=useState(String(branding.faviconUrl || ''))
@@ -33,8 +26,6 @@ export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
     try {
       // Giữ nguyên trang chủ, bộ màu, nguồn khóa học và các quyền đã lưu.
       const result=await updateSiteProfileRuntime(profile.id,{
-        ...(primaryDomain!==initial.primary || additionalDomains!==initial.additional
-          ? {primaryDomain,additionalDomains:additionalDomains.split(',').map(item=>item.trim()).filter(Boolean)} : {}),
         siteConfig:{
           branding:{...branding,name:brandName.trim(),logoUrl:logoUrl.trim(),faviconUrl:faviconUrl.trim()},
           ...(profile.communityAvailable?{modules:{...modules,community}}:{}),
@@ -66,15 +57,6 @@ export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
       </div>
       <p className="text-sm text-gray-500">Thông tin thương hiệu dùng cho khung website trên tên miền riêng. Nội dung bên trong thiết kế được sửa tại trình thiết kế.</p>
       {profile.communityAvailable && <label className="flex min-h-11 items-center gap-3 rounded-xl border p-3 text-sm"><input type="checkbox" checked={community} onChange={e=>setCommunity(e.target.checked)} className="h-4 w-4 accent-emerald-600"/>Hiển thị bảng tin cộng đồng</label>}
-      <details className="rounded-xl border border-gray-200 p-4">
-        <summary className="cursor-pointer text-sm font-medium text-gray-700">Tên miền do Admin cấp</summary>
-        <p className="my-3 text-sm text-gray-500">Dành cho tên miền cấu hình thủ công. Chủ website kết nối và kiểm tra DNS tại mục Tên miền trong Quản lý website.</p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm font-medium text-gray-700">Tên miền chính<input value={primaryDomain} onChange={e=>setPrimaryDomain(e.target.value)} placeholder="example.com" className={field}/></label>
-          <label className="text-sm font-medium text-gray-700">Tên miền phụ<input value={additionalDomains} onChange={e=>setAdditionalDomains(e.target.value)} placeholder="www.example.com" className={field}/></label>
-        </div>
-        <p className="mt-3 text-sm text-gray-500">Lưu ở đây chưa tự cấu hình DNS hoặc HTTPS.</p>
-      </details>
       <button type="button" onClick={saveRuntime} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving?'Đang lưu...':'Lưu thông tin website'}</button>
     </fieldset>
   </section>
