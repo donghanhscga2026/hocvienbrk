@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { zipFrameSource } from '@/lib/course-page/importer/source-url'
+import { zipFrameSource, zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
 
 type Props = {
   id?: string
@@ -23,9 +23,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   const frameRef = React.useRef<HTMLIFrameElement | null>(null)
   const [height, setHeight] = React.useState(900)
   const sourceUrl = content?.exactSource?.url || content?.importedSource?.exactSource?.url || ''
-  const selectedBlockKeys: string[] | null = Array.isArray(content?.selectedBlockKeys)
-    ? content.selectedBlockKeys.filter((value: unknown): value is string => typeof value === 'string')
-    : null
+  const selectedBlockKeys = zipSelectedBlockKeys(content?.selectedBlockKeys)
   const registrationBlockKeys: string[] = Array.isArray(content?.registrationBlockKeys)
     ? content.registrationBlockKeys.filter((value: unknown): value is string => typeof value === 'string')
     : []

@@ -1,5 +1,13 @@
 const STORAGE_PREFIX = '/storage/v1/object/public/uploads/course-template-sources/'
 
+export function zipSelectedBlockKeys(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null
+  const keys = value.filter((key): key is string => typeof key === 'string')
+  // The old analyzer collapsed the entire document into this synthetic block.
+  // It represents the full page, rather than a real data-mfc-block in the ZIP.
+  return keys.length === 1 && keys[0] === 'imported-1' ? null : keys
+}
+
 // Only sources uploaded by this importer may be served as HTML by the application.
 export function resolveZipStorageSource(value: string, supabaseUrl: string): URL | null {
   try {
