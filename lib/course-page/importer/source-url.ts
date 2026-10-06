@@ -1,9 +1,9 @@
 const STORAGE_PREFIX = '/storage/v1/object/public/uploads/course-template-sources/'
 
 export function zipCourseLinks(pathname: string): Record<string, string> {
-  return pathname === '/khoa-hoc/BAN_DO_TAI_CHINH'
-    ? { '2': '/khoa-hoc/KICH_HOAT_DONG_TIEN' }
-    : {}
+  if (pathname === '/khoa-hoc/BAN_DO_TAI_CHINH') return { '2': '/khoa-hoc/KICH_HOAT_DONG_TIEN' }
+  if (pathname === '/khoa-hoc/KICH_HOAT_DONG_TIEN') return { '21': '/khoa-hoc/BAN_DO_TAI_CHINH' }
+  return {}
 }
 
 export function zipSelectedBlockKeys(value: unknown): string[] | null {
