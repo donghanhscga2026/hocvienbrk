@@ -59,6 +59,7 @@ export async function POST(request: Request) {
         const checking='Đang kiểm tra DNS và HTTPS'
         const reserved=await prisma.siteProfileDomain.updateMany({where:{...where,OR:[{checkedAt:null},{checkedAt:{lt:new Date(Date.now()-30000)}}]},data:{checkedAt,message:checking}})
         if(!reserved.count) throw new CrmError('Chờ 30 giây trước lần kiểm tra tiếp theo.',429)
+        if(!domain.token) throw new CrmError('Tên miền chưa có mã xác minh. Hãy xóa và thêm lại tên miền.',409)
         const result=await verifyDomain(hostname,domain.token)
         // So sánh token và thời điểm: không bật bản ghi vừa bị thay thế/xóa trong lúc kiểm tra.
         await prisma.siteProfileDomain.updateMany({where:{...where,token:domain.token,checkedAt,message:checking},data:{message:result.message,...(result.valid ? {verifiedAt:new Date(),isActive:true} : {})}})
