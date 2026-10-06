@@ -6,10 +6,14 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Bell, X } from 'lucide-react'
 import { formatCrmDate } from '@/lib/crm/shared'
+import { useDomainBrand } from '@/components/website/DomainShell'
 
 type Row = { id: string; title: string; kind: string; readAt: string | null; createdAt: string; href: string }
 type Feed = { notifications: Row[]; total: number; unread: number }
 export default function NotificationBell() {
+  return useDomainBrand() ? null : <PlatformNotificationBell />
+}
+function PlatformNotificationBell() {
   const { data: session } = useSession()
   const userId = session?.user?.id
   const router = useRouter()

@@ -13,6 +13,9 @@
     "lint": "eslint",
     "test:crm-notifications": "node scripts/test-crm-notifications.cjs",
     "test:website-builder": "node scripts/test-website-builder.cjs",
+    "test:custom-domains": "node scripts/test-custom-domains.cjs",
+    "test:multisite-integration": "node scripts/test-multisite-integration.cjs",
+    "test:website-cleanup": "node scripts/test-website-cleanup.cjs",
     "process-legacy": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/process-legacy-users.ts",
     "fill-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fill-missing-ids.ts",
     "change-id": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/change-id.ts",
@@ -23,6 +26,7 @@
     "migrate-external-images": "ts-node -P tsconfig.seed.json scripts/migrate-external-images-to-supabase.ts"
   },
   "dependencies": {
+    "@auth/core": "0.37.2",
     "@auth/prisma-adapter": "^2.11.1",
     "@getbrevo/brevo": "^5.0.4",
     "@hookform/resolvers": "^5.2.2",

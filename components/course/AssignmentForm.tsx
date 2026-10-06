@@ -270,7 +270,7 @@ function AssignmentForm({
     }
 
     return (
-        <div className="flex flex-col h-full min-h-0 bg-[#FFFDE7]">
+        <div className="flex flex-col h-full min-h-0 bg-[#FFFDE7] website:bg-brk-background">
             {showRules && <RulesModal onClose={() => setShowRules(false)} />}
 
             <div className="shrink-0 z-10 bg-brk-primary/10 border-b border-brk-accent/20 px-4 py-2">
@@ -286,7 +286,7 @@ function AssignmentForm({
                         <button
                             onClick={handleSubmit}
                             disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-1.5 bg-brk-accent hover:brightness-110 active:scale-[0.98] text-brk-on-primary font-black rounded-xl py-2 transition-all shadow-md disabled:opacity-60 text-sm"
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-brk-accent hover:brightness-110 active:scale-[0.98] text-brk-on-primary website:text-brk-on-accent font-black rounded-xl py-2 transition-all shadow-md disabled:opacity-60 text-sm"
                         >
                             {loading
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -326,7 +326,7 @@ function AssignmentForm({
                     </p>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="bg-white website:bg-brk-surface rounded-xl border border-gray-200 website:border-brk-outline px-3 py-2.5 shadow-sm">
                     <SectionHead num={2} label="Bồi Nhân = Bài tập/Bài học theo yêu cầu (2đ)" max={2} current={refScore} />
                     {/* [FIX] "relative" giờ chỉ bọc riêng khối bên dưới tiêu đề (không
                         còn ôm chung với SectionHead ở trên) — top:0 của ô mở rộng vì vậy
@@ -365,17 +365,17 @@ function AssignmentForm({
                                 placeholder="Đây là nơi ghi lại nội dung theo yêu cầu trong bài tập hoặc có thể chia sẻ bài học tâm đắc ngộ của bạn..."
                                 rows={3}
                                 className={reflectionExpanded
-                                    ? 'w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
-                                    : 'w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 text-justify'
+                                    ? 'w-full bg-white website:bg-brk-surface text-base text-gray-800 website:text-brk-on-surface border border-gray-200 website:border-brk-outline rounded-lg p-3 pt-12 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 website:placeholder:text-brk-muted text-justify'
+                                    : 'w-full bg-white website:bg-brk-surface text-base text-gray-800 website:text-brk-on-surface border border-gray-200 website:border-brk-outline rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 website:placeholder:text-brk-muted text-justify'
                                 }
                                 style={reflectionExpanded ? { minHeight: '320px' } : undefined}
                             />
                         </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>
+                    <p className="text-[10px] text-gray-400 website:text-brk-muted mt-0.5">{reflection.length} ký tự {reflection.length >= 86 ? '✓ Sâu sắc' : '(cần ≥ 86 để đạt max)'}</p>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="bg-white website:bg-brk-surface rounded-xl border border-gray-200 website:border-brk-outline px-3 py-2.5 shadow-sm">
                     <SectionHead num={3} label="Hành Lễ = Link thực hành mỗi ngày (3đ)" max={3} current={pracScore} />
                     <div className="flex flex-col gap-1.5">
                         {links.map((link, i) => (
@@ -389,13 +389,13 @@ function AssignmentForm({
                                     setLinks(next)
                                 }}
                                 placeholder={`link video hoặc link bài tập ${i + 1}`}
-                                className="w-full text-sm text-gray-800 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300"
+                                className="w-full text-sm text-gray-800 website:text-brk-on-surface border border-gray-200 website:border-brk-outline rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-gray-300 website:placeholder:text-brk-muted"
                             />
                         ))}
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="bg-white website:bg-brk-surface rounded-xl border border-gray-200 website:border-brk-outline px-3 py-2.5 shadow-sm">
                     <SectionHead num={4} label="Trọng Nghĩa = hỗ trợ đồng đội (2đ)" max={2} current={supportScore} />
                     <div className="flex flex-col gap-1.5">
                         {[
@@ -413,7 +413,7 @@ function AssignmentForm({
                                     }}
                                     className="w-4 h-4 accent-orange-500 cursor-pointer"
                                 />
-                                <span className={`text-sm ${supports[i] ? 'text-gray-800 font-semibold' : 'text-gray-500'}`}>
+                                <span className={`text-sm ${supports[i] ? 'text-gray-800 website:text-brk-on-surface font-semibold' : 'text-gray-500 website:text-brk-muted'}`}>
                                     {label}
                                 </span>
                             </label>
@@ -421,19 +421,19 @@ function AssignmentForm({
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 px-3 py-2.5 shadow-sm">
+                <div className="bg-white website:bg-brk-surface rounded-xl border border-gray-200 website:border-brk-outline px-3 py-2.5 shadow-sm">
                     <SectionHead num={5} label="Giữ Tín = Làm đúng hạn (1đ)" max={1} current={currentTimingScore === 1 ? 1 : 0} />
                     <div className="flex flex-col gap-1 text-sm">
                         <div className="flex justify-between">
-                            <span className="text-gray-500">Đúng hạn (Trước 23:59):</span>
+                            <span className="text-gray-500 website:text-brk-muted">Đúng hạn (Trước 23:59):</span>
                             <span className="text-green-600 font-bold">+1đ</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-gray-500">Muộn (Sau 23:59):</span>
+                            <span className="text-gray-500 website:text-brk-muted">Muộn (Sau 23:59):</span>
                             <span className="text-red-500 font-bold">-1đ</span>
                         </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">* Hệ thống tự động ghi nhận theo thời gian thực.</p>
+                    <p className="text-[10px] text-gray-400 website:text-brk-muted mt-1">* Hệ thống tự động ghi nhận theo thời gian thực.</p>
                 </div>
 
                 <div className="h-2" />

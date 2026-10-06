@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { Role } from '@prisma/client'
+import { domainContext } from '@/lib/website/domain-context'
 
 /**
  * Trả về NextResponse 403 nếu request không phải từ user có role ADMIN.
@@ -9,6 +10,7 @@ import { Role } from '@prisma/client'
  *   if (denied) return denied
  */
 export async function requireAdmin() {
+  if(await domainContext()) return NextResponse.json({error:'Quản trị hệ thống tại tên miền chính.'},{status:403})
   const session = await auth()
   if (session?.user?.role !== Role.ADMIN) {
     return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 403 })
@@ -34,6 +36,7 @@ export async function requireAuth() {
  * Dùng: const denied = await requireAdminAction(); if (denied) return denied
  */
 export async function requireAdminAction(): Promise<{ success: false; error: string } | null> {
+  if(await domainContext()) return {success:false,error:'Quản trị hệ thống tại tên miền chính.'}
   const session = await auth()
   if (session?.user?.role !== Role.ADMIN) {
     return { success: false, error: 'Unauthorized. Admin only.' }

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/auth"
 import prisma from "@/lib/prisma"
+import { requireDomainModule } from '@/lib/website/domain-context'
 
 export async function GET() {
     try {
+        const domain=await requireDomainModule('affiliate')
         const session = await auth()
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -32,7 +34,7 @@ export async function GET() {
             orderBy: { createdAt: 'desc' }
         })
 
-        const landings = await prisma.landingPage.findMany({
+        const landings = domain ? [] : await prisma.landingPage.findMany({
             where: { isActive: true },
             select: { slug: true, title: true }
         })
@@ -42,7 +44,7 @@ export async function GET() {
             refs,
             landings,
             user,
-            baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+            baseUrl: domain ? 'https://'+domain.hostname : process.env.NEXT_PUBLIC_BASE_URL || 'https://giautoandien.io.vn'
         })
     } catch (error) {
         console.error('[API] Affiliate links error:', error)

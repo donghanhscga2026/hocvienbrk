@@ -4,11 +4,20 @@ import prisma from "@/lib/prisma"
 import { PayoutStatus } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 import { requireAdminAction } from "@/lib/api-auth"
+import { auth } from '@/auth'
+import { requireDomainModule } from '@/lib/website/domain-context'
+
+async function ownAffiliate(userId:number) {
+    await requireDomainModule('affiliate')
+    const session=await auth()
+    if(!session?.user?.id || Number(session.user.id)!==userId) throw new Error('Bạn chỉ được dùng ví affiliate của mình.')
+}
 
 // ==================== WALLET ====================
 
 export async function getAffiliateWallet(userId: number) {
     try {
+        await ownAffiliate(userId)
         let wallet = await prisma.affiliateWallet.findUnique({
             where: { userId }
         })
@@ -31,6 +40,7 @@ export async function getWalletTransactions(userId: number, options?: {
     limit?: number
 }) {
     try {
+        await ownAffiliate(userId)
         const wallet = await prisma.affiliateWallet.findUnique({
             where: { userId }
         })
@@ -69,6 +79,8 @@ export async function requestPayout(
     amount: number
 ) {
     try {
+        await ownAffiliate(userId)
+        if(!Number.isFinite(amount) || amount<=0) throw new Error('Số tiền không hợp lệ.')
         // 1. Kiểm tra số dư
         const wallet = await prisma.affiliateWallet.findUnique({
             where: { userId }
@@ -156,6 +168,7 @@ export async function requestPayout(
 
 export async function getPayoutHistory(userId: number) {
     try {
+        await ownAffiliate(userId)
         const payouts = await prisma.affiliatePayout.findMany({
             where: { userId },
             orderBy: { createdAt: 'desc' }
@@ -171,6 +184,7 @@ export async function getPayoutHistory(userId: number) {
 // ==================== ADMIN ACTIONS ====================
 
 export async function getPendingPayouts() {
+    const denied=await requireAdminAction();if(denied)return denied
     try {
         const payouts = await prisma.affiliatePayout.findMany({
             where: { status: PayoutStatus.PENDING },
@@ -261,6 +275,7 @@ export async function rejectPayout(payoutId: number, notes: string) {
 }
 
 export async function getAffiliateStats() {
+    const denied=await requireAdminAction();if(denied)return denied
     try {
         const [
             totalAffiliates,

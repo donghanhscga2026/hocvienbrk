@@ -1,8 +1,9 @@
 import { z } from 'zod'
 
-export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
+// Giữ loại khối cũ để bản nháp và website đã lưu vẫn đọc được.
+export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'course-hero', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
 export type Kind = typeof kinds[number]
-export const labels: Record<Kind, string> = { container: 'Bố cục / cột', heading: 'Tiêu đề', text: 'Văn bản', image: 'Ảnh', video: 'Video', button: 'Nút', courses: 'Khóa học', testimonials: 'Lời chứng thực', posts: 'Bài viết', form: 'Form tư vấn → CRM', affiliate: 'Nút affiliate', html: 'HTML / CSS', divider: 'Đường phân cách' }
+export const labels: Record<Kind, string> = { container: 'Bố cục / cột', heading: 'Tiêu đề', text: 'Văn bản', image: 'Ảnh', video: 'Video', button: 'Nút', courses: 'Khóa học', 'course-hero': 'Khóa học chính', testimonials: 'Lời chứng thực', posts: 'Bài viết', form: 'Form tư vấn → CRM', affiliate: 'Nút affiliate', html: 'HTML / CSS', divider: 'Đường phân cách' }
 const color = z.string().regex(/^(#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$/i)
 const safeLink = z.string().max(2000).refine(v => !v || /^https?:\/\/[^\s]+$/i.test(v) || /^\/(?!\/)[^\s\\]*$/.test(v) || /^#[\w-]+$/.test(v), 'Liên kết phải là HTTPS/HTTP, đường dẫn / hoặc #anchor.')
 const fonts = z.enum(['inherit','sans-serif','serif','monospace'])
@@ -43,17 +44,4 @@ export function moveNode(nodes: WebsiteNode[], id: string, parent: string | null
   const removed = removeNode(nodes, id)
   function insert(list: WebsiteNode[]) { const index = before ? list.findIndex(n => n.id === before) : -1; const result = [...list]; result.splice(index < 0 ? list.length : index, 0, source!); return result }
   return parent ? updateNode(removed, parent, n => ({ ...n, children: insert(n.children) })) : insert(removed)
-}
-export function templateDocument(key: string, name: string): WebsiteDocument {
-  const doc = blankDocument(name)
-  if(key === 'blank') return doc
-  const hero = makeNode('container'); hero.style = { background: '#f5f3ff', padding: 64, gap: 24, radius: 24 }; hero.mobile = { padding: 24 }
-  const title = makeNode('heading'); title.text = key === 'business' ? 'Cùng bạn tạo nên những thay đổi có giá trị' : 'Học tập. Chuyển hóa. Phát triển.'; title.style = { fontSize: 48 }; title.mobile = { fontSize: 30 }
-  const text = makeNode('text'); text.text = 'Giới thiệu thương hiệu và điều bạn giúp khách hàng đạt được.'
-  const cta = makeNode('button'); cta.text = 'Khám phá khóa học'; cta.url = '#courses'
-  hero.children = [title, text, cta]
-  const intro = makeNode('container'); intro.style.columns = 2; intro.mobile.columns = 1
-  const about = makeNode('text'); about.text = 'Về chúng tôi\nChia sẻ câu chuyện, kinh nghiệm và những giá trị bạn mang lại.'; intro.children = [about, makeNode('image')]
-  doc.pages[0].nodes = [hero, intro, makeNode('courses'), makeNode('testimonials'), makeNode('form')]
-  return doc
 }
