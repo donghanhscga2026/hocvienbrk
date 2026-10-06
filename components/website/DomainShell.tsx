@@ -6,7 +6,7 @@ import {usePathname} from 'next/navigation'
 import {websiteTheme} from '@/lib/website/theme'
 import type {DomainModules} from '@/lib/website/domain-shared'
 
-type Brand=DomainModules & {name:string;color:string;background:string;ownerId:number|null;footerText?:string|null;logoUrl?:string;tools?:boolean}
+type Brand=DomainModules & {name:string;color:string;background:string;ownerId:number|null;footerText?:string|null;logoUrl?:string;tools?:boolean;palette?:unknown}
 type Page={title:string;slug:string}
 const pathIsLearning=(path:string)=>/^\/(?:courses|khoa-hoc)\/[^/]+\/learn$/.test(path)
 const Context=createContext<Brand|null>(null)
@@ -15,7 +15,7 @@ export const useDomainBrand=()=>useContext(Context)
 /** Khung điều hướng chung cho trang thiết kế, khóa học và tài khoản. */
 export default function DomainShell({brand,pages=[],path:initialPath='/',children}:{brand:Brand;pages?:Page[];path?:string;children:React.ReactNode}) {
   const {data:session}=useSession()
-  const theme=websiteTheme(brand.color,brand.background)
+  const theme=websiteTheme(brand.color,brand.background,brand.palette)
 
   const pathname=usePathname()
   const path=pathname ? pathname.replace(/^\/site-domain\/[^/]+/, '') || '/' : initialPath

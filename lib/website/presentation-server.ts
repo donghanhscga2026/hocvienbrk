@@ -3,6 +3,7 @@ import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import {cache} from 'react'
 import prisma from '@/lib/prisma'
 import {publishedWebsite} from '@/lib/website/server'
+import {normalizeWebsitePalette} from './theme'
 import {blankDocument} from './document'
 import {presentationKey,presentationSchema} from './presentation'
 
@@ -29,11 +30,11 @@ export async function activeCustomWebsite(profileId:number) {
 export async function domainWebsite(profile:{id:number;title:string|null;subtitle?:string|null;accentColor?:string|null;backgroundColor?:string|null;siteConfig?:unknown;theme?:{colors:unknown}|null}) {
   const state=await presentationState(profile.id)
   const config=getSiteRuntimeConfig(profile)
-  if(state.mode==='custom') return state.custom ? {...state.custom,name:config.branding.name || state.custom.name}:null
+  const palette=normalizeWebsitePalette(profile.theme?.colors)
+  if(state.mode==='custom') return state.custom ? {...state.custom,name:config.branding.name || state.custom.name,color:palette.primary || state.custom.color,background:palette.background || state.custom.background}:null
   const document=blankDocument(config.branding.name || profile.title || 'Website của tôi')
   document.description=profile.subtitle || ''
-  const palette=profile.theme?.colors as Record<string,string>|undefined
-  document.color=palette?.primary || profile.accentColor || '#7c3aed'
-  document.background=palette?.background || profile.backgroundColor || '#f8fafc'
+  document.color=palette.primary || profile.accentColor || '#7c3aed'
+  document.background=palette.background || profile.backgroundColor || '#f8fafc'
   return document
 }

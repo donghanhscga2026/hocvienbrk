@@ -82,6 +82,7 @@ export async function getSiteProfileAdminById(id: number) {
           include: { user: { select: { id: true, name: true, email: true, image: true } } }
         },
         theme: true,
+        verifiedDomains: { select: { hostname: true } },
         domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
         surveys: true,
         landingPages: true,

@@ -2,10 +2,12 @@
 
 import { CSSProperties, FormEvent, useState, useSyncExternalStore } from 'react'
 import { NodeStyle, WebsiteDocument, WebsiteNode } from '@/lib/website/document'
+import {useDomainBrand} from './DomainShell'
 import { websiteTheme } from '@/lib/website/theme'
 import { websiteHref, DomainModules } from '@/lib/website/domain-shared'
 
 export interface WebsiteData {
+  community?: boolean
   courses: { id: number; title: string; image: string; description: string; href: string }[]
   testimonials: { id: number; courseId: number; name: string; role: string | null; content: string; rating: number }[]
   posts: { id: string; title: string; content: string }[]
@@ -34,11 +36,13 @@ function LeadForm({ node, slug, page, preview }: { node: WebsiteNode; slug: stri
 function subscribeLocation(callback: () => void) { window.addEventListener('popstate',callback); return () => window.removeEventListener('popstate',callback) }
 export default function WebsiteView({ document: doc, data, slug, pageSlug = '', preview = false, mobile = false, selected, onSelect, customDomain = false, modules }: { document: WebsiteDocument; data: WebsiteData; slug: string; pageSlug?: string; preview?: boolean; mobile?: boolean; selected?: string; onSelect?: (id: string) => void; customDomain?: boolean; modules?: DomainModules }) {
   const referral = useSyncExternalStore(subscribeLocation, () => new URLSearchParams(window.location.search).get('ref') || '', () => '')
-  const theme=websiteTheme(doc.color,doc.background)
+  const brand=useDomainBrand()
+  const theme=websiteTheme(customDomain ? brand?.color || doc.color : doc.color,customDomain ? brand?.background || doc.background : doc.background,customDomain ? brand?.palette : undefined)
   const page = doc.pages.find(p => p.slug === pageSlug) || doc.pages[0]
   function href(url: string) { return websiteHref(url,slug,modules?.affiliate === false ? '' : referral,customDomain) }
   const card = 'p-5 rounded-xl border bg-white text-gray-900 grid gap-3 website:bg-brk-surface website:text-brk-on-surface website:border-brk-outline'
   function render(n: WebsiteNode) {
+    if(n.kind === 'posts' && data.community === false) return null
     if(modules && ((['courses','testimonials'].includes(n.kind) && !modules.courses) || (n.kind === 'form' && !modules.crm) || (n.kind === 'affiliate' && !modules.affiliate))) return null
     const courses = n.courseIds.length ? data.courses.filter(c => n.courseIds.includes(c.id)) : data.courses
     const style = cssStyle({ ...(n.kind === 'heading' ? { fontSize: 30 } : n.kind === 'html' ? { minHeight: 400 } : {}), ...n.style, ...(mobile ? { ...(n.kind === 'container' ? { columns: 1 } : {}), ...n.mobile } : {}) },n.kind)

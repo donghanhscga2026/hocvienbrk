@@ -15,6 +15,7 @@
     "test:website-builder": "node scripts/test-website-builder.cjs",
     "test:custom-domains": "node scripts/test-custom-domains.cjs",
     "test:multisite-integration": "node scripts/test-multisite-integration.cjs",
+    "test:website-cleanup": "node scripts/test-website-cleanup.cjs",
     "process-legacy": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/process-legacy-users.ts",
     "fill-missing": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/fill-missing-ids.ts",
     "change-id": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/change-id.ts",
