@@ -164,7 +164,7 @@ async function rewriteCss(
   return result
 }
 
-const BRIDGE = `
+export const BRIDGE = `
 <script data-mfc-zip-bridge>
 (function(){
   if (window.__MFC_ZIP_BRIDGE__) return;
@@ -204,10 +204,29 @@ const BRIDGE = `
     try{decoded=decodeURIComponent(decoded);}catch(err){}
     return document.getElementById(decoded) || document.getElementById(anchor||'');
   }
+  function configureLinks(data){
+    var page;
+    try{page=new URL(data.pageUrl);if(page.origin!==location.origin||!/^\\/khoa-hoc\\/[A-Za-z0-9_-]+$/.test(page.pathname))return;}catch(err){return;}
+    document.querySelectorAll('a[href]').forEach(function(el){
+      var href=el.getAttribute('href')||'';
+      var anchor=el.getAttribute('data-mfc-anchor')||(href.charAt(0)==='#'?href.slice(1):'');
+      if(!anchor)return;
+      el.setAttribute('data-mfc-anchor',anchor);
+      var course=el.getAttribute('data-course');
+      var target=data.courseLinks && data.courseLinks[course];
+      if(typeof target==='string' && /^\\/khoa-hoc\\/[A-Za-z0-9_-]+$/.test(target)){
+        el.setAttribute('data-mfc-course-link',target);
+        el.setAttribute('href',page.origin+target);
+      }else{
+        el.removeAttribute('data-mfc-course-link');
+        el.setAttribute('href',page.origin+page.pathname+'#'+anchor);
+      }
+    });
+  }
   function navigateAnchor(anchor,updateHash){
     if(!anchor)return;
     if(isRegistrationAnchor(anchor)){
-      post({type:'action',actionType:'open_registration'});
+      post({type:'action',actionType:'open_registration',anchor:anchor,updateHash:updateHash!==false});
       return;
     }
     var target=targetForAnchor(anchor);
@@ -216,11 +235,13 @@ const BRIDGE = `
     post({type:'scroll',top:Math.max(0,top),anchor:anchor,updateHash:updateHash!==false});
   }
   addEventListener('message',function(e){
+    if(e.source!==parent)return;
     var data=e.data||{};
     if(data.source!=='mfc-zip-parent') return;
     if(data.type==='configure'){
       cfg.selectedBlockKeys=Array.isArray(data.selectedBlockKeys)?data.selectedBlockKeys:null;
       cfg.registrationBlockKeys=Array.isArray(data.registrationBlockKeys)?data.registrationBlockKeys:[];
+      configureLinks(data);
       applyConfig();
       return;
     }
@@ -240,6 +261,15 @@ const BRIDGE = `
   document.addEventListener('click', function(e){
     var el=e.target && e.target.closest ? e.target.closest('a[href],button[data-mfc-register],[data-mfc-action="register"]') : null;
     if(!el)return;
+    var courseLink=el.getAttribute('data-mfc-course-link');
+    if(courseLink){
+      e.preventDefault();e.stopImmediatePropagation();
+      post({type:'action',actionType:'course_link',target:courseLink});return;
+    }
+    var sourceAnchor=el.getAttribute('data-mfc-anchor');
+    if(sourceAnchor){
+      e.preventDefault();e.stopImmediatePropagation();navigateAnchor(sourceAnchor,true);return;
+    }
     if(el.matches && el.matches('button[data-mfc-register],[data-mfc-action="register"]')){
       e.preventDefault();e.stopImmediatePropagation();post({type:'action',actionType:'open_registration'});return;
     }
@@ -272,6 +302,11 @@ const BRIDGE = `
   if(window.ResizeObserver){ try { new ResizeObserver(sendHeight).observe(document.documentElement); } catch(e){} }
 })();
 <\/script>`
+
+// Upgrade the importer-owned bridge in already saved ZIPs without changing assets.
+export function upgradeZipBridge(html: string): string {
+  return html.replace(/<script\b[^>]*\bdata-mfc-zip-bridge(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?[^>]*>[\s\S]*?<\/script\s*>/i, () => BRIDGE.trim())
+}
 
 export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite> {
   if (!file.name.toLowerCase().endsWith('.zip')) throw new Error('Vui lòng chọn file .zip')

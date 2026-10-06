@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { zipFrameSource, zipSelectedBlockKeys } from '@/lib/course-page/importer/source-url'
+import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/course-page/importer/source-url'
 
 type Props = {
   id?: string
@@ -75,12 +75,26 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
 
       if (data.source === 'mfc-zip-source' && data.type === 'action') {
         const actionType = typeof data.actionType === 'string' ? data.actionType : 'open_registration'
+        if (actionType === 'course_link') {
+          const allowedTargets = Object.values(zipCourseLinks(window.location.pathname))
+          if (typeof data.target === 'string' && allowedTargets.includes(data.target)) {
+            window.location.assign(data.target)
+          }
+          return
+        }
         if (actionType === 'external_link') {
           const target = safeExternal(data.target)
           if (target) onAction?.('external_link', target)
           return
         }
-        if (['open_registration', 'open_share'].includes(actionType)) onAction?.(actionType)
+        if (['open_registration', 'open_share'].includes(actionType)) {
+          if (actionType === 'open_registration' && data.updateHash !== false && typeof data.anchor === 'string') {
+            const url = new URL(window.location.href)
+            url.hash = data.anchor
+            if (url.hash !== window.location.hash) window.history.pushState(null, '', `${url.pathname}${url.search}${url.hash}`)
+          }
+          onAction?.(actionType)
+        }
         return
       }
 
@@ -98,6 +112,8 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
           type: 'configure',
           selectedBlockKeys,
           registrationBlockKeys,
+          pageUrl: window.location.origin + window.location.pathname,
+          courseLinks: zipCourseLinks(window.location.pathname),
         }, '*')
       } catch {}
     }
@@ -160,6 +176,8 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
             type: 'configure',
             selectedBlockKeys,
             registrationBlockKeys,
+            pageUrl: window.location.origin + window.location.pathname,
+            courseLinks: zipCourseLinks(window.location.pathname),
           }, '*')
           const rawHash = window.location.hash
           if (rawHash && rawHash !== '#') {
