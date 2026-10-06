@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { zipFrameSource } from '@/lib/course-page/importer/source-url'
 
 type Props = {
   id?: string
@@ -148,7 +149,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       ref={frameRef}
       id={id}
       title={content?.exactSource?.entryPath || 'ZIP website template'}
-      src={sourceUrl}
+      src={zipFrameSource(sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       scrolling="no"
