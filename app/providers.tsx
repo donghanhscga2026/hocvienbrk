@@ -13,14 +13,16 @@ export default function Providers({
   children,
   session,
   attentionHighlight,
+  website = false,
 }: {
   children: React.ReactNode,
   session?: Session | null,
   attentionHighlight: { config: AttentionHighlightConfig; items: AttentionHighlightItem[] }
+  website?: boolean
 }) {
   return (
     <SessionProvider session={session}>
-      <ThemeProvider>
+      <PlatformTheme enabled={!website}>
         <AttentionHighlightProvider config={attentionHighlight.config} items={attentionHighlight.items}>
           <AccountAssistantProvider>
             <AssistantProvider>
@@ -30,7 +32,8 @@ export default function Providers({
             </AssistantProvider>
           </AccountAssistantProvider>
         </AttentionHighlightProvider>
-      </ThemeProvider>
+      </PlatformTheme>
     </SessionProvider>
   )
 }
+function PlatformTheme({enabled,children}:{enabled:boolean;children:React.ReactNode}) { return enabled ? <ThemeProvider>{children}</ThemeProvider> : children }

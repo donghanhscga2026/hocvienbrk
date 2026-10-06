@@ -441,8 +441,8 @@ function getVerificationTemplate3(name: string, verifyUrl: string, emailId: stri
 /**
  * Get random verification template
  */
-function getRandomVerificationTemplate(name: string, token: string): { subject: string; html: string } {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
+function getRandomVerificationTemplate(name: string, token: string, websiteOrigin?: string): { subject: string; html: string } {
+  const baseUrl = websiteOrigin || process.env.NEXT_PUBLIC_APP_URL || 'https://giautoandien.io.vn';
   const verifyUrl = `${baseUrl}/api/auth/verify?token=${token}`;
   const emailId = generateEmailId();
   const greeting = randomPick(greetings);
@@ -500,8 +500,9 @@ export async function sendOtpStatusNotification(
   await sendTelegram(msg, 'CRON_LOG');
 }
 
-export async function sendVerificationEmail(to: string, studentName: string, token: string, userId?: number) {
-  const { subject, html } = getRandomVerificationTemplate(studentName, token);
+export async function sendVerificationEmail(to: string, studentName: string, token: string, userId?: number, websiteOrigin?: string) {
+  // Origin chỉ do máy chủ lấy từ tên miền đã xác minh; không lấy từ form đăng ký.
+  const { subject, html } = getRandomVerificationTemplate(studentName, token, websiteOrigin);
   const result = await sendGmail(to, subject, html);
   
   try {

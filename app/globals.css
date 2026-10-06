@@ -1,6 +1,50 @@
 @import url("https://fonts.googleapis.com/css2?family=Momo+Signature&display=swap");
 @import "tailwindcss";
 
+/* Ánh xạ màu chung, gồm cả các biến thể /10, /50, hover và placeholder.
+   Tên miền riêng cấp giá trị ngay từ server; theme nền tảng cũ vẫn được ưu tiên. */
+@theme inline {
+  --color-brk-primary: var(--color-primary, #4eb09b);
+  --color-brk-on-primary: var(--color-on-primary, #ffffff);
+  --color-brk-surface: var(--color-surface, #ffffff);
+  --color-brk-background: var(--color-background, #fae0c7);
+  --color-brk-on-surface: var(--color-on-surface, #333333);
+  --color-brk-muted: var(--color-muted, #765f5c);
+  --color-brk-accent: var(--color-accent, #f28076);
+  --color-brk-on-accent: var(--color-on-accent, #172033);
+  --color-brk-outline: var(--color-outline, #fbc193);
+  --color-brk-section: var(--color-surface, #ffffff);
+  --color-brk-section-alt: var(--color-background, #fae0c7);
+  --color-brk-section-secondary: var(--color-muted, #765f5c);
+  --color-brk-bg: var(--color-background, #fae0c7);
+  --color-brk-primary-25: color-mix(in srgb, var(--color-primary, #4eb09b) 25%, transparent);
+  --color-brk-primary-hover: color-mix(in srgb, var(--color-primary, #4eb09b) 85%, black);
+  --color-brk-accent-10: color-mix(in srgb, var(--color-accent, #f28076) 10%, transparent);
+  --color-brk-accent-20: color-mix(in srgb, var(--color-accent, #f28076) 20%, transparent);
+  --color-brk-accent-30: color-mix(in srgb, var(--color-accent, #f28076) 30%, transparent);
+  --color-brk-surface-dark: color-mix(in srgb, var(--color-surface, #ffffff) 90%, black);
+}
+@custom-variant website (&:where([data-website-theme], [data-website-theme] *));
+
+html[data-website-theme] body {
+  background: var(--color-background);
+  color: var(--color-on-surface);
+}
+/* Tên lớp cũ dùng cùng hậu tố cho nền và chữ nhưng có ý nghĩa khác nhau. */
+html[data-website-theme] .text-brk-section { color: var(--color-on-surface); }
+html[data-website-theme] .text-brk-primary { color: var(--color-accent); }
+html[data-website-theme] .bg-brk-accent.text-brk-on-primary { color: var(--color-on-accent); }
+html[data-website-theme] .bg-brk-primary.text-brk-on-surface { color: var(--color-on-primary); }
+/* Trang học chia chiều cao thực cho menu, breadcrumb và nội dung, kể cả khi menu mobile mở. */
+[data-website-learning="true"] {
+  height: 100dvh;
+  min-height: 0 !important;
+}
+[data-website-learning="true"] > header,
+[data-website-learning="true"] > nav {
+  flex-shrink: 0;
+}
+
 /* ============================= */
 /* CSS VARIABLES - Default Theme (from DB) */
 /* ============================= */

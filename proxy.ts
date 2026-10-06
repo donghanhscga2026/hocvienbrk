@@ -1,7 +1,12 @@
 import NextAuth from "next-auth"
 import { authConfig } from "./auth.config"
 import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import type { NextRequest, NextFetchEvent, NextMiddleware } from "next/server"
+import { activeDomain } from '@/lib/website/domains'
+import { domainRoute, requestHostname, isPlatformHost } from '@/lib/website/domain-shared'
+import prisma from '@/lib/prisma'
+import {courseBelongsToProfile} from '@/lib/site-profile/config'
+import { applicationKeys, type ApplicationKey } from '@/lib/website/applications'
 
 const { auth } = NextAuth(authConfig)
 
@@ -73,7 +78,43 @@ const proxyHandler = auth(async function proxy(request: NextRequest & { auth: an
     return response
 })
 
-export { proxyHandler as proxy, proxyHandler as default }
+/** Domain riêng: chỉ mở các route đã cấp, giữ domain trong thanh địa chỉ. */
+export default async function proxy(request: NextRequest, event: NextFetchEvent) {
+    const hostname=requestHostname(request.headers.get('host') || '')
+    const path=request.nextUrl.pathname
+    if(isPlatformHost(hostname)) {
+        if(path.startsWith('/site-domain/')) return new NextResponse('Not found',{status:404})
+        if(path.startsWith('/api/') && !ADMIN_ONLY_PREFIXES.some(p=>path.startsWith(p))) return NextResponse.next()
+        return (proxyHandler as unknown as NextMiddleware)(request,event)
+    }
+    if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
+    const domain=await activeDomain(hostname)
+    if(!domain) return new NextResponse('Tên miền chưa được xác minh hoặc đang tạm dừng.',{status:503,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
+    if(path.startsWith('/ung-dung/')) {
+        const key=path.slice('/ung-dung/'.length)
+        if(!(applicationKeys as readonly string[]).includes(key)) return new NextResponse('Not found',{status:404})
+        if(!domain.applications[key as ApplicationKey]) return NextResponse.json({error:'Ứng dụng đã ngắt kết nối hoặc chưa được cấp.'},{status:403,headers:{'Cache-Control':'no-store'}})
+    }
+    const route=domainRoute(path,domain)
+    if(route==='deny') return NextResponse.json({error:'Trang hoặc chức năng chưa được cấp cho website này.'},{status:403,headers:{'Cache-Control':'no-store'}})
+    const coursePath=path.match(/^\/(?:khoa-hoc|courses)\/([^/]+)/)
+    if(coursePath) {
+        let slug: string
+        try { slug=decodeURIComponent(coursePath[1]).replace(/\$+$/,'') } catch { return new NextResponse('Not found',{status:404}) }
+        const course=await prisma.course.findUnique({where:{id_khoa:slug},select:{id:true,teacherId:true,categoryId:true,status:true}})
+        const permitted=courseBelongsToProfile(domain.profile,course)
+        if(!permitted) return new NextResponse('Khóa học không thuộc website này.',{status:404})
+    }
+    const requestHeaders=new Headers(request.headers)
+    requestHeaders.set('x-website-path',path)
+    const destination=request.nextUrl.clone()
+    if(route==='page' || route==='account' || route==='catalog') destination.pathname='/site-domain/'+hostname+(path==='/' ? '' : path)
+    if(/^\/courses\/[^/]+$/.test(path)) destination.pathname=path.replace('/courses/','/khoa-hoc/')
+    const response=destination.pathname!==path ? NextResponse.rewrite(destination,{request:{headers:requestHeaders}}) : NextResponse.next({request:{headers:requestHeaders}})
+    const ref=request.nextUrl.searchParams.get('ref')
+    if(ref && domain.affiliate) saveRefCookie(response,ref,domain.profile.slug,coursePath?.[1] || null,null,coursePath ? 'khoa-hoc' : 'page')
+    return response
+}
 
 function saveRefCookie(
     response: NextResponse, 
@@ -105,7 +146,7 @@ function saveRefCookie(
 
 export const config = {
     matcher: [
-        "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)).*)",
+        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)).*)",
         // Các prefix API cần được proxy chặn theo role ADMIN (xem ADMIN_ONLY_PREFIXES ở trên)
         "/api/admin/:path*",
         "/api/sync-tca/:path*",

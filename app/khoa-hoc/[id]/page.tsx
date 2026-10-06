@@ -7,6 +7,7 @@ import { CourseLandingClient } from '@/components/landing/LandingPageClient'
 import { getPublishedCoursePageBySlug } from '@/app/actions/course-page-actions'
 import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
+import { requireDomainCourse } from '@/lib/website/domain-context'
 import { canProfileAccessCourse, getCurrentSiteProfile } from '@/lib/site-profile/runtime'
 
 interface PageProps {
@@ -26,6 +27,7 @@ const getCourseByIdKhoa = cache((idKhoa: string) =>
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
     let { id } = await params
     id = id.replace(/\$+$/, '')
+    await requireDomainCourse(id)
 
     const course = await getCourseByIdKhoa(id)
 
@@ -84,6 +86,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     let { id } = await params
     const session = await getSession()
+
+    await requireDomainCourse(id.replace(/\$+$/, ''))
 
     id = id.replace(/\$+$/, '')
 

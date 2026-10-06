@@ -1,4 +1,4 @@
-import NextAuth, { AuthError, CredentialsSignin } from "next-auth"
+import NextAuth, { AuthError, CredentialsSignin, type NextAuthConfig } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import { z } from "zod"
@@ -11,6 +11,8 @@ import { authConfig } from "./auth.config"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decryptMfaSecret, verifyTotp } from "@/lib/mfa"
 import { randomBytes } from "node:crypto"
+import { activeDomain } from '@/lib/website/domains'
+import { requestHostname } from '@/lib/website/domain-shared'
 
 class CustomLoginError extends CredentialsSignin {
   constructor(message: string, code: string) {
@@ -54,7 +56,7 @@ const customAdapter = {
     }
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const authOptions: NextAuthConfig = {
     ...authConfig,
     trustHost: true,
     adapter: customAdapter as any, 
@@ -240,6 +242,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ],
     callbacks: {
         async redirect({ url, baseUrl }) {
+            const headerList=await (await import('next/headers')).headers()
+            const domain=await activeDomain(requestHostname(headerList.get('host') || ''))
+            if(domain) {
+                const origin='https://'+domain.hostname
+                try { const destination=new URL(url,origin); return destination.origin===origin ? destination.toString() : origin }
+                catch { return origin }
+            }
             // Hỗ trợ cả localhost và domain chính
             if (url.startsWith("/")) return `${baseUrl}${url}`;
             
@@ -304,6 +313,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             if (token.sub != null && session.user) {
                 session.user.id = token.sub as string;
                 session.user.role = token.role as Role;
+                const headerList=await (await import('next/headers')).headers()
+                // Domain riêng dùng phiên học viên; không mang quyền quản trị toàn hệ thống.
+                if(await activeDomain(requestHostname(headerList.get('host') || ''))) session.user.role=Role.STUDENT;
                 (session.user as any).needsPasswordChange = token.needsPasswordChange as boolean;
                 (session.user as any).isUnverified = token.isUnverified as boolean;
                 (session.user as any).affiliateCode = token.affiliateCode as string | undefined;
@@ -441,4 +453,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
         }
     }
-})
+}
+export const { handlers, signIn, signOut, auth } = NextAuth(authOptions)

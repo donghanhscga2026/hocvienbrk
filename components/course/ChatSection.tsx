@@ -106,36 +106,36 @@ const CommentItem = ({
                         <img
                             src={comment.userAvatar}
                             alt={comment.userName || 'User'}
-                            className={`rounded-full object-cover border border-zinc-800 ${isReply ? 'w-6 h-6' : 'w-8 h-8'}`}
+                            className={`rounded-full object-cover border border-zinc-800 website:border-brk-outline ${isReply ? 'w-6 h-6' : 'w-8 h-8'}`}
                         />
                     ) : (
-                        <div className={`rounded-full bg-yellow-400 flex items-center justify-center font-bold text-black ${isReply ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}`}>
+                        <div className={`rounded-full bg-yellow-400 website:bg-brk-accent flex items-center justify-center font-bold text-black website:text-brk-on-accent ${isReply ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}`}>
                             {getInitials(comment.userName)}
                         </div>
                     )}
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className={`font-semibold text-white ${isReply ? 'text-[13px]' : 'text-sm'}`}>
+                        <span className={`font-semibold text-white website:text-brk-on-surface ${isReply ? 'text-[13px]' : 'text-sm'}`}>
                             {comment.userName || 'Người dùng'}
-                            <span className="ml-1.5 font-normal text-zinc-400 text-[10px]">
+                            <span className="ml-1.5 font-normal text-zinc-400 website:text-brk-muted text-[10px]">
                                 {formatTimestamp(comment.createdAt)}
                             </span>
                         </span>
                         {comment.editedAt && !comment.sending && (
-                            <span className="text-[10px] text-zinc-500 italic">(đã chỉnh sửa)</span>
+                            <span className="text-[10px] text-zinc-500 website:text-brk-muted italic">(đã chỉnh sửa)</span>
                         )}
                         {comment.sending && <span className="text-[9px] text-yellow-500 italic">Đang gửi...</span>}
                     </div>
 
                     {isBeingEdited ? (
-                        <p className="text-[11px] text-yellow-400 italic mt-0.5">✎ Đang sửa ở ô soạn thảo bên dưới...</p>
+                        <p className="text-[11px] text-yellow-400 website:text-brk-accent italic mt-0.5">✎ Đang sửa ở ô soạn thảo bên dưới...</p>
                     ) : (
                         <>
                             {comment.content && (
                                 <p
                                     ref={contentRef}
-                                    className={`text-[13px] text-zinc-200 mt-0.5 break-words leading-relaxed text-justify ${!isContentExpanded ? 'line-clamp-3' : ''}`}
+                                    className={`text-[13px] text-zinc-200 website:text-brk-on-surface mt-0.5 break-words leading-relaxed text-justify ${!isContentExpanded ? 'line-clamp-3' : ''}`}
                                     dangerouslySetInnerHTML={{ __html: formatCommentContent(comment.content) }}
                                 />
                             )}
@@ -143,7 +143,7 @@ const CommentItem = ({
                                 <img
                                     src={comment.imageUrl}
                                     alt="Hình ảnh đính kèm"
-                                    className="mt-1.5 max-w-[220px] max-h-[220px] rounded-lg border border-zinc-800 object-cover cursor-zoom-in"
+                                    className="mt-1.5 max-w-[220px] max-h-[220px] rounded-lg border border-zinc-800 website:border-brk-outline object-cover cursor-zoom-in"
                                     onClick={() => window.open(comment.imageUrl!, '_blank')}
                                 />
                             )}
@@ -153,7 +153,7 @@ const CommentItem = ({
                                         {onReply && (
                                             <button
                                                 onClick={() => onReply(comment)}
-                                                className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                                className="text-[11px] font-semibold text-zinc-300 website:text-brk-on-surface hover:text-yellow-400 website:hover:text-brk-accent transition-colors"
                                             >
                                                 ↩ Trả lời
                                             </button>
@@ -161,7 +161,7 @@ const CommentItem = ({
                                         {isOwner && (
                                             <button
                                                 onClick={() => onStartEdit?.(comment)}
-                                                className="text-[11px] font-semibold text-zinc-300 hover:text-yellow-400 transition-colors"
+                                                className="text-[11px] font-semibold text-zinc-300 website:text-brk-on-surface hover:text-yellow-400 website:hover:text-brk-accent transition-colors"
                                             >
                                                 ✎ Sửa
                                             </button>
@@ -171,7 +171,7 @@ const CommentItem = ({
                                         <button
                                             type="button"
                                             onClick={isContentExpanded ? collapseContent : expandContent}
-                                            className="text-[11px] font-bold text-yellow-400 hover:text-yellow-300 transition-colors"
+                                            className="text-[11px] font-bold text-yellow-400 website:text-brk-accent hover:text-yellow-300 website:hover:text-brk-accent transition-colors"
                                         >
                                             {isContentExpanded ? '(thu gọn)' : '(xem thêm)'}
                                         </button>
@@ -512,12 +512,12 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
     }, [optimisticComments])
 
     return (
-        <div className="relative flex min-h-0 flex-col h-full bg-zinc-950">
-            <div className="shrink-0 px-4 py-2 sm:py-3 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4 text-yellow-400" />
+        <div className="relative flex min-h-0 flex-col h-full bg-zinc-950 website:bg-brk-background">
+            <div className="shrink-0 px-4 py-2 sm:py-3 border-b border-zinc-800 website:border-brk-outline bg-zinc-900/50 website:bg-brk-surface/50 backdrop-blur-sm">
+                <h3 className="text-sm font-semibold text-white website:text-brk-on-surface flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-yellow-400 website:text-brk-accent" />
                     Tương tác
-                    <span className="text-zinc-400 font-normal text-xs">
+                    <span className="text-zinc-400 website:text-brk-muted font-normal text-xs">
                         ({loadedTopLevel} của {totalTopLevel} bình luận)
                     </span>
                 </h3>
@@ -526,16 +526,16 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
             <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 custom-scrollbar">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
-                        <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
-                        <span className="text-xs text-zinc-400">Đang tải nội dung...</span>
+                        <Loader2 className="h-6 w-6 animate-spin text-yellow-400 website:text-brk-accent" />
+                        <span className="text-xs text-zinc-400 website:text-brk-muted">Đang tải nội dung...</span>
                     </div>
                 ) : optimisticComments.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-3">
-                            <MessageCircle className="h-6 w-6 text-zinc-600" />
+                        <div className="w-12 h-12 rounded-full bg-zinc-900 website:bg-brk-surface flex items-center justify-center mb-3">
+                            <MessageCircle className="h-6 w-6 text-zinc-600 website:text-brk-muted" />
                         </div>
-                        <p className="text-zinc-300 text-sm font-medium">Chưa có bình luận nào</p>
-                        <p className="text-zinc-400 text-xs mt-1">Hãy là người đầu tiên bắt đầu cuộc trò chuyện!</p>
+                        <p className="text-zinc-300 website:text-brk-on-surface text-sm font-medium">Chưa có bình luận nào</p>
+                        <p className="text-zinc-400 website:text-brk-muted text-xs mt-1">Hãy là người đầu tiên bắt đầu cuộc trò chuyện!</p>
                     </div>
                 ) : (
                     <>
@@ -549,7 +549,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 onStartEdit={handleStartEdit}
                             />
                             {repliesByParent[String(comment.id)]?.length > 0 && (
-                                <div className="ml-11 pl-3 border-l-2 border-zinc-800 -mt-1">
+                                <div className="ml-11 pl-3 border-l-2 border-zinc-800 website:border-brk-outline -mt-1">
                                     {repliesByParent[String(comment.id)].map(reply => (
                                         <CommentItem
                                             key={reply.id}
@@ -573,7 +573,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 type="button"
                                 onClick={handleLoadMoreComments}
                                 disabled={loadingMore}
-                                className="flex items-center gap-2 text-xs font-semibold text-zinc-300 hover:text-yellow-400 bg-zinc-800/60 hover:bg-zinc-800 px-4 py-2 rounded-full transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 text-xs font-semibold text-zinc-300 website:text-brk-on-surface hover:text-yellow-400 website:hover:text-brk-accent bg-zinc-800/60 website:bg-brk-surface/60 hover:bg-zinc-800 website:hover:bg-brk-surface px-4 py-2 rounded-full transition-colors disabled:opacity-50"
                             >
                                 {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                                 Xem thêm bình luận khác ({totalTopLevel - loadedTopLevel})
@@ -590,7 +590,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                 thảo, dù giờ ô mở rộng dùng position:absolute (neo theo div gốc
                 "relative" của ChatSection, không còn position:fixed theo viewport
                 như trước) nên rủi ro containing-block bị đổi đã giảm nhiều. */}
-            <div className="shrink-0 border-t border-zinc-800 bg-zinc-900/90 p-3">
+            <div className="shrink-0 border-t border-zinc-800 website:border-brk-outline bg-zinc-900/90 website:bg-brk-surface/90 p-3">
                 {session?.user ? (
                     <>
                     <input
@@ -601,29 +601,29 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                         onChange={handleImageFileChange}
                     />
                     {!commentExpanded && replyingTo && (
-                        <div className="flex items-center justify-between gap-2 mb-2 pl-3 pr-2 py-1.5 rounded-xl bg-zinc-800/70 border border-zinc-700">
-                            <span className="text-[11px] text-zinc-300 truncate">
-                                ↩ Đang trả lời <span className="font-semibold text-yellow-400">{replyingTo.userName || 'Người dùng'}</span>
+                        <div className="flex items-center justify-between gap-2 mb-2 pl-3 pr-2 py-1.5 rounded-xl bg-zinc-800/70 website:bg-brk-surface/70 border border-zinc-700 website:border-brk-outline">
+                            <span className="text-[11px] text-zinc-300 website:text-brk-on-surface truncate">
+                                ↩ Đang trả lời <span className="font-semibold text-yellow-400 website:text-brk-accent">{replyingTo.userName || 'Người dùng'}</span>
                             </span>
                             <button
                                 type="button"
                                 onClick={() => setReplyingTo(null)}
-                                className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                                className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 website:text-brk-muted hover:text-white website:hover:text-brk-on-surface hover:bg-zinc-700 website:hover:bg-brk-surface transition-colors"
                             >
                                 <X className="h-3 w-3" />
                             </button>
                         </div>
                     )}
                     {!commentExpanded && (pendingImageUrl || uploadingImage) && (
-                        <div className="flex items-center gap-2 mb-2 pl-2 pr-2 py-1.5 rounded-xl bg-zinc-800/70 border border-zinc-700">
+                        <div className="flex items-center gap-2 mb-2 pl-2 pr-2 py-1.5 rounded-xl bg-zinc-800/70 website:bg-brk-surface/70 border border-zinc-700 website:border-brk-outline">
                             {uploadingImage ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+                                <Loader2 className="w-4 h-4 animate-spin text-zinc-400 website:text-brk-muted" />
                             ) : (
                                 <img src={pendingImageUrl!} alt="preview" className="w-8 h-8 rounded object-cover" />
                             )}
-                            <span className="text-[11px] text-zinc-300 flex-1">{uploadingImage ? 'Đang tải ảnh...' : 'Đã đính kèm ảnh'}</span>
+                            <span className="text-[11px] text-zinc-300 website:text-brk-on-surface flex-1">{uploadingImage ? 'Đang tải ảnh...' : 'Đã đính kèm ảnh'}</span>
                             {!uploadingImage && (
-                                <button type="button" onClick={() => setPendingImageUrl(null)} className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors">
+                                <button type="button" onClick={() => setPendingImageUrl(null)} className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 website:text-brk-muted hover:text-white website:hover:text-brk-on-surface hover:bg-zinc-700 website:hover:bg-brk-surface transition-colors">
                                     <X className="h-3 w-3" />
                                 </button>
                             )}
@@ -649,12 +649,12 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 {(editingId != null || replyingTo) && (
                                     <div className="mb-1.5 shrink-0">
                                         {editingId != null ? (
-                                            <span className="inline-block max-w-full text-xs text-zinc-200 bg-zinc-800 px-3 py-1.5 rounded-lg truncate">
+                                            <span className="inline-block max-w-full text-xs text-zinc-200 website:text-brk-on-surface bg-zinc-800 website:bg-brk-surface px-3 py-1.5 rounded-lg truncate">
                                                 ✎ Đang sửa bình luận
                                             </span>
                                         ) : replyingTo && (
-                                            <span className="inline-block max-w-full text-xs text-zinc-200 bg-zinc-800 px-3 py-1.5 rounded-lg truncate">
-                                                ↩ Đang trả lời <span className="font-semibold text-yellow-400">{replyingTo.userName || 'Người dùng'}</span>
+                                            <span className="inline-block max-w-full text-xs text-zinc-200 website:text-brk-on-surface bg-zinc-800 website:bg-brk-surface px-3 py-1.5 rounded-lg truncate">
+                                                ↩ Đang trả lời <span className="font-semibold text-yellow-400 website:text-brk-accent">{replyingTo.userName || 'Người dùng'}</span>
                                             </span>
                                         )}
                                     </div>
@@ -694,7 +694,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                             type="submit"
                                             onMouseDown={(e) => e.preventDefault()}
                                             disabled={(!newComment.trim() && !pendingImageUrl) || isPending || uploadingImage}
-                                            className="flex items-center gap-1 bg-yellow-400 hover:bg-yellow-300 text-black text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors disabled:opacity-30 disabled:grayscale"
+                                            className="flex items-center gap-1 bg-yellow-400 website:bg-brk-accent hover:bg-yellow-300 website:hover:bg-brk-accent text-black website:text-brk-on-accent text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors disabled:opacity-30 disabled:grayscale"
                                         >
                                             {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} {editingId != null ? 'Lưu' : 'Gửi'}
                                         </button>
@@ -702,14 +702,14 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                             type="button"
                                             onMouseDown={(e) => e.preventDefault()}
                                             onClick={handleCloseComposer}
-                                            className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
+                                            className="flex items-center gap-1 bg-zinc-800 website:bg-brk-surface hover:bg-zinc-700 website:hover:bg-brk-surface text-white website:text-brk-on-surface text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg transition-colors"
                                         >
                                             <X className="w-3.5 h-3.5" /> ĐÓNG
                                         </button>
                                     </div>
 
                                     {activePopover === 'color' && (
-                                        <div className="absolute top-full left-0 mt-1 z-10 flex gap-1.5 p-2 bg-white border border-gray-200 rounded-xl shadow-xl">
+                                        <div className="absolute top-full left-0 mt-1 z-10 flex gap-1.5 p-2 bg-white website:bg-brk-surface border border-gray-200 website:border-brk-outline rounded-xl shadow-xl">
                                             {COLOR_PRESETS.map(c => (
                                                 <button
                                                     key={c.key}
@@ -717,14 +717,14 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                                     onMouseDown={(e) => e.preventDefault()}
                                                     title={c.label}
                                                     onClick={() => applyFormat({ color: c.key })}
-                                                    className="w-6 h-6 rounded-full border border-gray-200 hover:scale-110 transition-transform"
+                                                    className="w-6 h-6 rounded-full border border-gray-200 website:border-brk-outline hover:scale-110 transition-transform"
                                                     style={{ backgroundColor: c.hex }}
                                                 />
                                             ))}
                                         </div>
                                     )}
                                     {activePopover === 'size' && (
-                                        <div className="absolute top-full left-9 mt-1 z-10 flex gap-1.5 p-2 bg-white border border-gray-200 rounded-xl shadow-xl">
+                                        <div className="absolute top-full left-9 mt-1 z-10 flex gap-1.5 p-2 bg-white website:bg-brk-surface border border-gray-200 website:border-brk-outline rounded-xl shadow-xl">
                                             {SIZE_PRESETS.map(s => (
                                                 <button
                                                     key={s.key}
@@ -739,7 +739,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                         </div>
                                     )}
                                     {activePopover === 'emoji' && (
-                                        <div className="absolute top-full left-16 mt-1 z-10 grid grid-cols-5 gap-1 p-2 bg-white border border-gray-200 rounded-xl shadow-xl w-[190px]">
+                                        <div className="absolute top-full left-16 mt-1 z-10 grid grid-cols-5 gap-1 p-2 bg-white website:bg-brk-surface border border-gray-200 website:border-brk-outline rounded-xl shadow-xl w-[190px]">
                                             {EMOJI_PRESETS.map(emoji => (
                                                 <button
                                                     key={emoji}
@@ -758,13 +758,13 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 {(pendingImageUrl || uploadingImage) && (
                                     <div className="flex items-center gap-2 mb-2 pl-2 pr-2 py-1.5 rounded-xl bg-gray-100 shrink-0">
                                         {uploadingImage ? (
-                                            <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                                            <Loader2 className="w-4 h-4 animate-spin text-gray-500 website:text-brk-muted" />
                                         ) : (
                                             <img src={pendingImageUrl!} alt="preview" className="w-10 h-10 rounded-lg object-cover" />
                                         )}
                                         <span className="text-xs text-gray-600 flex-1">{uploadingImage ? 'Đang tải ảnh...' : 'Đã đính kèm ảnh — sẽ gửi kèm bình luận'}</span>
                                         {!uploadingImage && (
-                                            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setPendingImageUrl(null)} className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition-colors">
+                                            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setPendingImageUrl(null)} className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-500 website:text-brk-muted hover:text-gray-800 website:hover:text-brk-on-surface hover:bg-gray-200 transition-colors">
                                                 <X className="h-3.5 w-3.5" />
                                             </button>
                                         )}
@@ -801,8 +801,8 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                 }
                                 rows={commentExpanded ? undefined : 1}
                                 className={commentExpanded
-                                    ? 'flex-1 w-full bg-white text-base text-gray-800 border border-gray-200 rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 placeholder:text-gray-300 text-justify leading-relaxed'
-                                    : 'flex-1 w-full block bg-zinc-800 border border-zinc-700 rounded-2xl pl-4 pr-4 py-2.5 text-base text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed text-justify'
+                                    ? 'flex-1 w-full bg-white website:bg-brk-surface text-base text-gray-800 website:text-brk-on-surface border border-gray-200 website:border-brk-outline rounded-lg p-3 shadow-2xl resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400/50 placeholder:text-gray-300 website:placeholder:text-brk-muted text-justify leading-relaxed'
+                                    : 'flex-1 w-full block bg-zinc-800 website:bg-brk-surface border border-zinc-700 website:border-brk-outline rounded-2xl pl-4 pr-4 py-2.5 text-base text-white website:text-brk-on-surface placeholder:text-zinc-500 website:placeholder:text-brk-muted focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition-all resize-none overflow-hidden leading-relaxed text-justify'
                                 }
                                 style={commentExpanded ? { minHeight: '160px' } : { minHeight: '42px', maxHeight: '120px' }}
                                 disabled={isPending}
@@ -812,7 +812,7 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                                     type="submit"
                                     title="Ấn vào đây để gửi bình luận"
                                     disabled={(!newComment.trim() && !pendingImageUrl) || isPending}
-                                    className="shrink-0 w-9 h-9 rounded-xl bg-yellow-400 text-black flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 transition-all active:scale-90 mb-0.5"
+                                    className="shrink-0 w-9 h-9 rounded-xl bg-yellow-400 website:bg-brk-accent text-black website:text-brk-on-accent flex items-center justify-center disabled:opacity-30 disabled:grayscale hover:bg-yellow-300 website:hover:bg-brk-accent transition-all active:scale-90 mb-0.5"
                                 >
                                     {isPending ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -825,10 +825,10 @@ function ChatSection({ lessonId, session }: ChatSectionProps) {
                     </form>
                     </>
                 ) : (
-                    <div className="bg-zinc-800/50 rounded-xl py-3 px-4 border border-zinc-700/50 text-center">
+                    <div className="bg-zinc-800/50 website:bg-brk-surface/50 rounded-xl py-3 px-4 border border-zinc-700/50 website:border-brk-outline/50 text-center">
                         <button
                             onClick={openAssistant}
-                            className="inline-flex items-center gap-2 text-sm font-semibold text-yellow-400 hover:text-yellow-300 transition-colors"
+                            className="inline-flex items-center gap-2 text-sm font-semibold text-yellow-400 website:text-brk-accent hover:text-yellow-300 website:hover:text-brk-accent transition-colors"
                         >
                             <LogIn className="h-4 w-4" />
                             Đăng nhập để tham gia tương tác

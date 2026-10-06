@@ -49,6 +49,7 @@ function load(relative) {
     if(name === '@/auth') return { auth: async () => sessionId == null ? null : { user: { id: String(sessionId) } } }
     if(name === '@/lib/prisma') return { __esModule: true, default: fake }
     if(name === '@/lib/crm/service') return { CrmError }
+    if(name === '@/lib/website/domains') return { activeDomain:async()=>null }
     if(name === '@/app/actions/site-profile-actions') return { getCoursesForProfile: async () => [{ id: 7,id_khoa: 'COURSE-7',name_lop: 'Course',name_khoa: null,link_anh_bia: null,mo_ta_ngan: null,teacherBankAccount: { accountNumber: 'private' } }],getPostsForProfile: async () => [{ id: 'post',title:'Post',content:'<p>Public text</p>' }] }
     if(name.startsWith('@/')) return load(name.slice(2))
     if(name.startsWith('.')) return load(path.relative(root,path.resolve(path.dirname(file),name)))
@@ -57,15 +58,47 @@ function load(relative) {
   return module.exports
 }
 const document = load('lib/website/document')
+function fixtureDocument(name) {
+  const doc=document.blankDocument(name),hero=document.makeNode('container')
+  hero.children=[document.makeNode('heading'),document.makeNode('text'),document.makeNode('button')]
+  doc.pages[0].nodes=[hero,document.makeNode('courses'),document.makeNode('testimonials'),document.makeNode('form')]
+  return doc
+}
 const api = load('app/api/websites/route')
 const lead = load('app/api/websites/lead/route')
 const server = load('lib/website/server')
-function request(body, origin = 'https://test.invalid') { return new Request('https://test.invalid/api/websites',{ method: 'POST',headers: { origin,host:'test.invalid','Content-Type':'application/json' },body:JSON.stringify(body) }) }
+function request(body, origin = 'https://giautoandien.io.vn') { return new Request('https://giautoandien.io.vn/api/websites',{ method: 'POST',headers: { origin,host:'giautoandien.io.vn','Content-Type':'application/json' },body:JSON.stringify(body) }) }
 async function post(body) { const response = await api.POST(request(body)); return { status: response.status, body: await response.json() } }
 async function uiChecks() {
   const React = require('react')
   const { renderToStaticMarkup } = require('react-dom/server')
   const View = load('components/website/WebsiteView').default
+  const complete=document.blankDocument('Lucy')
+  complete.pages.push({id:document.uid(),title:'Service',slug:'dich-vu',nodes:[]},{id:document.uid(),title:'Contact',slug:'lien-he',nodes:[]})
+  complete.pages[0].nodes=['/dich-vu','/lien-he'].map(url=>{const node=document.makeNode('button');node.url=url;return node})
+  const completeHtml=renderToStaticMarkup(React.createElement(View,{document:complete,data:{courses:[],testimonials:[],posts:[]},slug:'lucy'}))
+  ok(completeHtml.includes('href="/page/lucy/dich-vu"') && completeHtml.includes('href="/page/lucy/lien-he"'),'Template CTA links stay inside the profile website')
+  const domainHtml=renderToStaticMarkup(React.createElement(View,{document:complete,data:{courses:[],testimonials:[],posts:[]},slug:'lucy',customDomain:true}))
+  ok(domainHtml.includes('href="/dich-vu"') && !domainHtml.includes('href="/page/lucy/dich-vu"'),'Custom-domain CTA links retain local paths')
+  const expert=document.blankDocument('Teacher')
+  const legacyHero=document.makeNode('course-hero'),legacyReviews=document.makeNode('testimonials')
+  legacyReviews.text='Chia sẻ từ học viên'
+  expert.pages[0].nodes=[legacyHero,legacyReviews,document.makeNode('courses')]
+  ok(document.parseDocument(JSON.parse(JSON.stringify(expert))).pages.length===1,'Previously saved course hero document remains readable')
+  const main=expert.pages[0].nodes[0];main.courseIds=[7]
+  const expertData={courses:[{id:7,title:'Actual course',image:'/actual-cover.png',description:'Actual description',href:'/khoa-hoc/COURSE-7'},{id:8,title:'Related course',image:'',description:'Other',href:'/khoa-hoc/COURSE-8'}],testimonials:[{id:1,courseId:7,name:'Actual learner',content:'Actual review',rating:5},{id:2,courseId:8,name:'Other learner',content:'Other review',rating:5}],posts:[]}
+  const salesMarkup=renderToStaticMarkup(React.createElement(View,{document:expert,data:expertData,slug:'teacher'}))
+  ok(salesMarkup.includes('<h1') && salesMarkup.includes('Actual course') && salesMarkup.includes('/actual-cover.png') && salesMarkup.includes('href="/khoa-hoc/COURSE-7"'),'Hero displays selected course fields and original enrollment route')
+  ok(salesMarkup.includes('Actual review') && !salesMarkup.includes('Other review'),'Default testimonials follow only the selected course')
+  ok((salesMarkup.match(/Actual course/g)||[]).length===2,'Selected course appears in hero title and image alt, not related cards')
+  const emptyReviews=renderToStaticMarkup(React.createElement(View,{document:expert,data:{...expertData,testimonials:[]},slug:'teacher'}))
+  ok(!emptyReviews.includes('Chia sẻ từ học viên'),'Public page hides testimonials without real reviews')
+  main.courseIds=[999]
+  const missing=renderToStaticMarkup(React.createElement(View,{document:expert,data:expertData,slug:'teacher'}))
+  ok(!missing.includes('Xem học phí') && !missing.includes('Actual review'),'Missing or out-of-scope course never falls back to a different product')
+  main.courseIds=[7]
+  const blocked=renderToStaticMarkup(React.createElement(View,{document:expert,data:expertData,slug:'teacher',modules:{courses:false,crm:false,affiliate:false}}))
+  ok(!blocked.includes('Actual course') && !blocked.includes('Actual review'),'Disabling course module suppresses hero and related data')
   const data = { courses: [],testimonials: [],posts: [] }
   const custom = document.blankDocument('Brand'); const html = document.makeNode('html'); html.html='<script>window.top.hacked=true</script><h2>HTML</h2>'; custom.pages[0].nodes=[html]
   const markup = renderToStaticMarkup(React.createElement(View,{ document:custom,data,slug:'brand' }))
@@ -81,7 +114,7 @@ async function uiChecks() {
   Object.defineProperty(global,'navigator',{ value:dom.window.navigator,configurable:true })
   global.IS_REACT_ACT_ENVIRONMENT=true; window.confirm=()=>true
   let saved = null; let calls=0
-  global.fetch=async (_url,options) => { calls++; if(!options?.method) return { ok:true,json:async()=>({ profile:{ slug:'owner-one',isActive:true,canUseCrm:true },document:document.blankDocument('Brand'),revision:-1,history:[],published:false,data,templates:[] }) }; saved=JSON.parse(options.body); return { ok:true,json:async()=>({ revision:0,document:saved.document,history:[],published:saved.action==='publish' }) } }
+  global.fetch=async (_url,options) => { calls++; if(!options?.method) return { ok:true,json:async()=>({ profile:{ slug:'owner-one',isActive:true,canUseCrm:true },document:document.blankDocument('Brand'),revision:-1,history:[],published:false,data:expertData,templates:load('lib/course-page/templates').COURSE_TEMPLATE_LIBRARY.map(template=>({key:template.key,name:template.name,...load('lib/website/course-template').adaptCourseTemplate(template.key,'Brand')})) }) }; saved=JSON.parse(options.body); return { ok:true,json:async()=>({ revision:0,document:saved.document,history:[],published:saved.action==='publish' }) } }
   const { createRoot } = require('react-dom/client')
   const root = createRoot(global.document.getElementById('root'))
   const Editor = load('components/website/WebsiteEditor').default
@@ -119,6 +152,14 @@ async function uiChecks() {
   await click('Xuất bản')
   ok(saved.action==='publish' && saved.document.pages.length===2,'Publish submits complete multi-page document')
   ok(calls===4,'Preview and local edits do not write automatically')
+  const templateChoice=global.document.querySelector('select[aria-label="Mẫu sales page khóa học"]')
+  assert.deepEqual([...templateChoice.options].map(option=>option.value),['','mfc-classic','wigrow']);checks++
+  ok(!findButton('Khóa học chính'),'Removed course hero is unavailable in Add component menu')
+  await React.act(async()=>{templateChoice.value='mfc-classic';templateChoice.dispatchEvent(new window.Event('change',{bubbles:true}))})
+  ok(global.document.querySelector('main').textContent.includes('Actual course'),'Existing course template renders connected course data')
+  ok(calls===4,'Applying existing template does not write automatically')
+  await click('Lưu nháp')
+  ok(document.walkNodes(saved.document.pages[0].nodes).some(node=>node.kind==='courses'),'Existing sales template remains editable and can be saved')
   await React.act(async()=>root.unmount()); dom.window.close()
 }
 async function run() {
@@ -126,8 +167,12 @@ async function run() {
   await pg.exec(fs.readFileSync(root+'/prisma/migrations/20261005040000_site_website/migration.sql','utf8'))
   ok((await rows(pg,"SELECT relrowsecurity FROM pg_class WHERE relname='SiteWebsite'"))[0].relrowsecurity,'Draft table has RLS')
   for(const role of ['anon','authenticated']) ok(!(await rows(pg,"SELECT has_table_privilege($1,'\"SiteWebsite\"','SELECT') p",[role]))[0].p,'No direct draft reads: '+role)
-  const doc = document.templateDocument('business','Business')
-  ok(document.parseDocument(doc).pages.length === 1,'Built-in template validates')
+  const doc = fixtureDocument('Business')
+  ok(document.parseDocument(doc).pages.length === 1,'Editable document fixture validates')
+  ok(!document.templateDocument && !document.sharedTemplateDocument && !document.completeTemplateDocument && !document.expertSalesTemplateDocument,'Removed templates have no remaining generators')
+  const available=await (await api.GET()).json()
+  assert.deepEqual(available.templates.map(template=>template.key),['mfc-classic','wigrow']);checks++
+  for(const template of available.templates) ok(document.parseDocument(template.document).pages.length===1,'Built-in course template remains valid: '+template.key)
   const catalog=load('lib/website/sections')
   for(const [key] of catalog.sections) { const sample=document.blankDocument(); sample.pages[0].nodes=[catalog.makeSection(key)]; ok(document.parseDocument(sample).pages[0].nodes.length===1,'Editable section preset: '+key) }
   const attack = structuredClone(doc); attack.pages[0].nodes[0].children[2].url = 'javascript:alert(1)'; throws(() => document.parseDocument(attack),'Reject script URL')
@@ -143,6 +188,8 @@ async function run() {
   const copied = document.cloneNode(parent); ok(copied.id !== parent.id && copied.children[0].id !== child.id,'Duplicate regenerates recursive IDs')
   for(const key of ['mfc-classic','wigrow']) { const adapted=load('lib/website/course-template').adaptCourseTemplate(key,'Brand'); document.parseDocument(adapted.document); ok(adapted.notes.length > 0 && document.walkNodes(adapted.document.pages[0].nodes).some(n => n.kind==='courses'),'Course template conversion: '+key) }
   sessionId = null; ok((await api.GET()).status===401,'Anonymous cannot read drafts'); sessionId=1
+  const incomplete=document.blankDocument('Teacher');incomplete.pages[0].nodes=[document.makeNode('course-hero')]
+  ok((await post({action:'publish',revision:-1,document:incomplete})).status===400,'Incomplete course offer cannot be published')
   const first=await post({ action:'save',revision:-1,document:doc }); ok(first.status===200 && first.body.revision===0,'Create own draft')
   ok(await server.publishedWebsite(11) === null,'Draft never renders publicly')
   ok((await post({ action:'publish',revision:-1,document:doc })).status===409,'Reject stale editor revision')

@@ -10,6 +10,7 @@ import NotificationBell from '@/components/notifications/NotificationBell'
 import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import { CoursePage } from '@/lib/course-page/types'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
+import { useDomainBrand } from '@/components/website/DomainShell'
 
 interface CoursePageViewProps {
   coursePage: CoursePage
@@ -37,6 +38,7 @@ export default function CoursePageView({
   activeStudentCount = 0,
 }: CoursePageViewProps) {
   const router = useRouter()
+  const brand=useDomainBrand()
 
   // ── Modal state ──────────────────────────────────────────────────────────
   const [showShare, setShowShare] = React.useState(false)
@@ -89,6 +91,7 @@ export default function CoursePageView({
       }
       setShowRegistration(true)
     } else if (actionType === 'open_share') {
+      if(brand && !brand.affiliate) return
       if (!session) {
         // Not logged in — open registration flow which starts at auth
         setShowRegistration(true)

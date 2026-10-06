@@ -11,6 +11,12 @@ import AffiliateTracker from "@/components/AffiliateTracker";
 import AccountAssistantTrigger from "@/components/auth/AccountAssistantTrigger";
 import { getSession } from "@/lib/get-session";
 import { getAttentionHighlightSettings } from "@/app/actions/attention-highlight-actions";
+import { headers } from 'next/headers'
+import { domainContext } from '@/lib/website/domain-context'
+import { domainWebsite } from '@/lib/website/presentation-server'
+import DomainShell from '@/components/website/DomainShell'
+import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
+import { websiteTheme, normalizeWebsitePalette } from '@/lib/website/theme'
 import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/runtime";
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
@@ -25,6 +31,13 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
+  const domain=await domainContext()
+  if(domain){
+    const doc=await domainWebsite(domain.profile)
+    const config=getSiteRuntimeConfig(domain.profile)
+    const name=config.branding.name || doc?.name || domain.profile.title || domain.hostname
+    return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,icons:config.branding.faviconUrl?{icon:config.branding.faviconUrl,apple:config.branding.faviconUrl}:undefined,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'}}
+  }
   const profile = await getCurrentSiteProfile()
   const runtimeConfig = profile ? getSiteRuntimeConfig(profile) : null
   const brandName = runtimeConfig?.branding.name || profile?.title || 'MFC'
@@ -79,25 +92,12 @@ const getThemePaletteMap = unstable_cache(
 )
 
 function compactThemePalette(colors: unknown) {
-  const value = colors && typeof colors === 'object' && !Array.isArray(colors)
-    ? colors as Record<string, unknown>
-    : {}
-  const pick = (key: string, fallback: string) => {
-    const candidate = value[key]
-    return typeof candidate === 'string' && candidate.length <= 100 && !candidate.includes('</')
-      ? candidate
-      : fallback
-  }
+  const palette = normalizeWebsitePalette(colors)
   return {
-    p: pick('primary', '#4EB09B'),
-    op: pick('primaryForeground', '#ffffff'),
-    s: pick('card', pick('backgroundSecondary', '#ffffff')),
-    b: pick('background', '#FAE0C7'),
-    os: pick('foreground', '#333333'),
-    m: pick('foregroundSecondary', pick('mutedForeground', '#765F5C')),
-    a: pick('accent', '#F28076'),
-    o: pick('border', '#FBC193'),
-    d: false,
+    p: palette.primary || '#4EB09B', op: palette.onPrimary || '#ffffff',
+    s: palette.surface || '#ffffff', b: palette.background || '#FAE0C7',
+    os: palette.foreground || '#333333', m: palette.muted || '#765F5C',
+    a: palette.accent || '#F28076', o: palette.outline || '#FBC193', d: false,
   }
 }
 
@@ -107,6 +107,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const domain=await domainContext()
+  if(domain) {
+    const [doc,session]=await Promise.all([domainWebsite(domain.profile),getSession()])
+    const path=(await headers()).get('x-website-path') || '/'
+    const config=getSiteRuntimeConfig(domain.profile)
+    const brand={palette:domain.profile.theme?.colors,logoUrl:config.branding.logoUrl,tools:config.modules.tools,name:config.branding.name || doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
+    const theme=websiteTheme(brand.color,brand.background,brand.palette)
+    return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+  }
   const [siteProfile, themeRows] = await Promise.all([
     getCurrentSiteProfile(),
     getThemePaletteMap(),

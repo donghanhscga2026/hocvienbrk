@@ -6,7 +6,6 @@ import { useSession } from 'next-auth/react'
 import { ArrowLeft, Loader2, AlertCircle, CheckCircle, Save, Image } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
 import { getMySiteProfile, updateSiteProfile } from '@/app/actions/site-profile-actions'
-import ProfileMemberManager from '@/components/admin/ProfileMemberManager'
 
 interface Profile {
   id: number
@@ -122,7 +121,7 @@ export default function MySiteEditPage() {
   if (!session?.user) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <MainHeader title="CHỈNH SỬA TRANG" />
+        <MainHeader title="Chỉnh sửa mẫu có sẵn" />
         <div className="p-4 max-w-lg mx-auto">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
@@ -150,7 +149,7 @@ export default function MySiteEditPage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <MainHeader title="CHỈNH SỬA TRANG" />
+        <MainHeader title="Chỉnh sửa mẫu có sẵn" />
         <div className="p-4 max-w-lg mx-auto">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
             <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
@@ -172,12 +171,11 @@ export default function MySiteEditPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MainHeader title="CHỈNH SỬA TRANG" toolSlug="my-site" />
+      <MainHeader title="Chỉnh sửa mẫu có sẵn" toolSlug="my-site" />
 
       <div className="p-4 max-w-lg mx-auto pb-20">
-        <Link href="/tools/my-site/design" className="block mb-4 rounded-xl bg-violet-600 text-white p-4 font-bold">
-          Mở trình thiết kế website: mẫu, kéo thả, trang con và HTML/CSS →
-        </Link>
+        <Link href="/tools/my-site/manage" className="block mb-4 text-violet-700 underline">← Quản lý website của tôi</Link>
+        <p className="mb-4 rounded-xl bg-violet-50 text-violet-900 p-4 text-sm">Bạn đang sửa mẫu có sẵn. Các thay đổi chỉ hiển thị khi chọn “Mẫu có sẵn” trong Quản lý website.</p>
         <form onSubmit={handleSubmit}>
           {saved && (
             <div className="mb-4 bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-700">
@@ -361,13 +359,7 @@ export default function MySiteEditPage() {
             </div>
           </div>
 
-          <div className="mb-4">
-            <ProfileMemberManager 
-              profileId={profile.id} 
-              initialMembers={(profile as any).members || []} 
-              onUpdate={loadProfile}
-            />
-          </div>
+          <Link href="/tools/my-site/data" className="block mb-4 rounded-xl bg-white border p-4 text-violet-700">Quản lý nguồn khóa học & giáo viên liên kết →</Link>
 
           <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
             <h2 className="text-lg font-bold text-gray-800 mb-4">Footer</h2>
