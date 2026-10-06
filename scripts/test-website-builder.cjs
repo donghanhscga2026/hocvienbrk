@@ -129,6 +129,14 @@ async function run() {
   for(const role of ['anon','authenticated']) ok(!(await rows(pg,"SELECT has_table_privilege($1,'\"SiteWebsite\"','SELECT') p",[role]))[0].p,'No direct draft reads: '+role)
   const doc = document.templateDocument('business','Business')
   ok(document.parseDocument(doc).pages.length === 1,'Built-in template validates')
+  for(const key of ['shared','shared-sales']) {
+    const sample=document.templateDocument(key,'Demo')
+    ok(document.parseDocument(JSON.parse(JSON.stringify(sample))).pages.length===2,'Shared template JSON round trip: '+key)
+    const blocks=document.walkNodes(sample.pages[0].nodes)
+    ok(blocks.some(node=>node.kind==='courses' && node.courseIds.length===0),'Shared template reads website course source: '+key)
+    ok(sample.layout.showHeader===(key==='shared'),'Website and sales header differ: '+key)
+    ok(sample.pages.some(page=>page.slug==='lien-he' && page.nodes.some(node=>node.kind==='form')),'Editable contact page: '+key)
+  }
   const catalog=load('lib/website/sections')
   for(const [key] of catalog.sections) { const sample=document.blankDocument(); sample.pages[0].nodes=[catalog.makeSection(key)]; ok(document.parseDocument(sample).pages[0].nodes.length===1,'Editable section preset: '+key) }
   const attack = structuredClone(doc); attack.pages[0].nodes[0].children[2].url = 'javascript:alert(1)'; throws(() => document.parseDocument(attack),'Reject script URL')

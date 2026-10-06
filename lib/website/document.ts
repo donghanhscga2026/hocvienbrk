@@ -45,6 +45,7 @@ export function moveNode(nodes: WebsiteNode[], id: string, parent: string | null
   return parent ? updateNode(removed, parent, n => ({ ...n, children: insert(n.children) })) : insert(removed)
 }
 export function templateDocument(key: string, name: string): WebsiteDocument {
+  if (key === 'shared' || key === 'shared-sales') return sharedTemplateDocument(name, key === 'shared-sales')
   const doc = blankDocument(name)
   if(key === 'blank') return doc
   const hero = makeNode('container'); hero.style = { background: '#f5f3ff', padding: 64, gap: 24, radius: 24 }; hero.mobile = { padding: 24 }
@@ -55,5 +56,61 @@ export function templateDocument(key: string, name: string): WebsiteDocument {
   const intro = makeNode('container'); intro.style.columns = 2; intro.mobile.columns = 1
   const about = makeNode('text'); about.text = 'Về chúng tôi\nChia sẻ câu chuyện, kinh nghiệm và những giá trị bạn mang lại.'; intro.children = [about, makeNode('image')]
   doc.pages[0].nodes = [hero, intro, makeNode('courses'), makeNode('testimonials'), makeNode('form')]
+  return doc
+}
+
+/** Mẫu chung gồm các khối có thể sửa; khóa học và form đọc dữ liệu của website. */
+export function sharedTemplateDocument(name = 'Thương hiệu của bạn', sales = false): WebsiteDocument {
+  const doc = blankDocument(name)
+  doc.description = 'Giới thiệu chuyên môn, dịch vụ và các chương trình học của bạn.'
+  doc.color = '#0f766e'
+  doc.background = '#f8faf9'
+  doc.layout = {...doc.layout, maxWidth: 1160, padding: 24, gap: 32, showHeader: !sales, showFooter: true}
+  const text = (kind: 'heading' | 'text', value: string, size?: number) => {
+    const node = makeNode(kind); node.text = value
+    if (size) {node.style.fontSize = size; node.mobile.fontSize = Math.min(size, 32)}
+    return node
+  }
+  const box = (children: WebsiteNode[], background = '#ffffff', columns = 1) => {
+    const node = makeNode('container')
+    node.style = {background, padding: 32, gap: 20, radius: 24, columns}
+    node.mobile = {padding: 20, columns: 1}
+    node.children = children
+    return node
+  }
+  const button = (label: string, url: string) => {
+    const node = makeNode('button'); node.text = label; node.url = url; return node
+  }
+  const hero = box([
+    text('text', sales ? 'Chương trình dành cho bạn' : 'Chuyên môn · Giá trị · Kết nối'),
+    text('heading', sales ? 'Bắt đầu hành trình học tập phù hợp với bạn' : 'Biến kiến thức thành giá trị. Cùng bạn tiến xa hơn.', 48),
+    text('text', 'Chia sẻ bạn giúp ai, giải quyết vấn đề gì và điều khách hàng có thể nhận được. Thay nội dung này bằng lời giới thiệu của bạn.'),
+    button(sales ? 'Khám phá chương trình' : 'Xem khóa học của tôi', '#courses'),
+  ], '#e8f3ef')
+  const services = box([
+    box([text('heading', 'Học tập có định hướng', 24), text('text', 'Các chương trình giúp bạn xây nền tảng và thực hành từng bước.')], '#f8faf9'),
+    box([text('heading', 'Tư vấn phù hợp', 24), text('text', 'Cùng tìm giải pháp phù hợp với mục tiêu và hoàn cảnh của bạn.')], '#f8faf9'),
+    box([text('heading', 'Đồng hành lâu dài', 24), text('text', 'Kết nối, chia sẻ kinh nghiệm và hỗ trợ trong quá trình áp dụng.')], '#f8faf9'),
+  ], '#ffffff', 3)
+  const about = box([
+    text('heading', 'Chuyên môn của bạn, câu chuyện của bạn', 30),
+    text('text', 'Giới thiệu người phụ trách, kinh nghiệm và cách bạn đồng hành với khách hàng. Chỉ đưa những thông tin và kết quả đã có thật.'),
+    button('Trao đổi cùng tôi', '/lien-he'),
+  ])
+  const courses = makeNode('courses'); courses.text = 'Khóa học và chương trình'
+  const faq = box([
+    text('heading', 'Trước khi bắt đầu', 30),
+    text('heading', 'Tôi nên chọn chương trình nào?', 22),
+    text('text', 'Xem nội dung từng khóa học hoặc gửi thông tin để được tư vấn.'),
+    text('heading', 'Đăng ký ở đâu?', 22),
+    text('text', 'Mở khóa học và đăng ký qua quy trình của nền tảng. Quyền học theo đăng ký của từng tài khoản.'),
+  ])
+  const form = makeNode('form'); form.text = 'Bạn cần một hướng đi phù hợp?'
+  doc.pages[0].nodes = [hero, services, courses, ...(sales ? [] : [about]), faq, form]
+  const contact = makeNode('form'); contact.text = 'Gửi nhu cầu của bạn'
+  doc.pages.push({id: uid(), title: 'Liên hệ', slug: 'lien-he', nodes: [
+    text('heading', 'Cùng trao đổi về mục tiêu của bạn', 36),
+    text('text', 'Điền thông tin để chủ website liên hệ và tư vấn.'), contact,
+  ]})
   return doc
 }
