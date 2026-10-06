@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
+import { requireDomainModule } from '@/lib/website/domain-context'
 
 export async function GET() {
     try {
+        await requireDomainModule('affiliate')
         // Lấy user từ session
         const session = await auth()
         if (!session?.user?.id) {

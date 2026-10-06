@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { X, Link2, Facebook, MessageCircle, Send, Check } from 'lucide-react'
+import { useDomainBrand } from '@/components/website/DomainShell'
 
 interface ShareModalProps {
   isOpen: boolean
@@ -16,6 +17,7 @@ interface ShareModalProps {
 }
 
 export default function ShareModal({ isOpen, onClose, course, affiliateCode, profileSlug = null, shareType = 'course' }: ShareModalProps) {
+  const brand=useDomainBrand()
   const [copied, setCopied] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -35,7 +37,7 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
     }
   }, [isOpen])
 
-  if (!mounted || !isOpen) return null
+  if (!mounted || !isOpen || (brand && !brand.affiliate)) return null
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
 

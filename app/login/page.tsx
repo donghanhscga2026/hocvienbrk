@@ -8,6 +8,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
 import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy"
+import { safeReturnPath } from '@/lib/website/domain-shared'
 // import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"  // DISABLED: Google Auth
 // import { useEmailPrefill } from "@/hooks/useEmailPrefill"  // DISABLED: Google Auth
 
@@ -86,7 +87,7 @@ function LoginForm() {
         setActionType(null)
 
         try {
-            const callbackUrl = redirectSlug ? `/${redirectSlug}` : "/"
+            const callbackUrl = safeReturnPath(searchParams.get('callbackUrl')) || (redirectSlug ? safeReturnPath(`/${redirectSlug}`) : null) || "/"
             
             const result = await signIn("credentials", {
                 identifier: data.identifier,

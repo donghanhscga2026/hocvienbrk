@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { isTestAccount } from "@/lib/test-account"
 import { EnrollmentMode } from "@prisma/client"
+import { auth } from '@/auth'
+import { requireDomainCourse, domainContext } from '@/lib/website/domain-context'
 
 export async function POST(request: NextRequest) {
   try {
     const { userId, idKhoa } = await request.json()
+    const session=await auth()
+    if(!session?.user?.id || Number(session.user.id)!==Number(userId)) return NextResponse.json({error:'Unauthorized'},{status:403})
+    await requireDomainCourse(idKhoa)
+    const websiteDomain=await domainContext()
 
     if (!userId || !idKhoa) {
       return NextResponse.json({ error: "Missing userId or idKhoa" }, { status: 400 })
@@ -108,7 +114,7 @@ export async function POST(request: NextRequest) {
         status: isAutoActive ? "ACTIVE" : "PENDING",
         studyMode,
         phi_coc: effectivePhiCoc,
-        referrerId: user?.referrerId || null,
+        referrerId: websiteDomain && !websiteDomain.affiliate ? null : user?.referrerId || null,
       }
     })
 
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Track affiliate conversion for purchase
-    if (user?.referrerId) {
+    if (user?.referrerId && (!websiteDomain || websiteDomain.affiliate)) {
       try {
         const { trackAffiliateConversion } = await import("@/lib/affiliate/tracking")
         const { cookies } = await import("next/headers")

@@ -13,6 +13,7 @@ import UserMenu from './UserMenu'
 import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
+import { useDomainBrand } from '@/components/website/DomainShell'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
 const MbwDashboardPopup = dynamic(() => import('@/components/mbw/MbwDashboardPopup'), { ssr: false })
@@ -23,7 +24,11 @@ interface MainHeaderProps {
     profile?: any
 }
 
-export default function MainHeader({ title, profile }: MainHeaderProps) {
+export default function MainHeader(props: MainHeaderProps) {
+    const brand=useDomainBrand()
+    return brand ? null : <PlatformMainHeader {...props} />
+}
+function PlatformMainHeader({ title, profile }: MainHeaderProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { data: session } = useSession()

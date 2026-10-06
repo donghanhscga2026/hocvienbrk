@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="520" viewBox="0 0 640 520" role="img" aria-label="Minh họa website chuyên gia">
+<rect width="640" height="520" rx="32" fill="#dcece5"/>
+<circle cx="558" cy="58" r="70" fill="#b4d5c3"/><circle cx="72" cy="456" r="80" fill="#c5ddcf"/>
+<rect x="35" y="50" width="570" height="420" rx="18" fill="#fff"/>
+<path d="M35 90h570" stroke="#e2e8e5" stroke-width="2"/>
+<circle cx="58" cy="71" r="5" fill="#c4d5ce"/><circle cx="76" cy="71" r="5" fill="#c4d5ce"/><circle cx="94" cy="71" r="5" fill="#c4d5ce"/>
+<g font-family="Arial,sans-serif"><text x="64" y="122" fill="#0f766e" font-size="15" font-weight="700">Hương Lucy</text>
+<text x="357" y="122" fill="#65786f" font-size="11">Trang chủ</text><text x="425" y="122" fill="#65786f" font-size="11">Dịch vụ</text><text x="486" y="122" fill="#65786f" font-size="11">Liên hệ</text>
+<rect x="59" y="145" width="522" height="164" rx="14" fill="#edf5f0"/>
+<text x="81" y="180" fill="#0f766e" font-size="11" font-weight="700">Website · Nội dung · AI</text>
+<text x="81" y="210" fill="#173b30" font-size="25" font-weight="700">Chuyên môn của bạn.</text>
+<text x="81" y="242" fill="#173b30" font-size="25" font-weight="700">Một nơi để kết nối.</text>
+<rect x="81" y="266" width="130" height="26" rx="8" fill="#0f766e"/><text x="99" y="284" fill="#fff" font-size="11">Khám phá cùng tôi</text>
+<rect x="414" y="167" width="134" height="120" rx="16" fill="#cfdfd5"/><circle cx="481" cy="205" r="21" fill="#87aa96"/><path d="M439 270c0-49 83-49 83 0" fill="#87aa96"/>
+<text x="64" y="340" fill="#173b30" font-size="18" font-weight="700">Chương trình dành cho bạn</text>
+<g fill="#f4f7f5"><rect x="60" y="358" width="160" height="89" rx="10"/><rect x="237" y="358" width="160" height="89" rx="10"/><rect x="414" y="358" width="160" height="89" rx="10"/></g>
+<g fill="#b8d1c3"><rect x="73" y="371" width="134" height="26" rx="6"/><rect x="250" y="371" width="134" height="26" rx="6"/><rect x="427" y="371" width="134" height="26" rx="6"/></g>
+<g fill="#456657" font-size="12"><text x="74" y="418">Nền tảng website</text><text x="250" y="418">Thiết kế nội dung</text><text x="427" y="418">Ứng dụng AI</text></g>
+<g fill="#0f766e" font-size="10"><text x="74" y="436">Xem chương trình →</text><text x="250" y="436">Xem chương trình →</text><text x="427" y="436">Xem chương trình →</text></g></g>
+</svg>

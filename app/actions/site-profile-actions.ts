@@ -5,6 +5,8 @@ import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } f
 import { auth } from '@/auth'
 import { requireAdminAction } from '@/lib/api-auth'
 import { unstable_cache, revalidateTag } from 'next/cache'
+import {presentationKey,presentationSchema} from '@/lib/website/presentation'
+import {parseDocument,walkNodes} from '@/lib/website/document'
 import { getCourseWhereForProfile, getSiteRuntimeConfig, normalizeSiteHostname } from '@/lib/site-profile/runtime'
 
 // ─────────────────────────────────────────────────────────
@@ -73,7 +75,7 @@ export async function getSiteProfileAdmin(slug: string) {
  */
 export async function getSiteProfileAdminById(id: number) {
   try {
-    return await prisma.siteProfile.findUnique({
+    const profile=await prisma.siteProfile.findUnique({
       where: { id },
       include: {
         user: { select: { name: true, image: true, email: true } },
@@ -81,6 +83,7 @@ export async function getSiteProfileAdminById(id: number) {
           include: { user: { select: { id: true, name: true, email: true, image: true } } }
         },
         theme: true,
+        verifiedDomains: { select: { hostname: true } },
         domains: { orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }] },
         surveys: true,
         landingPages: true,
@@ -89,6 +92,17 @@ export async function getSiteProfileAdminById(id: number) {
         }
       }
     })
+    const access=profile ? await prisma.systemConfig.findUnique({where:{key:'website-access:'+profile.id}}):null
+    if (!profile) return null
+    const home = getSiteRuntimeConfig(profile).homepage.type
+    let communityAvailable = home === 'profile' || home === 'community'
+    if (home === 'website') {
+      const website = await prisma.siteWebsite.findUnique({where:{profileId:id},select:{published:true}})
+      if (website?.published) {
+        try { communityAvailable = parseDocument(website.published).pages.some(page => walkNodes(page.nodes).some(node => node.kind === 'posts')) } catch { communityAvailable = false }
+      }
+    }
+    return {...profile,websiteAccessConfigured:!!access,communityAvailable}
   } catch (error) {
     console.error(`[DB ERROR] getSiteProfileAdminById(${id}):`, error)
     return null
@@ -426,6 +440,7 @@ export async function updateSiteProfileRuntime(
   const denied = await requireAdminAction()
   if (denied) return { error: denied.error }
 
+  const updateDomains = input.primaryDomain !== undefined || input.additionalDomains !== undefined
   const primaryDomain = normalizeSiteHostname(input.primaryDomain)
   const additionalDomains = Array.from(new Set(
     (input.additionalDomains || [])
@@ -448,6 +463,8 @@ export async function updateSiteProfileRuntime(
     }
 
     if (domains.length) {
+      const verified=await prisma.siteDomain.findMany({where:{hostname:{in:domains}}})
+      if(verified.length)return {error:'Tên miền này đã được quản lý trong Website của tôi. Hãy chỉnh tại mục Tên miền ở đó.'}
       const conflicts = await prisma.siteProfileDomain.findMany({
         where: { hostname: { in: domains }, NOT: { profileId: id } },
         select: { hostname: true },
@@ -458,6 +475,21 @@ export async function updateSiteProfileRuntime(
     }
 
     await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420304)`
+      const occupied=await tx.siteDomain.findMany({where:{hostname:{in:domains}}})
+      const foreign=await tx.siteProfileDomain.findMany({where:{hostname:{in:domains},NOT:{profileId:id}}})
+      if(occupied.length || foreign.length)throw new Error('Tên miền đã được cấp ở cửa sổ khác')
+      // Bỏ cờ cũ trước khi đổi domain chính, tránh vi phạm unique index.
+      if (updateDomains) await tx.siteProfileDomain.updateMany({where:{profileId:id},data:{isPrimary:false}})
+      const rawHome=input.siteConfig?.homepage as {type?:string}|undefined
+      if(rawHome?.type){
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420306, ${id}::integer)`
+        const current=await tx.systemConfig.findUnique({where:{key:presentationKey(id)}})
+        const revision=current ? presentationSchema.parse(current.value).revision:0
+        if(rawHome.type==='website' && !await tx.siteWebsite.findUnique({where:{profileId:id},select:{published:true}}).then(row=>row?.published))throw new Error('Cần xuất bản thiết kế website trước')
+        const value={mode:rawHome.type==='website'?'custom':'template',revision:revision+1}
+        await tx.systemConfig.upsert({where:{key:presentationKey(id)},create:{key:presentationKey(id),value},update:{value}})
+      }
       await tx.siteProfile.update({
         where: { id },
         data: {
@@ -466,11 +498,11 @@ export async function updateSiteProfileRuntime(
         },
       })
 
-      await tx.siteProfileDomain.deleteMany({
+      if (updateDomains) await tx.siteProfileDomain.deleteMany({
         where: { profileId: id, hostname: { notIn: domains.length ? domains : ['__none__'] } },
       })
 
-      for (let index = 0; index < domains.length; index += 1) {
+      for (let index = 0; updateDomains && index < domains.length; index += 1) {
         await tx.siteProfileDomain.upsert({
           where: { hostname: domains[index] },
           create: {

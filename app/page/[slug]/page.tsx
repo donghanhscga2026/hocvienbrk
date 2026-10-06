@@ -1,18 +1,11 @@
 import { Metadata } from 'next'
 import { cache } from 'react'
-import { getSession } from '@/lib/get-session'
-import prisma from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import MainHeader from '@/components/layout/MainHeader'
-import MessageCard from '@/components/home/MessageCard'
-import HomePageClient from '@/components/home/HomePageClient'
-import FooterSection from '@/components/home/FooterSection'
-import SetHomeSlug from '@/components/home/SetHomeSlug'
 
-import { getSiteProfile, getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
-import { getHeroMessageForProfile } from '@/app/actions/message-actions'
-import { getRoadmapPoints } from '@/app/actions/roadmap-actions'
-import { publishedWebsite, websiteData } from '@/lib/website/server'
+import { getSiteProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
+import ProfileHome from '@/components/website/ProfileHome'
+import { activeCustomWebsite } from '@/lib/website/presentation-server'
+import { websiteData } from '@/lib/website/server'
 import WebsiteView from '@/components/website/WebsiteView'
 
 // [OPTIMIZE] cache() giúp generateMetadata và component trang dùng chung 1
@@ -35,7 +28,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     if (!profile) return { title: 'Không tìm thấy' }
 
-    const website = profile.isActive ? await publishedWebsite(profile.id) : null
+    const website = profile.isActive ? await activeCustomWebsite(profile.id) : null
     if (website) return { title: { absolute: website.name }, description: website.description, openGraph: { title: website.name, description: website.description }, twitter: { title: website.name, description: website.description } }
 
     const ogTitle = profile.metaTitle || profile.title || DEFAULT_OG_TITLE
@@ -61,7 +54,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PageSlugPage({ params }: PageProps) {
     const { slug } = await params
-    const session = await getSession()
 
     const profile = await getCachedSiteProfile(slug)
 
@@ -69,166 +61,8 @@ export default async function PageSlugPage({ params }: PageProps) {
 
     incrementProfileView(slug).catch(console.error)
 
-    const website = profile.isActive ? await publishedWebsite(profile.id) : null
+    const website = profile.isActive ? await activeCustomWebsite(profile.id) : null
     if (website) return <WebsiteView document={website} data={await websiteData(profile)} slug={slug} />
 
-    const [
-        courses,
-        survey,
-        message,
-        userRecord,
-        enrollments,
-        posts
-    ] = await Promise.all([
-        getCoursesForProfile(profile),
-        getSurveyForProfile(profile),
-        getHeroMessageForProfile(slug),
-        session?.user?.id
-            ? prisma.user.findUnique({
-                where: { id: parseInt(session.user.id) },
-                select: {
-                    name: true, id: true, image: true, phone: true, roadmap: true
-                }
-            })
-            : null,
-        session?.user?.id
-            ? prisma.enrollment.findMany({
-                where: { userId: parseInt(session.user.id) },
-                select: {
-                    id: true,
-                    courseId: true,
-                    status: true,
-                    startedAt: true,
-                    hiddenFromGifts: true,
-                    payment: { select: { id: true, status: true, proofImage: true, qrCodeUrl: true, transferContent: true, amount: true, bankName: true, accountNumber: true } },
-                    course: { select: { _count: { select: { lessons: true } } } },
-                    _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } }
-                }
-            })
-            : [],
-        getPostsForProfile(profile)
-    ])
-
-    const myCourseIds = new Set<number>()
-    const enrollmentsMap: Record<number, {
-        status: string
-        startedAt: Date | null
-        completedCount: number
-        totalLessons: number
-        enrollmentId?: number
-        payment?: { id: number; status: string; proofImage?: string | null }
-        hiddenFromGifts: boolean
-    }> = {}
-
-    enrollments.forEach((e: any) => {
-        if (e.status === 'ACTIVE' || e.status === 'COMPLETED') {
-            if (!e.hiddenFromGifts) {
-                myCourseIds.add(e.courseId)
-            }
-        }
-        enrollmentsMap[e.courseId] = {
-            status: e.status,
-            startedAt: e.startedAt,
-            completedCount: e._count?.lessonProgress || 0,
-            totalLessons: e.course?._count?.lessons || 0,
-            enrollmentId: e.id,
-            payment: e.payment,
-            hiddenFromGifts: e.hiddenFromGifts || false
-        }
-    })
-
-    const myCourses = courses.filter((c: any) => myCourseIds.has(c.id))
-
-    // Tách active vs completed
-    const myActiveCourses = myCourses
-        .filter((c: any) => enrollmentsMap[c.id]?.status === 'ACTIVE')
-        .sort((a: any, b: any) => {
-            const dateA = enrollmentsMap[a.id]?.startedAt ? new Date(enrollmentsMap[a.id].startedAt!).getTime() : 0
-            const dateB = enrollmentsMap[b.id]?.startedAt ? new Date(enrollmentsMap[b.id].startedAt!).getTime() : 0
-            return dateB - dateA
-        })
-    const myCompletedCourses = myCourses
-        .filter((c: any) => enrollmentsMap[c.id]?.status === 'COMPLETED')
-
-    const otherCourses = courses.filter((c: any) => !myCourseIds.has(c.id))
-
-    const groupedOtherCourses = otherCourses.reduce((acc: any[], course: any) => {
-        const category = course.courseCategory?.name || course.category || "Khác"
-        const existingGroup = acc.find(g => g.category === category)
-        if (existingGroup) {
-            existingGroup.courses.push(course)
-        } else {
-            acc.push({ category, courses: [course] })
-        }
-        return acc
-    }, []).sort((a: any, b: any) => {
-        const orderA = a.courses[0]?.courseCategory?.order ?? 0
-        const orderB = b.courses[0]?.courseCategory?.order ?? 0
-        return orderA - orderB
-    })
-
-    // Sort courses trong mỗi category: pin ASC → createdAt DESC
-    groupedOtherCourses.forEach((g: any) => {
-        g.courses.sort((a: any, b: any) => {
-            if (a.pin !== b.pin) return a.pin - b.pin
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        })
-    })
-
-    const userName = userRecord?.name ?? null
-    const userId = userRecord?.id ?? null
-    const userPhone = userRecord?.phone ?? null
-    const userRoadmap = userRecord?.roadmap
-    const customPath = userRoadmap?.customPath ?? null
-    const userGoal = userRoadmap?.goal ?? null
-    const targetPointId = userRoadmap?.targetPointId ?? 1
-
-    const roadmapPoints = await getRoadmapPoints()
-
-    const { resetSurveyAction } = await import('@/app/actions/survey-actions')
-
-    return (
-        <main className="min-h-screen" style={{
-            backgroundColor: profile.backgroundColor || undefined
-        }}>
-            <SetHomeSlug slug={slug} />
-
-            <MainHeader
-                title={profile.title || 'TRANG CHỦ'}
-                profile={profile}
-            />
-
-            <MessageCard
-                profile={profile}
-                session={session}
-                userName={userName || ''}
-                userId={userId !== null ? String(userId) : ''}
-                isDefault={profile.isDefault || false}
-                messageImageUrl={message?.imageUrl || null}
-                messageContent={(message as any)?.content || null}
-            />
-
-            <HomePageClient
-                profile={profile}
-                courses={courses}
-                myActiveCourses={myActiveCourses}
-                myCompletedCourses={myCompletedCourses}
-                groupedOtherCourses={groupedOtherCourses}
-                posts={posts}
-                session={session}
-                enrollmentsMap={enrollmentsMap}
-                userPhone={userPhone}
-                userId={userId}
-                customPath={customPath as number[] | null}
-                userGoal={userGoal}
-                targetPointId={targetPointId}
-                roadmapPoints={roadmapPoints || []}
-                survey={survey}
-                resetSurveyAction={resetSurveyAction}
-                showAllCourses={true}
-            />
-
-            <FooterSection profile={profile} />
-        </main>
-    )
+    return <ProfileHome profile={profile} />
 }

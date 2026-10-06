@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { resolveRefToUserId } from "@/lib/affiliate/resolve-ref-helper"
+import { requireDomainModule } from '@/lib/website/domain-context'
+import { auth } from '@/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    await requireDomainModule('affiliate')
     const { searchParams } = new URL(request.url)
     const ref = searchParams.get("ref")
     if (!ref) {
@@ -46,6 +49,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const domain=await requireDomainModule('affiliate')
+    const session=domain ? await auth() : null
+    if(domain && !session?.user?.id) return NextResponse.json({error:'Unauthorized'},{status:401})
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "50")
@@ -53,6 +59,7 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get("days") || "7")
 
     const where: any = {}
+    if(domain) where.link={userId:Number(session!.user!.id)}
     if (refUserId) {
       const links = await prisma.affiliateLink.findMany({
         where: { userId: parseInt(refUserId) },

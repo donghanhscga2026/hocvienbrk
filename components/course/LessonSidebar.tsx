@@ -101,15 +101,15 @@ function LessonSidebar({
     }
 
     return (
-        <div className="flex flex-col h-full bg-zinc-900 border-r border-zinc-800 w-80 shrink-0">
+        <div className="flex flex-col h-full bg-zinc-900 website:bg-brk-surface border-r border-zinc-800 website:border-brk-outline w-80 shrink-0">
             {/* ── Ngày bắt đầu block ── */}
-            <div className="p-4 border-b border-zinc-800 space-y-2">
+            <div className="p-4 border-b border-zinc-800 website:border-brk-outline space-y-2">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-zinc-300">
+                    <div className="flex items-center gap-2 text-zinc-300 website:text-brk-on-surface">
                         <CalendarDays className="w-4 h-4 text-orange-400 shrink-0" />
                         <div>
-                            <p className="text-[10px] text-zinc-400 uppercase tracking-wide">Ngày bắt đầu lộ trình</p>
-                            <p className="text-sm font-semibold text-white leading-tight">
+                            <p className="text-[10px] text-zinc-400 website:text-brk-muted uppercase tracking-wide">Ngày bắt đầu lộ trình</p>
+                            <p className="text-sm font-semibold text-white website:text-brk-on-surface leading-tight">
                                 {startedAt ? formatDateVN(startedAt) : '-- / -- / ----'}
                             </p>
                         </div>
@@ -124,14 +124,14 @@ function LessonSidebar({
                 </div>
 
                 {showDatePicker && (
-                    <div className="bg-zinc-800 rounded-lg p-3 space-y-2 border border-zinc-700">
-                        <p className="text-[10px] text-zinc-300">Chọn ngày mới (từ hôm nay trở đi):</p>
+                    <div className="bg-zinc-800 website:bg-brk-surface rounded-lg p-3 space-y-2 border border-zinc-700 website:border-brk-outline">
+                        <p className="text-[10px] text-zinc-300 website:text-brk-on-surface">Chọn ngày mới (từ hôm nay trở đi):</p>
                         <input
                             type="date"
                             value={dateInput}
                             min={today}
                             onChange={e => setDateInput(e.target.value)}
-                            className="w-full bg-zinc-700 text-white text-sm rounded-lg px-3 py-2 border border-zinc-600 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            className="w-full bg-zinc-700 website:bg-brk-surface text-white website:text-brk-on-surface text-sm rounded-lg px-3 py-2 border border-zinc-600 website:border-brk-outline focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                         {isPastDate && dateInput && (
                             <p className="text-[10px] text-red-400 font-semibold flex items-center gap-1">
@@ -148,7 +148,7 @@ function LessonSidebar({
                             </button>
                             <button
                                 onClick={() => { setShowDatePicker(false); setShowWarning(false) }}
-                                className="flex-1 text-xs text-zinc-200 hover:text-white border border-zinc-600 rounded-lg py-1.5 transition-colors"
+                                className="flex-1 text-xs text-zinc-200 website:text-brk-on-surface hover:text-white website:hover:text-brk-on-surface border border-zinc-600 website:border-brk-outline rounded-lg py-1.5 transition-colors"
                             >
                                 Hủy
                             </button>
@@ -158,12 +158,12 @@ function LessonSidebar({
             </div>
 
             {/* ── Tiêu đề danh sách ── */}
-            <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between gap-2">
-                <h2 className="font-bold text-sm text-zinc-200 uppercase tracking-wide">Nội dung khóa học</h2>
+            <div className="px-4 py-2 border-b border-zinc-800 website:border-brk-outline flex items-center justify-between gap-2">
+                <h2 className="font-bold text-sm text-zinc-200 website:text-brk-on-surface uppercase tracking-wide">Nội dung khóa học</h2>
                 <button
                     onClick={() => setSortDesc(v => !v)}
                     title={sortDesc ? 'Đang sắp xếp: Cuối → Đầu' : 'Đang sắp xếp: Đầu → Cuối'}
-                    className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-full px-2 py-1 transition-colors"
+                    className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-zinc-300 website:text-brk-on-surface hover:text-white website:hover:text-brk-on-surface bg-zinc-800 website:bg-brk-surface hover:bg-zinc-700 website:hover:bg-brk-surface border border-zinc-700 website:border-brk-outline rounded-full px-2 py-1 transition-colors"
                 >
                     <ArrowUpDown className="w-3 h-3" />
                     {sortDesc ? 'Cuối → Đầu' : 'Đầu → Cuối'}
@@ -186,9 +186,9 @@ function LessonSidebar({
                             disabled={!unlocked}
                             title={!unlocked ? 'Hoàn thành bài trước ≥5đ để mở khóa' : undefined}
                             className={cn(
-                                "w-full flex items-center gap-3 p-4 text-left transition-colors border-b border-zinc-800/50",
-                                isActive && "bg-zinc-800 border-l-2 border-l-orange-500",
-                                unlocked && !isActive && "hover:bg-zinc-800/50",
+                                "w-full flex items-center gap-3 p-4 text-left transition-colors border-b border-zinc-800/50 website:border-brk-outline/50",
+                                isActive && "bg-zinc-800 website:bg-brk-surface border-l-2 border-l-orange-500",
+                                unlocked && !isActive && "hover:bg-zinc-800/50 website:hover:bg-brk-surface/50",
                                 !unlocked && "opacity-40 cursor-not-allowed"
                             )}
                         >
@@ -198,15 +198,15 @@ function LessonSidebar({
                                 ) : isActive ? (
                                     <PlayCircle className="w-5 h-5 text-orange-400" />
                                 ) : !unlocked ? (
-                                    <Lock className="w-4 h-4 text-zinc-400" />
+                                    <Lock className="w-4 h-4 text-zinc-400 website:text-brk-muted" />
                                 ) : (
-                                    <div className="w-5 h-5 rounded-full border-2 border-zinc-600 flex items-center justify-center text-[10px] text-zinc-200">
+                                    <div className="w-5 h-5 rounded-full border-2 border-zinc-600 website:border-brk-outline flex items-center justify-center text-[10px] text-zinc-200 website:text-brk-on-surface">
                                         {lesson.order}
                                     </div>
                                 )}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={cn("text-sm font-medium line-clamp-2", isActive ? "text-white" : "text-zinc-100")}>
+                                <p className={cn("text-sm font-medium line-clamp-2", isActive ? "text-white website:text-brk-on-surface" : "text-zinc-100 website:text-brk-on-surface")}>
                                     {lesson.title}
                                     {lesson.isDailyChallenge && (
                                         <span className="ml-1.5 text-[9px] font-bold text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full align-middle">📝 Bài tập</span>

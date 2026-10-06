@@ -17,6 +17,7 @@ import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
 import { resolveImageUrl } from "@/lib/image-utils"
+import { requireDomainCourse, requireDomainEnrollment, domainContext } from '@/lib/website/domain-context'
 
 /**
  * Đăng ký khóa học mới
@@ -29,6 +30,7 @@ export async function enrollInCourseAction(
     useVndWallet: boolean = false
 ) {
     try {
+        await requireDomainCourse(courseId)
         const session = await auth()
         if (!session?.user?.id) throw new Error("Vui lòng đăng nhập để tiếp tục.")
 
@@ -242,6 +244,7 @@ export async function enrollInCourseAction(
             }
         }
 
+        const websiteDomain=await domainContext()
         // [ENROLL-DEBUG] Đọc affiliate cookie
         let enrollmentReferrerId: number | null = null
         let enrollmentRawRefCode: string | null = null
@@ -322,6 +325,8 @@ export async function enrollInCourseAction(
         console.log('[ENROLL-DEBUG] FINAL enrollmentReferrerId:', enrollmentReferrerId)
         console.log('[ENROLL-DEBUG] ===== END cookie read =====')
 
+        // Khi module bị khóa, không ghi nhận ref mới từ domain này.
+        if(websiteDomain && !websiteDomain.affiliate) { enrollmentReferrerId=null;enrollmentRawRefCode=null }
         // Chống self-referral: referrerId không được trùng userId (tránh vòng lặp cây chia sẻ)
         if (enrollmentReferrerId === userId) {
             enrollmentReferrerId = user?.referrerId ?? null
@@ -540,6 +545,7 @@ export async function enrollInCourseAction(
 export async function confirmStartDateAction(courseId: number, date: string | Date) {
     const logId = `[RESET-COURSE-${courseId}-${Date.now()}]`
     try {
+        await requireDomainCourse(courseId)
         const session = await auth()
         if (!session?.user?.id) return { success: false, message: "Unauthorized" }
 
@@ -603,6 +609,7 @@ export async function submitAssignmentAction({
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false, message: "Phiên đăng nhập hết hạn." }
+        await requireDomainEnrollment(enrollmentId,Number(session.user.id),lessonId)
 
         const now = new Date()
         let timingScore = 0
@@ -795,6 +802,7 @@ export async function saveAssignmentDraftAction({
     try {
         const session = await auth()
         if (!session?.user?.id) return { success: false }
+        await requireDomainEnrollment(enrollmentId,Number(session.user.id),lessonId)
 
         const validLinks = links.filter((l: string) => l && l.trim().length > 0)
 
@@ -823,6 +831,7 @@ export async function updateLastLessonAction(enrollmentId: number, lessonId: str
     try {
         const session = await auth()
         if (!session?.user?.id) return
+        await requireDomainEnrollment(enrollmentId,Number(session.user.id),lessonId)
         await prisma.enrollment.update({
             where: { id: enrollmentId },
             data: { lastLessonId: lessonId }
@@ -1026,6 +1035,7 @@ export async function getTeachersAction() {
 // GET COURSE LESSONS - Lấy danh sách bài học của khóa học
 // ==========================================
 export async function getCourseLessonsAction(courseId: number) {
+    await requireDomainCourse(courseId)
     return await prisma.lesson.findMany({
         where: { courseId },
         orderBy: { order: 'asc' },
@@ -1038,6 +1048,7 @@ export async function getCourseLessonsAction(courseId: number) {
 // ==========================================
 export async function checkEnrollmentStatusAction(courseId: number) {
     try {
+        await requireDomainCourse(courseId)
         const session = await auth()
         if (!session?.user?.id) return { status: null }
         const userId = Number(session.user.id)
@@ -1112,6 +1123,7 @@ export async function toggleHiddenFromGifts(enrollmentId: number) {
 
   const userId = parseInt(session.user.id)
   try {
+    await requireDomainEnrollment(enrollmentId,userId)
     const enrollment = await prisma.enrollment.findUnique({
       where: { id: enrollmentId, userId },
       select: { id: true, hiddenFromGifts: true }
@@ -1130,4 +1142,3 @@ export async function toggleHiddenFromGifts(enrollmentId: number) {
     return { success: false, error: error.message }
   }
 }
-

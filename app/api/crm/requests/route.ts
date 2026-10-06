@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { getCrmActor } from '@/lib/crm/auth'
 import { crmBody, crmFailure, crmResponse } from '@/lib/crm/http'
 import { createRequest, readRequests, requestSource, updateRequest } from '@/lib/crm/requests'
+import { requireDomainCourse, requireDomainModule } from '@/lib/website/domain-context'
 
 export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const raw = await crmBody(request, 20000)
+    const domain=await requireDomainModule('crm')
+    if(domain) { if(typeof raw?.courseId!=='number') return crmResponse({error:'Chọn khóa học của website.'},400); await requireDomainCourse(raw.courseId) }
     const session = await auth()
     const userId = session?.user?.id == null ? null : Number(session.user.id)
     const result = await createRequest(prisma, raw, userId != null && Number.isInteger(userId) && userId >= 0 ? userId : null, request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown')
