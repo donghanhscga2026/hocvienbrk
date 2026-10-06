@@ -4,28 +4,29 @@ import { z } from 'zod'
 import { crmBody, crmResponse } from '@/lib/crm/http'
 import { websiteFailure } from '@/lib/website/http'
 import { CrmError } from '@/lib/crm/service'
-import { ownedProfile, websiteData } from '@/lib/website/server'
+import { managedProfile, websiteData } from '@/lib/website/server'
 import { blankDocument, parseDocument, walkNodes } from '@/lib/website/document'
 import { canUseCrm } from '@/lib/crm/shared'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
 import { adaptCourseTemplate } from '@/lib/website/course-template'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const profile = await ownedProfile()
+    const value = new URL(request.url).searchParams.get('profileId')
+    const profile = await managedProfile(value ? Number(value) : undefined)
     const [row, data] = await Promise.all([prisma.siteWebsite.findUnique({ where: { profileId: profile.id } }), websiteData(profile)])
     const templates = COURSE_TEMPLATE_LIBRARY.map(t => ({ key: t.key, name: t.name, ...adaptCourseTemplate(t.key, profile.title || 'Website của tôi') }))
     return crmResponse({ profile: { slug: profile.slug, isActive: profile.isActive, canUseCrm: !!profile.user && canUseCrm(profile.user.role) }, document: row?.draft || blankDocument(profile.title || 'Website của tôi'), revision: row?.revision ?? -1, history: row?.history || [], published: !!row?.published, data, templates })
   } catch(e) { return websiteFailure(e) }
 }
-const command = z.object({ action: z.enum(['save', 'publish', 'unpublish', 'restore']), revision: z.number().int().min(-1), document: z.unknown().optional(), historyIndex: z.number().int().min(0).max(9).optional() }).strict()
+const command = z.object({ action: z.enum(['save', 'publish', 'unpublish', 'restore']), revision: z.number().int().min(-1), profileId: z.number().int().positive().optional(), document: z.unknown().optional(), historyIndex: z.number().int().min(0).max(9).optional() }).strict()
 export async function POST(request: Request) {
   try {
-    const profile = await ownedProfile()
     const input = command.parse(await crmBody(request, 700000))
+    const profile = await managedProfile(input.profileId)
     const doc = input.action === 'save' || input.action === 'publish' ? parseDocument(input.document) : null
     const result = await prisma.$transaction(async tx => {
-      const fresh = await tx.siteProfile.findFirst({ where: { id: profile.id, userId: profile.userId }, include: { user: { select: { role: true } } } })
+      const fresh = await tx.siteProfile.findUnique({ where: { id: profile.id }, include: { user: { select: { role: true } } } })
       if(!fresh) throw new CrmError('Bạn không còn quyền chỉnh sửa trang này.',403)
       const current = await tx.siteWebsite.findUnique({ where: { profileId: profile.id } })
       if((current?.revision ?? -1) !== input.revision) throw new CrmError('Bản nháp đã được sửa ở cửa sổ khác. Xuất JSON để giữ thay đổi rồi tải lại.', 409)
