@@ -9,7 +9,7 @@ function load(file) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText
   new Function('require', 'exports', 'module', code)(name =>
-    name === '@/lib/course-page/importer/source-url' ? load('lib/course-page/importer/source-url.ts') : require(name),
+    name.startsWith('@/lib/course-page/importer/') ? load(name.replace('@/', '') + '.ts') : require(name),
   module.exports, module)
   return module.exports
 }
@@ -20,6 +20,24 @@ async function run() {
   assert.deepEqual(fixture.sections.map(section => section.id), ['hero', 'details', 'footer'])
   assert.equal(zipSelectedBlockKeys(['imported-1']), null, 'Legacy full-page selections remain visible')
   assert.deepEqual(zipSelectedBlockKeys([]), [], 'An explicitly empty selection stays empty')
+  const { JSDOM: NavigationDOM } = require('jsdom')
+  const { BRIDGE, upgradeZipBridge: upgradeBridge } = load('lib/course-page/importer/zip-browser.ts')
+  const { zipCourseLinks: courseLinks } = load('lib/course-page/importer/source-url.ts')
+  const navigation = new NavigationDOM('<a data-course="2" href="#dang-ky">Option 1</a><a data-course="21" href="#dang-ky">Option 2</a><a href="#details">Details</a><section id="details"></section>' + BRIDGE, { runScripts: 'outside-only', url: 'https://app.invalid/api/course-template-source' })
+  navigation.window.eval(navigation.window.document.querySelector('[data-mfc-zip-bridge]').textContent)
+  const navigationMessages = []
+  navigation.window.postMessage = msg => navigationMessages.push(msg)
+  const navigationPath = '/khoa-hoc/BAN_DO_TAI_CHINH'
+  navigation.window.dispatchEvent(new navigation.window.MessageEvent('message', { source: navigation.window, data: { source: 'mfc-zip-parent', type: 'configure', pageUrl: 'https://app.invalid' + navigationPath, courseLinks: courseLinks(navigationPath) } }))
+  const navigationAnchors = [...navigation.window.document.querySelectorAll('a')]
+  assert.deepEqual(navigationAnchors.map(el => el.href), ['https://app.invalid/khoa-hoc/KICH_HOAT_DONG_TIEN', 'https://app.invalid' + navigationPath + '#dang-ky', 'https://app.invalid' + navigationPath + '#details'])
+  navigationAnchors.forEach(el => el.click())
+  assert.ok(navigationMessages.some(msg => msg.actionType === 'course_link'))
+  assert.ok(navigationMessages.some(msg => msg.actionType === 'open_registration' && msg.anchor === 'dang-ky'))
+  assert.ok(navigationMessages.some(msg => msg.type === 'scroll' && msg.anchor === 'details'))
+  assert.ok(upgradeBridge('<script data-mfc-zip-bridge>old</script>').includes('configureLinks'))
+  assert.deepEqual(courseLinks('/khoa-hoc/OTHER'), {}, 'Course-specific mapping never changes another course')
+  navigation.window.close()
   const { GET } = load('app/api/course-template-source/route.ts')
   const { NextRequest } = require('next/server')
   const storage = 'https://project.supabase.co'
@@ -85,9 +103,10 @@ async function run() {
     const actualKeys = [...page.querySelectorAll('[data-mfc-block]')].map(el => el.getAttribute('data-mfc-block'))
     assert.ok(analysis.sections.length > 1, 'Actual landing is split into its structural sections')
     assert.deepEqual(analysis.sections.map(section => section.id), actualKeys, 'Analyzer IDs match rendered ZIP blocks')
-    const preview = new JSDOM(prepared.html, { runScripts: 'outside-only' })
+    const preview = new JSDOM(prepared.html, { runScripts: 'outside-only', url: 'https://app.invalid/api/course-template-source' })
     preview.window.eval(preview.window.document.querySelector('[data-mfc-zip-bridge]').textContent)
     const configure = keys => preview.window.dispatchEvent(new preview.window.MessageEvent('message', {
+      source: preview.window,
       data: { source: 'mfc-zip-parent', type: 'configure', selectedBlockKeys: keys, registrationBlockKeys: [] },
     }))
     configure(['imported-1'])
@@ -98,9 +117,35 @@ async function run() {
     assert.ok([...preview.window.document.querySelectorAll('[data-mfc-block]')].some(el => !el.hidden && el.querySelector('h1')), 'New import keeps its hero visible after configuration')
     configure([])
     assert.ok([...preview.window.document.querySelectorAll('[data-mfc-block]')].every(el => el.hidden), 'Deselecting every block hides every block')
+    const { zipCourseLinks } = load('lib/course-page/importer/source-url.ts')
+    const { upgradeZipBridge } = load('lib/course-page/importer/zip-browser.ts')
+    const coursePath = '/khoa-hoc/BAN_DO_TAI_CHINH'
+    const messages = []
+    preview.window.postMessage = payload => messages.push(payload)
+    preview.window.dispatchEvent(new preview.window.MessageEvent('message', {
+      source: preview.window,
+      data: { source: 'mfc-zip-parent', type: 'configure', selectedBlockKeys: null, pageUrl: 'https://app.invalid' + coursePath, courseLinks: zipCourseLinks(coursePath) },
+    }))
+    const optionOne = preview.window.document.querySelector('a[data-course="2"]')
+    const optionTwo = preview.window.document.querySelector('a[data-course="21"]')
+    assert.equal(optionOne.href, 'https://app.invalid/khoa-hoc/KICH_HOAT_DONG_TIEN')
+    assert.equal(optionTwo.href, 'https://app.invalid' + coursePath + '#dang-ky')
+    optionOne.click()
+    assert.ok(messages.some(msg => msg.actionType === 'course_link' && msg.target === '/khoa-hoc/KICH_HOAT_DONG_TIEN'))
+    messages.length = 0
+    optionTwo.click()
+    assert.ok(messages.some(msg => msg.actionType === 'open_registration' && msg.anchor === 'dang-ky'))
+    assert.ok(!messages.some(msg => msg.actionType === 'external_link'), 'Canonical anchor opens current registration rather than another tab')
+    const legacy = prepared.html.replace(/<script data-mfc-zip-bridge>[\s\S]*?<\/script>/, '<script data-mfc-zip-bridge>/* old bridge */</script>')
+    assert.ok(upgradeZipBridge(legacy).includes('configureLinks'))
+    assert.equal(upgradeZipBridge(upgradeZipBridge(legacy)), upgradeZipBridge(legacy), 'Bridge upgrade is idempotent')
+    global.fetch = async () => new Response(legacy)
+    assert.equal(await (await GET(request(source))).text(), upgradeZipBridge(legacy), 'Saved sources receive the updated bridge')
     preview.window.close()
     global.fetch = async () => new Response(prepared.html, { headers: { 'Content-Type': 'text/plain' } })
-    assert.equal(await (await GET(request(source))).text(), prepared.html, 'Actual ZIP HTML and assets survive serving unchanged')
+    const served = await (await GET(request(source))).text()
+    const withoutBridge = html => html.replace(/<script\b[^>]*data-mfc-zip-bridge[^>]*>[\s\S]*?<\/script>/, '')
+    assert.ok(withoutBridge(served) === withoutBridge(prepared.html), 'Actual ZIP content and assets survive the bridge upgrade unchanged')
     console.log(`Actual ZIP: ${prepared.entryPath}, ${prepared.fileCount} files, ${prepared.inlinedAssetCount} embedded assets passed.`)
     dom.window.close()
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveZipStorageSource } from '@/lib/course-page/importer/source-url'
+import { upgradeZipBridge } from '@/lib/course-page/importer/zip-browser'
 
 export const runtime = 'nodejs'
 const MAX_HTML_BYTES = 8 * 1024 * 1024
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Storage deliberately returns HTML as text/plain. Serve only the bounded body,
     // with our own isolated HTML policy; never forward upstream cookies or headers.
-    return new NextResponse(Buffer.concat(chunks).toString('utf8'), {
+    return new NextResponse(upgradeZipBridge(Buffer.concat(chunks).toString('utf8')), {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Content-Security-Policy': SOURCE_CSP,

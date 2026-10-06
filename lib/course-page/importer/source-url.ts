@@ -1,5 +1,11 @@
 const STORAGE_PREFIX = '/storage/v1/object/public/uploads/course-template-sources/'
 
+export function zipCourseLinks(pathname: string): Record<string, string> {
+  return pathname === '/khoa-hoc/BAN_DO_TAI_CHINH'
+    ? { '2': '/khoa-hoc/KICH_HOAT_DONG_TIEN' }
+    : {}
+}
+
 export function zipSelectedBlockKeys(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null
   const keys = value.filter((key): key is string => typeof key === 'string')

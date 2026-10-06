@@ -2202,3 +2202,13 @@ Thiết lập quy trình an toàn để nhiều developer/AI phát triển song 
 - ✅ Ruleset đã chặn đường merge không đáp ứng điều kiện bắt buộc.
 - ✅ Team workflow đã được merge vào `master`.
 - ⏳ CODEOWNERS sẽ triển khai khi có reviewer độc lập phù hợp.
+
+---
+
+## ✅ Sửa hiển thị mẫu ZIP trên khóa học (2026-10-06)
+
+- PR #77: phục vụ HTML đã upload qua `/api/course-template-source` với `Content-Type: text/html`, kiểm tra nguồn Storage, giới hạn 8MB và sandbox riêng.
+- PR #79: sửa biểu thức nhận diện thẻ section; lựa chọn cũ `imported-1` được hiểu là toàn trang để không ẩn hết nội dung.
+- File: `app/api/course-template-source/route.ts`, `lib/course-page/importer/source-url.ts`, `lib/course-page/importer/html-analyzer.ts`, `components/course-page/sections/ZipSourceSection.tsx`, `scripts/test-zip-template-source.cjs`, `.github/workflows/security-ci.yml`.
+- Kiểm tra: TypeScript và build CI thành công; ZIP Bản Đồ Tài Chính được nhận diện thành 16 phần, 13 ảnh; chọn/bỏ Hero hoạt động trên production.
+- Người dùng xác nhận “ok rồi” ngày 2026-10-06. Tài liệu: `docs/ZIP_TEMPLATE_RENDERING.md`.
