@@ -126,6 +126,22 @@ async function run(){
  ok(configurations.get('website-presentation:7:v1').mode==='template','Admin homepage writes use shared presentation state')
  const revision=configurations.get('website-presentation:7:v1').revision
  ok((await mode.POST(request({mode:'template',revision:revision-1}))).status===409,'Admin update invalidates stale owner editor revision')
+ const previousRegistry=JSON.stringify(registry)
+ profile.siteConfig={homepage:{type:'landing',landingSlug:'saved-sales'},courseScope:{mode:'teacher',teacherIds:[3]},modules:{tools:false}}
+ result=await admin.updateSiteProfileRuntime(7,{siteConfig:{branding:{name:'Updated'}}})
+ ok(result.success && JSON.stringify(registry)===previousRegistry,'Brand-only save preserves domain rows and primary flags')
+ ok(profile.siteConfig.homepage.landingSlug==='saved-sales' && profile.siteConfig.courseScope.teacherIds[0]===3 && profile.siteConfig.modules.tools===false,'Removed controls retain their existing configuration')
+ ok(configurations.get('website-presentation:7:v1').revision===revision,'Brand-only save does not switch homepage presentation')
+ ok(!(await admin.getSiteProfileAdminById(7)).communityAvailable,'Landing does not offer a community checkbox')
+ profile.siteConfig={homepage:{type:'profile'}}
+ ok((await admin.getSiteProfileAdminById(7)).communityAvailable,'Built-in template offers its community board')
+ const {blankDocument,makeNode}=load('lib/website/document')
+ custom=blankDocument('Test')
+ profile.siteConfig={homepage:{type:'website'}}
+ ok(!(await admin.getSiteProfileAdminById(7)).communityAvailable,'Free design without posts hides community control')
+ const container=makeNode('container');container.children=[makeNode('posts')];custom.pages[0].nodes=[container]
+ ok((await admin.getSiteProfileAdminById(7)).communityAvailable,'Nested published posts block enables community control')
+ custom=null
  occupied=true;result=await admin.updateSiteProfileRuntime(7,{primaryDomain:'new.example'})
  ok(!!result.error,'Admin cannot claim a hostname from the verified registry')
  profile.siteConfig=null

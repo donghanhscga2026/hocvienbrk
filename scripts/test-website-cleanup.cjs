@@ -42,7 +42,6 @@ function load(relative){
 }
 global.fetch=async()=>({ok:true,json:async()=>({themes:[{id:'brand',name:'Brand'}]})})
 const click=async(el)=>{ok(!!el,'Interactive control exists');await act(async()=>el.click())}
-const change=async(el,value)=>{await act(async()=>{el.value=value;el.dispatchEvent(new window.Event('change',{bubbles:true}))})}
 const control=label=>[...document.querySelectorAll('label')].find(el=>el.textContent.includes(label))?.querySelector('input,select')
 async function run(){
  const {websiteTheme,normalizeWebsitePalette,contrastRatio}=load('lib/website/theme')
@@ -72,29 +71,30 @@ async function run(){
  ok(html.includes(palette.primary),'Website content uses the same primary as its shell')
  const Editor=load('components/admin/SiteRuntimeConfigEditor').default
  let mounted=createRoot(document.getElementById('root'))
- await act(async()=>mounted.render(React.createElement(Editor,{profile:{...profile,domains:[{hostname:'owner.example',isPrimary:true,isActive:true}]}})))
- ok(!control('Mã giáo viên') && !control('Mã khóa học') && !control('Mã danh mục'),'Automatic source hides all ID inputs')
- ok(!control('Cho phép người dùng') && !control('Khảo sát') && !control('Lộ trình'),'Unsupported domain controls are hidden')
- const source=control('Nguồn khóa học')
- for(const [mode,label] of [['teacher','Mã giáo viên'],['ids','Mã khóa học'],['category','Mã danh mục']]){
-  await change(source,mode);ok(!!control(label),'Only relevant ID control is shown: '+mode)
-  ok(document.querySelectorAll('input[placeholder^="Ví dụ:"]').length===1,'No unrelated ID input remains visible')
- }
- await change(source,'profile')
- await click([...document.querySelectorAll('button')].find(el=>el.textContent.includes('Lưu cấu hình')))
- ok(saved.siteConfig.modules.surveys===false && saved.siteConfig.modules.roadmap===true && saved.siteConfig.theme.allowUserOverride===true,'Saving preserves hidden legacy settings')
+ const configured={...profile,slug:'owner',communityAvailable:false,themeId:'brand',siteConfig:{...profile.siteConfig,homepage:{type:'landing',landingSlug:'existing-sales'},branding:{name:'Owner',custom:'keep'},courseScope:{mode:'teacher',teacherIds:[42]},modules:{community:false,tools:false,surveys:false,roadmap:true}},domains:[{hostname:'owner.example',isPrimary:true,isActive:true}]}
+ await act(async()=>mounted.render(React.createElement(Editor,{profile:configured})))
+ ok(document.querySelectorAll('select').length===0,'Duplicate homepage, theme and data selectors are removed')
+ ok(!control('Công cụ') && !control('Hiển thị bảng tin'),'No ineffective tools or missing community block controls')
+ ok(document.body.textContent.includes('Sales page đã chọn'),'Existing landing homepage is shown without changing it')
+ ok(document.querySelector('details summary').textContent==='Tên miền do Admin cấp' && !document.querySelector('details').open,'Manual domains are collapsed')
+ ok(document.querySelector('a[href="/page/owner"]'),'View link targets the edited profile')
+ await click([...document.querySelectorAll('button')].find(el=>el.textContent.includes('Lưu thông tin')))
+ ok(!('homepage' in saved.siteConfig) && !('courseScope' in saved.siteConfig) && !('theme' in saved.siteConfig) && !('themeId' in saved),'Save does not overwrite hidden homepage, course source or palette')
+ ok(!('modules' in saved.siteConfig),'No modules overwritten when no community control')
+ ok(saved.siteConfig.branding.custom==='keep','Unknown branding fields are preserved')
+ ok(!('primaryDomain' in saved) && !('additionalDomains' in saved),'Unchanged domain mapping is not rewritten')
  failSave=true
- const saveButton=[...document.querySelectorAll('button')].find(el=>el.textContent.includes('Lưu cấu hình'))
+ const saveButton=[...document.querySelectorAll('button')].find(el=>el.textContent.includes('Lưu thông tin'))
  await click(saveButton)
  ok(!saveButton.disabled && document.body.textContent.includes('Save rejected'),'Failed save restores controls and displays error')
+ failSave=false
  await act(async()=>mounted.unmount())
  mounted=createRoot(document.getElementById('root'))
- await act(async()=>mounted.render(React.createElement(Editor,{profile:{...profile,verifiedDomains:[{hostname:'verified.example'}]}})))
- ok(!control('Cho phép người dùng'),'Verified registry domains also hide unsupported controls')
- await act(async()=>mounted.unmount())
- mounted=createRoot(document.getElementById('root'))
- await act(async()=>mounted.render(React.createElement(Editor,{profile:{...profile,domains:[{hostname:'giautoandien.io.vn',isPrimary:true,isActive:true}]}})))
- ok(!!control('Cho phép người dùng') && !!control('Khảo sát') && !!control('Lộ trình'),'Platform controls remain available on the platform')
+ await act(async()=>mounted.render(React.createElement(Editor,{profile:{...configured,communityAvailable:true}})))
+ ok(!!control('Hiển thị bảng tin'),'Community control appears only when the profile declares a real board')
+ await click(control('Hiển thị bảng tin'))
+ await click([...document.querySelectorAll('button')].find(el=>el.textContent.includes('Lưu thông tin')))
+ ok(saved.siteConfig.modules.community===true && saved.siteConfig.modules.tools===false && saved.siteConfig.modules.surveys===false && saved.siteConfig.modules.roadmap===true,'Community changes preserve every other module setting')
  await act(async()=>mounted.unmount())
  console.log('Website cleanup: '+checks+' checks passed (mock data and DOM; no live writes).')
 }
