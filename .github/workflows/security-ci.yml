@@ -47,6 +47,9 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      - name: ZIP template source regression checks
+        run: node scripts/test-zip-template-source.cjs
+
       - name: Lint security-critical files
         run: >-
           npx eslint auth.ts auth.config.ts proxy.ts app/login/page.tsx
