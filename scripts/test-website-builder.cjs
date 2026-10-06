@@ -67,6 +67,11 @@ async function uiChecks() {
   const React = require('react')
   const { renderToStaticMarkup } = require('react-dom/server')
   const View = load('components/website/WebsiteView').default
+  const complete=document.completeTemplateDocument('Lucy')
+  const completeHtml=renderToStaticMarkup(React.createElement(View,{document:complete,data:{courses:[],testimonials:[],posts:[]},slug:'lucy'}))
+  ok(completeHtml.includes('href="/page/lucy/dich-vu"') && completeHtml.includes('href="/page/lucy/lien-he"'),'Template CTA links stay inside the profile website')
+  const domainHtml=renderToStaticMarkup(React.createElement(View,{document:complete,data:{courses:[],testimonials:[],posts:[]},slug:'lucy',customDomain:true}))
+  ok(domainHtml.includes('href="/dich-vu"') && !domainHtml.includes('href="/page/lucy/dich-vu"'),'Custom-domain CTA links retain local paths')
   const data = { courses: [],testimonials: [],posts: [] }
   const custom = document.blankDocument('Brand'); const html = document.makeNode('html'); html.html='<script>window.top.hacked=true</script><h2>HTML</h2>'; custom.pages[0].nodes=[html]
   const markup = renderToStaticMarkup(React.createElement(View,{ document:custom,data,slug:'brand' }))
@@ -128,6 +133,10 @@ async function run() {
   ok((await rows(pg,"SELECT relrowsecurity FROM pg_class WHERE relname='SiteWebsite'"))[0].relrowsecurity,'Draft table has RLS')
   for(const role of ['anon','authenticated']) ok(!(await rows(pg,"SELECT has_table_privilege($1,'\"SiteWebsite\"','SELECT') p",[role]))[0].p,'No direct draft reads: '+role)
   const doc = document.templateDocument('business','Business')
+  const full=document.templateDocument('shared-complete','Lucy')
+  ok(document.parseDocument(JSON.parse(JSON.stringify(full))).pages.length===5,'Full sample contains five valid editable pages')
+  ok(full.pages[0].nodes.length>=10,'Full sample includes service, process, package, FAQ and intake sections')
+  ok(document.walkNodes(full.pages[0].nodes).some(node=>node.kind==='image' && node.url==='/website-demo-preview.svg'),'Full sample has a bundled illustration')
   ok(document.parseDocument(doc).pages.length === 1,'Built-in template validates')
   for(const key of ['shared','shared-sales']) {
     const sample=document.templateDocument(key,'Demo')

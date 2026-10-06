@@ -3,7 +3,7 @@
 import {useMemo,useState} from 'react'
 import Link from 'next/link'
 import WebsiteView from '@/components/website/WebsiteView'
-import {makeNode,sharedTemplateDocument} from '@/lib/website/document'
+import {makeNode,completeTemplateDocument} from '@/lib/website/document'
 
 // Bản xem thử chỉ dùng dữ liệu minh họa; không đọc hoặc ghi dữ liệu khách hàng.
 const courses = [
@@ -13,12 +13,14 @@ const courses = [
 ]
 export default function WebsiteDemo() {
   const [sales,setSales]=useState(false),[showCourses,setShowCourses]=useState(true),[onlyFirst,setOnlyFirst]=useState(false)
-  const [html,setHtml]=useState(false),[mobile,setMobile]=useState(false),[name,setName]=useState('Thương hiệu của bạn')
+  const [html,setHtml]=useState(false),[mobile,setMobile]=useState(false),[name,setName]=useState('Hương Lucy')
   const [page,setPage]=useState(''),[showJson,setShowJson]=useState(false)
   const doc=useMemo(()=>{
-    const value=sharedTemplateDocument(name.trim() || 'Thương hiệu của bạn',sales)
-    value.pages[0].nodes=value.pages[0].nodes.filter(node=>showCourses || node.kind!=='courses')
-    value.pages[0].nodes.forEach(node=>{if(node.kind==='courses')node.courseIds=onlyFirst?[1]:[]})
+    const value=completeTemplateDocument(name.trim() || 'Hương Lucy',sales)
+    value.pages.forEach(item=>{
+      item.nodes=item.nodes.filter(node=>showCourses || node.kind!=='courses')
+      item.nodes.forEach(node=>{if(node.kind==='courses')node.courseIds=onlyFirst?[1]:[]})
+    })
     if(html) {
       const block=makeNode('html');block.text='Thông điệp riêng';block.style.minHeight=160
       block.html='<section><small>Thông điệp của bạn</small><h2>Một bước nhỏ hôm nay, một thay đổi lớn ngày mai.</h2></section>'
@@ -35,8 +37,8 @@ export default function WebsiteDemo() {
   return <main className="min-h-screen bg-slate-100 p-4 text-slate-900 sm:p-6">
     <header className="mx-auto mb-5 max-w-7xl">
       <Link href="/tools/my-site/manage" className="text-sm text-teal-700 underline">← Quản lý website</Link>
-      <h1 className="mt-3 text-2xl font-bold">Thử mẫu website chung</h1>
-      <p className="mt-2 text-sm text-slate-600">Đổi các lựa chọn để xem mẫu hoạt động. Khóa học dưới đây là dữ liệu minh họa; nút đăng ký và form chưa gửi thông tin.</p>
+      <h1 className="mt-3 text-2xl font-bold">Mẫu đầy đủ · Hương Lucy — Website & AI</h1>
+      <p className="mt-2 text-sm text-slate-600">Mẫu đã điền nội dung để bạn hình dung một website hoàn chỉnh. Gói dịch vụ và khóa học là minh họa, chưa phải thông tin công bố; form không gửi dữ liệu.</p>
     </header>
     <div className="mx-auto grid max-w-7xl items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="space-y-4 rounded-2xl bg-white p-5 lg:sticky lg:top-4">
@@ -55,7 +57,7 @@ export default function WebsiteDemo() {
       <section className="min-w-0 space-y-4">
         {showJson && <details open className="rounded-2xl bg-white p-4"><summary className="cursor-pointer font-semibold">JSON chứa bố cục, nội dung và khối dữ liệu</summary><p className="my-3 text-sm">Đây là cấu trúc cho trình thiết kế. Không chứa danh sách khóa học minh họa hay thông tin học viên.</p><pre className="max-h-64 overflow-auto rounded-xl bg-slate-900 p-4 text-xs text-slate-100">{JSON.stringify(doc,null,2)}</pre></details>}
         <div className="mx-auto overflow-hidden rounded-2xl bg-white shadow-sm" style={{width:mobile?390:'100%',maxWidth:'100%'}}>
-          {doc.layout.showHeader && <nav aria-label="Menu mẫu" className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><strong className="text-teal-800">{doc.name}</strong><div className="flex gap-4 text-sm"><button onClick={()=>setPage('')}>Trang chủ</button><button onClick={()=>setPage('lien-he')}>Liên hệ</button></div></nav>}
+          {doc.layout.showHeader && <nav aria-label="Menu mẫu" className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><strong className="text-teal-800">{doc.name}</strong><div className="flex flex-wrap gap-4 text-sm">{doc.pages.map(item=><button key={item.slug} aria-current={page===item.slug?'page':undefined} className={page===item.slug?'font-semibold text-teal-800':''} onClick={()=>setPage(item.slug)}>{item.title}</button>)}</div></nav>}
           {sales && <div className="flex gap-4 p-4 text-sm"><button onClick={()=>setPage('')}>Trang bán hàng</button><button onClick={()=>setPage('lien-he')}>Xem trang liên hệ</button></div>}
           <WebsiteView document={{...doc,layout:{...doc.layout,showHeader:false}}} data={{courses,testimonials:[],posts:[],community:false}} slug="demo" pageSlug={page} preview mobile={mobile}/>
         </div>

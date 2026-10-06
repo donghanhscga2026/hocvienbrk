@@ -39,7 +39,10 @@ export default function WebsiteView({ document: doc, data, slug, pageSlug = '', 
   const brand=useDomainBrand()
   const theme=websiteTheme(customDomain ? brand?.color || doc.color : doc.color,customDomain ? brand?.background || doc.background : doc.background,customDomain ? brand?.palette : undefined)
   const page = doc.pages.find(p => p.slug === pageSlug) || doc.pages[0]
-  function href(url: string) { return websiteHref(url,slug,modules?.affiliate === false ? '' : referral,customDomain) }
+  function href(url: string) {
+    if(!customDomain && doc.pages.some(p=>p.slug && url.split(/[?#]/)[0]==='/'+p.slug)) url='/page/'+slug+url
+    return websiteHref(url,slug,modules?.affiliate === false ? '' : referral,customDomain)
+  }
   const card = 'p-5 rounded-xl border bg-white text-gray-900 grid gap-3 website:bg-brk-surface website:text-brk-on-surface website:border-brk-outline'
   function render(n: WebsiteNode) {
     if(n.kind === 'posts' && data.community === false) return null

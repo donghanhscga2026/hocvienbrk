@@ -45,6 +45,7 @@ export function moveNode(nodes: WebsiteNode[], id: string, parent: string | null
   return parent ? updateNode(removed, parent, n => ({ ...n, children: insert(n.children) })) : insert(removed)
 }
 export function templateDocument(key: string, name: string): WebsiteDocument {
+  if (key === 'shared-complete') return completeTemplateDocument(name)
   if (key === 'shared' || key === 'shared-sales') return sharedTemplateDocument(name, key === 'shared-sales')
   const doc = blankDocument(name)
   if(key === 'blank') return doc
@@ -112,5 +113,99 @@ export function sharedTemplateDocument(name = 'Thương hiệu của bạn', sal
     text('heading', 'Cùng trao đổi về mục tiêu của bạn', 36),
     text('text', 'Điền thông tin để chủ website liên hệ và tư vấn.'), contact,
   ]})
+  return doc
+}
+
+/** Nội dung minh họa đầy đủ cho website dịch vụ; không có giá hay đánh giá bịa đặt. */
+export function completeTemplateDocument(name = 'Hương Lucy', sales = false): WebsiteDocument {
+  const doc = sharedTemplateDocument(name, sales)
+  doc.description = 'Website, landing page và ứng dụng AI dành cho chuyên gia, nhà đào tạo và người kinh doanh nhỏ.'
+  const copy = (kind: 'heading' | 'text', value: string, size = kind === 'heading' ? 28 : 17) => {
+    const node = makeNode(kind); node.text = value; node.style = {fontSize:size}; node.mobile = {fontSize:Math.min(size,30)}; return node
+  }
+  const cta = (title: string, url: string) => {const node=makeNode('button');node.text=title;node.url=url;return node}
+  const section = (children: WebsiteNode[], background = '#ffffff', columns = 1) => {
+    const node=makeNode('container');node.style={padding:32,gap:24,radius:24,background,columns};node.mobile={padding:20,columns:1};node.children=children;return node
+  }
+  const card = (title: string, body: string) => section([copy('heading',title,23),copy('text',body)],'#f3f7f5')
+  const hero=section([
+    copy('text','Website · Landing page · AI cho người làm chuyên môn',15),
+    copy('heading',sales?'Một nơi để khách hiểu bạn, tin bạn và bắt đầu kết nối':'Đưa chuyên môn của bạn lên một website có định hướng.',48),
+    copy('text','Dành cho chuyên gia, nhà đào tạo và người kinh doanh nhỏ: tập hợp câu chuyện, dịch vụ, khóa học và nội dung của bạn vào một nơi dễ tìm, dễ đọc và dễ liên hệ.'),
+    cta('Trao đổi về website của tôi','/lien-he'),
+    copy('text','Bắt đầu từ nhu cầu thực tế · Chỉnh được nội dung · Dùng được trên điện thoại',15),
+  ],'#e8f3ef')
+  const illustration=makeNode('image')
+  illustration.url='/website-demo-preview.svg'
+  illustration.text='Minh họa website có menu, nội dung giới thiệu và các thẻ khóa học'
+  illustration.style={radius:20}
+  hero.children=[section(hero.children,'#e8f3ef'),illustration]
+  hero.style.columns=2
+  const problems=section([
+    copy('heading','Bạn có nhiều giá trị để chia sẻ, nhưng khách đang phải tìm ở quá nhiều nơi.'),
+    copy('text','Bài viết nằm trên mạng xã hội, khóa học ở một nền tảng khác, thông tin dịch vụ gửi qua tin nhắn. Khi khách muốn tìm hiểu, họ khó biết nên bắt đầu ở đâu. Website giúp bạn sắp xếp lại hành trình này.'),
+    section([card('Thông tin rải rác','Gom giới thiệu, dịch vụ và khóa học vào một địa chỉ thống nhất.'),card('Khó trình bày giá trị','Làm rõ bạn giúp ai, giải quyết điều gì và cách làm việc cùng bạn.'),card('Khách chưa biết bước tiếp theo','Đặt lời mời liên hệ, đăng ký hoặc nhận tài liệu ở đúng chỗ.')],'#ffffff',3),
+  ])
+  const services=section([
+    copy('heading','Chọn giải pháp phù hợp với bước phát triển của bạn.'),
+    section([
+      card('Website thương hiệu cá nhân','Trang chủ, giới thiệu, dịch vụ, khóa học và liên hệ. Phù hợp khi bạn cần một nơi trình bày chuyên môn và nội dung lâu dài.'),
+      card('Landing page cho một mục tiêu','Trang bán khóa học, đăng ký sự kiện hoặc nhận quà tặng. Nội dung tập trung vào một lời mời và một hành động cụ thể.'),
+      card('AI hỗ trợ sáng tạo nội dung','Ứng dụng AI vào ý tưởng, nội dung, hình ảnh và video. Chọn công cụ theo công việc thực tế, hướng dẫn từng bước để bạn tự sử dụng.'),
+    ],'#ffffff',3),
+    cta('Xem phạm vi từng dịch vụ','/dich-vu'),
+  ])
+  const process=section([
+    copy('heading','Từ ý tưởng đến website: từng bước rõ ràng.'),
+    section([
+      card('01 · Làm rõ nhu cầu','Xác định khách hàng, mục tiêu của website, nội dung cần có và hành động bạn muốn khách thực hiện.'),
+      card('02 · Sắp xếp nội dung','Xây cấu trúc trang, thông điệp chính, hình ảnh và nguồn khóa học được kết nối.'),
+      card('03 · Thiết kế và kiểm tra','Chỉnh giao diện trên máy tính, điện thoại; kiểm tra menu, liên kết và form trước khi xuất bản.'),
+      card('04 · Bàn giao và sử dụng','Hướng dẫn cập nhật nội dung, quản lý tên miền và bật các tiện ích được cấp.'),
+    ],'#ffffff',2),
+  ])
+  const about=section([
+    copy('heading','Xin chào, tôi là '+name+'.'),
+    copy('text','Tôi làm việc trong lĩnh vực website, thiết kế banner, logo, hình ảnh và AI. Tôi muốn giúp người làm chuyên môn có một nơi trình bày giá trị rõ ràng và sử dụng công nghệ thuận tiện hơn.'),
+    copy('text','Cách tiếp cận của tôi bắt đầu từ nội dung và nhu cầu của người dùng: khách cần biết gì, tìm thông tin ở đâu và làm gì tiếp theo. Giao diện được xây quanh những câu hỏi đó.'),
+    cta('Tìm hiểu cách tôi làm việc','/gioi-thieu'),
+  ],'#e8f3ef')
+  const examples=section([
+    copy('heading','Ba cách áp dụng cùng một mẫu website.'),
+    copy('text','Các tình huống sau là minh họa cách dùng mẫu, không phải dự án khách hàng đã thực hiện.'),
+    section([card('Chuyên gia đào tạo','Giới thiệu chuyên gia → chương trình học → nội dung chia sẻ → đăng ký tư vấn.'),card('Dịch vụ chuyên môn','Vấn đề của khách → giải pháp → phạm vi dịch vụ → quy trình → gửi yêu cầu.'),card('Chiến dịch nhận quà','Lợi ích quà tặng → nội dung nhận được → cách sử dụng → form đăng ký.')],'#ffffff',3),
+  ])
+  const packages=section([
+    copy('heading','Phạm vi dịch vụ để bạn dễ lựa chọn.'),
+    copy('text','Đây là cấu trúc gói minh họa. Giá và phạm vi bàn giao cần thống nhất sau khi trao đổi, chưa phải bảng giá công bố.'),
+    section([
+      card('Landing page','Một trang tập trung: thông điệp, lợi ích, nội dung sản phẩm, câu hỏi thường gặp và form liên hệ. Dành cho một chiến dịch hoặc lời mời cụ thể.'),
+      card('Website chuyên gia','Bộ trang giới thiệu thương hiệu, dịch vụ, chương trình học và liên hệ. Dùng menu và bộ màu chung; cập nhật nội dung theo từng trang.'),
+      card('Website kết nối nền tảng','Website có nguồn khóa học từ hệ thống chính và các tiện ích được cấp. CRM, Affiliate hoặc ứng dụng khác được bật theo cấu hình và quyền tài khoản.'),
+    ],'#ffffff',3),
+    cta('Nhận đề xuất theo nhu cầu','/lien-he'),
+  ])
+  const courses=makeNode('courses');courses.text='Học thêm để chủ động sử dụng website và AI'
+  const faq=section([
+    copy('heading','Những điều bạn thường muốn biết trước khi bắt đầu.'),
+    ...[
+      ['Tôi chưa có đủ nội dung, có làm được không?','Có thể bắt đầu bằng thông tin cơ bản về bạn, dịch vụ và khách hàng. Sau đó hoàn thiện nội dung theo từng trang; ảnh và thông tin chưa có cần được đánh dấu để bổ sung.'],
+      ['Tôi có thể tự thay chữ, ảnh và màu không?','Với mẫu dùng các khối của hệ thống, bạn chỉnh nội dung trong trình thiết kế, lưu nháp và xuất bản sau khi xem trước.'],
+      ['Khóa học có phải nhập lại vào website này không?','Không. Khối Khóa học đọc nguồn đã chọn từ nền tảng chính. Quyền học bài vẫn theo đăng ký của học viên.'],
+      ['Tôi có thể dùng tên miền riêng không?','Có. Kết nối tên miền trong Quản lý website, hoàn tất cấu hình DNS và kiểm tra trước khi sử dụng.'],
+      ['Có thể dùng mẫu HTML riêng không?','Có khối HTML/CSS cách ly. File có JavaScript hoặc tài nguyên ngoài cần được xử lý tương thích; không phải mọi file đều nhập nguyên trạng được.'],
+      ['Tôi nên bắt đầu bằng website hay landing page?','Chọn landing page khi có một lời mời cụ thể. Chọn website khi cần nhiều trang để trình bày chuyên môn, dịch vụ và nội dung lâu dài.'],
+    ].flatMap(([question,answer])=>[copy('heading',question,21),copy('text',answer)]),
+  ])
+  const lead=makeNode('form');lead.text='Bạn đang muốn xây website cho mục tiêu nào?'
+  const invitation=section([copy('heading','Bắt đầu từ một cuộc trao đổi cụ thể.'),copy('text','Hãy chia sẻ lĩnh vực, khách hàng bạn muốn phục vụ và điều đang khiến bạn vướng. Tôi sẽ cùng bạn xác định những trang cần có và bước nên làm trước.'),lead],'#e8f3ef')
+  doc.pages[0].nodes=[hero,problems,services,process,...(sales?[]:[about]),examples,courses,packages,faq,invitation]
+  const cloned=(nodes:WebsiteNode[])=>nodes.map(cloneNode)
+  doc.pages=[doc.pages[0],
+    {id:uid(),title:'Giới thiệu',slug:'gioi-thieu',nodes:cloned([about,process,invitation])},
+    {id:uid(),title:'Dịch vụ',slug:'dich-vu',nodes:cloned([services,packages,faq,invitation])},
+    {id:uid(),title:'Khóa học',slug:'chuong-trinh',nodes:[copy('heading','Chương trình học dành cho bạn',36),copy('text','Xem nội dung từng chương trình để chọn hướng học phù hợp. Danh sách trên website thật lấy từ nguồn khóa học được chủ website lựa chọn.'),cloneNode(courses)]},
+    {id:uid(),title:'Liên hệ',slug:'lien-he',nodes:[copy('heading','Cùng trao đổi về mục tiêu của bạn',36),copy('text','Gửi lĩnh vực hoạt động, website hiện tại nếu có, các trang bạn cần và thời điểm dự kiến. Không cần biết lập trình để bắt đầu.'),cloneNode(lead),copy('text','Form trong bản xem thử không gửi dữ liệu. Khi xuất bản, form cần quyền CRM và thông tin liên hệ thực tế của chủ website.')]},
+  ]
   return doc
 }
