@@ -25,8 +25,8 @@ export async function requireDomainCourse(id: number|string) {
   if(!domain) return
   const course=await prisma.course.findUnique({where:typeof id==='number' ? {id} : {id_khoa:id},select:{id:true,teacherId:true,status:true}})
   const profile=domain.profile
-  const selected=Array.isArray(profile.courseIds) ? profile.courseIds.filter((v):v is number=>typeof v==='number') : []
-  const allowed=course?.status && (selected.length ? selected.includes(course.id) : profile.userId!=null && [profile.userId,...profile.members.map(m=>m.userId)].includes(course.teacherId ?? -1))
+  const selected=Array.isArray(profile.courseIds) ? profile.courseIds.filter((v: unknown):v is number=>typeof v==='number') : []
+  const allowed=course?.status && (selected.length ? selected.includes(course.id) : profile.userId!=null && [profile.userId,...profile.members.map((m: {userId:number})=>m.userId)].includes(course.teacherId ?? -1))
   if(!allowed) throw new CrmError('Khóa học không thuộc website này.',404)
 }
 export async function requireDomainEnrollment(enrollmentId: number, userId: number, lessonId?: string) {
