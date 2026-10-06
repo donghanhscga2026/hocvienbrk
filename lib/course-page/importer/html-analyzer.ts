@@ -617,7 +617,7 @@ export function analyzeWebsiteHtml(input: {
   const fonts = extractFonts(css)
 
   const blocks: Array<{ tag: string; attrs: string; html: string }> = []
-  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\x01>/gi
+  const blockRe = /<(header|section|footer|nav)\b([^>]*)>([\s\S]*?)<\/\1>/gi
   let blockMatch: RegExpExecArray | null
   while ((blockMatch = blockRe.exec(html)) && blocks.length < MAX_SECTIONS) {
     blocks.push({ tag: blockMatch[1].toLowerCase(), attrs: blockMatch[2], html: blockMatch[0] })

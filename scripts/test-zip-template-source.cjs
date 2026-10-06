@@ -14,7 +14,12 @@ function load(file) {
   return module.exports
 }
 async function run() {
-  const { resolveZipStorageSource, zipFrameSource } = load('lib/course-page/importer/source-url.ts')
+  const { resolveZipStorageSource, zipFrameSource, zipSelectedBlockKeys } = load('lib/course-page/importer/source-url.ts')
+  const { analyzeWebsiteHtml } = load('lib/course-page/importer/html-analyzer.ts')
+  const fixture = analyzeWebsiteHtml({ sourceType: 'zip', html: '<header data-mfc-block="hero"><h1>Hero</h1></header><section data-mfc-block="details"><h2>Details</h2></section><footer data-mfc-block="footer">Footer</footer>' })
+  assert.deepEqual(fixture.sections.map(section => section.id), ['hero', 'details', 'footer'])
+  assert.equal(zipSelectedBlockKeys(['imported-1']), null, 'Legacy full-page selections remain visible')
+  assert.deepEqual(zipSelectedBlockKeys([]), [], 'An explicitly empty selection stays empty')
   const { GET } = load('app/api/course-template-source/route.ts')
   const { NextRequest } = require('next/server')
   const storage = 'https://project.supabase.co'
@@ -76,6 +81,24 @@ async function run() {
     const page = new JSDOM(prepared.html).window.document
     assert.ok([...page.querySelectorAll('img')].some(img => img.src.startsWith('data:')))
     assert.ok(prepared.html.includes('mfc-zip-source'))
+    const analysis = analyzeWebsiteHtml({ html: prepared.analysisHtml, sourceType: 'zip' })
+    const actualKeys = [...page.querySelectorAll('[data-mfc-block]')].map(el => el.getAttribute('data-mfc-block'))
+    assert.ok(analysis.sections.length > 1, 'Actual landing is split into its structural sections')
+    assert.deepEqual(analysis.sections.map(section => section.id), actualKeys, 'Analyzer IDs match rendered ZIP blocks')
+    const preview = new JSDOM(prepared.html, { runScripts: 'outside-only' })
+    preview.window.eval(preview.window.document.querySelector('[data-mfc-zip-bridge]').textContent)
+    const configure = keys => preview.window.dispatchEvent(new preview.window.MessageEvent('message', {
+      data: { source: 'mfc-zip-parent', type: 'configure', selectedBlockKeys: keys, registrationBlockKeys: [] },
+    }))
+    configure(['imported-1'])
+    assert.ok([...preview.window.document.querySelectorAll('[data-mfc-block]')].every(el => el.hidden), 'Reproduce the previous blank preview')
+    configure(zipSelectedBlockKeys(['imported-1']))
+    assert.ok([...preview.window.document.querySelectorAll('[data-mfc-block]')].some(el => !el.hidden && el.querySelector('h1')), 'Legacy template keeps its hero visible after configuration')
+    configure(analysis.sections.map(section => section.id))
+    assert.ok([...preview.window.document.querySelectorAll('[data-mfc-block]')].some(el => !el.hidden && el.querySelector('h1')), 'New import keeps its hero visible after configuration')
+    configure([])
+    assert.ok([...preview.window.document.querySelectorAll('[data-mfc-block]')].every(el => el.hidden), 'Deselecting every block hides every block')
+    preview.window.close()
     global.fetch = async () => new Response(prepared.html, { headers: { 'Content-Type': 'text/plain' } })
     assert.equal(await (await GET(request(source))).text(), prepared.html, 'Actual ZIP HTML and assets survive serving unchanged')
     console.log(`Actual ZIP: ${prepared.entryPath}, ${prepared.fileCount} files, ${prepared.inlinedAssetCount} embedded assets passed.`)
