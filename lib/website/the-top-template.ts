@@ -93,12 +93,13 @@ export function theTopTemplateDocument(name = 'Học viện The Top 1%'): Websit
   ], { background: '#050912', padding: 36, align: 'center' })
 
   return {
+    id: 'thetop1',
     version: 1,
     name,
     description: 'Website Học viện The Top 1% — Thịnh vượng & Hạnh phúc trên con đường minh triết',
     color: gold,
     background: dark,
     layout: { maxWidth: 1600, padding: 0, gap: 0, fontFamily: 'serif', showHeader: false, showFooter: false },
-    pages: [{ id: 'thetop-home', title: 'Trang chủ', slug: '', nodes: [hero, pillars, cause, founder, who, foundations, journey, programs, community, footer] }]
+    pages: [{ id: 'thetop-home', title: 'Trang chủ', slug: '', nodes: [hero, pillars, cause, founder, who, foundations, journey, programs, community, footer] }, { id: 'thetop-about', title: 'Về The Top 1%', slug: 've-chung-toi', nodes: [] }, { id: 'thetop-courses', title: 'Khóa học', slug: 'khoa-hoc', nodes: [] }]
   }
 }
