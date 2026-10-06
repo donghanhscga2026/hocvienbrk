@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     const profile = await ownedProfile()
     const input = command.parse(await crmBody(request, 700000))
     const doc = input.action === 'save' || input.action === 'publish' ? parseDocument(input.document) : null
+    if(input.action === 'publish' && doc?.pages.some(page => walkNodes(page.nodes).some(node => node.kind === 'course-hero' && node.courseIds.length !== 1))) throw new CrmError('Chọn một khóa học chính trước khi xuất bản.',400)
     const result = await prisma.$transaction(async tx => {
       const fresh = await tx.siteProfile.findFirst({ where: { id: profile.id, userId: profile.userId }, include: { user: { select: { role: true } } } })
       if(!fresh) throw new CrmError('Bạn không còn quyền chỉnh sửa trang này.',403)

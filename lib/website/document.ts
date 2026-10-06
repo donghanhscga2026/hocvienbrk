@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
+export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'course-hero', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
 export type Kind = typeof kinds[number]
-export const labels: Record<Kind, string> = { container: 'Bố cục / cột', heading: 'Tiêu đề', text: 'Văn bản', image: 'Ảnh', video: 'Video', button: 'Nút', courses: 'Khóa học', testimonials: 'Lời chứng thực', posts: 'Bài viết', form: 'Form tư vấn → CRM', affiliate: 'Nút affiliate', html: 'HTML / CSS', divider: 'Đường phân cách' }
+export const labels: Record<Kind, string> = { container: 'Bố cục / cột', heading: 'Tiêu đề', text: 'Văn bản', image: 'Ảnh', video: 'Video', button: 'Nút', courses: 'Khóa học', 'course-hero': 'Khóa học chính', testimonials: 'Lời chứng thực', posts: 'Bài viết', form: 'Form tư vấn → CRM', affiliate: 'Nút affiliate', html: 'HTML / CSS', divider: 'Đường phân cách' }
 const color = z.string().regex(/^(#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$/i)
 const safeLink = z.string().max(2000).refine(v => !v || /^https?:\/\/[^\s]+$/i.test(v) || /^\/(?!\/)[^\s\\]*$/.test(v) || /^#[\w-]+$/.test(v), 'Liên kết phải là HTTPS/HTTP, đường dẫn / hoặc #anchor.')
 const fonts = z.enum(['inherit','sans-serif','serif','monospace'])
@@ -45,6 +45,7 @@ export function moveNode(nodes: WebsiteNode[], id: string, parent: string | null
   return parent ? updateNode(removed, parent, n => ({ ...n, children: insert(n.children) })) : insert(removed)
 }
 export function templateDocument(key: string, name: string): WebsiteDocument {
+  if (key === 'expert-sales') return expertSalesTemplateDocument(name)
   if (key === 'shared-complete') return completeTemplateDocument(name)
   if (key === 'shared' || key === 'shared-sales') return sharedTemplateDocument(name, key === 'shared-sales')
   const doc = blankDocument(name)
@@ -206,6 +207,64 @@ export function completeTemplateDocument(name = 'Hương Lucy', sales = false): 
     {id:uid(),title:'Dịch vụ',slug:'dich-vu',nodes:cloned([services,packages,faq,invitation])},
     {id:uid(),title:'Khóa học',slug:'chuong-trinh',nodes:[copy('heading','Chương trình học dành cho bạn',36),copy('text','Xem nội dung từng chương trình để chọn hướng học phù hợp. Danh sách trên website thật lấy từ nguồn khóa học được chủ website lựa chọn.'),cloneNode(courses)]},
     {id:uid(),title:'Liên hệ',slug:'lien-he',nodes:[copy('heading','Cùng trao đổi về mục tiêu của bạn',36),copy('text','Gửi lĩnh vực hoạt động, website hiện tại nếu có, các trang bạn cần và thời điểm dự kiến. Không cần biết lập trình để bắt đầu.'),cloneNode(lead),copy('text','Form trong bản xem thử không gửi dữ liệu. Khi xuất bản, form cần quyền CRM và thông tin liên hệ thực tế của chủ website.')]},
+  ]
+  return doc
+}
+
+/** Sales page đào tạo: khối sản phẩm đọc dữ liệu thật, nội dung tư vấn được biên tập. */
+export function expertSalesTemplateDocument(name = 'Chuyên gia của bạn'): WebsiteDocument {
+  const doc=blankDocument(name)
+  doc.description='Tìm hiểu chương trình học, chuyên gia giảng dạy và đăng ký qua nền tảng.'
+  doc.color='#0f766e';doc.background='#f7faf8';doc.layout={...doc.layout,maxWidth:1120,showHeader:false}
+  const text=(kind:'heading'|'text',value:string,size=kind==='heading'?28:17)=>{
+    const node=makeNode(kind);node.text=value;node.style={fontSize:size};node.mobile={fontSize:Math.min(size,30)};return node
+  }
+  const box=(children:WebsiteNode[],columns=1,background='#ffffff')=>{
+    const node=makeNode('container');node.style={padding:32,gap:22,columns,background,radius:24};node.mobile={padding:20,columns:1};node.children=children;return node
+  }
+  const card=(title:string,body:string)=>box([text('heading',title,22),text('text',body)],1,'#f0f6f3')
+  const button=(label:string,url:string)=>{const node=makeNode('button');node.text=label;node.url=url;return node}
+  const primary=makeNode('course-hero');primary.text='Chương trình học từ '+name
+  primary.style={padding:32,background:'#e8f3ef',radius:24};primary.mobile={padding:20}
+  const reviews=makeNode('testimonials');reviews.text='Chia sẻ từ học viên của chương trình'
+  const related=makeNode('courses');related.text='Các chương trình khác bạn có thể quan tâm'
+  doc.pages[0].title='Giới thiệu khóa học'
+  doc.pages[0].nodes=[
+    primary,
+    box([text('heading','Khóa học này phù hợp với ai?'),text('text','Nội dung bên dưới là mẫu biên tập cho giáo viên. Điều chỉnh đối tượng, mục tiêu và điều kiện đầu vào theo khóa học thực tế.'),
+      box([card('Người mới cần một lộ trình','Bạn muốn bắt đầu đúng hướng, có trình tự học rõ ràng thay vì tự ghép thông tin từ nhiều nguồn.'),card('Người đã học nhưng chưa áp dụng','Bạn cần hệ thống lại kiến thức và có bài tập để chuyển điều đã học thành hành động.'),card('Người muốn phát triển chuyên môn','Bạn muốn bổ sung kỹ năng cho công việc và chủ động hơn trong quá trình tự học.')],3)]),
+    box([text('heading','Từ hiểu kiến thức đến biết cách thực hành.'),box([
+      card('Nền tảng rõ ràng','Làm quen với khái niệm cốt lõi, biết điều gì cần học trước và cách liên hệ với mục tiêu của bạn.'),
+      card('Bài tập có định hướng','Thực hành theo từng phần, nhìn lại kết quả và ghi nhận những điểm cần cải thiện.'),
+      card('Khả năng ứng dụng','Xây một kế hoạch áp dụng vào tình huống của bạn. Kết quả phụ thuộc nội dung khóa học và quá trình thực hành.'),
+    ],3)]),
+    box([text('heading','Bạn sẽ học những gì?'),text('text','Đây là cấu trúc chương trình mẫu, cần sửa theo các bài học thật trước khi xuất bản.'),
+      box([card('Phần 1 · Hiểu nền tảng','Các khái niệm quan trọng, mục tiêu học tập và cách chuẩn bị để bắt đầu.'),
+      card('Phần 2 · Nắm phương pháp','Các bước thực hiện, tình huống minh họa và những lỗi thường gặp.'),
+      card('Phần 3 · Thực hành','Bài tập từng bước và hướng dẫn đối chiếu kết quả với mục tiêu.'),
+      card('Phần 4 · Áp dụng','Kế hoạch hành động, cách theo dõi tiến bộ và định hướng học tiếp.')],2)]),
+    box([text('heading','Đồng hành cùng '+name),text('text','Giới thiệu lĩnh vực chuyên môn, kinh nghiệm giảng dạy và phương pháp của bạn tại đây. Bổ sung ảnh chân dung, chứng chỉ hoặc dự án thực tế nếu phù hợp.'),
+      text('text','Tôi ưu tiên trình bày dễ hiểu, đi từ nền tảng đến thực hành và giúp người học biết bước tiếp theo. Hãy thay bằng phương pháp giảng dạy thực tế của bạn.')],1,'#e8f3ef'),
+    box([text('heading','Cách học và hỗ trợ'),box([
+      card('Truy cập trên nền tảng','Đăng nhập bằng tài khoản và học các bài trong khóa đã đăng ký. Quyền truy cập được quản lý bởi nền tảng.'),
+      card('Học trên thiết bị phù hợp','Mở bài học bằng máy tính hoặc điện thoại. Hình thức học và yêu cầu thiết bị cần được giáo viên xác nhận.'),
+      card('Hỗ trợ trong quá trình học','Ghi rõ kênh trao đổi, phạm vi hỗ trợ và thời gian phản hồi thực tế của chương trình.'),
+    ],3)]),
+    reviews,
+    box([text('heading','Đăng ký theo quy trình có sẵn.'),box([
+      card('01 · Xem thông tin khóa học','Kiểm tra nội dung, học phí, điều kiện và các thông tin hiện có trên trang khóa học.'),
+      card('02 · Đăng nhập và đăng ký','Dùng tài khoản của bạn, thực hiện các bước đăng ký và thanh toán nếu khóa học yêu cầu.'),
+      card('03 · Bắt đầu học','Sau khi được cấp quyền truy cập, mở khóa học và theo dõi các bài trong tài khoản.'),
+    ],3),text('text','Học phí và ưu đãi được xem ở trang khóa học để tránh thông tin khác nhau giữa hai nơi.'),button('Xem khóa học và bắt đầu đăng ký','#course-offer')]),
+    box([text('heading','Giải đáp trước khi đăng ký'),...[
+      ['Tôi chưa có kinh nghiệm có học được không?','Kiểm tra mục đối tượng phù hợp và yêu cầu đầu vào. Giáo viên cần ghi rõ mức độ của chương trình để bạn chọn đúng.'],
+      ['Tôi học bằng tài khoản nào?','Dùng tài khoản trên nền tảng chính. Chọn khóa học và làm theo quy trình đăng ký hiện có.'],
+      ['Học phí và thời hạn truy cập ở đâu?','Xem thông tin trên trang khóa học. Không mặc định mọi khóa đều có cùng học phí hoặc thời hạn truy cập.'],
+      ['Tôi có được hỗ trợ không?','Phạm vi hỗ trợ theo chính sách của từng chương trình. Xem mục Cách học và hỗ trợ hoặc liên hệ giáo viên trước khi đăng ký.'],
+      ['Học xong có chứng chỉ hoặc cam kết kết quả không?','Chỉ áp dụng nếu chương trình có công bố chính sách tương ứng. Không mặc định có chứng chỉ hoặc bảo đảm kết quả.'],
+    ].flatMap(([question,answer])=>[text('heading',question,21),text('text',answer)])]),
+    box([text('heading','Chọn bước học phù hợp với bạn.'),text('text','Xem lại nội dung và yêu cầu của chương trình. Khi đã phù hợp với mục tiêu, bạn có thể đăng ký qua nền tảng.'),button('Tìm hiểu và đăng ký khóa học','#course-offer')],1,'#e8f3ef'),
+    related,
   ]
   return doc
 }
