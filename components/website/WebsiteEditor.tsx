@@ -11,7 +11,7 @@ type Loaded = { profile: { slug: string; isActive: boolean; canUseCrm: boolean }
 const inputClass = 'w-full border border-gray-300 rounded-lg p-2 bg-white text-gray-900'
 const buttonClass = 'border border-gray-300 rounded-lg px-3 py-2 bg-white hover:bg-violet-50 disabled:opacity-40 text-sm'
 
-export default function WebsiteEditor() {
+export default function WebsiteEditor({ profileId }: { profileId?: number }) {
   const [loaded,setLoaded] = useState<Loaded | null>(null)
   const [doc,setDoc] = useState<WebsiteDocument | null>(null)
   const [pageId,setPageId] = useState(''); const [selected,setSelected] = useState('')
@@ -19,7 +19,7 @@ export default function WebsiteEditor() {
   const [busy,setBusy] = useState(false); const [dirty,setDirty] = useState(false); const [message,setMessage] = useState('')
   const [undo,setUndo] = useState<WebsiteDocument[]>([]); const [redo,setRedo] = useState<WebsiteDocument[]>([])
   const [drag,setDrag] = useState(''); const importInput = useRef<HTMLInputElement>(null)
-  useEffect(() => { let cancelled = false; fetch('/api/websites',{ cache: 'no-store' }).then(async response => { const value = await response.json(); if(!response.ok) throw new Error(value.error || 'Không thể mở website.'); if(!cancelled) { const document = parseDocument(value.document); setLoaded(value); setDoc(document); setPageId(document.pages[0].id) } }).catch(e => { if(!cancelled) setMessage(e.message) }); return () => { cancelled = true } },[])
+  useEffect(() => { let cancelled = false; fetch('/api/websites' + (profileId ? '?profileId=' + profileId : ''),{ cache: 'no-store' }).then(async response => { const value = await response.json(); if(!response.ok) throw new Error(value.error || 'Không thể mở website.'); if(!cancelled) { const document = parseDocument(value.document); setLoaded(value); setDoc(document); setPageId(document.pages[0].id) } }).catch(e => { if(!cancelled) setMessage(e.message) }); return () => { cancelled = true } },[profileId])
   useEffect(() => { if(!dirty) return; const before = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }; window.addEventListener('beforeunload',before); return () => window.removeEventListener('beforeunload',before) },[dirty])
   function change(next: WebsiteDocument) { if(!doc || busy) return; setUndo(list => [...list.slice(-29),doc]); setRedo([]); setDoc(next); setDirty(true) }
   function exportJson() { if(!doc) return; const url = URL.createObjectURL(new Blob([JSON.stringify(doc,null,2)],{ type: 'application/json' })); const a = document.createElement('a'); a.href=url; a.download='website.json'; a.click(); URL.revokeObjectURL(url) }
@@ -35,7 +35,7 @@ export default function WebsiteEditor() {
     setBusy(true); setMessage('')
     try {
       if(action === 'save' || action === 'publish') parseDocument(doc)
-      const response = await fetch('/api/websites',{ method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({ action, revision: loaded.revision, ...(action === 'save' || action === 'publish' ? { document: doc } : {}), ...(historyIndex != null ? { historyIndex } : {}) }) })
+      const response = await fetch('/api/websites',{ method:'POST',headers:{'Content-Type':'application/json'},body: JSON.stringify({ action, revision: loaded.revision, ...(profileId ? { profileId } : {}), ...(action === 'save' || action === 'publish' ? { document: doc } : {}), ...(historyIndex != null ? { historyIndex } : {}) }) })
       const value = await response.json(); if(!response.ok) throw new Error(value.error || 'Không thể lưu.')
       setLoaded({ ...loaded,...value }); setDoc(parseDocument(value.document)); setDirty(false)
       if(action === 'restore') { setPageId(value.document.pages[0].id); setSelected(''); setUndo([]); setRedo([]) }
