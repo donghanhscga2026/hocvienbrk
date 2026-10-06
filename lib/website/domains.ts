@@ -9,12 +9,12 @@ import { requestHostname, isPlatformHost } from './domain-shared'
 /** Không cache giữa các request: tắt domain có hiệu lực ngay. */
 export const findDomain=cache(async (hostname: string) => {
   if(isPlatformHost(hostname)) return null
-  try { return await prisma.siteDomain.findUnique({ where:{ hostname },include:{ profile:{ include:{ members:true } } } }) }
+  try { return await prisma.siteProfileDomain.findUnique({ where:{ hostname },include:{ profile:{ include:{ members:true } } } }) }
   catch(e) { if(e instanceof Prisma.PrismaClientKnownRequestError && e.code==='P2021') return null; throw e }
 })
 export async function activeDomain(rawHost: string) {
   const domain=await findDomain(requestHostname(rawHost))
-  if(!domain?.enabled || !domain.verifiedAt || !domain.profile.isActive) return null
+  if(!domain?.isActive || !domain.verifiedAt || !domain.profile.isActive) return null
   const config=await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
   if(!config) return {...domain,applications:noApplications}
   const access=accessSchema.parse(config.value)
