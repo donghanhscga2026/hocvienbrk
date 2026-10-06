@@ -1,3 +1,4 @@
+import { theTopTemplateDocument } from './the-top-template'
 import { z } from 'zod'
 
 export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
@@ -10,7 +11,7 @@ const styleSchema = z.object({ background: color.optional(), color: color.option
 export type NodeStyle = z.infer<typeof styleSchema>
 export interface WebsiteNode { id: string; kind: Kind; text: string; url: string; html: string; css: string; courseIds: number[]; style: NodeStyle; mobile: NodeStyle; children: WebsiteNode[] }
 const nodeSchema: z.ZodType<WebsiteNode> = z.lazy(() => z.object({ id: z.string().regex(/^[\w-]{1,80}$/), kind: z.enum(kinds), text: z.string().max(20000), url: safeLink, html: z.string().max(100000), css: z.string().max(30000), courseIds: z.array(z.number().int().positive()).max(200), style: styleSchema, mobile: styleSchema, children: z.array(nodeSchema).max(200) }).strict())
-export const documentSchema = z.object({ version: z.literal(1), name: z.string().trim().min(1).max(120), description: z.string().max(500), color, background: color, layout: z.object({ maxWidth: z.number().min(320).max(2400), padding: z.number().min(0).max(100), gap: z.number().min(0).max(120), fontFamily: fonts, showHeader: z.boolean(), showFooter: z.boolean() }).strict().default({ maxWidth: 1200, padding: 24, gap: 32, fontFamily: 'inherit', showHeader: true, showFooter: true }), pages: z.array(z.object({ id: z.string().regex(/^[\w-]{1,80}$/), title: z.string().trim().min(1).max(120), slug: z.string().regex(/^([a-z0-9]+(-[a-z0-9]+)*)?$/).max(80), nodes: z.array(nodeSchema).max(200) }).strict()).min(1).max(30) }).strict().superRefine((doc, ctx) => {
+export const documentSchema = z.object({ id: z.string().max(80).optional(), version: z.literal(1), name: z.string().trim().min(1).max(120), description: z.string().max(500), color, background: color, layout: z.object({ maxWidth: z.number().min(320).max(2400), padding: z.number().min(0).max(100), gap: z.number().min(0).max(120), fontFamily: fonts, showHeader: z.boolean(), showFooter: z.boolean() }).strict().default({ maxWidth: 1200, padding: 24, gap: 32, fontFamily: 'inherit', showHeader: true, showFooter: true }), pages: z.array(z.object({ id: z.string().regex(/^[\w-]{1,80}$/), title: z.string().trim().min(1).max(120), slug: z.string().regex(/^([a-z0-9]+(-[a-z0-9]+)*)?$/).max(80), nodes: z.array(nodeSchema).max(200) }).strict()).min(1).max(30) }).strict().superRefine((doc, ctx) => {
   const ids = new Set<string>(); const slugs = new Set<string>(); let count = 0
   const fail = (message: string) => ctx.addIssue({ code: 'custom', message })
   function walk(nodes: WebsiteNode[], depth: number) { if (depth > 8) { fail('Bố cục tối đa 8 cấp.'); return } for (const n of nodes) { count++; if(ids.has(n.id)) fail('ID thành phần bị trùng.'); ids.add(n.id); if(n.kind !== 'container' && n.children.length) fail('Chỉ bố cục mới chứa thành phần con.'); walk(n.children, depth + 1) } }
@@ -45,6 +46,7 @@ export function moveNode(nodes: WebsiteNode[], id: string, parent: string | null
   return parent ? updateNode(removed, parent, n => ({ ...n, children: insert(n.children) })) : insert(removed)
 }
 export function templateDocument(key: string, name: string): WebsiteDocument {
+  if(key === 'thetop1') return theTopTemplateDocument(name)
   const doc = blankDocument(name)
   if(key === 'blank') return doc
   const hero = makeNode('container'); hero.style = { background: '#f5f3ff', padding: 64, gap: 24, radius: 24 }; hero.mobile = { padding: 24 }

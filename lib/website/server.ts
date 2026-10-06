@@ -7,11 +7,24 @@ import { getCoursesForProfile, getPostsForProfile } from '@/app/actions/site-pro
 import { parseDocument } from './document'
 
 export async function ownedProfile() {
+  return managedProfile()
+}
+
+export async function managedProfile(profileId?: number) {
   const session = await auth()
   const id = Number(session?.user?.id)
   if(!session?.user?.id || !Number.isInteger(id)) throw new CrmError('Vui lòng đăng nhập.', 401)
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } })
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
   if(!user) throw new CrmError('Phiên đăng nhập không hợp lệ.', 401)
+
+  if(profileId != null) {
+    if(user.role !== 'ADMIN') throw new CrmError('Chỉ Admin mới có quyền thiết kế Site Profile khác.', 403)
+    if(!Number.isInteger(profileId) || profileId <= 0) throw new CrmError('Site Profile không hợp lệ.', 400)
+    const profile = await prisma.siteProfile.findUnique({ where: { id: profileId }, include: { members: true, user: { select: { role: true } } } })
+    if(!profile) throw new CrmError('Không tìm thấy Site Profile.', 404)
+    return profile
+  }
+
   const profile = await prisma.siteProfile.findUnique({ where: { userId: id }, include: { members: true, user: { select: { role: true } } } })
   if(!profile) throw new CrmError('Bạn chưa có trang riêng. Hãy nhờ quản trị viên cấp trang trước.', 404)
   return profile

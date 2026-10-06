@@ -2,6 +2,7 @@
 
 import { CSSProperties, FormEvent, useState, useSyncExternalStore } from 'react'
 import { NodeStyle, WebsiteDocument, WebsiteNode } from '@/lib/website/document'
+import TheTopSite from './TheTopSite'
 
 export interface WebsiteData {
   courses: { id: number; title: string; image: string; description: string; href: string }[]
@@ -33,6 +34,7 @@ function subscribeLocation(callback: () => void) { window.addEventListener('pops
 export default function WebsiteView({ document: doc, data, slug, pageSlug = '', preview = false, mobile = false, selected, onSelect }: { document: WebsiteDocument; data: WebsiteData; slug: string; pageSlug?: string; preview?: boolean; mobile?: boolean; selected?: string; onSelect?: (id: string) => void }) {
   const referral = useSyncExternalStore(subscribeLocation, () => new URLSearchParams(window.location.search).get('ref') || '', () => '')
   const page = doc.pages.find(p => p.slug === pageSlug) || doc.pages[0]
+  if(doc.id === 'thetop1' || doc.name.toLowerCase().includes('the top 1%')) return <TheTopSite data={data} slug={slug} pageSlug={pageSlug} preview={preview} />
   function href(url: string) { if(!url || !referral || !url.startsWith('/')) return url || '#'; const parsed = new URL(url,'https://website.local'); if(!parsed.searchParams.has('ref')) parsed.searchParams.set('ref',referral); return parsed.pathname + parsed.search + parsed.hash }
   const card = 'p-5 rounded-xl border bg-white text-gray-900 grid gap-3'
   function render(n: WebsiteNode) {

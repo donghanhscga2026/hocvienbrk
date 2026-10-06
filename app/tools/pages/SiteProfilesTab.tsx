@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { Eye, Edit, Plus, ToggleLeft, ToggleRight, Shield, AlertCircle } from 'lucide-react'
+import { Eye, Edit, Paintbrush, Plus, ToggleLeft, ToggleRight, Shield, AlertCircle } from 'lucide-react'
 import { getAllSiteProfiles } from '@/app/actions/site-profile-actions'
 
 export default function SiteProfilesTab() {
@@ -111,7 +111,7 @@ export default function SiteProfilesTab() {
                     </td>
                     <td className="px-5 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <Link href={`/page/${profile.slug}`} target="_blank" className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all"><Eye className="w-3.5 h-3.5" /></Link>
+                        <Link href={`/page/${profile.slug}`} target="_blank" title="Xem trang" className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all"><Eye className="w-3.5 h-3.5" /></Link>\n                        <Link href={`/tools/site-profiles/${profile.id}/website`} title="Thiết kế Website" className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-all"><Paintbrush className="w-3.5 h-3.5" /></Link>
                         {!profile.isDefault && (
                           <Link href={`/tools/site-profiles/${profile.id}/edit`} className="w-8 h-8 rounded-lg inline-flex items-center justify-center text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all"><Edit className="w-3.5 h-3.5" /></Link>
                         )}
