@@ -1,3 +1,4 @@
+import { theTopTemplateDocument } from './the-top-template'
 import { z } from 'zod'
 
 export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
@@ -45,6 +46,7 @@ export function moveNode(nodes: WebsiteNode[], id: string, parent: string | null
   return parent ? updateNode(removed, parent, n => ({ ...n, children: insert(n.children) })) : insert(removed)
 }
 export function templateDocument(key: string, name: string): WebsiteDocument {
+  if(key === 'thetop1') return theTopTemplateDocument(name)
   const doc = blankDocument(name)
   if(key === 'blank') return doc
   const hero = makeNode('container'); hero.style = { background: '#f5f3ff', padding: 64, gap: 24, radius: 24 }; hero.mobile = { padding: 24 }
