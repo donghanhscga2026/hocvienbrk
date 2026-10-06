@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import "./globals.css";
 import Providers from "./providers";
+import { getDefaultThemeColors } from "./contexts/theme-config";
 import PwaInstallProvider from "@/components/pwa/PwaInstallProvider";
 import PendingSurveyHandler from "@/components/home/PendingSurveyHandler";
 import AffiliateTracker from "@/components/AffiliateTracker";
@@ -121,11 +122,13 @@ export default async function RootLayout({
     getThemePaletteMap(),
   ])
   const runtimeConfig = siteProfile ? getSiteRuntimeConfig(siteProfile) : null
-  const siteThemeId = siteProfile?.themeId || 'classic'
+  const usePlatformDefault = !siteProfile || (siteProfile.slug === 'brk' && siteProfile.themeId === 'classic')
+  const siteThemeId = usePlatformDefault ? 'default' : siteProfile.themeId || 'classic'
   const palettes = Object.fromEntries(
     Object.entries(themeRows).map(([id, colors]) => [id, compactThemePalette(colors)]),
   )
-  const profilePalette = compactThemePalette(siteProfile?.theme?.colors)
+  const profilePalette = compactThemePalette(usePlatformDefault ? getDefaultThemeColors() : siteProfile?.theme?.colors)
+  if (usePlatformDefault) palettes.default = profilePalette
   const session = await getSession()
   const attentionHighlight = await getAttentionHighlightSettings()
 
