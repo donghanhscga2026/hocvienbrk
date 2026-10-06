@@ -16,7 +16,7 @@ async function snapshot(profileId:number) {
   const [row,basic,domains]=await Promise.all([
     prisma.systemConfig.findUnique({where:{key:accessKey(profileId)}}),
     prisma.systemConfig.findUnique({where:{key:basicKey}}),
-    prisma.siteProfileDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'},select:{hostname:true,courses:true,crm:true,affiliate:true,enabled:true}})
+    prisma.siteProfileDomain.findMany({where:{profileId},orderBy:{createdAt:'asc'},select:{hostname:true,courses:true,crm:true,affiliate:true,isActive:true}})
   ])
   const access=row ? accessSchema.parse(row.value) : initialAccess(domains[0] || noModules)
   const template=basic ? basicSchema.parse(basic.value) : {modules:{courses:true,crm:true,affiliate:true},applications:allApplications}
