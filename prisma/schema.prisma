@@ -1479,14 +1479,21 @@ model SiteProfile {
 }
 
 model SiteProfileDomain {
-  id        Int         @id @default(autoincrement())
-  profileId Int
-  hostname  String      @unique
-  isPrimary Boolean     @default(false)
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  profile   SiteProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id          Int         @id @default(autoincrement())
+  profileId   Int
+  hostname    String      @unique
+  isPrimary   Boolean     @default(false)
+  isActive    Boolean     @default(true)
+  token       String?     @unique
+  courses     Boolean     @default(false)
+  crm         Boolean     @default(false)
+  affiliate   Boolean     @default(false)
+  verifiedAt  DateTime?
+  checkedAt   DateTime?
+  message     String      @default("Chờ cấu hình DNS và Vercel")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  profile     SiteProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@index([profileId])
   @@index([isActive])
