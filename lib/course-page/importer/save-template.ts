@@ -1,4 +1,5 @@
 import type { WebsiteTemplateAnalysis } from './types'
+import { compactExactAnalysis } from './compact-analysis'
 
 export type SaveTemplateInput = {
   name: string
@@ -12,7 +13,7 @@ export async function saveImportedTemplate(input: SaveTemplateInput) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 90_000)
   try {
-    const json = new Blob([JSON.stringify(input)], { type: 'application/json' })
+    const json = new Blob([JSON.stringify({ ...input, analysis: compactExactAnalysis(input.analysis) })], { type: 'application/json' })
     if (json.size > 16 * 1024 * 1024) throw new Error('Dữ liệu mẫu vượt quá 16 MB. Hãy giảm ảnh nhúng hoặc nội dung rồi thử lại.')
     let body: Blob = json
     let contentType = 'application/json'

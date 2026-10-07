@@ -541,6 +541,9 @@ export default function CourseTemplateLibraryPage() {
                       <label className="mb-1 block text-[10px] font-black uppercase text-gray-500">Ghi chú</label>
                       <input value={templateDescription} onChange={e => setTemplateDescription(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" />
                     </div>
+                    {message?.type === 'error' && (
+                      <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{message.text}</div>
+                    )}
                     <button
                       type="button"
                       onClick={createTemplate}

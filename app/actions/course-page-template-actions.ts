@@ -10,6 +10,7 @@ import {
   WebsiteTemplateAnalysis,
 } from '@/lib/course-page/importer/types'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
+import { compactExactAnalysis } from '@/lib/course-page/importer/compact-analysis'
 
 function jsonSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -260,7 +261,7 @@ export async function createStoredCoursePageTemplate(input: {
       return section ? !isImportedRegistrationSection(section) : false
     })
     const storedAnalysis = input.analysis.exactSource?.url
-      ? jsonSafe(input.analysis)
+      ? jsonSafe(compactExactAnalysis(input.analysis))
       : await mirrorAnalysisImages(input.analysis, {
           sectionIds: safeSelectedIds,
         })

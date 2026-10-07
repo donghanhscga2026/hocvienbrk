@@ -88,6 +88,9 @@ async function run() {
   assert.equal(snapshot.sections.length, 1, 'Save one page, not multiple iframe fragments')
   assert.equal(snapshot.sections[0].variant, 'zip-source-v1')
   assert.ok(snapshot.sections[0].content.registrationBlockKeys.includes('dang-ky'))
+  const compacted = load('lib/course-page/importer/compact-analysis.ts').compactExactAnalysis(analysis)
+  assert.deepEqual(buildSnapshot('HTML', compacted, analysis.sections.map(s => s.id)), snapshot,
+    'Compact metadata preserves the exact page, selected sections and registration bridge')
   const { POST } = load('app/api/admin/course-page-templates/analyze/route.ts')
   const { NextRequest, NextResponse } = require('next/server')
   const url = 'https://app.invalid/api/admin/course-page-templates/analyze'
