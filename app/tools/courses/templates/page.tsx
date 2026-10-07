@@ -28,9 +28,9 @@ import { WebsiteTemplateAnalysis } from '@/lib/course-page/importer/types'
 import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
+import { saveImportedTemplate } from '@/lib/course-page/importer/save-template'
 import { supabase } from '@/lib/supabase'
 import {
-  createStoredCoursePageTemplate,
   deleteStoredCoursePageTemplate,
   getStoredCoursePageTemplates,
 } from '@/app/actions/course-page-template-actions'
@@ -86,10 +86,15 @@ export default function CourseTemplateLibraryPage() {
 
   const loadLibrary = async () => {
     setLoadingLibrary(true)
-    const res = await getStoredCoursePageTemplates()
-    if (res.success) setStoredTemplates((res.templates || []) as StoredTemplate[])
-    else setMessage({ type: 'error', text: res.error || 'Không thể tải mẫu của tôi' })
-    setLoadingLibrary(false)
+    try {
+      const res = await getStoredCoursePageTemplates()
+      if (res.success) setStoredTemplates((res.templates || []) as StoredTemplate[])
+      else setMessage({ type: 'error', text: res.error || 'Không thể tải mẫu của tôi' })
+    } catch {
+      setMessage({ type: 'error', text: 'Không tải được thư viện mẫu. Hãy tải lại trang để kiểm tra mẫu đã lưu.' })
+    } finally {
+      setLoadingLibrary(false)
+    }
   }
 
   useEffect(() => {
@@ -299,25 +304,27 @@ export default function CourseTemplateLibraryPage() {
 
     setSavingTemplate(true)
     setMessage(null)
-    const res = await createStoredCoursePageTemplate({
-      name: templateName.trim(),
-      description: templateDescription.trim(),
-      analysis,
-      selectedSectionIds: selectedIds,
-    })
-    if (res.success) {
-      await loadLibrary()
-      const createdName = res.template?.name || templateName
+    try {
+      const res = await saveImportedTemplate({
+        name: templateName.trim(),
+        description: templateDescription.trim(),
+        analysis,
+        selectedSectionIds: selectedIds,
+      })
+      const createdName = res.template.name || templateName
       setShowImporter(false)
       resetAnalysis()
       setSourceUrl('')
       setSourceFile(null)
       setSourceZip(null)
       setMessage({ type: 'success', text: `Đã tạo mẫu “${createdName}”. Mẫu đã sẵn sàng để áp dụng cho khóa học.` })
-    } else {
-      setMessage({ type: 'error', text: res.error || 'Không thể tạo mẫu' })
+      // Tải lại danh sách riêng, không giữ nút tạo mẫu trong trạng thái chờ.
+      void loadLibrary()
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Không thể tạo mẫu. Hãy kiểm tra thư viện trước khi tạo lại.' })
+    } finally {
+      setSavingTemplate(false)
     }
-    setSavingTemplate(false)
   }
 
   const deleteTemplate = async (template: StoredTemplate) => {
