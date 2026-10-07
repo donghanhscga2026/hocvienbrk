@@ -19,7 +19,7 @@ export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
   const [community,setCommunity]=useState(modules.community!==false)
   const [saving,setSaving]=useState(false)
   const [message,setMessage]=useState<{type:'success'|'error';text:string}|null>(null)
-  const homepageLabel=homepage.type==='landing'?'Sales page đã chọn':homepage.type==='website'?'Thiết kế tự do':'Mẫu có sẵn'
+  const homepageLabel=homepage.type==='landing'?'Sales page đã chọn':'Mẫu có sẵn'
   const field='mt-1 min-h-11 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm'
   async function saveRuntime() {
     setSaving(true);setMessage(null)
@@ -55,7 +55,7 @@ export default function SiteRuntimeConfigEditor({profile,onSaved}:Props) {
         <label className="text-sm font-medium text-gray-700">Đường dẫn logo<input value={logoUrl} onChange={e=>setLogoUrl(e.target.value)} placeholder="https://..." className={field}/></label>
         <label className="text-sm font-medium text-gray-700">Đường dẫn favicon<input value={faviconUrl} onChange={e=>setFaviconUrl(e.target.value)} placeholder="https://..." className={field}/></label>
       </div>
-      <p className="text-sm text-gray-500">Thông tin thương hiệu dùng cho khung website trên tên miền riêng. Nội dung bên trong thiết kế được sửa tại trình thiết kế.</p>
+      <p className="text-sm text-gray-500">Thông tin thương hiệu dùng cho khung website trên tên miền riêng. Ảnh bìa và nội dung được sửa trong mẫu có sẵn.</p>
       {profile.communityAvailable && <label className="flex min-h-11 items-center gap-3 rounded-xl border p-3 text-sm"><input type="checkbox" checked={community} onChange={e=>setCommunity(e.target.checked)} className="h-4 w-4 accent-emerald-600"/>Hiển thị bảng tin cộng đồng</label>}
       <button type="button" onClick={saveRuntime} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving?'Đang lưu...':'Lưu thông tin website'}</button>
     </fieldset>

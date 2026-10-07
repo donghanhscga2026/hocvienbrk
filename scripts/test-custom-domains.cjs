@@ -152,14 +152,11 @@ async function run(){
   ok((await proxy(routeRequest('/khoa-hoc/OTHER'),{})).status===404,'Proxy denies foreign course before rendering')
   ok((await proxy(routeRequest('/api/admin/backup'),{})).status===403,'Proxy closes global admin APIs')
   ok((await proxy(routeRequest('/tools/affiliate/clicks'),{})).status===403,'Global affiliate reports are not exposed on brand domain')
-  const document=load('lib/website/document'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server')
-  const View=load('components/website/WebsiteView').default,doc=document.blankDocument('Brand')
-  doc.pages[0].nodes=['courses','form','affiliate'].map(kind=>document.makeNode(kind))
-  const markup=renderToStaticMarkup(React.createElement(View,{document:doc,data:{courses:[],posts:[],testimonials:[]},slug:'huong-lucy',customDomain:true,modules:off}))
-  ok(!markup.includes('<form') && !markup.includes('id="courses"') && !markup.includes('<header'),'Disabled components stay hidden and shared shell owns navigation')
+  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server')
+  const markup=''
   const lead=load('app/api/websites/lead/route')
   const leadResponse=await lead.POST(req({slug:'other',page:'',node:'fake',name:'Customer',email:'customer@example.com',phone:'',message:'Hello',consent:true,website:''},'brk.io.vn'))
-  ok(leadResponse.status===403,'Brand lead cannot target another owner slug')
+  ok(leadResponse.status===410,'Retired free-design forms cannot write leads')
   const Shell=loader({'next/navigation':{usePathname:()=>null},'next-auth/react':{useSession:()=>({data:null}),signOut:()=>{}}})('components/website/DomainShell').default
   const shellProps={brand:{...on,name:'Brand',color:'#7c3aed',background:'#fff',ownerId:1},pages:[{title:'Giới thiệu',slug:'gioi-thieu'}]}
   const home=renderToStaticMarkup(React.createElement(Shell,{...shellProps,path:'/'},markup))
@@ -249,20 +246,20 @@ async function run(){
   const presentation=modeLoad('lib/website/presentation-server'),modeApi=modeLoad('app/api/websites/presentation/route')
   const modePost=(body,hostname='giautoandien.io.vn',origin='https://'+hostname)=>modeApi.POST(req(body,hostname,origin))
   sessionId=1
-  ok((await presentation.presentationState(7)).mode==='custom','Existing published website retains custom mode')
+  ok((await presentation.presentationState(7)).mode==='template','Retained free design cannot activate custom mode')
   ok((await modePost({mode:'template',revision:0},'brk.io.vn')).status===403,'Domain cannot administer presentation')
   ok((await modePost({mode:'template',revision:0},'giautoandien.io.vn','https://evil.invalid')).status===403,'Mode change rejects foreign origin')
   ok((await modePost({mode:'template',revision:0})).status===200,'Owner can select existing template')
-  ok((await presentation.activeCustomWebsite(7))===null && customDocument.name==='Saved custom','Template mode preserves published design without rendering it')
+  ok(customDocument.name==='Saved custom','Template mode preserves published design without rendering it')
   const templateDoc=await presentation.domainWebsite({...profiles[0],title:'Lucy',subtitle:'Intro',accentColor:'#123456',backgroundColor:'#f8fafc'})
   ok(templateDoc.name==='Lucy' && templateDoc.color==='#123456','Template works on domain with profile branding')
-  ok((await modePost({mode:'custom',revision:0})).status===409,'Stale mode revision cannot overwrite current selection')
+  ok((await modePost({mode:'template',revision:0})).status===409,'Stale mode revision cannot overwrite current selection')
   customDocument=null
-  ok((await modePost({mode:'custom',revision:1})).status===409,'Unpublished custom design cannot be selected')
+  ok((await modePost({mode:'custom',revision:1})).status===410,'Free design cannot be selected')
   ok((await presentation.domainWebsite({...profiles[0],title:'Lucy'})).name==='Lucy','Template domain does not require a published custom design')
   customDocument={name:'Preserved design',pages:[{slug:''}]}
-  ok((await modePost({mode:'custom',revision:1})).status===200,'Switch back restores preserved custom design')
-  ok((await presentation.activeCustomWebsite(7)).name==='Preserved design','Public route uses selected custom document')
+  ok((await modePost({mode:'custom',revision:1})).status===410,'Published free design cannot be reactivated')
+  ok(customDocument.name==='Preserved design','Retiring free design preserves stored document')
   customDocument=null
   ok((await presentation.presentationState(7)).mode==='template','Unpublishing falls back to existing template instead of breaking domain')
   sessionId=null

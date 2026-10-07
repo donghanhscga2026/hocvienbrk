@@ -10,9 +10,8 @@ import type { Metadata } from 'next'
 import { activeDomain } from '@/lib/website/domains'
 import { requestHostname } from '@/lib/website/domain-shared'
 import ProfileHome from '@/components/website/ProfileHome'
-import {domainWebsite,presentationState} from '@/lib/website/presentation-server'
+import {domainWebsite} from '@/lib/website/presentation-server'
 import { websiteData } from '@/lib/website/server'
-import WebsiteView from '@/components/website/WebsiteView'
 import { getSession } from '@/lib/get-session'
 import prisma from '@/lib/prisma'
 
@@ -58,11 +57,11 @@ export default async function DomainPage(props:Props) {
     if(!landing)notFound()
     return <LandingPageClient landing={landing as any}/>
   }
-  if(!path.length && (await presentationState(domain.profileId)).mode==='template') return <ProfileHome profile={domain.profile} customDomain modules={{courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}} />
+  if(!path.length) return <ProfileHome profile={domain.profile} customDomain modules={{courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}} />
   const catalog=path.join('/')==='khoa-hoc'
   if(catalog && !domain.courses) notFound()
-  if(!catalog && !document.pages.some(p=>p.slug===path.join('/'))) notFound()
+  if(!catalog) notFound()
   const data=await websiteData(domain.profile,{strict:true,courses:domain.courses})
   if(catalog) return <section className="max-w-5xl mx-auto p-6"><h1 className="text-2xl font-bold mb-6">Khóa học</h1><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{data.courses.map(c=><a className="border rounded-xl p-4 grid gap-3" key={c.id} href={c.href}>{c.image && <img src={c.image} alt="" className="rounded-lg w-full aspect-video object-cover" />}<h2 className="font-bold">{c.title}</h2><p>{c.description.replace(/<[^>]*>/g,'').slice(0,200)}</p></a>)}</div></section>
-  return <WebsiteView document={document} data={data} slug={domain.profile.slug} pageSlug={path.join('/')} customDomain modules={{courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}} />
+  notFound()
 }

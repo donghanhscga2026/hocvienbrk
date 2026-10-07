@@ -6,7 +6,6 @@ import { auth } from '@/auth'
 import { requireAdminAction } from '@/lib/api-auth'
 import { unstable_cache, revalidateTag } from 'next/cache'
 import {presentationKey,presentationSchema} from '@/lib/website/presentation'
-import {parseDocument,walkNodes} from '@/lib/website/document'
 import { getCourseWhereForProfile, getSiteRuntimeConfig, normalizeSiteHostname } from '@/lib/site-profile/runtime'
 
 // ─────────────────────────────────────────────────────────
@@ -95,13 +94,7 @@ export async function getSiteProfileAdminById(id: number) {
     const access=profile ? await prisma.systemConfig.findUnique({where:{key:'website-access:'+profile.id}}):null
     if (!profile) return null
     const home = getSiteRuntimeConfig(profile).homepage.type
-    let communityAvailable = home === 'profile' || home === 'community'
-    if (home === 'website') {
-      const website = await prisma.siteWebsite.findUnique({where:{profileId:id},select:{published:true}})
-      if (website?.published) {
-        try { communityAvailable = parseDocument(website.published).pages.some(page => walkNodes(page.nodes).some(node => node.kind === 'posts')) } catch { communityAvailable = false }
-      }
-    }
+    const communityAvailable = home === 'profile' || home === 'community'
     return {...profile,websiteAccessConfigured:!!access,communityAvailable}
   } catch (error) {
     console.error(`[DB ERROR] getSiteProfileAdminById(${id}):`, error)
@@ -439,6 +432,7 @@ export async function updateSiteProfileRuntime(
 ) {
   const denied = await requireAdminAction()
   if (denied) return { error: denied.error }
+  if((input.siteConfig?.homepage as {type?:string}|undefined)?.type==='website') return {error:'Thiết kế tự do đã được gỡ bỏ. Hãy sử dụng mẫu có sẵn.'}
 
   const updateDomains = input.primaryDomain !== undefined || input.additionalDomains !== undefined
   const primaryDomain = normalizeSiteHostname(input.primaryDomain)
@@ -486,8 +480,7 @@ export async function updateSiteProfileRuntime(
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420306, ${id}::integer)`
         const current=await tx.systemConfig.findUnique({where:{key:presentationKey(id)}})
         const revision=current ? presentationSchema.parse(current.value).revision:0
-        if(rawHome.type==='website' && !await tx.siteWebsite.findUnique({where:{profileId:id},select:{published:true}}).then(row=>row?.published))throw new Error('Cần xuất bản thiết kế website trước')
-        const value={mode:rawHome.type==='website'?'custom':'template',revision:revision+1}
+        const value={mode:'template',revision:revision+1}
         await tx.systemConfig.upsert({where:{key:presentationKey(id)},create:{key:presentationKey(id),value},update:{value}})
       }
       await tx.siteProfile.update({

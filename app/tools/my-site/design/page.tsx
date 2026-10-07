@@ -1,3 +1,4 @@
-import WebsiteEditor from '@/components/website/WebsiteEditor'
+import {redirect} from 'next/navigation'
 
-export default function DesignWebsitePage() { return <><div className="p-3 bg-violet-50 text-right"><a href="/tools/my-site/manage" className="text-violet-800 underline text-sm">Quản lý website, tên miền và chức năng →</a></div><WebsiteEditor /></> }
+/** Đường dẫn thiết kế cũ đưa người dùng về phần mẫu có sẵn. */
+export default function DesignWebsitePage() { redirect('/tools/my-site/manage') }

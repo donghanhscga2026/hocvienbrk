@@ -1,11 +1,9 @@
 import 'server-only'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
-import { Prisma } from '@prisma/client'
 import { CrmError } from '@/lib/crm/service'
 import { getCoursesForProfile, getPostsForProfile } from '@/app/actions/site-profile-actions'
 import {getCourseWhereForProfile,getSiteRuntimeConfig} from '@/lib/site-profile/config'
-import { parseDocument } from './document'
 
 export async function ownedProfile() {
   const session = await auth()
@@ -16,10 +14,6 @@ export async function ownedProfile() {
   const profile = await prisma.siteProfile.findUnique({ where: { userId: id }, include: { members: true, user: { select: { role: true } } } })
   if(!profile) throw new CrmError('Bạn chưa có trang riêng. Hãy nhờ quản trị viên cấp trang trước.', 404)
   return profile
-}
-export async function publishedWebsite(profileId: number) {
-  try { const row = await prisma.siteWebsite.findUnique({ where: { profileId }, select: { published: true } }); return row?.published ? parseDocument(row.published) : null }
-  catch(error) { if(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return null; throw error }
 }
 export async function websiteData(profile: Parameters<typeof getCoursesForProfile>[0], options: {strict?:boolean;courses?:boolean} = {}) {
   const config=getSiteRuntimeConfig(profile)

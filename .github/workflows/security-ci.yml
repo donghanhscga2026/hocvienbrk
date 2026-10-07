@@ -46,7 +46,7 @@ jobs:
 
       - name: Website and custom domain isolation tests
         run: |
-          npm run test:website-builder
+          npm run test:website-templates
           npm run test:custom-domains
 
       - name: TypeScript check

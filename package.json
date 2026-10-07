@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:crm-notifications": "node scripts/test-crm-notifications.cjs",
-    "test:website-builder": "node scripts/test-website-builder.cjs",
+    "test:website-templates": "node scripts/test-free-design-disabled.cjs",
     "test:custom-domains": "node scripts/test-custom-domains.cjs",
     "test:multisite-integration": "node scripts/test-multisite-integration.cjs",
     "test:website-cleanup": "node scripts/test-website-cleanup.cjs",

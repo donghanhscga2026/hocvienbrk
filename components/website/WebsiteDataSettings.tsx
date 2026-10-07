@@ -16,12 +16,12 @@ export default function WebsiteDataSettings() {
     try {
       if(!automatic && !selected.length)throw new Error('Chọn ít nhất một khóa học hoặc bật chế độ tự động.')
       const r=await fetch('/api/websites/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({courseIds:automatic?[]:selected})}),value=await r.json()
-      if(!r.ok)throw new Error(value.error);setMessage('Đã lưu nguồn khóa học cho cả hai mẫu giao diện.');await refresh()
+      if(!r.ok)throw new Error(value.error);setMessage('Đã lưu nguồn khóa học cho website.');await refresh()
     } catch(e){setError(e instanceof Error?e.message:'Không thể lưu.')} finally{setBusy(false)}
   }
   return <main className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"><div className="max-w-3xl mx-auto grid gap-6">
     <Link href="/tools/my-site/manage" className="text-violet-700">← Quản lý website của tôi</Link><h1 className="text-3xl font-bold">Dữ liệu & giáo viên</h1>
-    <p className="text-slate-600">Nguồn nội dung dùng chung cho mẫu có sẵn và thiết kế tự do. Quyền học và quản lý vẫn theo tài khoản.</p>
+    <p className="text-slate-600">Nguồn nội dung cho mẫu có sẵn của website. Quyền học và quản lý vẫn theo tài khoản.</p>
     {error && <p role="alert" className="bg-red-50 text-red-700 rounded-xl p-4">{error}</p>}{message && <p role="status" className="bg-green-50 text-green-800 rounded-xl p-4">{message}</p>}
     {!data && !error && <p>Đang tải…</p>}
     {data && <><ProfileMemberManager profileId={data.profileId} initialMembers={data.members} onUpdate={()=>void refresh()} />

@@ -107,7 +107,8 @@ export function getSiteRuntimeConfig(profile: {
       faviconUrl: shortText(rawBranding.faviconUrl),
     },
     homepage: {
-      type: homepageType,
+      // Cấu hình cũ được đọc như mẫu có sẵn, không ghi đè dữ liệu trong DB.
+      type: homepageType === 'website' ? 'profile' : homepageType,
       landingId: Number.isInteger(Number(rawHomepage.landingId)) && Number(rawHomepage.landingId) > 0
         ? Number(rawHomepage.landingId)
         : undefined,
