@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(source, {
       signal: controller.signal,
       redirect: 'error',
-      cache: 'no-store',
+      next: { revalidate: 86400 },
       credentials: 'omit',
     })
     if (!response.ok || !response.body) {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         'Content-Security-Policy': SOURCE_CSP,
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',
-        'Cache-Control': 'public, max-age=300',
+        'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
       },
     })
   } catch {

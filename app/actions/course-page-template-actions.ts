@@ -10,6 +10,7 @@ import {
   WebsiteTemplateAnalysis,
 } from '@/lib/course-page/importer/types'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
+import { compactExactAnalysis } from '@/lib/course-page/importer/compact-analysis'
 
 function jsonSafe<T>(value: T): T {
   return JSON.parse(JSON.stringify(value))
@@ -73,13 +74,13 @@ function buildSnapshot(
 
   if (!selected.length) throw new Error('Hãy chọn ít nhất một phần nội dung (form đăng ký nguồn luôn được thay bằng quy trình MFC)')
 
-  if (analysis.sourceType === 'zip' && analysis.exactSource?.url) {
+  if ((analysis.sourceType === 'zip' || analysis.sourceType === 'html') && analysis.exactSource?.url) {
     return {
       name,
       seo: {
         title: analysis.title || name,
         description: analysis.description || '',
-        importedFrom: analysis.exactSource.zipFileName || 'ZIP mã nguồn',
+        importedFrom: analysis.exactSource.zipFileName || analysis.exactSource.entryPath || 'HTML nguyên trang',
       },
       theme: {
         primaryColor: analysis.theme.primaryColor || '#6D28D9',
@@ -126,7 +127,7 @@ function buildSnapshot(
             .filter(isImportedRegistrationSection)
             .map(section => section.id),
           importedMeta: {
-            label: 'ZIP Exact Mode',
+            label: 'HTML/ZIP nguyên trang',
             sourceClass: analysis.exactSource.entryPath,
             confidence: 1,
           },
@@ -238,7 +239,7 @@ export async function createStoredCoursePageTemplate(input: {
     if (!input.analysis?.sections?.length) return { success: false, error: 'Chưa có kết quả phân tích website' }
 
     const selectedSet = new Set(input.selectedSectionIds)
-    const unresolvedLocalImages = input.analysis.sourceType === 'zip'
+    const unresolvedLocalImages = input.analysis.exactSource?.url
       ? []
       : input.analysis.sections
           .filter(section => selectedSet.has(section.id) && !isImportedRegistrationSection(section))
@@ -259,8 +260,8 @@ export async function createStoredCoursePageTemplate(input: {
       const section = input.analysis.sections.find(item => item.id === id)
       return section ? !isImportedRegistrationSection(section) : false
     })
-    const storedAnalysis = input.analysis.sourceType === 'zip'
-      ? jsonSafe(input.analysis)
+    const storedAnalysis = input.analysis.exactSource?.url
+      ? jsonSafe(compactExactAnalysis(input.analysis))
       : await mirrorAnalysisImages(input.analysis, {
           sectionIds: safeSelectedIds,
         })
