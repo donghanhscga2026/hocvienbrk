@@ -5,6 +5,7 @@ import { bindingSchema, controlsSchema, resolveControlAction } from '@/lib/cours
 import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/course-page/importer/source-url'
 
 type Props = {
+  hasDefaultRegistration?: boolean
   testMode?: boolean
   allowedCourseHrefs?: string[]
   id?: string
@@ -23,7 +24,7 @@ function safeExternal(value: unknown) {
   }
 }
 
-export default function ZipSourceSection({ id, content, onAction, testMode = false, allowedCourseHrefs, sourceEndpoint = '/api/course-template-source' }: Props) {
+export default function ZipSourceSection({ id, content, onAction, hasDefaultRegistration = true, testMode = false, allowedCourseHrefs, sourceEndpoint = '/api/course-template-source' }: Props) {
   const [controlMessage,setControlMessage] = React.useState('')
   const rawControls = content?.controls
   const parsedControls = controlsSchema.safeParse(rawControls && {...rawControls,bindings:Array.isArray(rawControls.bindings)?rawControls.bindings.map((b:any)=>bindingSchema.safeParse(b).success?b:{id:b?.id,action:'pending',target:''}):[]})
@@ -91,6 +92,7 @@ export default function ZipSourceSection({ id, content, onAction, testMode = fal
         if(['tab','scroll'].includes(b.action)){setControlMessage(`Đã thử “${item.label}”: ${b.action==='tab'?'chuyển tab':'cuộn nội dung'}.`);return}
         const resolved=resolveControlAction(b,window.location.href,allowedCourseHrefs)
         if(resolved.kind==='blocked'){setControlMessage('Khóa học hoặc đường dẫn này không còn hợp lệ trong website.');return}
+        if(resolved.kind==='registration'&&!hasDefaultRegistration){setControlMessage('Chọn khóa học cho nút đăng ký hoặc thêm Form tư vấn trong Page.');return}
         if(testMode){setControlMessage(`“${item.label}” → ${resolved.kind==='link'?resolved.url:'Đăng ký khóa học đang áp dụng / Form của Page'}`);return}
         if(resolved.kind==='registration')onAction?.('open_registration')
         if(resolved.kind==='link')window.location.assign(resolved.url)
@@ -172,7 +174,7 @@ export default function ZipSourceSection({ id, content, onAction, testMode = fal
       window.removeEventListener('popstate', sendAnchorToFrame)
       window.clearTimeout(timer)
     }
-  }, [onAction, sourceUrl, controlsKey, testMode, allowedCourseHrefs?.join('|'), selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
+  }, [onAction, sourceUrl, controlsKey, testMode, hasDefaultRegistration, allowedCourseHrefs?.join('|'), selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
 
   if (!sourceUrl) {
     return (

@@ -50,6 +50,9 @@ async function run(){
  await React.act(async()=>ui.render(React.createElement(Frame,{content:{exactSource:{url:'https://source.invalid/a.html'},controls:configured},onAction:action=>{if(action==='open_registration')registrations++}})))
  await React.act(async()=>window.dispatchEvent(new window.MessageEvent('message',{source:document.querySelector('iframe').contentWindow,data:{source:'mfc-zip-source',type:'control_action',controlId:'control-3'}})))
  assert.equal(registrations,1,'Configured registration calls existing checkout')
+ await React.act(async()=>ui.render(React.createElement(Frame,{content:{exactSource:{url:'https://source.invalid/a.html'},controls:configured},hasDefaultRegistration:false,onAction:()=>registrations++})))
+ await React.act(async()=>window.dispatchEvent(new window.MessageEvent('message',{source:document.querySelector('iframe').contentWindow,data:{source:'mfc-zip-source',type:'control_action',controlId:'control-3'}})))
+ assert.equal(registrations,1);assert.ok(document.querySelector('[role="status"]').textContent.includes('Chọn khóa học'),'Missing Page checkout gives configuration guidance')
  await React.act(async()=>ui.unmount());host.window.close()
  if(process.argv[2]){const actual=detectTemplateControls(fs.readFileSync(process.argv[2],'utf8'));controlsSchema.parse(actual.controls);console.log(`Actual template: ${actual.controls.items.length} controls, ${actual.controls.targets.length} content targets detected.`)}
  console.log('Template controls: stable detection, duplicate labels, tab groups, action override, navigation/referral, scope, persistence, UI editing, preview and message boundaries passed.')
