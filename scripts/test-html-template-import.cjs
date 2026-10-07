@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..')
 const cache = new Map()
 let uploadedHtml = ''
 let denied = null
+let ownerDenied = false
 function load(file) {
   if (cache.has(file)) return cache.get(file)
   const module = { exports: {} }
@@ -16,6 +17,8 @@ function load(file) {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true,
   } }).outputText
   new Function('require', 'exports', 'module', code)(name => {
+    if (name === '@/lib/website/server') return { ownedProfile: async () => { if (ownerDenied) throw new Error('Not owner'); return { id: 11 } } }
+    if (name === '@/lib/website/http') return { websiteFailure: () => require('next/server').NextResponse.json({ error: 'Not owner' }, { status: 403 }) }
     if (name === '@/lib/api-auth') return { requireAdmin: async () => denied }
     if (name === '@/lib/image-utils') return { saveUploadedFile: async buffer => { uploadedHtml = buffer.toString(); return 'https://project.supabase.co/storage/v1/object/public/uploads/course-template-sources/test.html' } }
     if (name === '@/lib/prisma') return {}
@@ -106,6 +109,35 @@ async function run() {
   assert.equal((await POST(new NextRequest(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({html:fixture}) }))).status, 200)
   denied = NextResponse.json({ error: 'denied' }, {status:403})
   assert.equal((await POST(new NextRequest(url, {method:'POST',body}))).status, 403)
+  global.DOMParser = dom.window.DOMParser
+  const zipBytes = Buffer.from('UEsDBBQAAAAAAGCIR102IAfmlQAAAJUAAAAKAAAAaW5kZXguaHRtbDxzY3JpcHQgc3JjPSJodHRwczovL2Nkbi50YWlsd2luZGNzcy5jb20iPjwvc2NyaXB0PjxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj48aDEgY2xhc3M9InRleHQtcmVkLTUwMCI+WklQIHBhZ2U8L2gxPjxpbWcgc3JjPSJsb2dvLnN2ZyI+UEsDBBQAAAAAAGCIR12PfwGUFAAAABQAAAAJAAAAc3R5bGUuY3NzaDF7Zm9udC13ZWlnaHQ6Ym9sZH1QSwMEFAAAAAAAYIhHXUVAG0NDAAAAQwAAAAgAAABsb2dvLnN2ZzxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB3aWR0aD0iMSIgaGVpZ2h0PSIxIj48L3N2Zz5QSwECFAMUAAAAAABgiEddNiAH5pUAAACVAAAACgAAAAAAAAAAAAAAgAEAAAAAaW5kZXguaHRtbFBLAQIUAxQAAAAAAGCIR12PfwGUFAAAABQAAAAJAAAAAAAAAAAAAACAAb0AAABzdHlsZS5jc3NQSwECFAMUAAAAAABgiEddRUAbQ0MAAABDAAAACAAAAAAAAAAAAAAAgAH4AAAAbG9nby5zdmdQSwUGAAAAAAMAAwClAAAAYQEAAAAA', 'base64')
+  const zipFile = new File([zipBytes], 'page.zip', {type:'application/zip'})
+  const { prepareWebsiteZip } = load('lib/course-page/importer/zip-browser.ts')
+  const websiteZip = await prepareWebsiteZip(zipFile, {preserveTailwindForCompilation:true})
+  assert.ok(websiteZip.html.includes('https://cdn.tailwindcss.com'), 'Website ZIP retains Tailwind until server compilation')
+  const zipPrepared = await prepareStandaloneHtml(websiteZip.html)
+  assert.ok(zipPrepared.html.includes('.text-red-500') && zipPrepared.html.includes('data:image/svg+xml;base64,'), 'ZIP embeds local assets and compiles responsive CSS')
+  const legacyZip = await prepareWebsiteZip(zipFile)
+  assert.ok(!legacyZip.html.includes('https://cdn.tailwindcss.com'), 'Existing course ZIP behavior remains unchanged')
+  assert.equal(load('app/api/website-template-source/route.ts').GET, load('app/api/course-template-source/route.ts').GET)
+  assert.equal(load('lib/website/domain-shared.ts').domainRoute('/api/website-template-source', {courses:false,crm:false,affiliate:false}), 'system', 'Page source remains available without course module')
+  const pageImport = load('app/api/websites/import/route.ts').POST
+  const pageRequest = (body, type = 'application/gzip', origin = 'https://app.invalid') => new Request('https://app.invalid/api/websites/import', { method: 'POST', headers: { 'Content-Type': type, origin }, body })
+  const pageResponse = await pageImport(pageRequest(body))
+  assert.equal(pageResponse.status, 200)
+  const pageResult = await pageResponse.json()
+  assert.ok(pageResult.url.endsWith('/test.html') && !('html' in pageResult), 'Store lightweight URL rather than full HTML in page document')
+  assert.ok(uploadedHtml.includes('data-mfc-compiled-tailwind'))
+  assert.equal((await pageImport(pageRequest(body, 'application/gzip', 'https://evil.invalid'))).status, 403)
+  assert.equal((await pageImport(pageRequest('bad gzip'))).status, 400)
+  assert.equal((await pageImport(pageRequest('x'.repeat(4 * 1024 * 1024 + 1), 'text/html'))).status, 413)
+  const missingAsset = await pageImport(pageRequest('<img src="missing.jpg">', 'text/html'))
+  assert.equal(missingAsset.status, 400)
+  assert.match((await missingAsset.json()).error, /Thiếu tài nguyên/)
+  ownerDenied = true
+  const lastUpload = uploadedHtml
+  assert.equal((await pageImport(pageRequest(body))).status, 403)
+  assert.equal(uploadedHtml, lastUpload, 'Unauthorized import never uploads a file')
   dom.window.close()
   if (process.argv[2]) {
     const source = fs.readFileSync(process.argv[2], 'utf8')

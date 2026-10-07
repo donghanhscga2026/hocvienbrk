@@ -5,6 +5,7 @@ import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/cour
 
 type Props = {
   id?: string
+  sourceEndpoint?: string
   content: any
   onAction?: (actionType: string, target?: string) => void
 }
@@ -19,7 +20,7 @@ function safeExternal(value: unknown) {
   }
 }
 
-export default function ZipSourceSection({ id, content, onAction }: Props) {
+export default function ZipSourceSection({ id, content, onAction, sourceEndpoint = '/api/course-template-source' }: Props) {
   const frameRef = React.useRef<HTMLIFrameElement | null>(null)
   const [height, setHeight] = React.useState(900)
   const sourceUrl = content?.exactSource?.url || content?.importedSource?.exactSource?.url || ''
@@ -163,7 +164,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       ref={frameRef}
       id={id}
       title={content?.exactSource?.entryPath || 'Mẫu HTML nguyên trang'}
-      src={zipFrameSource(sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')}
+      src={zipFrameSource(sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/^\/api\/course-template-source(?=\?)/, sourceEndpoint)}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       scrolling="no"

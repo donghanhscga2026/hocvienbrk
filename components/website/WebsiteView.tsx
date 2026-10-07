@@ -1,5 +1,7 @@
 'use client'
 
+import ZipSourceSection from '@/components/course-page/sections/ZipSourceSection'
+import { resolveZipStorageSource } from '@/lib/course-page/importer/source-url'
 import { CSSProperties, FormEvent, useState, useSyncExternalStore } from 'react'
 import { NodeStyle, WebsiteDocument, WebsiteNode, walkNodes } from '@/lib/website/document'
 import {useDomainBrand} from './DomainShell'
@@ -78,6 +80,19 @@ export default function WebsiteView({ document: doc, data, slug, pageSlug = '', 
       case 'testimonials': body = <section><h2 className="text-2xl font-bold mb-6">{n.text}</h2><div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,240px),1fr))' }}>{reviews.map(t => <blockquote key={t.id} className={card}><p>{'★'.repeat(Math.max(0,Math.min(5,t.rating)))}</p><p className="whitespace-pre-wrap">{t.content}</p><footer className="font-bold">{t.name} <span className="font-normal">{t.role}</span></footer></blockquote>)}</div>{!reviews.length && <p>Chưa có đánh giá phù hợp. Website thật sẽ ẩn phần này khi chưa có đánh giá.</p>}</section>; break
       case 'posts': body = <section><h2 className="text-2xl font-bold mb-6">{n.text}</h2><div className="grid gap-5">{data.posts.map(p => <details key={p.id} className={card}><summary className="font-bold cursor-pointer">{p.title}</summary><p className="whitespace-pre-wrap">{p.content}</p></details>)}</div></section>; break
       case 'form': body = <LeadForm node={n} slug={slug} page={page.slug} preview={preview} />; break
+      case 'imported-page': {
+        const valid = resolveZipStorageSource(n.url, process.env.NEXT_PUBLIC_SUPABASE_URL || '')
+        const course = modules?.courses === false ? undefined : data.courses.find(c => n.courseIds.length === 1 && c.id === n.courseIds[0])
+        const form = modules?.crm === false ? undefined : walkNodes(page.nodes).find(item => item.kind === 'form')
+        body = valid ? <ZipSourceSection sourceEndpoint="/api/website-template-source" content={{ exactSource: { url: n.url } }} onAction={(action, target) => {
+          if (action === 'open_registration') {
+            if (course && !preview) window.location.assign(href(course.href))
+            else if (form) window.document.querySelector(`[data-website-node="${form.id}"]`)?.scrollIntoView({ behavior: 'smooth' })
+          }
+          if (action === 'external_link' && target && !preview) window.location.assign(href(target))
+        }} /> : <p>Không tìm thấy nguồn trang nhập hợp lệ.</p>
+        break
+      }
       case 'html': {
         const csp = "default-src 'none'; img-src https: data:; media-src https:; style-src 'unsafe-inline'; font-src https:; base-uri 'none'; form-action 'none'"
         const src = '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + n.css.replace(/<\/style/gi,'') + '</style></head><body>' + n.html + '</body></html>'

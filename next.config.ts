@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["tailwindcss-importer"],
   // Tailwind đọc CSS nền từ ổ đĩa lúc nhập HTML trên máy chủ.
   outputFileTracingIncludes: {
+    "/api/websites/import": ["./node_modules/tailwindcss-importer/lib/css/*.css"],
     "/api/admin/course-page-templates/analyze": ["./node_modules/tailwindcss-importer/lib/css/*.css"],
   },
 

@@ -32,6 +32,7 @@ export function domainRoute(path: string, modules: DomainModules): 'page' | 'acc
   if(/^\/ung-dung\/[a-z]+$/.test(path)) return 'page'
   if(path==='/tai-khoan') return 'account'
   if(path==='/khoa-hoc') return modules.courses ? 'catalog' : 'deny'
+  if(path==='/api/website-template-source') return 'system'
   if(path==='/api/course-template-source') return modules.courses ? 'system' : 'deny'
   if(/^\/(?:khoa-hoc\/[^/]+|courses\/[^/]+(?:\/learn)?)$/.test(path)) return modules.courses ? 'system' : 'deny'
   if(path==='/api/enroll-after-register' || /^\/api\/upload\/(?:comment|lesson|payment)$/.test(path)) return modules.courses ? 'system' : 'deny'

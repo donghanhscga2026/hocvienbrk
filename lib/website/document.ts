@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
 // Giữ loại khối cũ để bản nháp và website đã lưu vẫn đọc được.
-export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'course-hero', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'divider'] as const
+export const kinds = ['container', 'heading', 'text', 'image', 'video', 'button', 'courses', 'course-hero', 'testimonials', 'posts', 'form', 'affiliate', 'html', 'imported-page', 'divider'] as const
 export type Kind = typeof kinds[number]
-export const labels: Record<Kind, string> = { container: 'Bố cục / cột', heading: 'Tiêu đề', text: 'Văn bản', image: 'Ảnh', video: 'Video', button: 'Nút', courses: 'Khóa học', 'course-hero': 'Khóa học chính', testimonials: 'Lời chứng thực', posts: 'Bài viết', form: 'Form tư vấn → CRM', affiliate: 'Nút affiliate', html: 'HTML / CSS', divider: 'Đường phân cách' }
+export const labels: Record<Kind, string> = { container: 'Bố cục / cột', heading: 'Tiêu đề', text: 'Văn bản', image: 'Ảnh', video: 'Video', button: 'Nút', courses: 'Khóa học', 'course-hero': 'Khóa học chính', testimonials: 'Lời chứng thực', posts: 'Bài viết', form: 'Form tư vấn → CRM', affiliate: 'Nút affiliate', html: 'HTML / CSS', 'imported-page': 'Trang HTML / ZIP', divider: 'Đường phân cách' }
 const color = z.string().regex(/^(#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$/i)
 const safeLink = z.string().max(2000).refine(v => !v || /^https?:\/\/[^\s]+$/i.test(v) || /^\/(?!\/)[^\s\\]*$/.test(v) || /^#[\w-]+$/.test(v), 'Liên kết phải là HTTPS/HTTP, đường dẫn / hoặc #anchor.')
 const fonts = z.enum(['inherit','sans-serif','serif','monospace'])

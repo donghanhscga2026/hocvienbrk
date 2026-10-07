@@ -308,7 +308,7 @@ export function upgradeZipBridge(html: string): string {
   return html.replace(/<script\b[^>]*\bdata-mfc-zip-bridge(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?[^>]*>[\s\S]*?<\/script\s*>/i, () => BRIDGE.trim())
 }
 
-export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite> {
+export async function prepareWebsiteZip(file: File, options: { preserveTailwindForCompilation?: boolean } = {}): Promise<PreparedZipWebsite> {
   if (!file.name.toLowerCase().endsWith('.zip')) throw new Error('Vui lòng chọn file .zip')
   const buffer = await file.arrayBuffer()
   const zip = findEntries(buffer)
@@ -401,6 +401,7 @@ export async function prepareWebsiteZip(file: File): Promise<PreparedZipWebsite>
 
   for (const script of Array.from(doc.querySelectorAll<HTMLScriptElement>('script[src]'))) {
     const src = script.getAttribute('src') || ''
+    if (options.preserveTailwindForCompilation && /^https:\/\/(?:cdn\.tailwindcss\.com(?:[/?]|$)|cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser)/i.test(src)) continue
     const resolved = resolveZipPath(main.name, src)
     const entry = resolved ? zip.entries.get(resolved) : null
     if (!entry) {
