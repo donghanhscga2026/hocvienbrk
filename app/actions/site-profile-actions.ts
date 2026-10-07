@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import {FREE_DESIGN_ENABLED,FREE_DESIGN_MESSAGE} from '@/lib/website/free-design'
 import { FALLBACK_PROFILE, FALLBACK_COURSES, FALLBACK_POSTS, FALLBACK_SURVEY } from '@/lib/db-fallback'
 import { auth } from '@/auth'
 import { requireAdminAction } from '@/lib/api-auth'
@@ -439,6 +440,7 @@ export async function updateSiteProfileRuntime(
 ) {
   const denied = await requireAdminAction()
   if (denied) return { error: denied.error }
+  if(!FREE_DESIGN_ENABLED && (input.siteConfig?.homepage as {type?:string}|undefined)?.type==='website') return {error:FREE_DESIGN_MESSAGE}
 
   const updateDomains = input.primaryDomain !== undefined || input.additionalDomains !== undefined
   const primaryDomain = normalizeSiteHostname(input.primaryDomain)

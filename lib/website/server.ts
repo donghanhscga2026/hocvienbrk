@@ -1,4 +1,5 @@
 import 'server-only'
+import {FREE_DESIGN_ENABLED} from './free-design'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
 import { Prisma } from '@prisma/client'
@@ -18,6 +19,7 @@ export async function ownedProfile() {
   return profile
 }
 export async function publishedWebsite(profileId: number) {
+  if(!FREE_DESIGN_ENABLED) return null
   try { const row = await prisma.siteWebsite.findUnique({ where: { profileId }, select: { published: true } }); return row?.published ? parseDocument(row.published) : null }
   catch(error) { if(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return null; throw error }
 }

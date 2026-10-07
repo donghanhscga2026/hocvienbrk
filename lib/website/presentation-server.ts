@@ -1,4 +1,5 @@
 import 'server-only'
+import {FREE_DESIGN_ENABLED} from './free-design'
 import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import {cache} from 'react'
 import prisma from '@/lib/prisma'
@@ -18,7 +19,7 @@ export const presentationState=cache(async (profileId:number)=>{
   const homepage=raw.homepage && typeof raw.homepage==='object' && !Array.isArray(raw.homepage)?raw.homepage:{}
   const state=config ? presentationSchema.parse(config.value) : {mode:typeof homepage.type==='string' ? (getSiteRuntimeConfig(profile || {}).homepage.type==='website' && custom ? 'custom' as const:'template' as const) : custom ? 'custom' as const : 'template' as const,revision:0}
   // Ẩn thiết kế tự do thì quay về mẫu có sẵn, tránh làm domain đang chạy thành 404.
-  return {...state,mode:state.mode==='custom' && !custom ? 'template' as const : state.mode,customPublished:!!custom,custom,homepageType:profile ? getSiteRuntimeConfig(profile).homepage.type:'profile'}
+  return {...state,mode:!FREE_DESIGN_ENABLED || state.mode==='custom' && !custom ? 'template' as const : state.mode,customPublished:!!custom,custom,homepageType:profile ? getSiteRuntimeConfig(profile).homepage.type:'profile'}
 })
 
 export async function activeCustomWebsite(profileId:number) {

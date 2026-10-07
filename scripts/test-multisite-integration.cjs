@@ -35,6 +35,7 @@ function loader(overrides={}){
   new Function('require','exports','module',code)(name=>{
    if(name in overrides)return overrides[name]
    if(name==='server-only')return {}
+    if(name === '@/lib/website/free-design' || name === './free-design') return {FREE_DESIGN_ENABLED:true,FREE_DESIGN_MESSAGE:'Paused'}
    if(name==='next/cache')return {unstable_cache:fn=>fn,revalidateTag:()=>{},revalidatePath:()=>{}}
    if(name==='react')return {...require('react'),cache:fn=>fn}
    if(name==='next/headers')return {headers:async()=>new Headers({host,'x-forwarded-host':forwarded})}

@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import {FREE_DESIGN_ENABLED,FREE_DESIGN_MESSAGE} from '@/lib/website/free-design'
 import {z} from 'zod'
 import {ownedProfile} from '@/lib/website/server'
 import {presentationState} from '@/lib/website/presentation-server'
@@ -22,6 +23,7 @@ const command=z.object({mode:z.enum(['template','custom']),revision:z.number().i
 export async function POST(request:Request) {
   try {
     const profile=await manager(request),input=command.parse(await crmBody(request,1000))
+    if(input.mode==='custom' && !FREE_DESIGN_ENABLED) throw new CrmError(FREE_DESIGN_MESSAGE,410)
     await prisma.$transaction(async tx=>{
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420306, ${profile.id}::integer)`
       const current=await tx.systemConfig.findUnique({where:{key:presentationKey(profile.id)}})

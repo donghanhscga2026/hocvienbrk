@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import {FREE_DESIGN_ENABLED,FREE_DESIGN_MESSAGE} from '@/lib/website/free-design'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { crmBody, crmResponse } from '@/lib/crm/http'
@@ -13,6 +14,7 @@ import { adaptCourseTemplate } from '@/lib/website/course-template'
 export async function GET() {
   try {
     const profile = await ownedProfile()
+    if(!FREE_DESIGN_ENABLED) throw new CrmError(FREE_DESIGN_MESSAGE,410)
     const [row, data] = await Promise.all([prisma.siteWebsite.findUnique({ where: { profileId: profile.id } }), websiteData(profile)])
     const templates = COURSE_TEMPLATE_LIBRARY.map(t => ({ key: t.key, name: t.name, ...adaptCourseTemplate(t.key, profile.title || 'Website của tôi') }))
     return crmResponse({ profile: { slug: profile.slug, isActive: profile.isActive, canUseCrm: !!profile.user && canUseCrm(profile.user.role) }, document: row?.draft || blankDocument(profile.title || 'Website của tôi'), revision: row?.revision ?? -1, history: row?.history || [], published: !!row?.published, data, templates })
@@ -22,6 +24,7 @@ const command = z.object({ action: z.enum(['save', 'publish', 'unpublish', 'rest
 export async function POST(request: Request) {
   try {
     const profile = await ownedProfile()
+    if(!FREE_DESIGN_ENABLED) throw new CrmError(FREE_DESIGN_MESSAGE,410)
     const input = command.parse(await crmBody(request, 700000))
     const doc = input.action === 'save' || input.action === 'publish' ? parseDocument(input.document) : null
     if(input.action === 'publish' && doc?.pages.some(page => walkNodes(page.nodes).some(node => node.kind === 'course-hero' && node.courseIds.length !== 1))) throw new CrmError('Chọn một khóa học chính trước khi xuất bản.',400)

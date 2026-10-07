@@ -36,6 +36,8 @@ function loader(overrides={}) {
     new Function('require','exports','module',js)(name=>{
       if(name in overrides)return overrides[name]
       if(name==='server-only')return {}
+      // Kiểm tra dữ liệu thiết kế cũ trong chế độ khôi phục; bản đang dùng được kiểm tra riêng.
+      if(name==='@/lib/website/free-design' || name==='./free-design')return {FREE_DESIGN_ENABLED:true,FREE_DESIGN_MESSAGE:'Paused'}
       if(name==='next/cache')return {unstable_cache:fn=>fn,revalidateTag:()=>{}}
       if(name==='next/headers')return {headers:async()=>new Headers({host})}
       if(name==='@/lib/prisma')return {__esModule:true,default:fake}

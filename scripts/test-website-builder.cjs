@@ -46,6 +46,7 @@ function load(relative) {
   const source = ts.transpileModule(fs.readFileSync(file,'utf8'),{ compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText
   new Function('require','exports','module',source)(name => {
     if(name === 'server-only') return {}
+    if(name === '@/lib/website/free-design' || name === './free-design') return {FREE_DESIGN_ENABLED:true,FREE_DESIGN_MESSAGE:'Paused'}
     if(name === '@/auth') return { auth: async () => sessionId == null ? null : { user: { id: String(sessionId) } } }
     if(name === '@/lib/prisma') return { __esModule: true, default: fake }
     if(name === '@/lib/crm/service') return { CrmError }

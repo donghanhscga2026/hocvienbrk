@@ -1,4 +1,5 @@
 import type {Prisma} from '@prisma/client'
+import {FREE_DESIGN_ENABLED} from '@/lib/website/free-design'
 
 export type SiteHomepageType = 'community' | 'profile' | 'landing' | 'website'
 export type SiteCourseScopeMode = 'all' | 'profile' | 'teacher' | 'ids' | 'category'
@@ -107,7 +108,8 @@ export function getSiteRuntimeConfig(profile: {
       faviconUrl: shortText(rawBranding.faviconUrl),
     },
     homepage: {
-      type: homepageType,
+      // Cấu hình cũ được đọc như mẫu có sẵn, không ghi đè dữ liệu trong DB.
+      type: homepageType === 'website' && !FREE_DESIGN_ENABLED ? 'profile' : homepageType,
       landingId: Number.isInteger(Number(rawHomepage.landingId)) && Number(rawHomepage.landingId) > 0
         ? Number(rawHomepage.landingId)
         : undefined,
