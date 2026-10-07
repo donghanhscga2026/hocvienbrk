@@ -29,6 +29,7 @@ import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
 import { saveImportedTemplate } from '@/lib/course-page/importer/save-template'
+import { zipFrameSource } from '@/lib/course-page/importer/source-url'
 import { supabase } from '@/lib/supabase'
 import {
   deleteStoredCoursePageTemplate,
@@ -678,7 +679,7 @@ export default function CourseTemplateLibraryPage() {
                       <h3 className="mt-1 text-lg font-black text-gray-900">{template.name}</h3>
                       {template.description && <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{template.description}</p>}
                       {template.sourceUrl && (
-                        <a href={template.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-[11px] font-bold text-blue-600">
+                        <a href={zipFrameSource(template.sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-[11px] font-bold text-blue-600">
                           <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">Trang nguồn</span>
                         </a>
                       )}
