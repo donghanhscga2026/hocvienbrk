@@ -117,11 +117,13 @@ async function run() {
   const resolved = await prepareStandaloneHtml('<img src="image.png"><link rel="stylesheet" href="main.css">', 'https://example.com/course/')
   assert.ok(resolved.html.includes('https://example.com/course/image.png'))
   const analysis = analyzeWebsiteHtml({ html: prepared.analysisHtml, sourceType: 'html' })
+  analysis.controls = prepared.controls
   analysis.exactSource = { url: 'https://project.supabase.co/storage/v1/object/public/uploads/course-template-sources/test.html' }
   const { buildSnapshot } = load('app/actions/course-page-template-actions.ts')
   const snapshot = buildSnapshot('HTML', analysis, analysis.sections.map(s => s.id))
   assert.equal(snapshot.sections.length, 1, 'Save one page, not multiple iframe fragments')
   assert.equal(snapshot.sections[0].variant, 'zip-source-v1')
+  assert.deepEqual(snapshot.sections[0].content.controls, prepared.controls, 'Saved snapshot retains per-button configuration')
   assert.ok(snapshot.sections[0].content.registrationBlockKeys.includes('dang-ky'))
   const compacted = load('lib/course-page/importer/compact-analysis.ts').compactExactAnalysis(analysis)
   assert.deepEqual(buildSnapshot('HTML', compacted, analysis.sections.map(s => s.id)), snapshot,
@@ -158,6 +160,7 @@ async function run() {
   const pageResponse = await pageImport(pageRequest(body))
   assert.equal(pageResponse.status, 200)
   const pageResult = await pageResponse.json()
+  assert.deepEqual(pageResult.controls,prepared.controls)
   assert.ok(pageResult.url.endsWith('/test.html') && !('html' in pageResult), 'Store lightweight URL rather than full HTML in page document')
   assert.ok(uploadedHtml.includes('data-mfc-compiled-tailwind'))
   assert.equal((await pageImport(pageRequest(body, 'application/gzip', 'https://evil.invalid'))).status, 403)

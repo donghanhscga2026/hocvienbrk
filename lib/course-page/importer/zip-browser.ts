@@ -1,6 +1,9 @@
+import { detectTemplateControls } from '@/lib/course-page/importer/detect-controls'
+import type { TemplateControls } from '@/lib/course-page/importer/controls'
 import { allowedSourceScript } from '@/lib/course-page/importer/script-policy'
 
 export type PreparedZipWebsite = {
+  controls: TemplateControls
   html: string
   analysisHtml: string
   entryPath: string
@@ -171,7 +174,7 @@ export const BRIDGE = `
 (function(){
   if (window.__MFC_ZIP_BRIDGE__) return;
   window.__MFC_ZIP_BRIDGE__ = true;
-  var cfg = { selectedBlockKeys: null, registrationBlockKeys: [] };
+  var cfg = { selectedBlockKeys: null, registrationBlockKeys: [], controlBindings: [] };
   function post(payload){ try { parent.postMessage(Object.assign({source:'mfc-zip-source'}, payload), '*'); } catch(e){} }
   function blocks(){ return Array.from(document.querySelectorAll('[data-mfc-block]')); }
   function keyOf(el){ return el && el.getAttribute ? (el.getAttribute('data-mfc-block') || '') : ''; }
@@ -242,6 +245,7 @@ export const BRIDGE = `
     var data=e.data||{};
     if(data.source!=='mfc-zip-parent') return;
     if(data.type==='configure'){
+      cfg.controlBindings=Array.isArray(data.controlBindings)?data.controlBindings:[];
       cfg.selectedBlockKeys=Array.isArray(data.selectedBlockKeys)?data.selectedBlockKeys:null;
       cfg.registrationBlockKeys=Array.isArray(data.registrationBlockKeys)?data.registrationBlockKeys:[];
       configureLinks(data);
@@ -262,6 +266,32 @@ export const BRIDGE = `
     post({type:'action',actionType:'open_registration',formData:data});
   }, true);
   document.addEventListener('click', function(e){
+    var control=e.target && e.target.closest ? e.target.closest('[data-mfc-control]') : null;
+    var binding=control && cfg.controlBindings.find(function(b){return b.id===control.getAttribute('data-mfc-control');});
+    if(binding && binding.action!=='keep'){
+      e.preventDefault();e.stopImmediatePropagation();
+      if(binding.action==='tab' || binding.action==='scroll'){
+        var target=document.querySelector('[data-mfc-target="'+binding.target+'"]');
+        if(!target)return;
+        if(binding.action==='tab'){
+          Array.from(target.parentElement.children).forEach(function(panel){
+            if(!panel.hasAttribute('data-mfc-target'))return;
+            if(!panel.hasAttribute('data-mfc-original-display'))panel.setAttribute('data-mfc-original-display',panel.style.display);
+            panel.hidden=panel!==target;
+            if(panel!==target){panel.style.display='none';return;}
+            panel.classList.remove('hidden');
+            var display=panel.getAttribute('data-mfc-original-display');
+            panel.style.display=display==='none'?'':display;
+            if(getComputedStyle(panel).display==='none')panel.style.display='block';
+          });
+          target.style.visibility='visible';target.hidden=false;
+          cfg.controlBindings.filter(function(b){return b.action==='tab';}).forEach(function(b){var button=document.querySelector('[data-mfc-control="'+b.id+'"]');var panel=document.querySelector('[data-mfc-target="'+b.target+'"]');if(button && panel && panel.parentElement===target.parentElement){button.setAttribute('aria-selected',String(b.id===binding.id));button.classList.toggle('active',b.id===binding.id);}});
+          sendHeight();
+        }else{post({type:'scroll',top:Math.max(0,target.getBoundingClientRect().top+window.scrollY),updateHash:false});}
+      }
+      post({type:'control_action',controlId:binding.id});return;
+    }
+
     var el=e.target && e.target.closest ? e.target.closest('a[href],button[data-mfc-register],[data-mfc-action="register"]') : null;
     if(!el)return;
     var courseLink=el.getAttribute('data-mfc-course-link');
@@ -447,7 +477,8 @@ export async function prepareWebsiteZip(file: File, options: { preserveTailwindF
   head.prepend(csp)
   head.insertAdjacentHTML('beforeend', BRIDGE)
 
-  const html = '<!doctype html>\n' + doc.documentElement.outerHTML
+  const detected = detectTemplateControls('<!doctype html>\n' + doc.documentElement.outerHTML)
+  const html = detected.html
   if (new Blob([html]).size > 8 * 1024 * 1024) {
     throw new Error('Trang sau khi đóng gói vượt 8MB. Hãy bỏ bớt video/file lớn khỏi ZIP hoặc dùng bản HTML nhẹ hơn.')
   }
@@ -455,6 +486,7 @@ export async function prepareWebsiteZip(file: File, options: { preserveTailwindF
   return {
     html,
     analysisHtml,
+    controls: detected.controls,
     entryPath: main.name,
     fileCount: zip.entries.size,
     inlinedAssetCount,

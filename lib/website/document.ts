@@ -1,3 +1,4 @@
+import { controlsSchema, TemplateControls } from '@/lib/course-page/importer/controls'
 import { z } from 'zod'
 
 // Giữ loại khối cũ để bản nháp và website đã lưu vẫn đọc được.
@@ -9,8 +10,8 @@ const safeLink = z.string().max(2000).refine(v => !v || /^https?:\/\/[^\s]+$/i.t
 const fonts = z.enum(['inherit','sans-serif','serif','monospace'])
 const styleSchema = z.object({ background: color.optional(), color: color.optional(), padding: z.number().min(0).max(240).optional(), gap: z.number().min(0).max(120).optional(), columns: z.number().int().min(1).max(6).optional(), fontSize: z.number().min(10).max(120).optional(), fontFamily: fonts.optional(), width: z.number().min(5).max(100).optional(), radius: z.number().min(0).max(100).optional(), maxWidth: z.number().min(200).max(2400).optional(), align: z.enum(['left', 'center', 'right']).optional(), minHeight: z.number().min(0).max(2000).optional() }).strict()
 export type NodeStyle = z.infer<typeof styleSchema>
-export interface WebsiteNode { id: string; kind: Kind; text: string; url: string; html: string; css: string; courseIds: number[]; style: NodeStyle; mobile: NodeStyle; children: WebsiteNode[] }
-const nodeSchema: z.ZodType<WebsiteNode> = z.lazy(() => z.object({ id: z.string().regex(/^[\w-]{1,80}$/), kind: z.enum(kinds), text: z.string().max(20000), url: safeLink, html: z.string().max(100000), css: z.string().max(30000), courseIds: z.array(z.number().int().positive()).max(200), style: styleSchema, mobile: styleSchema, children: z.array(nodeSchema).max(200) }).strict())
+export interface WebsiteNode { controls?: TemplateControls; id: string; kind: Kind; text: string; url: string; html: string; css: string; courseIds: number[]; style: NodeStyle; mobile: NodeStyle; children: WebsiteNode[] }
+const nodeSchema: z.ZodType<WebsiteNode> = z.lazy(() => z.object({ id: z.string().regex(/^[\w-]{1,80}$/), kind: z.enum(kinds), controls: controlsSchema.optional(), text: z.string().max(20000), url: safeLink, html: z.string().max(100000), css: z.string().max(30000), courseIds: z.array(z.number().int().positive()).max(200), style: styleSchema, mobile: styleSchema, children: z.array(nodeSchema).max(200) }).strict())
 export const documentSchema = z.object({ version: z.literal(1), name: z.string().trim().min(1).max(120), description: z.string().max(500), color, background: color, layout: z.object({ maxWidth: z.number().min(320).max(2400), padding: z.number().min(0).max(100), gap: z.number().min(0).max(120), fontFamily: fonts, showHeader: z.boolean(), showFooter: z.boolean() }).strict().default({ maxWidth: 1200, padding: 24, gap: 32, fontFamily: 'inherit', showHeader: true, showFooter: true }), pages: z.array(z.object({ id: z.string().regex(/^[\w-]{1,80}$/), title: z.string().trim().min(1).max(120), slug: z.string().regex(/^([a-z0-9]+(-[a-z0-9]+)*)?$/).max(80), nodes: z.array(nodeSchema).max(200) }).strict()).min(1).max(30) }).strict().superRefine((doc, ctx) => {
   const ids = new Set<string>(); const slugs = new Set<string>(); let count = 0
   const fail = (message: string) => ctx.addIssue({ code: 'custom', message })

@@ -34,6 +34,6 @@ export async function POST(request: Request) {
     try { prepared = await prepareStandaloneHtml(html) }
     catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'HTML không hợp lệ.' }, { status: 400 }) }
     const url = await saveUploadedFile(Buffer.from(prepared.html), `page-${profile.id}-${crypto.randomUUID()}.html`, 'course-template-sources', 'text/html; charset=utf-8')
-    return NextResponse.json({ url, warnings: [...prepared.warnings.map(w => w.replace('nút đăng ký dùng quy trình khóa học MFC', 'nút đăng ký cần nối với khóa học hoặc Form tư vấn của Page')), 'Form tự viết không gửi dữ liệu. Chọn khóa học hoặc thêm khối Form tư vấn để nhận đăng ký.'] })
+    return NextResponse.json({ url, controls: prepared.controls, warnings: [...prepared.warnings.map(w => w.replace('nút đăng ký dùng quy trình khóa học MFC', 'nút đăng ký cần nối với khóa học hoặc Form tư vấn của Page')), 'Form tự viết không gửi dữ liệu. Chọn khóa học hoặc thêm khối Form tư vấn để nhận đăng ký.'] })
   } catch (error) { return websiteFailure(error) }
 }

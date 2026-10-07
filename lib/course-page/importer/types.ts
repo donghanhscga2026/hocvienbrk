@@ -1,3 +1,4 @@
+import type { TemplateControls } from './controls'
 export type ImportedSourceType = 'url' | 'html' | 'zip'
 
 export type ImportedSectionType =
@@ -104,6 +105,7 @@ export type WebsiteTemplateAnalysis = {
     forms: number
   }
   warnings: string[]
+  controls?: TemplateControls
   exactSource?: {
     url: string
     zipFileName?: string

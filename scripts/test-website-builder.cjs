@@ -164,15 +164,19 @@ async function uiChecks() {
   await click('+ Trang'); await click('Tiêu đề')
   const sourceUrl = 'https://project.supabase.co/storage/v1/object/public/uploads/course-template-sources/test.html'
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://project.supabase.co'
+  const detectedControls=load('lib/course-page/importer/detect-controls').detectTemplateControls('<a href="/khoa-hoc/COURSE-7">Xem khóa học</a>').controls
   const oldFetch = global.fetch
-  global.fetch = async (url,options) => url === '/api/websites/import' ? { ok:true,json:async()=>({url:sourceUrl,warnings:[]}) } : oldFetch(url,options)
+  global.fetch = async (url,options) => url === '/api/websites/import' ? { ok:true,json:async()=>({url:sourceUrl,warnings:[],controls:detectedControls}) } : oldFetch(url,options)
   const fileInput = global.document.querySelector('input[type="file"]')
   Object.defineProperty(fileInput,'files',{value:[new File(['<h1>Imported page</h1>'],'page.html',{type:'text/html'})],configurable:true})
   await React.act(async()=>fileInput.dispatchEvent(new window.Event('change',{bubbles:true})))
   await React.act(async()=>{ findButton('Phân tích & xem trước').click(); for(let i=0;i<100 && !findButton('Dùng cho trang đang chọn');i++) await new Promise(resolve=>setTimeout(resolve,10)) })
   ok(findButton('Tablet') && findButton('Dùng cho trang đang chọn'),'Imported source offers all three device previews')
+  const mapping=global.document.querySelector('[aria-label="Hành động control-1"]')
+  await React.act(async()=>{mapping.value='register';mapping.dispatchEvent(new window.Event('change',{bubbles:true}))})
   await click('Dùng cho trang đang chọn'); await click('Lưu nháp')
   assert.deepEqual(saved.document.pages[0],firstPage); checks++
+  ok(saved.document.pages[1].nodes[0].controls.bindings[0].action==='register','Page import saves edited button mapping')
   ok(saved.document.pages[1].nodes.length===1 && saved.document.pages[1].nodes[0].kind==='imported-page','Import replaces only the selected page')
   ok(global.document.querySelector('main iframe').getAttribute('src').startsWith('/api/website-template-source?source='),'Imported page previews as HTML through the source endpoint')
   await click('Hoàn tác'); await click('Lưu nháp')

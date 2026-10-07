@@ -51,6 +51,9 @@ export default function CoursePageView({
   const effectiveEnrollment = localEnrollment || enrollment
   const isEnrolled = effectiveEnrollment?.status === 'ACTIVE'
 
+  // Liên kết đăng ký từ template mở đúng luồng đăng ký hiện có của khóa học.
+  React.useEffect(()=>{if(new URLSearchParams(window.location.search).get('register')==='1'){if(isEnrolled)router.replace(`/courses/${course.id_khoa}/learn`);else setShowRegistration(true)}},[course.id_khoa,isEnrolled,router])
+
   // ── Scroll progress ───────────────────────────────────────────────────────
   const [scrollProgress, setScrollProgress] = React.useState(0)
 

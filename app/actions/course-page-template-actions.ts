@@ -1,5 +1,7 @@
 'use server'
 
+import { controlsSchema } from '@/lib/course-page/importer/controls'
+
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAdminAction } from '@/lib/api-auth'
@@ -122,6 +124,7 @@ function buildSnapshot(
         visibility: 'all' as const,
         content: jsonSafe({
           exactSource: analysis.exactSource,
+          controls: analysis.controls ? controlsSchema.parse(analysis.controls) : undefined,
           selectedBlockKeys: selected.map(section => section.id),
           registrationBlockKeys: analysis.sections
             .filter(isImportedRegistrationSection)

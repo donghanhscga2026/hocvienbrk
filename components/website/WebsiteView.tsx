@@ -84,7 +84,7 @@ export default function WebsiteView({ document: doc, data, slug, pageSlug = '', 
         const valid = resolveZipStorageSource(n.url, process.env.NEXT_PUBLIC_SUPABASE_URL || '')
         const course = modules?.courses === false ? undefined : data.courses.find(c => n.courseIds.length === 1 && c.id === n.courseIds[0])
         const form = modules?.crm === false ? undefined : walkNodes(page.nodes).find(item => item.kind === 'form')
-        body = valid ? <ZipSourceSection sourceEndpoint="/api/website-template-source" content={{ exactSource: { url: n.url } }} onAction={(action, target) => {
+        body = valid ? <ZipSourceSection testMode={preview} allowedCourseHrefs={modules?.courses === false ? [] : data.courses.map(c=>c.href)} sourceEndpoint="/api/website-template-source" content={{ exactSource: { url: n.url }, controls: n.controls }} onAction={(action, target) => {
           if (action === 'open_registration') {
             if (course && !preview) window.location.assign(href(course.href))
             else if (form) window.document.querySelector(`[data-website-node="${form.id}"]`)?.scrollIntoView({ behavior: 'smooth' })

@@ -1,3 +1,4 @@
+import { detectTemplateControls } from '@/lib/course-page/importer/detect-controls'
 import { NextRequest, NextResponse } from 'next/server'
 import { gunzipSync } from 'node:zlib'
 import { requireAdmin } from '@/lib/api-auth'
@@ -18,6 +19,7 @@ async function analyzeStandalone(html: string, sourceUrl?: string, filename = 'w
   const safeName = filename.replace(/\.html?$/i, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 60) || 'website'
   const url = await saveUploadedFile(Buffer.from(prepared.html, 'utf8'),
     `${safeName}-${Date.now().toString(36)}.html`, 'course-template-sources', 'text/html; charset=utf-8')
+  analysis.controls = prepared.controls
   analysis.exactSource = { url, entryPath: filename }
   analysis.warnings = [...new Set([...analysis.warnings, ...prepared.warnings,
     'HTML giữ nguyên trang: bố cục không bị chia khung; form nguồn được thay bằng đăng ký khóa học MFC.',
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
       })
 
       if (requestedSourceType === 'zip') {
+        const detected = detectTemplateControls(html)
+        analysis.controls = detected.controls
         const safeName = (zipFileName || 'website')
           .replace(/\.zip$/i, '')
           .normalize('NFD')
@@ -86,7 +90,7 @@ export async function POST(request: NextRequest) {
           .slice(0, 60) || 'website'
         const sourceFilename = `${safeName}-${Date.now().toString(36)}.html`
         const exactUrl = await saveUploadedFile(
-          htmlBuffer,
+          Buffer.from(detected.html),
           sourceFilename,
           'course-template-sources',
           'text/html; charset=utf-8',

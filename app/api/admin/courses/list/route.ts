@@ -11,7 +11,7 @@ export async function GET() {
 
   try {
     const courses = await prisma.course.findMany({
-      select: { id: true, name_lop: true },
+      select: { id: true, name_lop: true, id_khoa: true },
       orderBy: { createdAt: "desc" },
     });
 

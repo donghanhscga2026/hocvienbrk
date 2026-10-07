@@ -1,3 +1,4 @@
+import { detectTemplateControls } from './detect-controls'
 import { parse as parseScript } from 'acorn'
 import { parse, parseFragment, serialize } from 'parse5'
 import postcss from 'postcss'
@@ -219,5 +220,7 @@ document.addEventListener('click',function(e){var b=e.target.closest&&e.target.c
   head.childNodes.unshift(...bridgeFragment.childNodes)
   const preparedHtml = '<!doctype html>\n' + serialize(doc)
   if (Buffer.byteLength(preparedHtml, 'utf8') > MAX_BYTES) throw new Error('HTML sau đóng gói CSS vượt quá giới hạn 8MB.')
-  return { html: preparedHtml, analysisHtml, warnings: [...new Set(warnings)] }
+  const detected = detectTemplateControls(preparedHtml)
+  if (Buffer.byteLength(detected.html, 'utf8') > MAX_BYTES) throw new Error('HTML sau nhận diện nút vượt quá giới hạn 8MB.')
+  return { html: detected.html, controls: detected.controls, analysisHtml, warnings: [...new Set(warnings)] }
 }

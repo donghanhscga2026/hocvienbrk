@@ -21,6 +21,8 @@ import {
   XSquare,
 } from 'lucide-react'
 import MainHeader from '@/components/layout/MainHeader'
+import { controlsSchema } from '@/lib/course-page/importer/controls'
+import TemplateControlEditor, { ControlCourse } from '@/components/course-page/TemplateControlEditor'
 import ImportedSection from '@/components/course-page/sections/ImportedSection'
 import ZipSourceSection from '@/components/course-page/sections/ZipSourceSection'
 import { COURSE_TEMPLATE_LIBRARY } from '@/lib/course-page/templates'
@@ -68,6 +70,9 @@ const SECTION_NAMES: Record<string, string> = {
 }
 
 export default function CourseTemplateLibraryPage() {
+  const [controlCourses,setControlCourses] = useState<ControlCourse[]>([])
+  const [courseListError,setCourseListError] = useState('')
+  useEffect(()=>{ let cancelled=false; fetch('/api/admin/courses/list').then(async r=>{if(!r.ok)throw new Error('Không tải được danh sách khóa học.');return r.json()}).then(rows=>{if(!cancelled)setControlCourses(rows.map((c:any)=>({title:c.name_lop,href:'/khoa-hoc/'+c.id_khoa}))) }).catch(e=>{if(!cancelled)setCourseListError(e.message)});return()=>{cancelled=true}},[])
   const [storedTemplates, setStoredTemplates] = useState<StoredTemplate[]>([])
   const [loadingLibrary, setLoadingLibrary] = useState(true)
   const [showImporter, setShowImporter] = useState(false)
@@ -171,6 +176,7 @@ export default function CourseTemplateLibraryPage() {
           sourceType: 'zip',
           sourceUrl: publicData.publicUrl,
         })
+        result.controls = prepared.controls
         result.exactSource = {
           url: publicData.publicUrl,
           zipFileName: sourceZip.name,
@@ -303,6 +309,7 @@ export default function CourseTemplateLibraryPage() {
       return
     }
 
+    if(analysis.controls&&!controlsSchema.safeParse(analysis.controls).success){setMessage({type:'error',text:'Có nút chưa chọn đích đến hợp lệ. Hãy kiểm tra phần Kết nối các nút.'});return}
     setSavingTemplate(true)
     setMessage(null)
     try {
@@ -558,6 +565,8 @@ export default function CourseTemplateLibraryPage() {
                 </div>
 
                 <div className="bg-gray-100 p-3 sm:p-5">
+                  {courseListError&&<p role="alert" className="mb-3 text-sm text-red-700">{courseListError}</p>}
+                  {analysis.controls&&<TemplateControlEditor value={analysis.controls} courses={controlCourses} onChange={controls=>setAnalysis({...analysis,controls})}/>}
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-black uppercase tracking-widest text-gray-500">Preview</div>
@@ -579,9 +588,10 @@ export default function CourseTemplateLibraryPage() {
                   >
                     {isExactAnalysis && analysis.exactSource?.url ? (
                       <div>
-                        <ZipSourceSection
+                        <ZipSourceSection testMode
                           content={{
                             exactSource: analysis.exactSource,
+                            controls: analysis.controls,
                             selectedBlockKeys: selectedSections.map(section => section.id),
                             registrationBlockKeys: registrationSectionIds,
                           }}
