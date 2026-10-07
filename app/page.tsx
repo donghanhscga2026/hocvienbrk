@@ -10,8 +10,6 @@ import FooterSection from '@/components/home/FooterSection'
 import prisma from '@/lib/prisma'
 import { getCoursesForProfile, getSurveyForProfile, getPostsForProfile, incrementProfileView } from '@/app/actions/site-profile-actions'
 import { getCurrentSiteProfile, getSiteRuntimeConfig } from '@/lib/site-profile/runtime'
-import { publishedWebsite, websiteData } from '@/lib/website/server'
-import WebsiteView from '@/components/website/WebsiteView'
 import { LandingPageClient } from '@/components/landing/LandingPageClient'
 import { getRandomMessage } from './actions/message-actions'
 import { resetSurveyAction } from './actions/survey-actions'
@@ -34,17 +32,6 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!profile) return { title: 'MFC' }
 
   const config = getSiteRuntimeConfig(profile)
-  if (config.homepage.type === 'website') {
-    const website = await publishedWebsite(profile.id)
-    if (website) {
-      return {
-        title: { absolute: website.name },
-        description: website.description,
-        openGraph: { title: website.name, description: website.description },
-        twitter: { title: website.name, description: website.description },
-      }
-    }
-  }
 
   if (config.homepage.type === 'landing') {
     const landing = await getHomepageLanding(config.homepage.landingId, config.homepage.landingSlug)
@@ -85,12 +72,6 @@ export default async function Home() {
     showAllCourses: runtimeConfig.modules.courses,
   }
 
-  if (profile && runtimeConfig.homepage.type === 'website') {
-    const website = await publishedWebsite(profile.id)
-    if (website) {
-      return <WebsiteView document={website} data={await websiteData(profile)} slug={profile.slug} />
-    }
-  }
 
   if (profile && runtimeConfig.homepage.type === 'landing') {
     const landing = await getHomepageLanding(runtimeConfig.homepage.landingId, runtimeConfig.homepage.landingSlug)

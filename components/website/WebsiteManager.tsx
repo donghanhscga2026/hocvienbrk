@@ -6,7 +6,7 @@ import {applicationKeys,applications,allApplications,noApplications,type Applica
 import type {DomainModules} from '@/lib/website/domain-shared'
 
 type Section='design'|'data'|'domains'|'apps'|'package'
-type Presentation={homepageType?:string;mode:'template'|'custom';revision:number;customPublished:boolean}
+type Presentation={homepageType?:string;mode:'template';revision:number;customPublished:boolean}
 type Snapshot={profileId?:number;access:WebsiteAccess;basic:DomainModules;basicApplications:ApplicationFlags;admin:boolean;name:string;slug:string;configured:boolean;domains:{hostname:string;enabled:boolean}[]}
 export default function WebsiteManager() {
   const [presentation,setPresentation]=useState<Presentation|null>(null)

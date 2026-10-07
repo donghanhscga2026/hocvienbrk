@@ -28,10 +28,9 @@ import { WebsiteTemplateAnalysis } from '@/lib/course-page/importer/types'
 import { prepareWebsiteZip } from '@/lib/course-page/importer/zip-browser'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { isImportedRegistrationSection } from '@/lib/course-page/importer/registration'
-import { saveImportedTemplate } from '@/lib/course-page/importer/save-template'
-import { zipFrameSource } from '@/lib/course-page/importer/source-url'
 import { supabase } from '@/lib/supabase'
 import {
+  createStoredCoursePageTemplate,
   deleteStoredCoursePageTemplate,
   getStoredCoursePageTemplates,
 } from '@/app/actions/course-page-template-actions'
@@ -87,15 +86,10 @@ export default function CourseTemplateLibraryPage() {
 
   const loadLibrary = async () => {
     setLoadingLibrary(true)
-    try {
-      const res = await getStoredCoursePageTemplates()
-      if (res.success) setStoredTemplates((res.templates || []) as StoredTemplate[])
-      else setMessage({ type: 'error', text: res.error || 'Không thể tải mẫu của tôi' })
-    } catch {
-      setMessage({ type: 'error', text: 'Không tải được thư viện mẫu. Hãy tải lại trang để kiểm tra mẫu đã lưu.' })
-    } finally {
-      setLoadingLibrary(false)
-    }
+    const res = await getStoredCoursePageTemplates()
+    if (res.success) setStoredTemplates((res.templates || []) as StoredTemplate[])
+    else setMessage({ type: 'error', text: res.error || 'Không thể tải mẫu của tôi' })
+    setLoadingLibrary(false)
   }
 
   useEffect(() => {
@@ -112,7 +106,7 @@ export default function CourseTemplateLibraryPage() {
     () => orderedSections.filter(section => selected.has(section.id)),
     [orderedSections, selected],
   )
-  const isExactAnalysis = Boolean(analysis?.exactSource?.url)
+  const isZipAnalysis = analysis?.sourceType === 'zip'
   const selectableSectionIds = useMemo(
     () => orderedSections.filter(section => !isImportedRegistrationSection(section)).map(section => section.id),
     [orderedSections],
@@ -305,27 +299,25 @@ export default function CourseTemplateLibraryPage() {
 
     setSavingTemplate(true)
     setMessage(null)
-    try {
-      const res = await saveImportedTemplate({
-        name: templateName.trim(),
-        description: templateDescription.trim(),
-        analysis,
-        selectedSectionIds: selectedIds,
-      })
-      const createdName = res.template.name || templateName
+    const res = await createStoredCoursePageTemplate({
+      name: templateName.trim(),
+      description: templateDescription.trim(),
+      analysis,
+      selectedSectionIds: selectedIds,
+    })
+    if (res.success) {
+      await loadLibrary()
+      const createdName = res.template?.name || templateName
       setShowImporter(false)
       resetAnalysis()
       setSourceUrl('')
       setSourceFile(null)
       setSourceZip(null)
       setMessage({ type: 'success', text: `Đã tạo mẫu “${createdName}”. Mẫu đã sẵn sàng để áp dụng cho khóa học.` })
-      // Tải lại danh sách riêng, không giữ nút tạo mẫu trong trạng thái chờ.
-      void loadLibrary()
-    } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Không thể tạo mẫu. Hãy kiểm tra thư viện trước khi tạo lại.' })
-    } finally {
-      setSavingTemplate(false)
+    } else {
+      setMessage({ type: 'error', text: res.error || 'Không thể tạo mẫu' })
     }
+    setSavingTemplate(false)
   }
 
   const deleteTemplate = async (template: StoredTemplate) => {
@@ -376,7 +368,7 @@ export default function CourseTemplateLibraryPage() {
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-purple-600">Website → Template</div>
                   <h2 className="mt-1 text-xl font-black text-gray-900">Phân tích và tạo mẫu</h2>
-                  <p className="mt-1 text-sm text-gray-600">Chọn 1 trong 3 nguồn: URL, file HTML hoặc ZIP mã nguồn. HTML mặc định giữ nguyên trang và đóng gói CSS Tailwind; ZIP giữ bố cục và tài nguyên đi kèm. URL phân tích thành các khối. Hãy xem cảnh báo và kiểm tra bản xem trước trước khi lưu.</p>
+                  <p className="mt-1 text-sm text-gray-600">Chọn 1 trong 3 nguồn: URL, file HTML hoặc ZIP mã nguồn. URL/HTML dùng Fidelity Mode để phân tích dần; ZIP dùng Exact ZIP Mode để giữ nguyên bố cục/asset/script nội bộ trong sandbox và nối form về MFC.</p>
                 </div>
                 {analysis && (
                   <button type="button" onClick={resetAnalysis} className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold text-gray-600">
@@ -479,7 +471,7 @@ export default function CourseTemplateLibraryPage() {
                   )}
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-sm font-black text-gray-900">{isExactAnalysis ? 'Các phần trong trang gốc' : 'Chọn phần đưa vào mẫu'}</div>
+                    <div className="text-sm font-black text-gray-900">{isZipAnalysis ? 'Các phần phát hiện trong ZIP' : 'Chọn phần đưa vào mẫu'}</div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setSelected(new Set(selectableSectionIds))} className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-2 text-[10px] font-black text-green-700">
                         <CheckSquare className="h-3.5 w-3.5" /> Chọn tất cả
@@ -502,8 +494,8 @@ export default function CourseTemplateLibraryPage() {
                         >
                           <button
                             type="button"
-                            draggable={!isExactAnalysis && !isImportedRegistrationSection(section)}
-                            onDragStart={() => { if (!isExactAnalysis && !isImportedRegistrationSection(section)) setDraggingId(section.id) }}
+                            draggable={!isZipAnalysis && !isImportedRegistrationSection(section)}
+                            onDragStart={() => { if (!isZipAnalysis && !isImportedRegistrationSection(section)) setDraggingId(section.id) }}
                             onDragEnd={() => setDraggingId(null)}
                             className="mt-0.5 cursor-grab rounded p-1 text-gray-400 active:cursor-grabbing"
                             title="Kéo để đổi vị trí"
@@ -524,7 +516,7 @@ export default function CourseTemplateLibraryPage() {
                               {isImportedRegistrationSection(section) ? ' · LOẠI BỎ — dùng đăng ký MFC' : ''}
                             </div>
                           </button>
-                          <div className={isExactAnalysis ? "hidden" : "flex shrink-0"}>
+                          <div className={isZipAnalysis ? "hidden" : "flex shrink-0"}>
                             <button type="button" onClick={() => moveSection(section.id, -1)} disabled={index === 0} className="rounded p-1 text-gray-400 disabled:opacity-20" title="Đưa lên"><ArrowUp className="h-3.5 w-3.5" /></button>
                             <button type="button" onClick={() => moveSection(section.id, 1)} disabled={index === orderedSections.length - 1} className="rounded p-1 text-gray-400 disabled:opacity-20" title="Đưa xuống"><ArrowDown className="h-3.5 w-3.5" /></button>
                           </div>
@@ -542,9 +534,6 @@ export default function CourseTemplateLibraryPage() {
                       <label className="mb-1 block text-[10px] font-black uppercase text-gray-500">Ghi chú</label>
                       <input value={templateDescription} onChange={e => setTemplateDescription(e.target.value)} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm" />
                     </div>
-                    {message?.type === 'error' && (
-                      <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{message.text}</div>
-                    )}
                     <button
                       type="button"
                       onClick={createTemplate}
@@ -552,7 +541,7 @@ export default function CourseTemplateLibraryPage() {
                       className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 font-black text-white disabled:opacity-40"
                     >
                       {savingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutTemplate className="h-4 w-4" />}
-                      {savingTemplate ? 'Đang tạo mẫu...' : isExactAnalysis ? 'Tạo mẫu nguyên trang' : `Tạo mẫu từ ${selected.size} phần đã chọn`}
+                      {savingTemplate ? 'Đang tạo mẫu...' : isZipAnalysis ? 'Tạo mẫu ZIP nguyên bản' : `Tạo mẫu từ ${selected.size} phần đã chọn`}
                     </button>
                   </div>
                 </div>
@@ -561,9 +550,9 @@ export default function CourseTemplateLibraryPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-black uppercase tracking-widest text-gray-500">Preview</div>
-                      <div className="text-[11px] text-gray-400">{isExactAnalysis ? "Xem nguyên trang với CSS đã đóng gói; thứ tự giữ theo file gốc." : "Bỏ chọn hoặc đổi thứ tự bên trái, bản xem trước cập nhật ngay."}</div>
+                      <div className="text-[11px] text-gray-400">{isZipAnalysis ? "Exact ZIP Mode: xem nguyên trang đã đóng gói." : "Bỏ chọn hoặc đổi thứ tự bên trái, bản xem trước cập nhật ngay."}</div>
                     </div>
-                    <div className="rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-gray-600">{isExactAnalysis ? "Nguyên trang" : `${selectedSections.length} phần`}</div>
+                    <div className="rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-gray-600">{isZipAnalysis ? "ZIP nguyên bản" : `${selectedSections.length} phần`}</div>
                   </div>
                   <div
                     className="max-h-[760px] overflow-y-auto rounded-2xl border bg-white shadow-sm"
@@ -577,8 +566,8 @@ export default function CourseTemplateLibraryPage() {
                       ['--course-body-font' as any]: analysis.theme.bodyFont || 'system-ui',
                     }}
                   >
-                    {isExactAnalysis && analysis.exactSource?.url ? (
-                      <div>
+                    {isZipAnalysis && analysis.exactSource?.url ? (
+                      <div className="pointer-events-none">
                         <ZipSourceSection
                           content={{
                             exactSource: analysis.exactSource,
@@ -679,7 +668,7 @@ export default function CourseTemplateLibraryPage() {
                       <h3 className="mt-1 text-lg font-black text-gray-900">{template.name}</h3>
                       {template.description && <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{template.description}</p>}
                       {template.sourceUrl && (
-                        <a href={zipFrameSource(template.sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-[11px] font-bold text-blue-600">
+                        <a href={template.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex max-w-full items-center gap-1 truncate text-[11px] font-bold text-blue-600">
                           <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">Trang nguồn</span>
                         </a>
                       )}

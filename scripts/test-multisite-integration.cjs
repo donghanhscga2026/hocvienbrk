@@ -35,7 +35,6 @@ function loader(overrides={}){
   new Function('require','exports','module',code)(name=>{
    if(name in overrides)return overrides[name]
    if(name==='server-only')return {}
-    if(name === '@/lib/website/free-design' || name === './free-design') return {FREE_DESIGN_ENABLED:true,FREE_DESIGN_MESSAGE:'Paused'}
    if(name==='next/cache')return {unstable_cache:fn=>fn,revalidateTag:()=>{},revalidatePath:()=>{}}
    if(name==='react')return {...require('react'),cache:fn=>fn}
    if(name==='next/headers')return {headers:async()=>new Headers({host,'x-forwarded-host':forwarded})}
@@ -99,13 +98,13 @@ async function run(){
  ok(response.status===200,'Template selection succeeds')
  ok(profile.siteConfig.homepage.type==='profile','Template selection updates admin homepage')
  response=await mode.POST(request({mode:'custom',revision:1}))
- ok(response.status===200 && profile.siteConfig.homepage.type==='website','Custom selection updates same homepage configuration')
- ok((await presentation.presentationState(7)).mode==='custom','Renderer follows saved selection')
- ok((await mode.POST(request({mode:'template',revision:1}))).status===409,'Stale presentation write is rejected')
+ ok(response.status===410 && profile.siteConfig.homepage.type==='profile','Removed free design cannot change homepage')
+ ok((await presentation.presentationState(7)).mode==='template','Renderer uses built-in template')
+ ok((await mode.POST(request({mode:'template',revision:0}))).status===409,'Stale presentation write is rejected')
  configurations.clear();profile.siteConfig={homepage:{type:'profile'}}
  ok((await presentation.presentationState(7)).mode==='template','Existing admin homepage wins over a retained published design')
  profile.siteConfig={homepage:{type:'website'}}
- ok((await presentation.presentationState(7)).mode==='custom','Admin website homepage selects published custom design')
+ ok((await presentation.presentationState(7)).mode==='template','Legacy free-design setting uses built-in template')
  custom=null
  ok((await presentation.presentationState(7)).mode==='template','Unpublished custom design falls back safely')
  profile.siteConfig=null
@@ -139,7 +138,7 @@ async function run(){
  const {blankDocument,makeNode}=load('lib/website/document')
  custom=blankDocument('Test')
  profile.siteConfig={homepage:{type:'website'}}
- ok(!(await admin.getSiteProfileAdminById(7)).communityAvailable,'Free design without posts hides community control')
+ ok((await admin.getSiteProfileAdminById(7)).communityAvailable,'Legacy free design uses built-in community board')
  const container=makeNode('container');container.children=[makeNode('posts')];custom.pages[0].nodes=[container]
  ok((await admin.getSiteProfileAdminById(7)).communityAvailable,'Nested published posts block enables community control')
  custom=null

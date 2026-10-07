@@ -14,13 +14,6 @@ const nextConfig: NextConfig = {
   // Tối ưu serverless deploy
   output: "standalone",
 
-  // Bộ biên dịch HTML chạy trên Node; không đóng gói plugin Tailwind bằng webpack.
-  serverExternalPackages: ["tailwindcss-importer"],
-  // Tailwind đọc CSS nền từ ổ đĩa lúc nhập HTML trên máy chủ.
-  outputFileTracingIncludes: {
-    "/api/admin/course-page-templates/analyze": ["./node_modules/tailwindcss-importer/lib/css/*.css"],
-  },
-
   // Strict mode giúp phát hiện bug React
   reactStrictMode: true,
 

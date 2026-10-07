@@ -46,21 +46,14 @@ jobs:
 
       - name: Website and custom domain isolation tests
         run: |
-          npm run test:website-builder
+          npm run test:website-templates
           npm run test:custom-domains
-          node scripts/test-free-design-disabled.cjs
 
       - name: TypeScript check
         run: npx tsc --noEmit
 
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs
-
-      - name: HTML template import regression checks
-        run: node scripts/test-html-template-import.cjs
-
-      - name: Template save regression checks
-        run: node scripts/test-template-save.cjs
 
       - name: Lint security-critical files
         run: >-

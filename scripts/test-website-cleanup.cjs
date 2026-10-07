@@ -62,13 +62,6 @@ async function run(){
  profile.siteConfig.modules.community=true
  ok((await server.websiteData(profile,{strict:true,courses:false})).posts.length===1,'Enabled community still loads domain posts')
  ok((await server.websiteData(profile,{courses:false})).posts.length===1,'Enabled community still loads platform posts')
- const {blankDocument,makeNode}=load('lib/website/document'),doc=blankDocument('Test')
- const post=makeNode('posts');post.text='Hidden board';doc.pages[0].nodes=[post,makeNode('button')]
- const View=load('components/website/WebsiteView').default
- const data={courses:[],testimonials:[],posts:[{id:'post',title:'Should not leak',content:'Should not leak'}],community:false}
- const html=renderToStaticMarkup(React.createElement(View,{document:doc,data,slug:'owner',customDomain:true}))
- ok(!html.includes('Should not leak') && !html.includes('Hidden board'),'Hidden post block cannot render even with stale post data')
- ok(html.includes(palette.primary),'Website content uses the same primary as its shell')
  const Editor=load('components/admin/SiteRuntimeConfigEditor').default
  let mounted=createRoot(document.getElementById('root'))
  const configured={...profile,slug:'owner',communityAvailable:false,themeId:'brand',siteConfig:{...profile.siteConfig,homepage:{type:'landing',landingSlug:'existing-sales'},branding:{name:'Owner',custom:'keep'},courseScope:{mode:'teacher',teacherIds:[42]},modules:{community:false,tools:false,surveys:false,roadmap:true}},domains:[{hostname:'owner.example',isPrimary:true,isActive:true}]}

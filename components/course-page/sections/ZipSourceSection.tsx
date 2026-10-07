@@ -153,7 +153,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
   if (!sourceUrl) {
     return (
       <section id={id} className="mx-auto max-w-3xl p-8 text-center text-sm text-red-600">
-        Không tìm thấy nguồn HTML của mẫu.
+        Không tìm thấy nguồn HTML của mẫu ZIP.
       </section>
     )
   }
@@ -162,7 +162,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
     <iframe
       ref={frameRef}
       id={id}
-      title={content?.exactSource?.entryPath || 'Mẫu HTML nguyên trang'}
+      title={content?.exactSource?.entryPath || 'ZIP website template'}
       src={zipFrameSource(sourceUrl, process.env.NEXT_PUBLIC_SUPABASE_URL || '')}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
