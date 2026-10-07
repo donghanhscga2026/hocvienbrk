@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/api-auth'
 import { saveUploadedFile } from '@/lib/image-utils'
+import sharp from 'sharp'
 
 // Chỉ nhận ảnh, và tự chọn phần mở rộng theo MIME đã kiểm tra
 // (không tin tên file client gửi lên) để tránh upload .svg/.html chứa script.
@@ -44,15 +45,29 @@ export async function POST(request: NextRequest) {
         }
 
         const bytes = await file.arrayBuffer()
-        const buffer = Buffer.from(bytes)
+        const inputBuffer = Buffer.from(bytes)
+
+        // Course artwork is public and requested frequently. Normalize raster uploads
+        // to a bounded WebP so repeated CDN hits consume far less Storage egress.
+        // Animated GIFs are preserved to avoid silently removing animation.
+        const shouldOptimize = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+        const buffer = shouldOptimize
+            ? await sharp(inputBuffer)
+                .rotate()
+                .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+                .webp({ quality: 80 })
+                .toBuffer()
+            : inputBuffer
 
         const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`
-        const filename = `course-${uniqueSuffix}.${ext}`
+        const outputExt = shouldOptimize ? 'webp' : ext
+        const outputType = shouldOptimize ? 'image/webp' : file.type
+        const filename = `course-${uniqueSuffix}.${outputExt}`
 
         // [FIX] Trước đây ghi thẳng vào ổ đĩa server — không hoạt động trên
         // Vercel (filesystem chỉ đọc lúc runtime). Đẩy lên Supabase Storage,
         // chỉ dự phòng ghi ổ đĩa khi chạy local.
-        const url = await saveUploadedFile(buffer, filename, 'courses', file.type)
+        const url = await saveUploadedFile(buffer, filename, 'courses', outputType)
 
         return NextResponse.json({ url, filename })
     } catch (error: any) {
