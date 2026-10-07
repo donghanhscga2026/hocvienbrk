@@ -25,7 +25,7 @@ export async function saveUploadedFile(
             .from('uploads')
             .upload(`${subDir}/${filename}`, buffer, {
                 contentType,
-                cacheControl: '3600',
+                cacheControl: '31536000',
                 upsert: true
             });
 
@@ -84,7 +84,7 @@ export async function saveBase64Image(base64Data: string, subDir: string = 'avat
                 .from('uploads')
                 .upload(`${subDir}/${fileName}`, buffer, {
                     contentType: `image/${extension}`,
-                    cacheControl: '3600',
+                    cacheControl: '31536000',
                     upsert: true
                 });
 
