@@ -55,6 +55,9 @@ jobs:
       - name: ZIP template source regression checks
         run: node scripts/test-zip-template-source.cjs
 
+      - name: HTML template import regression checks
+        run: node scripts/test-html-template-import.cjs
+
       - name: Lint security-critical files
         run: >-
           npx eslint auth.ts auth.config.ts proxy.ts app/login/page.tsx

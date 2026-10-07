@@ -4,11 +4,26 @@ import { requireAdmin } from '@/lib/api-auth'
 import { analyzeWebsiteHtml } from '@/lib/course-page/importer/html-analyzer'
 import { fetchRemoteHtml } from '@/lib/course-page/importer/fetch-html'
 import { mirrorAnalysisImages } from '@/lib/course-page/importer/image-mirror'
+import { prepareStandaloneHtml } from '@/lib/course-page/importer/prepare-html'
 import { saveUploadedFile } from '@/lib/image-utils'
 
 const MAX_HTML_BYTES = 8 * 1024 * 1024
 
 export const runtime = 'nodejs'
+
+// HTML mặc định dùng cùng sandbox và cầu nối đăng ký như ZIP.
+async function analyzeStandalone(html: string, sourceUrl?: string, filename = 'website.html') {
+  const prepared = await prepareStandaloneHtml(html, sourceUrl)
+  const analysis = analyzeWebsiteHtml({ html: prepared.analysisHtml, sourceType: 'html', sourceUrl })
+  const safeName = filename.replace(/\.html?$/i, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 60) || 'website'
+  const url = await saveUploadedFile(Buffer.from(prepared.html, 'utf8'),
+    `${safeName}-${Date.now().toString(36)}.html`, 'course-template-sources', 'text/html; charset=utf-8')
+  analysis.exactSource = { url, entryPath: filename }
+  analysis.warnings = [...new Set([...analysis.warnings, ...prepared.warnings,
+    'HTML giữ nguyên trang: bố cục không bị chia khung; form nguồn được thay bằng đăng ký khóa học MFC.',
+  ])]
+  return analysis
+}
 
 export async function POST(request: NextRequest) {
   const denied = await requireAdmin()
@@ -21,7 +36,7 @@ export async function POST(request: NextRequest) {
       const compressed = Buffer.from(await request.arrayBuffer())
       let htmlBuffer: Buffer
       try {
-        htmlBuffer = gunzipSync(compressed)
+        htmlBuffer = gunzipSync(compressed, { maxOutputLength: MAX_HTML_BYTES })
       } catch {
         return NextResponse.json({ error: 'File HTML nén không hợp lệ' }, { status: 400 })
       }
@@ -49,6 +64,12 @@ export async function POST(request: NextRequest) {
       const zipFileCount = Number(request.headers.get('x-zip-file-count') || 0) || undefined
       const zipInlinedAssetCount = Number(request.headers.get('x-zip-inlined-count') || 0) || undefined
 
+      if (requestedSourceType === 'html') {
+        const headerName = request.headers.get('x-html-filename') || 'website.html'
+        let filename = 'website.html'
+        try { filename = decodeURIComponent(headerName) } catch {}
+        return NextResponse.json({ success: true, analysis: await analyzeStandalone(html, sourceUrl, filename) })
+      }
       const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: requestedSourceType, sourceUrl })
       const analysis = await mirrorAnalysisImages(rawAnalysis, {
         dataOnly: true,
@@ -102,11 +123,7 @@ export async function POST(request: NextRequest) {
       }
 
       const html = await file.text()
-      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html', sourceUrl })
-      const analysis = await mirrorAnalysisImages(rawAnalysis, {
-        dataOnly: true,
-        failOnEmbeddedData: true,
-      })
+      const analysis = await analyzeStandalone(html, sourceUrl, file.name)
       return NextResponse.json({ success: true, analysis })
     }
 
@@ -133,11 +150,7 @@ export async function POST(request: NextRequest) {
       if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
         return NextResponse.json({ error: 'Nội dung HTML vượt quá giới hạn 8MB' }, { status: 400 })
       }
-      const rawAnalysis = analyzeWebsiteHtml({ html, sourceType: 'html' })
-      const analysis = await mirrorAnalysisImages(rawAnalysis, {
-        dataOnly: true,
-        failOnEmbeddedData: true,
-      })
+      const analysis = await analyzeStandalone(html)
       return NextResponse.json({ success: true, analysis })
     }
 
