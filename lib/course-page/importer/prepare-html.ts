@@ -3,6 +3,7 @@ import { parse, parseFragment, serialize } from 'parse5'
 import postcss from 'postcss'
 import tailwind from 'tailwindcss-importer'
 import { BRIDGE } from './zip-browser'
+import { allowedSourceScript } from './script-policy'
 
 const MAX_BYTES = 8 * 1024 * 1024
 
@@ -43,6 +44,22 @@ export function readTailwindConfig(scripts: string[]): Record<string, any> {
   return config
 }
 
+// Bỏ riêng cấu hình Tailwind đã biên dịch, giữ các hàm tương tác cùng nằm trong script.
+function withoutTailwindConfig(source: string) {
+  if (!/tailwind\s*\.\s*config\s*=/.test(source)) return source
+  const tree = parseScript(source, { ecmaVersion: 'latest' }) as any
+  let output = source
+  for (const statement of [...tree.body].reverse()) {
+    const assignment = statement.expression
+    const left = assignment?.left
+    if (statement.type === 'ExpressionStatement' && assignment?.type === 'AssignmentExpression' &&
+        left?.type === 'MemberExpression' && !left.computed && left.object.name === 'tailwind' && left.property.name === 'config') {
+      output = output.slice(0, statement.start) + output.slice(statement.end)
+    }
+  }
+  return output
+}
+
 // parse5 xử lý HTML bằng parser thật, kể cả thuộc tính không có dấu nháy.
 export async function prepareStandaloneHtml(html: string, sourceUrl?: string) {
   if (Buffer.byteLength(html, 'utf8') > MAX_BYTES) throw new Error('File HTML vượt quá giới hạn 8MB.')
@@ -64,7 +81,7 @@ export async function prepareStandaloneHtml(html: string, sourceUrl?: string) {
     const parent = node.parentNode
     if (parent?.childNodes) parent.childNodes = parent.childNodes.filter((child: any) => child !== node)
   }
-  const text = (node: any) => (node.childNodes || []).map((child: any) => child.value || '').join('')
+  const text = (node: any): string => (node.childNodes || []).map((child: any) => child.value || text(child)).join('')
   const scripts = elements.filter(node => node.tagName === 'script')
   const sources = scripts.map(node => get(node, 'src'))
   if (sources.some(src => /@tailwindcss\/browser/.test(src))) throw new Error('Tailwind v4 qua browser CDN chưa được hỗ trợ. Hãy xuất CSS có sẵn trước khi nhập.')
@@ -113,14 +130,36 @@ export async function prepareStandaloneHtml(html: string, sourceUrl?: string) {
   const keys = new Set<string>()
   let blockNumber = 0
   let removedScripts = 0
+  let retainedScripts = 0
+  let hasOriginalMenu = false
   for (const node of elements) {
-    if (node.tagName === 'script') { remove(node); removedScripts++; continue }
+    if (node.tagName === 'script') {
+      const src = get(node, 'src')
+      // Cầu nối do hệ thống thêm được tạo lại một lần, trước mọi script nguồn.
+      if (node.attrs.some((attr: any) => ['data-mfc-zip-bridge', 'data-mfc-html-menu'].includes(attr.name)) || /cdn\.tailwindcss\.com/.test(src)) { remove(node); continue }
+      if (src) {
+        const resolved = resolve(src, true)
+        if (!allowedSourceScript(resolved)) { remove(node); removedScripts++; continue }
+        set(node, 'src', resolved)
+        set(node, 'crossorigin', 'anonymous')
+        set(node, 'referrerpolicy', 'no-referrer')
+      } else {
+        const source = withoutTailwindConfig(text(node))
+        if (!source.trim()) { remove(node); continue }
+        node.childNodes = [{ nodeName: '#text', value: source, parentNode: node }]
+        if (/mobile-menu/.test(source)) hasOriginalMenu = true
+      }
+      retainedScripts++
+      continue
+    }
     if (['iframe', 'object', 'embed', 'base'].includes(node.tagName) || (node.tagName === 'meta' && get(node, 'http-equiv'))) {
       remove(node)
       warnings.push('Thành phần nhúng hoặc chuyển hướng của trang nguồn đã bị loại; hãy kiểm tra bản xem trước.')
       continue
     }
-    node.attrs = node.attrs.filter((item: any) => !/^on/i.test(item.name) && !['srcdoc', 'action', 'formaction', 'data-mfc-block'].includes(item.name))
+    node.attrs = node.attrs.filter((item: any) => !['onsubmit', 'srcdoc', 'action', 'formaction', 'data-mfc-block'].includes(item.name))
+    // Đăng ký luôn đi qua cầu nối của nền tảng, không mở form/checkout tự viết.
+    if (['button', 'a'].includes(node.tagName) && /đăng\s*ký|register|enroll/i.test(text(node))) set(node, 'data-mfc-action', 'register')
     if (structural.has(node.tagName)) {
       let parent = node.parentNode
       while (parent && !structural.has(parent.tagName)) parent = parent.parentNode
@@ -156,9 +195,11 @@ export async function prepareStandaloneHtml(html: string, sourceUrl?: string) {
     }
   }
   if (missing.size) throw new Error(`Thiếu tài nguyên HTML: ${[...missing].slice(0, 5).join(', ')}. Hãy gửi ZIP kèm tài nguyên hoặc nhập URL nguồn HTTPS.`)
-  if (removedScripts) warnings.push('Script nguồn và xử lý form nguồn đã bị loại. Hiệu ứng CSS được giữ; nút đăng ký dùng quy trình khóa học MFC. Hãy kiểm tra các tương tác khác trước khi lưu.')
+  if (removedScripts) warnings.push('Một số script ngoài danh sách CDN hỗ trợ đã bị loại; hãy đóng gói thư viện trong ZIP nếu tương tác phụ thuộc chúng.')
+  if (retainedScripts) warnings.push('Script tương tác được giữ trong khung cách ly; không truy cập tài khoản, dữ liệu hệ thống hoặc gửi yêu cầu API. Hãy thử tab, menu và hiệu ứng trước khi lưu.')
+  warnings.push('Form nguồn không gửi dữ liệu; nút đăng ký dùng quy trình khóa học MFC.')
   const menuButton = elements.find(node => get(node, 'id') === 'mobile-menu-btn')
-  if (menuButton && elements.some(node => get(node, 'id') === 'mobile-menu')) {
+  if (menuButton && !get(menuButton, 'onclick') && !hasOriginalMenu && elements.some(node => get(node, 'id') === 'mobile-menu')) {
     set(menuButton, 'data-mfc-menu', 'mobile-menu')
     set(menuButton, 'aria-controls', 'mobile-menu')
     set(menuButton, 'aria-expanded', 'false')
@@ -168,13 +209,14 @@ export async function prepareStandaloneHtml(html: string, sourceUrl?: string) {
   const cssFragment = parseFragment(`<style data-mfc-compiled-tailwind>${rewriteCss(compiledCss).replace(/<\/style/gi, '<\\/style')}</style>`)
   for (const child of cssFragment.childNodes) (child as any).parentNode = head
   head.childNodes.unshift(...cssFragment.childNodes)
+  set(elements.find(node => node.tagName === 'body'), 'data-mfc-source-interactions', 'true')
   const analysisHtml = serialize(doc)
   const bridgeFragment = parseFragment(BRIDGE + `<script data-mfc-html-menu>
 addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data||{};if(d.source==='mfc-zip-parent'&&d.type==='viewport'&&Number.isFinite(d.height)&&d.height>0&&d.height<10000){document.documentElement.style.setProperty('--mfc-viewport-height',d.height+'px');}});
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-mfc-menu]');if(!b)return;var m=document.getElementById(b.getAttribute('data-mfc-menu'));if(m){m.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!m.classList.contains('hidden')));}});
 </script>`)
   for (const child of bridgeFragment.childNodes) (child as any).parentNode = head
-  head.childNodes.push(...bridgeFragment.childNodes)
+  head.childNodes.unshift(...bridgeFragment.childNodes)
   const preparedHtml = '<!doctype html>\n' + serialize(doc)
   if (Buffer.byteLength(preparedHtml, 'utf8') > MAX_BYTES) throw new Error('HTML sau đóng gói CSS vượt quá giới hạn 8MB.')
   return { html: preparedHtml, analysisHtml, warnings: [...new Set(warnings)] }

@@ -40,7 +40,7 @@ const fixture = `<!doctype html><html lang="vi"><head>
 <body class="font-sans"><main class="max-w-7xl mx-auto"><nav id="menu"><button id="mobile-menu-btn">Menu</button><div id="mobile-menu" class="hidden">Nội dung menu</div></nav>
 <section id="hero" class="min-h-[90vh]"><h1 class="gs_reveal opacity-0 text-brand-gold">Khóa học</h1><div class="grid grid-cols-1 md:grid-cols-3"><p>Thông tin</p></div><a id="register" href="#dang-ky">Đăng ký</a></section>
 <section id="dang-ky"><h2>Đăng ký</h2><form onsubmit=submitForm(event)><input name="name"><button>Gửi</button></form></section>
-</main><footer>Footer</footer><script src="https://cdn.invalid/gsap.js"></script><script>throw new Error('untrusted')</script></body></html>`
+</main><footer>Footer</footer><script src="https://cdn.invalid/gsap.js"></script><script>window.sourceInteractionReady = true</script></body></html>`
 
 async function run() {
   const { prepareStandaloneHtml, readTailwindConfig } = load('lib/course-page/importer/prepare-html.ts')
@@ -57,7 +57,7 @@ async function run() {
   assert.ok(css.includes('min-height: calc(var(--mfc-viewport-height, 100vh) * 0.9)'), 'Avoid full-page iframe viewport feedback')
   assert.ok(doc.querySelector('link[rel="stylesheet"]').href.includes('fonts.googleapis.com'))
   assert.ok(!doc.querySelector('h1').classList.contains('opacity-0'), 'Reveal content remains readable')
-  assert.ok(prepared.warnings.some(w => w.includes('Script nguồn')))
+  assert.ok(prepared.warnings.some(w => w.includes('Script tương tác')))
   for (const script of doc.querySelectorAll('script')) dom.window.eval(script.textContent)
   const events = []
   dom.window.parent.postMessage = payload => events.push(payload)
@@ -75,6 +75,38 @@ async function run() {
     source: 'mfc-zip-parent', type: 'viewport', height: 844,
   } }))
   assert.equal(doc.documentElement.style.getPropertyValue('--mfc-viewport-height'), '844px')
+  const interactive = await prepareStandaloneHtml(`<!doctype html><html><head>
+<script src="https://cdn.tailwindcss.com"></script><script>tailwind.config={theme:{extend:{}}}; function selectTab(event){event.preventDefault();document.getElementById('details').hidden=false;document.getElementById('summary').hidden=true;}</script>
+</head><body><section id="content"><button id="tab-button" onclick="selectTab(event)">Thông tin</button><a id="tab-link" href="#details" onclick="selectTab(event)">Tab</a><a id="listener-tab" href="#details">Tab listener</a><div id="summary">Summary</div><div id="details" hidden>Details</div><button id="register-button" onclick="window.sourceCheckout=true"><span>Đăng ký</span></button></section><a id="scroll-link" href="#footer">Footer</a><footer id="footer">End</footer>
+<button id="mobile-menu-btn">Menu</button><div id="mobile-menu" class="hidden"></div>
+<script>document.getElementById('listener-tab').addEventListener('click',selectTab);document.getElementById('mobile-menu-btn').addEventListener('click',function(){document.getElementById('mobile-menu').classList.toggle('hidden');}); document.getElementById('content').style.transform='translateY(10px)';</script>
+</body></html>`)
+  const live = new JSDOM(interactive.html, {runScripts:'dangerously',url:'https://frame.invalid/api/course-template-source'})
+  const liveDoc=live.window.document, liveEvents=[]
+  live.window.postMessage=event=>liveEvents.push(event)
+  liveDoc.getElementById('tab-button').click()
+  assert.equal(liveDoc.getElementById('details').hidden,false, 'Inline tab handler survives import')
+  liveDoc.getElementById('details').hidden=true
+  liveDoc.getElementById('tab-link').click()
+  assert.equal(liveDoc.getElementById('details').hidden,false, 'Anchor tab is not swallowed by bridge')
+  liveDoc.getElementById('details').hidden=true
+  liveDoc.getElementById('listener-tab').click()
+  assert.equal(liveDoc.getElementById('details').hidden,false, 'Script event listener still switches tabs')
+  assert.ok(!liveEvents.some(event=>event.type==='scroll'), 'Tab handlers run before scroll fallback')
+  liveDoc.getElementById('scroll-link').click()
+  assert.ok(liveEvents.some(event=>event.type==='scroll'), 'Ordinary anchor still scrolls the parent page')
+  liveDoc.getElementById('register-button').click()
+  assert.ok(liveEvents.some(event=>event.actionType==='open_registration'))
+  assert.equal(live.window.sourceCheckout,undefined, 'Registration overrides source checkout')
+  liveDoc.getElementById('mobile-menu-btn').click()
+  assert.equal(liveDoc.getElementById('mobile-menu').classList.contains('hidden'),false, 'Original menu toggles once')
+  assert.equal(liveDoc.getElementById('content').style.transform,'translateY(10px)', 'Original animation setup executes')
+  assert.ok(!interactive.html.includes('tailwind.config='), 'Compiled config removed without losing sibling functions')
+  live.window.close()
+  const cdn = await prepareStandaloneHtml('<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script><script src="https://attacker.invalid/a.js"></script>')
+  assert.ok(cdn.html.includes('https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js'))
+  assert.ok(!cdn.html.includes('https://attacker.invalid/a.js'))
+  await assert.rejects(prepareStandaloneHtml('<script src="app.js"></script>'),/Thiếu tài nguyên/)
   await assert.rejects(prepareStandaloneHtml('<img src="images/missing.jpg">'), /Thiếu tài nguyên/)
   await assert.rejects(prepareStandaloneHtml('<style>.a{background:url(images/missing.jpg)}</style>'), /Thiếu tài nguyên/)
   await assert.rejects(prepareStandaloneHtml('<link rel="stylesheet" href="styles.css">'), /Thiếu tài nguyên/)
@@ -151,6 +183,6 @@ async function run() {
     if (process.argv[3]) fs.writeFileSync(process.argv[3], actual.html)
     console.log('The Top 1: original content, images, sections and brand CSS passed.')
   }
-  console.log('HTML import: CSS compilation, layout, checkout bridge, mobile menu, missing assets, config safety, snapshots and API transports passed.')
+  console.log('HTML import: original script tabs, menu, animation setup, CDN policy, registration bridge, CSS, assets, API boundaries and snapshots passed.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

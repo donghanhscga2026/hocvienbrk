@@ -1,3 +1,5 @@
+import { allowedSourceScript } from '@/lib/course-page/importer/script-policy'
+
 export type PreparedZipWebsite = {
   html: string
   analysisHtml: string
@@ -219,6 +221,7 @@ export const BRIDGE = `
         el.setAttribute('href',page.origin+target);
       }else{
         el.removeAttribute('data-mfc-course-link');
+        if(document.body && document.body.hasAttribute('data-mfc-source-interactions'))return;
         el.setAttribute('href',page.origin+page.pathname+'#'+anchor);
       }
     });
@@ -266,6 +269,10 @@ export const BRIDGE = `
       e.preventDefault();e.stopImmediatePropagation();
       post({type:'action',actionType:'course_link',target:courseLink});return;
     }
+    // Tab của HTML có script tự xử lý; chỉ cầu nối đăng ký được ưu tiên chặn.
+    var localHref=el.getAttribute('href')||'';
+    var anchor=el.getAttribute('data-mfc-anchor')||(localHref.charAt(0)==='#'?localHref.slice(1):'');
+    if(document.body && document.body.hasAttribute('data-mfc-source-interactions') && anchor && !isRegistrationAnchor(anchor))return;
     var sourceAnchor=el.getAttribute('data-mfc-anchor');
     if(sourceAnchor){
       e.preventDefault();e.stopImmediatePropagation();navigateAnchor(sourceAnchor,true);return;
@@ -297,6 +304,15 @@ export const BRIDGE = `
       }
     }catch(err){}
   }, true);
+  // Đợi handler của tab chạy trước; liên kết chưa được xử lý mới cuộn trang cha.
+  addEventListener('click',function(e){
+    if(e.defaultPrevented || !document.body || !document.body.hasAttribute('data-mfc-source-interactions'))return;
+    var el=e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if(!el)return;
+    var href=el.getAttribute('href')||'';
+    var anchor=el.getAttribute('data-mfc-anchor')||(href.charAt(0)==='#'?href.slice(1):'');
+    if(anchor && !isRegistrationAnchor(anchor)){e.preventDefault();navigateAnchor(anchor,true);}
+  });
   addEventListener('load',function(){applyConfig();setTimeout(applyConfig,100);setTimeout(applyConfig,800);});
   addEventListener('resize',sendHeight);
   if(window.ResizeObserver){ try { new ResizeObserver(sendHeight).observe(document.documentElement); } catch(e){} }
@@ -401,6 +417,7 @@ export async function prepareWebsiteZip(file: File, options: { preserveTailwindF
 
   for (const script of Array.from(doc.querySelectorAll<HTMLScriptElement>('script[src]'))) {
     const src = script.getAttribute('src') || ''
+    if (options.preserveTailwindForCompilation && allowedSourceScript(src)) continue
     if (options.preserveTailwindForCompilation && /^https:\/\/(?:cdn\.tailwindcss\.com(?:[/?]|$)|cdn\.jsdelivr\.net\/npm\/@tailwindcss\/browser)/i.test(src)) continue
     const resolved = resolveZipPath(main.name, src)
     const entry = resolved ? zip.entries.get(resolved) : null

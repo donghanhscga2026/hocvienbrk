@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { resolveZipStorageSource } from '@/lib/course-page/importer/source-url'
 import { upgradeZipBridge } from '@/lib/course-page/importer/zip-browser'
 
+import { SOURCE_SCRIPT_CSP } from '@/lib/course-page/importer/script-policy'
+
 export const runtime = 'nodejs'
 const MAX_HTML_BYTES = 8 * 1024 * 1024
 
 // Keep uploaded scripts isolated even when this URL is opened outside an iframe.
-const SOURCE_CSP = "sandbox allow-scripts; default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline' https:; font-src data: https:; script-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+const SOURCE_CSP = `sandbox allow-scripts; default-src 'none'; img-src data: blob: https:; style-src 'unsafe-inline' https:; font-src data: https:; script-src ${SOURCE_SCRIPT_CSP}; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`
 
 export async function GET(request: NextRequest) {
   const source = resolveZipStorageSource(
