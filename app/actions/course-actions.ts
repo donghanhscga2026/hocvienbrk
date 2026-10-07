@@ -887,7 +887,7 @@ export async function createCourseAction(formData: FormData) {
             date_join: formData.get('date_join') as string || null,
             mo_ta_ngan: formData.get('mo_ta_ngan') as string || null,
             mo_ta_dai: formData.get('mo_ta_dai') as string || null,
-            link_anh_bia: await resolveImageUrl(formData.get('link_anh_bia') as string || null, 'courses'),
+            link_anh_bia: await resolveImageUrl(formData.get('link_anh_bia') as string || null, 'courses', { mirrorExternal: false }),
             phi_coc: parseInt(formData.get('phi_coc') as string) || 0,
             feeType: (formData.get('feeType') as string) || 'MIEN_PHI',
             requiresReferralActivation: formData.get('requiresReferralActivation') === 'true',
