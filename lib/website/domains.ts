@@ -41,7 +41,7 @@ export const activeDomain=cache(async(rawHost:string)=>{
   const snapshot=await domainSnapshot(hostname)
   const domain=snapshot ? snapshot.domain : await findDomain(hostname)
   if(!domain?.enabled || !domain.verifiedAt || !domain.profile.isActive)return null
-  const row=snapshot ? (snapshot.access==null ? null : {value:snapshot.access}) : await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
+  const row=snapshot ? snapshot.access : await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
   // Gói quyền đã lưu là nguồn duy nhất quyết định kết nối sau khi được cấu hình.
   if(!row)return {...domain,applications:noApplications}
   const access=accessSchema.parse(row.value)

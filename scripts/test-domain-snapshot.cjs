@@ -60,6 +60,8 @@ async function run(){
   await db.query('UPDATE "SystemConfig" SET value=$1 WHERE key=$2',[JSON.stringify(access),'website-access:7'])
   domain=await activeDomain('brk.io.vn')
   ok(domain.courses && domain.applications.teaching,'Later requests observe changed modules and applications')
+  await db.query('UPDATE "SystemConfig" SET value=$1 WHERE key=$2',['null','website-access:7'])
+  await assert.rejects(()=>activeDomain('brk.io.vn'));checks++
   access.enabled={...noModules};access.applications.enabled={...noApplications}
   await db.query('UPDATE "SystemConfig" SET value=$1 WHERE key=$2',[JSON.stringify(access),'website-access:7'])
   domain=await activeDomain('brk.io.vn')
