@@ -73,6 +73,7 @@ async function run(){
  const before=fullReads;await server.readPublicPageTemplate(7);await server.readPublicPageTemplate(7)
  assert.equal(fullReads,before+2,'Oversized imports bypass the 2MB Next cache limit')
  await save(7,{...template,revision:5,active:'yes'});assert.equal(await server.readPublicPageTemplate(7),null)
+  for(const malformed of [null,'invalid scalar',42,[]]){await save(7,malformed);assert.equal(await server.readPublicPageTemplate(7),null,'Malformed archived JSON must fall back to the built-in page')}
  await frameChecks()
  await sql.close()
  console.log('Template assets: PostgreSQL metadata, revision caching, permission freshness, oversized fallback, fonts/images, script preservation, CORS, invalid/private assets and single-transfer iframe passed; no live writes.')

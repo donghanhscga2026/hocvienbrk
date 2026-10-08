@@ -18,7 +18,8 @@ const sourceForRevision=unstable_cache(async(id:number,revision:number)=>{
 export const readPublicPageTemplate=cache(async(id:number):Promise<PageTemplate|null>=>{
   if(!Number.isSafeInteger(id) || id<1)return null
   const rows=await prisma.$queryRaw<Row[]>`
-    SELECT c.value - 'source' AS metadata, octet_length(c.value->>'source') AS "sourceBytes"
+    SELECT CASE WHEN jsonb_typeof(c.value)='object' THEN c.value - 'source' ELSE NULL END AS metadata,
+      octet_length(c.value->>'source') AS "sourceBytes"
     FROM public."SystemConfig" c
     JOIN public."SiteProfile" p ON p.id=${id}::integer AND p."isActive"=true
     WHERE c.key=${pageTemplateKey(id)}
