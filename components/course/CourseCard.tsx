@@ -244,8 +244,12 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
 
                     {/* Tên công khai của giảng viên, lấy từ khóa học trên hệ thống. */}
                     {course.teacher?.name?.trim() && (
-                        <p className="mb-3 text-sm leading-relaxed break-words text-brk-muted" data-course-teacher>
-                            Giảng viên: {course.teacher.name.trim()}
+                        <p className="mb-3 flex w-fit max-w-full items-center gap-2 rounded-xl border border-brk-primary/20 bg-brk-primary/10 px-3 py-2 text-sm leading-relaxed" data-course-teacher>
+                            <Users className="h-4 w-4 shrink-0 text-brk-primary" aria-hidden="true" />
+                            <span className="min-w-0 break-words">
+                                <span className="text-brk-muted">Giảng viên: </span>
+                                <span className="font-semibold text-brk-on-surface">{course.teacher.name.trim()}</span>
+                            </span>
                         </p>
                     )}
 
