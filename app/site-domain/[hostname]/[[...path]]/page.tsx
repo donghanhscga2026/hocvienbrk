@@ -1,3 +1,4 @@
+import ImportedPage from '@/components/website/ImportedPage'
 import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import {LandingPageClient} from '@/components/landing/LandingPageClient'
 import { CrmError } from '@/lib/crm/service'
@@ -50,6 +51,10 @@ export default async function DomainPage(props:Props) {
     const data=domain.courses ? await websiteData(domain.profile,{strict:true}) : {courses:[]}
     const enrollments=await prisma.enrollment.findMany({where:{userId:Number(session.user.id),courseId:{in:data.courses.map(c=>c.id)}},select:{status:true,course:{select:{id_khoa:true,name_lop:true}}}})
     return <section className="max-w-3xl mx-auto p-6 grid gap-4"><h1 className="text-2xl font-bold">Xin chào {session.user.name}</h1><h2 className="font-bold">Khóa học của bạn tại {document.name}</h2>{enrollments.map(e=><a className="border rounded-xl p-4" key={e.course.id_khoa} href={(e.status==='ACTIVE' ? '/courses/'+encodeURIComponent(e.course.id_khoa)+'/learn' : '/khoa-hoc/'+encodeURIComponent(e.course.id_khoa))}>{e.course.name_lop} · {e.status}</a>)}{!enrollments.length && <p>Bạn chưa có khóa học tại website này.</p>}</section>
+  }
+  if(!path.length) {
+    const imported=await ImportedPage({profile:domain.profile,coursesEnabled:domain.courses})
+    if(imported)return imported
   }
   if(!path.length && getSiteRuntimeConfig(domain.profile).homepage.type==='landing'){
     const homepage=getSiteRuntimeConfig(domain.profile).homepage
