@@ -110,6 +110,7 @@ export default function WebsiteManager() {
               <article className="space-y-3 rounded-xl border p-4"><h3 className="font-semibold">Mẫu có sẵn</h3><a href="/tools/my-site/edit" className="block text-sm text-violet-700 underline">Chỉnh sửa mẫu</a><button className={button} disabled={busy || !imported?.active && !landing && presentation.mode==='template'} onClick={()=>void chooseMode('template')}>{!imported?.active && !landing && presentation.mode==='template'?'Đang sử dụng':'Dùng mẫu có sẵn'}</button></article>
             </div></details>
             <a className={button} href="/tools/my-site/template">Nhập HTML / ZIP và chèn danh sách khóa học →</a>
+            <a className={button} href="/tools/my-site/forms">Form của tôi · nhận đăng ký vào CRM →</a>
             <p className="text-sm text-slate-500">Chỉnh màu, ảnh bìa và nội dung trong mẫu có sẵn. Chọn nguồn khóa học tại Dữ liệu & giáo viên.</p>
           </>}
         </div>}

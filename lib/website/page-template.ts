@@ -1,5 +1,6 @@
 import {parse, parseFragment, serialize, type DefaultTreeAdapterMap} from 'parse5'
 import {z} from 'zod'
+import {formBindingsSchema} from '@/lib/crm/form-shared'
 
 export const PAGE_HTML_LIMIT = 8 * 1024 * 1024
 export const PAGE_COMPRESSED_LIMIT = 2500 * 1024
@@ -8,6 +9,7 @@ export const pageTemplateSchema = z.object({
   revision:z.number().int().nonnegative(), active:z.boolean(), name:z.string().min(1).max(160),
   region:z.string().regex(/^(?:__append__|[A-Za-z][\w:.-]{0,159})$/),
   source:z.string().max(Math.ceil(PAGE_COMPRESSED_LIMIT / 3) * 4 + 4),
+  forms:formBindingsSchema.optional(),
 }).strict()
 export type PageTemplate = z.infer<typeof pageTemplateSchema>
 export type PageCourse = {id:number;title:string;description:string;image:string;href:string;price?:number;feeType?:string}
@@ -46,6 +48,8 @@ export function coursePrice(course:PageCourse) {
 export function renderPageTemplate(html:string,region:string|null,courses:PageCourse[]) {
   if(new TextEncoder().encode(html).length>PAGE_HTML_LIMIT)throw new Error('Template sau giải nén vượt 8MB.')
   const doc=parse(html),nodes=walk(doc),body=nodes.find(n=>n.tagName==='body')!,head=nodes.find(n=>n.tagName==='head')!
+  // Preserve original form indices even when replacing course cards removes another form.
+  nodes.filter(n=>n.tagName==='form').forEach((n,index)=>set(n,'data-system-template-form-index',String(index)))
   const matches=nodes.filter(n=>attr(n,'id')===region)
   if(region!==null && region!=='__append__' && (matches.length!==1 || !['div','section','main','ul','ol','article'].includes(matches[0].tagName)))throw new Error('Chọn một vùng danh sách duy nhất trong template.')
   let slot=region===null?body:matches[0]

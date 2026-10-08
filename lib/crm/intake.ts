@@ -36,7 +36,7 @@ export async function captureLead(db: PrismaClient, raw: unknown, address: strin
     ])
     if (local >= 10 || global >= 1000) throw new CrmError('Có quá nhiều yêu cầu. Vui lòng thử lại sau.', 429)
     if (await tx.crmSubmission.findUnique({ where: { key } })) return
-    const found = await tx.crmContact.findMany({ where: { OR: [
+    const found = await tx.crmContact.findMany({ where: { ownerId: null, OR: [
       ...(data.email ? [{ email: { equals: data.email, mode: 'insensitive' as const } }] : []), ...(data.phone ? [{ phone: data.phone }] : []),
     ] } })
     const conflict = found.length > 1 || !!(found[0] && (identityConflict(found[0], data) || found[0].archived))

@@ -4,6 +4,9 @@ import {useEffect,useMemo,useRef,useState} from 'react'
 import {prepareWebsiteZip} from '@/lib/course-page/importer/zip-browser'
 import {PAGE_HTML_LIMIT,PAGE_COMPRESSED_LIMIT,renderPageTemplate,type PageCourse,type PageTemplate} from '@/lib/website/page-template'
 import ImportedPageFrame from './ImportedPageFrame'
+import TemplateFormBindings from './TemplateFormBindings'
+import {connectPageForms} from '@/lib/website/page-forms'
+import type {FormBinding,ManagedForm} from '@/lib/crm/form-shared'
 
 async function pack(html:string) {
   const buffer=new Uint8Array(await new Response(new Blob([html]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())
@@ -29,6 +32,14 @@ export default function PageTemplateImport() {
   const [width,setWidth]=useState('100%'),[loaded,setLoaded]=useState(false)
   const [configLoading,setConfigLoading]=useState(true),[configError,setConfigError]=useState(''),[loadAttempt,setLoadAttempt]=useState(0)
   const localFile=useRef(false)
+  const [forms,setForms]=useState<ManagedForm[]>([]),[bindings,setBindings]=useState<FormBinding[]>([]),[formError,setFormError]=useState('')
+  useEffect(()=>{
+    const abort=new AbortController()
+    let active=true
+    const timeout=setTimeout(()=>abort.abort(),25000)
+    fetch('/api/websites/forms',{signal:abort.signal,cache:'no-store'}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error);if(active){setForms(data.forms || []);setFormError('')}}).catch(e=>{if(active)setFormError(e.name==='AbortError'?'Tải form quá lâu. Vui lòng thử lại.':e.message)}).finally(()=>clearTimeout(timeout))
+    return()=>{active=false;clearTimeout(timeout);abort.abort()}
+  },[loadAttempt])
   useEffect(()=>{
     const controller=new AbortController()
     let active=true
@@ -41,7 +52,7 @@ export default function PageTemplateImport() {
       if(data.template && !localFile.current){
         try {
           const source=await unpack(data.template.source)
-          if(active && !localFile.current){setHtml(source);setName(data.template.name);setRegion(data.template.region)}
+          if(active && !localFile.current){setHtml(source);setName(data.template.name);setRegion(data.template.region);setBindings(data.template.forms || [])}
         }catch{if(active)setError('Không đọc được template đã lưu. Bạn có thể chọn file mới để thay thế.')}
       }
     }).catch(e=>{if(active)setConfigError(e.name==='AbortError'?'Tải cấu hình Page quá lâu. Bấm thử lại; bạn vẫn có thể chọn file.':e.message)})
@@ -51,13 +62,13 @@ export default function PageTemplateImport() {
   const options=useMemo(()=>html?regions(html):[],[html])
   const preview=useMemo(()=>{
     if(!html)return {html:'',error:''}
-    try{return {html:renderPageTemplate(html,region,courses),error:''}}catch(e){
+    try{return {html:connectPageForms(renderPageTemplate(html,region,courses),bindings,forms.filter(f=>f.active),true),error:''}}catch(e){
       const error=e instanceof Error?e.message:'Vùng không hợp lệ.'
       // Vùng chèn chưa hợp lệ: vẫn xem được bản gốc, chưa cho áp dụng.
       try{return {html:renderPageTemplate(html,null,[]),error}}
       catch{return {html:'',error}}
     }
-  },[html,region,courses])
+  },[html,region,courses,bindings,forms])
   async function choose(file?:File) {
     if(!file)return
     localFile.current=true
@@ -72,6 +83,7 @@ export default function PageTemplateImport() {
       const ids=regions(source).map(n=>n.id)
       setRegion(ids.includes('courses')?'courses':ids.includes('course-list')?'course-list':'__append__')
       setHtml(source);setName(file.name.slice(0,160))
+      setBindings([])
       setMessage('Đã đọc file. Chọn vùng khóa học và kiểm tra bản xem trước trước khi áp dụng.')
     }catch(e){setError(e instanceof Error?e.message:'Không đọc được file.')}finally{setBusy(false)}
   }
@@ -81,7 +93,7 @@ export default function PageTemplateImport() {
     setBusy(true);setError('');setMessage('')
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000)
     try {
-      const payload=action==='apply'?{action,revision:saved?.revision || 0,name,region,source:await pack(html)}:{action,revision:saved?.revision || 0}
+      const payload=action==='apply'?{action,revision:saved?.revision || 0,name,region,source:await pack(html),forms:bindings}:{action,revision:saved?.revision || 0}
       const response=await fetch('/api/websites/page-template',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal})
       const data=await response.json();if(!response.ok)throw new Error(data.error)
       setSaved(data.template);setMessage(action==='apply'?'Đã áp dụng template. Mở Page để kiểm tra nút khóa học.':'Đã trở về giao diện có sẵn trước đó.')
@@ -100,11 +112,12 @@ export default function PageTemplateImport() {
       <p className="text-sm">Đang dùng: <strong>{saved?.active?saved.name:'Giao diện có sẵn'}</strong></p>
       <label className="block"><span className="mb-2 block font-medium">File HTML / ZIP</span><input type="file" accept=".html,.htm,.zip" disabled={busy} onChange={e=>void choose(e.target.files?.[0])} /></label>
       {html && <label className="block"><span className="mb-2 block font-medium">Vùng hiển thị danh sách khóa học</span><select className="w-full rounded-xl border p-3" disabled={busy} value={region} onChange={e=>setRegion(e.target.value)}><option value="__append__">Thêm vùng khóa học ở cuối trang</option>{options.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}</select><span className="mt-2 block text-sm text-slate-500">Chỉ thay các thẻ khóa học bằng {courses.length} khóa học thật. Tiêu đề, đoạn giới thiệu và nội dung xung quanh được giữ nguyên. Với mẫu The Top1, chọn courses; không chọn cả mục khoa-hoc.</span></label>}
-      <p className="text-sm text-slate-500">HTML nên có CSS và JS nhúng; ZIP có thể chứa các file đi kèm. Hiệu ứng chạy trong khung riêng. Nút của danh sách khóa học mở trang thông tin trên hệ thống chính để đăng ký; các form và nút khác cần được cấu hình riêng trong template.</p>
+      <p className="text-sm text-slate-500">HTML nên có CSS và JS nhúng; ZIP có thể chứa các file đi kèm. Hiệu ứng chạy trong khung riêng. Nút khóa học mở trang thông tin trên hệ thống chính. Kết nối form bên dưới để nhận khách vào CRM; bản xem trước không ghi đăng ký.</p>
+      {html && <>{formError && <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800"><p>Chưa tải được form: {formError}</p><button type="button" disabled={busy} className="mt-2 underline" onClick={()=>setLoadAttempt(n=>n+1)}>Tải lại form và cấu hình</button></div>}<TemplateFormBindings html={html} forms={forms} bindings={bindings} onChange={setBindings} regions={options} disabled={busy}/></>}
       {warnings.length>0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">{warnings.map(w=><li key={w}>{w}</li>)}</ul>}
-      {preview.error && <p role="alert" className="text-amber-800">{preview.error} Bên dưới là template gốc, chưa thay danh sách khóa học. Hãy chọn lại vùng chèn.</p>}
+      {preview.error && <p role="alert" className="text-amber-800">{preview.error} Bên dưới là template gốc. Hãy kiểm tra vùng chèn và kết nối form trước khi áp dụng.</p>}
       <div className="flex flex-wrap gap-3"><button className={button+' bg-violet-700 text-white'} disabled={busy || !loaded || !!preview.error || !preview.html} onClick={()=>void save('apply')}>{busy?'Đang xử lý…':'Áp dụng template cho Page'}</button><button className={button} disabled={busy || !loaded || !saved?.active} onClick={()=>void save('builtin')}>Dùng lại giao diện có sẵn</button>{slug && <a className={button} target="_blank" rel="noreferrer" href={'/page/'+slug}>Mở Page ↗</a>}</div>
     </section>
-    {preview.html && <section className="space-y-3"><div className="flex flex-wrap items-center gap-2"><h2 className="mr-auto font-semibold">Xem trước · nút khóa học không chuyển trang ở đây</h2>{[['100%','Máy tính'],['768px','Tablet'],['390px','Điện thoại']].map(([size,label])=><button key={size} className={button+(width===size?' bg-violet-100':' bg-white')} onClick={()=>setWidth(size)}>{label}</button>)}</div><div className="mx-auto max-w-full overflow-hidden rounded-xl border shadow" style={{width}}><ImportedPageFrame html={preview.html} links={courses.map(c=>c.href)} preview /></div></section>}
+    {preview.html && <section className="space-y-3"><div className="flex flex-wrap items-center gap-2"><h2 className="mr-auto font-semibold">Xem trước · nút khóa học không chuyển trang ở đây</h2>{[['100%','Máy tính'],['768px','Tablet'],['390px','Điện thoại']].map(([size,label])=><button key={size} className={button+(width===size?' bg-violet-100':' bg-white')} onClick={()=>setWidth(size)}>{label}</button>)}</div><div className="mx-auto max-w-full overflow-hidden rounded-xl border shadow" style={{width}}><ImportedPageFrame html={preview.html} links={courses.map(c=>c.href)} forms={forms} slug={slug} preview /></div></section>}
   </div></main>
 }

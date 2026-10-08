@@ -22,7 +22,7 @@ export async function readRequests(db: PrismaClient, actor: CrmActor, page: numb
   if (contactId != null && !await db.crmContact.findFirst({ where: { id: contactId, ...contactScope(actor) }, select: { id: true } })) throw new CrmError('Không có quyền xem hồ sơ.', 404)
   const where = { AND: [scope], ...(requestId ? { id: requestId } : {}), ...(status ? { status } : {}), ...(contactId == null ? {} : { contactId }) }
   const [requests, total] = await Promise.all([
-    db.crmRequest.findMany({ where, include: { course: { select: { name_lop: true, id_khoa: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
+    db.crmRequest.findMany({ where, include: { course: { select: { name_lop: true, id_khoa: true } }, formSubmission: {select:{id:true,formVersion:true,identityStatus:true}} }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
     db.crmRequest.count({ where }),
   ])
   const contacts = await db.crmContact.findMany({ where: { AND: [contactScope(actor)], id: { in: requests.map(r => r.contactId).filter((id): id is number => id != null) } }, select: { id: true } })
@@ -39,7 +39,7 @@ export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unkn
   const previous = await db.crmRequest.findFirst({ where: { id: input.id, version: input.version, ...requestScope(actor) } })
   if (!previous) throw new CrmError('Yêu cầu đã thay đổi hoặc bạn không có quyền. Hãy tải lại.', 409)
   if (input.ownerId !== undefined) {
-    if (actor.role !== 'ADMIN' || previous.courseId != null) throw new CrmError('Chỉ quản trị viên phân công yêu cầu chung.', 403)
+    if (actor.role !== 'ADMIN' || previous.courseId != null || await db.crmFormSubmission.findUnique({where:{requestId:previous.id},select:{id:true}})) throw new CrmError('Yêu cầu từ form riêng luôn thuộc chủ Page; chỉ quản trị viên phân công yêu cầu chung.', 403)
     const owner = input.ownerId == null ? null : await db.user.findUnique({ where: { id: input.ownerId }, select: { role: true } })
     if (input.ownerId != null && (!owner || !canUseCrm(owner.role))) throw new CrmError('Người phụ trách không có quyền CRM.')
   }
@@ -53,7 +53,8 @@ export async function requestSource(db: PrismaClient, actor: CrmActor, id: strin
   if (!row) throw new CrmError('Không có quyền xem nguồn yêu cầu.', 404)
   const lesson = row.lessonId && row.courseId != null ? await db.lesson.findFirst({ where: { id: row.lessonId, courseId: row.courseId }, select: { title: true, content: true } }) : null
   const comment = row.commentId != null && row.userId != null && row.lessonId ? await db.lessonComment.findFirst({ where: { id: row.commentId, lessonId: row.lessonId, userId: row.userId }, select: { content: true, createdAt: true } }) : null
-  return { lesson, comment }
+  const submission=await db.crmFormSubmission.findFirst({where:{requestId:row.id,...(actor.role==='ADMIN'?{}:{ownerId:actor.id})},select:{definitionSnapshot:true,answers:true,formVersion:true,identityStatus:true,createdAt:true}})
+  return { lesson, comment, submission }
 }
 export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string) {
   const input = requestInput.parse(raw)
