@@ -7,7 +7,7 @@ type Props={value:string;disabled:boolean;onChange:(value:string)=>void}
 
 export default function TemplateCodeEditor({value,disabled,onChange}:Props){
   const host=useRef<HTMLDivElement>(null),view=useRef<EditorView|null>(null)
-  const latest=useRef({value,disabled,onChange})
+  const latest=useRef({value,disabled,onChange}),syncingValue=useRef(false)
   const setReadOnly=useRef<((disabled:boolean)=>void)|null>(null)
   const [failed,setFailed]=useState(false)
   useEffect(()=>{latest.current={value,disabled,onChange}},[value,disabled,onChange])
@@ -24,7 +24,7 @@ export default function TemplateCodeEditor({value,disabled,onChange}:Props){
         ui.keymap.of([...commands.defaultKeymap,...commands.historyKeymap,commands.indentWithTab]),
         ui.EditorView.contentAttributes.of({'aria-label':'Mã HTML của template'}),
         readOnly.of(access(latest.current.disabled)),
-        ui.EditorView.updateListener.of(update=>{if(update.docChanged)latest.current.onChange(update.state.doc.toString())}),
+        ui.EditorView.updateListener.of(update=>{if(update.docChanged && !syncingValue.current)latest.current.onChange(update.state.doc.toString())}),
         ui.EditorView.theme({
           '&':{height:'28rem',fontSize:'14px',backgroundColor:'#f8fafc'},
           '.cm-scroller':{overflow:'auto',fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',lineHeight:'1.6'},
@@ -41,7 +41,9 @@ export default function TemplateCodeEditor({value,disabled,onChange}:Props){
   useEffect(()=>{
     const editor=view.current
     if(editor && editor.state.doc.toString()!==value){
-      editor.dispatch({changes:{from:0,to:editor.state.doc.length,insert:value}})
+      syncingValue.current=true
+      try{editor.dispatch({changes:{from:0,to:editor.state.doc.length,insert:value}})}
+      finally{syncingValue.current=false}
     }
   },[value])
   useEffect(()=>{
@@ -50,4 +52,5 @@ export default function TemplateCodeEditor({value,disabled,onChange}:Props){
   },[disabled])
   return failed?<textarea aria-label="Mã HTML của template" className="h-96 w-full whitespace-pre-wrap rounded-xl border p-4 font-mono text-sm [overflow-wrap:anywhere]" value={value} disabled={disabled} spellCheck={false} wrap="soft" onChange={event=>onChange(event.target.value)}/>:<div ref={host} className="overflow-hidden rounded-xl border border-slate-300"/>
 }
+
 

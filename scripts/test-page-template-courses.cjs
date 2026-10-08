@@ -198,6 +198,7 @@ async function uiChecks(courses,initial){
  await React.act(async()=>{button('Định dạng mã').click();await new Promise(r=>setTimeout(r,500))})
  assert.ok(editor.value.split('\n').length>10)
  assert.ok(editor.value.includes('<script>window.effectsKept=true</script>'))
+ assert.ok(document.body.textContent.includes('Đã chia dòng và thụt lề mã HTML'),'Updating editor value preserves format confirmation')
  assert.equal(posts.length,2,'Formatting must not publish or write')
  assert.equal(button('Áp dụng template cho Page').disabled,true)
  await React.act(async()=>button('Bỏ sửa mã chưa xem trước').click());assert.equal(editor.value,fixture)
