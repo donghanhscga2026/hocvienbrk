@@ -300,6 +300,8 @@ async function run(){
   ok((await dataPost({courseIds:[]})).status===200 && !testProfile.courseIds.length,'Automatic mode restores teacher-based course scope')
   let templateProps
   const templateLoad=loader({
+    // This suite exercises built-in home scoping; public template cache/SQL is covered separately.
+    '@/lib/website/public-page-template':{readPublicPageTemplate:async()=>null},
     '@/lib/prisma':{__esModule:true,default:scopedDb},'@/lib/get-session':{getSession:async()=>({user:{id:'1',name:'Learner'}})},
     '@/components/home/HomePageClient':{__esModule:true,default:props=>{templateProps=props;return null}},
     '@/components/home/MessageCard':{__esModule:true,default:()=>null},
