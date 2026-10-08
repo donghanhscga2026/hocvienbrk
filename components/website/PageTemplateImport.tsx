@@ -51,7 +51,12 @@ export default function PageTemplateImport() {
   const options=useMemo(()=>html?regions(html):[],[html])
   const preview=useMemo(()=>{
     if(!html)return {html:'',error:''}
-    try{return {html:renderPageTemplate(html,region,courses),error:''}}catch(e){return {html:'',error:e instanceof Error?e.message:'Vùng không hợp lệ.'}}
+    try{return {html:renderPageTemplate(html,region,courses),error:''}}catch(e){
+      const error=e instanceof Error?e.message:'Vùng không hợp lệ.'
+      // Vùng chèn chưa hợp lệ: vẫn xem được bản gốc, chưa cho áp dụng.
+      try{return {html:renderPageTemplate(html,null,[]),error}}
+      catch{return {html:'',error}}
+    }
   },[html,region,courses])
   async function choose(file?:File) {
     if(!file)return
@@ -72,6 +77,7 @@ export default function PageTemplateImport() {
   }
   async function save(action:'apply'|'builtin') {
     if(!loaded){setError('Cần tải cấu hình Page thành công trước khi áp dụng.');return}
+    if(action==='apply' && (preview.error || !preview.html)){setError('Chọn vùng danh sách hợp lệ trước khi áp dụng template.');return}
     setBusy(true);setError('');setMessage('')
     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),60000)
     try {
@@ -96,8 +102,8 @@ export default function PageTemplateImport() {
       {html && <label className="block"><span className="mb-2 block font-medium">Vùng hiển thị danh sách khóa học</span><select className="w-full rounded-xl border p-3" disabled={busy} value={region} onChange={e=>setRegion(e.target.value)}><option value="__append__">Thêm vùng khóa học ở cuối trang</option>{options.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}</select><span className="mt-2 block text-sm text-slate-500">Chỉ thay các thẻ khóa học bằng {courses.length} khóa học thật. Tiêu đề, đoạn giới thiệu và nội dung xung quanh được giữ nguyên. Với mẫu The Top1, chọn courses; không chọn cả mục khoa-hoc.</span></label>}
       <p className="text-sm text-slate-500">HTML nên có CSS và JS nhúng; ZIP có thể chứa các file đi kèm. Hiệu ứng chạy trong khung riêng. Nút của danh sách khóa học mở trang thông tin trên hệ thống chính để đăng ký; các form và nút khác cần được cấu hình riêng trong template.</p>
       {warnings.length>0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">{warnings.map(w=><li key={w}>{w}</li>)}</ul>}
-      {preview.error && <p role="alert" className="text-red-700">{preview.error}</p>}
-      <div className="flex flex-wrap gap-3"><button className={button+' bg-violet-700 text-white'} disabled={busy || !loaded || !preview.html} onClick={()=>void save('apply')}>{busy?'Đang xử lý…':'Áp dụng template cho Page'}</button><button className={button} disabled={busy || !loaded || !saved?.active} onClick={()=>void save('builtin')}>Dùng lại giao diện có sẵn</button>{slug && <a className={button} target="_blank" rel="noreferrer" href={'/page/'+slug}>Mở Page ↗</a>}</div>
+      {preview.error && <p role="alert" className="text-amber-800">{preview.error} Bên dưới là template gốc, chưa thay danh sách khóa học. Hãy chọn lại vùng chèn.</p>}
+      <div className="flex flex-wrap gap-3"><button className={button+' bg-violet-700 text-white'} disabled={busy || !loaded || !!preview.error || !preview.html} onClick={()=>void save('apply')}>{busy?'Đang xử lý…':'Áp dụng template cho Page'}</button><button className={button} disabled={busy || !loaded || !saved?.active} onClick={()=>void save('builtin')}>Dùng lại giao diện có sẵn</button>{slug && <a className={button} target="_blank" rel="noreferrer" href={'/page/'+slug}>Mở Page ↗</a>}</div>
     </section>
     {preview.html && <section className="space-y-3"><div className="flex flex-wrap items-center gap-2"><h2 className="mr-auto font-semibold">Xem trước · nút khóa học không chuyển trang ở đây</h2>{[['100%','Máy tính'],['768px','Tablet'],['390px','Điện thoại']].map(([size,label])=><button key={size} className={button+(width===size?' bg-violet-100':' bg-white')} onClick={()=>setWidth(size)}>{label}</button>)}</div><div className="mx-auto max-w-full overflow-hidden rounded-xl border shadow" style={{width}}><ImportedPageFrame html={preview.html} links={courses.map(c=>c.href)} preview /></div></section>}
   </div></main>
