@@ -27,7 +27,8 @@ export const findDomain=cache(async(hostname:string)=>{
   // Domain do quản trị viên cấp là nguồn tin cậy; domain tự đăng ký vẫn phải xác minh.
   return {...managed,token:'',enabled:managed.isActive,courses:config.modules.courses,crm:false,affiliate:config.modules.affiliate,verifiedAt:managed.createdAt,checkedAt:null,message:'Tên miền được quản trị viên cấp',profile:managed.profile}
 })
-export async function activeDomain(rawHost:string){
+// Metadata, layout và nội dung dùng cùng kết quả trong một request, không cache quyền giữa các request.
+export const activeDomain=cache(async(rawHost:string)=>{
   const domain=await findDomain(requestHostname(rawHost))
   if(!domain?.enabled || !domain.verifiedAt || !domain.profile.isActive)return null
   const row=await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
@@ -38,4 +39,4 @@ export async function activeDomain(rawHost:string){
   const raw=domain.profile.siteConfig && typeof domain.profile.siteConfig==='object' && !Array.isArray(domain.profile.siteConfig)?domain.profile.siteConfig:{}
   const original=raw.modules && typeof raw.modules==='object' && !Array.isArray(raw.modules)?raw.modules:{}
   return {...domain,...modules,profile:{...domain.profile,siteConfig:{...raw,modules:{...original,courses:modules.courses,affiliate:modules.affiliate}}},applications:effectiveApplications(access.applications)}
-}
+})

@@ -37,6 +37,15 @@ async function run(){
  profiles[0].siteConfig.modules.courses=false;assert.deepEqual(server.pageCourseWhere(profiles[0]),{AND:[{id:-1},{teacherId:1}]});profiles[0].siteConfig.modules.courses=true
  assert.deepEqual(await server.pageCourses(profiles[0],false),[])
  assert.deepEqual(await server.pageCourses({userId:null}),[])
+ const domainCourses=await server.pageCourses(profiles[0],true,true)
+ assert.equal(domainCourses[0].href,'/khoa-hoc/REAL')
+ assert.equal(new URL(domainCourses[0].href,'https://brk.io.vn').hostname,'brk.io.vn')
+ for(const region of ['courses','__append__']){
+  const local=new JSDOM(compiler.renderPageTemplate(fixture,region,domainCourses),{runScripts:'dangerously'})
+  const messages=[];local.window.parent.postMessage=data=>messages.push(data)
+  local.window.document.querySelector('[data-system-course-link]').click()
+  assert.equal(messages[0].href,'/khoa-hoc/REAL');local.window.close()
+ }
  const html=compiler.renderPageTemplate(fixture,'courses',courses)
  const dom=new JSDOM(html,{runScripts:'dangerously',url:'https://preview.invalid'}),doc=dom.window.document,events=[]
  dom.window.parent.postMessage=e=>events.push(e)

@@ -114,7 +114,7 @@ export default async function RootLayout({
     const [doc,session]=await Promise.all([domainWebsite(domain.profile),getSession()])
     const path=(await headers()).get('x-website-path') || '/'
     // Chỉ bỏ menu chung khi template trang chủ đã render thành công.
-    const importedHome=path==='/' && !!await ImportedPage({profile:domain.profile,coursesEnabled:domain.courses})
+    const importedHome=path==='/' && !!await ImportedPage({profile:domain.profile,coursesEnabled:domain.courses,customDomain:true})
     const config=getSiteRuntimeConfig(domain.profile)
     const brand={palette:domain.profile.theme?.colors,logoUrl:config.branding.logoUrl,tools:config.modules.tools,name:config.branding.name || doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
     const theme=websiteTheme(brand.color,brand.background,brand.palette)
