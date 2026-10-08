@@ -12,7 +12,7 @@ export const pageTemplateSchema = z.object({
   forms:formBindingsSchema.optional(),
 }).strict()
 export type PageTemplate = z.infer<typeof pageTemplateSchema>
-export type PageCourse = {id:number;title:string;description:string;image:string;href:string;price?:number;feeType?:string}
+export type PageCourse = {id:number;title:string;description:string;image:string;href:string;price?:number;feeType?:string;teacherName?:string}
 type Node = DefaultTreeAdapterMap['node']
 type Element = DefaultTreeAdapterMap['element']
 const element = (node:Node):node is Element => 'tagName' in node
@@ -114,6 +114,16 @@ export function renderPageTemplate(html:string,region:string|null,courses:PageCo
     } else {
       card=parseFragment(`<article class="system-course-card"><a class="system-course-open" data-system-course-link="${escape(course.href)}" href="${escape(course.href)}" aria-label="Xem khóa học ${escape(course.title)}"><div class="system-course-media">${course.image?`<img src="${escape(course.image)}" alt="" loading="lazy">`:'<span>Khóa học trực tuyến</span>'}</div><div class="system-course-content"><span class="system-course-label">Khóa học</span><h3 title="${escape(course.title)}">${escape(course.title)}</h3><p>${escape(cleanText(course.description))}</p><div class="system-course-pricing"><span>${escape(pricing.label)}</span><strong>${escape(pricing.text)}</strong></div><span class="system-course-cta">Xem khóa học <span aria-hidden="true">→</span></span></div></a></article>`).childNodes[0] as Element
     }
+    const teacherName=course.teacherName?.trim()
+    if(teacherName){
+      const content=walk(card).find(n=>hasClass(n,'course-body') || hasClass(n,'system-course-content')) || card
+      const title=walk(content).find(n=>/^h[1-6]$/.test(n.tagName) && !hasClass(n,'cover-title'))
+      const teacher=parseFragment('<span class="system-course-teacher">Giảng viên: '+escape(teacherName)+'</span>').childNodes[0]
+      if(title?.parentNode && 'childNodes' in title.parentNode){
+        teacher.parentNode=title.parentNode
+        title.parentNode.childNodes.splice(title.parentNode.childNodes.indexOf(title)+1,0,teacher)
+      }else{teacher.parentNode=content;content.childNodes.push(teacher)}
+    }
     card.parentNode=slot;slot.childNodes.push(card)
   }
   if(!courses.length)append(slot,'<p role="status">Chưa có khóa học đang mở trên trang này.</p>')
@@ -158,6 +168,7 @@ document.addEventListener('click',function(e){
 [data-system-course-list] .system-course-label{color:#6d28d9;font-size:12px;line-height:18px;font-weight:600}
 [data-system-course-list] .system-course-content h3{margin:0;min-height:52px;font-size:19px;line-height:26px;font-weight:700;color:#0f172a;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 [data-system-course-list] .system-course-content p{margin:0;min-height:66px;font-size:14px;line-height:22px;font-weight:400;color:#64748b;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere}
+[data-system-course-list] .system-course-teacher{display:block;margin:0;font-size:14px;line-height:22px;font-weight:400;color:#64748b;overflow-wrap:anywhere;text-transform:none}
 [data-system-course-list] .system-course-pricing{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:16px;border-top:1px solid #eef2f6}
 [data-system-course-list] .system-course-pricing>span{font-size:12px;line-height:20px;color:#64748b}
 [data-system-course-list] .system-course-pricing>strong{font-size:20px;line-height:28px;font-weight:750;color:#6d28d9;white-space:nowrap}

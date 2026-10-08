@@ -21,8 +21,8 @@ export function pageCourseWhere(profile:CourseScopeProfile) {
 }
 export async function pageCourses(profile:CourseScopeProfile,enabled=true) {
   if(!enabled || profile.userId==null)return []
-  const rows=await prisma.course.findMany({where:pageCourseWhere(profile),orderBy:[{pin:'asc'},{id:'asc'}],take:100,select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,mo_ta_ngan:true,link_anh_bia:true,phi_coc:true,feeType:true}})
-  return rows.map(c=>({id:c.id,title:c.name_khoa || c.name_lop,description:c.mo_ta_ngan || '',price:c.phi_coc,feeType:c.feeType,image:publicImage(c.link_anh_bia),href:PLATFORM_ORIGIN+'/khoa-hoc/'+encodeURIComponent(c.id_khoa)}))
+  const rows=await prisma.course.findMany({where:pageCourseWhere(profile),orderBy:[{pin:'asc'},{id:'asc'}],take:100,select:{id:true,id_khoa:true,name_khoa:true,name_lop:true,mo_ta_ngan:true,link_anh_bia:true,phi_coc:true,feeType:true,teacher:{select:{name:true}}}})
+  return rows.map(c=>({id:c.id,title:c.name_khoa || c.name_lop,description:c.mo_ta_ngan || '',teacherName:c.teacher?.name?.trim() || '',price:c.phi_coc,feeType:c.feeType,image:publicImage(c.link_anh_bia),href:PLATFORM_ORIGIN+'/khoa-hoc/'+encodeURIComponent(c.id_khoa)}))
 }
 function publicImage(value:string|null) {
   if(!value)return ''

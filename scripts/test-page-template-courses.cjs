@@ -6,7 +6,7 @@ class CrmError extends Error{constructor(message,status=400){super(message);this
 const profiles=[{id:7,userId:1,isActive:true,slug:'one',siteConfig:{courseScope:{mode:'all'},modules:{courses:true}}},{id:8,userId:2,isActive:true,slug:'two',siteConfig:{courseScope:{mode:'all'},modules:{courses:true}}}]
 const db={
  systemConfig:{findUnique:async({where})=>entries.get(where.key)||null,upsert:async({where,create,update})=>{writes++;entries.set(where.key,{value:entries.has(where.key)?update.value:create.value})}},
- course:{findMany:async args=>{query=args;return [{id:11,id_khoa:'REAL',name_khoa:'Khóa học thật <safe>',name_lop:'Class',phi_coc:500000,feeType:'PHI_CAM_KET',mo_ta_ngan:'<b>Mô tả thật</b>',link_anh_bia:'/real.png'}]}},
+ course:{findMany:async args=>{query=args;return [{id:11,id_khoa:'REAL',name_khoa:'Khóa học thật <safe>',name_lop:'Class',phi_coc:500000,feeType:'PHI_CAM_KET',mo_ta_ngan:'<b>Mô tả thật</b>',link_anh_bia:'/real.png',teacher:{name:'  Nguyễn <img src=x onerror=alert(1)> & An  '}}]}},
  $executeRaw:async()=>{},$transaction:async fn=>fn(db),
 }
 function load(rel){
@@ -32,6 +32,7 @@ const request=(body,origin='https://giautoandien.io.vn',host='giautoandien.io.vn
 async function run(){
  const compiler=load('lib/website/page-template'),server=load('lib/website/page-template-server'),api=load('app/api/websites/page-template/route')
  const courses=await server.pageCourses(profiles[0]);assert.deepEqual(query.where,{AND:[{status:true},{teacherId:1}]});assert.equal(courses[0].href,'https://giautoandien.io.vn/khoa-hoc/REAL')
+ assert.deepEqual(query.select.teacher,{select:{name:true}});assert.equal(courses[0].teacherName,'Nguyễn <img src=x onerror=alert(1)> & An');
  assert.equal('teacherBankAccount' in query.select,false);assert.equal(courses[0].price,500000);assert.equal(courses[0].feeType,'PHI_CAM_KET')
  profiles[0].siteConfig.modules.courses=false;assert.deepEqual(server.pageCourseWhere(profiles[0]),{AND:[{id:-1},{teacherId:1}]});profiles[0].siteConfig.modules.courses=true
  assert.deepEqual(await server.pageCourses(profiles[0],false),[])
@@ -41,6 +42,9 @@ async function run(){
  dom.window.parent.postMessage=e=>events.push(e)
  assert.equal(doc.querySelector('head').firstElementChild.httpEquiv,'Content-Security-Policy')
  assert.equal(doc.querySelectorAll('#courses .course').length,1);assert.equal(doc.querySelector('#courses h3').textContent,courses[0].title)
+ assert.equal(doc.querySelector('#courses h3').nextElementSibling.className,'system-course-teacher')
+ assert.equal(doc.querySelector('.system-course-teacher').textContent,'Giảng viên: '+courses[0].teacherName)
+ assert.equal(doc.querySelector('.system-course-teacher img'),null,'Teacher names must be escaped as text')
  assert.equal(doc.querySelector('.course-cover').children.length,1)
  assert.equal(doc.querySelector('.course-cover').firstElementChild.tagName,'IMG')
  assert.equal(doc.querySelector('.course-cover').textContent,'')
@@ -84,7 +88,16 @@ async function run(){
  const custom=new JSDOM(compiler.renderPageTemplate(customCards,'different-grid',courses))
  assert.equal(custom.window.document.querySelector('#khoa-hoc h2').textContent,'Keep title')
  assert.equal(custom.window.document.querySelector('#different-grid h3').textContent,courses[0].title)
+ assert.equal(custom.window.document.querySelector('#different-grid h3').nextElementSibling.textContent,'Giảng viên: '+courses[0].teacherName)
+ assert.equal(custom.window.document.querySelector('.system-course-teacher img'),null)
  custom.window.close()
+ for(const teacherName of [undefined,'','   ']){
+  for(const region of ['courses','__append__']){
+   const missing=new JSDOM(compiler.renderPageTemplate(fixture,region,[{...courses[0],teacherName}]))
+   assert.equal(missing.window.document.querySelector('.system-course-teacher'),null)
+   missing.window.close()
+  }
+ }
  assert.throws(()=>compiler.renderPageTemplate(customCards,'khoa-hoc',courses),/chứa tiêu đề/)
  const noImage=customCards.replace('<img src="/cover.png">','<span>2,500,000đ</span>')
  assert.ok(compiler.renderPageTemplate(noImage,'different-grid',courses).includes('500.000đ'))
