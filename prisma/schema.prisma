@@ -63,6 +63,7 @@ model User {
   appNotifications             AppNotification[]
   pushSubscriptions            WebPushSubscription[]
   crmContacts                  CrmContact[]
+  crmForms                     CrmForm[]
   crmIdentityContact           CrmContact? @relation("CrmIdentity")
   crmStudentProfiles           CrmContact[] @relation("CrmStudentProfile")
 
@@ -1425,6 +1426,7 @@ model Tool {
 }
 
 model SiteProfile {
+  crmForms CrmForm[]
   verifiedDomains      SiteDomain[]
   website              SiteWebsite?
   domains              SiteProfileDomain[]
@@ -1798,6 +1800,7 @@ model CoursePageTemplate {
 
 // CRM phase 1: contacts are independent of login accounts and affiliate ownership.
 model CrmContact {
+  formSubmissions CrmFormSubmission[]
   requests CrmRequest[]
   studentProfile Boolean @default(false)
   studentUserId Int?
@@ -1809,8 +1812,8 @@ model CrmContact {
   submissions   CrmSubmission[]
   id            Int              @id @default(autoincrement())
   name          String
-  email         String?          @unique
-  phone         String?          @unique
+  email         String?
+  phone         String?
   source        String           @default("Nhập tay")
   needs         String           @default("")
   tags          String[]         @default([])
@@ -1827,12 +1830,54 @@ model CrmContact {
   tasks         CrmTask[]
 
   @@index([ownerId, archived, updatedAt])
+  @@unique([ownerId, email])
+  @@unique([ownerId, phone])
   @@unique([ownerId, studentUserId])
   @@index([studentUserId])
 }
 
+model CrmForm {
+  id String @id @default(uuid())
+  ownerId Int
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  profileId Int
+  profile SiteProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  name String
+  active Boolean @default(true)
+  version Int @default(1)
+  config Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  submissions CrmFormSubmission[]
+  @@index([ownerId, profileId, updatedAt])
+}
+
+model CrmFormSubmission {
+  id String @id @default(uuid())
+  key String @unique
+  formId String
+  form CrmForm @relation(fields: [formId], references: [id], onDelete: Restrict)
+  ownerId Int
+  profileId Int
+  contactId Int?
+  contact CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  requestId String @unique
+  request CrmRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  formVersion Int
+  definitionSnapshot Json
+  answers Json
+  identityStatus String @default("RECEIVED")
+  ipHash String
+  createdAt DateTime @default(now())
+  @@index([ownerId, createdAt])
+  @@index([formId, createdAt])
+  @@index([contactId, createdAt])
+  @@index([ipHash, createdAt])
+}
+
 // Explicit support/consultation only; ordinary lesson interactions remain in LMS.
 model CrmRequest {
+  formSubmission CrmFormSubmission?
   id String @id @default(uuid())
   key String @unique
   contactId Int?

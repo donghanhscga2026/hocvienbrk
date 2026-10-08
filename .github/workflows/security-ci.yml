@@ -49,6 +49,7 @@ jobs:
           npm run test:website-templates
           npm run test:custom-domains
           node scripts/test-page-template-courses.cjs
+          node scripts/test-page-crm-forms.cjs
 
       - name: TypeScript check
         run: npx tsc --noEmit

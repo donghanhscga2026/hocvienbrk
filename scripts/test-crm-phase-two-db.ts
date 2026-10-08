@@ -27,11 +27,11 @@ export async function testPhaseTwo(db: PrismaClient) {
   const staleCsv = 'name,email\nStale,stale@crm.invalid'
   const stale = await writePhaseTwo(db, admin, cmd({ action: 'import.preview', csv: staleCsv, ownerId: 101 })) as Preview
   await denied(() => writePhaseTwo(db, admin, cmd({ action: 'import.execute', csv: staleCsv, ownerId: 102, token: stale.token })), 409)
-  check(!await db.crmContact.findUnique({ where: { email: 'stale@crm.invalid' } }), 'Invalid confirmation rolls back all writes')
+  check(!await db.crmContact.findFirst({ where: { email: 'stale@crm.invalid' } }), 'Invalid confirmation rolls back all writes')
   const student = await db.user.create({ data: { id: 201, name: 'Learner', email: 'csv-a@crm.invalid' } })
-  const learnerPreview = await writePhaseTwo(db, admin, cmd({ action: 'students.preview', userIds: [201], ownerId: 102 })) as Preview
+  const learnerPreview = await writePhaseTwo(db, admin, cmd({ action: 'students.preview', userIds: [201], ownerId: 101 })) as Preview
   check(learnerPreview.counts.LINK === 1, 'Existing customer is linked without duplicate')
-  await writePhaseTwo(db, admin, cmd({ action: 'students.execute', userIds: [201], ownerId: 102, token: learnerPreview.token }))
+  await writePhaseTwo(db, admin, cmd({ action: 'students.execute', userIds: [201], ownerId: 101, token: learnerPreview.token }))
   const contact = await db.crmContact.findUniqueOrThrow({ where: { linkedUserId: 201 } })
   check(contact.ownerId === 101 && contact.needs === 'Nhu cầu', 'Student import preserves owner and existing needs')
   const course = await db.course.create({ data: { id_khoa: 'CRM-TEST', name_lop: 'AI test', teacherId: 101 } })
@@ -58,7 +58,7 @@ export async function testPhaseTwo(db: PrismaClient) {
   await denied(() => writePhaseTwo(db, admin, cmd({ action: 'capture.toggle', landingId: landing.id, updatedAt: landing.updatedAt.toISOString(), enabled: false })), 409)
   await captureLead(db, lead, 'test-ip'); await captureLead(db, lead, 'test-ip')
   check(await db.crmSubmission.count() === 1 && await db.crmContact.count({ where: { email: lead.email } }) === 1, 'Repeated public form is idempotent')
-  const publicContact = await db.crmContact.findUniqueOrThrow({ where: { email: lead.email } })
+  const publicContact = await db.crmContact.findFirstOrThrow({ where: { email: lead.email, ownerId: null } })
   check(publicContact.ownerId == null && publicContact.linkedUserId == null, 'Public inputs cannot assign owners or link login accounts')
   await captureLead(db, { ...lead, name: 'Impersonated' }, 'test-ip')
   check((await db.crmContact.findUniqueOrThrow({ where: { id: publicContact.id } })).name === 'Lead', 'Public submission cannot overwrite existing contact')

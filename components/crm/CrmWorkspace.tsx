@@ -9,6 +9,7 @@ import CrmStudents from './CrmStudents'
 import CrmContactList, { CrmLearning } from './CrmContactList'
 import CrmCareForm from './CrmCareForm'
 import CrmRequests from './CrmRequests'
+import {PLATFORM_ORIGIN} from '@/lib/website/domain-shared'
 import {
   ACTIVITY_LABELS, CRM_STAGES, CrmContactView, CrmDetail, CrmOpportunityView, CrmOwner, CrmStageValue,
   CrmTaskView, formatCrmDate, isOpenStage, STAGE_LABELS, vietnamInputToIso,
@@ -241,6 +242,7 @@ export default function CrmWorkspace() {
           <button type="button" className={secondary + ' lg:hidden'} aria-label="Mở hoặc đóng menu CRM" aria-expanded={menuOpen} aria-controls="crm-sidebar-menu" onClick={() => setMenuOpen(value => !value)}><Menu size={18} />Menu</button>
         </div>
         <nav id="crm-sidebar-menu" aria-label="Các mục CRM" className={(menuOpen ? 'grid' : 'hidden') + ' mt-2 gap-2 lg:grid'}>
+          <a href={PLATFORM_ORIGIN+'/tools/my-site/forms'} className="flex min-h-12 items-center rounded-xl px-3 py-3 text-sm text-slate-600 hover:bg-slate-100">Form của tôi</a>
           {([
             { key: 'contacts', label: 'Khách hàng / Học viên', icon: Users },
             { key: 'requests', label: 'Yêu cầu cần giải đáp', icon: MessageCircle },

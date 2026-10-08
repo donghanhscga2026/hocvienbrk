@@ -29,9 +29,9 @@ export function identityConflict(contact: { email: string | null; phone: string 
   return !!((contact.email && incoming.email && normalizeEmail(contact.email) !== normalizeEmail(incoming.email)) ||
     (contact.phone && incoming.phone && normalizePhone(contact.phone) !== normalizePhone(incoming.phone)))
 }
-async function matches(db: Db, email: string | null, phone: string | null) {
+async function matches(db: Db, email: string | null, phone: string | null, ownerId: number | null) {
   // Never query OR []: every intake/import requires a valid identity.
-  return db.crmContact.findMany({ where: { OR: [
+  return db.crmContact.findMany({ where: { ownerId, OR: [
     ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
     ...(phone ? [{ phone }] : []),
   ] }, orderBy: { id: 'asc' } })
@@ -81,7 +81,7 @@ async function importPlan(db: Db, command: z.infer<typeof phaseTwoCommand>) {
       rows.push({ ...base, status: 'CONFLICT', message: 'Trùng định danh trong cùng danh sách; cần tách và kiểm tra.' }); continue
     }
     if (data.email) emails.add(data.email); if (data.phone) phones.add(data.phone)
-    const found = await matches(db, data.email, data.phone)
+    const found = await matches(db, data.email, data.phone, command.ownerId)
     const alreadyLinked = record.userId === undefined ? null : await db.crmContact.findUnique({ where: { linkedUserId: record.userId } })
     if (alreadyLinked && (!found.length || found.some(c => c.id !== alreadyLinked.id))) {
       rows.push({ ...base, status: 'CONFLICT', message: 'Tài khoản đã liên kết hồ sơ khác.' }); continue
