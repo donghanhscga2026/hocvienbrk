@@ -88,7 +88,9 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
         return (proxyHandler as unknown as NextMiddleware)(request,event)
     }
     if(path.startsWith('/.well-known/giautoandien-domain/')) return NextResponse.next()
+    const domainStarted=performance.now()
     const domain=await activeDomain(hostname)
+    const domainDuration=performance.now()-domainStarted
     if(!domain) return new NextResponse('Tên miền chưa được xác minh hoặc đang tạm dừng.',{status:503,headers:{'Cache-Control':'no-store','Content-Type':'text/plain; charset=utf-8'}})
     if(path.startsWith('/ung-dung/')) {
         const key=path.slice('/ung-dung/'.length)
@@ -111,6 +113,7 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(route==='page' || route==='account' || route==='catalog') destination.pathname='/site-domain/'+hostname+(path==='/' ? '' : path)
     if(/^\/courses\/[^/]+$/.test(path)) destination.pathname=path.replace('/courses/','/khoa-hoc/')
     const response=destination.pathname!==path ? NextResponse.rewrite(destination,{request:{headers:requestHeaders}}) : NextResponse.next({request:{headers:requestHeaders}})
+    response.headers.set('Server-Timing',`website-domain;dur=${domainDuration.toFixed(1)}`)
     const ref=request.nextUrl.searchParams.get('ref')
     if(ref && domain.affiliate) saveRefCookie(response,ref,domain.profile.slug,coursePath?.[1] || null,null,coursePath ? 'khoa-hoc' : 'page')
     return response
