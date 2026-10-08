@@ -148,7 +148,6 @@ function saveRefCookie(
 }
 
 export const config = {
-    regions: ['icn1'],
     matcher: [
         "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)).*)",
         // Các prefix API cần được proxy chặn theo role ADMIN (xem ADMIN_ONLY_PREFIXES ở trên)
