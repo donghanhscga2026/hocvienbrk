@@ -57,10 +57,11 @@ export function renderPageTemplate(html:string,region:string|null,courses:PageCo
       let parent:Node|null=n.parentNode
       while(parent && parent!==slot){
         if(element(parent) && (['article','a'].includes(parent.tagName) || ['course','course-card','system-course-card','card'].some(c=>hasClass(parent as Element,c))))return false
-        // Thẻ dùng tên class tùy ý vẫn có ảnh, tên khóa học và nút/link.
+        // Thẻ dùng tên class tùy ý có ảnh hoặc giá, tên khóa học và nút/link.
         if(element(parent) && parent.parentNode===slot){
           const parts=walk(parent)
-          if(parts.filter(p=>/^h[1-6]$/.test(p.tagName)).length===1 && parts.some(p=>p.tagName==='img') && parts.some(p=>['a','button'].includes(p.tagName)))return false
+          const hasMediaOrPrice=parts.some(p=>p.tagName==='img' || hasClass(p,'price') || (p.tagName==='span' && p.childNodes.some(c=>c.nodeName==='#text' && 'value' in c && /\d[\d.,\s]*[đ₫]/i.test(c.value))))
+          if(parts.filter(p=>/^h[1-6]$/.test(p.tagName)).length===1 && hasMediaOrPrice && parts.some(p=>['a','button'].includes(p.tagName)))return false
         }
         parent='parentNode' in parent?parent.parentNode:null
       }
@@ -100,7 +101,11 @@ export function renderPageTemplate(html:string,region:string|null,courses:PageCo
         if(n.tagName==='button'){set(n,'type','button');set(n,'data-system-course-link',course.href);set(n,'aria-label','Xem thông tin '+course.title);text(n,'Xem thông tin')}
       }
       const cover=descendants.find(n=>hasClass(n,'course-cover'))
-      if(cover && course.image)append(cover,`<img class="system-course-cover" src="${escape(course.image)}" alt="" loading="lazy">`)
+      if(cover && course.image){
+        // Ảnh bìa thật thay toàn bộ chữ/số trang trí của ảnh mẫu.
+        cover.childNodes=[];set(cover,'data-system-course-cover','image')
+        append(cover,`<img class="system-course-cover" src="${escape(course.image)}" alt="" loading="lazy">`)
+      }
       set(card,'data-category','course');set(card,'class',attr(card,'class')+' visible')
     } else {
       card=parseFragment(`<article class="system-course-card"><a class="system-course-open" data-system-course-link="${escape(course.href)}" href="${escape(course.href)}" aria-label="Xem khóa học ${escape(course.title)}"><div class="system-course-media">${course.image?`<img src="${escape(course.image)}" alt="" loading="lazy">`:'<span>Khóa học trực tuyến</span>'}</div><div class="system-course-content"><span class="system-course-label">Khóa học</span><h3 title="${escape(course.title)}">${escape(course.title)}</h3><p>${escape(cleanText(course.description))}</p><div class="system-course-pricing"><span>${escape(pricing.label)}</span><strong>${escape(pricing.text)}</strong></div><span class="system-course-cta">Xem khóa học <span aria-hidden="true">→</span></span></div></a></article>`).childNodes[0] as Element
@@ -133,6 +138,8 @@ export function renderPageTemplate(html:string,region:string|null,courses:PageCo
 [data-system-course-list] .system-course-pricing>strong{font-size:20px;line-height:28px;font-weight:750;color:#6d28d9;white-space:nowrap}
 [data-system-course-list] .system-course-cta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding:12px 16px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;font-size:14px;line-height:22px;font-weight:600}
 [data-system-course-list] .course-body p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+[data-system-course-list] [data-system-course-cover="image"]{position:relative;padding:0;overflow:hidden;background:none}
+[data-system-course-list] [data-system-course-cover="image"]::before,[data-system-course-list] [data-system-course-cover="image"]::after{display:none;content:none}
 @media(prefers-reduced-motion:reduce){[data-system-course-list] .system-course-card{transition:none}[data-system-course-list] .system-course-card:hover{transform:none}}
 </style>`)
   return '<!doctype html>\n'+serialize(doc)
