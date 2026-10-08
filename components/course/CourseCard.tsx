@@ -242,6 +242,13 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         </h3>
                     </div>
 
+                    {/* Tên công khai của giảng viên, lấy từ khóa học trên hệ thống. */}
+                    {course.teacher?.name?.trim() && (
+                        <p className="mb-3 text-sm leading-relaxed break-words text-brk-muted" data-course-teacher>
+                            Giảng viên: {course.teacher.name.trim()}
+                        </p>
+                    )}
+
                     {/* Badges - [Số tiền/Dạng phí] [Chia sẻ] [Kích hoạt] [Mục lục] */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                         {!isActive && (
