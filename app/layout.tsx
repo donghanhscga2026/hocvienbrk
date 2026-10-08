@@ -16,6 +16,7 @@ import { headers } from 'next/headers'
 import { domainContext } from '@/lib/website/domain-context'
 import { domainWebsite } from '@/lib/website/presentation-server'
 import DomainShell from '@/components/website/DomainShell'
+import ImportedPage from '@/components/website/ImportedPage'
 import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
 import { websiteTheme, normalizeWebsitePalette } from '@/lib/website/theme'
 import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/runtime";
@@ -112,10 +113,12 @@ export default async function RootLayout({
   if(domain) {
     const [doc,session]=await Promise.all([domainWebsite(domain.profile),getSession()])
     const path=(await headers()).get('x-website-path') || '/'
+    // Chỉ bỏ menu chung khi template trang chủ đã render thành công.
+    const importedHome=path==='/' && !!await ImportedPage({profile:domain.profile,coursesEnabled:domain.courses})
     const config=getSiteRuntimeConfig(domain.profile)
     const brand={palette:domain.profile.theme?.colors,logoUrl:config.branding.logoUrl,tools:config.modules.tools,name:config.branding.name || doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
     const theme=websiteTheme(brand.color,brand.background,brand.palette)
-    return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+    return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path} importedHome={importedHome}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
   }
   const [siteProfile, themeRows] = await Promise.all([
     getCurrentSiteProfile(),
