@@ -51,6 +51,7 @@ jobs:
           node scripts/test-domain-snapshot.cjs
           node scripts/test-page-template-courses.cjs
           node scripts/test-page-template-assets.cjs
+          node scripts/test-website-pages.cjs
           node scripts/test-page-crm-forms.cjs
 
       - name: TypeScript check

@@ -1,3 +1,5 @@
+import WebsiteContentPage from '@/components/website/WebsiteContentPage'
+import {readWebsitePages} from '@/lib/website/pages-server'
 import ImportedPage from '@/components/website/ImportedPage'
 import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
 import {LandingPageClient} from '@/components/landing/LandingPageClient'
@@ -63,6 +65,14 @@ export default async function DomainPage(props:Props) {
     return <LandingPageClient landing={landing as any}/>
   }
   if(!path.length) return <ProfileHome profile={domain.profile} customDomain modules={{courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}} />
+  if(path.length===1){
+    const content=await readWebsitePages(domain.profile.id)
+    const page=content.pages.find(p=>p.slug===path[0] && p.published)
+    if(page){
+      const imported=await ImportedPage({profile:domain.profile,coursesEnabled:domain.courses,customDomain:true,pageSlug:page.slug})
+      return imported || <WebsiteContentPage page={page}/>
+    }
+  }
   const catalog=path.join('/')==='khoa-hoc'
   if(catalog && !domain.courses) notFound()
   if(!catalog) notFound()

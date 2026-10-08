@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),cache=new Map()
 let writes=0,designReads=0
 const saved={mode:'custom',revision:4},profile={id:7,userId:1,slug:'lucy',title:'Lucy',siteConfig:{homepage:{type:'website'},branding:{name:'Brand'},courseScope:{mode:'ids',courseIds:[8]}},members:[],user:{role:'ADMIN'}}
 class CrmError extends Error{constructor(message,status=400){super(message);this.status=status}}
-const db={user:{findUnique:async()=>({id:1})},siteProfile:{findUnique:async()=>profile},systemConfig:{findUnique:async()=>({value:saved})},siteWebsite:{findUnique:async()=>{designReads++;throw Error('Retained design must not be read')}},$transaction:async()=>{writes++;throw Error('Unexpected write')}}
+const db={user:{findUnique:async()=>({id:1})},siteProfile:{findUnique:async()=>profile},systemConfig:{findUnique:async({where})=>where.key.startsWith('website-pages:')?null:({value:saved})},siteWebsite:{findUnique:async()=>{designReads++;throw Error('Retained design must not be read')}},$transaction:async()=>{writes++;throw Error('Unexpected write')}}
 function load(rel){
  let file=path.resolve(root,rel);if(!path.extname(file))file=fs.existsSync(file+'.ts')?file+'.ts':fs.existsSync(file+'.tsx')?file+'.tsx':path.join(file,'index.ts')
  if(file===path.join(root,'lib/crm/service.ts'))return {CrmError}
