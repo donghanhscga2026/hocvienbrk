@@ -1,13 +1,5 @@
-import prisma from '@/lib/prisma'
-import {crmBody,crmFailure,crmResponse} from '@/lib/crm/http'
-import {submitForm} from '@/lib/crm/forms'
-import {requireDomainModule} from '@/lib/website/domain-context'
+import {crmResponse} from '@/lib/crm/http'
 
 export const dynamic='force-dynamic'
-export async function POST(request:Request){
-  try{
-    const raw=await crmBody(request,48000),domain=await requireDomainModule('crm')
-    const address=request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    return crmResponse(await submitForm(prisma,raw,address,domain?.profileId),201)
-  }catch(e){return crmFailure(e)}
-}
+/** Chặn cả template cũ đang mở, không tạo yêu cầu hay thông báo CRM. */
+export async function POST(){return crmResponse({error:'Form Page đã ngừng nhận đăng ký. Vui lòng mở khóa học trên hệ thống.'},410)}
