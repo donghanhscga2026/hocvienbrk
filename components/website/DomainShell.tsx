@@ -13,7 +13,7 @@ const Context=createContext<Brand|null>(null)
 export const useDomainBrand=()=>useContext(Context)
 
 /** Khung điều hướng chung cho trang thiết kế, khóa học và tài khoản. */
-export default function DomainShell({brand,pages=[],path:initialPath='/',importedHome=false,children}:{brand:Brand;pages?:Page[];path?:string;importedHome?:boolean;children:React.ReactNode}) {
+export default function DomainShell({brand,pages=[],path:initialPath='/',importedHome=false,navigation,children}:{brand:Brand;pages?:Page[];path?:string;importedHome?:boolean;navigation?:{href:string;title:string}[];children:React.ReactNode}) {
   const {data:session}=useSession()
   const theme=websiteTheme(brand.color,brand.background,brand.palette)
 
@@ -21,12 +21,14 @@ export default function DomainShell({brand,pages=[],path:initialPath='/',importe
   const path=pathname ? pathname.replace(/^\/site-domain\/[^/]+/, '') || '/' : initialPath
   const learning=pathIsLearning(path)
   const [open,setOpen]=useState(false)
-  const links=[{href:'/',title:'Trang chủ'},...pages.filter(p=>p.slug && !['khoa-hoc','cong-cu','tai-khoan','ung-dung'].includes(p.slug)).map(p=>({href:'/'+p.slug,title:p.title})),...(brand.courses ? [{href:'/khoa-hoc',title:'Khóa học'}] : []),...(brand.tools!==false ? [{href:'/cong-cu',title:session?.user ? 'Không gian của tôi' : 'Công cụ'}]:[])]
+  const configured=navigation?.filter(l=>!(l.href==='/khoa-hoc' && !brand.courses) && !(l.href==='/cong-cu' && brand.tools===false))
+  const links=configured ?? [{href:'/',title:'Trang chủ'},...pages.filter(p=>p.slug && !['khoa-hoc','cong-cu','tai-khoan','ung-dung'].includes(p.slug)).map(p=>({href:'/'+p.slug,title:p.title})),...(brand.courses ? [{href:'/khoa-hoc',title:'Khóa học'}] : []),...(brand.tools!==false ? [{href:'/cong-cu',title:session?.user ? 'Không gian của tôi' : 'Công cụ'}]:[])]
   const course=/^\/(khoa-hoc|courses)\//.test(path)
+  const ownTemplate=importedHome && (path==='/' || pages.some(p=>'/'+p.slug===path))
   const label=links.find(l=>l.href===path)?.title || ({'/login':'Đăng nhập','/register':'Đăng ký','/tai-khoan':'Tài khoản','/account-settings':'Thông tin tài khoản','/forgot-password':'Quên mật khẩu','/tools/crm':'CRM','/tools/affiliate':'Affiliate'} as Record<string,string>)[path] || (course ? (path.endsWith('/learn') ? 'Học tập' : 'Chi tiết khóa học') : 'Trang nội dung')
   return <Context.Provider value={brand}><div style={{background:theme.background,color:theme.text,minHeight:'100vh'}} className="flex flex-col" data-website-shell data-website-learning={learning || undefined}>
     <a href="#website-content" className="sr-only focus:not-sr-only focus:p-3">Đến nội dung chính</a>
-    {!(importedHome && path==='/') && <header className="border-b border-brk-outline bg-brk-surface text-brk-on-surface">
+    {!ownTemplate && <header className="border-b border-brk-outline bg-brk-surface text-brk-on-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center gap-4">
         <a href="/" className="font-bold text-xl min-w-0 flex-1 break-words lg:flex-none lg:mr-6" style={{color:theme.accent}}>{brand.logoUrl ? <img src={brand.logoUrl} alt={brand.name} className="max-h-12 max-w-48 object-contain"/>:brand.name}</a>
         <button type="button" className="lg:hidden border rounded-lg px-3 py-2" aria-expanded={open} aria-controls="website-menu" onClick={()=>setOpen(!open)}>{open ? 'Đóng menu' : 'Menu'}</button>
@@ -37,8 +39,8 @@ export default function DomainShell({brand,pages=[],path:initialPath='/',importe
         </nav>
       </div>
     </header>}
-    {path!=='/' && <nav aria-label="Đường dẫn trang" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 text-sm text-brk-muted"><ol className="flex flex-wrap gap-2"><li><a href="/" className="hover:underline">Trang chủ</a></li>{course && <li><span aria-hidden="true">/ </span><a href="/khoa-hoc" className="hover:underline">Khóa học</a></li>}<li><span aria-hidden="true">/ </span><span aria-current="page" className="text-brk-on-surface">{label}</span></li></ol></nav>}
+    {!ownTemplate && path!=='/' && <nav aria-label="Đường dẫn trang" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 text-sm text-brk-muted"><ol className="flex flex-wrap gap-2"><li><a href="/" className="hover:underline">Trang chủ</a></li>{course && <li><span aria-hidden="true">/ </span><a href="/khoa-hoc" className="hover:underline">Khóa học</a></li>}<li><span aria-hidden="true">/ </span><span aria-current="page" className="text-brk-on-surface">{label}</span></li></ol></nav>}
     <div id="website-content" className={`flex-1 min-w-0 ${learning ? 'min-h-0 overflow-hidden' : ''}`}>{children}</div>
-    {!learning && !(importedHome && path==='/') && <footer className="border-t border-brk-outline mt-10 bg-brk-surface text-brk-muted"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap justify-between gap-4 text-sm"><p>{brand.footerText || '© '+brand.name}</p><nav aria-label="Liên kết chân trang" className="flex flex-wrap gap-4"><a href="/">Trang chủ</a><a href="/tai-khoan">Tài khoản</a></nav></div></footer>}
+    {!learning && !ownTemplate && <footer className="border-t border-brk-outline mt-10 bg-brk-surface text-brk-muted"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap justify-between gap-4 text-sm"><p>{brand.footerText || '© '+brand.name}</p><nav aria-label="Liên kết chân trang" className="flex flex-wrap gap-4"><a href="/">Trang chủ</a><a href="/tai-khoan">Tài khoản</a></nav></div></footer>}
   </div></Context.Provider>
 }
