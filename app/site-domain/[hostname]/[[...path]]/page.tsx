@@ -16,6 +16,8 @@ import { websiteData } from '@/lib/website/server'
 import { getSession } from '@/lib/get-session'
 import prisma from '@/lib/prisma'
 
+export const preferredRegion='icn1'
+
 type Props={params:Promise<{hostname:string;path?:string[]}>}
 async function context(props:Props) {
   const {hostname,path=[]}=await props.params

@@ -113,7 +113,7 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if(route==='page' || route==='account' || route==='catalog') destination.pathname='/site-domain/'+hostname+(path==='/' ? '' : path)
     if(/^\/courses\/[^/]+$/.test(path)) destination.pathname=path.replace('/courses/','/khoa-hoc/')
     const response=destination.pathname!==path ? NextResponse.rewrite(destination,{request:{headers:requestHeaders}}) : NextResponse.next({request:{headers:requestHeaders}})
-    response.headers.set('Server-Timing',`website-domain;dur=${domainDuration.toFixed(1)}`)
+    response.headers.set('Server-Timing',`website-domain;dur=${domainDuration.toFixed(1)};desc="${process.env.VERCEL_REGION || 'local'}"`)
     const ref=request.nextUrl.searchParams.get('ref')
     if(ref && domain.affiliate) saveRefCookie(response,ref,domain.profile.slug,coursePath?.[1] || null,null,coursePath ? 'khoa-hoc' : 'page')
     return response
@@ -148,6 +148,7 @@ function saveRefCookie(
 }
 
 export const config = {
+    regions: ['icn1'],
     matcher: [
         "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff|woff2)).*)",
         // Các prefix API cần được proxy chặn theo role ADMIN (xem ADMIN_ONLY_PREFIXES ở trên)
