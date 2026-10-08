@@ -139,10 +139,11 @@ async function run(){
  console.log('Page import: owner/course scope, empty and generic slots, preserved effects, real navigation, CSP isolation, gzip limits, authentication, origin, revisions, responsive preview, network failure and builtin fallback passed; no live writes.')
 }
 async function uiChecks(courses,initial){
- const React=require('react'),{createRoot}=require('react-dom/client')
+ const React=require('react')
  const dom=new JSDOM('<div id="root"></div>',{url:'https://giautoandien.io.vn/tools/my-site/template'})
  global.window=dom.window;global.document=dom.window.document;global.DOMParser=dom.window.DOMParser;global.IS_REACT_ACT_ENVIRONMENT=true
  Object.defineProperty(global,'navigator',{value:dom.window.navigator,configurable:true})
+ const {createRoot}=require('react-dom/client')
  let state=initial,posts=[],fail=false
  global.fetch=async (_url,options)=>{
   if(!options?.method)return {ok:true,json:async()=>({template:state,courses,slug:'one'})}
@@ -169,6 +170,27 @@ async function uiChecks(courses,initial){
  assert.equal(posts.length,1);assert.equal(posts[0].region,'__append__');assert.equal(load('lib/website/page-template-server').decodePageSource(posts[0].source),fixture)
  assert.equal(button('Dùng lại giao diện có sẵn').disabled,false)
  await React.act(async()=>{button('Dùng lại giao diện có sẵn').click();await new Promise(r=>setTimeout(r,30))});assert.equal(posts[1].action,'builtin');assert.equal(state.active,false)
+ await React.act(async()=>button('Chỉnh sửa mã HTML').click())
+ const editor=document.querySelector('textarea')
+ assert.equal(editor.value,fixture,'Editor displays original source, not injected course HTML')
+ const edited=fixture.replace('My brand','My edited brand')
+ const type=async text=>React.act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(editor,text);editor.dispatchEvent(new window.Event('input',{bubbles:true}))})
+ await type(edited)
+ assert.equal(button('Áp dụng template cho Page').disabled,true,'Unpreviewed edits cannot publish stale source')
+ assert.ok(!document.querySelector('iframe').srcdoc.includes('My edited brand'),'Typing does not repeatedly reset the iframe')
+ const leave=new window.Event('beforeunload',{cancelable:true});window.dispatchEvent(leave);assert.equal(leave.defaultPrevented,true,'Unsaved code protected against navigation')
+ await React.act(async()=>button('Bỏ sửa mã chưa xem trước').click());assert.equal(editor.value,fixture)
+ await type(' ');await React.act(async()=>button('Cập nhật xem trước').click())
+ assert.ok(document.body.textContent.includes('Mã HTML không được để trống'));assert.ok(document.querySelector('iframe').srcdoc.includes('My brand'))
+ await type(edited);await React.act(async()=>button('Cập nhật xem trước').click())
+ assert.ok(document.querySelector('iframe').srcdoc.includes('My edited brand'))
+ assert.ok(document.querySelector('iframe').srcdoc.includes('window.effectsKept=true'))
+ assert.ok(document.querySelector('iframe').srcdoc.includes('Khóa học thật'),'Edited preview still injects real course data')
+ assert.equal(posts.length,2,'Previewing code must not write')
+ await React.act(async()=>{button('Áp dụng template cho Page').click();await new Promise(r=>setTimeout(r,100))})
+ assert.equal(posts.length,3);assert.equal(load('lib/website/page-template-server').decodePageSource(posts[2].source),edited,'Edited original source persists through existing gzip save API')
+ const cleanLeave=new window.Event('beforeunload',{cancelable:true});window.dispatchEvent(cleanLeave);assert.equal(cleanLeave.defaultPrevented,false,'Successful save clears unsaved warning')
+
  await React.act(async()=>ui.unmount());dom.window.close()
 }
 async function pickerFailureChecks(courses,initial){
