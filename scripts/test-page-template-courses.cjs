@@ -67,6 +67,7 @@ async function run(){
  profileId=8;user=2;assert.equal((await (await api.GET(request())).json()).template,null);profileId=7;user=1
  assert.equal((await api.POST(request({action:'builtin',revision:1}))).status,200);assert.equal(entries.get(compiler.pageTemplateKey(7)).value.active,false);assert.equal(entries.get(compiler.pageTemplateKey(7)).value.source,source)
  await uiChecks(courses,entries.get(compiler.pageTemplateKey(7)).value)
+ await pickerFailureChecks(courses,entries.get(compiler.pageTemplateKey(7)).value)
  console.log('Page import: owner/course scope, empty and generic slots, preserved effects, real navigation, CSP isolation, gzip limits, authentication, origin, revisions, responsive preview, network failure and builtin fallback passed; no live writes.')
 }
 async function uiChecks(courses,initial){
@@ -101,5 +102,36 @@ async function uiChecks(courses,initial){
  assert.equal(button('Dùng lại giao diện có sẵn').disabled,false)
  await React.act(async()=>{button('Dùng lại giao diện có sẵn').click();await new Promise(r=>setTimeout(r,30))});assert.equal(posts[1].action,'builtin');assert.equal(state.active,false)
  await React.act(async()=>ui.unmount());dom.window.close()
+}
+async function pickerFailureChecks(courses,initial){
+ const React=require('react'),{createRoot}=require('react-dom/client')
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://giautoandien.io.vn/tools/my-site/template'})
+ global.window=dom.window;global.document=dom.window.document;global.DOMParser=dom.window.DOMParser
+ Object.defineProperty(global,'navigator',{value:dom.window.navigator,configurable:true})
+ let pending,posts=0
+ global.fetch=async (_url,options)=>{
+  if(options?.method){posts++;throw new Error('Unexpected write')}
+  return new Promise((resolve,reject)=>{pending={resolve,reject}})
+ }
+ const ui=createRoot(document.getElementById('root')),button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text)
+ await React.act(async()=>ui.render(React.createElement(load('components/website/PageTemplateImport').default)))
+ const input=document.querySelector('input[type="file"]')
+ assert.equal(input.disabled,false,'Native file picker must open while configuration is pending')
+ const local=fixture.replace('My brand','My local draft')
+ Object.defineProperty(input,'files',{configurable:true,value:[{name:'local.html',size:Buffer.byteLength(local),text:async()=>local}]})
+ await React.act(async()=>{input.dispatchEvent(new window.Event('change',{bubbles:true}));await new Promise(r=>setTimeout(r,30))})
+ assert.ok(document.querySelector('iframe').srcdoc.includes('My local draft'))
+ assert.equal(button('Áp dụng template cho Page').disabled,true,'A failed or pending owner lookup must never allow publishing')
+ await React.act(async()=>{pending.reject(new Error('Cấu hình không tải được'));await new Promise(r=>setTimeout(r,20))})
+ assert.equal(input.disabled,false,'File picker must stay usable after a configuration failure')
+ assert.ok(document.body.textContent.includes('Cấu hình không tải được'))
+ await React.act(async()=>button('Thử tải lại cấu hình').click())
+ await React.act(async()=>{pending.resolve({ok:true,json:async()=>({template:initial,courses,slug:'one'})});await new Promise(r=>setTimeout(r,40))})
+ assert.ok(document.querySelector('iframe').srcdoc.includes('My local draft'),'Late configuration must not overwrite a selected local file')
+ assert.ok(document.querySelector('iframe').srcdoc.includes('Khóa học thật'))
+ assert.equal(button('Áp dụng template cho Page').disabled,false)
+ assert.equal(posts,0)
+ await React.act(async()=>ui.unmount());dom.window.close()
+ console.log('File picker: initial loading, configuration failure, local file preview, safe retry and late response preservation passed.')
 }
 run().catch(e=>{console.error(e);process.exitCode=1})
