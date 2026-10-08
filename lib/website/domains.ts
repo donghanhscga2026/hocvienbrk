@@ -6,6 +6,7 @@ import {accessKey,accessSchema,effectiveModules} from './access'
 import {effectiveApplications,noApplications} from './applications'
 import {requestHostname,isPlatformHost} from './domain-shared'
 import {getSiteRuntimeConfig} from '@/lib/site-profile/config'
+import {domainSnapshot} from './domain-snapshot'
 
 const profileInclude={members:true,theme:true} as const
 function missingTable(error:unknown) {
@@ -15,6 +16,8 @@ function missingTable(error:unknown) {
 /** Hai bảng cũ được đọc qua một bộ phân giải; không tự chuyển hoặc ghi dữ liệu. */
 export const findDomain=cache(async(hostname:string)=>{
   if(isPlatformHost(hostname))return null
+  const snapshot=await domainSnapshot(hostname)
+  if(snapshot)return snapshot.domain
   // Bảng cũ chỉ cần mã chủ sở hữu để kiểm tra trùng, tránh tải website và quan hệ lần thứ hai.
   const [verified,managedRef]=await Promise.all([
     prisma.siteDomain.findUnique({where:{hostname},include:{profile:{include:profileInclude}}}).catch(missingTable),
@@ -34,9 +37,11 @@ export const findDomain=cache(async(hostname:string)=>{
 })
 // Metadata, layout và nội dung dùng cùng kết quả trong một request, không cache quyền giữa các request.
 export const activeDomain=cache(async(rawHost:string)=>{
-  const domain=await findDomain(requestHostname(rawHost))
+  const hostname=requestHostname(rawHost)
+  const snapshot=await domainSnapshot(hostname)
+  const domain=snapshot ? snapshot.domain : await findDomain(hostname)
   if(!domain?.enabled || !domain.verifiedAt || !domain.profile.isActive)return null
-  const row=await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
+  const row=snapshot ? snapshot.access : await prisma.systemConfig.findUnique({where:{key:accessKey(domain.profileId)}})
   // Gói quyền đã lưu là nguồn duy nhất quyết định kết nối sau khi được cấu hình.
   if(!row)return {...domain,applications:noApplications}
   const access=accessSchema.parse(row.value)
