@@ -6,7 +6,7 @@ class CrmError extends Error{constructor(message,status=400){super(message);this
 const profiles=[{id:7,userId:1,isActive:true,slug:'one',siteConfig:{courseScope:{mode:'all'},modules:{courses:true}}},{id:8,userId:2,isActive:true,slug:'two',siteConfig:{courseScope:{mode:'all'},modules:{courses:true}}}]
 const db={
  systemConfig:{findUnique:async({where})=>entries.get(where.key)||null,upsert:async({where,create,update})=>{writes++;entries.set(where.key,{value:entries.has(where.key)?update.value:create.value})}},
- course:{findMany:async args=>{query=args;return [{id:11,id_khoa:'REAL',name_khoa:'Khóa học thật <safe>',name_lop:'Class',mo_ta_ngan:'<b>Mô tả thật</b>',link_anh_bia:'/real.png'}]}},
+ course:{findMany:async args=>{query=args;return [{id:11,id_khoa:'REAL',name_khoa:'Khóa học thật <safe>',name_lop:'Class',phi_coc:500000,feeType:'PHI_CAM_KET',mo_ta_ngan:'<b>Mô tả thật</b>',link_anh_bia:'/real.png'}]}},
  $executeRaw:async()=>{},$transaction:async fn=>fn(db),
 }
 function load(rel){
@@ -32,7 +32,7 @@ const request=(body,origin='https://giautoandien.io.vn',host='giautoandien.io.vn
 async function run(){
  const compiler=load('lib/website/page-template'),server=load('lib/website/page-template-server'),api=load('app/api/websites/page-template/route')
  const courses=await server.pageCourses(profiles[0]);assert.deepEqual(query.where,{AND:[{status:true},{teacherId:1}]});assert.equal(courses[0].href,'https://giautoandien.io.vn/khoa-hoc/REAL')
- assert.equal('teacherBankAccount' in query.select,false)
+ assert.equal('teacherBankAccount' in query.select,false);assert.equal(courses[0].price,500000);assert.equal(courses[0].feeType,'PHI_CAM_KET')
  profiles[0].siteConfig.modules.courses=false;assert.deepEqual(server.pageCourseWhere(profiles[0]),{AND:[{id:-1},{teacherId:1}]});profiles[0].siteConfig.modules.courses=true
  assert.deepEqual(await server.pageCourses(profiles[0],false),[])
  assert.deepEqual(await server.pageCourses({userId:null}),[])
@@ -42,15 +42,19 @@ async function run(){
  assert.equal(doc.querySelector('head').firstElementChild.httpEquiv,'Content-Security-Policy')
  assert.equal(doc.querySelectorAll('#courses .course').length,1);assert.equal(doc.querySelector('#courses h3').textContent,courses[0].title)
  assert.equal(doc.querySelector('#courses h3 safe'),null);assert.ok(!doc.querySelector('#courses').textContent.includes('9.999.999'))
- assert.equal(doc.querySelector('#courses p').textContent,'Mô tả thật');assert.equal(doc.querySelector('#hero').textContent,'My brand');assert.equal(doc.querySelector('#khoa-hoc h2').textContent,'Courses heading')
+ assert.equal(doc.querySelector('#courses .price').textContent,'500.000đ');assert.equal(doc.querySelector('#courses p').textContent,'Mô tả thật');assert.equal(doc.querySelector('#hero').textContent,'My brand');assert.equal(doc.querySelector('#khoa-hoc h2').textContent,'Courses heading')
  assert.equal(doc.querySelector('.filter').hidden,true);assert.equal(doc.querySelectorAll('[data-mfc-zip-bridge],script[src],[onclick]').length,0)
  assert.equal(dom.window.effectsKept,true);doc.querySelector('.detail-btn').click();assert.equal(dom.window.wrongModal,undefined);assert.equal(events[0].href,courses[0].href)
  assert.ok(doc.querySelector('.course').classList.contains('visible'));dom.window.close()
  const empty=new JSDOM(compiler.renderPageTemplate(fixture,'courses',[]));assert.ok(empty.window.document.querySelector('#courses').textContent.includes('Chưa có'));assert.ok(!empty.window.document.querySelector('#courses').textContent.includes('Sample'));empty.window.close()
+ const whole=new JSDOM(compiler.renderPageTemplate(fixture,'khoa-hoc',courses));assert.equal(whole.window.document.querySelector('#khoa-hoc h2').textContent,'Courses heading');assert.equal(whole.window.document.querySelectorAll('#courses .course').length,1);whole.window.close()
+ assert.throws(()=>compiler.renderPageTemplate('<section id="khoa-hoc"><h2>Keep heading</h2><p>Keep intro</p><div id="different-grid"></div></section>','khoa-hoc',courses),/chứa tiêu đề/)
+ assert.throws(()=>compiler.renderPageTemplate('<section id="section"><div><h2>Nested heading</h2><p>Intro</p></div><div id="unrecognized-grid"></div></section>','section',courses),/chứa tiêu đề/)
+ assert.equal(compiler.coursePrice({price:0,feeType:'MIEN_PHI'}).text,'Miễn phí');assert.equal(compiler.coursePrice({price:0,feeType:'PHI_TUY_TINH'}).text,'Tùy tâm');assert.equal(compiler.coursePrice({}).text,'Xem học phí')
  assert.throws(()=>compiler.renderPageTemplate(fixture,'missing',[]),/duy nhất/)
  assert.throws(()=>compiler.renderPageTemplate(fixture.replace('id="hero"','id="courses"'),'courses',[]),/duy nhất/)
  assert.throws(()=>compiler.renderPageTemplate(fixture,'hero',[]),/duy nhất/)
- const appended=new JSDOM(compiler.renderPageTemplate('<h1>Generic</h1>','__append__',courses));assert.equal(appended.window.document.querySelector('.system-course-card h3').textContent,courses[0].title);appended.window.close()
+ const appended=new JSDOM(compiler.renderPageTemplate('<h1>Generic</h1>','__append__',courses));assert.equal(appended.window.document.querySelector('.system-course-card h3').textContent,courses[0].title);assert.equal(appended.window.document.querySelector('.system-course-pricing strong').textContent,'500.000đ');appended.window.close()
  assert.equal(server.decodePageSource(source),fixture);assert.throws(()=>server.decodePageSource('invalid!'))
  assert.throws(()=>server.decodePageSource(gzipSync('x'.repeat(compiler.PAGE_HTML_LIMIT+1)).toString('base64')))
  const apply={action:'apply',revision:0,name:'Test HTML',region:'courses',source}

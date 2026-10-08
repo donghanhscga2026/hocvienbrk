@@ -19,7 +19,7 @@ function regions(html:string) {
   const doc=new DOMParser().parseFromString(html,'text/html')
   return [...doc.querySelectorAll<HTMLElement>('div[id],section[id],main[id],ul[id],ol[id],article[id]')]
     .filter(n=>/^[A-Za-z][\w:.-]{0,159}$/.test(n.id) && doc.querySelectorAll('[id]').length<2000)
-    .map(n=>({id:n.id,label:n.id+(n.querySelector('h1,h2,h3')?.textContent?' · '+n.querySelector('h1,h2,h3')!.textContent!.trim().slice(0,60):'')}))
+    .map(n=>({id:n.id,label:(n.id==='courses' || n.id==='course-list'?'Danh sách khóa học · ': '')+n.id+(n.querySelector('h1,h2,h3')?.textContent?' · '+n.querySelector('h1,h2,h3')!.textContent!.trim().slice(0,60):'')}))
     .filter((n,i,all)=>all.findIndex(x=>x.id===n.id)===i).slice(0,100)
 }
 export default function PageTemplateImport() {
@@ -93,7 +93,7 @@ export default function PageTemplateImport() {
     <section className="space-y-4 rounded-2xl border bg-white p-5">
       <p className="text-sm">Đang dùng: <strong>{saved?.active?saved.name:'Giao diện có sẵn'}</strong></p>
       <label className="block"><span className="mb-2 block font-medium">File HTML / ZIP</span><input type="file" accept=".html,.htm,.zip" disabled={busy} onChange={e=>void choose(e.target.files?.[0])} /></label>
-      {html && <label className="block"><span className="mb-2 block font-medium">Vùng hiển thị danh sách khóa học</span><select className="w-full rounded-xl border p-3" disabled={busy} value={region} onChange={e=>setRegion(e.target.value)}><option value="__append__">Thêm vùng khóa học ở cuối trang</option>{options.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}</select><span className="mt-2 block text-sm text-slate-500">Nội dung minh họa trong vùng đã chọn sẽ được thay bằng {courses.length} khóa học thật. Hãy chọn vùng chứa các thẻ khóa học, tránh chọn cả trang.</span></label>}
+      {html && <label className="block"><span className="mb-2 block font-medium">Vùng hiển thị danh sách khóa học</span><select className="w-full rounded-xl border p-3" disabled={busy} value={region} onChange={e=>setRegion(e.target.value)}><option value="__append__">Thêm vùng khóa học ở cuối trang</option>{options.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}</select><span className="mt-2 block text-sm text-slate-500">Chỉ thay các thẻ khóa học bằng {courses.length} khóa học thật. Tiêu đề, đoạn giới thiệu và nội dung xung quanh được giữ nguyên. Với mẫu The Top1, chọn courses; không chọn cả mục khoa-hoc.</span></label>}
       <p className="text-sm text-slate-500">HTML nên có CSS và JS nhúng; ZIP có thể chứa các file đi kèm. Hiệu ứng chạy trong khung riêng. Nút của danh sách khóa học mở trang thông tin trên hệ thống chính để đăng ký; các form và nút khác cần được cấu hình riêng trong template.</p>
       {warnings.length>0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">{warnings.map(w=><li key={w}>{w}</li>)}</ul>}
       {preview.error && <p role="alert" className="text-red-700">{preview.error}</p>}

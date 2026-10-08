@@ -10,7 +10,7 @@ export const pageTemplateSchema = z.object({
   source:z.string().max(Math.ceil(PAGE_COMPRESSED_LIMIT / 3) * 4 + 4),
 }).strict()
 export type PageTemplate = z.infer<typeof pageTemplateSchema>
-export type PageCourse = {id:number;title:string;description:string;image:string;href:string}
+export type PageCourse = {id:number;title:string;description:string;image:string;href:string;price?:number;feeType?:string}
 type Node = DefaultTreeAdapterMap['node']
 type Element = DefaultTreeAdapterMap['element']
 const element = (node:Node):node is Element => 'tagName' in node
@@ -33,6 +33,14 @@ const cleanText=(value:string)=>{
   return plain.length>180?plain.slice(0,177).trimEnd()+'…':plain
 }
 
+export function coursePrice(course:PageCourse) {
+  const labels:Record<string,string>={PHI_CAM_KET:'Phí cam kết',PHI_TUY_TINH:'Phí tùy tâm',PHI_DONG_HANH:'Phí đồng hành',PHI_TOI_THIEU:'Phí tối thiểu'}
+  const label=labels[course.feeType || ''] || 'Học phí'
+  if(course.price==null || !Number.isFinite(course.price) || course.price<0)return {label,text:'Xem học phí'}
+  if(course.price===0)return {label,text:course.feeType==='PHI_TUY_TINH'?'Tùy tâm':'Miễn phí'}
+  return {label,text:course.price.toLocaleString('vi-VN')+'đ'}
+}
+
 /** Compile one region before the template's own scripts initialize. No private course fields enter the frame. */
 export function renderPageTemplate(html:string,region:string,courses:PageCourse[]) {
   if(new TextEncoder().encode(html).length>PAGE_HTML_LIMIT)throw new Error('Template sau giải nén vượt 8MB.')
@@ -40,6 +48,19 @@ export function renderPageTemplate(html:string,region:string,courses:PageCourse[
   const matches=nodes.filter(n=>attr(n,'id')===region)
   if(region!=='__append__' && (matches.length!==1 || !['div','section','main','ul','ol','article'].includes(matches[0].tagName)))throw new Error('Chọn một vùng danh sách duy nhất trong template.')
   let slot=matches[0]
+  if(slot){
+    const inner=walk(slot).filter(n=>n!==slot && ['courses','course-list','system-course-list'].includes(attr(n,'id')))
+    if(inner.length===1)slot=inner[0]
+    else if(walk(slot).some(n=>{
+      if(!/^h[1-6]$/.test(n.tagName))return false
+      let parent:Node|null=n.parentNode
+      while(parent && parent!==slot){
+        if(element(parent) && (['article','a'].includes(parent.tagName) || ['course','course-card','system-course-card','card'].some(c=>hasClass(parent as Element,c))))return false
+        parent='parentNode' in parent?parent.parentNode:null
+      }
+      return true
+    }))throw new Error('Vùng này chứa tiêu đề. Hãy chọn vùng danh sách bên trong, ví dụ courses, để giữ nguyên phần giới thiệu.')
+  }
   if(region==='__append__') {
     append(body,'<section><h2>Khóa học của tôi</h2><div id="system-course-list"></div></section>')
     slot=walk(body).find(n=>attr(n,'id')==='system-course-list')!
@@ -54,6 +75,7 @@ export function renderPageTemplate(html:string,region:string,courses:PageCourse[
   slot.childNodes=[];set(slot,'data-system-course-list','true')
   if(!prototype)set(slot,'data-system-course-layout','cards')
   for(const [index,course] of courses.entries()) {
+    const pricing=coursePrice(course)
     let card:Element
     if(prototype && element(prototype)) {
       const fragment=parseFragment(serialize({nodeName:'#document-fragment',childNodes:[prototype]}))
@@ -67,14 +89,14 @@ export function renderPageTemplate(html:string,region:string,courses:PageCourse[
         if(n.tagName==='p')text(n,cleanText(course.description))
         if(hasClass(n,'course-category'))text(n,'Khóa học')
         if(hasClass(n,'cover-tag'))text(n,'Khóa học trên hệ thống')
-        if(hasClass(n,'price'))text(n,'Xem học phí tại trang khóa học')
+        if(hasClass(n,'price')){text(n,pricing.text);set(n,'title',pricing.label)}
         if(n.tagName==='button'){set(n,'type','button');set(n,'data-system-course-link',course.href);set(n,'aria-label','Xem thông tin '+course.title);text(n,'Xem thông tin')}
       }
       const cover=descendants.find(n=>hasClass(n,'course-cover'))
       if(cover && course.image)append(cover,`<img class="system-course-cover" src="${escape(course.image)}" alt="" loading="lazy">`)
       set(card,'data-category','course');set(card,'class',attr(card,'class')+' visible')
     } else {
-      card=parseFragment(`<article class="system-course-card"><a class="system-course-open" data-system-course-link="${escape(course.href)}" href="${escape(course.href)}" aria-label="Xem khóa học ${escape(course.title)}"><div class="system-course-media">${course.image?`<img src="${escape(course.image)}" alt="" loading="lazy">`:'<span>Khóa học trực tuyến</span>'}</div><div class="system-course-content"><span class="system-course-label">Khóa học</span><h3 title="${escape(course.title)}">${escape(course.title)}</h3><p>${escape(cleanText(course.description))}</p><span class="system-course-cta">Xem khóa học <span aria-hidden="true">→</span></span></div></a></article>`).childNodes[0] as Element
+      card=parseFragment(`<article class="system-course-card"><a class="system-course-open" data-system-course-link="${escape(course.href)}" href="${escape(course.href)}" aria-label="Xem khóa học ${escape(course.title)}"><div class="system-course-media">${course.image?`<img src="${escape(course.image)}" alt="" loading="lazy">`:'<span>Khóa học trực tuyến</span>'}</div><div class="system-course-content"><span class="system-course-label">Khóa học</span><h3 title="${escape(course.title)}">${escape(course.title)}</h3><p>${escape(cleanText(course.description))}</p><div class="system-course-pricing"><span>${escape(pricing.label)}</span><strong>${escape(pricing.text)}</strong></div><span class="system-course-cta">Xem khóa học <span aria-hidden="true">→</span></span></div></a></article>`).childNodes[0] as Element
     }
     card.parentNode=slot;slot.childNodes.push(card)
   }
@@ -98,7 +120,10 @@ export function renderPageTemplate(html:string,region:string,courses:PageCourse[
 [data-system-course-list] .system-course-label{color:#6d28d9;font-size:12px;line-height:18px;font-weight:600}
 [data-system-course-list] .system-course-content h3{margin:0;min-height:52px;font-size:19px;line-height:26px;font-weight:700;color:#0f172a;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 [data-system-course-list] .system-course-content p{margin:0;min-height:66px;font-size:14px;line-height:22px;font-weight:400;color:#64748b;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere}
-[data-system-course-list] .system-course-cta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding:12px 16px;border-radius:12px;background:#f5f3ff;color:#6d28d9;font-size:14px;line-height:22px;font-weight:600}
+[data-system-course-list] .system-course-pricing{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:16px;border-top:1px solid #eef2f6}
+[data-system-course-list] .system-course-pricing>span{font-size:12px;line-height:20px;color:#64748b}
+[data-system-course-list] .system-course-pricing>strong{font-size:20px;line-height:28px;font-weight:750;color:#6d28d9;white-space:nowrap}
+[data-system-course-list] .system-course-cta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding:12px 16px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;font-size:14px;line-height:22px;font-weight:600}
 [data-system-course-list] .course-body p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 @media(prefers-reduced-motion:reduce){[data-system-course-list] .system-course-card{transition:none}[data-system-course-list] .system-course-card:hover{transform:none}}
 </style>`)
