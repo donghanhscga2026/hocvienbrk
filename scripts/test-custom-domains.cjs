@@ -93,6 +93,17 @@ async function authChecks(){
   ok((await foreignLogin.json()).url==='https://brk.io.vn','Auth callback rejects foreign origin')
 }
 async function run(){
+  let verified={profileId:7,enabled:true},managedOwner=7,fullManagedReads=0
+  const resolver=loader({'@/lib/prisma':{__esModule:true,default:{
+    siteDomain:{findUnique:async()=>verified},
+    siteProfileDomain:{findUnique:async args=>{if(args.include)fullManagedReads++;return args.select ? {profileId:managedOwner} : {profileId:managedOwner,isActive:true,createdAt:new Date(),profile:profiles[0]}}},
+  }}})('lib/website/domains')
+  ok(await resolver.findDomain('example.vn')===verified,'Verified domain remains authoritative')
+  ok(fullManagedReads===0,'Verified domain does not load legacy profile relations')
+  managedOwner=8;ok(await resolver.findDomain('example.vn')===null,'Lightweight legacy check still blocks conflicting owners')
+  managedOwner=7;verified.enabled=false;ok((await resolver.findDomain('example.vn')).enabled===false,'Disabled verified domain never falls back to active legacy domain')
+  verified=null;ok((await resolver.findDomain('example.vn')).enabled===true,'Legacy-only domains still resolve their full profile')
+  ok(fullManagedReads===1,'Full legacy profile is loaded only for a legacy-only domain')
   for(const raw of ['https://brk.io.vn','brk.io.vn/path','brk.io.vn:443','127.0.0.1','foo.local','giautoandien.io.vn','a.giautoandien.io.vn','preview.vercel.app','-bad.vn','bad_.vn']){assert.throws(()=>shared.normalizeHostname(raw));checks++}
   ok(shared.normalizeHostname(' BRK.IO.VN. ')==='brk.io.vn','Normalize apex domain')
   ok(shared.normalizeHostname('learn.brk.io.vn')==='learn.brk.io.vn','Support customer subdomain')
