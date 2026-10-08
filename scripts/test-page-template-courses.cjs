@@ -50,6 +50,25 @@ async function run(){
  assert.equal(doc.querySelector('.filter').hidden,true);assert.equal(doc.querySelectorAll('[data-mfc-zip-bridge],script[src],[onclick]').length,0)
  assert.equal(dom.window.effectsKept,true);doc.querySelector('.detail-btn').click();assert.equal(dom.window.wrongModal,undefined);assert.equal(events[0].href,courses[0].href)
  assert.ok(doc.querySelector('.course').classList.contains('visible'));dom.window.close()
+ const anchorFixture='<nav id="mobile-nav"><a href="#ve-chung-toi"><span>About</span></a><a href="#lo-trinh">Journey</a><a href="#khoa-hoc">Courses</a><a href="#cong-dong">Community</a><a href="#dang-ky">Try free</a><a href="#m%E1%BB%A5c">Encoded</a><a href="#missing">Missing</a><a href="#">Top</a></nav><section id="ve-chung-toi"></section><section id="lo-trinh"></section><section id="khoa-hoc"></section><section id="cong-dong"></section><section id="dang-ky"></section><section id="mục"></section><script>document.querySelectorAll("#mobile-nav a").forEach(a=>a.addEventListener("click",()=>window.mobileMenuClosed=true))</script>'
+ for(const region of [null,'__append__']){
+  const anchors=new JSDOM(compiler.renderPageTemplate(anchorFixture,region,courses),{runScripts:'dangerously',url:'https://preview.invalid/page/owner'})
+  const scrolled=[],messages=[],w=anchors.window
+  w.HTMLElement.prototype.scrollIntoView=function(options){scrolled.push({id:this.id||'body',options})}
+  w.matchMedia=()=>({matches:false});w.parent.postMessage=e=>messages.push(e)
+  for(const [index,a] of [...w.document.querySelectorAll('#mobile-nav a')].entries()){
+   const event=new w.MouseEvent('click',{bubbles:true,cancelable:true})
+   ;(index===0?a.querySelector('span'):a).dispatchEvent(event)
+   assert.equal(event.defaultPrevented,true)
+   assert.equal(w.mobileMenuClosed,true,'Anchor handling must keep the template mobile menu handler')
+  }
+  assert.deepEqual(scrolled.map(s=>s.id),['ve-chung-toi','lo-trinh','khoa-hoc','cong-dong','dang-ky','mục','body'])
+  assert.equal(scrolled[0].options.behavior,'smooth');assert.equal(messages.length,0)
+  assert.equal(w.location.href,'https://preview.invalid/page/owner','Section links must never reload or navigate the iframe')
+  w.matchMedia=()=>({matches:true});w.document.querySelector('#mobile-nav a').click()
+  assert.equal(scrolled.at(-1).options.behavior,'instant')
+  anchors.window.close()
+ }
  const empty=new JSDOM(compiler.renderPageTemplate(fixture,'courses',[]));assert.ok(empty.window.document.querySelector('#courses').textContent.includes('Chưa có'));assert.ok(!empty.window.document.querySelector('#courses').textContent.includes('Sample'));empty.window.close()
  const whole=new JSDOM(compiler.renderPageTemplate(fixture,'khoa-hoc',courses));assert.equal(whole.window.document.querySelector('#khoa-hoc h2').textContent,'Courses heading');assert.equal(whole.window.document.querySelectorAll('#courses .course').length,1);whole.window.close()
  assert.throws(()=>compiler.renderPageTemplate('<section id="khoa-hoc"><h2>Keep heading</h2><p>Keep intro</p><div id="different-grid"></div></section>','khoa-hoc',courses),/chứa tiêu đề/)
