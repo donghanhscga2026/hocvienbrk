@@ -211,13 +211,14 @@ const getCoursesForProfileCached = unstable_cache(
       include: {
         courseCategory: true,
         teacherBankAccount: true,
+        teacher: { select: { name: true } },
         _count: { select: { enrollments: { where: { status: 'ACTIVE' } }, lessons: true } }
       },
       orderBy: [{ pin: 'asc' }, { id: 'asc' }]
     })
     return courses.map(course => ({ ...course, activeStudentCount: course._count?.enrollments ?? 0 }))
   },
-  ['courses-for-profile'],
+  ['courses-for-profile-with-teacher'],
   { tags: ['site-profile'], revalidate: 600 }
 )
 

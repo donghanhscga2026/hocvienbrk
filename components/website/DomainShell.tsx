@@ -39,6 +39,6 @@ export default function DomainShell({brand,pages=[],path:initialPath='/',importe
     </header>}
     {path!=='/' && <nav aria-label="Đường dẫn trang" className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 text-sm text-brk-muted"><ol className="flex flex-wrap gap-2"><li><a href="/" className="hover:underline">Trang chủ</a></li>{course && <li><span aria-hidden="true">/ </span><a href="/khoa-hoc" className="hover:underline">Khóa học</a></li>}<li><span aria-hidden="true">/ </span><span aria-current="page" className="text-brk-on-surface">{label}</span></li></ol></nav>}
     <div id="website-content" className={`flex-1 min-w-0 ${learning ? 'min-h-0 overflow-hidden' : ''}`}>{children}</div>
-    {!learning && <footer className="border-t border-brk-outline mt-10 bg-brk-surface text-brk-muted"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap justify-between gap-4 text-sm"><p>{brand.footerText || '© '+brand.name}</p><nav aria-label="Liên kết chân trang" className="flex flex-wrap gap-4"><a href="/">Trang chủ</a><a href="/tai-khoan">Tài khoản</a></nav></div></footer>}
+    {!learning && !(importedHome && path==='/') && <footer className="border-t border-brk-outline mt-10 bg-brk-surface text-brk-muted"><div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-wrap justify-between gap-4 text-sm"><p>{brand.footerText || '© '+brand.name}</p><nav aria-label="Liên kết chân trang" className="flex flex-wrap gap-4"><a href="/">Trang chủ</a><a href="/tai-khoan">Tài khoản</a></nav></div></footer>}
   </div></Context.Provider>
 }

@@ -164,6 +164,10 @@ async function run(){
   ok(home.includes('href="/khoa-hoc"') && home.includes('href="/gioi-thieu"') && home.includes('href="/login"'),'Home has shared course, custom page and login navigation')
   ok(detail.includes('aria-label="Đường dẫn trang"') && !home.includes('aria-label="Đường dẫn trang"'),'Breadcrumb appears on internal pages only')
   ok(home.includes('aria-expanded="false"') && home.includes('aria-controls="website-menu"'),'Mobile navigation exposes accessible toggle')
+  const importedHome=renderToStaticMarkup(React.createElement(Shell,{...shellProps,path:'/',importedHome:true},'Custom template'))
+  const importedDetail=renderToStaticMarkup(React.createElement(Shell,{...shellProps,path:'/khoa-hoc/OWN',importedHome:true},'Course'))
+  ok(!importedHome.includes('<header') && !importedHome.includes('<footer') && importedHome.includes('Custom template'),'Imported home uses its own header and footer')
+  ok(home.includes('<footer') && importedDetail.includes('<header') && importedDetail.includes('<footer'),'Built-in home and internal course pages retain shared navigation and footer')
 
   const {websiteTheme,contrastRatio}=load('lib/website/theme')
   for (const background of ['#ffffff','#f8fafc','#808080','#777777','#121212','#2d3142','#fae0c7','#0000','transparent']) {

@@ -31,7 +31,7 @@ export default async function ProfileHome({profile,customDomain=false,modules}:{
     ] = await Promise.all([
         customDomain ? (modules?.courses===false ? [] : prisma.course.findMany({
             where:courseWhere,
-            include:{courseCategory:true,teacherBankAccount:true,_count:{select:{enrollments:{where:{status:'ACTIVE'}},lessons:true}}},
+            include:{courseCategory:true,teacherBankAccount:true,teacher:{select:{name:true}},_count:{select:{enrollments:{where:{status:'ACTIVE'}},lessons:true}}},
             orderBy:[{pin:'asc'},{id:'asc'}]
         }).then(rows=>rows.map(c=>({...c,activeStudentCount:c._count.enrollments})))) : getCoursesForProfile(profile),
         customDomain ? null : getSurveyForProfile(profile),
