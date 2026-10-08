@@ -14,7 +14,7 @@ import type {DomainModules} from '@/lib/website/domain-shared'
 
 /** Giữ mẫu trang cá nhân hiện có; domain chỉ đọc dữ liệu thuộc website, không dùng dữ liệu dự phòng. */
 export default async function ProfileHome({profile,customDomain=false,modules}:{profile:any;customDomain?:boolean;modules?:DomainModules}) {
-    const imported=await ImportedPage({profile,coursesEnabled:modules?.courses!==false})
+    const imported=await ImportedPage({profile,coursesEnabled:modules?.courses!==false,customDomain})
     if(imported)return imported
     const config=getSiteRuntimeConfig(profile)
     const courseWhere=getCourseWhereForProfile(profile)
