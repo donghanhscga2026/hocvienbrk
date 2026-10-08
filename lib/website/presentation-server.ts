@@ -28,5 +28,5 @@ export async function domainWebsite(profile:{id:number;slug?:string;title:string
   document.background=palette.background || profile.backgroundColor || '#f8fafc'
   const content=await readWebsitePages(profile.id)
   document.pages.push(...content.pages.filter(p=>p.published).map(p=>({id:'page-'+p.slug,title:p.title,slug:p.slug,nodes:[]})))
-  return {...document,navigation:content.menu.length?websiteNavigation(content,profile.slug || '',true,{courses:config.modules.courses,tools:config.modules.tools}):undefined}
+  return {...document,navigation:content.menu.length || content.pages.some(p=>p.published)?websiteNavigation(content,profile.slug || '',true,{courses:config.modules.courses,tools:config.modules.tools}):undefined}
 }

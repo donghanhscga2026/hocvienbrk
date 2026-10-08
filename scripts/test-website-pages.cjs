@@ -23,7 +23,8 @@ function load(rel){
   if(name==='@/auth')return {auth:async()=>userId==null?null:{user:{id:String(userId)}}}
   if(name==='@/lib/crm/service')return {CrmError}
   if(name==='@/app/actions/site-profile-actions')return {getCoursesForProfile:async()=>[],getPostsForProfile:async()=>[],getSiteProfile:async slug=>profiles.find(p=>p.slug===slug && p.isActive)}
-  if(name==='next/navigation')return {notFound:()=>{throw Error('404')}}
+  if(name==='next/navigation')return {notFound:()=>{throw Error('404')},usePathname:()=>null}
+  if(name==='next-auth/react')return {useSession:()=>({data:null}),signOut:()=>{}}
   if(name==='next/cache')return {unstable_cache:(fn,keys)=>async(...args)=>{const key=JSON.stringify([keys,args]);if(!sourceCache.has(key))sourceCache.set(key,Promise.resolve(fn(...args)));return sourceCache.get(key)}}
   if(name.startsWith('@/'))return load(name.slice(2))
   if(name.startsWith('.'))return load(path.relative(root,path.resolve(path.dirname(file),name)))
@@ -84,6 +85,18 @@ async function run(){
  await assert.rejects(()=>publicRoute.default({params:Promise.resolve({slug:'lucy',pageSlug:'gioi-thieu'})}),/404/);checks++
  rows.set(pages.websitePagesKey(7),published)
  check((await publicRoute.default({params:Promise.resolve({slug:'lucy',pageSlug:'gioi-thieu'})})).props.html.includes('Keep title'),'Public page selects own template')
+ const presentation=load('lib/website/presentation-server')
+ rows.set(pages.websitePagesKey(7),{...published,menu:[],pages:[{...page,published:true,showInMenu:false}]})
+ const documentConfig=await presentation.domainWebsite({...profiles[0],title:'Lucy'})
+ check(documentConfig.pages.some(p=>p.slug==='gioi-thieu') && !documentConfig.navigation.some(l=>l.href==='/gioi-thieu'),'Published page can stay accessible while excluded from native automatic menu')
+ rows.set(pages.websitePagesKey(7),published)
+ const Shell=load('components/website/DomainShell').default,brand={name:'Lucy',color:'#7c3aed',background:'#ffffff',ownerId:1,courses:true,crm:false,affiliate:false}
+ const shell=renderToStaticMarkup(React.createElement(Shell,{brand,pages:[{title:'About',slug:'gioi-thieu'}],path:'/gioi-thieu',importedHome:true},'Imported content'))
+ check(!shell.includes('<header') && !shell.includes('<footer') && !shell.includes('Đường dẫn trang'),'Imported subpage uses its own complete template chrome')
+ const native=renderToStaticMarkup(React.createElement(Shell,{brand,path:'/khoa-hoc/OWN',importedHome:true},'Course'))
+ check(native.includes('<header') && native.includes('<footer'),'Internal course pages keep the system shell')
+ const fontHtml='<style>@font-face{src:url(data:font/ttf;base64,'+Buffer.alloc(4000,42).toString('base64')+')}</style>'
+ check(load('lib/website/page-template-assets').externalizePageAssets(fontHtml,7,1,'gioi-thieu').html.includes('?page=gioi-thieu'),'Subpage asset URL keeps the independent template identity')
  check((await templates.POST(request({action:'builtin',revision:1},'gioi-thieu'))).status===200,'Owner can switch to plain content without deleting source')
  check(rows.get(key).source===template.source && !rows.get(key).active,'Old template retained on switch')
  const uiDom=new JSDOM('<div id="root"></div>',{url:'https://giautoandien.io.vn/tools/my-site/pages'})
