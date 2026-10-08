@@ -134,15 +134,33 @@ async function run(){
  const summary=await (await api.GET(new Request('https://giautoandien.io.vn/api/websites/page-template?summary=1',{headers:{host:'giautoandien.io.vn'}}))).json();assert.equal(summary.template.active,true);assert.equal(summary.template.source,undefined)
  profileId=8;user=2;assert.equal((await (await api.GET(request())).json()).template,null);profileId=7;user=1
  assert.equal((await api.POST(request({action:'builtin',revision:1}))).status,200);assert.equal(entries.get(compiler.pageTemplateKey(7)).value.active,false);assert.equal(entries.get(compiler.pageTemplateKey(7)).value.source,source)
+ await formatterChecks()
  await uiChecks(courses,entries.get(compiler.pageTemplateKey(7)).value)
  await pickerFailureChecks(courses,entries.get(compiler.pageTemplateKey(7)).value)
  console.log('Page import: owner/course scope, empty and generic slots, preserved effects, real navigation, CSP isolation, gzip limits, authentication, origin, revisions, responsive preview, network failure and builtin fallback passed; no live writes.')
 }
+async function formatterChecks(){
+ const {formatTemplateHtml}=load('lib/website/template-format')
+ const raw='<script>const message=\` a\n  b \`;window.effectsKept=true</script><style>.a::before{content:" a  b "}</style><pre> a\n   b </pre><textarea>  a\n b</textarea>'
+ const input='<!doctype html><html><head></head><body><section><h2>Heading</h2><div><span>A</span><span>B</span></div><img src="data:image/png;base64,'+'a'.repeat(10000)+'">'+raw+'</section></body></html>'
+ const formatted=await formatTemplateHtml(input)
+ assert.ok(formatted.split('\n').length>10,'Minified HTML becomes readable structural lines')
+ const before=new JSDOM(input),after=new JSDOM(formatted)
+ for(const tag of ['script','style','pre','textarea'])assert.equal(after.window.document.querySelector(tag).textContent,before.window.document.querySelector(tag).textContent,tag+' content preserved byte for byte')
+ assert.equal(after.window.document.querySelector('img').getAttribute('src'),before.window.document.querySelector('img').getAttribute('src'),'Embedded assets unchanged')
+ assert.equal(after.window.document.querySelector('div').textContent,'AB','Inline spacing preserved')
+ assert.equal(await formatTemplateHtml(formatted),formatted,'Formatting is stable')
+ await assert.rejects(()=>formatTemplateHtml('<section><div></section>'))
+ before.window.close();after.window.close()
+}
 async function uiChecks(courses,initial){
  const React=require('react')
- const dom=new JSDOM('<div id="root"></div>',{url:'https://giautoandien.io.vn/tools/my-site/template'})
+ const dom=new JSDOM('<div id="root"></div>',{url:'https://giautoandien.io.vn/tools/my-site/template',pretendToBeVisual:true})
  global.window=dom.window;global.document=dom.window.document;global.DOMParser=dom.window.DOMParser;global.IS_REACT_ACT_ENVIRONMENT=true
  Object.defineProperty(global,'navigator',{value:dom.window.navigator,configurable:true})
+ global.MutationObserver=window.MutationObserver;global.getComputedStyle=window.getComputedStyle;global.Node=window.Node;global.Window=window.Window
+ window.Range.prototype.getClientRects=()=>[]
+ window.Range.prototype.getBoundingClientRect=()=>({left:0,right:0,top:0,bottom:0,width:0,height:0})
  const {createRoot}=require('react-dom/client')
  let state=initial,posts=[],fail=false
  global.fetch=async (_url,options)=>{
@@ -171,10 +189,20 @@ async function uiChecks(courses,initial){
  assert.equal(button('Dùng lại giao diện có sẵn').disabled,false)
  await React.act(async()=>{button('Dùng lại giao diện có sẵn').click();await new Promise(r=>setTimeout(r,30))});assert.equal(posts[1].action,'builtin');assert.equal(state.active,false)
  await React.act(async()=>button('Chỉnh sửa mã HTML').click())
- const editor=document.querySelector('textarea')
+ for(let i=0;i<50 && !document.querySelector('.cm-editor');i++)await React.act(async()=>new Promise(r=>setTimeout(r,20)))
+ const view=require('@codemirror/view').EditorView.findFromDOM(document.querySelector('.cm-editor'))
+ assert.ok(view,'Code editor loaded with virtualized lines')
+ const editor={get value(){return view.state.doc.toString()}}
+ assert.ok(document.querySelector('.cm-lineNumbers'),'Editor includes line numbers')
  assert.equal(editor.value,fixture,'Editor displays original source, not injected course HTML')
+ await React.act(async()=>{button('Định dạng mã').click();await new Promise(r=>setTimeout(r,500))})
+ assert.ok(editor.value.split('\n').length>10)
+ assert.ok(editor.value.includes('<script>window.effectsKept=true</script>'))
+ assert.equal(posts.length,2,'Formatting must not publish or write')
+ assert.equal(button('Áp dụng template cho Page').disabled,true)
+ await React.act(async()=>button('Bỏ sửa mã chưa xem trước').click());assert.equal(editor.value,fixture)
  const edited=fixture.replace('My brand','My edited brand')
- const type=async text=>React.act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(editor,text);editor.dispatchEvent(new window.Event('input',{bubbles:true}))})
+ const type=async text=>React.act(async()=>{view.dispatch({changes:{from:0,to:view.state.doc.length,insert:text}})})
  await type(edited)
  assert.equal(button('Áp dụng template cho Page').disabled,true,'Unpreviewed edits cannot publish stale source')
  assert.ok(!document.querySelector('iframe').srcdoc.includes('My edited brand'),'Typing does not repeatedly reset the iframe')
@@ -243,3 +271,4 @@ async function pickerFailureChecks(courses,initial){
  console.log('File picker: initial loading, configuration failure, local file preview, safe retry and late response preservation passed.')
 }
 run().catch(e=>{console.error(e);process.exitCode=1})
+

@@ -5,6 +5,7 @@ import {prepareWebsiteZip} from '@/lib/course-page/importer/zip-browser'
 import {PAGE_HTML_LIMIT,PAGE_COMPRESSED_LIMIT,renderPageTemplate,type PageCourse} from '@/lib/website/page-template'
 import {type ContentTemplate} from '@/lib/website/pages'
 import ImportedPageFrame from './ImportedPageFrame'
+import TemplateCodeEditor from './TemplateCodeEditor'
 
 async function pack(html:string) {
   const buffer=new Uint8Array(await new Response(new Blob([html]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer())
@@ -86,6 +87,18 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
       setMessage('Đã đọc file. Chọn vùng khóa học và kiểm tra bản xem trước trước khi áp dụng.')
     }catch(e){setError(e instanceof Error?e.message:'Không đọc được file.')}finally{setBusy(false)}
   }
+  async function formatCode(){
+    if(!codeDraft.trim()){setError('Mã HTML không được để trống.');return}
+    setBusy(true);setError('');setMessage('')
+    try{
+      const {formatTemplateHtml}=await import('@/lib/website/template-format')
+      const formatted=await formatTemplateHtml(codeDraft)
+      if(new Blob([formatted]).size>PAGE_HTML_LIMIT)throw new Error('Mã sau định dạng vượt 8MB. Mã hiện tại được giữ nguyên.')
+      localFile.current=true;setCodeDraft(formatted)
+      setMessage('Đã chia dòng và thụt lề mã HTML. Kiểm tra Cập nhật xem trước rồi Áp dụng template cho Page để lưu.')
+    }catch(e){setError(e instanceof Error?e.message:'Không thể định dạng mã. Mã hiện tại được giữ nguyên.')}
+    finally{setBusy(false)}
+  }
   function updateCodePreview(){
     if(!codeDraft.trim()){setError('Mã HTML không được để trống.');return}
     if(new Blob([codeDraft]).size>PAGE_HTML_LIMIT){setError('Mã HTML vượt 8MB. Hãy giảm ảnh hoặc font nhúng.');return}
@@ -116,7 +129,7 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
     <section className="space-y-4 rounded-2xl border bg-white p-5">
       <p className="text-sm">Đang dùng: <strong>{saved?.active?saved.name:'Giao diện có sẵn'}</strong></p>
       <label className="block"><span className="mb-2 block font-medium">File HTML / ZIP</span><input type="file" accept=".html,.htm,.zip" disabled={busy} onChange={e=>void choose(e.target.files?.[0])} /></label>
-      {html && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><button type="button" className="font-semibold text-violet-700" aria-expanded={codeOpen} aria-controls="template-html-editor" onClick={()=>setCodeOpen(open=>!open)}>{codeOpen?'Ẩn mã HTML':'Chỉnh sửa mã HTML'}</button>{codeOpen && <div id="template-html-editor" className="mt-4 space-y-3"><p className="text-sm text-slate-600">Sửa HTML, CSS và JavaScript nhúng của template. Với ZIP, đây là mã HTML đã được đóng gói. Danh sách khóa học thật vẫn được chèn vào vùng bạn chọn.</p><label className="block"><span className="mb-2 block font-medium">Mã HTML của template</span><textarea className="h-96 w-full resize-y whitespace-pre-wrap [overflow-wrap:anywhere] rounded-xl border bg-slate-950 p-4 font-mono text-sm leading-6 text-slate-100" value={codeDraft} spellCheck={false} wrap="soft" disabled={busy} onChange={event=>{localFile.current=true;setCodeDraft(event.target.value);setMessage('')}}/></label><div className="flex flex-wrap items-center gap-3"><button type="button" className={button+' bg-violet-700 text-white'} disabled={busy || !codeDirty} onClick={updateCodePreview}>Cập nhật xem trước</button><button type="button" className={button} disabled={busy || !codeDirty} onClick={()=>{setCodeDraft(html);setError('')}}>Bỏ sửa mã chưa xem trước</button><span className="text-sm text-slate-500">{codeDirty?'Mã vừa sửa chưa cập nhật vào bản xem trước':unsaved?'Bản xem trước có thay đổi chưa lưu':'Mã đang khớp với template đã lưu'}</span></div></div>}</div>}
+      {html && <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><button type="button" className="font-semibold text-violet-700" aria-expanded={codeOpen} aria-controls="template-html-editor" onClick={()=>setCodeOpen(open=>!open)}>{codeOpen?'Ẩn mã HTML':'Chỉnh sửa mã HTML'}</button>{codeOpen && <div id="template-html-editor" className="mt-4 space-y-3"><p className="text-sm text-slate-600">Sửa HTML, CSS và JavaScript nhúng của template. Với ZIP, đây là mã HTML đã được đóng gói. Danh sách khóa học thật vẫn được chèn vào vùng bạn chọn.</p><div><span className="mb-2 block font-medium">Mã HTML của template</span><TemplateCodeEditor value={codeDraft} disabled={busy} onChange={value=>{localFile.current=true;setCodeDraft(value);setMessage('')}}/></div><div className="flex flex-wrap items-center gap-3"><button type="button" className={button} disabled={busy} onClick={()=>void formatCode()}>Định dạng mã</button><button type="button" className={button+' bg-violet-700 text-white'} disabled={busy || !codeDirty} onClick={updateCodePreview}>Cập nhật xem trước</button><button type="button" className={button} disabled={busy || !codeDirty} onClick={()=>{setCodeDraft(html);setError('')}}>Bỏ sửa mã chưa xem trước</button><span className="text-sm text-slate-500">{codeDirty?'Mã vừa sửa chưa cập nhật vào bản xem trước':unsaved?'Bản xem trước có thay đổi chưa lưu':'Mã đang khớp với template đã lưu'}</span></div></div>}</div>}
       {html && <label className="block"><span className="mb-2 block font-medium">Vùng hiển thị danh sách khóa học</span><select className="w-full rounded-xl border p-3" disabled={busy} value={region} onChange={e=>setRegion(e.target.value)}>{pageSlug && <option value="__original__">Giữ nguyên template, không chèn khóa học</option>}<option value="__append__">Thêm vùng khóa học ở cuối trang</option>{options.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}</select><span className="mt-2 block text-sm text-slate-500">Chỉ thay các thẻ khóa học bằng {courses.length} khóa học thật. Tiêu đề, đoạn giới thiệu và nội dung xung quanh được giữ nguyên. Với mẫu The Top1, chọn courses; không chọn cả mục khoa-hoc.</span></label>}
       <p className="text-sm text-slate-500">HTML nên có CSS và JS nhúng; ZIP có thể chứa các file đi kèm. Hiệu ứng chạy trong khung riêng. Nút khóa học mở trang thông tin trên hệ thống chính. Khách đăng nhập và đăng ký học trên hệ thống để nhận tài liệu.</p>
       {warnings.length>0 && <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">{warnings.map(w=><li key={w}>{w}</li>)}</ul>}
@@ -126,3 +139,4 @@ export default function PageTemplateImport({pageSlug=''}:{pageSlug?:string}) {
     {preview.html && <section className="space-y-3"><div className="flex flex-wrap items-center gap-2"><h2 className="mr-auto font-semibold">Xem trước · nút khóa học không chuyển trang ở đây</h2>{[['100%','Máy tính'],['768px','Tablet'],['390px','Điện thoại']].map(([size,label])=><button key={size} className={button+(width===size?' bg-violet-100':' bg-white')} onClick={()=>setWidth(size)}>{label}</button>)}</div><div className="mx-auto max-w-full overflow-hidden rounded-xl border shadow" style={{width}}><ImportedPageFrame html={preview.html} links={courses.map(c=>c.href)} preview /></div></section>}
   </div></main>
 }
+
