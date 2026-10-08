@@ -12,6 +12,7 @@ const esc=(text:string)=>text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 const plain=(node:Node):string=>node.nodeName==='#text' && 'value' in node?node.value:'childNodes' in node?node.childNodes.map(plain).join(''):''
 const append=(node:Element,html:string)=>{for(const child of parseFragment(html).childNodes){child.parentNode=node;node.childNodes.push(child)}}
 const controls=(node:Element)=>walk(node).filter(n=>['input','select','textarea'].includes(n.tagName) && !['hidden','password','submit','button','reset','file','image'].includes(attr(n,'type').toLowerCase()) && !n.attrs.some(a=>a.name==='disabled'))
+const buttons=(node:Element)=>walk(node).filter(n=>(n.tagName==='button' || n.tagName==='input' && ['submit','button'].includes(attr(n,'type'))) && attr(n,'type')!=='reset' && !n.attrs.some(a=>a.name==='disabled'))
 const safeJson=(value:unknown)=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')
 
 export function inspectTemplateForms(html:string){
@@ -22,7 +23,7 @@ export function inspectTemplateForms(html:string){
     while(!label && parent && parent!==node){if(isElement(parent) && parent.tagName==='label')label=parent;parent='parentNode' in parent?parent.parentNode:null}
     const values=control.tagName==='select'?walk(control).filter(n=>n.tagName==='option').map(n=>attr(n,'value') || plain(n)).filter(Boolean).slice(0,30):['radio','checkbox'].includes(attr(control,'type'))?[attr(control,'value') || 'on']:[]
     return {index,type:attr(control,'type') || control.tagName,label:(label?plain(label).trim():attr(control,'placeholder') || attr(control,'name') || attr(control,'id') || 'Ô '+(index+1)).slice(0,100),values}
-  })}))
+  }),buttons:buttons(node).slice(0,100).map((n,index)=>({index,label:plain(n).trim().slice(0,100) || attr(n,'value') || 'Nút '+(index+1),type:attr(n,'type') || 'submit'}))}))
 }
 
 /** Run on the compiled/sandboxed Page, before any template script can handle submit. */
@@ -82,6 +83,13 @@ export function connectPageForms(html:string,rawBindings:FormBinding[],forms:Pub
         }
       }
       if(!mapping.email?.length && !mapping.phone?.length)throw new Error('Cần ghép ít nhất email hoặc số điện thoại.')
+      if(binding.mode==='existing'){
+        const choices=buttons(target),native=choices.filter(n=>n.tagName==='button' && attr(n,'type')!=='button' || n.tagName==='input' && attr(n,'type')==='submit')
+        const marked=choices.filter(n=>n.attrs.some(a=>a.name==='data-mfc-register'))
+        const selected=binding.submit!==undefined?choices[binding.submit]:native[0] || (marked.length===1?marked[0]:choices.length===1?choices[0]:undefined)
+        if(!selected)throw new Error('Chọn nút gửi đăng ký cho form trong template.')
+        set(selected,'type','submit')
+      }
       bound.add(target);set(target,'data-system-lead-form','true');remove(target,'action');remove(target,'target');remove(target,'onsubmit')
       set(target,'data-system-form-binding',String(runtime.length))
       // Add fresh explicit contact permission. Marketing permission remains disabled.

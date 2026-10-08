@@ -180,6 +180,17 @@ async function run(){
   const removedFirst=compiler.renderPageTemplate(fixture.replace('<div id="courses"></div>','<div id="courses"><form id="course-form"><input></form></div>'),'courses',[])
   const keptIndex=bridge.connectPageForms(removedFirst,[{...binding,index:1}],[publicForm],true)
   ok(new JSDOM(keptIndex).window.document.querySelector('#custom').hasAttribute('data-system-lead-form'),'Replacing course cards cannot shift the chosen registration form')
+  const buttonForm=compiler.renderPageTemplate('<form id="registration-form"><input name="name"><input type="tel" name="phone"><button type="button" data-mfc-register onclick="window.badClick=true">Đăng ký</button></form>','__append__',[])
+  const baseConfig=shared.defaultForm,baseDefinition={...publicForm,config:baseConfig},baseBinding={mode:'existing',formId:formB.id,index:0,mapping:{name:[0],phone:[1]}}
+  const promoted=new JSDOM(bridge.connectPageForms(buttonForm,[baseBinding],[baseDefinition],true),{runScripts:'dangerously',url:'https://test.invalid'})
+  const pf=promoted.window.document.querySelector('form'),promotedEvents=[]
+  promoted.window.crypto.randomUUID=crypto.randomUUID;promoted.window.parent.postMessage=e=>promotedEvents.push(e)
+  pf.querySelector('[name="name"]').value='Lead';pf.querySelector('[name="phone"]').value='0909876543';pf.querySelector('[data-system-form-consent]').checked=true;pf.querySelector('button').click()
+  ok(pf.querySelector('button').type==='submit' && promotedEvents.length===1 && !promoted.window.badClick,'The Top1 ordinary registration button is promoted and old inline handlers are bypassed')
+  promoted.window.close()
+  const multipleButtons=buttonForm.replace('<button type="button" data-mfc-register','<button type="button">Quay lại</button><button type="button"')
+  assert.throws(()=>bridge.connectPageForms(multipleButtons,[baseBinding],[baseDefinition],true),/Chọn nút/);checks++
+  ok(new JSDOM(bridge.connectPageForms(multipleButtons,[{...baseBinding,submit:1}],[baseDefinition],true)).window.document.querySelectorAll('button')[1].type==='submit','Teachers can explicitly choose the registration button among several ordinary buttons')
   const generated=bridge.connectPageForms(compiled,[{mode:'generated',formId:formB.id,region:'new-form',theme:'dark'}],[publicForm],true)
   ok(new JSDOM(generated).window.document.querySelector('#new-form select[multiple]'),'Generated forms support multiple selections and fit only the chosen region')
   ok(bridge.connectPageForms(compiled,[{mode:'generated',formId:formB.id,region:'__append__',theme:'light'}],[publicForm],true).includes('system-lead-form'),'Generated form can append below existing forms')

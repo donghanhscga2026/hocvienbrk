@@ -26,7 +26,7 @@ export type FormConfig=z.infer<typeof formConfigSchema>
 export type PublicForm={id:string;version:number;config:FormConfig}
 export type ManagedForm=PublicForm&{name:string;active:boolean;createdAt:string;updatedAt:string;submissions:number}
 export const formBindingSchema=z.discriminatedUnion('mode',[
-  z.object({mode:z.literal('existing'),formId:z.uuid(),index:z.number().int().nonnegative().max(99),mapping:z.record(z.string(),z.array(z.number().int().nonnegative().max(199)).min(1).max(30))}).strict(),
+  z.object({mode:z.literal('existing'),formId:z.uuid(),index:z.number().int().nonnegative().max(99),submit:z.number().int().nonnegative().max(99).optional(),mapping:z.record(z.string(),z.array(z.number().int().nonnegative().max(199)).min(1).max(30))}).strict(),
   z.object({mode:z.literal('generated'),formId:z.uuid(),region:z.string().regex(/^(?:__append__|[A-Za-z][\w:.-]{0,159})$/),theme:z.enum(['light','dark'])}).strict(),
 ])
 export type FormBinding=z.infer<typeof formBindingSchema>
