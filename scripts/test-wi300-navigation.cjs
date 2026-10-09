@@ -36,6 +36,7 @@ async function run() {
   const link = { __esModule: true, default: ({ children, scroll, onNavigate, ...props }) => React.createElement('a', props, children) }
   let pathname = '/', scrollCalls = 0, user = null
   let logoutCalls = 0, cleanupCalls = 0
+  let walletCalls = 0, installCalls = 0, walletOpen = false
   const personal = load('lib/wi300/personal-space.ts', { './catalog': load('lib/wi300/catalog.ts') })
   global.Node = dom.window.Node
   window.scrollTo = () => { scrollCalls++ }
@@ -44,6 +45,10 @@ async function run() {
     'next-auth/react': { useSession: () => ({ data: user ? { user } : null }), signOut: async () => { logoutCalls++ } }, 'next/navigation': { usePathname: () => pathname },
     './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': { signOutPushCleanup: async () => { cleanupCalls++ } },
     '@/lib/wi300/personal-space': personal,
+    '@/components/notifications/NotificationBell': { __esModule: true, default: () => React.createElement('button', { 'aria-label': 'Thông báo' }, 'Thông báo') },
+    '@/components/pwa/PwaInstallProvider': { InstallAppButton: ({ appName, onBeforeOpen }) => React.createElement('button', { onClick: () => { onBeforeOpen(); installCalls++ } }, `Cài ứng dụng ${appName}`) },
+    '@/components/mbw/MbwDashboardContext': { useMbwDashboard: () => ({ isOpen: walletOpen, open: () => { walletCalls++; walletOpen = true } }) },
+    'next/dynamic': { __esModule: true, default: () => props => props.shareType ? React.createElement('div', { 'data-header-share': props.affiliateCode, 'data-site-name': props.siteName }, 'Share') : React.createElement('div', { 'data-wallet': props.title }) },
   }).default
   const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header },
     './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts') }).default
@@ -62,10 +67,34 @@ async function run() {
   assert.ok(navLinks.every(href => !href.includes('#')))
   assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Không gian khóa học')
   assert.equal(document.querySelector('header details'), null)
+  assert.equal(document.querySelector('header button[aria-label="Chia sẻ link affiliate"]'), null)
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
   await act(async () => renderShell())
   assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
   assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
+  const accountButtons = [...document.querySelectorAll('header details button')]
+  assert.ok(accountButtons.some(button => button.textContent === 'Ví Wi'))
+  const installButton = accountButtons.find(button => button.textContent === 'Cài ứng dụng WI300')
+  const shareButton = document.querySelector('header button[aria-label="Chia sẻ link affiliate"]')
+  assert.equal(shareButton.closest('details'), null, 'Chia sẻ nằm ngoài dropdown')
+  assert.equal(document.querySelector('header button[aria-label="Thông báo"]').closest('details'), null)
+  await act(async () => shareButton.click())
+  assert.equal(document.querySelector('[data-header-share]').dataset.headerShare, '42')
+  assert.equal(document.querySelector('[data-header-share]').dataset.siteName, 'WI300')
+  user = { id: '0', name: 'Lucy', role: 'STUDENT' }
+  await act(async () => renderShell())
+  assert.equal(document.querySelector('[data-header-share]').dataset.headerShare, '0')
+  const accountDetails = document.querySelector('header details')
+  accountDetails.open = true
+  await act(async () => installButton.click())
+  assert.equal(installCalls, 1)
+  assert.equal(accountDetails.open, false)
+  accountDetails.open = true
+  await act(async () => accountButtons.find(button => button.textContent === 'Ví Wi').click())
+  await act(async () => renderShell())
+  assert.equal(walletCalls, 1)
+  assert.equal(accountDetails.open, false)
+  assert.equal(document.querySelector('[data-wallet]').dataset.wallet, 'Ví Wi')
   user.role = 'TEACHER'
   await act(async () => renderShell())
   assert.ok(document.querySelector('header details a[href="/my-space?tab=teaching"]'))
@@ -77,7 +106,7 @@ async function run() {
   details.open = true
   await act(async () => document.body.dispatchEvent(new window.Event('pointerdown', { bubbles: true })))
   assert.equal(details.open, false)
-  await act(async () => document.querySelector('header details button').click())
+  await act(async () => [...document.querySelectorAll('header details button')].find(button => button.textContent === 'Đăng xuất').click())
   assert.equal(logoutCalls, 1)
   assert.equal(cleanupCalls, 1)
   user = null
@@ -161,6 +190,27 @@ async function run() {
   response = await favicon.GET(new Request('https://wi300.vn/favicon.ico'))
   assert.equal(response.headers.get('location'), brand.iconUrl)
   assert.match(response.headers.get('cache-control'), /no-store/)
+  // Hướng dẫn cài app đổi nhận diện theo deployment; website cũ giữ MFC.
+  let installBrand = brand
+  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} })
+  global.navigator = window.navigator
+  window.HTMLDialogElement.prototype.showModal = function () { this.open = true }
+  window.HTMLDialogElement.prototype.close = function () { this.open = false }
+  const pwa = load('components/pwa/PwaInstallProvider.tsx', {
+    'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) },
+    'next-auth/react': { useSession: () => ({ data: null, status: 'unauthenticated' }) },
+    '@/lib/web-push-client': { clearChangedPushAccount: async () => {} },
+    '@/components/wi300/Wi300BrandContext': { useWi300Brand: () => installBrand },
+  })
+  await act(async () => root.render(React.createElement(pwa.default, null, React.createElement(pwa.InstallAppButton))))
+  assert.equal(document.querySelector('h2').textContent, 'Cài ứng dụng WI300')
+  assert.ok(document.querySelector(`img[src="${brand.iconUrl}"]`))
+  assert.doesNotMatch(document.body.textContent, /MFC/)
+  await act(async () => document.querySelector('button').click())
+  assert.equal(document.querySelector('dialog').open, true)
+  installBrand = null
+  await act(async () => root.render(React.createElement(pwa.default, null, React.createElement(pwa.InstallAppButton))))
+  assert.equal(document.querySelector('h2').textContent, 'Cài ứng dụng MFC')
   await act(async () => root.unmount())
   dom.window.close()
   console.log('WI300 navigation: recent active courses, separate SEO/assets, real menu routes, forward/Back/hash/notification scroll, template ownership and breadcrumb passed.')

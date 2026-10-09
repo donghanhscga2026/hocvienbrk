@@ -21,7 +21,7 @@ function VoucherTypeBadge({ type }: { type: string }) {
   )
 }
 
-export default function MbwDashboardPopup() {
+export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy Phước Báu' }: { title?: string } = {}) {
   const { isOpen, close, data, refresh } = useMbwDashboard()
 
   // Refresh nền khi mở để số dư luôn mới, hiển thị data cache ngay lập tức
@@ -49,7 +49,7 @@ export default function MbwDashboardPopup() {
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-brk-primary" />
             <div>
-              <h2 className="text-sm font-black text-brk-on-surface">Tài khoản Dòng chảy Phước Báu</h2>
+              <h2 className="text-sm font-black text-brk-on-surface">{title}</h2>
               {data && (
                 <p className="text-[10px] text-brk-muted">#{data.user.id} {data.user.name || data.user.email}</p>
               )}
