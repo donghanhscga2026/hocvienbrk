@@ -19,9 +19,9 @@ export function getDeploymentBrand(env: Record<string, string | undefined> = pro
     iconUrl: asset(env.WI300_FAVICON_URL, '/wi300/wipa-icon.png'),
     ogImageUrl: asset(env.WI300_OG_IMAGE_URL, logoUrl),
     palette: {
-      primary: '#af2528', onPrimary: '#ffffff', accent: '#aa913c',
-      background: '#fbf8f2', surface: '#ffffff',
-      onSurface: '#28241f', muted: '#70685e', outline: '#e8e0d3',
+      primary: '#1b7038', onPrimary: '#ffffff', accent: '#b82025',
+      background: '#f4f9ee', surface: '#ffffff',
+      onSurface: '#203126', muted: '#58675c', outline: '#dce8d7',
     },
   }
 }

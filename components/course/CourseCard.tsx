@@ -70,9 +70,10 @@ interface CourseCardProps {
     darkMode?: boolean
     profileSlug?: string | null
     showSharing?: boolean
+    shareSiteName?: string
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null, showSharing = true }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null, showSharing = true, shareSiteName }: CourseCardProps) {
     const router = useRouter()
     const [showPayment, setShowPayment] = useState(false)
     const [showRegistrationModal, setShowRegistrationModal] = useState(false)
@@ -81,7 +82,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
     const enrollment = localEnrollment || propEnrollment
     const [showToc, setShowToc] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [affiliateCode, setAffiliateCode] = useState<string | null>(null)
+    // Luôn dùng tài khoản hiện tại, không giữ mã affiliate của phiên đăng nhập trước.
+    const affiliateCode = isLoggedIn && userId != null ? String(userId) : null
     const [hiddenFromGifts, setHiddenFromGifts] = useState(enrollment?.hiddenFromGifts || false)
     const [toggleLoading, setToggleLoading] = useState(false)
 
@@ -124,8 +126,6 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
     useEffect(() => {
         // Dùng != null để handle userId = 0 (ID hợp lệ)
         if (isLoggedIn && userId != null) {
-            setAffiliateCode(String(userId))
-            
             // Lấy số dư ví MBV từ server action (dùng chung 1 request giữa các card)
             getSharedMbvBalance()
                 .then(bal => setVoucherBalance(bal))
@@ -327,7 +327,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             )}
                         </span>
 
-                        {/* WI300 chưa đưa affiliate vào giao diện; web cũ giữ mặc định. */}
+                        {/* Giữ chức năng chia sẻ và mã giới thiệu theo tài khoản. */}
                         {showSharing && <button
                             onClick={(e) => {
                                 e.preventDefault()
@@ -455,6 +455,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                 affiliateCode={affiliateCode}
                 profileSlug={profileSlug}
                 shareType="course"
+                siteName={shareSiteName}
             />}
 
             {showToc && <LessonTocModal
