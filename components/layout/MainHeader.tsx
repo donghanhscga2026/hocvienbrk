@@ -14,6 +14,7 @@ import AssistantHeaderIcon from '@/components/assistant/AssistantHeaderIcon'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import dynamic from 'next/dynamic'
 import { useDomainBrand } from '@/components/website/DomainShell'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 
 const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false })
 const MbwDashboardPopup = dynamic(() => import('@/components/mbw/MbwDashboardPopup'), { ssr: false })
@@ -26,7 +27,8 @@ interface MainHeaderProps {
 
 export default function MainHeader(props: MainHeaderProps) {
     const brand=useDomainBrand()
-    return brand ? null : <PlatformMainHeader {...props} />
+    const wi300=useWi300Brand()
+    return brand || wi300 ? null : <PlatformMainHeader {...props} />
 }
 function PlatformMainHeader({ title, profile }: MainHeaderProps) {
     const pathname = usePathname()
