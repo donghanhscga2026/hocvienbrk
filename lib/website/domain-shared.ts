@@ -7,7 +7,14 @@ export function normalizeHostname(raw: string): string {
   return host
 }
 export function requestHostname(raw: string) { return raw.toLowerCase().replace(/:\d+$/,'').replace(/\.$/,'') }
-export function isPlatformHost(host: string) { return ['giautoandien.io.vn','www.giautoandien.io.vn','localhost','127.0.0.1'].includes(host) || host.endsWith('.vercel.app') }
+export function isPlatformHost(host: string) {
+  if(['giautoandien.io.vn','www.giautoandien.io.vn','localhost','127.0.0.1'].includes(host) || host.endsWith('.vercel.app')) return true
+  // Mỗi project tự cấp tên miền hệ thống; chỉ khớp chính xác, không nhận URL hoặc wildcard.
+  return (process.env.PLATFORM_HOSTS || '').split(',').some(raw => {
+    const configured=raw.trim().toLowerCase().replace(/\.$/,'')
+    return configured.length<=253 && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(configured) && configured===host
+  })
+}
 /** Giữ trang và chức năng liên quan trên tên miền riêng, giữ mã giới thiệu. */
 export function websiteHref(input: string, slug: string, referral: string, customDomain: boolean) {
   if(!input) return '#'
