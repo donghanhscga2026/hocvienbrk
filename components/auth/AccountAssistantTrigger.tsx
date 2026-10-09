@@ -6,13 +6,13 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useAccountAssistant } from './AccountAssistantContext'
 
 function TriggerInner() {
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { openAssistant } = useAccountAssistant()
+  const { openAssistant, enabled } = useAccountAssistant()
 
   useEffect(() => {
-    if (status !== 'unauthenticated') return
+    if (!enabled || status !== 'unauthenticated') return
     if (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password') return
     if (pathname === '/complete-profile') return
 
@@ -22,7 +22,7 @@ function TriggerInner() {
     if (pathname === '/' || ref) {
       openAssistant()
     }
-  }, [status, pathname, searchParams, openAssistant])
+  }, [enabled, status, pathname, searchParams, openAssistant])
 
   return null
 }
