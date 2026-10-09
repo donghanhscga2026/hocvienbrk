@@ -2,6 +2,9 @@
 function asset(value: string | undefined, fallback: string) {
   const url = value?.trim()
   if (!url) return fallback
+  // Nâng cấp cả project từng cấu hình đường dẫn nhận diện mặc định cũ.
+  if (url === '/wi300/wipa-logo.png') return '/wi300/300dns-logo.webp'
+  if (url === '/wi300/wipa-icon.png') return '/wi300/300dns-icon.png'
   if (url.startsWith('/') && !url.startsWith('//') && !url.includes('\\')) return url
   try { return new URL(url).protocol === 'https:' ? url : fallback } catch { return fallback }
 }
@@ -10,17 +13,17 @@ export function getDeploymentBrand(env: Record<string, string | undefined> = pro
   if (env.SITE_VARIANT?.trim().toLowerCase() !== 'wi300') return null
   const name = env.WI300_NAME?.trim() || 'WI300'
   const tagline = env.WI300_TAGLINE?.trim() || 'Liên minh 300 doanh nghiệp số'
-  const logoUrl = asset(env.WI300_LOGO_URL, '/wi300/wipa-logo.png')
+  const logoUrl = asset(env.WI300_LOGO_URL, '/wi300/300dns-logo.webp')
   return {
     variant: 'wi300' as const, name, tagline,
     description: env.WI300_DESCRIPTION?.trim() || 'WI300 — Nền tảng kết nối cá nhân và doanh nghiệp với tri thức, khóa học, sản phẩm, dịch vụ và cơ hội hợp tác từ Liên minh 300 doanh nghiệp số.',
     seoTitle: env.WI300_SEO_TITLE?.trim() || `${name} | ${tagline}`,
     logoUrl, wordmarkUrl: logoUrl,
-    iconUrl: asset(env.WI300_FAVICON_URL, '/wi300/wipa-icon.png'),
+    iconUrl: asset(env.WI300_FAVICON_URL, '/wi300/300dns-icon.png'),
     ogImageUrl: asset(env.WI300_OG_IMAGE_URL, logoUrl),
     palette: {
-      primary: '#1b7038', onPrimary: '#ffffff', accent: '#b82025',
-      background: '#f4f9ee', surface: '#ffffff',
+      primary: '#236c1e', onPrimary: '#ffffff', accent: '#b51a18',
+      background: '#f3f7df', surface: '#ffffff',
       onSurface: '#203126', muted: '#58675c', outline: '#dce8d7',
     },
   }

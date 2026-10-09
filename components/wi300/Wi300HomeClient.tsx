@@ -13,6 +13,7 @@ import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
 import Wi300PersonalSpace from './Wi300PersonalSpace'
 import Wi300Businesses, { featuredBusinesses } from './Wi300Businesses'
+import Wi300Teachers from './Wi300Teachers'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 type Props = {
@@ -42,16 +43,16 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const filtered = sortCourses(filterCourses(courses, query, category, fee), sort)
   const featured = courses.filter(course => course.pin != null && course.pin > 0).slice(0, 3)
   const myCourses = recentActiveCourses(courses, enrollments)
-  // Chỉ giới thiệu tối đa 3 giảng viên trong phạm vi công khai; ưu tiên Cương Leo.
+  // Chỉ giới thiệu tối đa 6 giảng viên trong phạm vi công khai; ưu tiên Cương Leo.
   const teachers = Array.from(new Set(courses.map(course => course.teacherId))).flatMap(id => {
     const ownCourses = courses.filter(course => course.teacherId === id)
     const name = ownCourses[0]?.teacher?.name
     const pins = ownCourses.flatMap(course => course.pin != null && course.pin > 0 ? [course.pin] : [])
-    return id != null && name ? [{ id, name, count: ownCourses.length, pin: pins.length ? Math.min(...pins) : Infinity }] : []
+    return id != null && name ? [{ id, name, image: ownCourses[0]?.teacher?.image, count: ownCourses.length, pin: pins.length ? Math.min(...pins) : Infinity }] : []
   }).sort((a, b) => {
     const preferred = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === 'cuong leo' ? 0 : 1
     return preferred(a.name) - preferred(b.name) || a.pin - b.pin || a.name.localeCompare(b.name, 'vi')
-  }).slice(0, 3)
+  }).slice(0, 6)
   const teacherCount = new Set(courses.map(course => course.teacherId).filter(id => id != null)).size
   const paymentCourseId = paymentCourse?.id
   const paymentEnrollmentStatus = paymentCourseId != null ? enrollmentMap.get(paymentCourseId)?.status : undefined
@@ -90,7 +91,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
             {!catalogError && courses.length > 0 && <p className="mt-7 text-sm text-brk-muted">{courses.length} khóa học · {teacherCount} giảng viên · Cùng phát triển trong cộng đồng doanh nghiệp số</p>}
           </div>
           <div className="relative rounded-[2rem] border border-brk-outline bg-brk-background p-5 sm:p-8">
-            <div className="flex items-center gap-4 rounded-2xl bg-white p-4 shadow-sm"><Image src={brand.logoUrl} alt="WIPA" width={500} height={500} unoptimized className="h-28 w-28 shrink-0 object-contain" /><div><p className="text-2xl font-extrabold text-brk-primary">{brand.name}</p><p className="mt-1 text-sm leading-6 text-brk-muted">Một cộng đồng.<br />Nhiều cơ hội cùng phát triển.</p></div></div>
+            <div className="rounded-2xl bg-white p-5 shadow-sm"><Image src={brand.logoUrl} alt={`${brand.name} — 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} unoptimized className="h-auto w-full object-contain" /><p className="mt-4 text-center text-sm leading-6 text-brk-muted">Một cộng đồng. Nhiều cơ hội cùng phát triển.</p></div>
             <p className="mt-6 text-sm font-semibold text-brk-muted">Doanh nghiệp tiêu biểu trong hệ sinh thái Wi</p>
             <div className="mt-3 flex flex-wrap gap-2">{featuredBusinesses.map(name => <span key={name} className="rounded-xl border border-brk-outline bg-white px-3 py-2 text-sm font-bold text-brk-primary">{name}</span>)}</div>
             <p className="mt-6 border-t border-brk-outline pt-5 text-sm leading-6 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</p>
@@ -119,10 +120,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
       <div className="mt-6 grid gap-4 sm:grid-cols-2">{[{ id: 'san-pham', title: 'Sản phẩm', icon: Package }, { id: 'dich-vu', title: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ id, title, icon: Icon }) => <section id={id} key={id} className="scroll-mt-44 rounded-2xl border border-brk-outline p-5 lg:scroll-mt-24"><Icon className="mb-3 text-brk-accent" /><h2 className="font-bold">{title}</h2><p className="mt-2 text-sm text-brk-muted">Sẽ được bổ sung trong giai đoạn tiếp theo.</p></section>)}</div>
     </section>}
     {view === 'discover' && <><Wi300Businesses />
-      <section id="giang-vien" className="mx-auto max-w-7xl scroll-mt-40 px-4 pb-4 lg:scroll-mt-24 lg:px-6">
-        <h2 className="text-2xl font-bold">Giảng viên tiêu biểu</h2><p className="mt-2 text-sm text-brk-muted">Gặp gỡ những người chia sẻ tri thức trong hệ sinh thái Wi.</p>
-        {teachers.length ? <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{teachers.map(teacher => <li key={teacher.id}><Link href={`/khoa-hoc?q=${encodeURIComponent(teacher.name)}`} className="flex min-h-24 items-center gap-4 rounded-2xl border border-brk-outline bg-white p-5 hover:border-brk-primary"><span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brk-background font-bold text-brk-primary">{teacher.name.trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span><span className="min-w-0"><span className="block break-words font-bold">{teacher.name}</span><span className="mt-1 block text-sm text-brk-muted">{teacher.count} khóa học · Xem khóa học →</span></span></Link></li>)}</ul> : <p className="mt-5 rounded-xl border border-brk-outline bg-white p-5 text-sm text-brk-muted">{catalogError ? 'Chưa tải được danh sách giảng viên.' : 'Giảng viên sẽ xuất hiện khi có khóa học trong danh mục.'}</p>}
-      </section>
+      <Wi300Teachers teachers={teachers} catalogError={catalogError} />
     </>}
     {view === 'space' ? <Wi300PersonalSpace teachingCourses={teachingCourses} teachingError={teachingError} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} accountError={accountError || catalogError} /> : <section id="khoa-hoc" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 lg:scroll-mt-24 lg:px-6">
       {view === 'catalog' ? <h1 className="text-3xl font-bold">Khóa học</h1> : <h2 className="text-2xl font-bold sm:text-3xl">Khám phá khóa học</h2>}<p className="mt-2 text-sm leading-6 text-brk-muted">Tìm kiến thức và kỹ năng cho bước tiến tiếp theo.</p>
