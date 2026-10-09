@@ -12,6 +12,18 @@ export function recentActiveCourses<T extends { id: number }>(courses: T[], enro
     .slice(0, limit).map(row => byId.get(row.courseId)!)
 }
 
+export type CourseSort = 'recommended' | 'newest' | 'price-asc' | 'price-desc'
+
+/** Sắp xếp bản sao sau khi lọc, không thay đổi thứ tự dữ liệu cache hoặc khóa nổi bật. */
+export function sortCourses<T extends { id: number; phi_coc: number; createdAt: Date | string }>(courses: T[], order: CourseSort) {
+  if (order === 'recommended') return [...courses]
+  const created = (course: T) => new Date(course.createdAt).getTime() || 0
+  return [...courses].sort((a, b) => {
+    const price = order === 'price-asc' ? a.phi_coc - b.phi_coc : order === 'price-desc' ? b.phi_coc - a.phi_coc : 0
+    return price || created(b) - created(a) || b.id - a.id
+  })
+}
+
 export const categoryName = (course: CatalogItem) => course.courseCategory?.name || course.category || 'Khác'
 
 export function filterCourses<T extends CatalogItem>(courses: T[], query: string, category: string, fee: string) {

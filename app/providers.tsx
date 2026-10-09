@@ -15,19 +15,21 @@ export default function Providers({
   attentionHighlight,
   website = false,
   accountAssistant = true,
+  assistantToast = true,
 }: {
   children: React.ReactNode,
   session?: Session | null,
   attentionHighlight: { config: AttentionHighlightConfig; items: AttentionHighlightItem[] }
   website?: boolean
   accountAssistant?: boolean
+  assistantToast?: boolean
 }) {
   return (
     <SessionProvider session={session}>
       <PlatformTheme enabled={!website}>
         <AttentionHighlightProvider config={attentionHighlight.config} items={attentionHighlight.items}>
           <AccountAssistantProvider enabled={accountAssistant}>
-            <AssistantProvider>
+            <AssistantProvider toastEnabled={assistantToast}>
               <MbwDashboardProvider>
                 {children}
               </MbwDashboardProvider>

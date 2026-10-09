@@ -5,9 +5,8 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { Search } from 'lucide-react'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
-import { filterPersonalTools, isContentTool, pendingCourseLabel, toolGroup, toolGroups, type PersonalTool } from '@/lib/wi300/personal-space'
+import { isContentTool, pendingCourseLabel, toolGroup, toolGroups, type PersonalTool } from '@/lib/wi300/personal-space'
 import type { Wi300Course, Wi300Enrollment } from './Wi300Home'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
@@ -39,8 +38,6 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const [toolsLoading, setToolsLoading] = useState(true)
   const [learningStatus, setLearningStatus] = useState<LearningStatus>('active')
   const [learningPage, setLearningPage] = useState(1)
-  const [toolQuery, setToolQuery] = useState('')
-  const [selectedToolGroup, setSelectedToolGroup] = useState('')
   const [paymentCourseId, setPaymentCourseId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -77,8 +74,6 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const pages = permittedTools.filter(isContentTool)
   const otherTools = permittedTools.filter(tool => !isContentTool(tool))
   const availableGroups = toolGroups.filter(group => otherTools.some(tool => toolGroup(tool) === group.id))
-  const currentToolGroup = availableGroups.some(group => group.id === selectedToolGroup) ? selectedToolGroup : ''
-  const filteredTools = filterPersonalTools(otherTools, toolQuery, currentToolGroup)
 
   const toolList = (items: Tool[], grouped = false) => toolsLoading ? <p role="status" className={box}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={box}>Chưa tải được công cụ. Vui lòng tải lại trang.</p> : items.length ? <div className="grid gap-3 sm:grid-cols-2">{items.map(tool => {
     const group = toolGroups.find(item => item.id === toolGroup(tool))!
@@ -118,7 +113,16 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
         </section>
         {['ADMIN', 'TEACHER'].includes(role) && <Link href="/tools/courses" className="inline-flex min-h-11 items-center font-semibold text-brk-primary">Quản lý khóa học tôi giảng dạy →</Link>}
       </>}
-      {tab === 'tools' && <><p className="text-brk-muted">Tìm công cụ theo mục đích sử dụng. Danh sách hiển thị theo quyền tài khoản của bạn.</p><div className="flex flex-col gap-3 sm:flex-row"><label className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-brk-outline bg-white px-4"><Search aria-hidden className="h-5 w-5 shrink-0 text-brk-muted" /><span className="sr-only">Tìm công cụ</span><input type="search" value={toolQuery} onChange={event => setToolQuery(event.target.value)} placeholder="Tìm công cụ hoặc mục đích…" className="min-w-0 flex-1 bg-transparent py-3 text-sm outline-none" /></label><label className="sr-only" htmlFor="wi300-tool-group">Nhóm công cụ</label><select id="wi300-tool-group" value={currentToolGroup} onChange={event => setSelectedToolGroup(event.target.value)} className="min-h-12 max-w-full rounded-xl border border-brk-outline bg-white px-3 text-sm sm:max-w-64"><option value="">Tất cả nhóm ({otherTools.length})</option>{availableGroups.map(group => <option key={group.id} value={group.id}>{group.label} ({otherTools.filter(tool => toolGroup(tool) === group.id).length})</option>)}</select></div>{!toolsLoading && !toolsError && <p role="status" className="text-sm text-brk-muted">{filteredTools.length} công cụ{currentToolGroup ? ` · ${availableGroups.find(group => group.id === currentToolGroup)?.label}` : ''}</p>}{toolList(filteredTools, true)}</>}
+      {tab === 'tools' && <><p className="text-brk-muted">Các công cụ được chia theo mục đích sử dụng và quyền tài khoản của bạn.</p>
+        {/* Chỉ hiển thị nhóm có công cụ được phép dùng, giữ nguyên phân quyền. */}
+        {toolsLoading || toolsError || !otherTools.length ? toolList(otherTools) : availableGroups.map(group => {
+          const items = otherTools.filter(tool => toolGroup(tool) === group.id)
+          return <section key={group.id} aria-labelledby={`tool-group-${group.id}`} className="rounded-2xl border border-brk-outline bg-brk-background p-4 sm:p-5">
+            <div className="mb-4"><h2 id={`tool-group-${group.id}`} className="text-lg font-bold">{group.label} <span className="text-sm font-normal text-brk-muted">({items.length})</span></h2><p className="mt-1 text-sm text-brk-muted">{group.description}</p></div>
+            {toolList(items)}
+          </section>
+        })}
+      </>}
       {tab === 'pages' && <><p className="text-brk-muted">Quản lý website, trang giới thiệu, landing page và bài viết.</p>{toolList(pages)}</>}
       {tab === 'account' && <section className={box}><h2 className="text-xl font-bold">Hồ sơ & bảo mật</h2><p className="mt-3 text-brk-muted">Cập nhật thông tin cá nhân, mật khẩu và tài khoản nhận thanh toán.</p><Link href="/account-settings" className="mt-4 inline-flex min-h-11 items-center font-semibold text-brk-primary">Cài đặt tài khoản →</Link><div className="mt-5 border-t border-brk-outline pt-5"><h2 className="font-bold">Hỗ trợ</h2><Link href="/tools/ho-tro" className="inline-flex min-h-11 items-center text-brk-primary">Yêu cầu hỗ trợ & theo dõi phản hồi →</Link></div></section>}
     </div>

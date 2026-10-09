@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense, useRef } from "react"
 import Link from "next/link"
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2, MessageCircle } from "lucide-react"
 import { signIn } from "next-auth/react"
@@ -17,6 +18,7 @@ import { useEmailPrefill } from "@/hooks/useEmailPrefill"
 const REGISTRATION_DISABLED = false;
 
 function RegisterForm() {
+    const wi300 = useWi300Brand()
     const [isLoading, setIsLoading] = useState(false)
     const [isVerifying, setIsVerifying] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -383,8 +385,9 @@ function RegisterForm() {
         <div className="w-full max-w-md space-y-6 rounded-xl bg-brk-surface p-6 sm:p-8 shadow-lg">
             <div className="text-center">
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-brk-on-surface">
-                    {success && registeredEmail ? "Xác minh tài khoản" : "Tạo tài khoản mới"}
+                    {success && registeredEmail ? "Xác minh tài khoản" : wi300 ? `Tạo tài khoản ${wi300.name}` : "Tạo tài khoản mới"}
                 </h2>
+                {wi300 && !(success && registeredEmail) && <p className="mt-2 text-sm text-brk-muted">Học tập, kết nối và khám phá các giá trị từ cộng đồng doanh nghiệp số.</p>}
                 {success && registeredEmail && (
                     <p className="mt-2 text-sm text-brk-muted">
                         Nhập mã OTP đã gửi đến email của bạn

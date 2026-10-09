@@ -5,6 +5,7 @@ import { signIn, signOut, useSession } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
 import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy"
@@ -13,6 +14,7 @@ import { safeReturnPath } from '@/lib/website/domain-shared'
 // import { useEmailPrefill } from "@/hooks/useEmailPrefill"  // DISABLED: Google Auth
 
 function LoginForm() {
+    const wi300 = useWi300Brand()
     const { data: session } = useSession()
     const [isLoading, setIsLoading] = useState(false)
     const [isChangingPassword, setIsChangingPassword] = useState(false)
@@ -124,29 +126,6 @@ function LoginForm() {
                     }
                 }
 
-                /*
-                // OLD - Shared Account #2689 Fallback START
-                // Code cũ: tự động đăng nhập vào tài khoản chung #2689
-                // Giữ lại phòng sau này cần chuyển đổi linh hoạt
-                try {
-                    await fetch('/api/auth/report-failed-login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ identifier: data.identifier })
-                    })
-                } catch {}
-                const specialResult = await signIn("credentials", {
-                    identifier: "2689",
-                    password: "Brk#2689",
-                    redirect: false,
-                })
-                if (specialResult?.ok) {
-                    setError("Hãy kết bạn zalo với số điện thoại +84 876 473 257 để được hỗ trợ thêm!")
-                    setTimeout(() => { router.push(callbackUrl); router.refresh() }, 5000)
-                    return
-                }
-                // OLD - Shared Account #2689 Fallback END
-                */
 
                 setError(errorMsg)
                 setActionType(extraAction || null)
@@ -326,8 +305,8 @@ function LoginForm() {
             <div className="w-full max-w-sm">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-black text-brk-on-surface tracking-tight">HỌC VIỆN BRK</h1>
-                    <p className="text-brk-accent text-sm mt-1">Đăng nhập để tiếp tục hành trình</p>
+                    <h1 className="text-2xl font-black text-brk-on-surface tracking-tight">{wi300 ? `Đăng nhập ${wi300.name}` : 'HỌC VIỆN BRK'}</h1>
+                    <p className="text-brk-accent text-sm mt-1">{wi300 ? 'Học tập, kết nối và khám phá cùng cộng đồng doanh nghiệp số.' : 'Đăng nhập để tiếp tục hành trình'}</p>
                 </div>
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
