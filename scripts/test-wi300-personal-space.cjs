@@ -42,11 +42,17 @@ async function run() {
   let role = 'STUDENT'
   let paymentProps = null
   let refreshCalls = 0
+  let mobile = false
+  const viewportListeners = new Set()
+  window.matchMedia = () => ({ matches: mobile, addEventListener: (_, callback) => viewportListeners.add(callback), removeEventListener: (_, callback) => viewportListeners.delete(callback) })
+  const responsive = load('components/wi300/useCoursePageSize.ts')
+  const Teaching = load('components/wi300/Wi300TeachingPanel.tsx', { 'next/link': link, './useCoursePageSize': responsive })
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { role, name: 'Lucy' } } }) },
     'next/navigation': { useSearchParams: () => params, useRouter: () => ({ refresh: () => { refreshCalls++ } }) },
     'next/dynamic': { __esModule: true, default: () => props => { paymentProps = props; return React.createElement('div', { 'data-payment': true }, 'Payment') } },
     '@/lib/wi300/catalog': catalog, '@/lib/wi300/personal-space': helpers,
+    './useCoursePageSize': responsive, './Wi300TeachingPanel': Teaching,
   })
   // Các quy tắc role giống trang tools cũ, kể cả ADMIN không tự có quyền DEVELOPER.
   for (const [actor, allowed, expected] of [['STUDENT', ['ADMIN'], false], ['STUDENT', [], true], ['TEACHER', ['STUDENT'], true], ['ADMIN', ['TEACHER'], true], ['ADMIN', ['DEVELOPER'], false]]) assert.equal(SpaceModule.canUseTool(actor, allowed), expected)
@@ -58,7 +64,8 @@ async function run() {
   const savedFetch = global.fetch
   global.fetch = async () => ({ ok: true, json: async () => ({ tools }) })
   const root = createRoot(document.getElementById('root'))
-  const render = () => root.render(React.createElement(SpaceModule.default, { courses, enrollments, userId: 42, userPhone: 'test', accountError: false }))
+  const teachingCourses = Array.from({ length: 9 }, (_, i) => ({ id: 100 + i, id_khoa: 'T' + i, name_lop: 'Dạy ' + i, status: i < 8, _count: { lessons: 10, enrollments: 4 } }))
+  const render = () => root.render(React.createElement(SpaceModule.default, { courses, enrollments, teachingCourses, userId: 42, userPhone: 'test', accountError: false }))
   try {
     await act(async () => render())
     assert.equal(document.querySelectorAll('article').length, 6)
@@ -94,6 +101,31 @@ async function run() {
     params = new URLSearchParams('tab=pages')
     await act(async () => render())
     assert.ok(document.querySelector('a[href^="/tools/pages"]'))
+    params = new URLSearchParams('tab=teaching')
+    await act(async () => render())
+    assert.equal(document.querySelector('a[href="/my-space?tab=teaching"]'), null, 'Học viên không thấy mục giảng dạy')
+    assert.equal(document.querySelector('[aria-label="Trạng thái giảng dạy"]'), null, 'URL tự nhập không mở khu giảng dạy')
+    role = 'TEACHER'
+    await act(async () => render())
+    assert.equal(document.querySelectorAll('li').length, 6)
+    assert.match(document.querySelector('[aria-label="Phân trang khóa giảng dạy"]').textContent, /Trang 1\/2/)
+    assert.ok(document.querySelector('a[href="/tools/courses/new?id=100"]'))
+    await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.startsWith('Đã ẩn')).click())
+    assert.equal(document.querySelectorAll('li').length, 1)
+    assert.match(document.querySelector('li').textContent, /Dạy 8/)
+    params = new URLSearchParams()
+    await act(async () => render())
+    assert.equal(document.querySelectorAll('[aria-labelledby="space-learning-title"] article').length, 3)
+    assert.equal(document.querySelectorAll('[aria-labelledby="space-teaching-title"] li').length, 3)
+    params = new URLSearchParams('tab=learning')
+    await act(async () => render())
+    await act(async () => { mobile = true; viewportListeners.forEach(callback => callback()) })
+    assert.equal(document.querySelectorAll('article').length, 3, 'Điện thoại chỉ hiện ba khóa/trang')
+    assert.match(document.querySelector('[aria-label="Phân trang khóa học"]').textContent, /Trang 1\/3/)
+    params = new URLSearchParams('tab=teaching')
+    await act(async () => render())
+    await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.startsWith('Đang mở')).click())
+    assert.equal(document.querySelectorAll('li').length, 3, 'Giảng dạy trên điện thoại cũng ba khóa/trang')
   } finally { global.fetch = savedFetch }
 
   let pushed = null

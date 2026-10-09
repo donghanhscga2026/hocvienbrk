@@ -77,6 +77,7 @@ async function run() {
 
   let selection
   const home = load('components/wi300/Wi300Home.tsx', {
+    '@/lib/wi300/personal-space': { canTeach: role => ['ADMIN', 'TEACHER'].includes(role) },
     'next/cache': { unstable_cache: fn => fn },
     './Wi300HomeClient': { __esModule: true, default: () => null },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({}), getCourseWhereForProfile: () => ({ status: true, id: { in: [17] } }) },

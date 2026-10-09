@@ -46,6 +46,7 @@ async function run() {
   assert.equal((await manifest()).short_name, 'MFC')
 
   const catalog = load('lib/wi300/catalog.ts')
+  const personal = load('lib/wi300/personal-space.ts', { './catalog': catalog })
   const courses = [
     { id: 1, name_lop: 'Ứng dụng AI', phi_coc: 0, createdAt: '2026-01-01T00:00:00Z', teacher: { name: 'Hương Lucy' }, category: 'Công nghệ' },
     { id: 2, name_lop: 'Thiết kế website', phi_coc: 200, createdAt: '2026-03-01T00:00:00Z', teacher: { name: 'An' }, category: 'Công nghệ' },
@@ -62,13 +63,20 @@ async function run() {
 
   const scope = load('lib/site-profile/config.ts')
   let fail = false, profile = { siteConfig: { courseScope: { mode: 'ids', courseIds: [2] } } }
-  let courseWhere, enrollmentWhere
+  let courseWhere, enrollmentWhere, teachingQueries = []
   const home = load('components/wi300/Wi300Home.tsx', {
+    '@/lib/wi300/personal-space': personal,
     'next/cache': { unstable_cache: fn => fn },
     './Wi300HomeClient': { default: () => null },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => profile, getCourseWhereForProfile: scope.getCourseWhereForProfile },
     '@/lib/prisma': { __esModule: true, default: {
-      course: { findMany: async args => { courseWhere = args.where; if (fail) throw Error('Simulated database failure'); return [{ ...courses[1] }] } },
+      course: { findMany: async args => {
+        if ('teacherId' in args.where) {
+          teachingQueries.push(args)
+          return [{ id: 9, id_khoa: 'PRIVATE', name_lop: 'Khóa đã ẩn của tôi', status: false, _count: { lessons: 4, enrollments: 2 } }]
+        }
+        courseWhere = args.where; if (fail) throw Error('Simulated database failure'); return [{ ...courses[1] }]
+      } },
       user: { findUnique: async () => ({ phone: 'test' }) },
       enrollment: { findMany: async args => { enrollmentWhere = args.where; return [{ id: 7, courseId: 2, status: 'ACTIVE', startedAt: null, hiddenFromGifts: false, payment: null, updatedAt: new Date(), lessonProgress: [], _count: { lessonProgress: 3 }, course: { _count: { lessons: 10 } } }] } },
     } },
@@ -80,6 +88,22 @@ async function run() {
   assert.equal(result.props.enrollments[0].completedCount, 3)
   assert.equal(result.props.enrollments[0].payment, undefined)
   assert.equal(result.props.catalogError, false)
+  for (const role of ['STUDENT', 'AFFILIATE', 'DEVELOPER']) {
+    result = await home({ brand, session: { user: { id: '42', role } }, view: 'space' })
+    assert.deepEqual(result.props.teachingCourses, [])
+  }
+  assert.equal(teachingQueries.length, 0, 'Vai trò không được dạy không đọc dữ liệu giảng dạy')
+  for (const role of ['TEACHER', 'ADMIN']) {
+    result = await home({ brand, session: { user: { id: '42', role } }, view: 'space' })
+    assert.equal(result.props.teachingCourses[0].status, false, 'Khóa đã ẩn vẫn có trong khu giảng dạy riêng')
+    assert.deepEqual(teachingQueries.at(-1).where, { teacherId: 42 }, 'ADMIN cũng chỉ đọc SELF')
+    assert.deepEqual(result.props.courses.map(course => course.id), [2], 'Không trộn khóa riêng vào danh mục công khai')
+    assert.equal(teachingQueries.at(-1).select.teacher, undefined, 'Không gửi hồ sơ riêng của giáo viên')
+    assert.equal(teachingQueries.at(-1).select.teacherBankAccount, undefined)
+  }
+  const beforePublic = teachingQueries.length
+  await home({ brand, session: { user: { id: '42', role: 'TEACHER' } }, view: 'discover' })
+  assert.equal(teachingQueries.length, beforePublic, 'Trang khám phá không đọc khóa giảng dạy riêng')
   const originalError = console.error
   try {
     console.error = () => {}
@@ -132,6 +156,10 @@ async function run() {
   await act(async () => renderer.render(React.createElement(HomeClient, { ...props, loggedIn: true, userId: 42, enrollments: [{ courseId: 1, status: 'ACTIVE', completedCount: 3, totalLessons: 10 }] })))
   assert.equal(document.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '30')
   assert.match(document.querySelector('#khoa-hoc-cua-toi a[href*="/learn"]').getAttribute('href'), /\/learn$/)
+  await act(async () => renderer.render(React.createElement(HomeClient, { ...props, view: 'discover', courses: courses.map((course, i) => ({ ...course, teacherId: i + 1 })) })))
+  assert.equal(document.querySelectorAll('#giang-vien li').length, 3)
+  assert.ok(document.querySelector('#giang-vien a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
+  assert.equal(document.querySelectorAll('[data-course]').length, 3, 'Khám phá hiển thị khóa trực tiếp')
   await act(async () => renderer.unmount())
   dom.window.close()
   console.log('WI300: brand isolation, original manifest, course scope, Vietnamese filters, personal progress and database failure checks passed.')

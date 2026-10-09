@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-profile/runtime'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
+import { canTeach } from '@/lib/wi300/personal-space'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
 const courseSelect = {
@@ -20,6 +21,11 @@ const courseSelect = {
 } satisfies Prisma.CourseSelect
 
 export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }>
+const teachingSelect = {
+  id: true, id_khoa: true, name_lop: true, status: true,
+  _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' as const } } } },
+} satisfies Prisma.CourseSelect
+export type Wi300TeachingCourse = Prisma.CourseGetPayload<{ select: typeof teachingSelect }>
 export type Wi300Enrollment = {
   id: number; courseId: number; status: string; startedAt: Date | null; completedCount: number;
   totalLessons: number; enrollmentId: number; hiddenFromGifts: boolean; lastStudiedAt?: Date | null; lastLessonId?: string | null;
@@ -38,6 +44,20 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
   let userPhone: string | null = null
   let catalogError = false
   let accountError = false
+
+  // Dữ liệu giảng dạy không cache chung, không đưa khóa riêng vào danh mục công khai.
+  // ADMIN cũng mặc định chỉ thấy khóa của mình, giống bộ lọc SELF hiện có.
+  const teachingReady = (async (): Promise<{ teachingCourses: Wi300TeachingCourse[]; teachingError: boolean }> => {
+    if (view === 'space' && userId != null && Number.isInteger(userId) && canTeach(session?.user?.role)) {
+      try {
+        return { teachingCourses: await prisma.course.findMany({ where: { teacherId: userId }, select: teachingSelect, orderBy: { updatedAt: 'desc' } }), teachingError: false }
+      } catch (error) {
+        console.error('[WI300] Không tải được khóa giảng dạy', error)
+        return { teachingCourses: [], teachingError: true }
+      }
+    }
+    return { teachingCourses: [], teachingError: false }
+  })()
 
   try {
     const profile = await getCurrentSiteProfile()
@@ -73,5 +93,6 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
       accountError = true
     }
   }
-  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
+  const { teachingCourses, teachingError } = await teachingReady
+  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }
