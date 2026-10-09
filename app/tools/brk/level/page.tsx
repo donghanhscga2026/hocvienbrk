@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { getBrkLevelData, getBrkWalletData } from '@/app/actions/brk-actions'
 import BrkLevelProgress from '@/components/brk/BrkLevelProgress'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
+import { walletText } from '@/lib/wi300/wallet-display'
 
 interface LevelConfig {
   id: number
@@ -53,6 +55,7 @@ interface TimelineItem {
 }
 
 export default function BrkLevelPage() {
+  const wi300 = !!useWi300Brand()
   const [onSystem, setOnSystem] = useState(4)
   const [progress, setProgress] = useState<LevelProgress | null>(null)
   const [configs, setConfigs] = useState<LevelConfig[]>([])
@@ -202,7 +205,7 @@ export default function BrkLevelPage() {
             Hồ Sơ Thăng Tiến Cấp Bậc
           </h1>
           <p className="text-indigo-200 text-sm max-w-xl">
-            Theo dõi chi tiết điểm số, doanh số dồn, thu nhập đối ứng và từng mốc thăng hoa của bạn trên hệ thống MFC.
+            {walletText('Theo dõi chi tiết điểm số, doanh số dồn, thu nhập đối ứng và từng mốc thăng hoa của bạn trên hệ thống MFC.', wi300)}
           </p>
         </div>
       </div>
@@ -332,7 +335,7 @@ export default function BrkLevelPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 pb-3 border-b border-slate-100">
                       <div className="space-y-0.5">
                         <span className="text-xs text-slate-400 font-medium">{timeString} {dateString}</span>
-                        <h3 className="font-bold text-slate-800 text-base">{item.title}</h3>
+                        <h3 className="font-bold text-slate-800 text-base">{walletText(item.title, wi300)}</h3>
                       </div>
 
                       {/* Cash / MBDT / MBV Changes details */}
@@ -356,7 +359,7 @@ export default function BrkLevelPage() {
                             )}
                             {item.changeMBV > 0 && (
                               <div className="text-purple-600 font-bold text-xs">
-                                +{formatCASH(item.changeMBV)} MBV
+                                +{formatCASH(item.changeMBV)} {walletText('MBV', wi300)}
                               </div>
                             )}
                           </div>
@@ -368,7 +371,7 @@ export default function BrkLevelPage() {
 
                     {/* Body description */}
                     <div className="py-3 text-sm text-slate-600 space-y-2">
-                      <p className="leading-relaxed whitespace-pre-line">{item.desc}</p>
+                      <p className="leading-relaxed whitespace-pre-line">{walletText(item.desc, wi300)}</p>
                       
                       {/* Leader/Placement Chain info (if present) */}
                       {item.extra?.leaderChain && (
@@ -401,7 +404,7 @@ export default function BrkLevelPage() {
 
                       {/* Income MBDT (cỡ chữ to hơn, không đơn vị) */}
                       <div className="space-y-0.5">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Thu nhập (MBDT)</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{walletText('Thu nhập (MBDT)', wi300)}</span>
                         <div className="text-emerald-700 font-extrabold text-base leading-none">
                           {formatMBDT(item.incomeMBDT)}
                         </div>
@@ -436,7 +439,7 @@ export default function BrkLevelPage() {
                 <th className="px-5 py-3 text-left text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Cấp bậc</th>
                 <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Điểm yêu cầu (MBP)</th>
                 <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Hoa hồng chênh lệch</th>
-                <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">Quà tặng MBV</th>
+                <th className="px-5 py-3 text-right text-slate-500 font-semibold uppercase tracking-wider text-[11px]">{walletText('Quà tặng MBV', wi300)}</th>
                 <th className="px-5 py-3 text-left text-slate-500 font-semibold uppercase tracking-wider text-[11px] pl-8">Yêu cầu nhánh bảo trợ</th>
               </tr>
             </thead>

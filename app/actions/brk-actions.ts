@@ -221,6 +221,7 @@ export async function getBrkWalletData() {
       id: tx.id,
       amount: Number(tx.amount),
       type: tx.type,
+      balanceType: tx.balanceType,
       description: tx.description,
       balanceBefore: Number(tx.balanceBefore),
       balanceAfter: Number(tx.balanceAfter),

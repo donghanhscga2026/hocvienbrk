@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import BrkWalletCard from '@/components/brk/BrkWalletCard'
 import BrkLevelProgress from '@/components/brk/BrkLevelProgress'
 import BrkRevenueHistory from '@/components/brk/BrkRevenueHistory'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
+import { walletMoney, walletText } from '@/lib/wi300/wallet-display'
 import { getBrkDashboard, getAvailableBrkSystems, joinBrkSystem, cancelBrkMembership, getBrkRevenueShare, previewMoveMemberAction, moveBrkMemberAction, rebuildBrkSubtreeAction } from '@/app/actions/brk-actions'
 
 interface BrkSystemInfo {
@@ -87,6 +89,7 @@ interface RebuildSubtreeResult {
 }
 
 export default function BrkDashboardPage() {
+  const wi300 = !!useWi300Brand()
   const [walletBalance, setWalletBalance] = useState(0)
   const [systems, setSystems] = useState<BrkSystemInfo[]>([])
   const [availableSystems, setAvailableSystems] = useState<AvailableSystem[]>([])
@@ -212,7 +215,7 @@ export default function BrkDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">MFC Affiliate</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{wi300 ? 'Quyền lợi Wi300' : 'MFC Affiliate'}</h1>
         <div className="flex gap-2 flex-wrap">
           {(['dashboard', 'systems', 'revenue', 'move', 'rebuild'] as const).map((tab) => (
             <button
@@ -238,7 +241,7 @@ export default function BrkDashboardPage() {
               <div key={sys.onSystem} className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">{sys.nameSystem}</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">{walletText(sys.nameSystem, wi300)}</h3>
                     <p className="text-sm text-gray-500">
                       F1: {sys.f1Count} | Tổng hạ: {sys.totalDownline} | Điểm: {sys.totalPoints.toFixed(0)} MP
                     </p>
@@ -278,7 +281,7 @@ export default function BrkDashboardPage() {
 
             {systems.length === 0 && (
               <div className="text-center py-12 text-gray-400">
-                Bạn chưa tham gia hệ thống MFC nào. Hãy chuyển qua tab "Hệ thống" để tham gia.
+                {walletText('Bạn chưa tham gia hệ thống MFC nào. Hãy chuyển qua tab "Hệ thống" để tham gia.', wi300)}
               </div>
             )}
           </div>
@@ -289,9 +292,9 @@ export default function BrkDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {availableSystems.map((sys) => (
             <div key={sys.onSystem} className="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-md transition">
-              <h3 className="font-semibold text-gray-800 text-lg mb-2">{sys.nameSystem}</h3>
+              <h3 className="font-semibold text-gray-800 text-lg mb-2">{walletText(sys.nameSystem, wi300)}</h3>
               <div className="space-y-1 text-sm text-gray-500 mb-4">
-                <p>Phí: ${sys.fee}</p>
+                <p>Phí: {walletMoney(sys.fee, wi300)}</p>
                 <p>Thời hạn: {sys.durationDays} ngày</p>
                 <p>Cân nhắc: {sys.graceDays} ngày</p>
                 <p>Hoàn lại: {sys.returnPct}%</p>
@@ -315,7 +318,7 @@ export default function BrkDashboardPage() {
 
           {availableSystems.length === 0 && (
             <div className="col-span-full text-center py-12 text-gray-400">
-              Chưa có hệ thống MFC nào được tạo.
+              {walletText('Chưa có hệ thống MFC nào được tạo.', wi300)}
             </div>
           )}
         </div>
