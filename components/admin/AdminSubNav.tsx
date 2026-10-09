@@ -2,7 +2,9 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import * as LucideIcons from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface NavItem {
   label: string
@@ -17,12 +19,13 @@ interface AdminSubNavProps {
 
 export function AdminSubNav({ title, items }: AdminSubNavProps) {
   const pathname = usePathname()
+  const wi300 = useWi300Brand()
   
   return (
-    <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
-      <div className="flex items-center gap-2 p-3 overflow-x-auto">
+    <div className={wi300 ? "bg-white border-b border-gray-100 rounded-xl" : "bg-white border-b border-gray-100 sticky top-0 z-50"}>
+      <div aria-label={title || 'Điều hướng quản trị'} className="flex items-center gap-2 p-3 overflow-x-auto">
         {items.map((item) => {
-          const Icon = item.icon ? (LucideIcons as any)[item.icon] : null
+          const Icon = item.icon ? (LucideIcons as unknown as Record<string, LucideIcon>)[item.icon] : null
           const active = pathname === item.href
           
           return (

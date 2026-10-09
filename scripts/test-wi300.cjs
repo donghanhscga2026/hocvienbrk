@@ -47,14 +47,18 @@ async function run() {
 
   const catalog = load('lib/wi300/catalog.ts')
   const courses = [
-    { id: 1, name_lop: 'Ứng dụng AI', phi_coc: 0, teacher: { name: 'Hương Lucy' }, category: 'Công nghệ' },
-    { id: 2, name_lop: 'Thiết kế website', phi_coc: 200, teacher: { name: 'An' }, category: 'Công nghệ' },
-    { id: 3, name_lop: 'Kinh doanh', phi_coc: 500, teacher: { name: 'Bình' }, category: 'Kinh doanh' },
+    { id: 1, name_lop: 'Ứng dụng AI', phi_coc: 0, createdAt: '2026-01-01T00:00:00Z', teacher: { name: 'Hương Lucy' }, category: 'Công nghệ' },
+    { id: 2, name_lop: 'Thiết kế website', phi_coc: 200, createdAt: '2026-03-01T00:00:00Z', teacher: { name: 'An' }, category: 'Công nghệ' },
+    { id: 3, name_lop: 'Kinh doanh', phi_coc: 500, createdAt: '2026-02-01T00:00:00Z', teacher: { name: 'Bình' }, category: 'Kinh doanh' },
   ]
   assert.deepEqual(catalog.filterCourses(courses, 'huong', '', 'all').map(c => c.id), [1])
   assert.deepEqual(catalog.filterCourses(courses, 'ung dung', 'Công nghệ', 'free').map(c => c.id), [1])
   assert.deepEqual(catalog.filterCourses(courses, '', 'Công nghệ', 'paid').map(c => c.id), [2])
   assert.equal(catalog.filterCourses(courses, 'khong co', '', 'all').length, 0)
+  assert.deepEqual(catalog.sortCourses(courses, 'newest').map(c => c.id), [2, 3, 1])
+  assert.deepEqual(catalog.sortCourses(courses, 'price-asc').map(c => c.id), [1, 2, 3])
+  assert.deepEqual(catalog.sortCourses(courses, 'price-desc').map(c => c.id), [3, 2, 1])
+  assert.deepEqual(courses.map(c => c.id), [1, 2, 3], 'Sắp xếp không đổi nguồn cache')
 
   const scope = load('lib/site-profile/config.ts')
   let fail = false, profile = { siteConfig: { courseScope: { mode: 'ids', courseIds: [2] } } }
@@ -103,14 +107,21 @@ async function run() {
     '@/components/course/CourseCard': { __esModule: true, default: ({ course }) => React.createElement('article', { 'data-course': course.id }, course.name_lop) },
     '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
     '@/lib/wi300/catalog': catalog,
+    './Wi300Businesses': load('components/wi300/Wi300Businesses.tsx'),
     './Wi300PersonalSpace': { __esModule: true, default: () => null },
   }).default
   const renderer = createRoot(document.getElementById('root'))
   const props = { brand, courses, enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
   await act(async () => renderer.render(React.createElement(HomeClient, props)))
-  assert.match(document.querySelector('h1').textContent, /Kết nối doanh nghiệp/)
+  assert.match(document.querySelector('h1').textContent, /Kết nối con người/)
   assert.equal(document.querySelectorAll('[data-course]').length, 3)
-  assert.ok(document.querySelector('a[href="/gioi-thieu"]'))
+  assert.ok(document.querySelector('a[href="/#doanh-nghiep-tieu-bieu"]'))
+  assert.equal(document.querySelectorAll('#doanh-nghiep-tieu-bieu li').length, 5)
+  const sort = document.getElementById('wi300-sort')
+  await act(async () => { sort.value = 'newest'; sort.dispatchEvent(new window.Event('change', { bubbles: true })) })
+  assert.deepEqual([...document.querySelectorAll('[data-course]')].map(e => Number(e.dataset.course)), [2, 3, 1])
+  await act(async () => { sort.value = 'price-desc'; sort.dispatchEvent(new window.Event('change', { bubbles: true })) })
+  assert.deepEqual([...document.querySelectorAll('[data-course]')].map(e => Number(e.dataset.course)), [3, 2, 1])
   const categoryButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent === 'Công nghệ')
   await act(async () => categoryButton.click())
   assert.equal(document.querySelectorAll('[data-course]').length, 2)

@@ -41,7 +41,7 @@ async function run() {
     'next-auth/react': { useSession: () => ({ data: null }) }, 'next/navigation': { usePathname: () => pathname },
     './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': {},
   }).default
-  const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header } }).default
+  const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header }, 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts') }).default
   const root = createRoot(document.getElementById('root'))
   const renderShell = () => root.render(React.createElement(Shell, null, React.createElement('div', null, 'Page')))
   await act(async () => renderShell())
@@ -109,6 +109,14 @@ async function run() {
     assert.equal(document.querySelectorAll('article').length, 1)
     assert.equal(document.querySelector('a[href="/my-space?tab=pages"]').textContent, 'Website & nội dung')
   } finally { global.fetch = savedFetch }
+  pathname = '/tools/posts'
+  await act(async () => renderShell())
+  assert.equal(document.querySelector('h1').textContent, 'Bài viết cộng đồng')
+  assert.ok(document.querySelector('div.max-w-7xl.px-4'), 'Trang mặc định có khung và khoảng lề')
+  assert.match(document.querySelector('[aria-label="Đường dẫn trang"]').textContent, /Không gian của tôi/)
+  pathname = '/page/custom-template'
+  await act(async () => renderShell())
+  assert.equal(document.querySelector('[aria-label="Đường dẫn trang"]'), null, 'Không bọc trang template riêng')
   let currentBrand = null
   const favicon = load('app/favicon.ico/route.ts', { '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => currentBrand } })
   let response = await favicon.GET(new Request('https://old.example.com/favicon.ico'))

@@ -11,6 +11,7 @@ import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceActi
 import { useRouter } from 'next/navigation'
 import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import MainHeader from '@/components/layout/MainHeader'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
 import CourseDashboardModal from '@/components/course/CourseDashboardModal'
@@ -72,6 +73,7 @@ export default function CourseLandingTemplate({
     activeStudentCount
 }: CourseLandingTemplateProps) {
     const router = useRouter()
+    const wi300 = useWi300Brand()
     const { openAssistant } = useAccountAssistant()
     const [loading, setLoading] = useState(false)
     const [showAllLessons, setShowAllLessons] = useState(false)
@@ -233,8 +235,8 @@ export default function CourseLandingTemplate({
             <MainHeader title="" />
 
             {/* CTA Section */}
-            <section className="py-8 pt-20">
-                <div className="container mx-auto px-4">
+            <section className={wi300 ? "py-8" : "py-8 pt-20"}>
+                <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
                     <div className="max-w-lg mx-auto">
                         <div className="bg-brk-surface rounded-3xl shadow-2xl border border-brk-outline p-6 md:p-8">
                             {isValidImageUrl(course.link_anh_bia) && (
@@ -405,8 +407,8 @@ export default function CourseLandingTemplate({
 
             {/* Overview Section */}
             <section className="py-16">
-                <div className="container mx-auto px-4">
-                    <div className="max-w-4xl">
+                <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                    <div className={wi300 ? "mx-auto max-w-5xl" : "max-w-4xl"}>
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                             Giới thiệu khóa học
                         </h2>
@@ -421,8 +423,8 @@ export default function CourseLandingTemplate({
             {/* Curriculum Section */}
             {lessons.length > 0 && (
                 <section className="py-16 bg-brk-surface">
-                    <div className="container mx-auto px-4">
-                        <div className="max-w-4xl">
+                    <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                        <div className={wi300 ? "mx-auto max-w-5xl" : "max-w-4xl"}>
                             <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                                 Nội dung khóa học
                             </h2>
@@ -473,8 +475,8 @@ export default function CourseLandingTemplate({
 
             {/* Testimonials Section */}
             <section className="py-16">
-                <div className="container mx-auto px-4">
-                    <div className="max-w-4xl">
+                <div className={wi300 ? "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8" : "container mx-auto px-4"}>
+                    <div className={wi300 ? "mx-auto max-w-5xl" : "max-w-4xl"}>
                         <h2 className="text-2xl font-black text-brk-on-surface mb-6">
                             Thành viên nói gì về khóa học
                         </h2>

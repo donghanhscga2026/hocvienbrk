@@ -53,7 +53,7 @@ export function useFloatingAssistant() {
   return ctx
 }
 
-export function AssistantProvider({ children }: { children: ReactNode }) {
+export function AssistantProvider({ children, toastEnabled = true }: { children: ReactNode; toastEnabled?: boolean }) {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [displayMode, setDisplayMode] = useState<DisplayMode>('icon')
@@ -87,17 +87,17 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    fetchGuide(pathname)
+    void Promise.resolve().then(() => fetchGuide(pathname))
   }, [pathname, fetchGuide])
 
   useEffect(() => {
-    if (!guideData && !toolGuideData) return
+    if (!toastEnabled || (!guideData && !toolGuideData)) return
     const seen: Record<string, boolean> = JSON.parse(localStorage.getItem(TOAST_SEEN_KEY) || '{}')
     if (!seen[pathname]) {
       const timer = setTimeout(() => setShowToast(true), 2000)
       return () => clearTimeout(timer)
     }
-  }, [pathname, guideData, toolGuideData])
+  }, [pathname, guideData, toolGuideData, toastEnabled])
 
   useEffect(() => {
     fetch('/api/assistant-guide/config').then(r => r.json()).then(json => {
@@ -120,7 +120,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       activeTab, setActiveTab, showToast, dismissToast,
     }}>
       {children}
-      {showToast && (guideData || toolGuideData) && (
+      {toastEnabled && showToast && (guideData || toolGuideData) && (
         <AssistantToast
           guideData={guideData}
           toolGuideData={toolGuideData}
