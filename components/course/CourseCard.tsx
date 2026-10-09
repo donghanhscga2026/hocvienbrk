@@ -65,9 +65,10 @@ interface CourseCardProps {
     priority?: boolean
     darkMode?: boolean
     profileSlug?: string | null
+    showSharing?: boolean
 }
 
-export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null }: CourseCardProps) {
+export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollment, userPhone = null, userId = null, priority = false, darkMode = false, profileSlug = null, showSharing = true }: CourseCardProps) {
     const router = useRouter()
     const [showPayment, setShowPayment] = useState(false)
     const [showRegistrationModal, setShowRegistrationModal] = useState(false)
@@ -322,8 +323,8 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                             )}
                         </span>
 
-                        {/* Chia sẻ */}
-                        <button
+                        {/* WI300 chưa đưa affiliate vào giao diện; web cũ giữ mặc định. */}
+                        {showSharing && <button
                             onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
@@ -333,7 +334,7 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                         >
                             <Share2 className="w-2.5 h-2.5" />
                             Chia sẻ
-                        </button>
+                        </button>}
 
                         {/* Chờ thanh toán (Nếu có) */}
                         {isPending && (

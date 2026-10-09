@@ -15,6 +15,8 @@ import { getRandomMessage } from './actions/message-actions'
 import { resetSurveyAction } from './actions/survey-actions'
 import { getRoadmapPoints } from './actions/roadmap-actions'
 import { FALLBACK_PROFILE } from '@/lib/db-fallback'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import Wi300Home from '@/components/wi300/Wi300Home'
 
 const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string) => {
   if (!landingId && !landingSlug) return null
@@ -28,6 +30,8 @@ const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string
 })
 
 export async function generateMetadata(): Promise<Metadata> {
+  const brand = await getCurrentDeploymentBrand()
+  if (brand) return { title: { absolute: `${brand.name} | ${brand.tagline}` }, description: brand.description, openGraph: { title: `${brand.name} | ${brand.tagline}`, description: brand.description, images: [brand.logoUrl] } }
   const profile = await getCurrentSiteProfile()
   if (!profile) return { title: 'MFC' }
 
@@ -61,6 +65,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   const session = await getSession()
+  const brand = await getCurrentDeploymentBrand()
+  if (brand) return <Wi300Home brand={brand} session={session} />
   
   // Resolve Site Profile theo hostname; localhost/host chưa khai báo fallback profile mặc định.
   const profile = await getCurrentSiteProfile()

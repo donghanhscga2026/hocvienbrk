@@ -21,6 +21,9 @@ import ImportedPage from '@/components/website/ImportedPage'
 import { DEFAULT_ATTENTION_CONFIG } from '@/lib/attention-highlight-types'
 import { websiteTheme, normalizeWebsitePalette } from '@/lib/website/theme'
 import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/runtime";
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { Wi300BrandProvider } from '@/components/wi300/Wi300BrandContext'
+import Wi300Header from '@/components/wi300/Wi300Header'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -40,6 +43,14 @@ export async function generateMetadata(): Promise<Metadata> {
     const config=getSiteRuntimeConfig(domain.profile)
     const name=config.branding.name || doc?.name || domain.profile.title || domain.hostname
     return {metadataBase:new URL('https://'+domain.hostname),title:{default:name,template:'%s | '+name},description:doc?.description || '',applicationName:name,icons:config.branding.faviconUrl?{icon:config.branding.faviconUrl,apple:config.branding.faviconUrl}:undefined,openGraph:{title:name,description:doc?.description || '',siteName:name,url:'https://'+domain.hostname,type:'website'}}
+  }
+  const brand = await getCurrentDeploymentBrand()
+  if (brand) return {
+    title: { default: `${brand.name} | ${brand.tagline}`, template: `%s | ${brand.name}` },
+    description: brand.description, applicationName: brand.name,
+    icons: { icon: brand.iconUrl, apple: brand.iconUrl }, manifest: '/manifest.webmanifest',
+    appleWebApp: { capable: true, title: brand.name, statusBarStyle: 'default' },
+    openGraph: { title: brand.name, description: brand.description, siteName: brand.name, images: [brand.logoUrl] },
   }
   const profile = await getCurrentSiteProfile()
   const runtimeConfig = profile ? getSiteRuntimeConfig(profile) : null
@@ -78,7 +89,10 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#047857" };
+export async function generateViewport(): Promise<Viewport> {
+  const brand = await getCurrentDeploymentBrand()
+  return { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: brand?.palette.primary || '#047857' }
+}
 
 const getThemePaletteMap = unstable_cache(
   async () => {
@@ -122,6 +136,13 @@ export default async function RootLayout({
     const brand={palette:domain.profile.theme?.colors,logoUrl:config.branding.logoUrl,tools:config.modules.tools,name:config.branding.name || doc?.name || domain.profile.title || domain.hostname,color:doc?.color || '#7c3aed',background:doc?.background || '#ffffff',ownerId:domain.profile.userId,footerText:domain.profile.footerText,courses:domain.courses,crm:domain.crm,affiliate:domain.affiliate}
     const theme=websiteTheme(brand.color,brand.background,brand.palette)
     return <html lang="vi" data-website-theme={theme.dark ? 'dark' : 'light'} style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{config:DEFAULT_ATTENTION_CONFIG,items:[]}}><DomainShell brand={brand} navigation={doc.navigation} pages={doc?.pages.map(p=>({title:p.title,slug:p.slug}))} path={path} importedHome={importedHome}>{children}{domain.affiliate && <AffiliateTracker />}</DomainShell></Providers></body></html>
+  }
+  const brand = await getCurrentDeploymentBrand()
+  if (brand) {
+    const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
+    const session = await getSession()
+    // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
+    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Header />{children}<AccountAssistantTrigger /></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
   }
   const [siteProfile, themeRows] = await Promise.all([
     getCurrentSiteProfile(),

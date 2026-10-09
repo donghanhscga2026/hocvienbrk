@@ -1,0 +1,131 @@
+/* Kiểm tra cách ly thương hiệu, phạm vi khóa học và trạng thái lỗi; không ghi DB. */
+const fs = require('node:fs')
+const path = require('node:path')
+const assert = require('node:assert/strict')
+const ts = require('typescript')
+const root = path.resolve(__dirname, '..')
+function load(file, overrides = {}) {
+  const module = { exports: {} }
+  const source = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+  }).outputText
+  new Function('require', 'exports', 'module', source)(name => name in overrides ? overrides[name] : require(name), module.exports, module)
+  return module.exports
+}
+const saved = { variant: process.env.SITE_VARIANT, hosts: process.env.PLATFORM_HOSTS }
+async function run() {
+  const config = load('lib/site-profile/deployment-brand.ts')
+  assert.equal(config.getDeploymentBrand({}), null)
+  assert.equal(config.getDeploymentBrand({ SITE_VARIANT: 'unknown' }), null)
+  assert.equal(config.getDeploymentBrand({ SITE_VARIANT: ' Wi300 ' }).name, 'WI300')
+  assert.equal(config.getDeploymentBrand({ SITE_VARIANT: 'wi300', WI300_NAME: 'Tên riêng' }).name, 'Tên riêng')
+  process.env.SITE_VARIANT = 'wi300'
+  process.env.PLATFORM_HOSTS = 'wi300.vn,www.wi300.vn'
+  let hostname = 'www.wi300.vn'
+  const shared = load('lib/website/domain-shared.ts')
+  const runtime = load('lib/site-profile/deployment-runtime.ts', {
+    'server-only': {}, 'react': { cache: fn => fn },
+    'next/headers': { headers: async () => ({ get: () => hostname }) },
+    './deployment-brand': config, '@/lib/website/domain-shared': shared,
+  })
+  for (const host of ['wi300.vn', 'www.wi300.vn', 'preview.vercel.app', 'localhost:3008']) {
+    hostname = host
+    assert.equal((await runtime.getCurrentDeploymentBrand()).variant, 'wi300')
+  }
+  for (const host of ['brk.io.vn', 'wi300.vn.evil.vn']) {
+    hostname = host
+    assert.equal(await runtime.getCurrentDeploymentBrand(), null, 'Không đổi thương hiệu domain chuyên gia')
+  }
+  hostname = 'www.wi300.vn'
+  delete process.env.SITE_VARIANT
+  assert.equal(await runtime.getCurrentDeploymentBrand(), null, 'Web cũ không tự bật WI300')
+  process.env.SITE_VARIANT = 'wi300'
+  const manifest = load('app/manifest.ts', { '@/lib/site-profile/deployment-runtime': runtime }).default
+  assert.equal((await manifest()).short_name, 'WI300')
+  delete process.env.SITE_VARIANT
+  assert.equal((await manifest()).short_name, 'MFC')
+
+  const catalog = load('lib/wi300/catalog.ts')
+  const courses = [
+    { id: 1, name_lop: 'Ứng dụng AI', phi_coc: 0, teacher: { name: 'Hương Lucy' }, category: 'Công nghệ' },
+    { id: 2, name_lop: 'Thiết kế website', phi_coc: 200, teacher: { name: 'An' }, category: 'Công nghệ' },
+    { id: 3, name_lop: 'Kinh doanh', phi_coc: 500, teacher: { name: 'Bình' }, category: 'Kinh doanh' },
+  ]
+  assert.deepEqual(catalog.filterCourses(courses, 'huong', '', 'all').map(c => c.id), [1])
+  assert.deepEqual(catalog.filterCourses(courses, 'ung dung', 'Công nghệ', 'free').map(c => c.id), [1])
+  assert.deepEqual(catalog.filterCourses(courses, '', 'Công nghệ', 'paid').map(c => c.id), [2])
+  assert.equal(catalog.filterCourses(courses, 'khong co', '', 'all').length, 0)
+
+  const scope = load('lib/site-profile/config.ts')
+  let fail = false, profile = { siteConfig: { courseScope: { mode: 'ids', courseIds: [2] } } }
+  let courseWhere, enrollmentWhere
+  const home = load('components/wi300/Wi300Home.tsx', {
+    'next/cache': { unstable_cache: fn => fn },
+    './Wi300HomeClient': { default: () => null },
+    '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => profile, getCourseWhereForProfile: scope.getCourseWhereForProfile },
+    '@/lib/prisma': { __esModule: true, default: {
+      course: { findMany: async args => { courseWhere = args.where; if (fail) throw Error('Simulated database failure'); return [{ ...courses[1] }] } },
+      user: { findUnique: async () => ({ phone: 'test' }) },
+      enrollment: { findMany: async args => { enrollmentWhere = args.where; return [{ id: 7, courseId: 2, status: 'ACTIVE', startedAt: null, hiddenFromGifts: false, payment: null, _count: { lessonProgress: 3 }, course: { _count: { lessons: 10 } } }] } },
+    } },
+  }).default
+  const brand = config.getDeploymentBrand({ SITE_VARIANT: 'wi300' })
+  let result = await home({ brand, session: { user: { id: '42' } } })
+  assert.deepEqual(courseWhere, { status: true, id: { in: [2] } })
+  assert.deepEqual(enrollmentWhere, { userId: 42, courseId: { in: [2] } })
+  assert.equal(result.props.enrollments[0].completedCount, 3)
+  assert.equal(result.props.enrollments[0].payment, undefined)
+  assert.equal(result.props.catalogError, false)
+  const originalError = console.error
+  try {
+    console.error = () => {}
+    fail = true
+    result = await home({ brand, session: null })
+  } finally { console.error = originalError }
+  assert.equal(result.props.catalogError, true)
+  assert.deepEqual(result.props.courses, [], 'Không đưa khóa giả vào khi DB lỗi')
+
+  // Kiểm tra thao tác thật trên component trang chủ bằng DOM, không cần backend.
+  const { JSDOM } = require('jsdom')
+  const dom = new JSDOM('<div id="root"></div>', { url: 'https://www.wi300.vn/' })
+  global.window = dom.window
+  global.document = dom.window.document
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const React = require('react')
+  const { createRoot } = require('react-dom/client')
+  const { act } = React
+  const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
+  const HomeClient = load('components/wi300/Wi300HomeClient.tsx', {
+    'next/link': link,
+    'next/image': { __esModule: true, default: ({ priority, ...props }) => React.createElement('img', props) },
+    'next/dynamic': { __esModule: true, default: () => () => null },
+    'next/navigation': { useSearchParams: () => new URLSearchParams() },
+    '@/components/course/CourseCard': { __esModule: true, default: ({ course }) => React.createElement('article', { 'data-course': course.id }, course.name_lop) },
+    '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
+    '@/lib/wi300/catalog': catalog,
+  }).default
+  const renderer = createRoot(document.getElementById('root'))
+  const props = { brand, courses, enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
+  await act(async () => renderer.render(React.createElement(HomeClient, props)))
+  assert.match(document.querySelector('h1').textContent, /Khai phóng tri thức/)
+  assert.equal(document.querySelectorAll('[data-course]').length, 3)
+  assert.ok(document.querySelector('#gioi-thieu'))
+  const categoryButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent === 'Công nghệ')
+  await act(async () => categoryButton.click())
+  assert.equal(document.querySelectorAll('[data-course]').length, 2)
+  const select = document.querySelector('#wi300-fee')
+  await act(async () => { select.value = 'free'; select.dispatchEvent(new window.Event('change', { bubbles: true })) })
+  assert.equal(document.querySelectorAll('[data-course]').length, 1)
+  assert.equal(document.querySelector('[data-course]').textContent, 'Ứng dụng AI')
+  await act(async () => renderer.render(React.createElement(HomeClient, { ...props, loggedIn: true, userId: 42, enrollments: [{ courseId: 1, status: 'ACTIVE', completedCount: 3, totalLessons: 10 }] })))
+  assert.equal(document.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '30')
+  assert.match(document.querySelector('#khoa-hoc-cua-toi a').getAttribute('href'), /\/learn$/)
+  await act(async () => renderer.unmount())
+  dom.window.close()
+  console.log('WI300: brand isolation, original manifest, course scope, Vietnamese filters, personal progress and database failure checks passed.')
+}
+run().catch(error => { console.error(error); process.exitCode = 1 }).finally(() => {
+  for (const [key, value] of [['SITE_VARIANT', saved.variant], ['PLATFORM_HOSTS', saved.hosts]]) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+})
