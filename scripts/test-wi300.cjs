@@ -123,6 +123,11 @@ async function run() {
   const { createRoot } = require('react-dom/client')
   const { act } = React
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
+  const TeacherStrip = load('components/wi300/Wi300Teachers.tsx', {
+    'next/link': link,
+    'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) },
+    './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } },
+  })
   const HomeClient = load('components/wi300/Wi300HomeClient.tsx', {
     'next/link': link,
     'next/image': { __esModule: true, default: ({ priority, unoptimized, ...props }) => React.createElement('img', props) },
@@ -133,6 +138,7 @@ async function run() {
     '@/lib/wi300/catalog': catalog,
     './Wi300Businesses': load('components/wi300/Wi300Businesses.tsx', { './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } } }),
     './Wi300PersonalSpace': { __esModule: true, default: () => null },
+    './Wi300Teachers': TeacherStrip,
   }).default
   const renderer = createRoot(document.getElementById('root'))
   const props = { brand, courses, enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
@@ -162,7 +168,7 @@ async function run() {
   assert.ok(document.querySelector('[aria-labelledby="wi300-partner-title"] a[href="/account-settings"]'))
   assert.match(document.querySelector('#khoa-hoc-cua-toi a[href*="/learn"]').getAttribute('href'), /\/learn$/)
   await act(async () => renderer.render(React.createElement(HomeClient, { ...props, view: 'discover', courses: courses.map((course, i) => ({ ...course, teacherId: i + 1 })) })))
-  assert.equal(document.querySelectorAll('#giang-vien li').length, 3)
+  assert.equal(document.querySelectorAll('#giang-vien ul[aria-label] li').length, 3)
   assert.ok(document.querySelector('#giang-vien a[href="/khoa-hoc?q=H%C6%B0%C6%A1ng%20Lucy"]'))
   assert.equal(document.querySelectorAll('[data-course]').length, 3, 'Khám phá hiển thị khóa trực tiếp')
   assert.deepEqual([...document.querySelectorAll('[aria-label="Nội dung khám phá"] a')].map(a => a.textContent), ['Khóa học', 'Sản phẩm', 'Dịch vụ'])
@@ -170,9 +176,18 @@ async function run() {
   assert.ok(document.querySelector('img[src="/wi300/ecosystem-banner.webp"]'))
   const manyTeachers = Array.from({ length: 8 }, (_, i) => ({ ...courses[0], id: i + 1, teacherId: i + 1, teacher: { name: i === 7 ? 'Cương Leo' : `Giảng viên ${i}` }, pin: i === 4 ? 1 : null }))
   await act(async () => renderer.render(React.createElement(HomeClient, { ...props, view: 'discover', courses: manyTeachers })))
-  assert.equal(document.querySelectorAll('#giang-vien li').length, 3)
+  assert.equal(document.querySelectorAll('#giang-vien ul[aria-label] li').length, 6)
+  assert.equal(document.querySelectorAll('#giang-vien ul[aria-hidden="true"] li').length, 6)
+  assert.ok([...document.querySelectorAll('#giang-vien ul[aria-hidden="true"] a')].every(a => a.tabIndex === -1))
+  await act(async () => document.querySelector('#giang-vien button').click())
+  assert.ok(document.querySelector('#giang-vien .paused'))
+  assert.equal(document.querySelector('#giang-vien button').getAttribute('aria-pressed'), 'true')
   assert.match(document.querySelector('#giang-vien li').textContent, /Cương Leo/)
   assert.match(document.querySelectorAll('#giang-vien li')[1].textContent, /Giảng viên 4/)
+  await act(async () => renderer.render(React.createElement(HomeClient, { ...props, view: 'discover', courses: [{ ...manyTeachers[7], teacher: { name: 'Cương Leo', image: '/teacher.png' } }] })))
+  assert.equal(document.querySelector('#giang-vien ul[aria-hidden]'), null, 'Một người không lặp chạy')
+  assert.equal(document.querySelector('#giang-vien button'), null)
+  assert.ok(document.querySelector('#giang-vien img[src="/teacher.png"]'))
   await act(async () => renderer.unmount())
   dom.window.close()
   console.log('WI300: brand isolation, original manifest, course scope, Vietnamese filters, personal progress and database failure checks passed.')

@@ -46,8 +46,7 @@ export default function Wi300Header() {
   return <><header className="sticky top-0 z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl">
     <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-2 px-4 py-2 lg:px-6">
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex shrink-0 items-center gap-2">
-        <Image src={brand.iconUrl} alt="WIPA" width={1280} height={1280} priority unoptimized className="hidden h-11 w-11 object-contain sm:block" />
-        <div><span className="text-lg font-extrabold tracking-tight text-brk-primary sm:text-xl">{brand.name}</span><span className="hidden text-[10px] text-brk-muted xl:block">{brand.tagline}</span></div>
+        <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-32 object-contain sm:w-44" />
       </Link>
       <nav aria-label="Điều hướng chính" className="order-3 flex w-full gap-1 overflow-x-auto py-1 lg:order-none lg:w-auto">
         {links.map(({ href, label, icon: Icon }) => {
@@ -56,7 +55,7 @@ export default function Wi300Header() {
         })}
       </nav>
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
-        <Link href="/my-space" aria-current={path === '/my-space' ? 'page' : undefined} className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-brk-outline px-2 text-[11px] font-semibold text-brk-primary hover:bg-brk-background sm:px-3 sm:text-sm"><LayoutGrid className="hidden h-4 w-4 sm:block" aria-hidden="true" />Không gian khóa học</Link>
+        <Link href="/my-space" aria-current={path === '/my-space' ? 'page' : undefined} className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-brk-outline px-2 text-[11px] font-semibold text-brk-primary hover:bg-brk-background sm:px-3 sm:text-sm"><LayoutGrid className="hidden h-4 w-4 sm:block" aria-hidden="true" />Không gian của tôi</Link>
         {/* Cụm hành động nhanh cạnh avatar; không gọi API chia sẻ cho tới khi mở. */}
         {userId != null && <><button type="button" aria-label="Chia sẻ link affiliate" title="Chia sẻ link affiliate" onClick={() => setShowShare(true)} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brk-background"><Image src="/Share_Link_3d.png" alt="" width={32} height={32} /></button><NotificationBell /></>}
         {session?.user ? <details ref={accountRef} className="relative" onKeyDown={event => {

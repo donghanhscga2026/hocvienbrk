@@ -16,7 +16,7 @@ const courseSelect = {
   feeType: true, voucherConfig: true, allowMbvDeduction: true,
   requiresReferralActivation: true, referralActivationThreshold: true,
   courseCategory: { select: { name: true } }, teacherBankAccount: true,
-  teacher: { select: { name: true } },
+  teacher: { select: { name: true, image: true } },
   _count: { select: { enrollments: { where: { status: 'ACTIVE' as const } }, lessons: true } },
 } satisfies Prisma.CourseSelect
 
@@ -35,7 +35,7 @@ export type Wi300Enrollment = {
 // Cùng phạm vi khóa học của SITE_PROFILE_KEY; cache không phụ thuộc nhận diện giao diện.
 const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => prisma.course.findMany({
   where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
-}), ['wi300-course-catalog-v2'], { tags: ['site-profile'], revalidate: 600 })
+}), ['wi300-course-catalog-v3'], { tags: ['site-profile'], revalidate: 600 })
 
 export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
   const userId = session?.user?.id != null ? Number(session.user.id) : null

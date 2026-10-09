@@ -11,7 +11,7 @@ export default function Wi300Footer() {
   return <footer className="shrink-0 border-t border-brk-outline bg-white text-brk-on-surface">
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-[2fr_1fr_1fr] lg:px-8">
       <div className="sm:col-span-2 lg:col-span-1">
-        <Link href="/" className="inline-flex items-center gap-3"><Image src={brand.iconUrl} alt={brand.name} width={64} height={64} unoptimized className="h-14 w-14 object-contain" /><span><span className="block text-xl font-extrabold text-brk-primary">{brand.name}</span><span className="mt-1 block text-sm text-brk-muted">{brand.tagline}</span></span></Link>
+        <Link href="/" className="inline-block"><Image src={brand.logoUrl} alt={`${brand.name} — 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} unoptimized className="h-auto w-60 max-w-full object-contain" /></Link><p className="mt-3 text-sm text-brk-muted">{brand.tagline}</p>
         <p className="mt-4 max-w-md text-sm leading-6 text-brk-muted">Kết nối cá nhân và doanh nghiệp với tri thức, các giá trị và cơ hội hợp tác trong hệ sinh thái Wi.</p>
         <p className="mt-3 text-xs leading-6 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</p>
       </div>
