@@ -8,11 +8,11 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowRight, BookOpen, Search, Sparkles, BriefcaseBusiness, Package } from 'lucide-react'
 import CourseCard from '@/components/course/CourseCard'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
-import { categoryName, filterCourses, recentActiveCourses, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
+import { categoryName, filterCourses, searchText, sortCourses, type CourseSort } from '@/lib/wi300/catalog'
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
 import Wi300PersonalSpace from './Wi300PersonalSpace'
-import Wi300Businesses, { featuredBusinesses } from './Wi300Businesses'
+import Wi300Businesses from './Wi300Businesses'
 import Wi300Teachers from './Wi300Teachers'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
@@ -41,18 +41,11 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const enrollmentMap = new Map(enrollments.map(enrollment => [enrollment.courseId, enrollment]))
   const categories = Array.from(new Set(courses.map(categoryName)))
   const filtered = sortCourses(filterCourses(courses, query, category, fee), sort)
-  const featured = courses.filter(course => course.pin != null && course.pin > 0).slice(0, 3)
-  const myCourses = recentActiveCourses(courses, enrollments)
-  // Chỉ giới thiệu tối đa 6 giảng viên trong phạm vi công khai; ưu tiên Cương Leo.
-  const teachers = Array.from(new Set(courses.map(course => course.teacherId))).flatMap(id => {
-    const ownCourses = courses.filter(course => course.teacherId === id)
-    const name = ownCourses[0]?.teacher?.name
-    const pins = ownCourses.flatMap(course => course.pin != null && course.pin > 0 ? [course.pin] : [])
-    return id != null && name ? [{ id, name, image: ownCourses[0]?.teacher?.image, count: ownCourses.length, pin: pins.length ? Math.min(...pins) : Infinity }] : []
-  }).sort((a, b) => {
-    const preferred = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === 'cuong leo' ? 0 : 1
-    return preferred(a.name) - preferred(b.name) || a.pin - b.pin || a.name.localeCompare(b.name, 'vi')
-  }).slice(0, 6)
+  const featured = [...courses].sort((a, b) => (a.pin != null && a.pin > 0 ? a.pin : Infinity) - (b.pin != null && b.pin > 0 ? b.pin : Infinity)).slice(0, 6)
+  const teachers = ['Cương Leo', 'Hoàng Thu Hà', 'Võ Thị Kim Hồng', 'Nguyễn Hải Yến', 'Nhàn Victory', 'Hương Lucy'].map(name => {
+    const ownCourses = courses.filter(course => searchText(course.teacher?.name || '') === searchText(name))
+    return { id: ownCourses[0]?.teacherId ?? name, name, image: ownCourses[0]?.teacher?.image, count: ownCourses.length || null }
+  })
   const teacherCount = new Set(courses.map(course => course.teacherId).filter(id => id != null)).size
   const paymentCourseId = paymentCourse?.id
   const paymentEnrollmentStatus = paymentCourseId != null ? enrollmentMap.get(paymentCourseId)?.status : undefined
@@ -90,25 +83,19 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
             <div className="mt-7 flex flex-wrap gap-3"><Link href="/khoa-hoc" className={action}>Khám phá khóa học<ArrowRight className="h-4 w-4" /></Link><Link href="/#doanh-nghiep-tieu-bieu" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-brk-outline px-5 font-semibold hover:bg-brk-background">Khám phá doanh nghiệp</Link></div>
             {!catalogError && courses.length > 0 && <p className="mt-7 text-sm text-brk-muted">{courses.length} khóa học · {teacherCount} giảng viên · Cùng phát triển trong cộng đồng doanh nghiệp số</p>}
           </div>
-          <div className="relative rounded-[2rem] border border-brk-outline bg-brk-background p-5 sm:p-8">
-            <div className="rounded-2xl bg-white p-5 shadow-sm"><Image src={brand.logoUrl} alt={`${brand.name} — 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} unoptimized className="h-auto w-full object-contain" /><p className="mt-4 text-center text-sm leading-6 text-brk-muted">Một cộng đồng. Nhiều cơ hội cùng phát triển.</p></div>
-            <p className="mt-6 text-sm font-semibold text-brk-muted">Doanh nghiệp tiêu biểu trong hệ sinh thái Wi</p>
-            <div className="mt-3 flex flex-wrap gap-2">{featuredBusinesses.map(name => <span key={name} className="rounded-xl border border-brk-outline bg-white px-3 py-2 text-sm font-bold text-brk-primary">{name}</span>)}</div>
-            <p className="mt-6 border-t border-brk-outline pt-5 text-sm leading-6 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</p>
-          </div>
+          <figure className="rounded-[2rem] border border-brk-outline bg-brk-background p-3 sm:p-5">
+            <a href="/wi300/ecosystem-banner.webp" target="_blank" rel="noopener noreferrer" aria-label="Xem ảnh hệ sinh thái Wi đầy đủ (mở tab mới)"><Image src="/wi300/ecosystem-banner.webp" alt="Hệ sinh thái Wi: kết nối con người, lan tỏa giá trị, kiến tạo tương lai" width={1280} height={720} priority sizes="(max-width: 1023px) 100vw, 600px" className="h-auto w-full rounded-2xl" /></a>
+            <figcaption className="px-2 pt-4 text-sm leading-6 text-brk-muted">300DNS là dự án của WIPA. Các dự án thuộc 300DNS được WIPA cố vấn.</figcaption>
+          </figure>
         </div>
       </section>
-      {loggedIn && <section id="khoa-hoc-cua-toi" className="mx-auto max-w-7xl px-4 pt-10 lg:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-2xl font-bold">Khóa học của tôi</h2><p className="mt-2 text-sm text-brk-muted">3 khóa đang học gần đây, để bạn tiếp tục ngay.</p></div><Link href="/my-space?tab=learning" className="py-3 text-sm font-semibold text-brk-primary">Xem tất cả →</Link></div>
-        {accountError ? <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Chưa tải được thông tin học tập. Vui lòng tải lại trang.</p> : myCourses.length ? <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{myCourses.map(course => {
-          const enrollment = enrollmentMap.get(course.id)!
-          const percent = enrollment.totalLessons ? Math.min(100, Math.round(enrollment.completedCount / enrollment.totalLessons * 100)) : 0
-          const lesson = enrollment.lastLessonId ? `?lesson=${encodeURIComponent(enrollment.lastLessonId)}` : ''
-          return <Link key={course.id} href={`/courses/${encodeURIComponent(course.id_khoa)}/learn${lesson}`} className="rounded-2xl border border-brk-outline bg-white p-5 transition-shadow hover:shadow-md"><span className="text-xs font-semibold text-brk-primary">Đang học</span><h3 className="mt-2 font-bold">{course.name_lop}</h3><div role="progressbar" aria-label={`Tiến độ ${course.name_lop}`} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} className="mt-4 h-1.5 overflow-hidden rounded-full bg-brk-background"><div className="h-full rounded-full bg-brk-primary" style={{ width: `${percent}%` }} /></div><p className="mt-3 flex items-center justify-between text-xs text-brk-muted"><span>{enrollment.completedCount}/{enrollment.totalLessons} bài học</span><span className="font-semibold text-brk-primary">Vào học →</span></p></Link>
-        })}</div> : <p className="mt-4 rounded-2xl border border-brk-outline bg-white p-5 text-sm text-brk-muted">Bạn chưa có khóa đang học. Khám phá khóa học bên dưới để bắt đầu.</p>}
-      </section>}
+      <section aria-label="Nội dung khám phá" className="mx-auto grid max-w-7xl gap-4 px-4 pt-8 sm:grid-cols-3 lg:px-6">
+        <Link href="/khoa-hoc" className="flex min-h-28 items-center gap-4 rounded-2xl border border-brk-outline bg-white p-5 hover:border-brk-primary"><BookOpen className="h-7 w-7 shrink-0 text-brk-primary" /><div><h2 className="font-bold">Khóa học</h2><p className="mt-1 text-sm text-brk-muted">Khám phá tri thức và kỹ năng →</p></div></Link>
+        {[{ title: 'Sản phẩm', icon: Package }, { title: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ title, icon: Icon }) => <div key={title} className="flex min-h-28 items-center gap-4 rounded-2xl border border-brk-outline bg-white p-5"><Icon className="h-7 w-7 shrink-0 text-brk-accent" /><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-brk-muted">Sẽ được bổ sung</p></div></div>)}
+      </section>
       <Wi300Businesses />
-      {featured.length > 0 && <section className="mx-auto max-w-7xl px-4 pt-12 lg:px-6"><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><h2 className="text-2xl font-bold">Khóa học nổi bật</h2><Link href="/khoa-hoc" className="py-3 text-sm font-semibold text-brk-primary">Xem tất cả →</Link></div><div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{featured.map(card)}</div></section>}
+      <Wi300Teachers teachers={teachers} catalogError={catalogError} />
+      <section id="khoa-hoc" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 lg:scroll-mt-24 lg:px-6"><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><h2 className="text-2xl font-bold">Khóa học tiêu biểu</h2><Link href="/khoa-hoc" className="py-3 text-sm font-semibold text-brk-primary">Xem tất cả khóa học →</Link></div>{catalogError ? <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">Chưa tải được khóa học. Vui lòng thử lại sau.</p> : featured.length ? <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{featured.map(card)}</div> : <p className="text-brk-muted">Các khóa học sẽ được cập nhật tại đây.</p>}</section>
     </>}
     {view === 'discover' && <section className="mx-auto max-w-7xl px-4 pt-10 lg:px-6">
       <h1 className="text-3xl font-bold">Khám phá hệ sinh thái {brand.name}</h1>
@@ -122,7 +109,8 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
     {view === 'discover' && <><Wi300Businesses />
       <Wi300Teachers teachers={teachers} catalogError={catalogError} />
     </>}
-    {view === 'space' ? <Wi300PersonalSpace teachingCourses={teachingCourses} teachingError={teachingError} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} accountError={accountError || catalogError} /> : <section id="khoa-hoc" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 lg:scroll-mt-24 lg:px-6">
+    {view === 'space' && <Wi300PersonalSpace teachingCourses={teachingCourses} teachingError={teachingError} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} accountError={accountError || catalogError} />}
+    {(view === 'catalog' || view === 'discover') && <section id="khoa-hoc" className="mx-auto max-w-7xl scroll-mt-40 px-4 py-12 lg:scroll-mt-24 lg:px-6">
       {view === 'catalog' ? <h1 className="text-3xl font-bold">Khóa học</h1> : <h2 className="text-2xl font-bold sm:text-3xl">Khám phá khóa học</h2>}<p className="mt-2 text-sm leading-6 text-brk-muted">Tìm kiến thức và kỹ năng cho bước tiến tiếp theo.</p>
       <div className="mt-6 flex flex-col gap-3 lg:flex-row"><label className="flex min-h-12 flex-1 items-center gap-3 rounded-xl border border-brk-outline bg-white px-4"><Search className="h-5 w-5 shrink-0 text-brk-muted" /><span className="sr-only">Tìm khóa học hoặc giảng viên</span><input value={query} onChange={event => { setQuery(event.target.value); setLimit(9) }} placeholder="Tìm khóa học, giảng viên…" className="min-w-0 flex-1 bg-transparent py-3 text-sm outline-none" type="search" /></label><label className="sr-only" htmlFor="wi300-fee">Lọc theo học phí</label><select id="wi300-fee" value={fee} onChange={event => { setFee(event.target.value); setLimit(9) }} className="min-h-12 rounded-xl border border-brk-outline bg-white px-4 text-sm"><option value="all">Tất cả học phí</option><option value="free">Miễn phí</option><option value="paid">Có phí</option></select><label className="sr-only" htmlFor="wi300-sort">Sắp xếp khóa học</label><select id="wi300-sort" value={sort} onChange={event => { setSort(event.target.value as CourseSort); setLimit(9) }} className="min-h-12 rounded-xl border border-brk-outline bg-white px-4 text-sm"><option value="recommended">Đề xuất</option><option value="newest">Mới nhất</option><option value="price-asc">Giá thấp đến cao</option><option value="price-desc">Giá cao đến thấp</option></select></div>
       <div role="group" aria-label="Danh mục khóa học" className="mt-4 flex flex-wrap gap-2">{['', ...categories].map(name => <button key={name} type="button" aria-pressed={category === name} onClick={() => { setCategory(name); setLimit(9) }} className={`min-h-11 rounded-xl border px-4 text-sm font-medium ${category === name ? 'border-brk-primary bg-brk-primary text-white' : 'border-brk-outline bg-white text-brk-muted hover:border-brk-primary'}`}>{name || 'Tất cả'}</button>)}</div>

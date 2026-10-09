@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { BookOpen, ChevronDown, Compass, GraduationCap, Home, LayoutGrid, LogOut, Settings, Wallet } from 'lucide-react'
+import { BookOpen, ChevronDown, GraduationCap, Home, LayoutGrid, LogOut, Settings, Wallet } from 'lucide-react'
 import { useWi300Brand } from './Wi300BrandContext'
 import { signOutPushCleanup } from '@/lib/web-push-client'
 import { canTeach } from '@/lib/wi300/personal-space'
@@ -39,7 +39,6 @@ export default function Wi300Header() {
   if (!brand) return null
   const links = [
     { href: '/', label: 'Trang chủ', icon: Home },
-    { href: '/kham-pha', label: 'Khám phá', icon: Compass },
     { href: '/khoa-hoc', label: 'Khóa học', icon: BookOpen },
   ]
   const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'

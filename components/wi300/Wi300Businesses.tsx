@@ -7,11 +7,12 @@ import styles from './Wi300Businesses.module.css'
 
 /** Dùng logo chính thức khi đã có; tên trong hình tròn là đại diện tạm. */
 const businesses = [
-  { name: 'Wi.Mentor', description: 'Cố vấn và đồng hành', logo: null },
+  { name: 'WiArt', description: 'Nghệ thuật và sáng tạo', logo: '/wi300/businesses/wi-art.webp' },
+  { name: 'Wi.Mentor', description: 'Cố vấn và đồng hành', logo: '/wi300/businesses/wi-mentor.webp' },
   { name: 'Wi.Tech', description: 'Công nghệ và giải pháp số', logo: null },
   { name: 'Wi.Grow', description: 'Phát triển cùng doanh nghiệp', logo: '/wi300/businesses/wi-grow.png' },
-  { name: 'Wi.Finance', description: 'Tài chính và dòng tiền', logo: null },
-  { name: 'Wi.Marketing', description: 'Marketing và kết nối khách hàng', logo: null },
+  { name: 'Wi.Finance', description: 'Tài chính và dòng tiền', logo: '/wi300/businesses/wi-finance.webp' },
+  { name: 'Wi.Marketing', description: 'Marketing và kết nối khách hàng', logo: '/wi300/businesses/wi-marketing.webp' },
   { name: 'WiCan', description: 'Kết nối trong hệ sinh thái Wi', logo: null },
 ]
 export const featuredBusinesses = businesses.map(business => business.name)

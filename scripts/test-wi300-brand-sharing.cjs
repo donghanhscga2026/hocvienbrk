@@ -32,8 +32,8 @@ async function run() {
   const styles = { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' }
   const Business = load('components/wi300/Wi300Businesses.tsx', { 'next/image': image, './Wi300Businesses.module.css': { __esModule: true, default: styles } }).default
   await act(async () => root.render(React.createElement(Business)))
-  assert.equal(document.querySelectorAll('ul[aria-label] li').length, 6)
-  assert.equal(document.querySelectorAll('ul[aria-hidden="true"] li').length, 6)
+  assert.equal(document.querySelectorAll('ul[aria-label] li').length, 7)
+  assert.equal(document.querySelectorAll('ul[aria-hidden="true"] li').length, 7)
   await act(async () => document.querySelector('button').click())
   assert.equal(document.querySelector('button').getAttribute('aria-pressed'), 'true')
   assert.ok(document.querySelector('.viewport.paused'))

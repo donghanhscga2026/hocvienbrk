@@ -108,10 +108,10 @@ async function run() {
   }).default
   const html = require('react-dom/server').renderToStaticMarkup(React.createElement(Business))
   const businessDoc = new JSDOM(html).window.document
-  assert.equal(businessDoc.querySelectorAll('ul[aria-label] li').length, 6)
-  assert.equal(businessDoc.querySelectorAll('ul[aria-label] [role="img"]').length, 5)
-  assert.equal(businessDoc.querySelectorAll('ul[aria-hidden="true"] li').length, 6)
-  assert.match(businessDoc.querySelector('img').src, /wi-grow.png/)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-label] li').length, 7)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-label] [role="img"]').length, 2)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-hidden="true"] li').length, 7)
+  for (const logo of ['wi-art.webp', 'wi-mentor.webp', 'wi-finance.webp', 'wi-marketing.webp', 'wi-grow.png']) assert.ok(businessDoc.querySelector(`ul[aria-label] img[src$="${logo}"]`))
   assert.equal(businessDoc.querySelectorAll('a').length, 0, 'No invented company URLs')
   console.log('WI300 template viewport, repeated menu navigation, registration isolation, post edit authorization/UI and business identities passed.')
 }

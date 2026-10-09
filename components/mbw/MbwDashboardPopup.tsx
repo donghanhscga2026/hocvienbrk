@@ -3,6 +3,8 @@
 import { useEffect } from 'react'
 import { X, Wallet, Ticket, Loader2 } from 'lucide-react'
 import { useMbwDashboard } from './MbwDashboardContext'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
+import { walletText } from '@/lib/wi300/wallet-display'
 
 function formatMoney(v: number) {
   return v.toLocaleString('vi-VN', { maximumFractionDigits: 0 })
@@ -23,6 +25,7 @@ function VoucherTypeBadge({ type }: { type: string }) {
 
 export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy Phước Báu' }: { title?: string } = {}) {
   const { isOpen, close, data, refresh } = useMbwDashboard()
+  const wi300 = !!useWi300Brand()
 
   // Refresh nền khi mở để số dư luôn mới, hiển thị data cache ngay lập tức
   useEffect(() => {
@@ -70,11 +73,11 @@ export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy P
             <>
               <div className="space-y-2.5">
                 <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl p-3 border border-amber-200 flex items-center justify-between">
-                  <p className="text-xs font-bold text-amber-700">Thu nhập đối ứng (MBDT)</p>
+                  <p className="text-xs font-bold text-amber-700">{walletText('Thu nhập đối ứng (MBDT)', wi300)}</p>
                   <p className="text-sm font-black text-amber-600">{formatMoney(data.balance.brkd)}</p>
                 </div>
                 <div className="bg-gradient-to-br from-purple-50 to-fuchsia-50 rounded-xl p-3 border border-purple-200 flex items-center justify-between">
-                  <p className="text-xs font-bold text-purple-700">Voucher quy đổi (MBV)</p>
+                  <p className="text-xs font-bold text-purple-700">{walletText('Voucher quy đổi (MBV)', wi300)}</p>
                   <p className="text-sm font-black text-purple-600">{formatMoney(data.balance.mbvBalance)}</p>
                 </div>
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 flex items-center justify-between">
@@ -96,7 +99,7 @@ export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy P
                       <div key={v.id} className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-gray-800 truncate">{v.voucherName}</p>
+                            <p className="text-sm font-bold text-gray-800 truncate">{walletText(v.voucherName, wi300)}</p>
                           </div>
                           <div className="flex items-center gap-2 ml-2 shrink-0">
                             <VoucherTypeBadge type={v.voucherType} />
@@ -108,7 +111,7 @@ export default function MbwDashboardPopup({ title = 'Tài khoản Dòng chảy P
                           </div>
                         </div>
                         {v.description && (
-                          <p className="text-[11px] text-gray-500 leading-relaxed mt-1">{v.description}</p>
+                          <p className="text-[11px] text-gray-500 leading-relaxed mt-1">{walletText(v.description, wi300)}</p>
                         )}
                       </div>
                     ))}

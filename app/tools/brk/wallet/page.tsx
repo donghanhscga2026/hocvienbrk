@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react'
 import { getBrkWalletData } from '@/app/actions/brk-actions'
 import BrkWalletCard from '@/components/brk/BrkWalletCard'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
+import { walletTransactionAmount, walletText } from '@/lib/wi300/wallet-display'
 
 interface Transaction {
   id: number
   amount: number
   type: string
+  balanceType?: string
   description: string
   balanceBefore: number
   balanceAfter: number
@@ -20,6 +23,7 @@ interface WalletData {
 }
 
 export default function BrkWalletPage() {
+  const wi300 = !!useWi300Brand()
   const [data, setData] = useState<WalletData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -31,7 +35,7 @@ export default function BrkWalletPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Ví MFC</h1>
+      <h1 className="text-2xl font-bold text-gray-800">{wi300 ? 'Ví Wi' : 'Ví MFC'}</h1>
 
       {data?.wallet && (
         <BrkWalletCard
@@ -49,11 +53,11 @@ export default function BrkWalletPage() {
           {data?.transactions.map((tx) => (
             <div key={tx.id} className="p-4 flex justify-between items-center">
               <div>
-                <span className="text-sm font-medium text-gray-700">{tx.description}</span>
+                <span className="text-sm font-medium text-gray-700">{walletText(tx.description, wi300)}</span>
                 <div className="text-xs text-gray-400">{new Date(tx.createdAt).toLocaleString('vi-VN')}</div>
               </div>
               <span className={`font-semibold ${Number(tx.amount) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                {Number(tx.amount) >= 0 ? '+' : ''}${Number(tx.amount).toFixed(2)}
+                {Number(tx.amount) >= 0 ? '+' : ''}{walletTransactionAmount(Number(tx.amount), tx.balanceType, wi300)}
               </span>
             </div>
           ))}
