@@ -67,7 +67,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const clearFilters = () => { setQuery(''); setCategory(''); setFee('all'); setSort('recommended'); setLimit(9) }
   const card = (course: Wi300Course, index: number) => <CourseCard key={course.id} course={course} isLoggedIn={loggedIn} enrollment={enrollmentMap.get(course.id)} userId={userId} userPhone={userPhone} priority={index < 3} showSharing={false} />
 
-  return <main className="min-h-screen overflow-x-clip bg-brk-background text-brk-on-surface">
+  return <main className="overflow-x-clip bg-brk-background text-brk-on-surface">
     {view === 'home' && <>
       <section className="relative overflow-hidden border-b border-brk-outline bg-white">
         <div aria-hidden="true" className="absolute -right-32 -top-32 h-[36rem] w-[36rem] rounded-full bg-amber-50" />
@@ -107,7 +107,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
       <p role="status" className="my-5 text-sm text-brk-muted">{catalogError ? 'Danh mục tạm thời chưa tải được.' : `${filtered.length} khóa học${category ? ` · ${category}` : ''}`}</p>
       {catalogError ? <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900"><p>Chưa thể tải khóa học. Vui lòng thử lại sau.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 font-semibold underline">Tải lại trang</button></div> : filtered.length ? <><div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.slice(0, limit).map(card)}</div>{limit < filtered.length && <div className="mt-8 text-center"><button type="button" onClick={() => setLimit(value => value + 9)} className="min-h-12 rounded-xl border border-brk-outline bg-white px-6 font-semibold text-brk-primary">Xem thêm khóa học</button></div>}</> : <div className="rounded-2xl border border-brk-outline bg-white p-8 text-center"><BookOpen className="mx-auto mb-3 h-8 w-8 text-brk-muted" /><p className="text-brk-muted">{courses.length ? 'Chưa tìm thấy khóa học phù hợp với bộ lọc.' : 'Các khóa học sẽ được cập nhật tại đây.'}</p>{courses.length > 0 && <button type="button" onClick={clearFilters} className="mt-3 min-h-11 font-semibold text-brk-primary">Xóa bộ lọc</button>}</div>}
     </section>}
-    <footer className="border-t border-brk-outline bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-6"><div><p className="font-bold text-brk-primary">{brand.name}</p><p className="mt-2 text-xs text-brk-muted">{brand.tagline}</p></div><nav aria-label="Điều hướng chân trang" className="flex flex-wrap gap-5 text-sm text-brk-muted"><Link href="/khoa-hoc" className="py-3">Khóa học</Link><Link href="/gioi-thieu" className="py-3">Giới thiệu</Link><Link href="/my-space" className="py-3">Không gian của tôi</Link></nav></div></footer>
+
     {paymentCourse && <PaymentModal course={paymentCourse} enrollment={enrollmentMap.get(paymentCourse.id)} userId={userId} userPhone={userPhone} onClose={closePayment} />}
   </main>
 }

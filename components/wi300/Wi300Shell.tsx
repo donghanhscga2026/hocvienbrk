@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import Wi300Header from './Wi300Header'
+import Wi300Footer from './Wi300Footer'
 import Link from 'next/link'
 import { defaultPageTitle } from '@/lib/wi300/default-pages'
 
@@ -29,7 +30,8 @@ export default function Wi300Shell({ children }: { children: React.ReactNode }) 
   const courseOwnsShell = /^\/khoa-hoc\/[^/]+\/?$/.test(pathname) || /^\/courses\/[^/]+\/learn\/?$/.test(pathname)
   const title = defaultPageTitle(pathname)
   // Chỉ căn khung trang hệ thống mặc định; trang khóa học/template sở hữu bố cục riêng.
-  return <>{!courseOwnsShell && <Wi300Header />}{title ? <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  const standardPage = !!title || ['/', '/khoa-hoc', '/kham-pha', '/gioi-thieu', '/my-space', '/login', '/register', '/forgot-password'].includes(pathname)
+  const content = title ? <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <nav aria-label="Đường dẫn trang" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-brk-muted">
       <Link href="/" className="text-brk-primary">Trang chủ</Link><span aria-hidden>/</span>
       <Link href="/my-space" className="text-brk-primary">Không gian của tôi</Link><span aria-hidden>/</span>
@@ -38,5 +40,8 @@ export default function Wi300Shell({ children }: { children: React.ReactNode }) 
     </nav>
     {pathname.startsWith('/tools/') && <h1 className="mb-6 text-2xl font-bold text-brk-on-surface">{title}</h1>}
     {children}
-  </div> : children}</>
+  </div> : children
+  if (!standardPage) return <>{!courseOwnsShell && <Wi300Header />}{content}</>
+  // Toàn trang sở hữu chiều cao; nội dung co giãn, footer luôn là phần cuối.
+  return <div data-wi300-shell className="flex min-h-dvh flex-col"><Wi300Header /><div data-wi300-content className="flex min-w-0 flex-1 flex-col [&>.min-h-screen]:min-h-0 [&>.min-h-screen]:flex-1">{content}</div><Wi300Footer /></div>
 }
