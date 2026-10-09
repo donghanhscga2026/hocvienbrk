@@ -42,12 +42,16 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
   const filtered = sortCourses(filterCourses(courses, query, category, fee), sort)
   const featured = courses.filter(course => course.pin != null && course.pin > 0).slice(0, 3)
   const myCourses = recentActiveCourses(courses, enrollments)
-  // Chỉ khám phá giảng viên có khóa thuộc danh mục công khai của website này.
+  // Chỉ giới thiệu tối đa 3 giảng viên trong phạm vi công khai; ưu tiên Cương Leo.
   const teachers = Array.from(new Set(courses.map(course => course.teacherId))).flatMap(id => {
     const ownCourses = courses.filter(course => course.teacherId === id)
     const name = ownCourses[0]?.teacher?.name
-    return id != null && name ? [{ id, name, count: ownCourses.length }] : []
-  })
+    const pins = ownCourses.flatMap(course => course.pin != null && course.pin > 0 ? [course.pin] : [])
+    return id != null && name ? [{ id, name, count: ownCourses.length, pin: pins.length ? Math.min(...pins) : Infinity }] : []
+  }).sort((a, b) => {
+    const preferred = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === 'cuong leo' ? 0 : 1
+    return preferred(a.name) - preferred(b.name) || a.pin - b.pin || a.name.localeCompare(b.name, 'vi')
+  }).slice(0, 3)
   const teacherCount = new Set(courses.map(course => course.teacherId).filter(id => id != null)).size
   const paymentCourseId = paymentCourse?.id
   const paymentEnrollmentStatus = paymentCourseId != null ? enrollmentMap.get(paymentCourseId)?.status : undefined
@@ -108,14 +112,15 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
     {view === 'discover' && <section className="mx-auto max-w-7xl px-4 pt-10 lg:px-6">
       <h1 className="text-3xl font-bold">Khám phá hệ sinh thái {brand.name}</h1>
       <p className="mt-3 max-w-2xl leading-7 text-brk-muted">Kết nối doanh nghiệp, giảng viên và tìm nội dung phù hợp với bạn.</p>
+      <Image src="/wi300/ecosystem-banner.webp" alt="Hệ sinh thái Wi: kết nối con người, lan tỏa giá trị, kiến tạo tương lai" width={1280} height={720} sizes="(max-width: 1280px) 100vw, 1232px" className="mt-6 h-auto w-full rounded-2xl border border-brk-outline" />
       <nav aria-label="Nội dung khám phá" className="mt-5 flex flex-wrap gap-2">
-        {[{ href: '#doanh-nghiep-tieu-bieu', label: 'Doanh nghiệp' }, { href: '#giang-vien', label: 'Giảng viên' }, { href: '#khoa-hoc', label: 'Khóa học' }].map(item => <Link key={item.href} href={item.href} className="inline-flex min-h-11 items-center rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary">{item.label}</Link>)}
+        {[{ href: '#khoa-hoc', label: 'Khóa học', icon: BookOpen }, { href: '#san-pham', label: 'Sản phẩm', icon: Package }, { href: '#dich-vu', label: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ href, label, icon: Icon }) => <Link key={href} href={href} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-brk-outline bg-white px-4 text-sm font-semibold text-brk-primary hover:border-brk-primary"><Icon className="h-5 w-5" aria-hidden="true" />{label}</Link>)}
       </nav>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">{[{ title: 'Sản phẩm', icon: Package }, { title: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ title, icon: Icon }) => <div key={title} className="rounded-2xl border border-brk-outline p-5"><Icon className="mb-3 text-brk-accent" /><h2 className="font-bold">{title}</h2><p className="mt-2 text-sm text-brk-muted">Sẽ được bổ sung trong giai đoạn tiếp theo.</p></div>)}</div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">{[{ id: 'san-pham', title: 'Sản phẩm', icon: Package }, { id: 'dich-vu', title: 'Dịch vụ', icon: BriefcaseBusiness }].map(({ id, title, icon: Icon }) => <section id={id} key={id} className="scroll-mt-44 rounded-2xl border border-brk-outline p-5 lg:scroll-mt-24"><Icon className="mb-3 text-brk-accent" /><h2 className="font-bold">{title}</h2><p className="mt-2 text-sm text-brk-muted">Sẽ được bổ sung trong giai đoạn tiếp theo.</p></section>)}</div>
     </section>}
     {view === 'discover' && <><Wi300Businesses />
       <section id="giang-vien" className="mx-auto max-w-7xl scroll-mt-40 px-4 pb-4 lg:scroll-mt-24 lg:px-6">
-        <h2 className="text-2xl font-bold">Giảng viên</h2><p className="mt-2 text-sm text-brk-muted">Khám phá các khóa học theo giảng viên.</p>
+        <h2 className="text-2xl font-bold">Giảng viên tiêu biểu</h2><p className="mt-2 text-sm text-brk-muted">Gặp gỡ những người chia sẻ tri thức trong hệ sinh thái Wi.</p>
         {teachers.length ? <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{teachers.map(teacher => <li key={teacher.id}><Link href={`/khoa-hoc?q=${encodeURIComponent(teacher.name)}`} className="flex min-h-24 items-center gap-4 rounded-2xl border border-brk-outline bg-white p-5 hover:border-brk-primary"><span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brk-background font-bold text-brk-primary">{teacher.name.trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span><span className="min-w-0"><span className="block break-words font-bold">{teacher.name}</span><span className="mt-1 block text-sm text-brk-muted">{teacher.count} khóa học · Xem khóa học →</span></span></Link></li>)}</ul> : <p className="mt-5 rounded-xl border border-brk-outline bg-white p-5 text-sm text-brk-muted">{catalogError ? 'Chưa tải được danh sách giảng viên.' : 'Giảng viên sẽ xuất hiện khi có khóa học trong danh mục.'}</p>}
       </section>
     </>}
@@ -127,6 +132,7 @@ function HomeContent({ brand, courses, enrollments, userId, userPhone, loggedIn,
       {catalogError ? <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900"><p>Chưa thể tải khóa học. Vui lòng thử lại sau.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 font-semibold underline">Tải lại trang</button></div> : filtered.length ? <><div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.slice(0, limit).map(card)}</div>{limit < filtered.length && <div className="mt-8 text-center"><button type="button" onClick={() => setLimit(value => value + 9)} className="min-h-12 rounded-xl border border-brk-outline bg-white px-6 font-semibold text-brk-primary">Xem thêm khóa học</button></div>}</> : <div className="rounded-2xl border border-brk-outline bg-white p-8 text-center"><BookOpen className="mx-auto mb-3 h-8 w-8 text-brk-muted" /><p className="text-brk-muted">{courses.length ? 'Chưa tìm thấy khóa học phù hợp với bộ lọc.' : 'Các khóa học sẽ được cập nhật tại đây.'}</p>{courses.length > 0 && <button type="button" onClick={clearFilters} className="mt-3 min-h-11 font-semibold text-brk-primary">Xóa bộ lọc</button>}</div>}
     </section>}
 
+    {view === 'home' && <section className="mx-auto max-w-7xl px-4 pb-12 lg:px-6" aria-labelledby="wi300-partner-title"><div className="grid gap-6 rounded-3xl bg-brk-primary p-6 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center"><div><p className="text-sm font-semibold text-white/80">Dành cho giảng viên và doanh nghiệp</p><h2 id="wi300-partner-title" className="mt-3 text-3xl font-bold">Trở thành đối tác {brand.name}</h2><p className="mt-4 max-w-2xl leading-7 text-white/90">Chia sẻ chuyên môn, giới thiệu giá trị của doanh nghiệp và cùng mở rộng cơ hội hợp tác trong Liên minh 300 doanh nghiệp số.</p><p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">Đăng ký tài khoản và hoàn thiện hồ sơ để bắt đầu kết nối.</p></div><Link href={loggedIn ? '/account-settings' : '/register'} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-brk-primary">{loggedIn ? 'Hoàn thiện hồ sơ tham gia' : 'Đăng ký tham gia'}<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></div></section>}
     {paymentCourse && <PaymentModal course={paymentCourse} enrollment={enrollmentMap.get(paymentCourse.id)} userId={userId} userPhone={userPhone} onClose={closePayment} />}
   </main>
 }
