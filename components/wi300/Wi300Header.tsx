@@ -20,7 +20,7 @@ export default function Wi300Header() {
     { href: '/gioi-thieu', label: 'Giới thiệu', icon: Info },
     { href: '/my-space', label: 'Không gian của tôi', icon: LayoutGrid },
   ]
-  return <header className="sticky top-0 z-50 border-b border-brk-outline bg-white/95 backdrop-blur-xl">
+  return <header className="sticky top-0 z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl">
     <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-3 px-4 py-2 lg:px-6">
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex items-center gap-2">
         <Image src={brand.iconUrl} alt="WIPA" width={1280} height={1280} priority unoptimized className="h-11 w-11 object-contain" />

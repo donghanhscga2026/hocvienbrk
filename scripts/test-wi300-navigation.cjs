@@ -41,12 +41,19 @@ async function run() {
     'next-auth/react': { useSession: () => ({ data: null }) }, 'next/navigation': { usePathname: () => pathname },
     './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': {},
   }).default
-  const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header }, 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts') }).default
+  const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header },
+    './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts') }).default
   const root = createRoot(document.getElementById('root'))
   const renderShell = () => root.render(React.createElement(Shell, null, React.createElement('div', null, 'Page')))
   await act(async () => renderShell())
   assert.equal(scrollCalls, 0, 'Không ép scroll khi khởi tạo')
-  const navLinks = [...document.querySelectorAll('nav a')].map(a => a.getAttribute('href'))
+  assert.ok(document.querySelector('[data-wi300-shell].min-h-dvh.flex-col'))
+  assert.ok(document.querySelector('[data-wi300-content].flex-1'))
+  assert.ok(document.querySelector('header.sticky.top-0'))
+  assert.equal(document.querySelectorAll('footer').length, 1)
+  assert.equal(document.querySelector('[data-wi300-shell]').lastElementChild.tagName, 'FOOTER')
+  assert.ok(document.querySelector('footer a[href="/#doanh-nghiep-tieu-bieu"]'))
+  const navLinks = [...document.querySelectorAll('header nav a')].map(a => a.getAttribute('href'))
   assert.deepEqual(navLinks, ['/', '/kham-pha', '/khoa-hoc', '/gioi-thieu', '/my-space'])
   assert.ok(navLinks.every(href => !href.includes('#')))
   pathname = '/khoa-hoc/example'
@@ -54,6 +61,7 @@ async function run() {
   await act(async () => renderShell())
   assert.equal(scrollCalls, 1, 'Chuyển khóa học mới về đầu')
   assert.equal(document.querySelectorAll('header').length, 0, 'Course tự sở hữu menu')
+  assert.equal(document.querySelectorAll('footer').length, 0, 'Không thêm footer vào template khóa học')
   pathname = '/'
   window.history.replaceState(null, '', pathname)
   window.dispatchEvent(new window.PopStateEvent('popstate'))
@@ -117,6 +125,7 @@ async function run() {
   pathname = '/page/custom-template'
   await act(async () => renderShell())
   assert.equal(document.querySelector('[aria-label="Đường dẫn trang"]'), null, 'Không bọc trang template riêng')
+  assert.equal(document.querySelectorAll('footer').length, 0, 'Giữ footer của template riêng')
   let currentBrand = null
   const favicon = load('app/favicon.ico/route.ts', { '@/lib/site-profile/deployment-runtime': { getCurrentDeploymentBrand: async () => currentBrand } })
   let response = await favicon.GET(new Request('https://old.example.com/favicon.ico'))
