@@ -9,7 +9,7 @@ import styles from './Wi300Businesses.module.css'
 const businesses = [
   { name: 'WiArt', description: 'Nghệ thuật và sáng tạo', logo: '/wi300/businesses/wi-art.webp' },
   { name: 'Wi.Mentor', description: 'Cố vấn và đồng hành', logo: '/wi300/businesses/wi-mentor.webp' },
-  { name: 'Wi.Tech', description: 'Công nghệ và giải pháp số', logo: null },
+  { name: 'Wi.Tech', description: 'Công nghệ và giải pháp số', logo: '/wi300/businesses/wi-tech.png' },
   { name: 'Wi.Grow', description: 'Phát triển cùng doanh nghiệp', logo: '/wi300/businesses/wi-grow.png' },
   { name: 'Wi.Finance', description: 'Tài chính và dòng tiền', logo: '/wi300/businesses/wi-finance.webp' },
   { name: 'Wi.Marketing', description: 'Marketing và kết nối khách hàng', logo: '/wi300/businesses/wi-marketing.webp' },
@@ -30,8 +30,9 @@ export default function Wi300Businesses() {
         {/* Bản lặp chỉ phục vụ chuyển động, không đọc trùng bằng trình đọc màn hình. */}
         {[false, true].map(copy => <ul key={String(copy)} aria-label={copy ? undefined : 'Doanh nghiệp tiêu biểu'} aria-hidden={copy || undefined} className={`${styles.group} ${copy ? styles.copy : ''}`}>
           {businesses.map(business => <li key={business.name} className="w-40 shrink-0 text-center sm:w-48">
-            <div className="mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white p-3 shadow-md ring-1 ring-brk-outline sm:h-40 sm:w-40">
-              {business.logo ? <Image src={business.logo} alt={copy ? '' : business.name} width={160} height={160} className="h-full w-full object-contain" /> : <span role="img" aria-label={`Ảnh đại diện tạm của ${business.name}`} className="flex h-full w-full items-center justify-center rounded-full bg-brk-background px-2 text-lg font-extrabold tracking-tight text-brk-primary">{business.name}</span>}
+            <div className="mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white shadow-md ring-1 ring-brk-outline sm:h-40 sm:w-40">
+              {/* Ảnh vuông phủ kín vòng tròn; logo ngang giữ đủ chữ và được bo tròn ngay trên ảnh. */}
+              {business.logo ? <Image src={business.logo} alt={copy ? '' : business.name} width={160} height={160} className={`h-full w-full rounded-full ${business.name === 'Wi.Mentor' ? 'object-cover' : business.name === 'WiArt' ? 'bg-[#f1f2ed] object-contain' : 'bg-white object-contain p-2'}`} /> : <span role="img" aria-label={`Ảnh đại diện tạm của ${business.name}`} className="flex h-full w-full items-center justify-center rounded-full bg-brk-background px-2 text-lg font-extrabold tracking-tight text-brk-primary">{business.name}</span>}
             </div>
             <h3 className="mt-5 text-lg font-bold text-brk-on-surface">{business.name}</h3>
             <p className="mt-2 text-sm leading-6 text-brk-muted">{business.description}</p>
