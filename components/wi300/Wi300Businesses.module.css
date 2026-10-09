@@ -1,0 +1,33 @@
+.viewport {
+  overflow: hidden;
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  animation: businesses-left 48s linear infinite;
+}
+
+.group {
+  display: flex;
+  gap: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.viewport:hover .track,
+.viewport:focus-within .track,
+.paused .track {
+  animation-play-state: paused;
+}
+
+/* Hai nhóm có cùng độ rộng, dịch đúng một nhóm để vòng lặp không giật. */
+@keyframes businesses-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewport { overflow-x: auto; }
+  .track { animation: none; }
+  .copy { display: none; }
+}

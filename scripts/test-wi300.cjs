@@ -128,10 +128,10 @@ async function run() {
     'next/image': { __esModule: true, default: ({ priority, unoptimized, ...props }) => React.createElement('img', props) },
     'next/dynamic': { __esModule: true, default: () => () => null },
     'next/navigation': { useSearchParams: () => new URLSearchParams() },
-    '@/components/course/CourseCard': { __esModule: true, default: ({ course }) => React.createElement('article', { 'data-course': course.id }, course.name_lop) },
+    '@/components/course/CourseCard': { __esModule: true, default: ({ course, showSharing, shareSiteName }) => React.createElement('article', { 'data-course': course.id, 'data-sharing': String(showSharing), 'data-share-site': shareSiteName }, course.name_lop) },
     '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
     '@/lib/wi300/catalog': catalog,
-    './Wi300Businesses': load('components/wi300/Wi300Businesses.tsx'),
+    './Wi300Businesses': load('components/wi300/Wi300Businesses.tsx', { './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } } }),
     './Wi300PersonalSpace': { __esModule: true, default: () => null },
   }).default
   const renderer = createRoot(document.getElementById('root'))
@@ -139,8 +139,10 @@ async function run() {
   await act(async () => renderer.render(React.createElement(HomeClient, props)))
   assert.match(document.querySelector('h1').textContent, /Kết nối con người/)
   assert.equal(document.querySelectorAll('[data-course]').length, 3)
+  assert.ok([...document.querySelectorAll('[data-course]')].every(card => card.dataset.sharing === 'true' && card.dataset.shareSite === 'WI300'))
   assert.ok(document.querySelector('a[href="/#doanh-nghiep-tieu-bieu"]'))
-  assert.equal(document.querySelectorAll('#doanh-nghiep-tieu-bieu li').length, 5)
+  assert.equal(document.querySelectorAll('#doanh-nghiep-tieu-bieu ul[aria-label] li').length, 6)
+  assert.match(document.querySelector('#doanh-nghiep-tieu-bieu ul[aria-label]').textContent, /WiCan/)
   const sort = document.getElementById('wi300-sort')
   await act(async () => { sort.value = 'newest'; sort.dispatchEvent(new window.Event('change', { bubbles: true })) })
   assert.deepEqual([...document.querySelectorAll('[data-course]')].map(e => Number(e.dataset.course)), [2, 3, 1])

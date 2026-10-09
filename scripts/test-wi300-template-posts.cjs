@@ -103,12 +103,14 @@ async function run() {
   uiDom.window.close()
 
   const Business = load('components/wi300/Wi300Businesses.tsx', {
+    './Wi300Businesses.module.css': { __esModule: true, default: { viewport: 'viewport', track: 'track', group: 'group', copy: 'copy', paused: 'paused' } },
     'next/image': { __esModule: true, default: props => React.createElement('img', props) }
   }).default
   const html = require('react-dom/server').renderToStaticMarkup(React.createElement(Business))
   const businessDoc = new JSDOM(html).window.document
-  assert.equal(businessDoc.querySelectorAll('li').length, 5)
-  assert.equal(businessDoc.querySelectorAll('[role="img"]').length, 4)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-label] li').length, 6)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-label] [role="img"]').length, 5)
+  assert.equal(businessDoc.querySelectorAll('ul[aria-hidden="true"] li').length, 6)
   assert.match(businessDoc.querySelector('img').src, /wi-grow.png/)
   assert.equal(businessDoc.querySelectorAll('a').length, 0, 'No invented company URLs')
   console.log('WI300 template viewport, repeated menu navigation, registration isolation, post edit authorization/UI and business identities passed.')

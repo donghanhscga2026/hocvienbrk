@@ -1,8 +1,12 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useSyncExternalStore } from 'react'
 import { X, Link2, Facebook, MessageCircle, Send, Check } from 'lucide-react'
 import { useDomainBrand } from '@/components/website/DomainShell'
+
+const subscribeMounted = () => () => {}
+const clientMounted = () => true
+const serverMounted = () => false
 
 interface ShareModalProps {
   isOpen: boolean
@@ -14,23 +18,25 @@ interface ShareModalProps {
   affiliateCode: string | null
   profileSlug?: string | null
   shareType?: 'course' | 'header'  // Phân biệt share từ course hay header
+  siteName?: string
 }
 
-export default function ShareModal({ isOpen, onClose, course, affiliateCode, profileSlug = null, shareType = 'course' }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, course, affiliateCode, profileSlug = null, shareType = 'course', siteName = 'Cộng đồng học tập MFC' }: ShareModalProps) {
   const brand=useDomainBrand()
   const [copied, setCopied] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(subscribeMounted, clientMounted, serverMounted)
+  const [previousOpen, setPreviousOpen] = useState(isOpen)
+  // Đặt lại trạng thái copy khi prop mở/đóng đổi, không tạo render dây chuyền trong effect.
+  if (previousOpen !== isOpen) {
+    setPreviousOpen(isOpen)
+    setCopied(false)
+  }
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
-      setCopied(false)
     }
     return () => {
       document.body.style.overflow = 'unset'
@@ -62,8 +68,8 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
 
   // Title tùy theo shareType
   const shareTitle = shareType === 'course'
-    ? `Khóa học: ${course.name_lop} - Cộng đồng học tập MFC`
-    : 'Trang chủ - Cộng đồng học tập MFC'
+    ? `Khóa học: ${course.name_lop} - ${siteName}`
+    : `Trang chủ - ${siteName}`
 
   const encodedUrl = encodeURIComponent(shareUrl)
   const encodedTitle = encodeURIComponent(shareTitle)
@@ -79,7 +85,7 @@ export default function ShareModal({ isOpen, onClose, course, affiliateCode, pro
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
+    } catch {
       const input = document.createElement('input')
       input.value = shareUrl
       document.body.appendChild(input)
