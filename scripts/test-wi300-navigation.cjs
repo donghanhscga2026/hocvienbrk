@@ -34,12 +34,16 @@ async function run() {
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   const link = { __esModule: true, default: ({ children, scroll, onNavigate, ...props }) => React.createElement('a', props, children) }
-  let pathname = '/', scrollCalls = 0
+  let pathname = '/', scrollCalls = 0, user = null
+  let logoutCalls = 0, cleanupCalls = 0
+  const personal = load('lib/wi300/personal-space.ts', { './catalog': load('lib/wi300/catalog.ts') })
+  global.Node = dom.window.Node
   window.scrollTo = () => { scrollCalls++ }
   const Header = load('components/wi300/Wi300Header.tsx', {
     'next/link': link, 'next/image': { __esModule: true, default: ({ priority, unoptimized, ...props }) => React.createElement('img', props) },
-    'next-auth/react': { useSession: () => ({ data: null }) }, 'next/navigation': { usePathname: () => pathname },
-    './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': {},
+    'next-auth/react': { useSession: () => ({ data: user ? { user } : null }), signOut: async () => { logoutCalls++ } }, 'next/navigation': { usePathname: () => pathname },
+    './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': { signOutPushCleanup: async () => { cleanupCalls++ } },
+    '@/lib/wi300/personal-space': personal,
   }).default
   const Shell = load('components/wi300/Wi300Shell.tsx', { 'next/navigation': { usePathname: () => pathname }, './Wi300Header': { __esModule: true, default: Header },
     './Wi300Footer': load('components/wi300/Wi300Footer.tsx', { 'next/link': link, 'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) }, './Wi300BrandContext': { useWi300Brand: () => brand } }), 'next/link': link, '@/lib/wi300/default-pages': load('lib/wi300/default-pages.ts') }).default
@@ -54,8 +58,29 @@ async function run() {
   assert.equal(document.querySelector('[data-wi300-shell]').lastElementChild.tagName, 'FOOTER')
   assert.ok(document.querySelector('footer a[href="/#doanh-nghiep-tieu-bieu"]'))
   const navLinks = [...document.querySelectorAll('header nav a')].map(a => a.getAttribute('href'))
-  assert.deepEqual(navLinks, ['/', '/kham-pha', '/khoa-hoc', '/gioi-thieu', '/my-space'])
+  assert.deepEqual(navLinks, ['/', '/kham-pha', '/khoa-hoc'])
   assert.ok(navLinks.every(href => !href.includes('#')))
+  assert.equal(document.querySelector('header a[href="/my-space"]').textContent, 'Không gian khóa học')
+  assert.equal(document.querySelector('header details'), null)
+  user = { id: '42', name: 'Lucy', role: 'STUDENT' }
+  await act(async () => renderShell())
+  assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
+  assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
+  user.role = 'TEACHER'
+  await act(async () => renderShell())
+  assert.ok(document.querySelector('header details a[href="/my-space?tab=teaching"]'))
+  const details = document.querySelector('header details')
+  details.open = true
+  await act(async () => details.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  assert.equal(details.open, false)
+  assert.equal(document.activeElement.tagName, 'SUMMARY')
+  details.open = true
+  await act(async () => document.body.dispatchEvent(new window.Event('pointerdown', { bubbles: true })))
+  assert.equal(details.open, false)
+  await act(async () => document.querySelector('header details button').click())
+  assert.equal(logoutCalls, 1)
+  assert.equal(cleanupCalls, 1)
+  user = null
   pathname = '/khoa-hoc/example'
   window.history.pushState(null, '', pathname)
   await act(async () => renderShell())
@@ -93,6 +118,8 @@ async function run() {
   await act(async () => root.render(React.createElement(View, { coursePage: { ...coursePage, theme: { importedLayout: true } }, course: { id: 1 }, session: null, wi300Breadcrumb: React.createElement(Breadcrumb, { title: 'Khóa A' }) })))
   assert.equal(document.querySelectorAll('nav:not([aria-label])').length, 0, 'HTML import không nhận thêm menu')
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
+    './Wi300TeachingPanel': { __esModule: true, default: () => null },
+    './useCoursePageSize': { __esModule: true, default: () => 6 },
     'next/dynamic': { __esModule: true, default: () => () => null },
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { role: 'STUDENT', name: 'Lucy' } } }) },
     'next/navigation': { useSearchParams: () => new URLSearchParams('tab=learning'), useRouter: () => ({ refresh() {} }) },

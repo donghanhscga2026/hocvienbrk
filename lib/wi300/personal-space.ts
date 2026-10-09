@@ -2,6 +2,11 @@ import { searchText } from './catalog'
 
 export type PersonalTool = { id: number; slug?: string; name: string; url: string; roles: string[]; isActive: boolean }
 
+// Cùng điều kiện hiển thị giảng dạy ở header và dữ liệu riêng trên server.
+export function canTeach(role?: string | null) {
+  return role === 'TEACHER' || role === 'ADMIN'
+}
+
 // Phân nhóm bằng mã ổn định; đổi tên hiển thị không làm công cụ chuyển nhóm.
 export const toolGroups = [
   { id: 'training', label: 'Đào tạo & khóa học', description: 'Khóa học, học viên và lộ trình đào tạo.', slugs: ['courses', 'students', 'roadmap', 'my-learning'] },
