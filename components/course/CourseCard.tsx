@@ -4,15 +4,19 @@ import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import PaymentModal from './PaymentModal'
-import RegistrationFlowModal from '@/components/course-page/RegistrationFlowModal'
-import UploadProofModal from '@/components/payment/UploadProofModal'
+import dynamic from 'next/dynamic'
 import { enrollInCourseAction, getBrkMbvBalanceAction, toggleHiddenFromGifts } from '@/app/actions/course-actions'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
 import { isValidImageUrl } from '@/lib/image-validation'
-import ShareModal from '@/components/share/ShareModal'
-import LessonTocModal from './LessonTocModal'
+
 import { Share2, BookOpen, Users, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react'
+
+// Tải cửa sổ khi người dùng mở, không nạp form thanh toán cho mọi card.
+const modalLoading = () => <div role="status" className="fixed bottom-4 left-1/2 z-[250] -translate-x-1/2 rounded-xl bg-white px-5 py-3 text-sm shadow-lg">Đang mở…</div>
+const PaymentModal = dynamic(() => import('./PaymentModal'), { ssr: false, loading: modalLoading })
+const RegistrationFlowModal = dynamic(() => import('@/components/course-page/RegistrationFlowModal'), { ssr: false, loading: modalLoading })
+const ShareModal = dynamic(() => import('@/components/share/ShareModal'), { ssr: false, loading: modalLoading })
+const LessonTocModal = dynamic(() => import('./LessonTocModal'), { ssr: false, loading: modalLoading })
 
 // Chuyển URL thành link clickable (cho phần mô tả khóa học)
 const makeLinksClickable = (html: string): string => {
@@ -444,21 +448,21 @@ export default function CourseCard({ course, isLoggedIn, enrollment: propEnrollm
                 />
             )}
 
-            <ShareModal
+            {showShare && <ShareModal
                 isOpen={showShare}
                 onClose={() => setShowShare(false)}
                 course={course}
                 affiliateCode={affiliateCode}
                 profileSlug={profileSlug}
                 shareType="course"
-            />
+            />}
 
-            <LessonTocModal
+            {showToc && <LessonTocModal
                 isOpen={showToc}
                 onClose={() => setShowToc(false)}
                 courseId={course.id}
                 courseName={course.name_lop}
-            />
+            />}
         </>
     )
 }

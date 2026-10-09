@@ -4,13 +4,17 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import CourseThemeProvider from './CourseThemeProvider'
 import SectionRenderer from './SectionRenderer'
-import ShareLinkModal from './ShareLinkModal'
-import RegistrationFlowModal from './RegistrationFlowModal'
+import dynamic from 'next/dynamic'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import CrmRequestButton from '@/components/crm/CrmRequestButton'
 import { CoursePage } from '@/lib/course-page/types'
 import { checkEnrollmentStatusAction } from '@/app/actions/course-actions'
 import { useDomainBrand } from '@/components/website/DomainShell'
+
+// Nội dung trang vẫn SSR; chỉ các cửa sổ tương tác được tải theo nhu cầu.
+const modalLoading = () => <div role="status" className="fixed bottom-4 left-1/2 z-[250] -translate-x-1/2 rounded-xl bg-white px-5 py-3 text-sm shadow-lg">Đang mở…</div>
+const ShareLinkModal = dynamic(() => import('./ShareLinkModal'), { ssr: false, loading: modalLoading })
+const RegistrationFlowModal = dynamic(() => import('./RegistrationFlowModal'), { ssr: false, loading: modalLoading })
 
 interface CoursePageViewProps {
   coursePage: CoursePage
