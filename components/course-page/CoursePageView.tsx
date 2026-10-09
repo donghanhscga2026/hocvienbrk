@@ -23,6 +23,7 @@ interface CoursePageViewProps {
   testimonials?: any[]
   totalHours?: number
   activeStudentCount?: number
+  wi300Breadcrumb?: React.ReactNode
 }
 
 export default function CoursePageView({
@@ -36,6 +37,7 @@ export default function CoursePageView({
   testimonials = [],
   totalHours = 0,
   activeStudentCount = 0,
+  wi300Breadcrumb,
 }: CoursePageViewProps) {
   const router = useRouter()
   const brand=useDomainBrand()
@@ -135,7 +137,7 @@ export default function CoursePageView({
 
       {/* Navigation */}
       {!importedLayout && <nav
-        className="fixed top-0 left-0 right-0 z-50 px-2 py-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] flex justify-between items-center gap-1 sm:gap-3 sm:px-4"
+        className={`${wi300Breadcrumb ? 'sticky top-0' : 'fixed top-0 left-0 right-0'} z-50 px-2 py-2 pt-[calc(0.5rem_+_env(safe-area-inset-top))] flex justify-between items-center gap-1 sm:gap-3 sm:px-4`}
         style={{
           background: 'color-mix(in srgb, var(--course-surface) 92%, transparent)',
           backdropFilter: 'blur(12px)',
@@ -172,9 +174,10 @@ export default function CoursePageView({
         <div className="flex items-center justify-end gap-1"><NotificationBell /><CrmRequestButton courseId={course.id} courseTitle={course.name_lop} signedIn={!!session?.user} compact /></div>
         </div>
       </nav>}
+      {wi300Breadcrumb}
 
       {/* Page sections */}
-      <div className={importedLayout ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}>
+      <div className={importedLayout || wi300Breadcrumb ? '' : 'pt-[calc(80px_+_env(safe-area-inset-top))]'}>
         <SectionRenderer
           sections={coursePage.sections}
           isEnrolled={isEnrolled}

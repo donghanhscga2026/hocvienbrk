@@ -66,7 +66,7 @@ async function run() {
     '@/lib/prisma': { __esModule: true, default: {
       course: { findMany: async args => { courseWhere = args.where; if (fail) throw Error('Simulated database failure'); return [{ ...courses[1] }] } },
       user: { findUnique: async () => ({ phone: 'test' }) },
-      enrollment: { findMany: async args => { enrollmentWhere = args.where; return [{ id: 7, courseId: 2, status: 'ACTIVE', startedAt: null, hiddenFromGifts: false, payment: null, _count: { lessonProgress: 3 }, course: { _count: { lessons: 10 } } }] } },
+      enrollment: { findMany: async args => { enrollmentWhere = args.where; return [{ id: 7, courseId: 2, status: 'ACTIVE', startedAt: null, hiddenFromGifts: false, payment: null, updatedAt: new Date(), lessonProgress: [], _count: { lessonProgress: 3 }, course: { _count: { lessons: 10 } } }] } },
     } },
   }).default
   const brand = config.getDeploymentBrand({ SITE_VARIANT: 'wi300' })
@@ -97,19 +97,20 @@ async function run() {
   const link = { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) }
   const HomeClient = load('components/wi300/Wi300HomeClient.tsx', {
     'next/link': link,
-    'next/image': { __esModule: true, default: ({ priority, ...props }) => React.createElement('img', props) },
+    'next/image': { __esModule: true, default: ({ priority, unoptimized, ...props }) => React.createElement('img', props) },
     'next/dynamic': { __esModule: true, default: () => () => null },
     'next/navigation': { useSearchParams: () => new URLSearchParams() },
     '@/components/course/CourseCard': { __esModule: true, default: ({ course }) => React.createElement('article', { 'data-course': course.id }, course.name_lop) },
     '@/app/actions/course-actions': { checkEnrollmentStatusAction: async () => ({ status: 'PENDING' }) },
     '@/lib/wi300/catalog': catalog,
+    './Wi300PersonalSpace': { __esModule: true, default: () => null },
   }).default
   const renderer = createRoot(document.getElementById('root'))
   const props = { brand, courses, enrollments: [], userId: null, userPhone: null, loggedIn: false, catalogError: false, accountError: false }
   await act(async () => renderer.render(React.createElement(HomeClient, props)))
-  assert.match(document.querySelector('h1').textContent, /Khai phóng tri thức/)
+  assert.match(document.querySelector('h1').textContent, /Kết nối doanh nghiệp/)
   assert.equal(document.querySelectorAll('[data-course]').length, 3)
-  assert.ok(document.querySelector('#gioi-thieu'))
+  assert.ok(document.querySelector('a[href="/gioi-thieu"]'))
   const categoryButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent === 'Công nghệ')
   await act(async () => categoryButton.click())
   assert.equal(document.querySelectorAll('[data-course]').length, 2)
@@ -119,7 +120,7 @@ async function run() {
   assert.equal(document.querySelector('[data-course]').textContent, 'Ứng dụng AI')
   await act(async () => renderer.render(React.createElement(HomeClient, { ...props, loggedIn: true, userId: 42, enrollments: [{ courseId: 1, status: 'ACTIVE', completedCount: 3, totalLessons: 10 }] })))
   assert.equal(document.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '30')
-  assert.match(document.querySelector('#khoa-hoc-cua-toi a').getAttribute('href'), /\/learn$/)
+  assert.match(document.querySelector('#khoa-hoc-cua-toi a[href*="/learn"]').getAttribute('href'), /\/learn$/)
   await act(async () => renderer.unmount())
   dom.window.close()
   console.log('WI300: brand isolation, original manifest, course scope, Vietnamese filters, personal progress and database failure checks passed.')
