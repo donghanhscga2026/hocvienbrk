@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { zipFrameSource, zipSelectedBlockKeys, zipCourseLinks } from '@/lib/course-page/importer/source-url'
 
 type Props = {
@@ -20,6 +21,8 @@ function safeExternal(value: unknown) {
 }
 
 export default function ZipSourceSection({ id, content, onAction }: Props) {
+  const syncStickyNavigation = !!useWi300Brand()
+  const navigationHeight = React.useRef(72)
   const frameRef = React.useRef<HTMLIFrameElement | null>(null)
   const [height, setHeight] = React.useState(900)
   const sourceUrl = content?.exactSource?.url || content?.importedSource?.exactSource?.url || ''
@@ -50,6 +53,11 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       if (event.source !== frame.contentWindow) return
       const data = event.data || {}
 
+      if (data.source === 'mfc-zip-source' && data.type === 'navigation_metrics' && Number.isFinite(data.height)) {
+        navigationHeight.current = Math.max(0, Math.min(300, data.height))
+        return
+      }
+
       if ((data.source === 'mfc-zip-source' || data.source === 'dhcc') && data.type === 'height' && Number.isFinite(data.height)) {
         setHeight(Math.max(300, Math.min(20000, Math.ceil(data.height))))
         return
@@ -68,7 +76,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
           }
         }
 
-        const absoluteTop = window.scrollY + rect.top + Number(data.top) - 72
+        const absoluteTop = window.scrollY + rect.top + Number(data.top) - (syncStickyNavigation ? navigationHeight.current + 12 : 72)
         window.scrollTo({ top: Math.max(0, absoluteTop), behavior: 'smooth' })
         return
       }
@@ -100,7 +108,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
 
       if (data.source === 'dhcc' && data.type === 'scroll' && Number.isFinite(data.top)) {
         const rect = frame.getBoundingClientRect()
-        const absoluteTop = window.scrollY + rect.top + Number(data.top) - 72
+        const absoluteTop = window.scrollY + rect.top + Number(data.top) - (syncStickyNavigation ? navigationHeight.current + 12 : 72)
         window.scrollTo({ top: Math.max(0, absoluteTop), behavior: 'smooth' })
       }
     }
@@ -112,6 +120,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
           type: 'configure',
           selectedBlockKeys,
           registrationBlockKeys,
+          syncStickyNavigation,
           pageUrl: window.location.origin + window.location.pathname,
           courseLinks: zipCourseLinks(window.location.pathname),
         }, '*')
@@ -148,7 +157,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
       window.removeEventListener('popstate', sendAnchorToFrame)
       window.clearTimeout(timer)
     }
-  }, [onAction, sourceUrl, selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
+  }, [onAction, sourceUrl, syncStickyNavigation, selectedBlockKeys?.join('|'), registrationBlockKeys.join('|')])
 
   if (!sourceUrl) {
     return (
@@ -176,6 +185,7 @@ export default function ZipSourceSection({ id, content, onAction }: Props) {
             type: 'configure',
             selectedBlockKeys,
             registrationBlockKeys,
+            syncStickyNavigation,
             pageUrl: window.location.origin + window.location.pathname,
             courseLinks: zipCourseLinks(window.location.pathname),
           }, '*')

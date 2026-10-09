@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { X, Send, User as UserIcon, Clock, MessageCircle, Loader2 } from 'lucide-react'
 import { getPostDetailAction, commentOnPostAction } from '@/app/actions/post-actions'
 import { formatDistanceToNow } from 'date-fns'
@@ -12,6 +14,7 @@ interface PostDetailModalProps {
 }
 
 export default function PostDetailModal({ postId, onClose }: PostDetailModalProps) {
+    const { data: session } = useSession()
     const [post, setPost] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [comment, setComment] = useState('')
@@ -69,6 +72,8 @@ export default function PostDetailModal({ postId, onClose }: PostDetailModalProp
                     </div>
                 ) : post ? (
                     <div className="flex-1 flex flex-col overflow-hidden">
+                        {/* Chỉ quản trị viên có liên kết sửa; server vẫn kiểm tra quyền khi lưu. */}
+                        {session?.user?.role === 'ADMIN' && <Link href={`/tools/posts?edit=${encodeURIComponent(postId)}`} className="shrink-0 border-b border-gray-100 px-6 py-3 text-sm font-semibold text-brk-primary">Sửa bài viết</Link>}
                         {/* Post Content */}
                         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
                             <div className="space-y-4">
