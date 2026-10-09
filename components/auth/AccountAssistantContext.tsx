@@ -2,12 +2,14 @@
 
 import React, { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 
 // [OPTIMIZE] Modal 948 dòng + thư viện libphonenumber-js chỉ cần tải khi
 // người dùng thực sự mở trợ lý tài khoản, không phải trên mọi trang.
 const AccountAssistantModal = dynamic(() => import('./AccountAssistantModal'), { ssr: false })
 
 interface AccountAssistantContextType {
+  enabled: boolean
   isOpen: boolean
   openAssistant: () => void
   closeAssistant: () => void
@@ -21,16 +23,20 @@ export function useAccountAssistant() {
   return ctx
 }
 
-export function AccountAssistantProvider({ children }: { children: ReactNode }) {
+export function AccountAssistantProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
 
-  const openAssistant = useCallback(() => setIsOpen(true), [])
+  const openAssistant = useCallback(() => {
+    if (enabled) setIsOpen(true)
+    else router.push('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash))
+  }, [enabled, router])
   const closeAssistant = useCallback(() => setIsOpen(false), [])
 
   return (
-    <AccountAssistantContext.Provider value={{ isOpen, openAssistant, closeAssistant }}>
+    <AccountAssistantContext.Provider value={{ enabled, isOpen: enabled && isOpen, openAssistant, closeAssistant }}>
       {children}
-      {isOpen && <AccountAssistantModal onClose={closeAssistant} />}
+      {enabled && isOpen && <AccountAssistantModal onClose={closeAssistant} />}
     </AccountAssistantContext.Provider>
   )
 }

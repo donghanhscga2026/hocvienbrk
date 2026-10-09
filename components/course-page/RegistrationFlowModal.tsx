@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { X, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import AccountAssistantModal from '@/components/auth/AccountAssistantModal'
+import { useAccountAssistant } from '@/components/auth/AccountAssistantContext'
 import { enrollInCourseAction, checkEnrollmentStatusAction, getBrkMbvBalanceAction, getBrkVndWalletBalanceAction } from '@/app/actions/course-actions'
 import { resolveBankBin } from '@/lib/bank-bin'
 import { getClientRef } from '@/lib/affiliate/get-client-ref'
@@ -31,6 +33,7 @@ export default function RegistrationFlowModal({
   onEnrolled,
 }: RegistrationFlowModalProps) {
   const { data: liveSession } = useSession()
+  const { enabled: accountAssistantEnabled } = useAccountAssistant()
 
   // Determine initial step
   const getInitialStep = (): FlowStep => {
@@ -188,9 +191,14 @@ export default function RegistrationFlowModal({
       {/* ── STEP: auth ─────────────────────────────────────────────────────── */}
       {step === 'auth' && (
         <div onClick={e => e.stopPropagation()}>
-          <AccountAssistantModal
+          {accountAssistantEnabled ? <AccountAssistantModal
             onClose={onClose}
-          />
+          /> : <div role="dialog" aria-modal="true" aria-labelledby="wi300-registration-auth" className="w-full max-w-md rounded-2xl bg-white p-6 text-brk-on-surface">
+            <div className="flex items-center justify-between gap-3"><h2 id="wi300-registration-auth" className="text-xl font-bold">Đăng nhập để tham gia khóa học</h2><button type="button" onClick={onClose} aria-label="Đóng" className="flex h-11 w-11 shrink-0 items-center justify-center"><X className="h-5 w-5" /></button></div>
+            <p className="mt-3 text-sm leading-6 text-brk-muted">Đăng nhập hoặc tạo tài khoản để tiếp tục đăng ký {course.name_lop}.</p>
+            <Link href={`/login?callbackUrl=${encodeURIComponent(`/khoa-hoc/${encodeURIComponent(course.id_khoa)}`)}`} className="mt-5 flex min-h-12 items-center justify-center rounded-xl bg-brk-primary px-4 font-semibold text-white">Đăng nhập</Link>
+            <Link href={`/register?redirect=${encodeURIComponent(`khoa-hoc/${course.id_khoa}`)}`} className="mt-3 flex min-h-12 items-center justify-center rounded-xl border border-brk-outline px-4 font-semibold">Tạo tài khoản</Link>
+          </div>}
         </div>
       )}
 

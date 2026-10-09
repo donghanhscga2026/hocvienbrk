@@ -33,7 +33,7 @@ async function run() {
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
-  const link = { __esModule: true, default: ({ children, scroll, ...props }) => React.createElement('a', props, children) }
+  const link = { __esModule: true, default: ({ children, scroll, onNavigate, ...props }) => React.createElement('a', props, children) }
   let pathname = '/', scrollCalls = 0
   window.scrollTo = () => { scrollCalls++ }
   const Header = load('components/wi300/Wi300Header.tsx', {
@@ -85,10 +85,12 @@ async function run() {
   await act(async () => root.render(React.createElement(View, { coursePage: { ...coursePage, theme: { importedLayout: true } }, course: { id: 1 }, session: null, wi300Breadcrumb: React.createElement(Breadcrumb, { title: 'Khóa A' }) })))
   assert.equal(document.querySelectorAll('nav:not([aria-label])').length, 0, 'HTML import không nhận thêm menu')
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
+    'next/dynamic': { __esModule: true, default: () => () => null },
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { role: 'STUDENT', name: 'Lucy' } } }) },
-    'next/navigation': { useSearchParams: () => new URLSearchParams('tab=learning') },
+    'next/navigation': { useSearchParams: () => new URLSearchParams('tab=learning'), useRouter: () => ({ refresh() {} }) },
     '@/components/course/CourseCard': { __esModule: true, default: ({ course }) => React.createElement('article', null, course.name_lop) },
     '@/lib/wi300/catalog': load('lib/wi300/catalog.ts'),
+    '@/lib/wi300/personal-space': load('lib/wi300/personal-space.ts', { './catalog': load('lib/wi300/catalog.ts') }),
   })
   assert.equal(SpaceModule.canUseTool('STUDENT', ['ADMIN']), false)
   assert.equal(SpaceModule.canUseTool('TEACHER', ['STUDENT']), true)
@@ -99,8 +101,12 @@ async function run() {
   try {
     await act(async () => root.render(React.createElement(SpaceModule.default, { courses: courses.map(c => ({ ...c, name_lop: `Khóa ${c.id}` })), enrollments: rows, userId: 1, userPhone: null, accountError: false })))
     assert.match(document.querySelector('h1').textContent, /Học tập/)
-    assert.equal(document.querySelectorAll('article').length, 7)
-    assert.deepEqual([...document.querySelectorAll('h2')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ kích hoạt (1)'])
+    assert.equal(document.querySelectorAll('article').length, 4)
+    assert.deepEqual([...document.querySelectorAll('[role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
+    await act(async () => document.getElementById('learning-tab-completed').click())
+    assert.equal(document.querySelectorAll('article').length, 2)
+    await act(async () => document.getElementById('learning-tab-pending').click())
+    assert.equal(document.querySelectorAll('article').length, 1)
     assert.equal(document.querySelector('a[href="/my-space?tab=pages"]').textContent, 'Website & nội dung')
   } finally { global.fetch = savedFetch }
   let currentBrand = null
