@@ -6,13 +6,20 @@ import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-prof
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 
-const courseInclude = {
-  courseCategory: true, teacherBankAccount: true,
+// Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
+const courseSelect = {
+  id: true, id_khoa: true, name_lop: true, name_khoa: true, status: true,
+  mo_ta_ngan: true, link_anh_bia: true, link_zalo: true, phi_coc: true,
+  createdAt: true, updatedAt: true, type: true, pin: true, category: true,
+  teacherId: true, categoryId: true, teacherBankAccountId: true, vipExempt: true,
+  feeType: true, voucherConfig: true, allowMbvDeduction: true,
+  requiresReferralActivation: true, referralActivationThreshold: true,
+  courseCategory: { select: { name: true } }, teacherBankAccount: true,
   teacher: { select: { name: true } },
   _count: { select: { enrollments: { where: { status: 'ACTIVE' as const } }, lessons: true } },
-} satisfies Prisma.CourseInclude
+} satisfies Prisma.CourseSelect
 
-export type Wi300Course = Prisma.CourseGetPayload<{ include: typeof courseInclude }>
+export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }>
 export type Wi300Enrollment = {
   id: number; courseId: number; status: string; startedAt: Date | null; completedCount: number;
   totalLessons: number; enrollmentId: number; hiddenFromGifts: boolean; lastStudiedAt?: Date | null; lastLessonId?: string | null;
@@ -21,8 +28,8 @@ export type Wi300Enrollment = {
 
 // Cùng phạm vi khóa học của SITE_PROFILE_KEY; cache không phụ thuộc nhận diện giao diện.
 const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => prisma.course.findMany({
-  where, include: courseInclude, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
-}), ['wi300-course-catalog'], { tags: ['site-profile'], revalidate: 600 })
+  where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
+}), ['wi300-course-catalog-v2'], { tags: ['site-profile'], revalidate: 600 })
 
 export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
   const userId = session?.user?.id != null ? Number(session.user.id) : null

@@ -1,9 +1,5 @@
-import { Loader2 } from 'lucide-react';
+import Wi300Loading from '@/components/wi300/Wi300Loading'
 
 export default function Loading() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <Loader2 className="w-8 h-8 animate-spin text-yellow-400" />
-    </div>
-  );
+  return <Wi300Loading detail />
 }

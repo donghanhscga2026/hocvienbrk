@@ -12,6 +12,11 @@ import { canProfileAccessCourse, getCurrentSiteProfile } from '@/lib/site-profil
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import Wi300Header from '@/components/wi300/Wi300Header'
 import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
+import { courseLoadingPlan } from '@/lib/course-page/loading-plan'
+
+// Dùng chung kiểm tra phạm vi trong metadata và nội dung của cùng request.
+const getPageProfile = cache(getCurrentSiteProfile)
+const canAccessPageCourse = cache(canProfileAccessCourse)
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -36,8 +41,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     if (!course) return { title: 'Không tìm thấy khóa học' }
 
-    const siteProfile = await getCurrentSiteProfile()
-    if (siteProfile && !(await canProfileAccessCourse(siteProfile, course.id))) {
+    const siteProfile = await getPageProfile()
+    if (siteProfile && !(await canAccessPageCourse(siteProfile, course.id))) {
         return { title: 'Không tìm thấy khóa học' }
     }
 
@@ -89,21 +94,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     let { id } = await params
-    const session = await getSession()
-
     await requireDomainCourse(id.replace(/\$+$/, ''))
 
     id = id.replace(/\$+$/, '')
 
-    const course = await getCourseByIdKhoa(id)
+    // Dữ liệu công khai và phiên của request độc lập; không cache phiên/người học chung.
+    const [course, siteProfile, session, publishedPage, deploymentBrand, requestSearch] = await Promise.all([
+        getCourseByIdKhoa(id), getPageProfile(), getSession(), getPublishedCoursePageBySlug(id),
+        getCurrentDeploymentBrand(), searchParams || Promise.resolve(undefined),
+    ])
 
     if (!course) notFound()
-
-    const siteProfile = await getCurrentSiteProfile()
-    if (siteProfile && !(await canProfileAccessCourse(siteProfile, course.id))) notFound()
+    if (siteProfile && !(await canAccessPageCourse(siteProfile, course.id))) notFound()
 
     const courseId = course.id
     const userId = session?.user?.id ? parseInt(session.user.id) : null
+    const requestedLesson = requestSearch?.notificationLesson
+    const loadPlan = courseLoadingPlan(publishedPage, !!deploymentBrand, requestedLesson)
 
     // [OPTIMIZE] Các truy vấn dưới đây độc lập với nhau — chạy song song
     // thay vì tuần tự để giảm tổng thời gian chờ của trang bán khóa học.
@@ -123,21 +130,21 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
         userId
             ? prisma.enrollment.findFirst({ where: { userId, courseId } })
             : Promise.resolve(null),
-        prisma.lesson.findMany({
+        loadPlan.lessons ? prisma.lesson.findMany({
             where: { courseId },
             orderBy: { order: 'asc' },
             select: { id: true, title: true, order: true }
-        }),
+        }) : Promise.resolve([]),
         // Tổng thời lượng video từ lessonProgress.maxTime
-        prisma.lessonProgress.groupBy({
+        loadPlan.statistics ? prisma.lessonProgress.groupBy({
             by: ['lessonId'],
             where: { lesson: { courseId }, maxTime: { gt: 0 } },
             _max: { maxTime: true }
-        }),
+        }) : Promise.resolve([]),
         // Số thành viên đang học
-        prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }),
+        loadPlan.statistics ? prisma.enrollment.count({ where: { courseId, status: 'ACTIVE' } }) : Promise.resolve(0),
         // Testimonials từ dữ liệu thật (LessonProgress.assignment.reflection)
-        prisma.lessonProgress.findMany({
+        loadPlan.testimonials ? prisma.lessonProgress.findMany({
             where: { lesson: { courseId }, status: 'COMPLETED' },
             include: {
                 enrollment: {
@@ -147,8 +154,8 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
             },
             orderBy: { submittedAt: 'desc' },
             take: 5
-        }),
-        prisma.lessonComment.findMany({
+        }) : Promise.resolve([]),
+        loadPlan.testimonials ? prisma.lessonComment.findMany({
             where: { lesson: { courseId } },
             include: {
                 user: { select: { id: true, name: true, image: true } },
@@ -156,8 +163,8 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
             },
             orderBy: { createdAt: 'desc' },
             take: 10
-        }),
-        getPublishedCoursePageBySlug(id)
+        }) : Promise.resolve([]),
+        Promise.resolve(publishedPage)
     ])
 
     const userPhone = userRow?.phone || null
@@ -192,7 +199,6 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     ].slice(0, 5)
 
     // Chỉ tự mở bài từ thông báo khi bài đó thực sự thuộc khóa học này.
-    const requestedLesson = (await searchParams)?.notificationLesson
     const notificationEntry = typeof requestedLesson === 'string'
         && lessons.some(lesson => lesson.id === requestedLesson)
         ? <NotificationLessonEntry courseSlug={course.id_khoa} lessonId={requestedLesson} />
@@ -200,10 +206,9 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
 
     // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
     const effectiveCoursePage = coursePage
-    const deploymentBrand = await getCurrentDeploymentBrand()
     const breadcrumb = deploymentBrand ? <Wi300Breadcrumb title={course.name_lop} /> : undefined
 
-    // coursePage đã được lấy song song ở trên cùng các query khác
+    // Giữ dữ liệu đã publish; chỉ bỏ phần thống kê mà mẫu ZIP không dùng.
     if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
         return (
             <>
