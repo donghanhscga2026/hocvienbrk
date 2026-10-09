@@ -7,7 +7,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     id: '/', name: `${brand.name} — ${brand.tagline}`, short_name: brand.name,
     description: brand.description, lang: 'vi', start_url: '/', scope: '/', display: 'standalone',
     background_color: '#ffffff', theme_color: brand.palette.primary,
-    icons: [{ src: brand.iconUrl, sizes: '1280x854', type: 'image/png', purpose: 'any' }],
+    icons: [{ src: brand.iconUrl, purpose: 'any' }],
   }
   return {
     id: '/', name: 'MFC - Dòng chảy Phước Báu', short_name: 'MFC',

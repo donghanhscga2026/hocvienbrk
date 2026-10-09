@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import CoursePlayer from "@/components/course/CoursePlayer"
 import { requireDomainCourse } from '@/lib/website/domain-context'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
 
 type PlaylistItem = {
   type: 'video' | 'doc'
@@ -123,13 +125,17 @@ export default async function CourseLearnPage({
     redirect(`/khoa-hoc/${id}`)
   }
 
+  const brand = await getCurrentDeploymentBrand()
   return (
-    <div className="h-screen h-dvh website:h-full website:min-h-0 bg-black website:bg-brk-background overflow-hidden flex flex-col">
+    <div className={brand ? 'h-dvh min-h-0 overflow-hidden flex flex-col bg-brk-background' : 'h-screen h-dvh website:h-full website:min-h-0 bg-black website:bg-brk-background overflow-hidden flex flex-col'}>
+      {brand && <Wi300Breadcrumb title={course.name_lop} courseSlug={course.id_khoa} learning />}
+      <div className={brand ? 'min-h-0 flex-1' : 'contents'}>
       <CoursePlayer
         course={{ id: course.id, id_khoa: course.id_khoa, name_lop: course.name_lop, type: course.type, teacherId: course.teacherId, lessons }}
         enrollment={enrollment}
         session={session}
       />
+      </div>
     </div>
   )
 }

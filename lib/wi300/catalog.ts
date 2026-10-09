@@ -4,6 +4,14 @@ export function searchText(value: string) {
 }
 
 type CatalogItem = { name_lop: string; phi_coc: number; teacher?: { name: string | null } | null; courseCategory?: { name: string } | null; category?: string | null }
+type LearningEnrollment = { courseId: number; status: string; completedCount: number; totalLessons: number; lastStudiedAt?: Date | string | null; hiddenFromGifts: boolean }
+export function recentActiveCourses<T extends { id: number }>(courses: T[], enrollments: LearningEnrollment[], limit = 3) {
+  const byId = new Map(courses.map(course => [course.id, course]))
+  return enrollments.filter(row => row.status === 'ACTIVE' && !row.hiddenFromGifts && !(row.totalLessons > 0 && row.completedCount >= row.totalLessons) && byId.has(row.courseId))
+    .sort((a, b) => (b.lastStudiedAt ? new Date(b.lastStudiedAt).getTime() : 0) - (a.lastStudiedAt ? new Date(a.lastStudiedAt).getTime() : 0) || b.courseId - a.courseId)
+    .slice(0, limit).map(row => byId.get(row.courseId)!)
+}
+
 export const categoryName = (course: CatalogItem) => course.courseCategory?.name || course.category || 'Khác'
 
 export function filterCourses<T extends CatalogItem>(courses: T[], query: string, category: string, fee: string) {

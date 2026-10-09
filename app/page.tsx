@@ -31,7 +31,7 @@ const getHomepageLanding = cache(async (landingId?: number, landingSlug?: string
 
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getCurrentDeploymentBrand()
-  if (brand) return { title: { absolute: `${brand.name} | ${brand.tagline}` }, description: brand.description, openGraph: { title: `${brand.name} | ${brand.tagline}`, description: brand.description, images: [brand.logoUrl] } }
+  if (brand) return { title: { absolute: brand.seoTitle }, description: brand.description, openGraph: { title: brand.seoTitle, description: brand.description, images: [brand.ogImageUrl] } }
   const profile = await getCurrentSiteProfile()
   if (!profile) return { title: 'MFC' }
 

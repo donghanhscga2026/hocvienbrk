@@ -15,7 +15,7 @@ const courseInclude = {
 export type Wi300Course = Prisma.CourseGetPayload<{ include: typeof courseInclude }>
 export type Wi300Enrollment = {
   id: number; courseId: number; status: string; startedAt: Date | null; completedCount: number;
-  totalLessons: number; enrollmentId: number; hiddenFromGifts: boolean;
+  totalLessons: number; enrollmentId: number; hiddenFromGifts: boolean; lastStudiedAt?: Date | null; lastLessonId?: string | null;
   payment?: { id: number; status: string; proofImage: string | null; qrCodeUrl: string | null; transferContent: string | null; amount: number; bankName: string | null; accountNumber: string | null };
 }
 
@@ -24,7 +24,7 @@ const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => pris
   where, include: courseInclude, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
 }), ['wi300-course-catalog'], { tags: ['site-profile'], revalidate: 600 })
 
-export default async function Wi300Home({ brand, session }: { brand: DeploymentBrand; session: Session | null }) {
+export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
   const userId = session?.user?.id != null ? Number(session.user.id) : null
   let courses: Wi300Course[] = []
   let enrollments: Wi300Enrollment[] = []
@@ -45,7 +45,8 @@ export default async function Wi300Home({ brand, session }: { brand: DeploymentB
       const [user, rows] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
         prisma.enrollment.findMany({ where: { userId, courseId: { in: courses.map(course => course.id) } }, select: {
-          id: true, courseId: true, status: true, startedAt: true, hiddenFromGifts: true,
+          id: true, courseId: true, status: true, startedAt: true, hiddenFromGifts: true, updatedAt: true, lastLessonId: true,
+          lessonProgress: { where: { status: { not: 'RESET' } }, orderBy: { updatedAt: 'desc' }, take: 1, select: { updatedAt: true } },
           payment: { select: { id: true, status: true, proofImage: true, qrCodeUrl: true, transferContent: true, amount: true, bankName: true, accountNumber: true } },
           course: { select: { _count: { select: { lessons: true } } } },
           _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } },
@@ -56,11 +57,14 @@ export default async function Wi300Home({ brand, session }: { brand: DeploymentB
         id: row.id, courseId: row.courseId, status: row.status, startedAt: row.startedAt,
         completedCount: row._count.lessonProgress, totalLessons: row.course._count.lessons,
         enrollmentId: row.id, hiddenFromGifts: row.hiddenFromGifts, payment: row.payment || undefined,
+        lastStudiedAt: row.lastLessonId && row.updatedAt > (row.lessonProgress[0]?.updatedAt || row.updatedAt)
+          ? row.updatedAt : row.lessonProgress[0]?.updatedAt || row.updatedAt,
+        lastLessonId: row.lastLessonId,
       }))
     } catch (error) {
       console.error('[WI300] Không tải được khóa học của tài khoản', error)
       accountError = true
     }
   }
-  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} />
+  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }

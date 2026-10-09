@@ -9,6 +9,9 @@ import CoursePageView from '@/components/course-page/CoursePageView'
 import NotificationLessonEntry from '@/components/course/NotificationLessonEntry'
 import { requireDomainCourse } from '@/lib/website/domain-context'
 import { canProfileAccessCourse, getCurrentSiteProfile } from '@/lib/site-profile/runtime'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import Wi300Header from '@/components/wi300/Wi300Header'
+import Wi300Breadcrumb from '@/components/wi300/Wi300Breadcrumb'
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -38,8 +41,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         return { title: 'Không tìm thấy khóa học' }
     }
 
-    const defaultDescription = siteProfile?.metaDescription || siteProfile?.subtitle || undefined
-    const defaultImage = siteProfile?.metaImage || siteProfile?.heroImage || '/og-image.png'
+    const brand = await getCurrentDeploymentBrand()
+    const defaultDescription = brand?.description || siteProfile?.metaDescription || siteProfile?.subtitle || undefined
+    const defaultImage = brand?.ogImageUrl || siteProfile?.metaImage || siteProfile?.heroImage || '/og-image.png'
     const courseImg = course.link_anh_bia || (course as any).link_anh_bia_khoa
     
     // Check if dynamic course page exists
@@ -196,6 +200,8 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
 
     // Course page hiển thị hoàn toàn theo dữ liệu đã publish trong DB.
     const effectiveCoursePage = coursePage
+    const deploymentBrand = await getCurrentDeploymentBrand()
+    const breadcrumb = deploymentBrand ? <Wi300Breadcrumb title={course.name_lop} /> : undefined
 
     // coursePage đã được lấy song song ở trên cùng các query khác
     if (effectiveCoursePage && (effectiveCoursePage as any).useTemplate !== false) {
@@ -203,6 +209,7 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
             <>
                 {notificationEntry}
                 <CoursePageView
+                    wi300Breadcrumb={breadcrumb}
                     coursePage={effectiveCoursePage as any}
                     course={course}
                     enrollment={enrollment}
@@ -221,6 +228,8 @@ export default async function KhoaHocPage({ params, searchParams }: PageProps) {
     return (
         <>
             {notificationEntry}
+            {deploymentBrand && <Wi300Header />}
+            {breadcrumb}
             <CourseLandingClient
                 course={course}
                 lessons={lessons}

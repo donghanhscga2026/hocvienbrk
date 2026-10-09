@@ -23,7 +23,7 @@ import { websiteTheme, normalizeWebsitePalette } from '@/lib/website/theme'
 import { getCurrentSiteProfile, getSiteRuntimeConfig } from "@/lib/site-profile/runtime";
 import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import { Wi300BrandProvider } from '@/components/wi300/Wi300BrandContext'
-import Wi300Header from '@/components/wi300/Wi300Header'
+import Wi300Shell from '@/components/wi300/Wi300Shell'
 
 // [OPTIMIZE] font-thin/extralight/light (100/200/300) không có class Tailwind
 // nào trong toàn bộ codebase dùng tới (đã kiểm bằng grep) — bỏ để giảm số file
@@ -46,11 +46,12 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   const brand = await getCurrentDeploymentBrand()
   if (brand) return {
-    title: { default: `${brand.name} | ${brand.tagline}`, template: `%s | ${brand.name}` },
+    metadataBase: new URL(`https://${(await headers()).get('host') || 'wi300.vn'}`),
+    title: { default: brand.seoTitle, template: `%s | ${brand.name}` },
     description: brand.description, applicationName: brand.name,
     icons: { icon: brand.iconUrl, apple: brand.iconUrl }, manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, title: brand.name, statusBarStyle: 'default' },
-    openGraph: { title: brand.name, description: brand.description, siteName: brand.name, images: [brand.logoUrl] },
+    openGraph: { title: brand.seoTitle, description: brand.description, siteName: brand.name, images: [brand.ogImageUrl] },
   }
   const profile = await getCurrentSiteProfile()
   const runtimeConfig = profile ? getSiteRuntimeConfig(profile) : null
@@ -69,7 +70,7 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: { capable: true, title: brandName, statusBarStyle: 'default' },
     icons: runtimeConfig?.branding.faviconUrl
       ? { icon: runtimeConfig.branding.faviconUrl, apple: runtimeConfig.branding.faviconUrl }
-      : { apple: '/pwa/apple-touch-icon.png' },
+      : { icon: '/favicon.ico', apple: '/pwa/apple-touch-icon.png' },
     description,
     openGraph: {
       title,
@@ -142,7 +143,7 @@ export default async function RootLayout({
     const theme = websiteTheme(brand.palette.primary, brand.palette.background, brand.palette)
     const session = await getSession()
     // Bảng màu riêng lấy từ server, không dùng lựa chọn theme đã lưu của web cũ.
-    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Header />{children}<AccountAssistantTrigger /></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
+    return <html lang="vi" data-website-theme="light" data-site-variant="wi300" style={theme.style}><body className={`${beVietnamPro.variable} antialiased`}><Providers session={session} website attentionHighlight={{ config: DEFAULT_ATTENTION_CONFIG, items: [] }}><Wi300BrandProvider brand={brand}><PwaInstallProvider><Wi300Shell>{children}</Wi300Shell><AccountAssistantTrigger /></PwaInstallProvider></Wi300BrandProvider></Providers></body></html>
   }
   const [siteProfile, themeRows] = await Promise.all([
     getCurrentSiteProfile(),
