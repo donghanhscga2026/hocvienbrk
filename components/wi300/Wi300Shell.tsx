@@ -30,7 +30,7 @@ export default function Wi300Shell({ children }: { children: React.ReactNode }) 
   const courseOwnsShell = /^\/khoa-hoc\/[^/]+\/?$/.test(pathname) || /^\/courses\/[^/]+\/learn\/?$/.test(pathname)
   const title = defaultPageTitle(pathname)
   // Chỉ căn khung trang hệ thống mặc định; trang khóa học/template sở hữu bố cục riêng.
-  const standardPage = !!title || ['/', '/khoa-hoc', '/kham-pha', '/gioi-thieu', '/my-space', '/login', '/register', '/forgot-password'].includes(pathname)
+  const standardPage = !!title || ['/', '/khoa-hoc', '/san-pham', '/doi-tac', '/kham-pha', '/gioi-thieu', '/my-space', '/login', '/register', '/forgot-password'].includes(pathname)
   const content = title ? <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <nav aria-label="Đường dẫn trang" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-brk-muted">
       <Link href="/" className="text-brk-primary">Trang chủ</Link><span aria-hidden>/</span>

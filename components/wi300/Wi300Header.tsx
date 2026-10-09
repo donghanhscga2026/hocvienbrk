@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { BookOpen, ChevronDown, GraduationCap, Home, LayoutGrid, LogOut, Settings, Wallet } from 'lucide-react'
+import { BookOpen, ChevronDown, GraduationCap, Home, LayoutGrid, LogOut, Package, Settings, Wallet } from 'lucide-react'
 import { useWi300Brand } from './Wi300BrandContext'
 import { signOutPushCleanup } from '@/lib/web-push-client'
 import { canTeach } from '@/lib/wi300/personal-space'
@@ -40,6 +40,7 @@ export default function Wi300Header() {
   const links = [
     { href: '/', label: 'Trang chủ', icon: Home },
     { href: '/khoa-hoc', label: 'Khóa học', icon: BookOpen },
+    { href: '/san-pham', label: 'Sản phẩm', icon: Package },
   ]
   const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'
   return <><header className="sticky top-0 z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl">
@@ -66,6 +67,7 @@ export default function Wi300Header() {
             <Link href="/my-space?tab=learning" onClick={closeAccount} className={accountLink}><BookOpen className="h-4 w-4" aria-hidden="true" />Học tập</Link>
             {canTeach(session.user.role) && <Link href="/my-space?tab=teaching" onClick={closeAccount} className={accountLink}><GraduationCap className="h-4 w-4" aria-hidden="true" />Giảng dạy</Link>}
             <Link href="/account-settings" onClick={closeAccount} className={accountLink}><Settings className="h-4 w-4" aria-hidden="true" />Cài đặt</Link>
+            <Link href="/doi-tac" onClick={closeAccount} className={accountLink}><GraduationCap className="h-4 w-4" aria-hidden="true" />Đăng ký đối tác</Link>
             <button type="button" onClick={() => { closeAccount(); openWallet() }} className={`${accountLink} w-full text-left`}><Wallet className="h-4 w-4" aria-hidden="true" />Ví Wi</button>
             <InstallAppButton appName={brand.name} className="w-full hover:bg-brk-background" onBeforeOpen={closeAccount} />
             <button type="button" className={`${accountLink} w-full border-t border-brk-outline text-left`} onClick={async () => { closeAccount(); await signOutPushCleanup(); await signOut({ callbackUrl: '/' }) }}><LogOut className="h-4 w-4" aria-hidden="true" />Đăng xuất</button>
