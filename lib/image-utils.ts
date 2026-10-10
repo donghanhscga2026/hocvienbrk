@@ -151,7 +151,8 @@ function isAlreadyStoredUrl(url: string): boolean {
  */
 export async function resolveImageUrl(
     url: string | null | undefined,
-    subDir: string
+    subDir: string,
+    options: { mirrorExternal?: boolean } = {}
 ): Promise<string | null> {
     if (!url) return null;
     const trimmed = url.trim();
@@ -172,6 +173,12 @@ export async function resolveImageUrl(
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return trimmed;
     if (isBlockedHost(parsed.hostname)) return trimmed;
+
+    // Some high-traffic public images (notably course covers) can intentionally
+    // remain on a trusted external host. This avoids duplicating the asset in
+    // Supabase Storage and avoids Supabase Cached Egress for every view.
+    // Existing callers preserve the safer mirror-to-Supabase behavior by default.
+    if (options.mirrorExternal === false) return trimmed;
 
     try {
         const controller = new AbortController();
