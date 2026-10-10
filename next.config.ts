@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
+const isVercelPreview = process.env.VERCEL_ENV === "preview";
 
 const nextConfig: NextConfig = {
   // Tăng tốc phản hồi HTTP
@@ -158,7 +159,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https:",
               "connect-src 'self' https: ws: wss:",
-              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.tiktok.com https://www.facebook.com https://drive.google.com https://docs.google.com https://*.supabase.co",
+              `frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.tiktok.com https://www.facebook.com https://drive.google.com https://docs.google.com https://*.supabase.co${isVercelPreview ? " https://vercel.live" : ""}`,
               "media-src 'self' https: blob:",
               "object-src 'none'",
               "base-uri 'self'",

@@ -137,6 +137,17 @@ function RegisterForm() {
         }
     }, [prefillEmail, setValue])
 
+    // Phone-first login forwards new members directly to this existing form.
+    // The registration field stores the national part separately from +84.
+    useEffect(() => {
+        const phoneFromLogin = searchParams.get("phone")
+        if (phoneFromLogin && /^0[0-9]{9}$/.test(phoneFromLogin)) {
+            setSelectedIso("VN")
+            setValue("countryCode", "+84")
+            setValue("phone", phoneFromLogin.slice(1))
+        }
+    }, [searchParams, setValue])
+
     const countryCode = watch("countryCode")
     const formReferrerId = watch("referrerId")
     const userName = watch("name")

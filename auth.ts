@@ -10,6 +10,8 @@ import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decryptMfaSecret, verifyTotp } from "@/lib/mfa"
+import { consumeLoginOtp } from "@/lib/auth/email-login-otp"
+import { lookupLoginPhone } from "@/lib/auth/phone-login"
 import { randomBytes } from "node:crypto"
 import { activeDomain } from '@/lib/website/domains'
 import { requestHostname } from '@/lib/website/domain-shared'
@@ -83,15 +85,16 @@ export const authOptions: NextAuthConfig = {
                 identifier: { label: "Student ID / Email / Phone", type: "text" },
                 password: { label: "Password", type: "password" },
                 otp: { label: "Authenticator code", type: "text" },
+                loginOtp: { label: "Email one-time code", type: "text" },
             },
             authorize: async (credentials) => {
                 const parsedCredentials = z
-                    .object({ identifier: z.string(), password: z.string(), otp: z.string().optional() })
+                    .object({ identifier: z.string(), password: z.string().optional(), otp: z.string().optional(), loginOtp: z.string().optional() })
                     .safeParse(credentials)
 
                 if (!parsedCredentials.success) return null;
 
-                const { identifier, password, otp } = parsedCredentials.data
+                const { identifier, password, otp, loginOtp } = parsedCredentials.data
 
                 // Chặn dò mật khẩu hàng loạt: giới hạn theo identifier VÀ theo IP
                 // (IP để chặn kiểu tấn công dò tuần tự nhiều ID khác nhau từ 1 nguồn).
@@ -113,7 +116,7 @@ export const authOptions: NextAuthConfig = {
                     // Nếu không lấy được headers thì bỏ qua rate-limit thay vì chặn đăng nhập hợp lệ
                 }
 
-                let user = null;
+                let user = loginOtp ? await lookupLoginPhone(identifier) : null;
                 let potentialId = NaN;
 
                 // 1. Thử nhận diện ID thành viên (nếu chỉ chứa các ký số)
@@ -122,7 +125,7 @@ export const authOptions: NextAuthConfig = {
                     potentialId = parseInt(identifier);
                 }
 
-                if (!isNaN(potentialId) && potentialId >= 0 && potentialId < 2147483647) {
+                if (!loginOtp && !isNaN(potentialId) && potentialId >= 0 && potentialId < 2147483647) {
                     console.log(`🔍 [Auth] Đang kiểm tra đăng nhập theo ID thành viên: #${potentialId}`);
                     user = await prisma.user.findUnique({
                         where: { id: potentialId }
@@ -130,7 +133,7 @@ export const authOptions: NextAuthConfig = {
                 }
 
                 // 2. Thử nhận diện và tìm kiếm theo Số điện thoại nếu chưa tìm thấy theo ID
-                if (!user) {
+                if (!user && !loginOtp) {
                     let cleanPhone = identifier.replace(/\s/g, '');
                     // Loại bỏ các tiền tố +84, 84, 0
                     while (true) {
@@ -161,7 +164,7 @@ export const authOptions: NextAuthConfig = {
                 }
 
                 // 3. Thử tìm kiếm theo Email (nếu nhập vào có ký tự @)
-                if (!user && identifier.includes('@')) {
+                if (!user && !loginOtp && identifier.includes('@')) {
                     const normalizedEmail = identifier.toLowerCase().trim();
                     console.log(`🔍 [Auth] Đang tìm kiếm thành viên theo Email: ${normalizedEmail}`);
                     user = await prisma.user.findFirst({
@@ -185,12 +188,23 @@ export const authOptions: NextAuthConfig = {
                     } else {
                         errorCode = "PHONE_NOT_FOUND";
                     }
+                } else if (loginOtp) {
+                    // OTP email is a separate, single-use credential from password-reset codes.
+                    // MFA remains mandatory for administrators regardless of login method.
+                    if (!user.emailVerified || !/^\d{6}$/.test(loginOtp)) {
+                        isLoginFailed = true;
+                    } else if (user.role === "ADMIN" && user.mfaEnabled &&
+                        (!user.mfaSecret || !otp || !verifyTotp(decryptMfaSecret(user.mfaSecret), otp.trim()))) {
+                        isLoginFailed = true;
+                    } else if (!(await consumeLoginOtp(user.id, loginOtp))) {
+                        isLoginFailed = true;
+                    }
                 } else if (!user.password) {
                     isLoginFailed = true;
                     failReason = "Tài khoản chưa thiết lập mật khẩu (đăng nhập Google)";
                     errorCode = "NO_PASSWORD";
                 } else {
-                    const passwordsMatch = await bcrypt.compare(password, user.password);
+                    const passwordsMatch = await bcrypt.compare(password || "", user.password);
                     if (!passwordsMatch) {
                         isLoginFailed = true;
                         failReason = "Mật khẩu không chính xác";
@@ -215,7 +229,7 @@ export const authOptions: NextAuthConfig = {
                 console.log(`✅ [Auth] Đăng nhập thành công: #${validUser.id} (${validUser.email})`);
 
                 // Kiểm tra nếu dùng mật khẩu mặc định
-                const isDefault = await isDefaultPassword(validUser.password!);
+                const isDefault = loginOtp ? false : validUser.password ? await isDefaultPassword(validUser.password) : false;
                 const userAny = validUser as any;
                 
                 // Tối ưu hóa: Nếu ảnh là base64 quá lớn (> 2KB), không cho vào session để tránh lỗi Header Too Large (494)
