@@ -100,7 +100,12 @@ function LoginForm() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Không thể kiểm tra tài khoản.")
             if (!data.found) {
-                setError("Chưa tìm thấy tài khoản. Nếu bạn mới tham gia, hãy chọn Đăng ký ngay.")
+                // Reuse the existing registration form and preserve referral/redirect context.
+                const registrationParams = new URLSearchParams()
+                registrationParams.set("phone", identifier)
+                if (redirectSlug) registrationParams.set("redirect", redirectSlug)
+                if (refCode) registrationParams.set("ref", refCode)
+                router.push(`/register?${registrationParams.toString()}`)
                 return
             }
             setValue("identifier", identifier)
