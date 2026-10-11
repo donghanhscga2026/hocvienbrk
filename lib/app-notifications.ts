@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client'
 import { auth } from '@/auth'
 import prisma from '@/lib/prisma'
 import { CrmError } from '@/lib/crm/service'
+import { NOTIFICATION_PAGE_SIZE } from './notification-pagination'
 
 export async function notificationActor() {
   const session = await auth()
@@ -65,7 +66,7 @@ export function notificationHref(row: NotificationRow) {
 export async function readNotifications(actor: Actor, page: number) {
   const visible = visibleNotifications(actor)
   const [rows, stats] = await prisma.$transaction([
-    prisma.$queryRaw<NotificationRow[]>(Prisma.sql`WITH visible AS (${visible}) SELECT * FROM visible ORDER BY "notBefore" DESC, id DESC LIMIT 20 OFFSET ${(page - 1) * 20}`),
+    prisma.$queryRaw<NotificationRow[]>(Prisma.sql`WITH visible AS (${visible}) SELECT * FROM visible ORDER BY "notBefore" DESC, id DESC LIMIT ${NOTIFICATION_PAGE_SIZE} OFFSET ${(page - 1) * NOTIFICATION_PAGE_SIZE}`),
     prisma.$queryRaw<{ total: bigint; unread: bigint }[]>(Prisma.sql`WITH visible AS (${visible}) SELECT count(*) AS total, count(*) FILTER (WHERE "readAt" IS NULL) AS unread FROM visible`),
   ])
   return { notifications: rows.map(row => ({ id: row.id, title: row.title, kind: row.kind, readAt: row.readAt, createdAt: row.notBefore, href: notificationHref(row) })), total: Number(stats[0].total), unread: Number(stats[0].unread) }

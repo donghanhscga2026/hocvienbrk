@@ -150,9 +150,9 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
     </article>
   }
 
-  return <div className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-4 sm:py-8 lg:px-6"><div className="grid min-w-0 gap-5 lg:grid-cols-[210px_minmax(0,1fr)]">
-    <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>
-    <div className="min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan cá nhân' : tab === 'pages' ? 'Website & nội dung' : tabs.find(item => item.id === tab)?.label}</h1>
+  return <div className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-4 sm:py-8 lg:px-6"><div className="grid min-w-0 gap-5 lg:grid-cols-[290px_minmax(0,1fr)]">
+    <aside className="relative z-30 min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>
+    <div className="relative z-0 min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan cá nhân' : tab === 'pages' ? 'Website & nội dung' : tabs.find(item => item.id === tab)?.label}</h1>
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
       {tab === 'home' && <>
         <p className="text-sm leading-6 text-brk-muted">Chào {session?.user?.name || 'bạn'}! Theo dõi khóa học và công việc của bạn tại đây.</p>
