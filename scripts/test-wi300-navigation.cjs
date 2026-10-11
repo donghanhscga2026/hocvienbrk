@@ -43,9 +43,11 @@ async function run() {
   const personal = load('lib/wi300/personal-space.ts', { './catalog': load('lib/wi300/catalog.ts') })
   global.Node = dom.window.Node
   window.scrollTo = () => { scrollCalls++ }
+  const spaceMenu = load('components/wi300/Wi300SpaceMenu.tsx', { 'next/link': link, '@/lib/wi300/personal-space': personal })
   const Header = load('components/wi300/Wi300Header.tsx', {
     'next/link': link, 'next/image': { __esModule: true, default: ({ priority, unoptimized, ...props }) => React.createElement('img', props) },
     'next-auth/react': { useSession: () => ({ data: user ? { user } : null }), signOut: async () => { logoutCalls++ } }, 'next/navigation': { usePathname: () => pathname },
+    './Wi300SpaceMenu': spaceMenu,
     './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': { signOutPushCleanup: async () => { cleanupCalls++ } },
     '@/lib/wi300/personal-space': personal,
     '@/components/notifications/NotificationBell': { __esModule: true, default: () => React.createElement('button', { 'aria-label': 'Thông báo', className: 'min-h-11 min-w-11 shrink-0 flex items-center justify-center' }, React.createElement(require('lucide-react').Bell, { size: 22 })) },
@@ -154,6 +156,7 @@ async function run() {
   await act(async () => root.render(React.createElement(View, { coursePage: { ...coursePage, theme: { importedLayout: true } }, course: { id: 1 }, session: null, wi300Breadcrumb: React.createElement(Breadcrumb, { title: 'Khóa A' }) })))
   assert.equal(document.querySelectorAll('nav:not([aria-label])').length, 0, 'HTML import không nhận thêm menu')
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
+    './Wi300SpaceMenu': spaceMenu,
     './Wi300CourseCover': { __esModule: true, default: () => null },
     './Wi300TeachingPanel': { __esModule: true, default: () => null },
     './useCoursePageSize': { __esModule: true, default: () => 6 },

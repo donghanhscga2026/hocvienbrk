@@ -55,3 +55,46 @@ export function pendingCourseLabel(payment?: { status: string; proofImage: strin
   if (payment.status === 'PENDING' && payment.amount > 0) return 'Chờ thanh toán'
   return 'Chờ kích hoạt'
 }
+
+// Quyền menu dùng cùng quy tắc với màn công cụ; không thay thế kiểm tra ở server.
+export function canUseTool(role: string, roles: string[]) {
+  return !roles.length || roles.includes(role) || (role === 'ADMIN' && roles.some(r => ['TEACHER', 'AFFILIATE', 'STUDENT'].includes(r))) || (role === 'TEACHER' && roles.some(r => ['AFFILIATE', 'STUDENT'].includes(r)))
+}
+export function safeToolUrl(url: string) {
+  if (url.startsWith('/') && !url.startsWith('//') && !url.includes('\\')) return url
+  try { return new URL(url).protocol === 'https:' ? url : null } catch { return null }
+}
+export type SpaceShortcut = { label: string; href: string; icon?: string | null }
+export type SpaceNavGroup = { id: string; label: string; href: string; icon: string; items: SpaceShortcut[] }
+
+// Header và sidebar nhận cùng cấu trúc; mục con đi thẳng tới chức năng.
+export function spaceNavigation(role: string, tools: PersonalTool[]): SpaceNavGroup[] {
+  const loggedIn = role !== 'guest'
+  const groups: SpaceNavGroup[] = [
+    { id: 'home', label: 'Tổng quan cá nhân', href: '/my-space', icon: 'LayoutGrid', items: [
+      { label: 'Tổng quan học tập', href: '/my-space?view=learning', icon: 'BookOpen' },
+      ...(canTeach(role) ? [{ label: 'Tổng quan giảng dạy', href: '/my-space?view=teaching', icon: 'GraduationCap' }] : []),
+    ] },
+    { id: 'learning', label: 'Dành cho học viên', href: '/my-space?tab=learning', icon: 'BookOpen', items: [
+      { label: 'Khóa đang học', href: '/my-space?tab=learning&status=active', icon: 'BookOpen' },
+      { label: 'Khóa đã hoàn thành', href: '/my-space?tab=learning&status=completed', icon: 'GraduationCap' },
+      { label: 'Đăng ký chờ xử lý', href: '/my-space?tab=learning&status=pending', icon: 'CreditCard' },
+      ...(loggedIn ? [{ label: 'Yêu cầu của tôi', href: '/my-requests', icon: 'MessageCircle' }] : []),
+    ] },
+    ...(canTeach(role) ? [{ id: 'teaching', label: 'Dành cho giảng viên', href: '/my-space?tab=teaching', icon: 'GraduationCap', items: [] }] : []),
+    ...(loggedIn ? [{ id: 'affiliate', label: 'Dành cho cộng tác viên', href: '/my-space?tab=affiliate', icon: 'Link2', items: [{ label: 'Link giới thiệu & hoa hồng', href: '/tools/affiliate', icon: 'Link2' }] }] : []),
+    { id: 'tools', label: 'Công cụ & tiện ích', href: '/my-space?tab=tools', icon: 'LayoutGrid', items: [] },
+    { id: 'account', label: 'Tài khoản & cài đặt', href: '/my-space?tab=account', icon: 'UserRound', items: [
+      { label: loggedIn ? 'Cài đặt tài khoản' : 'Đăng nhập', href: loggedIn ? '/account-settings' : '/login', icon: 'Settings' },
+      { label: 'Hỗ trợ & phản hồi', href: '/support', icon: 'LifeBuoy' },
+      { label: 'Đăng ký đối tác', href: '/doi-tac', icon: 'Handshake' },
+    ] },
+    ...(role === 'ADMIN' ? [{ id: 'admin', label: 'Quản trị hệ thống', href: '/my-space?tab=admin', icon: 'ShieldCheck', items: [] }] : []),
+  ]
+  for (const tool of tools) {
+    if (!tool || !tool.isActive || !Array.isArray(tool.roles) || !tool.roles.every(r => typeof r === 'string') || !canUseTool(role, tool.roles) || typeof tool.url !== 'string' || !safeToolUrl(tool.url) || typeof tool.name !== 'string') continue
+    const group = groups.find(g => g.id === toolWorkspace(tool))
+    if (group && !group.items.some(i => i.href === tool.url)) group.items.push({ label: tool.name, href: tool.url, icon: tool.icon })
+  }
+  return groups
+}

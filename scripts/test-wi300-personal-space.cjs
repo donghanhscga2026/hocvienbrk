@@ -58,11 +58,12 @@ async function run() {
   const responsive = load('components/wi300/useCoursePageSize.ts')
   const Cover = load('components/wi300/Wi300CourseCover.tsx', { 'next/image': { __esModule: true, default: ({ fill, unoptimized, ...props }) => React.createElement('img', props) }, '@/lib/image-validation': load('lib/image-validation.ts') })
   const Teaching = load('components/wi300/Wi300TeachingPanel.tsx', { 'next/link': link, './Wi300CourseCover': Cover, './useCoursePageSize': responsive })
+  const spaceMenu = load('components/wi300/Wi300SpaceMenu.tsx', { 'next/link': link, '@/lib/wi300/personal-space': helpers })
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { role, name: 'Lucy' } } }) },
     'next/navigation': { useSearchParams: () => params, useRouter: () => ({ refresh: () => { refreshCalls++ }, push: href => { params = new URLSearchParams(href.split('?')[1]); render() } }) },
     'next/dynamic': { __esModule: true, default: () => props => { paymentProps = props; return React.createElement('div', { 'data-payment': true }, 'Payment') } },
-    '@/lib/wi300/catalog': catalog, '@/lib/wi300/personal-space': helpers,
+    '@/lib/wi300/catalog': catalog, '@/lib/wi300/personal-space': helpers, './Wi300SpaceMenu': spaceMenu,
     './Wi300CourseCover': Cover, './useCoursePageSize': responsive, './Wi300TeachingPanel': Teaching,
   })
   // Các quy tắc role giống trang tools cũ, kể cả ADMIN không tự có quyền DEVELOPER.
@@ -175,6 +176,17 @@ async function run() {
     params = new URLSearchParams('tab=tools')
     await act(async () => render())
     assert.equal(document.querySelector('a[href="/tools/backup"]'), null, 'Quản trị được tách khỏi tiện ích')
+    params = new URLSearchParams('tab=learning&status=completed')
+    await act(async () => render())
+    assert.equal(document.getElementById('learning-tab-completed').getAttribute('aria-selected'), 'true', 'Lối tắt mở thẳng khóa đã hoàn thành')
+    assert.equal(document.querySelectorAll('article').length, 1)
+    params = new URLSearchParams('tab=learning&status=pending')
+    await act(async () => render())
+    assert.equal(document.getElementById('learning-tab-pending').getAttribute('aria-selected'), 'true', 'Lối tắt mở thẳng đăng ký chờ xử lý')
+    assert.equal(document.querySelectorAll('article').length, 1)
+    params = new URLSearchParams('tab=learning&status=invalid')
+    await act(async () => render())
+    assert.equal(document.getElementById('learning-tab-active').getAttribute('aria-selected'), 'true')
   } finally { global.fetch = savedFetch }
 
   let pushed = null
