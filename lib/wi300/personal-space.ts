@@ -1,6 +1,6 @@
 import { searchText } from './catalog'
 
-export type PersonalTool = { id: number; slug?: string; name: string; url: string; roles: string[]; isActive: boolean }
+export type PersonalTool = { id: number; slug?: string; name: string; url: string; roles: string[]; isActive: boolean; icon?: string | null; description?: string | null }
 
 // Cùng điều kiện hiển thị giảng dạy ở header và dữ liệu riêng trên server.
 export function canTeach(role?: string | null) {
