@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { restoreBackup } from '@/lib/backup-service'
 import { auth } from '@/auth'
 
+// Route dùng auth() + DB nên phải render động hoàn toàn — tránh lỗi build
+// "Failed to collect page data" khi Next.js cố prerender lúc build trên Vercel.
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
     const session = await auth()
     if (session?.user?.role !== 'ADMIN') {
