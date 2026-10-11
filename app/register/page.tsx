@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense, useRef } from "react"
 import Link from "next/link"
+import AccountSupportForm from '@/components/auth/AccountSupportForm'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, ChevronDown, CheckCircle2, MessageCircle } from "lucide-react"
@@ -10,6 +11,7 @@ import { signIn } from "next-auth/react"
 import { registerUser } from "../actions/auth-actions"
 import { COUNTRY_CODES } from "@/lib/country-codes"
 import { validatePasswordStrength, PASSWORD_POLICY_MESSAGE } from "@/lib/password-policy"
+import { safeReturnPath } from '@/lib/website/domain-shared'
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 import { useEmailPrefill } from "@/hooks/useEmailPrefill"
 
@@ -38,13 +40,15 @@ function RegisterForm() {
     const searchInputRef = useRef<HTMLInputElement>(null)
     const savedPasswordRef = useRef<string>("")
     const hasAutoLoggedRef = useRef(false)
-    
+
     const router = useRouter()
     const searchParams = useSearchParams()
     const { email: prefillEmail } = useEmailPrefill()
 
     const urlRef = searchParams.get('ref')
     const redirectSlug = searchParams.get('redirect')
+    const returnPath = safeReturnPath(searchParams.get('callbackUrl'))
+    const loginHref = returnPath ? '/login?callbackUrl=' + encodeURIComponent(returnPath) : redirectSlug ? '/login?redirect=' + encodeURIComponent(redirectSlug!) : '/login'
 
     const getAffiliateRef = () => {
         if (typeof window === 'undefined') return null
@@ -219,9 +223,9 @@ function RegisterForm() {
         }
     }, [canSkip])
 
-    const filteredCountries = COUNTRY_CODES.filter(c => 
-        c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
-        c.code.includes(countrySearch) || 
+    const filteredCountries = COUNTRY_CODES.filter(c =>
+        c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        c.code.includes(countrySearch) ||
         c.iso.toLowerCase().includes(countrySearch.toLowerCase())
     )
 
@@ -272,7 +276,7 @@ function RegisterForm() {
         if (!registeredUserId) {
             setError("Không tìm thấy mã thành viên. Vui lòng đăng nhập thủ công.")
             setTimeout(() => {
-                router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
+                router.push(loginHref)
             }, 2000)
             return
         }
@@ -284,7 +288,7 @@ function RegisterForm() {
         })
 
         if (signInResult?.ok) {
-            const destination = redirectSlug ? `/${redirectSlug}` : '/'
+            const destination = returnPath || (redirectSlug ? safeReturnPath(`/${redirectSlug}`) : null) || '/'
 
             // Auto-enroll nếu đến từ trang khóa học
             if (redirectSlug?.startsWith('khoa-hoc/')) {
@@ -305,7 +309,7 @@ function RegisterForm() {
         } else {
             setError("Đăng nhập tự động thất bại. Vui lòng đăng nhập thủ công.")
             setTimeout(() => {
-                router.push(redirectSlug ? `/login?redirect=${redirectSlug}` : "/login")
+                router.push(loginHref)
             }, 2000)
         }
     }
@@ -524,8 +528,8 @@ function RegisterForm() {
                 ) : (
                     <div className="space-y-4">
                         {false && (
-                        <SocialAuthButtons 
-                            callbackUrl={redirectSlug ? `/complete-profile?redirect=${redirectSlug}` : "/complete-profile"} 
+                        <SocialAuthButtons
+                            callbackUrl={safeReturnPath(searchParams.get('callbackUrl')) ? '/complete-profile?callbackUrl=' + encodeURIComponent(safeReturnPath(searchParams.get('callbackUrl'))!) : redirectSlug ? `/complete-profile?redirect=${encodeURIComponent(redirectSlug!)}` : '/complete-profile'}
                             isLoading={isLoading}
                             onLoading={(loading) => setIsLoading(loading)}
                             buttonText="Đăng ký bằng Google"
@@ -565,7 +569,7 @@ function RegisterForm() {
                                 )}
                             </div>
                         </div>
-                        
+
                         {error && (
                             <div className="rounded-md bg-brk-accent/10 p-3 text-sm text-brk-accent border border-brk-accent/30">
                                 {error}
@@ -627,8 +631,8 @@ function RegisterForm() {
                                         className="flex w-full items-center justify-between rounded-md border border-brk-outline bg-brk-surface px-3 py-2 text-sm shadow-sm focus:border-brk-primary focus:outline-none focus:ring-1 focus:ring-brk-primary"
                                     >
                                         <div className="flex items-center gap-2 overflow-hidden">
-                                            <img 
-                                                src={`https://flagcdn.com/w20/${selectedCountry.flag}.png`} 
+                                            <img
+                                                src={`https://flagcdn.com/w20/${selectedCountry.flag}.png`}
                                                 alt={selectedCountry.iso}
                                                 className="h-3.5 w-auto flex-shrink-0"
                                             />
@@ -664,8 +668,8 @@ function RegisterForm() {
                                                                 selectedIso === c.iso ? 'bg-brk-primary/10 font-semibold text-brk-primary' : 'text-brk-on-surface'
                                                             }`}
                                                         >
-                                                            <img 
-                                                                src={`https://flagcdn.com/w20/${c.flag}.png`} 
+                                                            <img
+                                                                src={`https://flagcdn.com/w20/${c.flag}.png`}
                                                                 alt={c.iso}
                                                                 className="h-3.5 w-auto"
                                                             />
@@ -691,7 +695,7 @@ function RegisterForm() {
                                     Số điện thoại (dùng zalo/telegram là tốt nhất)
                                 </label>
                                 <input
-                                    {...register("phone", { 
+                                    {...register("phone", {
                                         required: "Vui lòng nhập số điện thoại",
                                         minLength: { value: 9, message: "Số điện thoại phải có ít nhất 9 số" },
                                         maxLength: { value: 15, message: "Tối đa 15 số" },
@@ -761,10 +765,11 @@ function RegisterForm() {
                 </div>
                 )}
 
+                <AccountSupportForm page="register" />
                 {!success && (
                     <p className="text-center text-sm text-brk-accent">
                         Đã có tài khoản?{" "}
-                        <Link href={redirectSlug ? `/login?redirect=${redirectSlug}${urlRef ? '&ref=' + urlRef : ''}` : "/login"} className="font-medium text-brk-primary hover:text-brk-primary-hover">
+                        <Link href={returnPath ? loginHref : redirectSlug ? `/login?redirect=${encodeURIComponent(redirectSlug!)}${urlRef ? '&ref=' + encodeURIComponent(urlRef) : ''}` : "/login"} className="font-medium text-brk-primary hover:text-brk-primary-hover">
                             Đăng nhập
                         </Link>
                     </p>

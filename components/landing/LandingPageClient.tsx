@@ -115,6 +115,7 @@ function LandingPageContent({ landing }: LandingPageClientProps) {
                     webinarDuration={config.webinarDuration as string | undefined}
                     spotsLeft={config.spotsLeft as number | undefined}
                     spotsTotal={config.spotsTotal as number | undefined}
+                    draftSlug={landing.slug}
                     onRegister={config.crmCapture === true ? data => submitCrmLead(landing.slug, data) : undefined}
                     ctaText={landing.ctaText}
                     ctaLink={landing.ctaLink || undefined}

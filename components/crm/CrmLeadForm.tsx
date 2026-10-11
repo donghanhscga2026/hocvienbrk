@@ -1,6 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+export function readCrmLeadDraft(slug: string) {
+  try { const data = JSON.parse(sessionStorage.getItem('crm-lead-draft:' + slug) || 'null'); return data && Date.now() - data.savedAt < 86400000 ? data.data : null } catch { return null }
+}
 export async function submitCrmLead(slug: string, data: { name: string; email: string; phone: string; website?: string; message?: string }) {
   const params = new URLSearchParams(window.location.search)
   const response = await fetch('/api/crm/capture', {
@@ -8,15 +11,22 @@ export async function submitCrmLead(slug: string, data: { name: string; email: s
     body: JSON.stringify({ ...data, slug, consent: true, utmSource: (params.get('utm_source') || '').slice(0, 100), utmCampaign: (params.get('utm_campaign') || '').slice(0, 100), referral: (params.get('ref') || '').slice(0, 100) }),
   })
   const result = await response.json()
+  if (response.status === 401) {
+    try { sessionStorage.setItem('crm-lead-draft:' + slug, JSON.stringify({ data, savedAt: Date.now() })) } catch {}
+    window.location.assign('/login?callbackUrl=' + encodeURIComponent(window.location.pathname + window.location.search + window.location.hash))
+    throw new Error('Đăng nhập để gửi. Nội dung đăng ký được giữ trong bản nháp.')
+  }
   if (!response.ok) throw new Error(result.error || 'Chưa thể đăng ký. Vui lòng thử lại.')
+  try { sessionStorage.removeItem('crm-lead-draft:' + slug) } catch {}
 }
 // Added only when the administrator enables CRM capture on a landing page.
 export default function CrmLeadForm({ slug }: { slug: string }) {
   const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [phone, setPhone] = useState(''); const [website, setWebsite] = useState('')
   const [message, setMessage] = useState('')
   const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false); const [done, setDone] = useState(false); const [error, setError] = useState('')
+  useEffect(() => { const draft = readCrmLeadDraft(slug); if (!draft) return; setName(typeof draft.name === 'string' ? draft.name : ''); setEmail(typeof draft.email === 'string' ? draft.email : ''); setPhone(typeof draft.phone === 'string' ? draft.phone : ''); setMessage(typeof draft.message === 'string' ? draft.message : '') }, [slug])
   const style = 'w-full rounded-xl border p-3 text-sm'
-  return <section className="bg-slate-50 px-4 py-10"><div className="mx-auto max-w-lg rounded-2xl border bg-white p-5 sm:p-8"><h2 className="mb-4 text-2xl font-bold">Đăng ký nhận thông tin</h2>{done ? <p role="status">Đã tiếp nhận đăng ký. Người phụ trách sẽ liên hệ với bạn.</p> : <form className="space-y-4" onSubmit={async e => { e.preventDefault(); if (!consent) return; setBusy(true); setError(''); try { await submitCrmLead(slug, { name, email, phone, website, message }); setDone(true) } catch (e) { setError(e instanceof Error ? e.message : 'Chưa thể đăng ký.') } finally { setBusy(false) } }}>
+  return <section className="bg-slate-50 px-4 py-10"><div className="mx-auto max-w-lg rounded-2xl border bg-white p-5 sm:p-8"><h2 className="mb-4 text-2xl font-bold">Đăng ký nhận thông tin</h2><p className="mb-4 text-sm text-slate-500">Cần tài khoản để gửi đăng ký và theo dõi yêu cầu. Nếu chưa đăng nhập, bạn sẽ được chuyển đến trang đăng nhập và giữ bản nháp.</p>{done ? <p role="status">Đã tiếp nhận đăng ký. Người phụ trách sẽ liên hệ với bạn.</p> : <form className="space-y-4" onSubmit={async e => { e.preventDefault(); if (!consent) return; setBusy(true); setError(''); try { await submitCrmLead(slug, { name, email, phone, website, message }); setDone(true) } catch (e) { setError(e instanceof Error ? e.message : 'Chưa thể đăng ký.') } finally { setBusy(false) } }}>
     {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     <label className="block text-sm">Họ tên<input required disabled={busy} maxLength={150} className={style} value={name} onChange={e => setName(e.target.value)} /></label>
     <label className="block text-sm">Email<input type="email" disabled={busy} maxLength={254} className={style} value={email} onChange={e => setEmail(e.target.value)} /></label>

@@ -34,6 +34,8 @@ export function safeReturnPath(raw: string|null) { return raw && raw.startsWith(
 /** Danh sách cho phép rõ ràng: chức năng mới không tự mở trên website riêng. */
 export function domainRoute(path: string, modules: DomainModules): 'page' | 'account' | 'catalog' | 'system' | 'deny' {
   if(path==='/login' || path==='/register' || path==='/forgot-password' || path==='/complete-profile' || path==='/account-settings' || /^\/reset-password\/[a-zA-Z0-9_-]+$/.test(path) || path.startsWith('/api/auth/')) return 'system'
+  if(path==='/api/account-support') return 'system'
+  if(path==='/support' || path==='/my-requests' || path==='/api/my-requests') return modules.crm ? 'system' : 'deny'
   if(path==='/api/upload/url') return 'system' // Ảnh đại diện của tài khoản đã đăng nhập.
   if(path==='/cong-cu') return 'page'
   if(/^\/ung-dung\/[a-z]+$/.test(path)) return 'page'
@@ -43,6 +45,7 @@ export function domainRoute(path: string, modules: DomainModules): 'page' | 'acc
   if(/^\/(?:khoa-hoc\/[^/]+|courses\/[^/]+(?:\/learn)?)$/.test(path)) return modules.courses ? 'system' : 'deny'
   if(path==='/api/enroll-after-register' || /^\/api\/upload\/(?:comment|lesson|payment)$/.test(path)) return modules.courses ? 'system' : 'deny'
   if(path==='/tools/crm' || /^\/api\/crm(?:\/[^/]+)?$/.test(path) || path==='/api/websites/lead') return modules.crm ? 'system' : 'deny'
+  if(/^\/tools\/crm\/course\/\d+$/.test(path)) return modules.crm && modules.courses ? 'system' : 'deny'
   if(path==='/api/websites/forms/submit') return modules.crm ? 'system' : 'deny'
   if(path==='/tools/affiliate' || /^\/api\/affiliate\/(?:dashboard|withdraw|refs|links|resolve-ref|log-click)$/.test(path)) return modules.affiliate ? 'system' : 'deny'
   if(path==='/api/user/profile' || /^\/api\/user\/\d+$/.test(path)) return 'system'

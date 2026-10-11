@@ -117,15 +117,16 @@ function ToggleCheckbox({ checked, onChange, label }: { checked: boolean; onChan
     )
 }
 
-export default function MemberRosterPanel({ members, labels, canViewPhone, courseName }: {
+export default function MemberRosterPanel({ members, labels, canViewPhone, courseName, initialStudentId }: {
     members: RosterMember[]
     labels: CourseMemberLabels
     canViewPhone: boolean
     courseName: string
+    initialStudentId?: number
 }) {
     const [display, setDisplay] = useState<DisplayToggles>({ role: true, code: true, phone: true })
     const [exportingImage, setExportingImage] = useState(false)
-    const [selectedMember, setSelectedMember] = useState<RosterMember | null>(null)
+    const [selectedMember, setSelectedMember] = useState<RosterMember | null>(() => members.find(member => member.user.id === initialStudentId) || null)
 
     const effectiveDisplay: DisplayToggles = { ...display, phone: display.phone && canViewPhone }
 
@@ -248,6 +249,7 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
                 </div>
             </div>
 
+            {initialStudentId !== undefined && !members.some(member => member.user.id === initialStudentId) && <p role="status" className="p-4 text-sm text-slate-500">Học viên không còn trong danh sách đang học. Hãy tải lại hồ sơ CRM.</p>}
             {selectedMember && (
                 <MemberDetailPanel
                     member={{
@@ -262,6 +264,7 @@ export default function MemberRosterPanel({ members, labels, canViewPhone, cours
                         days: selectedMember.days,
                         todayOrder: selectedMember.todayOrder,
                     }}
+                    initialTab={initialStudentId !== undefined ? 'history' : 'overview'}
                     onClose={() => setSelectedMember(null)}
                 />
             )}

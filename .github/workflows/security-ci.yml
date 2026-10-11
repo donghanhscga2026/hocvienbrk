@@ -54,6 +54,14 @@ jobs:
           node scripts/test-website-pages.cjs
           node scripts/test-page-crm-forms.cjs
 
+      - name: CRM requests and personal space regression checks
+        run: |
+          node scripts/test-crm-request-workflow.cjs
+          node scripts/test-crm-request-ui.cjs
+          node scripts/test-crm-course-links.cjs
+          node scripts/test-wi300-personal-space.cjs
+          node scripts/test-wi300-navigation.cjs
+
       - name: TypeScript check
         run: npx tsc --noEmit
 

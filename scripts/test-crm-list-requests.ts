@@ -27,7 +27,7 @@ async function testNew(db: PrismaClient) {
   const comment = await db.lessonComment.create({ data: { userId: 9003, lessonId: lessons[0].id, content: 'Question' } })
   const payload = { key: randomUUID(), courseId: ca.id, lessonId: lessons[0].id, commentId: comment.id, content: 'Please explain', category: 'LEARNING', consent: true }
   const beforeOld = await db.lessonProgress.findMany({ where: { enrollmentId: ea.id } })
-  await deny(() => createRequest(db, payload, null, 'anon'), 403)
+  await deny(() => createRequest(db, payload, null, 'anon'), 401)
   await deny(() => createRequest(db, { ...payload, courseId: cb.id }, 9003, 'wrong'), 400)
   await deny(() => createRequest(db, payload, b.id, 'wrong-user'), 403)
   await createRequest(db, payload, 9003, 'learner')
@@ -54,13 +54,14 @@ async function testNew(db: PrismaClient) {
   check(Array.isArray(resolved.history) && resolved.history.length === 2 && resolved.status === 'RESOLVED', 'CAS updates retain prior status/results in audit history')
   check((await readRequests(db, a, 1)).requests.every(r => !('key' in r) && !('ipHash' in r) && !('history' in r)), 'List excludes private rate/idempotency metadata')
   const consult = { key: randomUUID(), courseId: ca.id, category: 'CONSULTATION', content: 'Fees?', name: 'Anonymous', email: 'learner9003@crm.invalid', phone: '', consent: true }
-  await createRequest(db, consult, null, 'consult'); await createRequest(db, consult, null, 'consult')
+  await deny(() => createRequest(db, consult, null, 'consult'), 401)
+  await createRequest(db, consult, 9003, 'consult'); await createRequest(db, consult, 9003, 'consult')
   const anonymous = await db.crmRequest.findFirstOrThrow({ where: { content: 'Fees?' } })
-  check(anonymous.userId === null && anonymous.contactId === null && anonymous.ownerId === a.id, 'Anonymous consultation never impersonates a matching login account')
+  check(anonymous.userId === 9003 && anonymous.contactId === contact.id && anonymous.ownerId === a.id, 'Consultation uses trusted session identity')
   check((await readRequests(db, a, 1, 'NEW')).total === 1, 'Unlinked consultation appears in teacher inbox')
   const landing = await db.landingPage.create({ data: { slug: 'list-request-test', title: 'Landing', template: 'hero-cta', config: { crmCapture: true } } })
   const lead = { slug: landing.slug, name: 'Lead', email: 'lead-list@crm.invalid', phone: '', consent: true, message: 'General question' }
-  await captureLead(db, lead, 'landing'); await captureLead(db, lead, 'landing')
+  await captureLead(db, lead, 'landing', 9003); await captureLead(db, lead, 'landing', 9003)
   const general = await db.crmRequest.findFirstOrThrow({ where: { content: lead.message } })
   check(general.ownerId === null && await db.crmRequest.count({ where: { content: lead.message } }) === 1, 'Landing message enters admin queue once')
   check(!(await readRequests(db, a, 1)).requests.some(r => r.id === general.id), 'General landing request is private to admin')

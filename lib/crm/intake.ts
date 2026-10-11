@@ -13,7 +13,8 @@ export const intakeInput = z.object({
   utmSource: z.string().trim().max(100).default(''), utmCampaign: z.string().trim().max(100).default(''),
   referral: z.string().trim().max(100).default(''),
 }).strict()
-export async function captureLead(db: PrismaClient, raw: unknown, address: string) {
+export async function captureLead(db: PrismaClient, raw: unknown, address: string, userId: number | null = null) {
+  if (userId == null) throw new CrmError('Vui lòng đăng nhập hoặc đăng ký để gửi yêu cầu.', 401)
   const input = intakeInput.parse(raw)
   // Honeypot submissions receive the same generic response without writing anything.
   if (input.website) return { received: true }
@@ -21,11 +22,13 @@ export async function captureLead(db: PrismaClient, raw: unknown, address: strin
   if (!keySecret) throw new CrmError('Form chưa được cấu hình.', 503)
   const hash = (value: string) => createHmac('sha256', keySecret).update(value).digest('hex')
   const data = contactFields.parse({ name: input.name, email: input.email, phone: input.phone, source: ('Landing page: ' + input.slug).slice(0, 100), needs: '', tags: [], ownerId: null, archived: false })
-  const key = hash('intake:' + input.slug + ':' + (data.email || '') + ':' + (data.phone || '') + (input.message ? ':message:' + input.message : ''))
+  const key = hash('intake:' + userId + ':' + input.slug + ':' + (data.email || '') + ':' + (data.phone || '') + (input.message ? ':message:' + input.message : ''))
   const ipHash = hash('rate:' + new Date().toISOString().slice(0, 10) + ':' + address)
   await db.$transaction(async tx => {
     // One transaction-level lock bounds global + per-address volume across instances.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420302)`
+    const user = await tx.user.findUnique({ where: { id: userId }, select: { id: true } })
+    if (!user) throw new CrmError('Vui lòng đăng nhập lại.', 401)
     const landing = await tx.landingPage.findFirst({ where: { slug: input.slug, isActive: true } })
     const config = landing?.config
     if (!landing || !config || typeof config !== 'object' || Array.isArray(config) || config.crmCapture !== true) throw new CrmError('Form chưa mở đăng ký.', 404)
@@ -43,7 +46,7 @@ export async function captureLead(db: PrismaClient, raw: unknown, address: strin
     const contact = conflict ? null : found[0] || await tx.crmContact.create({ data: { ...data, createdBy: -1 } })
     // Public inputs never link login accounts, transfer ownership or overwrite identities.
     const submission = await tx.crmSubmission.create({ data: { key, ipHash, landingId: landing.id, contactId: contact?.id, status: conflict ? 'CONFLICT' : 'RECEIVED', data: { name: data.name, email: data.email || '', phone: data.phone || '', utmSource: input.utmSource, utmCampaign: input.utmCampaign, referral: input.referral, message: input.message, consent: true } } })
-    if (input.message) await tx.crmRequest.create({ data: { key: hash('landing-request:' + key), ipHash, contactId: contact?.id, category: 'CONSULTATION', content: input.message, name: data.name, email: data.email, phone: data.phone, source: ('Landing page: ' + input.slug).slice(0, 200) } })
+    if (input.message) await tx.crmRequest.create({ data: { key: hash('landing-request:' + key), userId, ipHash, contactId: contact?.id, category: 'CONSULTATION', content: input.message, name: data.name, email: data.email, phone: data.phone, source: ('Landing page: ' + input.slug).slice(0, 200) } })
     if (contact) await tx.crmActivity.create({ data: { contactId: contact.id, type: 'FORM', authorId: -1, authorName: 'Form website', content: 'Đăng ký tại ' + landing.title + ' (yêu cầu #' + submission.id + '). Nguồn UTM: ' + input.utmSource + '; chiến dịch: ' + input.utmCampaign + '; mã giới thiệu tự khai: ' + input.referral } })
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 })
   // Do not expose existence, customer identifiers or conflict status to anonymous callers.

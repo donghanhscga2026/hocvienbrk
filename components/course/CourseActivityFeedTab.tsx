@@ -63,7 +63,7 @@ function FeedRow({ item }: { item: FeedItem }) {
     )
 }
 
-export default function CourseActivityFeedTab({ courseId }: { courseId: number }) {
+export default function CourseActivityFeedTab({ courseId, showAllActivity = false }: { courseId: number; showAllActivity?: boolean }) {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [feed, setFeed] = useState<FeedItem[]>([])
@@ -71,12 +71,12 @@ export default function CourseActivityFeedTab({ courseId }: { courseId: number }
     useEffect(() => {
         let cancelled = false
         setLoading(true)
-        getCourseActivityFeedAction(courseId).then(res => {
+        getCourseActivityFeedAction(courseId, showAllActivity ? 100 : 40).then(res => {
             if (cancelled) return
             if (res.success) {
                 const feedData = (res.feed as FeedItem[]) || []
                 const nowTime = new Date().getTime()
-                const recentFeed = feedData.filter(item => {
+                const recentFeed = showAllActivity ? feedData : feedData.filter(item => {
                     const diffDays = (nowTime - new Date(item.createdAt).getTime()) / (1000 * 3600 * 24)
                     return diffDays <= 3
                 })
@@ -86,7 +86,7 @@ export default function CourseActivityFeedTab({ courseId }: { courseId: number }
             setLoading(false)
         })
         return () => { cancelled = true }
-    }, [courseId])
+    }, [courseId, showAllActivity])
 
     return (
         <div className="flex-1 overflow-y-auto p-6">
@@ -100,6 +100,7 @@ export default function CourseActivityFeedTab({ courseId }: { courseId: number }
                 <div className="text-center text-gray-400 text-sm py-8">Chưa có hoạt động nào</div>
             ) : (
                 <div className="space-y-2">
+                    {showAllActivity && <p className="text-xs text-gray-500">Tối đa 100 hoạt động gần nhất của khóa học. Xem toàn bộ bài nộp trong hồ sơ từng học viên.</p>}
                     {feed.map(item => <FeedRow key={item.id} item={item} />)}
                 </div>
             )}
