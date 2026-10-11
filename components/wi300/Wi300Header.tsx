@@ -44,24 +44,24 @@ export default function Wi300Header() {
   ]
   const accountLink = 'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-brk-background focus-visible:outline-brk-primary'
   return <><header className="sticky top-0 z-50 shrink-0 border-b border-brk-outline bg-white/95 backdrop-blur-xl">
-    <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-2 px-4 py-2 lg:px-6">
+    <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-2 sm:px-4 lg:flex lg:justify-between lg:px-6">
       <Link href="/" aria-label={`${brand.name} — Trang chủ`} className="flex shrink-0 items-center gap-2">
-        <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-32 object-contain sm:w-44" />
+        <Image src={brand.logoUrl} alt={`${brand.name} — Liên minh 300 doanh nghiệp số, WIPA cố vấn`} width={2089} height={753} priority unoptimized className="h-auto w-24 object-contain min-[360px]:w-32 sm:w-44" />
       </Link>
-      <nav aria-label="Điều hướng chính" className="order-3 flex w-full justify-between gap-1 lg:justify-start py-1 lg:order-none lg:w-auto">
+      <nav aria-label="Điều hướng chính" className="col-span-2 row-start-2 flex w-full justify-between gap-1 lg:justify-start py-1 lg:w-auto">
         {links.map(({ href, label, icon: Icon }) => {
           const selected = path === href || (href === '/khoa-hoc' && path.startsWith('/khoa-hoc/'))
           return <Link key={href} href={href} aria-current={selected ? 'page' : undefined} className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold sm:px-2.5 sm:text-sm lg:flex-none ${selected ? 'bg-brk-background text-brk-primary' : 'text-brk-muted hover:bg-brk-background hover:text-brk-primary'}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</Link>
         })}
       </nav>
-      <div className="flex min-w-0 items-center justify-end gap-0.5 sm:gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-2">
         <Link href="/my-space" aria-current={path === '/my-space' ? 'page' : undefined} aria-label="Không gian của tôi" title="Không gian của tôi" className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-brk-outline px-2 text-[11px] font-semibold text-brk-primary hover:bg-brk-background sm:px-3 sm:text-sm"><LayoutGrid className="h-5 w-5 shrink-0" aria-hidden="true" /><span className="hidden sm:inline">Không gian của tôi</span></Link>
         {/* Cụm hành động nhanh cạnh avatar; không gọi API chia sẻ cho tới khi mở. */}
         {userId != null && <><button type="button" aria-label="Chia sẻ link affiliate" title="Chia sẻ link affiliate" onClick={() => setShowShare(true)} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brk-background"><Image src="/Share_Link_3d.png" alt="" width={32} height={32} /></button><NotificationBell /></>}
         {session?.user ? <details ref={accountRef} className="relative" onKeyDown={event => {
           if (event.key === 'Escape') { closeAccount(); accountRef.current?.querySelector('summary')?.focus() }
         }}>
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-xs font-semibold hover:bg-brk-background focus-visible:outline-brk-primary sm:px-2 sm:text-sm [&::-webkit-details-marker]:hidden" aria-label="Menu tài khoản">{session.user.image ? <Image src={session.user.image} alt="" width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded-full border-2 border-brk-primary object-cover" /> : <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brk-primary text-white">{(session.user.name || 'Tài khoản').trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span>}<span className="hidden max-w-24 truncate xl:block">{session.user.name || 'Tài khoản'}</span><ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" /></summary>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-xl px-1 text-xs font-semibold hover:bg-brk-background focus-visible:outline-brk-primary sm:px-2 sm:text-sm [&::-webkit-details-marker]:hidden" aria-label="Menu tài khoản">{session.user.image ? <Image src={session.user.image} alt="" width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded-full border-2 border-brk-primary object-cover" /> : <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brk-primary text-white">{(session.user.name || 'Tài khoản').trim().split(/\s+/).map(word => word[0]).slice(-2).join('')}</span>}<span className="hidden max-w-24 truncate xl:block">{session.user.name || 'Tài khoản'}</span><ChevronDown className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" /></summary>
           <div className="absolute right-0 top-full mt-2 max-h-[70dvh] w-60 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-brk-outline bg-white p-2 shadow-lg">
             <p className="truncate border-b border-brk-outline px-3 py-2 text-sm font-semibold">{session.user.name || 'Tài khoản'}</p>
             <Link href="/my-space?tab=learning" onClick={closeAccount} className={accountLink}><BookOpen className="h-4 w-4" aria-hidden="true" />Dành cho học viên</Link>

@@ -48,7 +48,7 @@ async function run() {
     'next-auth/react': { useSession: () => ({ data: user ? { user } : null }), signOut: async () => { logoutCalls++ } }, 'next/navigation': { usePathname: () => pathname },
     './Wi300BrandContext': { useWi300Brand: () => brand }, '@/lib/web-push-client': { signOutPushCleanup: async () => { cleanupCalls++ } },
     '@/lib/wi300/personal-space': personal,
-    '@/components/notifications/NotificationBell': { __esModule: true, default: () => React.createElement('button', { 'aria-label': 'Thông báo' }, 'Thông báo') },
+    '@/components/notifications/NotificationBell': { __esModule: true, default: () => React.createElement('button', { 'aria-label': 'Thông báo', className: 'min-h-11 min-w-11 shrink-0 flex items-center justify-center' }, React.createElement(require('lucide-react').Bell, { size: 22 })) },
     '@/components/pwa/PwaInstallProvider': { InstallAppButton: ({ appName, onBeforeOpen }) => React.createElement('button', { onClick: () => { onBeforeOpen(); installCalls++ } }, `Cài ứng dụng ${appName}`) },
     '@/components/mbw/MbwDashboardContext': { useMbwDashboard: () => ({ isOpen: walletOpen, open: () => { walletCalls++; walletOpen = true } }) },
     'next/dynamic': { __esModule: true, default: () => props => props.shareType ? React.createElement('div', { 'data-header-share': props.affiliateCode, 'data-site-name': props.siteName }, 'Share') : React.createElement('div', { 'data-wallet': props.title }) },
@@ -73,6 +73,7 @@ async function run() {
   assert.equal(document.querySelector('header button[aria-label="Chia sẻ link affiliate"]'), null)
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
   await act(async () => renderShell())
+  if (process.env.CRM_UI_SNAPSHOT_DIR) { const account = document.querySelector('header details'); account.open = true; fs.writeFileSync(path.join(process.env.CRM_UI_SNAPSHOT_DIR, 'header.html'), document.querySelector('header').outerHTML); account.open = false }
   assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
   assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
   const accountButtons = [...document.querySelectorAll('header details button')]

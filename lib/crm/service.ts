@@ -6,6 +6,7 @@ import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { projectStudent, studentIdentity, studentUserSelect } from './student-profile'
 import { learningSummaries } from './learning'
 import { requestScope } from './requests'
+import { readDashboard } from './dashboard'
 
 export class CrmError extends Error {
   constructor(message: string, public status = 400) { super(message) }
@@ -24,6 +25,7 @@ async function validateOwner(tx: Prisma.TransactionClient, actor: CrmActor, owne
 export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<typeof crmQuery>) {
   assertActor(actor)
   const scope = contactScope(actor)
+  if (query.view === 'overview') return readDashboard(db, actor)
   if (query.view === 'owners') {
     const owners = await db.user.findMany({
       where: actor.role === 'ADMIN' ? { role: { in: ['ADMIN', 'TEACHER', 'INSTRUCTOR'] } } : { id: actor.id },
@@ -75,6 +77,11 @@ export async function readCrm(db: PrismaClient, actor: CrmActor, query: z.infer<
   if (query.tag) where.tags = { has: query.tag }
   if (query.stage) where.opportunities = { some: { stage: query.stage } }
   // Lọc trước khi phân trang, luôn giữ nguyên phạm vi quyền của giáo viên.
+  if (query.group === 'attention') where.AND = [scope, { OR: [
+    { requests: { some: { AND: [requestScope(actor)], status: { not: 'RESOLVED' } } } },
+    { tasks: { some: { completedAt: null } } },
+    { opportunities: { some: { stage: { notIn: ['WON', 'LOST'] } } } },
+  ] }]
   if (query.group === 'students') {
     const enrollment = { some: actor.role === 'ADMIN' ? {} : { course: { teacherId: actor.id } } }
     where.AND = [scope, { OR: [
@@ -147,6 +154,7 @@ export async function writeCrm(db: PrismaClient, actor: CrmActor, command: CrmCo
     }
     if (command.action === 'contact.update') {
       if (contact.version !== command.version) throw new CrmError('Hồ sơ đã được cập nhật ở nơi khác. Hãy tải lại trước khi lưu.', 409)
+      if ((contact.studentProfile || contact.linkedUserId != null) && contact.name !== command.data.name) throw new CrmError('Tên của hồ sơ liên kết tài khoản không được sửa trong CRM.', 409)
       if (contact.studentProfile) {
         const identity = contact.studentUser ? studentIdentity(contact.studentUser) : { email: null, phone: null }
         if (command.data.ownerId !== contact.ownerId || command.data.email !== identity.email || command.data.phone !== identity.phone) throw new CrmError('Hồ sơ học viên giữ giáo viên và định danh từ website. Hãy tải lại nếu tài khoản đã đổi.', 409)

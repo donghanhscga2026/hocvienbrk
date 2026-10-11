@@ -84,6 +84,29 @@ async function run() {
   fake.crmRequest.count = async () => 3
   await deny(() => support.createAccountSupport(fake, { ...guest, key: crypto.randomUUID() }, 'isolated'), 429)
   ok(row.id === guestId, 'Rate limit prevents extra guest requests')
+  const dashboard = load('lib/crm/dashboard'), queried = []
+  const dashboardDb = Object.fromEntries(['crmRequest', 'crmTask'].map(model => [model, {
+    count: async args => { queried.push({ model, kind: 'count', ...args }); return 42 },
+    findMany: async args => { queried.push({ model, kind: 'list', ...args }); return [] },
+  }]))
+  const result = await dashboard.readDashboard(dashboardDb, teacher, new Date('2026-10-11T18:00:00Z'))
+  ok(result.stats.newRequests === 42 && result.queue.length === 0, 'Dashboard aggregates independently of bounded lists')
+  ok(queried.filter(q => q.model === 'crmRequest').every(q => q.where.AND[0].ownerId === teacher.id && q.where.AND[0].OR.some(rule => rule.course?.teacherId === teacher.id)), 'Every request count and list retains assignment and course scope')
+  ok(queried.filter(q => q.model === 'crmTask').every(q => q.where.contact.ownerId === teacher.id && q.where.contact.archived === false), 'Every task count and list retains contact scope and excludes archived contacts')
+  ok(queried.filter(q => q.kind === 'count').every(q => q.take === undefined && q.skip === undefined), 'Counts are not limited by contact pagination')
+  ok(queried.filter(q => q.kind === 'list').every(q => q.take <= 6 && q.select && !q.select.email && !q.select.phone && !q.select.history), 'Queues are bounded and do not expose identity or internal notes')
+  const today = queried.find(q => q.model === 'crmTask' && q.kind === 'count' && q.where.dueAt?.gte)
+  ok(today.where.dueAt.gte.toISOString() === '2026-10-11T17:00:00.000Z' && today.where.dueAt.lt.toISOString() === '2026-10-12T17:00:00.000Z', 'Today follows Vietnam date even when UTC date differs')
+  const countBefore = queried.length
+  await deny(() => dashboard.readDashboard(dashboardDb, { id: 3, role: 'STUDENT', name: 'Student' }), 403)
+  ok(queried.length === countBefore, 'Unauthorized role executes no dashboard query')
+  queried.length = 0
+  await dashboard.readDashboard(dashboardDb, admin)
+  ok(queried.filter(q => q.model === 'crmRequest').every(q => Object.keys(q.where.AND[0]).length === 0), 'Admin id zero can read authorized global scope')
+  const service = load('lib/crm/service'), validation = load('lib/crm/validation')
+  const contact = { id: 12, version: 1, name: 'Account identity', linkedUserId: 3, studentProfile: false, archived: false }
+  const tx = { crmContact: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => contact, update: async () => { throw new Error('Unexpected identity write') } } }
+  await deny(() => service.writeCrm({ $transaction: operation => operation(tx) }, admin, validation.crmCommand.parse({ action: 'contact.update', contactId: 12, version: 1, data: { name: 'Changed identity', email: 'member@example.com', phone: '', source: 'Website', needs: '', tags: [], ownerId: null, archived: false } })), 409)
   console.log(JSON.stringify({ result: 'passed', assertions: checks, scope: 'Isolated mocks; no production database writes' }))
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })
