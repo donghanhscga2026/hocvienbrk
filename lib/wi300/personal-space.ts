@@ -27,6 +27,19 @@ export function isContentTool(tool: PersonalTool) {
 export function toolGroup(tool: PersonalTool) {
   return toolGroups.find(group => group.slugs.includes(tool.slug || '') || group.slugs.includes(routeSlug(tool)))?.id || 'other'
 }
+
+// Phân khu chỉ sắp xếp điều hướng; quyền công cụ vẫn được kiểm tra riêng.
+export function toolWorkspace(tool: PersonalTool) {
+  const slug = routeSlug(tool) || tool.slug || ''
+  if (slug === 'dev-flow') return 'tools'
+  if (tool.roles.length && tool.roles.every(role => ['ADMIN', 'DEVELOPER'].includes(role))) return 'admin'
+  if (['roadmap', 'my-learning'].includes(slug)) return 'learning'
+  if (['affiliate', 'genealogy'].includes(slug)) return 'affiliate'
+  if (['bank-accounts', 'vouchers', 'brk', 'ho-tro', 'account-assistant', 'assistant-guide'].includes(slug)) return 'account'
+  if (isContentTool(tool) || ['courses', 'students', 'crm', 'email-mkt', 'payments'].includes(slug)) return 'teaching'
+  if (toolGroup(tool) === 'system') return 'admin'
+  return 'tools'
+}
 export function filterPersonalTools(tools: PersonalTool[], query: string, group: string) {
   const needle = searchText(query)
   return tools.filter(tool => (!group || toolGroup(tool) === group) && (!needle || searchText(`${tool.name} ${toolGroups.find(item => item.id === toolGroup(tool))?.description || ''}`).includes(needle)))

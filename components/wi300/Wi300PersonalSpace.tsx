@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { recentActiveCourses } from '@/lib/wi300/catalog'
-import { canTeach, isContentTool, pendingCourseLabel, toolGroup, toolGroups, type PersonalTool } from '@/lib/wi300/personal-space'
+import { canTeach, isContentTool, pendingCourseLabel, toolGroup, toolGroups, toolWorkspace, type PersonalTool } from '@/lib/wi300/personal-space'
 import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300Home'
 
 import Wi300TeachingPanel from './Wi300TeachingPanel'
@@ -15,7 +15,7 @@ import useCoursePageSize from './useCoursePageSize'
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 type Tool = PersonalTool
 type LearningStatus = 'active' | 'completed' | 'pending'
-const spaceTabs = [{ id: 'home', label: 'Tổng quan' }, { id: 'learning', label: 'Học tập' }, { id: 'teaching', label: 'Giảng dạy' }, { id: 'tools', label: 'Công cụ' }, { id: 'pages', label: 'Website & nội dung' }, { id: 'account', label: 'Tài khoản' }]
+const spaceTabs = [{ id: 'home', label: 'Tổng quan cá nhân' }, { id: 'learning', label: 'Dành cho học viên' }, { id: 'teaching', label: 'Dành cho giảng viên' }, { id: 'affiliate', label: 'Dành cho cộng tác viên' }, { id: 'tools', label: 'Công cụ & tiện ích' }, { id: 'account', label: 'Tài khoản & cài đặt' }, { id: 'admin', label: 'Quản trị hệ thống' }]
 const box = 'rounded-2xl border border-brk-outline bg-white p-5'
 const action = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-brk-primary px-4 text-sm font-semibold text-white'
 
@@ -34,8 +34,10 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const router = useRouter()
   const role = session?.user?.role || 'guest'
   const teachingAllowed = canTeach(role)
-  const tabs = spaceTabs.filter(item => item.id !== 'teaching' || teachingAllowed)
-  const tab = tabs.some(item => item.id === params.get('tab')) ? params.get('tab')! : 'home'
+  const tabs = spaceTabs.filter(item => (item.id !== 'teaching' || teachingAllowed) && (item.id !== 'admin' || role === 'ADMIN') && (item.id !== 'affiliate' || !!session?.user))
+  // Giữ đường dẫn Website & nội dung cũ cho bookmark đã lưu.
+  const requestedTab = params.get('tab')
+  const tab = requestedTab === 'pages' ? 'pages' : tabs.some(item => item.id === requestedTab) ? requestedTab! : 'home'
   const pageSize = useCoursePageSize()
   const titleRef = useRef<HTMLHeadingElement>(null)
   const [tools, setTools] = useState<Tool[]>([])
@@ -47,6 +49,9 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
 
   useEffect(() => {
     const controller = new AbortController()
+    setToolsLoading(true)
+    setToolsError(false)
+    setTools([])
     async function load() {
       try {
         const response = await fetch('/api/tools', { signal: controller.signal })
@@ -76,11 +81,12 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   // Lọc lại theo role hiện tại ngay khi render để tránh hiện danh sách của role cũ.
   const permittedTools = tools.filter(tool => canUseTool(role, tool.roles))
   const pages = permittedTools.filter(isContentTool)
-  const otherTools = permittedTools.filter(tool => !isContentTool(tool))
+  const workspaceTools = (workspace: string) => permittedTools.filter(tool => toolWorkspace(tool) === workspace)
+  const otherTools = workspaceTools('tools')
   const availableGroups = toolGroups.filter(group => otherTools.some(tool => toolGroup(tool) === group.id))
 
   const toolList = (items: Tool[], grouped = false) => toolsLoading ? <p role="status" className={box}>Đang tải công cụ…</p> : toolsError ? <p role="alert" className={box}>Chưa tải được công cụ. Vui lòng tải lại trang.</p> : items.length ? <div className="grid gap-3 sm:grid-cols-2">{items.map(tool => {
-    const group = toolGroups.find(item => item.id === toolGroup(tool))!
+    const group = isContentTool(tool) ? { label: 'Website & nội dung', description: 'Website, trang giới thiệu, landing page và bài viết.' } : toolGroups.find(item => item.id === toolGroup(tool))!
     return <Link key={tool.id} href={safeToolUrl(tool.url)!} className={`${box} transition-shadow hover:shadow-sm`}>
       {grouped && <p className="mb-2 text-xs font-semibold text-brk-primary">{group.label}</p>}
       <span className="font-semibold">{tool.name}</span><span className="ml-2 text-brk-primary">→</span>
@@ -103,9 +109,9 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
 
   return <div className="mx-auto max-w-7xl px-4 py-8 lg:px-6"><div className="grid gap-6 md:grid-cols-[210px_minmax(0,1fr)]">
     <aside className="md:sticky md:top-40 md:self-start lg:top-24"><nav aria-label="Menu không gian cá nhân" className={`${box} flex gap-2 overflow-x-auto md:block`}><p className="mb-3 hidden text-sm font-bold text-brk-muted md:block">Không gian của tôi</p>{tabs.map(item => <Link key={item.id} href={`/my-space${item.id === 'home' ? '' : `?tab=${item.id}`}`} scroll={false} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} aria-current={tab === item.id ? 'page' : undefined} className={`block min-h-11 shrink-0 rounded-xl px-3 py-3 text-sm font-semibold ${tab === item.id ? 'bg-brk-primary text-white' : 'hover:bg-brk-background'}`}>{item.label}</Link>)}</nav></aside>
-    <div className="min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-40 text-3xl font-bold lg:scroll-mt-24">{tab === 'home' ? `Chào ${session?.user?.name || 'bạn'}!` : tabs.find(item => item.id === tab)?.label}</h1>
+    <div className="min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-40 text-3xl font-bold lg:scroll-mt-24">{tab === 'home' ? `Chào ${session?.user?.name || 'bạn'}!` : tab === 'pages' ? 'Website & nội dung' : tabs.find(item => item.id === tab)?.label}</h1>
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
-      {tab === 'home' && <><p className="text-brk-muted">Học tập, giảng dạy, công cụ và nội dung của bạn trong một không gian.</p>
+      {tab === 'home' && <><p className="text-brk-muted">Chọn khu vực phù hợp với việc bạn muốn làm. Bạn có thể vừa học tập, vừa giảng dạy và giới thiệu khóa học bằng cùng một tài khoản.</p>
         <div className={`grid items-start gap-5 ${teachingAllowed ? 'xl:grid-cols-2' : ''}`}>
           <section className={`${box} space-y-4`} aria-labelledby="space-learning-title">
             <div><h2 id="space-learning-title" className="text-xl font-bold">Học tập</h2><p className="mt-2 text-sm text-brk-muted">{active.length} đang học · {completed.length} hoàn thành · {pending.length} chờ xử lý</p></div>
@@ -114,9 +120,11 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
           </section>
           {teachingAllowed && <section className={`${box} space-y-4`} aria-labelledby="space-teaching-title"><h2 id="space-teaching-title" className="text-xl font-bold">Giảng dạy</h2><Wi300TeachingPanel courses={teachingCourses} error={teachingError} preview /></section>}
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">{tabs.filter(item => ['tools', 'pages', 'account'].includes(item.id)).map(item => <Link key={item.id} href={`/my-space?tab=${item.id}`} className={box}><h2 className="font-bold">{item.label} →</h2></Link>)}</div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{tabs.filter(item => !['home', 'learning'].includes(item.id)).map(item => <Link key={item.id} href={`/my-space?tab=${item.id}`} className={box}><h2 className="font-bold">{item.label} →</h2></Link>)}</div>
       </>}
-      {tab === 'teaching' && teachingAllowed && <Wi300TeachingPanel courses={teachingCourses} error={teachingError} />}
+      {tab === 'teaching' && teachingAllowed && <><Wi300TeachingPanel courses={teachingCourses} error={teachingError} /><section className="space-y-3"><h2 className="text-xl font-bold">Quản lý giảng dạy & kinh doanh</h2><p className="text-sm text-brk-muted">Khóa học, học viên, CRM, website và marketing theo quyền tài khoản.</p>{toolList(workspaceTools('teaching'), true)}</section></>}
+      {tab === 'affiliate' && <><p className="text-brk-muted">Quản lý link giới thiệu, hoa hồng và mạng lưới của bạn. Affiliate hiện cho phép thành viên đã đăng nhập tham gia.</p><Link href="/tools/affiliate" className={box + ' block'}><h2 className="text-lg font-bold">Link giới thiệu & hoa hồng →</h2><p className="mt-2 text-sm text-brk-muted">Xem link của tôi, hoa hồng và yêu cầu thanh toán trong khu Affiliate.</p></Link>{toolList(workspaceTools('affiliate').filter(tool => tool.url.split(/[?#]/)[0].replace(/\/$/, '') !== '/tools/affiliate'))}</>}
+      {tab === 'admin' && role === 'ADMIN' && <><p className="text-brk-muted">Các công cụ quản trị được cấp cho tài khoản của bạn.</p>{toolList(workspaceTools('admin'), true)}</>}
       {tab === 'learning' && <>
         <div role="tablist" aria-label="Trạng thái học tập" className="flex gap-2 overflow-x-auto pb-1">{learningGroups.map((group, index) => <button key={group.id} id={`learning-tab-${group.id}`} type="button" role="tab" aria-selected={learningStatus === group.id} aria-controls="learning-panel" tabIndex={learningStatus === group.id ? 0 : -1} onClick={() => { setLearningStatus(group.id); setLearningPage(1) }} onKeyDown={event => {
           const next = event.key === 'ArrowRight' ? (index + 1) % learningGroups.length : event.key === 'ArrowLeft' ? (index + learningGroups.length - 1) % learningGroups.length : event.key === 'Home' ? 0 : event.key === 'End' ? learningGroups.length - 1 : -1
@@ -127,6 +135,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
           {totalPages > 1 && <nav aria-label="Phân trang khóa học" className="flex flex-wrap items-center justify-between gap-3"><button type="button" disabled={currentPage === 1} onClick={() => setLearningPage(currentPage - 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-4 text-sm disabled:opacity-40">← Trang trước</button><p role="status" className="text-sm text-brk-muted">Trang {currentPage}/{totalPages}</p><button type="button" disabled={currentPage === totalPages} onClick={() => setLearningPage(currentPage + 1)} className="min-h-11 rounded-xl border border-brk-outline bg-white px-4 text-sm disabled:opacity-40">Trang sau →</button></nav>}
         </section>
       </>}
+      {tab === 'learning' && <section className="space-y-3"><h2 className="text-xl font-bold">Lộ trình & công cụ học tập</h2>{toolList(workspaceTools('learning'))}</section>}
       {tab === 'tools' && <><p className="text-brk-muted">Các công cụ được chia theo mục đích sử dụng và quyền tài khoản của bạn.</p>
         {/* Chỉ hiển thị nhóm có công cụ được phép dùng, giữ nguyên phân quyền. */}
         {toolsLoading || toolsError || !otherTools.length ? toolList(otherTools) : availableGroups.map(group => {
@@ -137,6 +146,8 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
           </section>
         })}
       </>}
+      {tab === 'home' && !teachingAllowed && <section className={box}><h2 className="text-lg font-bold">Bạn muốn chia sẻ chuyên môn?</h2><p className="mt-2 text-sm leading-6 text-brk-muted">Gửi hồ sơ đăng ký giảng viên. Khu quản lý giảng dạy sẽ xuất hiện khi tài khoản được cấp quyền.</p><Link href="/doi-tac" className="mt-3 inline-flex min-h-11 items-center font-semibold text-brk-primary">Đăng ký làm giảng viên →</Link></section>}
+      {tab === 'account' && <section className="space-y-3"><h2 className="text-xl font-bold">Thanh toán & quyền lợi cá nhân</h2>{toolList(workspaceTools('account'))}</section>}
       {tab === 'pages' && <><p className="text-brk-muted">Quản lý website, trang giới thiệu, landing page và bài viết.</p>{toolList(pages)}</>}
       {tab === 'account' && <section className={box}><h2 className="text-xl font-bold">Hồ sơ & bảo mật</h2><p className="mt-3 text-brk-muted">Cập nhật thông tin cá nhân, mật khẩu và tài khoản nhận thanh toán.</p><Link href="/account-settings" className="mt-4 inline-flex min-h-11 items-center font-semibold text-brk-primary">Cài đặt tài khoản →</Link><div className="mt-5 border-t border-brk-outline pt-5"><h2 className="font-bold">Hỗ trợ</h2><Link href="/tools/ho-tro" className="inline-flex min-h-11 items-center text-brk-primary">Yêu cầu hỗ trợ & theo dõi phản hồi →</Link></div></section>}
     </div>

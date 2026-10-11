@@ -34,6 +34,14 @@ async function run() {
   assert.deepEqual(helpers.filterPersonalTools(tools, 'cham soc', 'marketing').map(t => t.id), [1])
   assert.deepEqual(helpers.filterPersonalTools(tools, 'youtube', 'system'), [])
 
+  assert.equal(helpers.toolWorkspace(tools[0]), 'teaching')
+  assert.equal(helpers.toolWorkspace(tools[1]), 'tools')
+  assert.equal(helpers.toolWorkspace(tools[2]), 'teaching')
+  assert.equal(helpers.toolWorkspace(tools[3]), 'admin')
+  for (const [slug, workspace] of [['roadmap', 'learning'], ['affiliate', 'affiliate'], ['genealogy', 'affiliate'], ['bank-accounts', 'account'], ['payments', 'teaching'], ['email-mkt', 'teaching'], ['dev-flow', 'tools']]) {
+    assert.equal(helpers.toolWorkspace({ id: 20, slug, name: slug, url: `/tools/${slug}`, roles: [], isActive: true }), workspace)
+  }
+
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/my-space?tab=learning' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
   const { createRoot } = require('react-dom/client')
@@ -69,6 +77,8 @@ async function run() {
   try {
     await act(async () => render())
     assert.equal(document.querySelectorAll('article').length, 6)
+    assert.ok(document.querySelector('nav a[href="/my-space?tab=affiliate"]'))
+    assert.equal(document.querySelector('nav a[href="/my-space?tab=admin"]'), null)
     assert.match(document.querySelector('[aria-label="Phân trang khóa học"]').textContent, /Trang 1\/2/)
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Trang sau')).click())
     assert.equal(document.querySelectorAll('article').length, 2)
@@ -110,6 +120,8 @@ async function run() {
     assert.equal(document.querySelectorAll('li').length, 6)
     assert.match(document.querySelector('[aria-label="Phân trang khóa giảng dạy"]').textContent, /Trang 1\/2/)
     assert.ok(document.querySelector('a[href="/tools/courses/new?id=100"]'))
+    assert.ok(document.querySelector('a[href="/tools/crm"]'), 'CRM nằm trong khu giảng viên')
+    assert.ok(document.querySelector('a[href^="/tools/pages"]'), 'Website nằm trong khu giảng viên')
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.startsWith('Đã ẩn')).click())
     assert.equal(document.querySelectorAll('li').length, 1)
     assert.match(document.querySelector('li').textContent, /Dạy 8/)
@@ -126,6 +138,20 @@ async function run() {
     await act(async () => render())
     await act(async () => [...document.querySelectorAll('button')].find(b => b.textContent.startsWith('Đang mở')).click())
     assert.equal(document.querySelectorAll('li').length, 3, 'Giảng dạy trên điện thoại cũng ba khóa/trang')
+    params = new URLSearchParams('tab=affiliate')
+    await act(async () => render())
+    assert.ok(document.querySelector('a[href="/tools/affiliate"]'))
+    assert.equal(document.querySelector('a[href="/tools/crm"]'), null)
+    params = new URLSearchParams('tab=admin')
+    await act(async () => render())
+    assert.equal(document.querySelector('a[href="/tools/backup"]'), null, 'Giảng viên không mở quản trị bằng URL')
+    role = 'ADMIN'
+    await act(async () => render())
+    assert.ok(document.querySelector('a[href="/tools/backup"]'))
+    assert.ok(document.querySelector('nav a[href="/my-space?tab=teaching"]'))
+    params = new URLSearchParams('tab=tools')
+    await act(async () => render())
+    assert.equal(document.querySelector('a[href="/tools/backup"]'), null, 'Quản trị được tách khỏi tiện ích')
   } finally { global.fetch = savedFetch }
 
   let pushed = null
