@@ -4,6 +4,8 @@ import { headers } from 'next/headers'
 import { unstable_cache } from 'next/cache'
 import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
+import { getCurrentDeploymentBrand } from './deployment-runtime'
+import { wi300CoursePreferences, wi300CourseWhere } from '@/lib/wi300/course-visibility'
 
 import {getCourseWhereForProfile,normalizeSiteHostname} from './config'
 import {activeDomain} from '@/lib/website/domains'
@@ -108,9 +110,11 @@ export async function getCurrentSiteProfile() {
 }
 
 export async function canProfileAccessCourse(profile: RuntimeSiteProfile, courseId: number) {
+  const base = getCourseWhereForProfile(profile)
+  const scope = await getCurrentDeploymentBrand() ? wi300CourseWhere(base, await wi300CoursePreferences(prisma), false) : base
   const course = await prisma.course.findFirst({
     where: {
-      AND: [getCourseWhereForProfile(profile), {id:courseId}],
+      AND: [scope, {id:courseId}],
     },
     select: { id: true },
   })

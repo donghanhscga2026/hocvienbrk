@@ -76,6 +76,9 @@ async function run() {
   if (process.env.CRM_UI_SNAPSHOT_DIR) { const account = document.querySelector('header details'); account.open = true; fs.writeFileSync(path.join(process.env.CRM_UI_SNAPSHOT_DIR, 'header.html'), document.querySelector('header').outerHTML); account.open = false }
   assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
   assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
+  assert.ok(document.querySelector('header details a[href="/my-requests"]'))
+  assert.ok(document.querySelector('header details a[href="/support"]'))
+  assert.equal(document.querySelector('header details details').open, false, 'Secondary utilities collapse by default')
   const accountButtons = [...document.querySelectorAll('header details button')]
   assert.ok(accountButtons.some(button => button.textContent === 'Ví Wi'))
   const installButton = accountButtons.find(button => button.textContent === 'Cài ứng dụng WI300')

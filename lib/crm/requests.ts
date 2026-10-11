@@ -99,7 +99,7 @@ export async function requestSource(db: PrismaClient, actor: CrmActor, id: strin
   const submission=await db.crmFormSubmission.findFirst({where:{requestId:row.id,...(actor.role==='ADMIN'?{}:{ownerId:actor.id})},select:{definitionSnapshot:true,answers:true,formVersion:true,identityStatus:true,createdAt:true}})
   return { lesson, comment, submission }
 }
-export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string, generalContext?: { ownerId: number; source: string }) {
+export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string, generalContext?: { ownerId: number; source: string }, wi300 = false) {
   const input = requestInput.parse(raw)
   if (userId == null) throw new CrmError('Vui lòng đăng nhập hoặc đăng ký trước khi gửi yêu cầu.', 401)
   if (input.website) return { received: true }
@@ -112,7 +112,8 @@ export async function createRequest(db: PrismaClient, raw: unknown, userId: numb
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420305)`
     const user = userId == null ? null : await tx.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true } })
     if (userId != null && !user) throw new CrmError('Vui lòng đăng nhập lại.', 401)
-    const course = input.courseId == null ? null : await tx.course.findFirst({ where: { id: input.courseId, status: true }, select: { id: true, teacherId: true, teacher: { select: { role: true } } } })
+    const preference = wi300 && input.courseId != null ? await tx.systemConfig.findUnique({ where: { key: 'wi300:course-visibility:' + input.courseId }, select: { value: true } }) : null
+    const course = input.courseId == null ? null : await tx.course.findFirst({ where: { id: input.courseId, ...(preference?.value === true ? {} : { status: true }) }, select: { id: true, teacherId: true, teacher: { select: { role: true } } } })
     if (input.courseId != null && !course) throw new CrmError('Khóa học không còn nhận yêu cầu.', 404)
     const enrollment = course && user ? await tx.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } }, select: { status: true } }) : null
     if (!input.feedback && (input.category === 'LEARNING' || (input.category === 'SUPPORT' && course)) && (!user || !enrollment || !['ACTIVE', 'PENDING'].includes(enrollment.status))) throw new CrmError('Cần đăng nhập và đăng ký khóa học để gửi hỗ trợ.', 403)

@@ -18,6 +18,8 @@ import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
 import { resolveImageUrl } from "@/lib/image-utils"
 import { requireDomainCourse, requireDomainEnrollment, domainContext } from '@/lib/website/domain-context'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
+import { WI300_LEARNING_PREFIX } from '@/lib/wi300/course-visibility'
 
 /**
  * Đăng ký khóa học mới
@@ -1119,7 +1121,7 @@ export async function getBrkVndWalletBalanceAction() {
 export async function toggleHiddenFromGifts(enrollmentId: number) {
   'use server'
   const session = await auth()
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+  if (session?.user?.id == null) return { success: false, error: 'Unauthorized' }
 
   const userId = parseInt(session.user.id)
   try {
@@ -1130,6 +1132,18 @@ export async function toggleHiddenFromGifts(enrollmentId: number) {
     })
 
     if (!enrollment) return { success: false, error: 'Enrollment not found' }
+
+    if (await getCurrentDeploymentBrand()) {
+      const key = WI300_LEARNING_PREFIX + userId + ':' + enrollment.id
+      const hiddenFromGifts = await prisma.$transaction(async tx => {
+        const previous = await tx.systemConfig.findUnique({ where: { key } })
+        const hidden = previous?.value !== true
+        await tx.systemConfig.upsert({ where: { key }, create: { key, value: hidden }, update: { value: hidden } })
+        return hidden
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      revalidatePath('/my-space')
+      return { success: true, hiddenFromGifts }
+    }
 
     const updated = await prisma.enrollment.update({
       where: { id: enrollmentId },

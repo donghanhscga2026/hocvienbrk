@@ -53,6 +53,7 @@ function CoursesTab() {
     const [storedTemplates, setStoredTemplates] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [visibilityScope, setVisibilityScope] = useState("shared")
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
     const [batchLoading, setBatchLoading] = useState(false)
@@ -92,7 +93,8 @@ function CoursesTab() {
         if (res.success) {
             setCourses(res.courses || [])
             setIsAdmin(res.isAdmin || false)
-            setCurrentUserId(res.userId || null)
+            setVisibilityScope(res.visibilityScope || "shared")
+            setCurrentUserId(res.userId ?? null)
         }
         setLoading(false)
     }
@@ -283,6 +285,7 @@ function CoursesTab() {
             <div className="flex items-center justify-between mt-4">
                 <div>
                     <p className="text-gray-600 text-sm">Quản lý nội dung & học phí</p>
+                    {visibilityScope === "wi300" && <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">Ẩn/hiện tại đây chỉ áp dụng cho danh mục WI300. Website gốc và quyền học đã đăng ký giữ nguyên. Nội dung và học phí vẫn dùng chung. Khóa chưa có lựa chọn riêng sẽ dùng trạng thái hiện tại làm mặc định; sau khi ẩn/hiện trên WI300, lựa chọn này độc lập.</p>}
                 </div>
                 <Link href="/tools/courses/new" className="bg-yellow-400 text-black p-2 rounded-xl inline-flex">
                     <Plus className="w-4 h-4" />

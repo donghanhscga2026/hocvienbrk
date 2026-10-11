@@ -40,6 +40,7 @@ global.fetch = async (url, options = {}) => {
   let data
   if (options.method === 'PATCH') data = { updated: true }
   else if (String(url).includes('profileId=')) data = { profile: { id: 3, name: rows[0].name, image: null, role: 'STUDENT', learning: contacts[0].learning, teaching: [], related: [] } }
+  else if (String(url).includes('/api/crm/partners')) data = { partners: rows.slice(0, 2).map(row => ({ ...row, partner: { kind: 'BUSINESS', organization: 'Wi.Tech', expertise: 'Chuyển đổi số', proposal: 'Phối hợp tổ chức khóa học AI cho doanh nghiệp', legacy: false } })), total: 42, stats: { new: 12, unassigned: 7, moreInfo: 3, accepted: 9 } }
   else if (String(url).includes('/api/crm/requests')) data = { requests: rows, total: rows.length }
   else if (String(url).includes('/api/crm/automation')) data = { from: '2026-09-11', to: '2026-10-11', contacts: 25, verifiedPayments: 3, verifiedAmount: 1500000, sources: Array.from({ length: 12 }, (_, i) => ({ label: 'Nguồn ' + i, count: i + 1 })), owners: Array.from({ length: 15 }, (_, i) => ({ label: 'Phụ trách ' + i, count: i + 1 })), stages: [] }
   else if (String(url).includes('view=overview')) data = { stats: { newRequests: 42, processing: 7, resolved: 12, overdue: 1, today: 3, completed: 8 }, queue: rows.slice(0, 3), appointments: [], recent: rows.slice(0, 3).map(row => ({ ...row, updatedAt: row.createdAt })), generatedAt: rows[0].createdAt }
@@ -115,6 +116,14 @@ async function run() {
   snapshot('reports')
   await click(button('Xem thêm nguồn & người phụ trách'))
   ok(document.body.textContent.includes('Phụ trách 0'), 'Full report groups remain accessible on explicit expansion')
+  query = new URLSearchParams('view=partners')
+  await act(async () => root.render(React.createElement(Workspace)))
+  ok(document.querySelector('nav[aria-label="Nhóm đối tác"]'), 'Partner area has separate business/teacher/both tabs')
+  ok(document.body.textContent.includes('42 hồ sơ'), 'Partner total is whole filtered scope')
+  snapshot('partners')
+  await click(button('Đăng ký cả hai'))
+  ok(calls.at(-1).url.includes('kind=BOTH') && calls.at(-1).url.includes('page=1'), 'Partner kind changes reset pagination and query server')
+  ok(document.querySelector('a[href*="view=requests&request="]'), 'Partner opens existing handling/profile drawer through anchored request')
   await act(async () => root.unmount())
   dom.window.close()
   console.log(JSON.stringify({ result: 'passed', assertions: checks, scope: 'Real React components with isolated fetch fixtures' }))
