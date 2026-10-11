@@ -803,7 +803,7 @@ async function checkCourseRosterAccess(courseId: number) {
 
     const userId = parseInt(session.user.id)
     const isAdmin = session.user.role === Role.ADMIN
-    const isTeacher = session.user.role === Role.TEACHER
+    const isTeacher = session.user.role === Role.TEACHER || session.user.role === Role.INSTRUCTOR
 
     const course = await prisma.course.findUnique({ where: { id: courseId }, select: { teacherId: true } })
     if (!course) return { error: "Không tìm thấy khóa học" as const }

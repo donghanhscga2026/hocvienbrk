@@ -49,7 +49,7 @@ export type CrmOwner = { id: number; name: string | null; email: string }
 export type CrmTaskView = { id: number; contactId: number; title: string; dueAt: string; completedAt: string | null }
 export type CrmOpportunityView = { id: number; title: string; stage: CrmStageValue; amount: number; lostReason: string; version: number; courseId?: number | null }
 export type CrmContactView = {
-  learning?: { courseId: number; title: string; slug: string; status: string; completed: number; total: number; lastActivityAt: string | null; lastLesson: string | null }[];
+  learning?: { userId?: number; courseId: number; title: string; slug: string; status: string; completed: number; total: number; lastActivityAt: string | null; lastLesson: string | null }[];
   pendingRequests?: number;
   studentProfile?: boolean;
   id: number; name: string; email: string | null; phone: string | null; source: string; needs: string;

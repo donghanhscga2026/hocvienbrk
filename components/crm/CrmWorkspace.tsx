@@ -326,7 +326,7 @@ export default function CrmWorkspace() {
         <p className="text-xs text-slate-500">Liên hệ gần nhất: {detail.lastContactAt ? formatCrmDate(detail.lastContactAt) : 'Chưa ghi nhận'}</p>
       </section>}
       </div><div hidden={detailTab !== 'learning'} className="space-y-4">
-      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold">Học tập</h3><CrmLearning contact={detail} /><p className="text-xs text-slate-500">Bài tập, điểm số và bình luận chi tiết được xem trong khóa học.</p></section>
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold">Học tập</h3><CrmLearning contact={detail} /><p className="text-xs text-slate-500">Dùng các nút trên để mở nhật ký khóa học hoặc bài nộp của đúng học viên.</p></section>
       <CrmRequests key={'requests-' + detail.id} owners={owners} isAdmin={actor.isAdmin} contactId={detail.id} onChanged={() => setRevision(v => v + 1)} />
       </div><div hidden={detailTab !== 'consultation'} className="space-y-4">
       <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">Cơ hội tư vấn</h3>{!detail.archived && <button disabled={busy} className={secondary} onClick={() => setOpportunity('new')}><Plus size={16} />Thêm cơ hội</button>}</div>

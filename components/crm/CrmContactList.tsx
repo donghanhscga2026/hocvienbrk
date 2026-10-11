@@ -5,6 +5,11 @@ const enrollmentLabels: Record<string, string> = { PENDING: 'Chờ duyệt', ACT
 export function CrmLearning({ contact }: { contact: CrmContactView }) {
   return contact.learning?.length ? <div className="space-y-3">{contact.learning.map(course => <div key={course.courseId}>
     <a href={'/khoa-hoc/' + encodeURIComponent(course.slug)} className="font-medium text-emerald-800 underline">{course.title}</a><p className="mt-1 text-xs">{enrollmentLabels[course.status] || course.status} · {course.total ? course.completed + '/' + course.total + ' bài hoàn thành (' + Math.round(course.completed / course.total * 100) + '%)' : 'Chưa có bài học'}</p>
+    {/* Liên kết mở đúng tab; quyền khóa học và học viên được kiểm tra lại tại máy chủ. */}
+    <div className="mt-2 flex flex-wrap gap-2">
+      <a className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-3 text-xs font-medium text-emerald-800" href={'/tools/crm/course/' + course.courseId + '?view=feed'}>Xem hoạt động khóa học</a>
+      {course.status === 'ACTIVE' && course.userId !== undefined && <a className="inline-flex min-h-11 items-center rounded-xl border border-slate-200 px-3 text-xs font-medium text-emerald-800" href={'/tools/crm/course/' + course.courseId + '?view=members&student=' + course.userId}>Xem bài nộp của học viên</a>}
+    </div>
     {course.lastActivityAt && <p className="mt-1 text-xs text-slate-500">Gần nhất: {course.lastLesson} · {formatCrmDate(course.lastActivityAt)}</p>}
   </div>)}</div> : <p className="text-xs text-slate-500">Chưa có khóa liên kết trong phạm vi phụ trách.</p>
 }

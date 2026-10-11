@@ -6,6 +6,7 @@ import { CrmActor, canUseCrm, contactScope } from './shared'
 import { CrmError } from './service'
 import { PARTNER_SOURCE, FEEDBACK_SOURCE, topicScope, requestTopic, requestEvents, partnerOutcome, type RequestTopic } from './request-workflow'
 import { learningSummaries } from './learning'
+import { requestOrigin } from './request-origin'
 
 export const requestInput = z.object({
   key: z.uuid(), courseId: z.number().int().positive().optional(), lessonId: z.string().max(100).optional(), commentId: z.number().int().positive().optional(),
@@ -29,10 +30,14 @@ export async function readRequests(db: PrismaClient, actor: CrmActor, page: numb
   ])
   const contacts = await db.crmContact.findMany({ where: { AND: [contactScope(actor)], id: { in: requests.map(r => r.contactId).filter((id): id is number => id != null) } }, select: { id: true } })
   const accessible = new Set(contacts.map(c => c.id))
+  // Chỉ tra bài học gắn với những yêu cầu đã qua bộ lọc quyền, tránh đọc chéo khóa.
+  const lessonPairs = requests.filter(row => row.lessonId && row.courseId != null).map(row => ({ id: row.lessonId!, courseId: row.courseId! }))
+  const lessons = lessonPairs.length ? await db.lesson.findMany({ where: { OR: lessonPairs }, select: { id: true, courseId: true, title: true } }) : []
+  const lessonTitles = new Map(lessons.map(lesson => [lesson.courseId + ':' + lesson.id, lesson.title]))
   return { requests: requests.map(row => {
     const { key, ipHash, history, ...safe } = row
     void key; void ipHash
-    return { ...safe, topic: requestTopic(row), events: requestEvents(history), outcome: partnerOutcome(history), contactId: row.contactId != null && accessible.has(row.contactId) ? row.contactId : null }
+    return { ...safe, origin: requestOrigin(row, lessonTitles.get(row.courseId + ':' + row.lessonId) || null), topic: requestTopic(row), events: requestEvents(history), outcome: partnerOutcome(history), contactId: row.contactId != null && accessible.has(row.contactId) ? row.contactId : null }
   }), total }
 }
 export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unknown) {

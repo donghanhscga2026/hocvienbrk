@@ -14,7 +14,7 @@ export async function learningSummaries(db: PrismaClient, actor: CrmActor, conta
   }) : []
   return new Map(contacts.map(contact => [contact.id, enrollments.filter(e => e.userId === (contact.studentProfile ? contact.studentUserId : contact.linkedUserId) && (!contact.studentProfile || e.course.teacherId === contact.ownerId)).map(e => {
     const rows = progress.filter(p => p.enrollmentId === e.id && p.lesson.courseId === e.course.id)
-    return { courseId: e.course.id, title: e.course.name_lop, slug: e.course.id_khoa, status: e.status,
+    return { userId: e.userId, courseId: e.course.id, title: e.course.name_lop, slug: e.course.id_khoa, status: e.status,
       completed: rows.filter(p => p.status === 'COMPLETED').length, total: e.course._count.lessons,
       lastActivityAt: rows[0]?.updatedAt ?? null, lastLesson: rows[0]?.lesson.title ?? null,
     }

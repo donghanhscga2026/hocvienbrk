@@ -136,7 +136,7 @@ function HistoryEntry({ day, highlighted }: { day: HistoryDay; highlighted: bool
     )
 }
 
-export default function MemberDetailPanel({ member, onClose }: {
+export default function MemberDetailPanel({ member, onClose, initialTab = 'overview' }: {
     member: {
         enrollmentId: number
         name: string | null
@@ -150,6 +150,7 @@ export default function MemberDetailPanel({ member, onClose }: {
         todayOrder?: number
     }
     onClose: () => void
+    initialTab?: 'overview' | 'history'
 }) {
     const isPS = member.memberRole === 'PS'
     // Chỉ tính trong phạm vi ngày đã tới hạn của riêng người này — tránh mẫu số
@@ -157,7 +158,7 @@ export default function MemberDetailPanel({ member, onClose }: {
     const reachedDayCount = member.todayOrder != null ? Math.min(member.days.length, member.todayOrder) : member.days.length
     const completedCount = member.days.filter(d => d.order <= reachedDayCount && d.status !== 'missing').length
 
-    const [tab, setTab] = useState<'overview' | 'history'>('overview')
+    const [tab, setTab] = useState<'overview' | 'history'>(initialTab)
     const [historyLoading, setHistoryLoading] = useState(false)
     const [historyError, setHistoryError] = useState<string | null>(null)
     const [history, setHistory] = useState<HistoryDay[] | null>(null)

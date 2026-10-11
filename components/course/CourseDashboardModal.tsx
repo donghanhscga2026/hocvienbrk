@@ -32,14 +32,17 @@ export type MembersTabContext = {
  * quyền chỉnh sửa (như trang quản trị) truyền `renderMembersTab` để thay
  * bằng nội dung riêng, dùng chung đúng 1 lần fetch roster + khung modal.
  */
-export default function CourseDashboardModal({ courseId, courseName, onClose, renderMembersTab }: {
+export default function CourseDashboardModal({ courseId, courseName, onClose, renderMembersTab, initialTab = 'overview', initialStudentId, showAllActivity = false }: {
     courseId: number
     courseName: string
     onClose: () => void
     renderMembersTab?: (ctx: MembersTabContext) => ReactNode
+    initialTab?: Tab
+    initialStudentId?: number
+    showAllActivity?: boolean
 }) {
-    const [tab, setTab] = useState<Tab>('overview')
-    const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['overview']))
+    const [tab, setTab] = useState<Tab>(initialTab)
+    const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set([initialTab]))
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [members, setMembers] = useState<RosterMember[]>([])
@@ -86,12 +89,12 @@ export default function CourseDashboardModal({ courseId, courseName, onClose, re
                     <h2 className="font-bold text-sm flex items-center gap-2">
                         <LayoutDashboard className="w-4 h-4" /> Dashboard khóa học — {courseName}
                     </h2>
-                    <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/20">
+                    <button aria-label="Đóng dashboard khóa học" onClick={onClose} className="min-h-11 min-w-11 rounded-lg hover:bg-white/20">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="flex items-center gap-1 px-4 pt-3 shrink-0 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-1 overflow-x-auto px-4 pt-3 shrink-0 border-b border-gray-100 bg-white">
                     {TABS.map(t => {
                         const Icon = t.icon
                         return (
@@ -99,7 +102,7 @@ export default function CourseDashboardModal({ courseId, courseName, onClose, re
                                 key={t.key}
                                 type="button"
                                 onClick={() => selectTab(t.key)}
-                                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg transition-colors ${tab === t.key ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex shrink-0 items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-t-lg transition-colors ${tab === t.key ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-gray-600'}`}
                             >
                                 <Icon className="w-3.5 h-3.5" />
                                 {t.label}
@@ -125,12 +128,12 @@ export default function CourseDashboardModal({ courseId, courseName, onClose, re
                             <div style={{ display: tab === 'members' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
                                 {renderMembersTab
                                     ? renderMembersTab({ courseId, courseName, members, labels, canViewPhone, reload: load })
-                                    : <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} />}
+                                    : <MemberRosterPanel members={members} labels={labels} canViewPhone={canViewPhone} courseName={courseName} initialStudentId={initialStudentId} />}
                             </div>
                         )}
                         {visitedTabs.has('feed') && (
                             <div style={{ display: tab === 'feed' ? 'flex' : 'none' }} className="flex-1 flex-col min-h-0">
-                                <CourseActivityFeedTab courseId={courseId} />
+                                <CourseActivityFeedTab courseId={courseId} showAllActivity={showAllActivity} />
                             </div>
                         )}
                     </>

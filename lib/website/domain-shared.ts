@@ -45,6 +45,7 @@ export function domainRoute(path: string, modules: DomainModules): 'page' | 'acc
   if(/^\/(?:khoa-hoc\/[^/]+|courses\/[^/]+(?:\/learn)?)$/.test(path)) return modules.courses ? 'system' : 'deny'
   if(path==='/api/enroll-after-register' || /^\/api\/upload\/(?:comment|lesson|payment)$/.test(path)) return modules.courses ? 'system' : 'deny'
   if(path==='/tools/crm' || /^\/api\/crm(?:\/[^/]+)?$/.test(path) || path==='/api/websites/lead') return modules.crm ? 'system' : 'deny'
+  if(/^\/tools\/crm\/course\/\d+$/.test(path)) return modules.crm && modules.courses ? 'system' : 'deny'
   if(path==='/api/websites/forms/submit') return modules.crm ? 'system' : 'deny'
   if(path==='/tools/affiliate' || /^\/api\/affiliate\/(?:dashboard|withdraw|refs|links|resolve-ref|log-click)$/.test(path)) return modules.affiliate ? 'system' : 'deny'
   if(path==='/api/user/profile' || /^\/api\/user\/\d+$/.test(path)) return 'system'
