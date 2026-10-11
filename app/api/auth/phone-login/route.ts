@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
 import { lookupLoginPhone, validLoginPhone } from "@/lib/auth/phone-login"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null)
+    // Mã thành viên: toàn ký số, dưới 7 ký số → tra trực tiếp theo id
+    const memberIdRaw = body?.memberId
+    if (typeof memberIdRaw === "string" && /^\d{1,6}$/.test(memberIdRaw)) {
+      const user = await prisma.user.findUnique({ where: { id: parseInt(memberIdRaw, 10) } })
+      // Do not expose role, ID, email or MFA status to an unauthenticated caller.
+      return NextResponse.json({ found: Boolean(user) })
+    }
     const phone = body?.phone
     if (!validLoginPhone(phone)) return NextResponse.json({ error: "Số điện thoại không hợp lệ." }, { status: 400 })
     const ip = getClientIp(request)

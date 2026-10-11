@@ -5,7 +5,8 @@ import { signIn, signOut, useSession } from "next-auth/react"
 import { useForm } from "react-hook-form"
 import { useState, useEffect, Suspense } from "react"
 import Link from "next/link"
-import AccountSupportForm from '@/components/auth/AccountSupportForm'
+// TẠM ẨN 2026-10-11: mở lại import này khi cần hiện form hỗ trợ đăng nhập
+// import AccountSupportForm from '@/components/auth/AccountSupportForm'
 import { useWi300Brand } from '@/components/wi300/Wi300BrandContext'
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react"
@@ -25,6 +26,7 @@ function LoginForm() {
     const [phoneStep, setPhoneStep] = useState(false)
     const [loginMethod, setLoginMethod] = useState<"password" | "email">("password")
     const [showAdminMfa, setShowAdminMfa] = useState(false)
+    const [showHelp, setShowHelp] = useState(false)
     const [otpRequested, setOtpRequested] = useState(false)
     const [showNewPassword, setShowNewPassword] = useState(false)
     const [success, setSuccess] = useState<string | null>(null)
@@ -89,15 +91,25 @@ function LoginForm() {
     }, [errorCode])
 
     async function checkPhone() {
-        const identifier = (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || ""
-        if (!/^0[0-9]{9}$/.test(identifier)) {
-            setError("Vui lòng nhập số điện thoại Việt Nam hợp lệ (10 chữ số).")
+        const rawInput = (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || ""
+        // Chuẩn hóa: bỏ khoảng trắng và ký tự phân tách thường gặp
+        const identifier = rawInput.replace(/[\s.()-]/g, "")
+        if (!identifier) {
+            setError("Vui lòng nhập số điện thoại hoặc mã thành viên.")
+            return
+        }
+        // Mã thành viên: toàn ký số và dưới 7 ký số
+        const isMemberId = /^\d+$/.test(identifier) && identifier.length < 7
+        // SĐT: chấp nhận +84xxxx, 84xxxx, 0xxxxxxxxx, xxxxxxxx
+        const isPhoneLike = /^\+?[0-9]{7,15}$/.test(identifier)
+        if (!isMemberId && !isPhoneLike) {
+            setError("Vui lòng nhập số điện thoại hợp lệ hoặc mã thành viên.")
             return
         }
         setIsLoading(true)
         setError(null)
         try {
-            const res = await fetch("/api/auth/phone-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: identifier }) })
+            const res = await fetch("/api/auth/phone-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(isMemberId ? { memberId: identifier } : { phone: identifier }) })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Không thể kiểm tra tài khoản.")
             if (!data.found) {
@@ -121,9 +133,12 @@ function LoginForm() {
         setIsLoading(true)
         setError(null)
         try {
+            const rawV = (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || ""
+            const v = rawV.replace(/[\s.()-]/g, "")
+            const isMid = /^\d+$/.test(v) && v.length < 7
             const res = await fetch("/api/auth/request-login-otp", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ phone: (document.getElementById("smart-login-phone") as HTMLInputElement)?.value?.trim() || "" })
+                body: JSON.stringify(isMid ? { memberId: v } : { phone: v })
             })
             const result = await res.json()
             if (!res.ok) throw new Error(result.error || "Không thể gửi mã OTP.")
@@ -358,7 +373,7 @@ function LoginForm() {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <h1 className="text-2xl font-black text-brk-on-surface tracking-tight">{wi300 ? `Đăng nhập ${wi300.name}` : 'HỌC VIỆN BRK'}</h1>
-                    <p className="text-brk-accent text-sm mt-1">{wi300 ? 'Học tập, kết nối và khám phá cùng cộng đồng doanh nghiệp số.' : 'Đăng nhập để tiếp tục hành trình'}</p>
+                    <p className="text-brk-accent text-sm mt-1">{wi300 ? `(${wi300.name} là nền tảng vận hành của hệ sinh thái WI.CAN)` : '(WI300 là nền tảng vận hành của hệ sinh thái WI.CAN)'}</p>
                 </div>
 
                 <div className="bg-brk-background/5 backdrop-blur-sm border border-brk-outline/10 rounded-2xl p-6 space-y-5 shadow-2xl">
@@ -379,17 +394,23 @@ function LoginForm() {
                         {warning && <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-sm text-brk-on-surface">{warning}</div>}
                         {error && <div role="alert" className="rounded-lg bg-brk-accent/10 border border-brk-accent/30 p-3 text-sm text-brk-accent">{error}</div>}
                         <div>
-                            <label htmlFor="smart-login-phone" className="block text-sm font-medium text-brk-accent mb-1.5">Số điện thoại của bạn</label>
+                            <label htmlFor="smart-login-phone" className="block text-sm font-medium text-brk-accent mb-1.5">Số điện thoại của bạn hoặc mã thành viên nếu đã có</label>
                             <input id="smart-login-phone" type="tel" inputMode="tel" autoComplete="tel"
-                                disabled={phoneStep} placeholder="Nhập số điện thoại"
+                                disabled={phoneStep} placeholder="Nhập số điện thoại hoặc mã thành viên nếu đã có"
                                 className="w-full rounded-xl border border-brk-outline bg-brk-background/5 px-4 py-3 text-brk-on-surface text-sm"
                                 onKeyDown={e => { if (!phoneStep && e.key === "Enter") { e.preventDefault(); void checkPhone() } }} />
                         </div>
                         {!phoneStep ? (
-                            <button type="button" disabled={isLoading} onClick={checkPhone}
-                                className="w-full rounded-xl bg-brk-primary px-4 py-3 font-bold text-brk-on-primary disabled:opacity-50">
-                                {isLoading ? "Đang kiểm tra..." : "Kiểm tra và tiếp tục"}
-                            </button>
+                            <>
+                                <button type="button" disabled={isLoading} onClick={checkPhone}
+                                    className="w-full rounded-xl bg-brk-primary px-4 py-3 font-bold text-brk-on-primary disabled:opacity-50">
+                                    {isLoading ? "Đang kiểm tra..." : "Kiểm tra và tiếp tục"}
+                                </button>
+                                <button type="button" onClick={() => setShowHelp(true)}
+                                    className="mx-auto block text-xs text-brk-muted underline hover:text-brk-primary">
+                                    Trợ giúp
+                                </button>
+                            </>
                         ) : (
                             <>
                                 <button type="button" className="text-xs text-brk-primary underline" onClick={() => {
@@ -442,15 +463,36 @@ function LoginForm() {
                                     <button type="submit" disabled={isLoading || (loginMethod === "email" && !otpRequested)}
                                         className="w-full rounded-xl bg-brk-primary px-4 py-3 text-sm font-bold text-brk-on-primary disabled:opacity-50">{isLoading ? "Đang đăng nhập..." : "Đăng nhập"}</button>
                                 </form>
+                                <button type="button" onClick={() => setShowHelp(true)}
+                                    className="mx-auto block text-xs text-brk-muted underline hover:text-brk-primary">
+                                    Trợ giúp
+                                </button>
                             </>
                         )}
                     </div>
 
+                    {/* TẠM ẨN 2026-10-11: form hỗ trợ khi không đăng nhập/đăng ký được — bỏ comment để mở lại
                     <AccountSupportForm page="login" />
+                    */}
+                    {/* TẠM ẨN 2026-10-11: link đăng ký — bỏ comment để mở lại
                     <p className="text-center text-sm text-brk-accent">
                         Chưa có tài khoản?{' '}
                         <Link href={safeReturnPath(searchParams.get('callbackUrl')) ? '/register?callbackUrl=' + encodeURIComponent(safeReturnPath(searchParams.get('callbackUrl'))!) : redirectSlug ? `/register?redirect=${encodeURIComponent(redirectSlug)}${refCode ? '&ref=' + encodeURIComponent(refCode) : ''}` : '/register'} className="font-semibold text-brk-primary hover:text-brk-primary">Đăng ký ngay</Link>
                     </p>
+                    */}
+                    {/* MODAL TRỢ GIÚP (placeholder — thay nội dung thật sau) */}
+                    {showHelp && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowHelp(false)}>
+                            <div className="w-full max-w-sm rounded-2xl bg-brk-surface p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-base font-bold text-brk-on-surface">Trợ giúp</h3>
+                                <p className="mt-2 text-sm text-brk-muted">Nội dung hướng dẫn & hỗ trợ đang được hoàn thiện.</p>
+                                <button type="button" onClick={() => setShowHelp(false)}
+                                    className="mt-4 w-full rounded-xl bg-brk-primary px-4 py-2.5 text-sm font-bold text-brk-on-primary">
+                                    Đóng
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
