@@ -11,6 +11,7 @@ import { requireCourseAccessAction } from "@/lib/course/permissions"
 import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
+import { resolveImageUrl } from "@/lib/image-utils"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -1891,7 +1892,9 @@ export async function updateCourseAction(courseId: number, data: {
             status: data.status,
             mo_ta_ngan: data.mo_ta_ngan ?? null,
             mo_ta_dai: data.mo_ta_dai ?? null,
-            link_anh_bia: data.link_anh_bia ?? null,
+            link_anh_bia: data.link_anh_bia !== undefined
+                ? await resolveImageUrl(data.link_anh_bia, 'courses')
+                : undefined,
             link_zalo: data.link_zalo ?? null,
             phi_coc: data.phi_coc,
             feeType: data.feeType,

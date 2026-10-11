@@ -140,14 +140,25 @@ function isAlreadyStoredUrl(url: string): boolean {
     }
 }
 
+const TRUSTED_EXTERNAL_IMAGE_HOSTS = new Set([
+    'i.postimg.cc',
+    'i.imgur.com',
+    'i.ibb.co',
+    'images.unsplash.com',
+    'w.ladicdn.com',
+]);
+
+function isTrustedExternalImageUrl(url: URL): boolean {
+    return url.protocol === 'https:' && TRUSTED_EXTERNAL_IMAGE_HOSTS.has(url.hostname.toLowerCase());
+}
+
 /**
- * Với link ảnh do người dùng dán tay (postimg.cc, imgur, ibb.co...), tải ảnh
- * về, nén/resize qua sharp rồi đẩy lên Supabase Storage, trả về link Supabase
- * thay cho link ngoài. Mục đích: next/image không còn phải fetch trực tiếp
- * các host ngoài không ổn định lúc render (nguồn gốc lỗi "upstream image
- * response timed out"). Nếu tải/nén thất bại (mạng lỗi, không phải ảnh, quá
- * lớn...) thì trả lại nguyên url gốc để không chặn việc lưu dữ liệu — trang
- * quản trị vẫn lưu được, chỉ là ảnh đó sẽ còn phụ thuộc host ngoài như cũ.
+ * Với link ảnh do người dùng dán tay:
+ * - Các CDN ảnh tin cậy (i.postimg.cc, i.imgur.com, i.ibb.co, Unsplash, LadiCDN)
+ *   được giữ nguyên URL ngoài để không phát sinh Supabase Storage/Cached Egress.
+ * - Host ngoài khác vẫn được tải về, nén/resize qua sharp rồi lưu vào Supabase
+ *   để ưu tiên độ ổn định và tránh phụ thuộc vào nguồn tùy ý.
+ * Nếu tải/nén thất bại thì giữ nguyên URL gốc để không chặn việc lưu dữ liệu.
  */
 export async function resolveImageUrl(
     url: string | null | undefined,
@@ -172,6 +183,12 @@ export async function resolveImageUrl(
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return trimmed;
     if (isBlockedHost(parsed.hostname)) return trimmed;
+
+    // Trusted direct-image CDNs are kept external on purpose. This avoids copying
+    // every pasted cover image into Supabase Storage and therefore avoids Supabase
+    // Storage/Cached Egress for those images. Unknown hosts are still mirrored to
+    // Supabase for reliability and to avoid depending on arbitrary third parties.
+    if (isTrustedExternalImageUrl(parsed)) return trimmed;
 
     try {
         const controller = new AbortController();
