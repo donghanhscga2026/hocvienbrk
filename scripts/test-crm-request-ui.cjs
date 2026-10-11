@@ -2,6 +2,7 @@ const fs = require('node:fs'), path = require('node:path'), assert = require('no
 const repo = path.resolve(__dirname, '..'), cache = new Map(), { act } = React
 const dom = new JSDOM('<div id="root"></div>', { url: 'https://test.invalid/support?requestOpen=general' })
 global.window = dom.window; global.document = dom.window.document; global.sessionStorage = dom.window.sessionStorage; global.IS_REACT_ACT_ENVIRONMENT = true
+Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
 window.HTMLDialogElement.prototype.showModal = function () { this.open = true }
 window.HTMLDialogElement.prototype.close = function () { this.open = false }
 document.addEventListener('click', event => { if (event.target.closest?.('a')) event.preventDefault() })

@@ -45,6 +45,7 @@ async function run() {
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/my-space?tab=learning' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true
+  Object.defineProperty(global, 'navigator', { configurable: true, value: dom.window.navigator })
   const { createRoot } = require('react-dom/client')
   const link = { __esModule: true, default: ({ children, scroll, onNavigate, ...props }) => React.createElement('a', props, children) }
   let params = new URLSearchParams('tab=learning')
