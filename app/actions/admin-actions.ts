@@ -1390,7 +1390,7 @@ export async function getAdminCoursesAction(options?: { teacherId?: number | 'AL
         const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
         const wi300 = !!await getCurrentDeploymentBrand()
         const preferences = wi300 ? await wi300CoursePreferences(prisma) : new Map<number, boolean>()
-        return { success: true, courses: courses.map(course => ({ ...course, globalStatus: course.status, status: preferences.get(course.id) ?? course.status })), isAdmin, userId, visibilityScope: wi300 ? "wi300" : "shared" }
+        return { success: true, courses: courses.map(course => ({ ...course, globalStatus: course.status, status: wi300 ? preferences.get(course.id) ?? false : course.status })), isAdmin, userId, visibilityScope: wi300 ? "wi300" : "shared" }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 

@@ -111,7 +111,7 @@ export async function getCurrentSiteProfile() {
 
 export async function canProfileAccessCourse(profile: RuntimeSiteProfile, courseId: number) {
   const base = getCourseWhereForProfile(profile)
-  const scope = await getCurrentDeploymentBrand() ? wi300CourseWhere(base, await wi300CoursePreferences(prisma), false) : base
+  const scope = await getCurrentDeploymentBrand() ? wi300CourseWhere(base, await wi300CoursePreferences(prisma), false, [courseId]) : base
   const course = await prisma.course.findFirst({
     where: {
       AND: [scope, {id:courseId}],

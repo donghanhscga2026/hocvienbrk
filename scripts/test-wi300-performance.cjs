@@ -77,16 +77,21 @@ async function run() {
 
   let selection
   const home = load('components/wi300/Wi300Home.tsx', {
+    '@/lib/wi300/course-visibility': load('lib/wi300/course-visibility.ts'),
     '@/lib/wi300/personal-space': { canTeach: role => ['ADMIN', 'TEACHER'].includes(role) },
     'next/cache': { unstable_cache: fn => fn },
     './Wi300HomeClient': { __esModule: true, default: () => null },
     '@/lib/site-profile/runtime': { getCurrentSiteProfile: async () => ({}), getCourseWhereForProfile: () => ({ status: true, id: { in: [17] } }) },
-    '@/lib/prisma': { __esModule: true, default: { course: { findMany: async args => { selection = args; return [] } } } }
+    '@/lib/prisma': { __esModule: true, default: { systemConfig: { findUnique: async () => ({ value: true }), findMany: async () => [{ key: 'wi300:course-visibility:17', value: true }] }, course: { findMany: async args => { selection = args; return [] } }, enrollment: { findMany: async args => args.select.courseId && !args.select.id ? [{ courseId: 18 }] : [] }, user: { findUnique: async () => null } } }
   }).default
   await home({ brand: { name: 'WI300' }, session: null })
-  assert.deepEqual(selection.where, { status: true, id: { in: [17] } })
+  assert.deepEqual(selection.where, { AND: [{ id: { in: [17] } }, { id: { in: [17] } }] })
   for (const field of ['mo_ta_dai', 'file_email', 'noidung_email', 'memberLabels']) assert.equal(selection.select[field], undefined)
   for (const field of ['id', 'id_khoa', 'phi_coc', 'teacherBankAccount', 'voucherConfig', 'allowMbvDeduction', 'createdAt']) assert.ok(selection.select[field])
+
+  const space = await home({ brand: { name: 'WI300' }, session: { user: { id: '0', role: 'STUDENT' } }, view: 'space' })
+  assert.equal(space.props.accountError, false)
+  assert.deepEqual(selection.where.AND[1], { id: { in: [17, 18] } }, 'Actual personal-space loader admits enrolled courses even when hidden, including account zero')
 
   const dom = new JSDOM('<div id="root"></div>', { url: 'https://wi300.vn/' })
   global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true

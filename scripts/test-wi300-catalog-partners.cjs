@@ -8,21 +8,35 @@ function load(file, overrides = {}) {
 class CrmError extends Error { constructor(message, status = 400) { super(message); this.status = status } }
 async function run() {
   const visibility = load('lib/wi300/course-visibility.ts'), config = new Map()
-  let sharedWrites = 0
-  const db = { course: { updateMany: async () => { sharedWrites++ } }, systemConfig: {
+  let sharedWrites = 0, snapshots = 0
+  const sourceCourses = [{ id: 1, status: true }, { id: 2, status: false }, { id: 3, status: true }, { id: 5, status: false }]
+  config.set(visibility.WI300_COURSE_PREFIX + 2, true)
+  const db = { course: { findMany: async () => { snapshots++; return sourceCourses }, updateMany: async () => { sharedWrites++ } }, systemConfig: {
+    findUnique: async ({ where }) => config.has(where.key) ? { value: config.get(where.key) } : null,
+    createMany: async ({ data }) => { for (const row of data) if (!config.has(row.key)) config.set(row.key, row.value) },
     findMany: async ({ where }) => [...config].filter(([key]) => key.startsWith(where.key.startsWith)).map(([key, value]) => ({ key, value })),
     upsert: async ({ where, create, update }) => { config.set(where.key, config.has(where.key) ? update.value : create.value) },
-  }, $transaction: async promises => Promise.all(promises) }
+  }, $executeRaw: async () => {}, $transaction: async operation => typeof operation === 'function' ? operation(db) : Promise.all(operation) }
+  let initial = await visibility.wi300CoursePreferences(db)
+  assert.deepEqual([...initial].sort((a,b) => a[0]-b[0]), [[1,true],[2,true],[3,true],[5,false]], 'Snapshot preserves the existing catalog and explicit WI300 choices')
+  sourceCourses[0].status = false; sourceCourses[1].status = true; sourceCourses[3].status = true; sourceCourses.push({ id: 4, status: true })
+  initial = await visibility.wi300CoursePreferences(db)
+  assert.equal(initial.get(1), true, 'Original-site hide cannot hide WI300')
+  assert.equal(initial.get(5), false, 'Original-site show cannot publish a previously unset hidden WI300 course')
+  assert.equal(initial.has(4), false, 'New shared courses are not automatically published on WI300')
+  assert.equal(snapshots, 1, 'Initialization only copies once')
   await visibility.setWi300CourseVisibility(db, [1, 2], false)
-  assert.deepEqual([...await visibility.wi300HiddenCourses(db)], [1, 2]); assert.equal(sharedWrites, 0)
+  assert.deepEqual([...await visibility.wi300HiddenCourses(db)].sort((a,b) => a-b), [1, 2, 5]); assert.equal(sharedWrites, 0)
   await visibility.setWi300CourseVisibility(db, [2], true)
   const preferences = await visibility.wi300CoursePreferences(db)
   const scope = { status: true, teacherId: { in: [3] } }
   const catalog = visibility.wi300CourseWhere(scope, preferences)
   assert.deepEqual(catalog.AND[0], { teacherId: { in: [3] } }, 'Teacher/category/site isolation is preserved')
-  assert.deepEqual(catalog.AND[1].OR[0], { status: true, id: { notIn: [1] } })
-  assert.deepEqual(catalog.AND[1].OR[1], { id: { in: [2] } }, 'Explicit WI300 show survives original-site hide')
-  assert.deepEqual(visibility.wi300CourseWhere(scope, preferences, false).AND[1].OR[0].id.notIn, [], 'Catalog hide does not revoke learning access')
+  assert.deepEqual(catalog.AND[1], { id: { in: [2, 3] } }, 'Catalog has no fallback to shared status')
+  assert.deepEqual(visibility.wi300CourseWhere(scope, preferences, false, [1]).AND[1], { id: { in: [2, 3, 1] } }, 'Verified enrollment retains access to hidden courses')
+  assert.deepEqual(visibility.wi300CourseWhere(scope, preferences, false).AND[1], catalog.AND[1], 'Unenrolled users cannot bypass catalog hiding')
+  sourceCourses[0].status = true
+  assert.equal((await visibility.wi300CoursePreferences(db)).get(1), false, 'Original-site show cannot show WI300')
   assert.deepEqual(scope, { status: true, teacherId: { in: [3] } }, 'Original site scope is not mutated')
   config.set('wi300:learning-hidden:0:7', true); config.set('wi300:learning-hidden:8:9', true)
   assert.deepEqual([...await visibility.wi300HiddenLearning(db, 0)], [7], 'Personal visibility is per account, including admin zero')
@@ -39,7 +53,7 @@ async function run() {
   }
   let brand = {}, role = 'ADMIN', session = { user: { id: '0', role: 'ADMIN' } }
   db.user = { findUnique: async () => ({ role }) }
-  db.course.findMany = async () => [{ id: 1, status: true }, { id: 2, status: false }]
+  db.course.findMany = async () => [{ id: 1, status: true }, { id: 2, status: false }, { id: 4, status: true }]
   const admin = actions('app/actions/admin-actions.ts', ['getAdminCoursesAction', 'bulkToggleCourseStatusAction', 'bulkUpdateCoursesOptionsAction'], {
     auth: async () => session, prisma: db, Role: { ADMIN: 'ADMIN', TEACHER: 'TEACHER', INSTRUCTOR: 'INSTRUCTOR' },
     getCurrentDeploymentBrand: async () => brand, setWi300CourseVisibility: visibility.setWi300CourseVisibility, wi300CoursePreferences: visibility.wi300CoursePreferences,
@@ -52,8 +66,11 @@ async function run() {
   let management = await admin.getAdminCoursesAction({ teacherId: 'ALL' })
   assert.equal(management.courses[0].status, false); assert.equal(management.courses[1].status, true)
   assert.equal(management.visibilityScope, 'wi300')
+  assert.equal(management.courses[2].status, false, 'Management shows unconfigured new courses as hidden on WI300')
   brand = null; await admin.bulkToggleCourseStatusAction([1], true)
   assert.equal(sharedWrites, 1, 'Original website retains its existing status action')
+  management = await admin.getAdminCoursesAction({ teacherId: 'ALL' })
+  assert.equal(management.courses[2].status, true, 'Original-site management still reads shared status')
   role = 'STUDENT'; brand = {}; const deniedAction = await admin.bulkToggleCourseStatusAction([1], false)
   assert.equal(deniedAction.success, false, 'Revoked role in DB overrides stale admin session')
   role = 'ADMIN'

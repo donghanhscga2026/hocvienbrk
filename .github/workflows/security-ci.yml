@@ -64,6 +64,7 @@ jobs:
           node scripts/test-wi300-navigation.cjs
           node scripts/test-wi300-partners.cjs
           node scripts/test-wi300-catalog-partners.cjs
+          node scripts/test-wi300-performance.cjs
 
       - name: TypeScript check
         run: npx tsc --noEmit
