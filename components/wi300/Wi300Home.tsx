@@ -22,7 +22,7 @@ const courseSelect = {
 
 export type Wi300Course = Prisma.CourseGetPayload<{ select: typeof courseSelect }>
 const teachingSelect = {
-  id: true, id_khoa: true, name_lop: true, status: true,
+  id: true, id_khoa: true, name_lop: true, status: true, link_anh_bia: true,
   _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' as const } } } },
 } satisfies Prisma.CourseSelect
 export type Wi300TeachingCourse = Prisma.CourseGetPayload<{ select: typeof teachingSelect }>

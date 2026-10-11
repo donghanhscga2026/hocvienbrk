@@ -27,6 +27,7 @@ async function run() {
     { id: 3, slug: 'custom-page', name: 'Trang của tôi', url: '/tools/pages?tab=my-site', roles: [], isActive: true },
     { id: 4, slug: 'backup', name: 'Sao lưu', url: '/tools/backup', roles: ['ADMIN'], isActive: true },
     { id: 5, slug: 'custom', name: 'Công cụ mới', url: '/tools/new-helper', roles: [], isActive: true },
+    { id: 6, slug: 'genealogy', name: 'Nhân Mạch', url: '/tools/genealogy', roles: [], isActive: true },
   ]
   assert.equal(helpers.isContentTool(tools[2]), true)
   assert.equal(helpers.toolGroup(tools[0]), 'marketing')
@@ -54,17 +55,18 @@ async function run() {
   const viewportListeners = new Set()
   window.matchMedia = () => ({ matches: mobile, addEventListener: (_, callback) => viewportListeners.add(callback), removeEventListener: (_, callback) => viewportListeners.delete(callback) })
   const responsive = load('components/wi300/useCoursePageSize.ts')
-  const Teaching = load('components/wi300/Wi300TeachingPanel.tsx', { 'next/link': link, './useCoursePageSize': responsive })
+  const Cover = load('components/wi300/Wi300CourseCover.tsx', { 'next/image': { __esModule: true, default: ({ fill, unoptimized, ...props }) => React.createElement('img', props) }, '@/lib/image-validation': load('lib/image-validation.ts') })
+  const Teaching = load('components/wi300/Wi300TeachingPanel.tsx', { 'next/link': link, './Wi300CourseCover': Cover, './useCoursePageSize': responsive })
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
     'next/link': link, 'next-auth/react': { useSession: () => ({ data: { user: { role, name: 'Lucy' } } }) },
-    'next/navigation': { useSearchParams: () => params, useRouter: () => ({ refresh: () => { refreshCalls++ } }) },
+    'next/navigation': { useSearchParams: () => params, useRouter: () => ({ refresh: () => { refreshCalls++ }, push: href => { params = new URLSearchParams(href.split('?')[1]); render() } }) },
     'next/dynamic': { __esModule: true, default: () => props => { paymentProps = props; return React.createElement('div', { 'data-payment': true }, 'Payment') } },
     '@/lib/wi300/catalog': catalog, '@/lib/wi300/personal-space': helpers,
-    './useCoursePageSize': responsive, './Wi300TeachingPanel': Teaching,
+    './Wi300CourseCover': Cover, './useCoursePageSize': responsive, './Wi300TeachingPanel': Teaching,
   })
   // Các quy tắc role giống trang tools cũ, kể cả ADMIN không tự có quyền DEVELOPER.
   for (const [actor, allowed, expected] of [['STUDENT', ['ADMIN'], false], ['STUDENT', [], true], ['TEACHER', ['STUDENT'], true], ['ADMIN', ['TEACHER'], true], ['ADMIN', ['DEVELOPER'], false]]) assert.equal(SpaceModule.canUseTool(actor, allowed), expected)
-  const courses = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, id_khoa: `C${i + 1}`, name_lop: `Khóa ${i + 1}` }))
+  const courses = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, id_khoa: `C${i + 1}`, name_lop: `Khóa ${i + 1}`, link_anh_bia: i === 7 ? 'https://example.com/course.png' : null }))
   const enrollments = courses.map(course => ({ courseId: course.id, status: 'ACTIVE', completedCount: 1, totalLessons: 10, hiddenFromGifts: false, lastStudiedAt: new Date(`2026-10-${String(course.id).padStart(2, '0')}T10:00:00Z`) }))
   enrollments[8].completedCount = 10
   enrollments[9].status = 'PENDING'
@@ -77,6 +79,8 @@ async function run() {
   try {
     await act(async () => render())
     assert.equal(document.querySelectorAll('article').length, 6)
+    assert.ok(document.querySelector('article img[src="https://example.com/course.png"]'))
+    assert.equal(document.querySelector('h1').textContent, 'Tổng quan cá nhân')
     assert.ok(document.querySelector('nav a[href="/my-space?tab=affiliate"]'))
     assert.equal(document.querySelector('nav a[href="/my-space?tab=admin"]'), null)
     assert.match(document.querySelector('[aria-label="Phân trang khóa học"]').textContent, /Trang 1\/2/)
@@ -115,6 +119,8 @@ async function run() {
     await act(async () => render())
     assert.equal(document.querySelector('a[href="/my-space?tab=teaching"]'), null, 'Học viên không thấy mục giảng dạy')
     assert.equal(document.querySelector('[aria-label="Trạng thái giảng dạy"]'), null, 'URL tự nhập không mở khu giảng dạy')
+    assert.equal(document.getElementById('overview-tab-teaching'), null)
+    assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'), '/my-space')
     role = 'TEACHER'
     await act(async () => render())
     assert.equal(document.querySelectorAll('li').length, 6)
@@ -127,8 +133,16 @@ async function run() {
     assert.match(document.querySelector('li').textContent, /Dạy 8/)
     params = new URLSearchParams()
     await act(async () => render())
-    assert.equal(document.querySelectorAll('[aria-labelledby="space-learning-title"] article').length, 3)
-    assert.equal(document.querySelectorAll('[aria-labelledby="space-teaching-title"] li').length, 3)
+    assert.equal(document.getElementById('overview-tab-learning').getAttribute('aria-selected'), 'true')
+    assert.equal(document.querySelectorAll('article').length, 6)
+    assert.equal(document.querySelectorAll('li').length, 0, 'Tổng quan chỉ mở một tab con')
+    assert.equal(document.querySelector('nav a[href="/my-space?tab=teaching"]'), null)
+    await act(async () => document.getElementById('overview-tab-learning').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    assert.equal(params.get('view'), 'teaching')
+    assert.equal(document.getElementById('overview-tab-teaching').getAttribute('aria-selected'), 'true')
+    assert.equal(document.activeElement.id, 'overview-tab-teaching')
+    assert.equal(document.querySelectorAll('article').length, 0)
+    assert.equal(document.querySelectorAll('li').length, 6)
     params = new URLSearchParams('tab=learning')
     await act(async () => render())
     await act(async () => { mobile = true; viewportListeners.forEach(callback => callback()) })
@@ -141,6 +155,7 @@ async function run() {
     params = new URLSearchParams('tab=affiliate')
     await act(async () => render())
     assert.ok(document.querySelector('a[href="/tools/affiliate"]'))
+    assert.equal(document.querySelector('a[href="/tools/affiliate"]').parentElement, document.querySelector('a[href="/tools/genealogy"]').parentElement, 'Affiliate và Nhân Mạch nằm cùng lưới')
     assert.equal(document.querySelector('a[href="/tools/crm"]'), null)
     params = new URLSearchParams('tab=admin')
     await act(async () => render())
@@ -148,7 +163,9 @@ async function run() {
     role = 'ADMIN'
     await act(async () => render())
     assert.ok(document.querySelector('a[href="/tools/backup"]'))
-    assert.ok(document.querySelector('nav a[href="/my-space?tab=teaching"]'))
+    params = new URLSearchParams('view=teaching')
+    await act(async () => render())
+    assert.ok(document.getElementById('overview-tab-teaching'))
     params = new URLSearchParams('tab=tools')
     await act(async () => render())
     assert.equal(document.querySelector('a[href="/tools/backup"]'), null, 'Quản trị được tách khỏi tiện ích')

@@ -73,8 +73,8 @@ async function run() {
   assert.equal(document.querySelector('header button[aria-label="Chia sẻ link affiliate"]'), null)
   user = { id: '42', name: 'Lucy', role: 'STUDENT' }
   await act(async () => renderShell())
-  assert.ok(document.querySelector('header details a[href="/my-space?tab=learning"]'))
-  assert.equal(document.querySelector('header details a[href="/my-space?tab=teaching"]'), null)
+  assert.ok(document.querySelector('header details a[href="/my-space?view=learning"]'))
+  assert.equal(document.querySelector('header details a[href="/my-space?view=teaching"]'), null)
   const accountButtons = [...document.querySelectorAll('header details button')]
   assert.ok(accountButtons.some(button => button.textContent === 'Ví Wi'))
   const installButton = accountButtons.find(button => button.textContent === 'Cài ứng dụng WI300')
@@ -100,7 +100,7 @@ async function run() {
   assert.equal(document.querySelector('[data-wallet]').dataset.wallet, 'Ví Wi')
   user.role = 'TEACHER'
   await act(async () => renderShell())
-  assert.ok(document.querySelector('header details a[href="/my-space?tab=teaching"]'))
+  assert.ok(document.querySelector('header details a[href="/my-space?view=teaching"]'))
   const details = document.querySelector('header details')
   details.open = true
   await act(async () => details.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
@@ -150,6 +150,7 @@ async function run() {
   await act(async () => root.render(React.createElement(View, { coursePage: { ...coursePage, theme: { importedLayout: true } }, course: { id: 1 }, session: null, wi300Breadcrumb: React.createElement(Breadcrumb, { title: 'Khóa A' }) })))
   assert.equal(document.querySelectorAll('nav:not([aria-label])').length, 0, 'HTML import không nhận thêm menu')
   const SpaceModule = load('components/wi300/Wi300PersonalSpace.tsx', {
+    './Wi300CourseCover': { __esModule: true, default: () => null },
     './Wi300TeachingPanel': { __esModule: true, default: () => null },
     './useCoursePageSize': { __esModule: true, default: () => 6 },
     'next/dynamic': { __esModule: true, default: () => () => null },
@@ -167,9 +168,9 @@ async function run() {
   global.fetch = async () => ({ ok: true, json: async () => ({ tools: [] }) })
   try {
     await act(async () => root.render(React.createElement(SpaceModule.default, { courses: courses.map(c => ({ ...c, name_lop: `Khóa ${c.id}` })), enrollments: rows, userId: 1, userPhone: null, accountError: false })))
-    assert.match(document.querySelector('h1').textContent, /Dành cho học viên/)
+    assert.match(document.querySelector('h1').textContent, /Tổng quan cá nhân/)
     assert.equal(document.querySelectorAll('article').length, 4)
-    assert.deepEqual([...document.querySelectorAll('[role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
+    assert.deepEqual([...document.querySelectorAll('[aria-label="Trạng thái học tập"] [role="tab"]')].map(h => h.textContent), ['Đang học (4)', 'Đã hoàn thành (2)', 'Chờ xử lý (1)'])
     await act(async () => document.getElementById('learning-tab-completed').click())
     assert.equal(document.querySelectorAll('article').length, 2)
     await act(async () => document.getElementById('learning-tab-pending').click())
