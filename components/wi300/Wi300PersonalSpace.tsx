@@ -13,6 +13,9 @@ import type { Wi300Course, Wi300Enrollment, Wi300TeachingCourse } from './Wi300H
 
 import Wi300TeachingPanel from './Wi300TeachingPanel'
 import useCoursePageSize from './useCoursePageSize'
+import { SpaceSidebar } from './Wi300SpaceMenu'
+import { canUseTool, safeToolUrl, spaceNavigation } from '@/lib/wi300/personal-space'
+export { canUseTool } from '@/lib/wi300/personal-space'
 
 const PaymentModal = dynamic(() => import('@/components/course/PaymentModal'), { ssr: false })
 type Tool = PersonalTool
@@ -54,15 +57,6 @@ function ToolBadge({ tool }: { tool: Pick<Tool, 'slug' | 'url' | 'icon' | 'descr
 }
 const toolTile = 'flex min-h-32 min-w-0 flex-col items-center justify-start gap-3 rounded-2xl border border-brk-outline bg-white p-4 text-center transition-shadow hover:border-brk-primary hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brk-primary'
 
-// Giữ nguyên quy tắc hiển thị công cụ của hệ thống cũ.
-export function canUseTool(role: string, roles: string[]) {
-  return !roles.length || roles.includes(role) || (role === 'ADMIN' && roles.some(r => ['TEACHER', 'AFFILIATE', 'STUDENT'].includes(r))) || (role === 'TEACHER' && roles.some(r => ['AFFILIATE', 'STUDENT'].includes(r)))
-}
-function safeToolUrl(url: string) {
-  if (url.startsWith('/') && !url.startsWith('//') && !url.includes('\\')) return url
-  try { return new URL(url).protocol === 'https:' ? url : null } catch { return null }
-}
-
 export default function Wi300PersonalSpace({ courses, enrollments, userId, userPhone, accountError, teachingCourses = [], teachingError = false }: { teachingCourses?: Wi300TeachingCourse[]; teachingError?: boolean; courses: Wi300Course[]; enrollments: Wi300Enrollment[]; userId: number | null; userPhone: string | null; accountError: boolean }) {
   const { data: session } = useSession()
   const params = useSearchParams()
@@ -81,9 +75,12 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   const [tools, setTools] = useState<Tool[]>([])
   const [toolsError, setToolsError] = useState(false)
   const [toolsLoading, setToolsLoading] = useState(true)
-  const [learningStatus, setLearningStatus] = useState<LearningStatus>('active')
+  const requestedStatus = params.get('status')
+  const [learningStatus, setLearningStatus] = useState<LearningStatus>(requestedStatus === 'completed' || requestedStatus === 'pending' ? requestedStatus : 'active')
   const [learningPage, setLearningPage] = useState(1)
   const [paymentCourseId, setPaymentCourseId] = useState<number | null>(null)
+  // Lối tắt menu mở thẳng nhóm khóa học, không cần bấm thêm tab trạng thái.
+  useEffect(() => { setLearningStatus(requestedStatus === 'completed' || requestedStatus === 'pending' ? requestedStatus : 'active'); setLearningPage(1) }, [requestedStatus])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -154,7 +151,7 @@ export default function Wi300PersonalSpace({ courses, enrollments, userId, userP
   }
 
   return <div className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-4 sm:py-8 lg:px-6"><div className="grid min-w-0 gap-5 lg:grid-cols-[210px_minmax(0,1fr)]">
-    <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start"><nav aria-label="Menu không gian cá nhân" className={`rounded-2xl border border-brk-outline bg-white p-2 grid grid-cols-2 gap-1 sm:flex sm:flex-wrap lg:block lg:p-4`}><p className="mb-3 hidden text-sm font-bold text-brk-muted lg:block">Không gian của tôi</p>{tabs.map(item => <Link key={item.id} href={`/my-space${item.id === 'home' ? '' : `?tab=${item.id}`}`} scroll={false} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} aria-current={tab === item.id ? 'page' : undefined} className={`flex min-h-11 min-w-0 items-center rounded-xl px-3 py-2 text-xs font-semibold sm:text-sm lg:w-full ${tab === item.id ? 'bg-brk-primary text-white' : 'hover:bg-brk-background'}`}>{item.label}</Link>)}</nav></aside>
+    <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start"><SpaceSidebar groups={spaceNavigation(role, permittedTools)} active={tab} route={params.toString()} onNavigate={() => titleRef.current?.scrollIntoView({ block: 'start' })} loading={toolsLoading} failed={toolsError} /></aside>
     <div className="min-w-0 space-y-5"><h1 ref={titleRef} className="scroll-mt-44 break-words text-2xl font-bold sm:text-3xl lg:scroll-mt-24">{tab === 'home' ? 'Tổng quan cá nhân' : tab === 'pages' ? 'Website & nội dung' : tabs.find(item => item.id === tab)?.label}</h1>
       {accountError && <p role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900">Chưa tải được dữ liệu học tập. Vui lòng thử tải lại trang.</p>}
       {tab === 'home' && <>

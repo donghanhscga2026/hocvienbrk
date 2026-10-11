@@ -11,6 +11,7 @@ import { useWi300Brand } from './Wi300BrandContext'
 import { signOutPushCleanup } from '@/lib/web-push-client'
 import { canTeach } from '@/lib/wi300/personal-space'
 import NotificationBell from '@/components/notifications/NotificationBell'
+import Wi300SpaceMenu from './Wi300SpaceMenu'
 import { InstallAppButton } from '@/components/pwa/PwaInstallProvider'
 import { useMbwDashboard } from '@/components/mbw/MbwDashboardContext'
 
@@ -55,7 +56,7 @@ export default function Wi300Header() {
         })}
       </nav>
       <div className="flex shrink-0 items-center justify-end gap-0.5 sm:gap-2">
-        <Link href="/my-space" aria-current={path === '/my-space' ? 'page' : undefined} aria-label="Không gian của tôi" title="Không gian của tôi" className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl border border-brk-outline px-2 text-[11px] font-semibold text-brk-primary hover:bg-brk-background sm:px-3 sm:text-sm"><LayoutGrid className="h-5 w-5 shrink-0" aria-hidden="true" /><span className="hidden sm:inline">Không gian của tôi</span></Link>
+        <Wi300SpaceMenu role={session?.user?.role || 'guest'} actorKey={userId} route={path} onOpen={closeAccount} />
         {/* Cụm hành động nhanh cạnh avatar; không gọi API chia sẻ cho tới khi mở. */}
         {userId != null && <><button type="button" aria-label="Chia sẻ link affiliate" title="Chia sẻ link affiliate" onClick={() => setShowShare(true)} className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-brk-background"><Image src="/Share_Link_3d.png" alt="" width={32} height={32} /></button><NotificationBell /></>}
         {session?.user ? <details ref={accountRef} className="relative" onKeyDown={event => {
