@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Be_Vietnam_Pro } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
@@ -30,10 +30,26 @@ import Wi300Shell from '@/components/wi300/Wi300Shell'
 // font tải trên mọi trang. Font Inter cũng đã bỏ hẳn: trước đây tải kèm toàn
 // site nhưng chỉ dùng đúng 1 chỗ ở CourseCard.tsx, nay đổi sang dùng chung
 // Be Vietnam Pro.
-const beVietnamPro = Be_Vietnam_Pro({
-  weight: ["400", "500", "600", "700", "800", "900"],
-  subsets: ["vietnamese", "latin"],
+// [SELF-HOSTED] Font nằm trong public/fonts, build không còn gọi tới
+// fonts.googleapis.com (trước đây hay fail với lỗi next/font
+// "Cannot read properties of null" làm rớt build).
+const beVietnamPro = localFont({
+  src: [
+    { path: "../public/fonts/be-vietnam-pro-vietnamese-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-vietnamese-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-vietnamese-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-vietnamese-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-vietnamese-800-normal.woff2", weight: "800", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-latin-800-normal.woff2", weight: "800", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-vietnamese-900-normal.woff2", weight: "900", style: "normal" },
+    { path: "../public/fonts/be-vietnam-pro-latin-900-normal.woff2", weight: "900", style: "normal" },
+  ],
   variable: "--font-be-vietnam-pro",
+  display: "swap",
 });
 
 export async function generateMetadata(): Promise<Metadata> {
