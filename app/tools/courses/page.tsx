@@ -53,6 +53,7 @@ function CoursesTab() {
     const [storedTemplates, setStoredTemplates] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [visibilityScope, setVisibilityScope] = useState("shared")
     const [currentUserId, setCurrentUserId] = useState<number | null>(null)
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
     const [batchLoading, setBatchLoading] = useState(false)
@@ -92,7 +93,8 @@ function CoursesTab() {
         if (res.success) {
             setCourses(res.courses || [])
             setIsAdmin(res.isAdmin || false)
-            setCurrentUserId(res.userId || null)
+            setVisibilityScope(res.visibilityScope || "shared")
+            setCurrentUserId(res.userId ?? null)
         }
         setLoading(false)
     }

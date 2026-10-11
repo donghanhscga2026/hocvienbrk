@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CalendarClock, Check, ChevronLeft, ChevronRight, BarChart3, GitBranch, LayoutGrid, List, Loader2, Menu, MessageCircle, Plus, RefreshCw, Search, Settings, Users, X } from 'lucide-react'
+import { CalendarClock, Check, ChevronLeft, ChevronRight, BarChart3, GitBranch, LayoutGrid, List, Loader2, Menu, MessageCircle, Plus, RefreshCw, Search, Settings, Users, X, Handshake } from 'lucide-react'
 import CrmDataTools, { CrmWebsitePanel, integrationRequest } from './CrmDataTools'
 import CrmPhaseThree, { CrmEmailConsent } from './CrmPhaseThree'
 import CrmStudents from './CrmStudents'
@@ -11,6 +11,7 @@ import CrmCareForm from './CrmCareForm'
 import CrmRequests from './CrmRequests'
 import CrmDrawer from './CrmDrawer'
 import CrmOverview from './CrmOverview'
+import CrmPartners from './CrmPartners'
 import {
   ACTIVITY_LABELS, CRM_STAGES, CrmContactView, CrmDetail, CrmOpportunityView, CrmOwner, CrmStageValue,
   CrmTaskView, formatCrmDate, isOpenStage, STAGE_LABELS, vietnamInputToIso,
@@ -122,8 +123,8 @@ function TaskForm({ busy, onSave }: { busy: boolean; onSave: (data: Command) => 
 
 export default function CrmWorkspace() {
   const queryView = useSearchParams().get('view')
-  const [tab, setTab] = useState<'overview' | 'contacts' | 'cards' | 'board' | 'tasks' | 'requests' | 'students' | 'reports' | 'tools'>('overview')
-  useEffect(() => { if (queryView === 'requests' || queryView === 'tasks' || queryView === 'contacts' || queryView === 'overview') setTab(queryView) }, [queryView])
+  const [tab, setTab] = useState<'overview' | 'contacts' | 'cards' | 'board' | 'tasks' | 'requests' | 'students' | 'reports' | 'tools' | 'partners'>('overview')
+  useEffect(() => { if (queryView === 'requests' || queryView === 'tasks' || queryView === 'contacts' || queryView === 'overview' || queryView === 'partners') setTab(queryView) }, [queryView])
   // Giữ kiểu xem khách hàng khi chuyển qua các mục chức năng khác.
   const [contactView, setContactView] = useState<'contacts' | 'cards'>('contacts')
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -235,21 +236,22 @@ export default function CrmWorkspace() {
   </button>
 
   const customerSection = tab === 'contacts' || tab === 'cards'
-  const sectionTitle = tab === 'overview' ? 'Tổng quan' : customerSection ? 'Khách hàng / Học viên' : tab === 'requests' ? 'Yêu cầu & phản hồi' : tab === 'board' ? 'Theo bước tư vấn' : tab === 'students' ? 'Đồng bộ học viên' : tab === 'reports' ? 'Báo cáo' : tab === 'tools' ? 'Cài đặt CRM' : 'Công việc'
+  const sectionTitle = tab === 'overview' ? 'Tổng quan' : customerSection ? 'Khách hàng / Học viên' : tab === 'partners' ? 'Đối tác WI300' : tab === 'requests' ? 'Yêu cầu & phản hồi' : tab === 'board' ? 'Theo bước tư vấn' : tab === 'students' ? 'Đồng bộ học viên' : tab === 'reports' ? 'Báo cáo' : tab === 'tools' ? 'Cài đặt CRM' : 'Công việc'
 
-  return <main className="mx-auto max-w-[1600px] p-3 text-slate-800 sm:p-6">
-    <div className="grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
+  return <main className="mx-auto min-h-[75dvh] max-w-[1600px] bg-slate-50/80 p-3 text-slate-800 sm:p-6">
+    <div className="grid items-start gap-4 lg:grid-cols-[224px_minmax(0,1fr)] lg:gap-6">
       {/* Menu chức năng nằm bên trái; trên điện thoại có thể thu gọn. */}
       <aside className="rounded-2xl border border-slate-200 bg-white p-3 lg:sticky lg:top-20">
         <div className="flex items-center justify-between gap-2 px-2 py-2">
           <p className="font-bold text-emerald-800">CRM · Chăm sóc</p>
           <button type="button" className={secondary + ' lg:hidden'} aria-label="Mở hoặc đóng menu CRM" aria-expanded={menuOpen} aria-controls="crm-sidebar-menu" onClick={() => setMenuOpen(value => !value)}><Menu size={18} />Menu</button>
         </div>
-        <nav id="crm-sidebar-menu" aria-label="Các mục CRM" className={(menuOpen ? 'grid' : 'hidden') + ' mt-2 gap-2 lg:grid'}>
+        <nav id="crm-sidebar-menu" aria-label="Các mục CRM" className={(menuOpen ? 'grid' : 'hidden') + ' mt-2 gap-1 lg:grid'}>
           {([
             { key: 'overview', label: 'Tổng quan', icon: LayoutGrid },
             { key: 'contacts', label: 'Khách hàng / Học viên', icon: Users },
             { key: 'requests', label: 'Yêu cầu & phản hồi', icon: MessageCircle },
+            { key: 'partners', label: 'Đối tác WI300', icon: Handshake },
             { key: 'board', label: 'Tư vấn & công việc', icon: GitBranch },
             { key: 'reports', label: 'Báo cáo', icon: BarChart3 },
             { key: 'tools', label: 'Cài đặt CRM', icon: Settings },
@@ -257,7 +259,7 @@ export default function CrmWorkspace() {
             const active = item.key === 'contacts' ? customerSection : item.key === 'board' ? tab === 'board' || tab === 'tasks' : item.key === 'tools' ? tab === 'tools' || tab === 'students' : tab === item.key
             const Icon = item.icon
             const count = item.key === 'requests' ? newRequests : item.key === 'board' ? tasks.stats.overdue || tasks.stats.today : null
-            return <button key={item.key} type="button" aria-current={active ? 'page' : undefined} className={'flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-emerald-600 ' + (active ? 'bg-emerald-700 font-semibold text-white' : 'text-slate-600 hover:bg-slate-100')} onClick={() => { setTab(item.key === 'contacts' ? contactView : item.key === 'tools' && !actor?.isAdmin ? 'students' : item.key); if (item.key === 'board') { setGroup('all'); setUnscheduled(false); setPage(1) } setMenuOpen(false) }}>
+            return <button key={item.key} type="button" aria-current={active ? 'page' : undefined} className={'flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-emerald-600 ' + (active ? 'bg-emerald-50 font-semibold text-emerald-900 ring-1 ring-inset ring-emerald-100' : 'text-slate-600 hover:bg-slate-100')} onClick={() => { setTab(item.key === 'contacts' ? contactView : item.key === 'tools' && !actor?.isAdmin ? 'students' : item.key); if (item.key === 'board') { setGroup('all'); setUnscheduled(false); setPage(1) } setMenuOpen(false) }}>
               <Icon size={18} className="shrink-0" /><span className="min-w-0 flex-1">{item.label}</span>
               {count != null && count > 0 && <span aria-label={item.key === 'requests' ? count + ' yêu cầu mới' : count + (tasks.stats.overdue ? ' công việc quá hạn' : ' công việc đến hạn hôm nay')} className={'shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ' + (active ? 'bg-white text-emerald-800' : 'bg-amber-100 text-amber-900')}>{count}</span>}
             </button>
@@ -266,27 +268,27 @@ export default function CrmWorkspace() {
         <p className="hidden px-2 pt-3 text-xs leading-relaxed text-slate-500 lg:block">Ưu tiên yêu cầu mới và công việc đến hạn.</p>
       </aside>
       <section aria-label={sectionTitle} className="min-w-0 space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-lg font-bold sm:text-2xl">CRM · Chăm sóc & hỗ trợ</h1><p className="mt-1 hidden text-sm text-slate-500 sm:block">Biết khách đang ở đâu và việc cần làm tiếp theo.</p></div><button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="mb-1 text-xs font-medium text-slate-400">CRM · Chăm sóc & hỗ trợ</p><h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{sectionTitle}</h1><p className="mt-1 text-xs leading-5 text-slate-500">{tab === "overview" ? "Yêu cầu chờ phản hồi, lịch đến hạn và những cập nhật mới nhất." : tab === "partners" ? "Theo dõi doanh nghiệp, giảng viên và kết quả hợp tác." : "Thông tin và công việc trong phạm vi phụ trách của bạn."}</p></div>{customerSection && <button disabled={!actor || busy} className={button} onClick={() => { setCreate(true); setError(''); setNotice('') }}><Plus size={18} />Thêm khách</button>}</div>
     {feedback}
     {(tab === 'tasks' || tab === 'board') && <div className="grid grid-cols-3 gap-2 sm:gap-4">{[
       { label: 'Việc hôm nay', value: tasks.stats.today, run: () => { setTab('tasks'); setDue('today'); setTaskPage(1) } },
       { label: 'Việc quá hạn', value: tasks.stats.overdue, run: () => { setTab('tasks'); setDue('overdue'); setTaskPage(1) } },
       { label: 'Cần lịch tiếp theo', value: tasks.stats.unscheduled, run: () => { setTab('contacts'); setUnscheduled(true); setGroup('all'); setArchived(false); setStage(''); setSource(''); setTag(''); setOwner(''); setSearch(''); setQuery(''); setPage(1) } },
     ].map(item => <button key={item.label} className="rounded-2xl border border-slate-200 bg-white p-3 text-left sm:p-4" onClick={item.run}><div className="text-2xl font-bold text-emerald-800">{item.value}</div><div className="mt-1 text-xs sm:text-sm">{item.label}</div></button>)}</div>}
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-xl font-bold">{sectionTitle}</h2>{customerSection && <p className="mt-1 text-sm text-slate-500">Xem khóa học, tiến độ và việc chăm sóc tiếp theo.</p>}</div>
+    {customerSection && <div className="flex flex-wrap items-center justify-between gap-3">
+      {customerSection && <p className="text-xs text-slate-500">Xem khóa học, tiến độ và việc chăm sóc tiếp theo.</p>}
       {/* Hai kiểu xem dùng chung danh sách, bộ lọc và phân trang. */}
       {customerSection && <div role="group" aria-label="Kiểu xem khách hàng" className="ml-auto flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
         {([{ key: 'contacts', label: 'Danh sách', icon: List }, { key: 'cards', label: 'Dạng thẻ', icon: LayoutGrid }] as const).map(item => <button key={item.key} type="button" aria-pressed={tab === item.key} className={tab === item.key ? button : secondary} onClick={() => { setContactView(item.key); setTab(item.key) }}><item.icon size={16} />{item.label}</button>)}
       </div>}
-    </div>
+    </div>}
     {/* Giữ component đồng bộ được mount để bảo toàn hành vi cập nhật học viên khi vào CRM. */}
     <div hidden={tab !== 'students'}>
       {actor && <CrmStudents actorId={actor.id} isAdmin={actor.isAdmin} onChanged={() => setRevision(value => value + 1)} />}
     </div>
     {(tab === 'board' || tab === 'tasks') && <div className="flex gap-2">{([{ id: 'board', label: 'Cơ hội tư vấn' }, { id: 'tasks', label: 'Công việc & lịch hẹn' }] as const).map(item => <button key={item.id} className={tab === item.id ? button : secondary} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>}
     {(tab === 'tools' || tab === 'students') && <div className="flex flex-wrap gap-2"><button className={tab === 'students' ? button : secondary} onClick={() => setTab('students')}>Đồng bộ học viên</button>{actor?.isAdmin && <button className={tab === 'tools' ? button : secondary} onClick={() => setTab('tools')}>Dữ liệu & tự động hóa</button>}</div>}
-    {tab === 'overview' ? <CrmOverview revision={revision} onOpen={open} onTasks={value => { setTab('tasks'); setDue(value); setTaskPage(1) }} /> : tab === 'students' ? <p className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">Học viên đăng ký khóa của giáo viên nào sẽ được đồng bộ vào CRM của giáo viên đó. Xem kết quả trong mục Khách hàng / Học viên.</p> : tab === 'reports' ? actor && <div className="space-y-5"><CrmOverview report revision={revision} onOpen={open} onTasks={value => { setTab('tasks'); setDue(value); setTaskPage(1) }} /><CrmPhaseThree key="reports" section="reports" isAdmin={actor.isAdmin} owners={owners} onChanged={() => setRevision(value => value + 1)} onOpen={open} onUnscheduled={() => { setTab('contacts'); setUnscheduled(true); setGroup('all'); setPage(1) }} /></div> : tab === 'tools' ? actor?.isAdmin && <div className="space-y-4"><p className="text-sm text-slate-500">Nhập khách, kết nối form website, chuẩn bị email và thiết lập tự động hóa.</p><CrmDataTools owners={owners} actorId={actor.id} onChanged={() => setRevision(value => value + 1)} /><CrmPhaseThree key="tools" section="tools" isAdmin owners={owners} onChanged={() => setRevision(value => value + 1)} onOpen={open} onUnscheduled={() => { setTab('contacts'); setUnscheduled(true); setGroup('all'); setPage(1) }} /></div> : tab === 'requests' ? <CrmRequests owners={owners} isAdmin={actor?.isAdmin} onChanged={() => setRevision(v => v + 1)} onOpen={open} /> : tab !== 'tasks' ? <>
+    {tab === 'overview' ? <CrmOverview revision={revision} onOpen={open} onTasks={value => { setTab('tasks'); setDue(value); setTaskPage(1) }} /> : tab === 'partners' ? <CrmPartners owners={owners} isAdmin={actor?.isAdmin} revision={revision} /> : tab === 'students' ? <p className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">Học viên đăng ký khóa của giáo viên nào sẽ được đồng bộ vào CRM của giáo viên đó. Xem kết quả trong mục Khách hàng / Học viên.</p> : tab === 'reports' ? actor && <div className="space-y-5"><CrmOverview report revision={revision} onOpen={open} onTasks={value => { setTab('tasks'); setDue(value); setTaskPage(1) }} /><CrmPhaseThree key="reports" section="reports" isAdmin={actor.isAdmin} owners={owners} onChanged={() => setRevision(value => value + 1)} onOpen={open} onUnscheduled={() => { setTab('contacts'); setUnscheduled(true); setGroup('all'); setPage(1) }} /></div> : tab === 'tools' ? actor?.isAdmin && <div className="space-y-4"><p className="text-sm text-slate-500">Nhập khách, kết nối form website, chuẩn bị email và thiết lập tự động hóa.</p><CrmDataTools owners={owners} actorId={actor.id} onChanged={() => setRevision(value => value + 1)} /><CrmPhaseThree key="tools" section="tools" isAdmin owners={owners} onChanged={() => setRevision(value => value + 1)} onOpen={open} onUnscheduled={() => { setTab('contacts'); setUnscheduled(true); setGroup('all'); setPage(1) }} /></div> : tab === 'requests' ? <CrmRequests owners={owners} isAdmin={actor?.isAdmin} onChanged={() => setRevision(v => v + 1)} onOpen={open} /> : tab !== 'tasks' ? <>
       {customerSection && <div className="space-y-2"><div role="group" aria-label="Nhóm khách hàng" className="flex gap-2 overflow-x-auto pb-1 [&>button]:shrink-0">{([{ key: 'attention', label: 'Cần theo dõi' }, { key: 'all', label: 'Tất cả hồ sơ' }, { key: 'students', label: 'Học viên' }, { key: 'consultation', label: 'Khách cần tư vấn' }] as const).map(item => <button key={item.key} type="button" aria-pressed={group === item.key} className={group === item.key ? button : secondary} onClick={() => { setGroup(item.key); setPage(1) }}>{item.label}</button>)}</div><p className="text-xs text-slate-500">{group === 'attention' ? 'Có yêu cầu đang mở, công việc chưa hoàn thành hoặc cơ hội tư vấn đang theo dõi.' : group === 'students' ? 'Hồ sơ học viên đồng bộ và khách đã liên kết tài khoản có đăng ký khóa học trong phạm vi phụ trách.' : group === 'consultation' ? 'Có cơ hội tư vấn chưa kết thúc. Học viên cũng có thể thuộc nhóm này khi cần tư vấn thêm.' : 'Tất cả hồ sơ trong phạm vi phụ trách và bộ lọc hiện tại.'}</p></div>}
       <form className="grid items-end gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto]" onSubmit={e => { e.preventDefault(); setSearch(query); resetPage() }}>
         <Field label="Tìm tên, email hoặc điện thoại"><div className="flex gap-2"><input className={input} value={query} onChange={e => setQuery(e.target.value)} maxLength={150} /><button aria-label="Tìm khách" className={secondary}><Search size={18} /></button></div></Field>

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { getCurrentDeploymentBrand } from '@/lib/site-profile/deployment-runtime'
 import prisma from '@/lib/prisma'
 import { auth } from '@/auth'
 import { getCrmActor } from '@/lib/crm/auth'
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     if(domain && raw?.courseId !== undefined) { if(typeof raw.courseId!=='number') return crmResponse({error:'Chọn khóa học của website.'},400); await requireDomainCourse(raw.courseId) }
     const session = await auth()
     const userId = session?.user?.id == null ? null : Number(session.user.id)
-    const result = await createRequest(prisma, raw, userId != null && Number.isInteger(userId) && userId >= 0 ? userId : null, request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown', domain && domain.profile.userId != null ? { ownerId: domain.profile.userId, source: 'Website: ' + domain.hostname } : undefined)
+    const result = await createRequest(prisma, raw, userId != null && Number.isInteger(userId) && userId >= 0 ? userId : null, request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown', domain && domain.profile.userId != null ? { ownerId: domain.profile.userId, source: 'Website: ' + domain.hostname } : undefined, !!await getCurrentDeploymentBrand())
     return crmResponse(result, 201)
   } catch (e) { return crmFailure(e) }
 }

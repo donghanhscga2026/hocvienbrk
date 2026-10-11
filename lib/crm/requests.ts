@@ -7,6 +7,8 @@ import { CrmError } from './service'
 import { PARTNER_SOURCE, FEEDBACK_SOURCE, topicScope, requestTopic, requestEvents, partnerOutcome, type RequestTopic } from './request-workflow'
 import { learningSummaries } from './learning'
 import { requestOrigin } from './request-origin'
+import { partnerDetails } from './partner-details'
+import { ensureWi300CourseVisibility } from '../wi300/course-visibility'
 
 export const requestInput = z.object({
   key: z.uuid(), courseId: z.number().int().positive().optional(), lessonId: z.string().max(100).optional(), commentId: z.number().int().positive().optional(),
@@ -37,7 +39,7 @@ export async function readRequests(db: PrismaClient, actor: CrmActor, page: numb
   return { requests: requests.map(row => {
     const { key, ipHash, history, ...safe } = row
     void key; void ipHash
-    return { ...safe, origin: requestOrigin(row, lessonTitles.get(row.courseId + ':' + row.lessonId) || null), topic: requestTopic(row), events: requestEvents(history), outcome: partnerOutcome(history), contactId: row.contactId != null && accessible.has(row.contactId) ? row.contactId : null }
+    return { ...safe, origin: requestOrigin(row, lessonTitles.get(row.courseId + ':' + row.lessonId) || null), partner: row.source === PARTNER_SOURCE ? partnerDetails(row.content, history) : null, topic: requestTopic(row), events: requestEvents(history), outcome: partnerOutcome(history), contactId: row.contactId != null && accessible.has(row.contactId) ? row.contactId : null }
   }), total }
 }
 export async function updateRequest(db: PrismaClient, actor: CrmActor, raw: unknown) {
@@ -99,7 +101,7 @@ export async function requestSource(db: PrismaClient, actor: CrmActor, id: strin
   const submission=await db.crmFormSubmission.findFirst({where:{requestId:row.id,...(actor.role==='ADMIN'?{}:{ownerId:actor.id})},select:{definitionSnapshot:true,answers:true,formVersion:true,identityStatus:true,createdAt:true}})
   return { lesson, comment, submission }
 }
-export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string, generalContext?: { ownerId: number; source: string }) {
+export async function createRequest(db: PrismaClient, raw: unknown, userId: number | null, address: string, generalContext?: { ownerId: number; source: string }, wi300 = false) {
   const input = requestInput.parse(raw)
   if (userId == null) throw new CrmError('Vui lòng đăng nhập hoặc đăng ký trước khi gửi yêu cầu.', 401)
   if (input.website) return { received: true }
@@ -108,13 +110,16 @@ export async function createRequest(db: PrismaClient, raw: unknown, userId: numb
   const hash = (value: string) => createHmac('sha256', secret).update(value).digest('hex')
   // Stable identity scopes idempotency, but anonymous identity never links an account.
   const ipHash = hash('request-rate:' + new Date().toISOString().slice(0, 10) + ':' + address)
+  if (wi300 && input.courseId != null) await ensureWi300CourseVisibility(db)
   await db.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(70420305)`
     const user = userId == null ? null : await tx.user.findUnique({ where: { id: userId }, select: { id: true, name: true, email: true, phone: true } })
     if (userId != null && !user) throw new CrmError('Vui lòng đăng nhập lại.', 401)
-    const course = input.courseId == null ? null : await tx.course.findFirst({ where: { id: input.courseId, status: true }, select: { id: true, teacherId: true, teacher: { select: { role: true } } } })
+    const preference = wi300 && input.courseId != null ? await tx.systemConfig.findUnique({ where: { key: 'wi300:course-visibility:' + input.courseId }, select: { value: true } }) : null
+    const course = input.courseId == null ? null : await tx.course.findFirst({ where: { id: input.courseId, ...(wi300 ? {} : { status: true }) }, select: { id: true, teacherId: true, teacher: { select: { role: true } } } })
     if (input.courseId != null && !course) throw new CrmError('Khóa học không còn nhận yêu cầu.', 404)
     const enrollment = course && user ? await tx.enrollment.findUnique({ where: { userId_courseId: { userId: user.id, courseId: course.id } }, select: { status: true } }) : null
+    if (wi300 && course && preference?.value !== true && (!enrollment || !['ACTIVE', 'PENDING'].includes(enrollment.status))) throw new CrmError('Khóa học không còn nhận yêu cầu.', 404)
     if (!input.feedback && (input.category === 'LEARNING' || (input.category === 'SUPPORT' && course)) && (!user || !enrollment || !['ACTIVE', 'PENDING'].includes(enrollment.status))) throw new CrmError('Cần đăng nhập và đăng ký khóa học để gửi hỗ trợ.', 403)
     if (input.lessonId && (!course || !await tx.lesson.findFirst({ where: { id: input.lessonId, courseId: course.id }, select: { id: true } }))) throw new CrmError('Bài học không thuộc khóa này.')
     if (input.lessonId && (!user || enrollment?.status !== 'ACTIVE')) throw new CrmError('Cần quyền học để gửi yêu cầu từ bài học.', 403)

@@ -13,7 +13,7 @@ const placeholder = { __esModule: true, default: () => null }
 const overrides = {
   'next/link': { __esModule: true, default: ({ children, scroll, onNavigate, ...props }) => React.createElement('a', props, children) },
   'next/image': { __esModule: true, default: ({ unoptimized, ...props }) => React.createElement('img', props) },
-  'next/navigation': { useSearchParams: () => query, useRouter: () => ({ refresh() {}, push() {} }) },
+  'next/navigation': { useSearchParams: () => query, useRouter: () => ({ refresh() {}, push() {}, replace() {} }) },
   'next-auth/react': { useSession: () => ({ data: signedIn ? { user: { id: 3, role: 'STUDENT' } } : null }) },
   './CrmDataTools': { ...placeholder, CrmWebsitePanel: () => null },
   './CrmPhaseThree': { ...placeholder, CrmEmailConsent: () => null },
@@ -32,14 +32,17 @@ function load(file) {
 }
 const owners = [{ id: 0, name: 'Điều phối WI300', email: 'admin@example.com' }, { id: 1, name: 'Nguyễn Mai', email: 'teacher@example.com' }]
 const rows = ['PARTNER','LEARNING','SUPPORT','ACCOUNT','FEEDBACK'].map((topic, index) => ({ id: '00000000-0000-4000-8000-00000000000' + (index + 1), contactId: null, ownerId: index < 2 ? 1 : null, name: ['Lê Minh Anh','Phạm Hà','Nguyễn Hồng','Trần Quân','Mai Ngọc'][index], email: 'member@example.com', phone: '+84912345678', userId: topic === 'ACCOUNT' ? null : 3, category: topic === 'LEARNING' ? 'LEARNING' : 'SUPPORT', topic, source: topic === 'PARTNER' ? 'Wi300: Đăng ký đối tác' : 'Yêu cầu thành viên', status: index ? 'NEW' : 'IN_PROGRESS', content: ['Đăng ký: Giảng viên và doanh nghiệp. Tôi muốn hợp tác giảng dạy về chuyển đổi số.', 'Nhờ giải thích thêm ví dụ ở bài 3 trong khóa xây dựng thương hiệu.', 'Tôi cần hỗ trợ tìm tài liệu và lộ trình phù hợp.', 'Tôi không nhận được mã xác minh khi tạo tài khoản.', 'Góp ý cách sắp xếp phần học tập trên điện thoại.'][index], resolution: 'Đã kiểm tra hồ sơ, chờ bổ sung thông tin.', publicReply: '', version: 1, createdAt: '2026-10-11T06:30:00Z', lessonId: null, course: null, outcome: 'MORE_INFO', events: [] }))
+rows[0].partner = { kind: 'BOTH', organization: 'Wi.Tech', expertise: 'Chuyển đổi số', proposal: 'Phối hợp đào tạo AI cho doanh nghiệp', portfolio: '', legacy: false }
 const contacts = rows.slice(0,3).map((row,index) => ({ id: index+1, name: row.name, email: row.email, phone: row.phone, source: 'Thành viên WI300', needs: 'Quan tâm ứng dụng AI trong doanh nghiệp', tags: [], ownerId: 1, owner: owners[1], archived: false, version: 1, lastContactAt: null, updatedAt: row.createdAt, opportunities: [{ id: index+1, title: 'Tư vấn khóa AI', stage: 'QUALIFIED', amount: 1000000, version: 1, lostReason: '' }], tasks: [{ id: index+1, title: 'Gọi lại trao đổi lộ trình', dueAt: '2026-10-12T02:00:00Z', completedAt: null }], learning: [{ courseId: 10+index, title: 'Ứng dụng AI trong công việc và phát triển doanh nghiệp', slug: 'ai-business', status: 'ACTIVE', completed: index+2, total: 10, lastActivityAt: row.createdAt, lastLesson: 'Bài 3' }], pendingRequests: index+1 }))
 contacts[0].studentProfile = true
 contacts[0].learning.push({ ...contacts[0].learning[0], courseId: 99, title: 'Khóa thứ hai', completed: 8 })
 global.fetch = async (url, options = {}) => {
   calls.push({ url: String(url), options })
   let data
-  if (options.method === 'PATCH') data = { updated: true }
+  if (String(url).includes('/api/crm/requests/bulk')) { const body = JSON.parse(options.body); data = body.action === 'SELECT' ? { items: rows.map(({ id, version }) => ({ id, version })) } : { updated: body.items.length, failed: 0, results: body.items.map(item => ({ id: item.id, updated: true })) } }
+  else if (options.method === 'PATCH') data = { updated: true }
   else if (String(url).includes('profileId=')) data = { profile: { id: 3, name: rows[0].name, image: null, role: 'STUDENT', learning: contacts[0].learning, teaching: [], related: [] } }
+  else if (String(url).includes('/api/crm/partners')) data = { partners: rows.slice(0, 2).map(row => ({ ...row, partner: { kind: 'BUSINESS', organization: 'Wi.Tech', expertise: 'Chuyển đổi số', proposal: 'Phối hợp tổ chức khóa học AI cho doanh nghiệp', legacy: false } })), total: 42, stats: { new: 12, unassigned: 7, moreInfo: 3, accepted: 9 } }
   else if (String(url).includes('/api/crm/requests')) data = { requests: rows, total: rows.length }
   else if (String(url).includes('/api/crm/automation')) data = { from: '2026-09-11', to: '2026-10-11', contacts: 25, verifiedPayments: 3, verifiedAmount: 1500000, sources: Array.from({ length: 12 }, (_, i) => ({ label: 'Nguồn ' + i, count: i + 1 })), owners: Array.from({ length: 15 }, (_, i) => ({ label: 'Phụ trách ' + i, count: i + 1 })), stages: [] }
   else if (String(url).includes('view=overview')) data = { stats: { newRequests: 42, processing: 7, resolved: 12, overdue: 1, today: 3, completed: 8 }, queue: rows.slice(0, 3), appointments: [], recent: rows.slice(0, 3).map(row => ({ ...row, updatedAt: row.createdAt })), generatedAt: rows[0].createdAt }
@@ -67,7 +70,21 @@ async function run() {
   await act(async () => root.render(React.createElement(Inbox, { owners, isAdmin: true, onChanged() {} })))
   ok(document.body.textContent.includes('Hỗ trợ tài khoản') && document.body.textContent.includes('Đăng ký đối tác'), 'Topics distinguish account support and partner requests')
   snapshot('requests')
-  await click([...document.querySelectorAll('button')].find(node => node.textContent.includes(rows[0].name)))
+  await click(document.querySelector('input[aria-label="Chọn yêu cầu của ' + rows[0].name + '"]'))
+  ok(document.querySelector('[aria-label="Thao tác yêu cầu đã chọn"]').textContent.includes('Đã chọn 1'), 'Selecting card exposes bulk actions')
+  await click(button('Giao phụ trách'))
+  const ownerSelect = document.querySelector('dialog select')
+  await act(async () => { ownerSelect.value = '0'; ownerSelect.dispatchEvent(new window.Event('change', { bubbles: true })) })
+  await click(button('Xác nhận cập nhật'))
+  const bulkCall = calls.filter(call => call.url.includes('/bulk') && JSON.parse(call.options.body).action === 'ASSIGN').at(-1)
+  ok(JSON.parse(bulkCall.options.body).ownerId === 0 && JSON.parse(bulkCall.options.body).items[0].version === 1, 'Bulk assignment keeps admin zero and selection version')
+  await click(button('Chọn toàn bộ kết quả lọc'))
+  ok(document.querySelector('[aria-label="Thao tác yêu cầu đã chọn"]').textContent.includes('Đã chọn 5'), 'Select all uses full server snapshot')
+  await click(button('Hoàn tất'))
+  ok(document.querySelector('dialog textarea').required, 'Bulk completion requires an explicit result')
+  await click(document.querySelector('button[aria-label="Đóng hồ sơ"]'))
+  await click(button('Bỏ chọn'))
+  await click([...document.querySelectorAll('button')].find(node => node.textContent.includes(rows[0].partner.organization)))
   ok(document.querySelector('dialog').open, 'Request opens accessible drawer')
   ok(document.querySelector('textarea').value.includes('Đã kiểm tra'), 'Internal notes retained')
   const reply = document.querySelectorAll('textarea')[1]
@@ -76,7 +93,7 @@ async function run() {
   await click(button('Nhắc người phụ trách'))
   const reminder = calls.filter(call => call.options.method === 'PATCH').at(-1)
   ok(JSON.parse(reminder.options.body).action === 'REMIND' && !('resolution' in JSON.parse(reminder.options.body)), 'Reminder sends no note or reply payload')
-  await click([...document.querySelectorAll('button')].find(node => node.textContent.includes(rows[0].name)))
+  await click([...document.querySelectorAll('button')].find(node => node.textContent.includes(rows[0].partner.organization)))
   await click(button('Hồ sơ người gửi'))
   ok(document.body.textContent.includes('Thành viên #3') && document.body.textContent.includes('Học viên'), 'Sender profile shows actual role')
   ok(calls.some(call => call.url.includes('profileId=' + rows[0].id)), 'Profile lookup anchors request, never arbitrary user ID')
@@ -98,7 +115,7 @@ async function run() {
   await click([...document.querySelectorAll('button')].find(node => node.textContent === contacts[0].name))
   ok(document.querySelector('dialog').open && document.querySelector('[aria-label="Các phần hồ sơ CRM"]'), 'Contact uses drawer with profile sections')
   snapshot('contact-drawer')
-  ok(!document.querySelector('dialog input'), 'Profile opens read-only without an editing form')
+  ok(!document.querySelector('dialog input:not([type=checkbox])'), 'Profile opens read-only without an editing form')
   await click(button('Chỉnh hồ sơ CRM'))
   ok([...document.querySelectorAll('dialog input')].filter(node => node.readOnly).length === 3, 'Account-linked name email and phone are locked')
   await click(button('Đóng chỉnh sửa'))
@@ -115,6 +132,14 @@ async function run() {
   snapshot('reports')
   await click(button('Xem thêm nguồn & người phụ trách'))
   ok(document.body.textContent.includes('Phụ trách 0'), 'Full report groups remain accessible on explicit expansion')
+  query = new URLSearchParams('view=partners')
+  await act(async () => root.render(React.createElement(Workspace)))
+  ok(document.querySelector('nav[aria-label="Nhóm đối tác"]'), 'Partner area has separate business/teacher/both tabs')
+  ok(document.body.textContent.includes('42 hồ sơ'), 'Partner total is whole filtered scope')
+  snapshot('partners')
+  await click(button('Đăng ký cả hai'))
+  ok(calls.at(-1).url.includes('kind=BOTH') && calls.at(-1).url.includes('page=1'), 'Partner kind changes reset pagination and query server')
+  ok(document.querySelector('a[href*="view=requests&request="]'), 'Partner opens existing handling/profile drawer through anchored request')
   await act(async () => root.unmount())
   dom.window.close()
   console.log(JSON.stringify({ result: 'passed', assertions: checks, scope: 'Real React components with isolated fetch fixtures' }))

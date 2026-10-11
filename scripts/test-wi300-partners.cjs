@@ -40,6 +40,8 @@ async function run() {
   assert.equal(rows.length, 1, 'Retry does not duplicate request')
   assert.equal(rows[0].userId, 0, 'Account zero is valid')
   assert.equal(rows[0].ownerId, null)
+  assert.equal(rows[0].history[0].partner.kind, 'TEACHER')
+  assert.equal(rows[0].history[0].partner.proposal, input.proposal)
   assert.equal(rows[0].phone, '+84901234567')
   assert.equal(rows[0].category, 'CONSULTATION')
   assert.equal(rows[0].source, service.PARTNER_SOURCE)
@@ -81,7 +83,7 @@ async function run() {
     if (options?.method === 'POST') { sent = JSON.parse(options.body); posts++; return { ok: !fail, json: async () => fail ? { error: 'Thử lại' } : { received: true } } }
     return { ok: true, json: async () => ({ requests: [{ id: 'r1', content: 'Đăng ký: Giảng viên\nNội dung mẫu', status: 'IN_PROGRESS', publicReply: 'Hẹn trao đổi trực tiếp.', createdAt: '2026-10-09T12:00:00Z' }], total: 1 }) }
   }
-  const Form = load('components/wi300/Wi300PartnerForm.tsx').default
+  const Form = load('components/wi300/Wi300PartnerForm.tsx', { 'next/link': { __esModule: true, default: ({ children, ...props }) => React.createElement('a', props, children) } }).default
   const root = createRoot(document.getElementById('root'))
   try {
     await React.act(async () => root.render(React.createElement(Form, { name: 'Lucy', phone: '0901234567' })))

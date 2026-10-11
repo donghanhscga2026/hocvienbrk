@@ -11,6 +11,8 @@ import { requireCourseAccessAction } from "@/lib/course/permissions"
 import { resolveCourseCategoryName } from "@/lib/course/category"
 import { canPinAnotherCourse, PIN_LIMIT_ERROR } from "@/lib/course/pin-limit"
 import { formatCourseSaveError } from "@/lib/course/errors"
+import { getCurrentDeploymentBrand } from "@/lib/site-profile/deployment-runtime"
+import { setWi300CourseVisibility, wi300CoursePreferences } from "@/lib/wi300/course-visibility"
 
 // Helper to check admin permission
 async function checkAdmin() {
@@ -1368,8 +1370,11 @@ export async function changeUserIdAction(prevState: any, formData: FormData) {
  */
 export async function getAdminCoursesAction(options?: { teacherId?: number | 'ALL' | 'SELF' }) {
     try {
-        const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-        const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
+        const session = await auth(); if (session?.user?.id == null) return { success: false, error: "Unauthorized" }
+        const userId = Number(session.user.id)
+        const currentUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+        if (!currentUser || ![Role.ADMIN, Role.TEACHER, Role.INSTRUCTOR].includes(currentUser.role as typeof Role.ADMIN)) return { success: false, error: "Unauthorized" }
+        const isAdmin = currentUser.role === Role.ADMIN
 
         let where: Record<string, any>
         if (!options) {
@@ -1383,20 +1388,26 @@ export async function getAdminCoursesAction(options?: { teacherId?: number | 'AL
         }
 
         const courses = await prisma.course.findMany({ where, include: { _count: { select: { lessons: true, enrollments: { where: { status: 'ACTIVE' } } } }, teacher: true, courseCategory: true }, orderBy: { id: 'desc' } })
-        return { success: true, courses, isAdmin, userId }
+        const wi300 = !!await getCurrentDeploymentBrand()
+        const preferences = wi300 ? await wi300CoursePreferences(prisma) : new Map<number, boolean>()
+        return { success: true, courses: courses.map(course => ({ ...course, globalStatus: course.status, status: wi300 ? preferences.get(course.id) ?? false : course.status })), isAdmin, userId, visibilityScope: wi300 ? "wi300" : "shared" }
     } catch (error: any) { return { success: false, error: error.message } }
 }
 
 export async function bulkToggleCourseStatusAction(courseIds: number[], newStatus: boolean) {
     try {
-        const session = await auth(); if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-        const isAdmin = session.user.role === Role.ADMIN; const userId = parseInt(session.user.id)
+        const session = await auth(); if (session?.user?.id == null) return { success: false, error: "Unauthorized" }
+        const userId = Number(session.user.id)
+        const currentUser = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+        if (!currentUser || ![Role.ADMIN, Role.TEACHER, Role.INSTRUCTOR].includes(currentUser.role as typeof Role.ADMIN)) return { success: false, error: "Unauthorized" }
+        const isAdmin = currentUser.role === Role.ADMIN
         if (!isAdmin) return { success: false, error: "Only admin can perform bulk actions" }
 
-        await prisma.course.updateMany({
-            where: { id: { in: courseIds } },
-            data: { status: newStatus }
-        })
+        if (await getCurrentDeploymentBrand()) {
+            await setWi300CourseVisibility(prisma, courseIds, newStatus)
+        } else {
+            await prisma.course.updateMany({ where: { id: { in: courseIds } }, data: { status: newStatus } })
+        }
 
         revalidateTag('site-profile', { expire: 0 })
         return { success: true }
@@ -1417,12 +1428,16 @@ export async function bulkUpdateCoursesOptionsAction(
 ) {
     try {
         const session = await auth()
-        if (!session?.user?.id) return { success: false, error: "Unauthorized" }
-        if (session.user.role !== Role.ADMIN) return { success: false, error: "Only admin can perform bulk actions" }
+        if (session?.user?.id == null) return { success: false, error: "Unauthorized" }
+        const currentUser = await prisma.user.findUnique({ where: { id: Number(session.user.id) }, select: { role: true } })
+        if (currentUser?.role !== Role.ADMIN) return { success: false, error: "Only admin can perform bulk actions" }
 
         // 1. Build scalar update data for Course model
         const courseData: Record<string, any> = {}
-        if (options.status !== undefined) courseData.status = options.status
+        if (options.status !== undefined) {
+            if (await getCurrentDeploymentBrand()) await setWi300CourseVisibility(prisma, courseIds, options.status)
+            else courseData.status = options.status
+        }
         if (options.type !== undefined) courseData.type = options.type
         if (options.feeType !== undefined) courseData.feeType = options.feeType
         if (options.requiresReferralActivation !== undefined) courseData.requiresReferralActivation = options.requiresReferralActivation
@@ -1865,6 +1880,7 @@ export async function updateCourseAction(courseId: number, data: {
         const { denied, ctx } = await requireCourseAccessAction(course.teacherId)
         if (denied) return denied
         const isAdmin = ctx!.isAdmin
+        const wi300 = !!await getCurrentDeploymentBrand()
 
         // ✅ Auto-resolve category name from categoryId
         if (data.categoryId !== undefined) {
@@ -1888,7 +1904,7 @@ export async function updateCourseAction(courseId: number, data: {
             name_lop: data.name_lop ? toTitleCase(data.name_lop) : data.name_lop,
             name_khoa: data.name_khoa ? toTitleCase(data.name_khoa) : null,
             date_join: data.date_join ?? null,
-            status: data.status,
+            status: wi300 ? undefined : data.status,
             mo_ta_ngan: data.mo_ta_ngan ?? null,
             mo_ta_dai: data.mo_ta_dai ?? null,
             link_anh_bia: data.link_anh_bia ?? null,
@@ -1930,6 +1946,8 @@ export async function updateCourseAction(courseId: number, data: {
             data: courseData
         })
 
+        if (wi300 && data.status !== undefined) await setWi300CourseVisibility(prisma, [courseId], data.status)
+
         // Update accepted vouchers
         if (data.acceptedVoucherIds !== undefined) {
             await prisma.courseAcceptedVoucher.deleteMany({ where: { courseId } })
@@ -1953,7 +1971,7 @@ export async function updateCourseAction(courseId: number, data: {
         revalidatePath('/tools/courses')
         revalidatePath('/') // Revalidate trang chủ nếu có đổi tên/giá
         revalidateTag('site-profile', { expire: 0 }) // Clear cache của site-profile (khoá học trên trang chủ)
-        return { success: true, course: updatedCourse }
+        return { success: true, course: { ...updatedCourse, status: wi300 && data.status !== undefined ? data.status : updatedCourse.status } }
     } catch (error: any) {
         console.error("Update Course Error:", error)
         return { success: false, error: formatCourseSaveError(error, data.id_khoa) }

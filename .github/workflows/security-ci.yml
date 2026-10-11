@@ -58,9 +58,13 @@ jobs:
         run: |
           node scripts/test-crm-request-workflow.cjs
           node scripts/test-crm-request-ui.cjs
+          node scripts/test-crm-request-bulk.cjs
           node scripts/test-crm-course-links.cjs
           node scripts/test-wi300-personal-space.cjs
           node scripts/test-wi300-navigation.cjs
+          node scripts/test-wi300-partners.cjs
+          node scripts/test-wi300-catalog-partners.cjs
+          node scripts/test-wi300-performance.cjs
 
       - name: TypeScript check
         run: npx tsc --noEmit

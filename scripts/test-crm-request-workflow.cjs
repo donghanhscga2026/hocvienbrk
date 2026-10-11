@@ -20,7 +20,7 @@ let checks = 0
 const ok = (value, message) => { assert.ok(value, message); checks++ }
 const deny = async (operation, status) => { await assert.rejects(operation, error => error.status === status); checks++ }
 const id = crypto.randomUUID(), teacher = { id: 1, role: 'TEACHER', name: 'Giảng viên' }, admin = { id: 0, role: 'ADMIN', name: 'Quản trị' }
-let row = { id, key: 'private-key', ipHash: 'private-ip', userId: 3, contactId: null, courseId: null, ownerId: null, category: 'CONSULTATION', source: workflow.PARTNER_SOURCE, version: 1, status: 'NEW', resolution: '', publicReply: '', history: [], name: 'Người gửi' }, notifications = [], users = [{ id: 0, role: 'ADMIN' }, { id: 1, role: 'TEACHER' }, { id: 2, role: 'TEACHER' }, { id: 3, role: 'STUDENT', name: 'Người gửi', image: null }]
+let row = { id, key: 'private-key', ipHash: 'private-ip', userId: 3, contactId: null, courseId: null, ownerId: null, category: 'CONSULTATION', source: workflow.PARTNER_SOURCE, version: 1, status: 'NEW', resolution: '', publicReply: '', history: [], name: 'Người gửi', content: 'Đăng ký: Doanh nghiệp\nDoanh nghiệp: Wi.Tech' }, notifications = [], users = [{ id: 0, role: 'ADMIN' }, { id: 1, role: 'TEACHER' }, { id: 2, role: 'TEACHER' }, { id: 3, role: 'STUDENT', name: 'Người gửi', image: null }]
 const matches = (where, value = row) => Object.entries(where).every(([key, field]) => key === 'OR' ? field.some(item => matches(item, value)) : key === 'AND' ? field.every(item => matches(item, value)) : key === 'course' ? value.courseId === 10 && field.teacherId === 1 : value[key] === field)
 const fake = {
   crmRequest: {
@@ -107,6 +107,27 @@ async function run() {
   const contact = { id: 12, version: 1, name: 'Account identity', linkedUserId: 3, studentProfile: false, archived: false }
   const tx = { crmContact: { updateMany: async () => ({ count: 1 }), findUniqueOrThrow: async () => contact, update: async () => { throw new Error('Unexpected identity write') } } }
   await deny(() => service.writeCrm({ $transaction: operation => operation(tx) }, admin, validation.crmCommand.parse({ action: 'contact.update', contactId: 12, version: 1, data: { name: 'Changed identity', email: 'member@example.com', phone: '', source: 'Website', needs: '', tags: [], ownerId: null, archived: false } })), 409)
+  // Actual intake function: WI300 visibility controls public requests, while
+  // verified students retain support access after catalog hiding.
+  let preference = false, enrolled = null, intakeWrites = 0
+  const intakeDb = {
+    systemConfig: { findUnique: async ({ where }) => ({ value: where.key === 'wi300:catalog-initialized:v1' ? true : preference }) },
+    user: { findUnique: async () => ({ id: 3, name: 'Student', email: 'student@test.invalid', phone: '' }) },
+    course: { findFirst: async ({ where }) => { assert.equal(where.status, undefined); return { id: 10, teacherId: null, teacher: null } } },
+    enrollment: { findUnique: async () => enrolled },
+    crmRequest: { findUnique: async () => null, count: async () => 0, create: async () => { intakeWrites++ } },
+    $executeRaw: async () => {}, $transaction: async fn => fn(intakeDb),
+  }
+  const intake = { ...input, courseId: 10 }
+  await deny(() => requests.createRequest(intakeDb, intake, 3, 'test', undefined, true), 404)
+  preference = undefined
+  await deny(() => requests.createRequest(intakeDb, intake, 3, 'test', undefined, true), 404)
+  ok(intakeWrites === 0, 'Unset or hidden WI300 course cannot inherit public requests from the original website')
+  preference = true
+  await requests.createRequest(intakeDb, intake, 3, 'test', undefined, true)
+  preference = false; enrolled = { status: 'ACTIVE' }
+  await requests.createRequest(intakeDb, { ...intake, category: 'LEARNING' }, 3, 'test', undefined, true)
+  ok(intakeWrites === 2, 'Explicit WI300 visibility and existing enrolled learning support remain available')
   console.log(JSON.stringify({ result: 'passed', assertions: checks, scope: 'Isolated mocks; no production database writes' }))
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

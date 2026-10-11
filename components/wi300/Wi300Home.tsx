@@ -6,6 +6,7 @@ import { getCurrentSiteProfile, getCourseWhereForProfile } from '@/lib/site-prof
 import type { DeploymentBrand } from '@/lib/site-profile/deployment-brand'
 import Wi300HomeClient from './Wi300HomeClient'
 import { canTeach } from '@/lib/wi300/personal-space'
+import { wi300CoursePreferences, wi300CourseWhere, wi300HiddenLearning } from '@/lib/wi300/course-visibility'
 
 // Chỉ gửi dữ liệu dùng bởi card, bộ lọc và đăng ký; bỏ nội dung dài/email quản trị.
 const courseSelect = {
@@ -35,10 +36,11 @@ export type Wi300Enrollment = {
 // Cùng phạm vi khóa học của SITE_PROFILE_KEY; cache không phụ thuộc nhận diện giao diện.
 const getCatalog = unstable_cache(async (where: Prisma.CourseWhereInput) => prisma.course.findMany({
   where, select: courseSelect, orderBy: [{ pin: 'asc' }, { updatedAt: 'desc' }],
-}), ['wi300-course-catalog-v3'], { tags: ['site-profile'], revalidate: 600 })
+}), ['wi300-course-catalog-v4'], { tags: ['site-profile'], revalidate: 600 })
 
 export default async function Wi300Home({ brand, session, view = 'home' }: { brand: DeploymentBrand; session: Session | null; view?: 'home' | 'catalog' | 'discover' | 'space' }) {
   const userId = session?.user?.id != null ? Number(session.user.id) : null
+  let preferences = new Map<number, boolean>()
   let courses: Wi300Course[] = []
   let enrollments: Wi300Enrollment[] = []
   let userPhone: string | null = null
@@ -61,7 +63,12 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
 
   try {
     const profile = await getCurrentSiteProfile()
-    courses = await getCatalog(getCourseWhereForProfile(profile || { userId: 0 }))
+    preferences = await wi300CoursePreferences(prisma)
+    const enrolledCourseIds = view === 'space' && userId != null && Number.isInteger(userId)
+      ? (await prisma.enrollment.findMany({ where: { userId }, select: { courseId: true } })).map(row => row.courseId) : []
+    // Catalog hiding is independent of existing learning/enrollment access.
+    courses = await getCatalog(wi300CourseWhere(getCourseWhereForProfile(profile || { userId: 0 }), preferences, view !== 'space', enrolledCourseIds))
+    courses = courses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))
   } catch (error) {
     // Không hiển thị khóa học giả hoặc khóa ngoài phạm vi khi database lỗi.
     console.error('[WI300] Không tải được danh mục khóa học', error)
@@ -69,7 +76,7 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
   }
   if (userId != null && Number.isInteger(userId)) {
     try {
-      const [user, rows] = await Promise.all([
+      const [user, rows, hiddenLearning] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
         prisma.enrollment.findMany({ where: { userId, courseId: { in: courses.map(course => course.id) } }, select: {
           id: true, courseId: true, status: true, startedAt: true, hiddenFromGifts: true, updatedAt: true, lastLessonId: true,
@@ -78,12 +85,13 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
           course: { select: { _count: { select: { lessons: true } } } },
           _count: { select: { lessonProgress: { where: { status: 'COMPLETED' } } } },
         } }),
+        wi300HiddenLearning(prisma, userId),
       ])
       userPhone = user?.phone || null
       enrollments = rows.map(row => ({
         id: row.id, courseId: row.courseId, status: row.status, startedAt: row.startedAt,
         completedCount: row._count.lessonProgress, totalLessons: row.course._count.lessons,
-        enrollmentId: row.id, hiddenFromGifts: row.hiddenFromGifts, payment: row.payment || undefined,
+        enrollmentId: row.id, hiddenFromGifts: hiddenLearning.has(row.id), payment: row.payment || undefined,
         lastStudiedAt: row.lastLessonId && row.updatedAt > (row.lessonProgress[0]?.updatedAt || row.updatedAt)
           ? row.updatedAt : row.lessonProgress[0]?.updatedAt || row.updatedAt,
         lastLessonId: row.lastLessonId,
@@ -94,5 +102,5 @@ export default async function Wi300Home({ brand, session, view = 'home' }: { bra
     }
   }
   const { teachingCourses, teachingError } = await teachingReady
-  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
+  return <Wi300HomeClient brand={brand} courses={courses} enrollments={enrollments} teachingCourses={teachingCourses.map(course => ({ ...course, status: preferences.get(course.id) ?? false }))} teachingError={teachingError} userId={userId} userPhone={userPhone} loggedIn={!!session?.user} catalogError={catalogError} accountError={accountError} view={view} />
 }
